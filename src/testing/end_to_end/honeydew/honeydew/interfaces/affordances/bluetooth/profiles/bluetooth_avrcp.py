@@ -27,8 +27,7 @@ class BluetoothAvrcp(bluetooth_common.BluetoothCommon):
         """Publish the media session mock player."""
 
     @abc.abstractmethod
-    def send_avrcp_command(
-            self, command: custom_types.BluetoothAvrcpCommand) -> None:
+    def send_avrcp_command(self, command: custom_types.BluetoothAvrcpCommand) -> None:
         """Send Avrcp command from the sink device."""
 
     @abc.abstractmethod

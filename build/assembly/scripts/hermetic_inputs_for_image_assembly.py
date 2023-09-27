@@ -24,12 +24,13 @@ def get_relative_path(relative_path: str, relative_to_file: str) -> str:
     return path
 
 
-def files_from_package_set(package_set: List[FilePath],
-                           deps: Set[FilePath]) -> Set[FilePath]:
+def files_from_package_set(
+    package_set: List[FilePath], deps: Set[FilePath]
+) -> Set[FilePath]:
     paths: Set[FilePath] = set()
     for manifest in package_set:
         paths.add(manifest)
-        with open(manifest, 'r') as file:
+        with open(manifest, "r") as file:
             package_manifest = json_load(PackageManifest, file)
             blob_sources = []
             for blob in package_manifest.blobs:
@@ -55,25 +56,28 @@ def files_from_package_set(package_set: List[FilePath],
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--image-assembly-config',
+        "--image-assembly-config",
         required=True,
-        help='The path to the image assembly config file')
+        help="The path to the image assembly config file",
+    )
     parser.add_argument(
-        '--output',
+        "--output",
         type=str,
         required=True,
-        help='The path to the first output of the image assembly target')
+        help="The path to the first output of the image assembly target",
+    )
     parser.add_argument(
-        '--depfile',
-        type=argparse.FileType('w'),
+        "--depfile",
+        type=argparse.FileType("w"),
         required=True,
-        help='The path to the depfile for this script')
+        help="The path to the depfile for this script",
+    )
 
     args = parser.parse_args()
     deps: Set[FilePath] = set()
     inputs: Set[FilePath] = set()
 
-    with open(args.image_assembly_config, 'r') as f:
+    with open(args.image_assembly_config, "r") as f:
         config = ImageAssemblyConfig.json_load(f)
 
         # Collect the list of files that are read in this script.
@@ -90,31 +94,31 @@ def main():
         inputs.update([entry.source for entry in config.bootfs_files])
         inputs.add(config.kernel.path)
 
-    with open(args.image_assembly_config, 'r') as f:
+    with open(args.image_assembly_config, "r") as f:
         image_assembly_config = json.load(f)
-        images_config = image_assembly_config['images_config']
-        for image in images_config['images']:
-            if image['type'] == 'vbmeta':
-                if 'key' in image:
-                    inputs.add(image['key'])
-                if 'key_metadata' in image:
-                    inputs.add(image['key_metadata'])
-                inputs.update(image.get('additional_descriptor_files', []))
-            elif image['type'] == 'zbi':
-                if 'postprocessing_script' in image:
-                    script = image['postprocessing_script']
-                    if 'path' in script:
-                        inputs.add(script['path'])
+        images_config = image_assembly_config["images_config"]
+        for image in images_config["images"]:
+            if image["type"] == "vbmeta":
+                if "key" in image:
+                    inputs.add(image["key"])
+                if "key_metadata" in image:
+                    inputs.add(image["key_metadata"])
+                inputs.update(image.get("additional_descriptor_files", []))
+            elif image["type"] == "zbi":
+                if "postprocessing_script" in image:
+                    script = image["postprocessing_script"]
+                    if "path" in script:
+                        inputs.add(script["path"])
 
     if deps:
         dep_file = DepFile(args.output)
         dep_file.update(deps)
         dep_file.write_to(args.depfile)
 
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         for input in inputs:
-            f.write(input + '\n')
+            f.write(input + "\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -55,13 +55,19 @@ def main():
         nargs="*",
         help="Action outputs, to be listed in generated depfile",
     )
-    parser.add_argument("--depfile", required=True, help="Path to output depfile")
-    parser.add_argument("command", nargs=argparse.REMAINDER, help="Action command")
+    parser.add_argument(
+        "--depfile", required=True, help="Path to output depfile"
+    )
+    parser.add_argument(
+        "command", nargs=argparse.REMAINDER, help="Action command"
+    )
 
     args = parser.parse_args()
 
     # Read implicit inputs from file.
-    implicit_inputs = [l.rstrip() for l in args.hermetic_inputs_file.readlines()]
+    implicit_inputs = [
+        l.rstrip() for l in args.hermetic_inputs_file.readlines()
+    ]
 
     # Read command, and remove initial -- if it is found.
     cmd_args = args.command
@@ -87,7 +93,8 @@ def main():
     depfile.parent.mkdir(exist_ok=True, parents=True)
     with depfile.open("w") as f:
         f.write(
-            "%s: %s\n" % (depfile_list(args.outputs), depfile_list(implicit_inputs))
+            "%s: %s\n"
+            % (depfile_list(args.outputs), depfile_list(implicit_inputs))
         )
 
     return 0

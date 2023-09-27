@@ -26,9 +26,11 @@ for gs in group_specs:
 
 
 def main(args):
-    snapshot = Snapshot.FromJSONFile(
-        sys.stdin) if args.snapshot is None else Snapshot.FromJSONFilename(
-            args.snapshot)
+    snapshot = (
+        Snapshot.FromJSONFile(sys.stdin)
+        if args.snapshot is None
+        else Snapshot.FromJSONFilename(args.snapshot)
+    )
     vmo_to_count = {}
     for p in snapshot.processes.values():
         for v in p.vmos:
@@ -37,8 +39,8 @@ def main(args):
             else:
                 vmo_to_count[v.koid] = 1
     nodes = []
-    snaphot_name = 'Snapshot'
-    kernel_name = 'Kernel'
+    snaphot_name = "Snapshot"
+    kernel_name = "Kernel"
     nodes.append(["Orphaned", snaphot_name, 0])
     nodes.append(["Orphaned VMOs", "Orphaned", snapshot.orphaned])
     nodes.append([kernel_name, snaphot_name, 0])
@@ -61,12 +63,14 @@ def main(args):
                         groups[gs[0]] = True
                     break
             vmo_name = "%s<%d:%d>" % (v.name, p.koid, v.koid)
-            nodes.append([
-                vmo_name,
-                process_name if group_name is None else group_name,
-                float(v.committed_bytes) / vmo_to_count[v.koid]
-            ])
-    template = '''\
+            nodes.append(
+                [
+                    vmo_name,
+                    process_name if group_name is None else group_name,
+                    float(v.committed_bytes) / vmo_to_count[v.koid],
+                ]
+            )
+    template = """\
 <html>
   <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -108,19 +112,21 @@ def main(args):
     <div id="chart_div" style="width: 100%%; height: 100%%;"></div>
   </body>
 </html>
-'''
-    node_strings = '\n'.join([
-        "[\'%s\',\'%s\',%.2g]," % (n[0], n[1], round(n[2] / (1024.0 * 1024), 2))
-        for n in nodes
-    ])
+"""
+    node_strings = "\n".join(
+        [
+            "['%s','%s',%.2g]," % (n[0], n[1], round(n[2] / (1024.0 * 1024), 2))
+            for n in nodes
+        ]
+    )
     print(template % node_strings)
 
 
 def get_arg_parser():
-    parser = argparse.ArgumentParser(description='Convert snapshot to tree.')
-    parser.add_argument('-s', '--snapshot')
+    parser = argparse.ArgumentParser(description="Convert snapshot to tree.")
+    parser.add_argument("-s", "--snapshot")
     return parser
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main(get_arg_parser().parse_args())

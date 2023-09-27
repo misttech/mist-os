@@ -31,7 +31,6 @@ class DepFileTests(unittest.TestCase):
     expected = "baz/output: \\\n  ../input_c \\\n  things/input_a \\\n  things/input_b\n"
 
     def test_specified_cwd(self):
-
         output = "/foo/bar/baz/output"
         input_a = "/foo/bar/things/input_a"
         input_b = "/foo/bar/things/input_b"
@@ -62,11 +61,13 @@ class DepFileTests(unittest.TestCase):
         depfile = DepFile("/foo/bar/baz/output", rebase="/foo/bar")
         depfile.update(
             [
-                "/foo/bar/things/input_a", "/foo/bar/things/input_b",
-                "/foo/input_c"
-            ])
+                "/foo/bar/things/input_a",
+                "/foo/bar/things/input_b",
+                "/foo/input_c",
+            ]
+        )
 
-        with tempfile.TemporaryFile('w+') as outfile:
+        with tempfile.TemporaryFile("w+") as outfile:
             # Write out the depfile
             depfile.write_to(outfile)
 
@@ -79,5 +80,6 @@ class DepFileTests(unittest.TestCase):
         depfile = DepFile("foo/bar/baz/output")
         self.assertEqual(str(depfile), "foo/bar/baz/output:\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

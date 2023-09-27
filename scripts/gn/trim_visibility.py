@@ -20,15 +20,15 @@ import gn_util
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Prints which of a target's given visibility list entries are actually needed."
+        description="Prints which of a target's given visibility list entries are actually needed."
     )
     parser.add_argument("--target", help="Target with visibility")
     parser.add_argument(
         "--verbose",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Print progress and stats")
+        help="Print progress and stats",
+    )
     args = parser.parse_args()
 
     if not args.target:

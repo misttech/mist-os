@@ -8,18 +8,17 @@ import json
 import os
 import sys
 
-FUCHSIA_MODULE = 'go.fuchsia.dev/fuchsia'
+FUCHSIA_MODULE = "go.fuchsia.dev/fuchsia"
 
 
 class Source(object):
-
     def __init__(self, name, path, file):
         self.name = name
         self.path = path
         self.file = file
 
     def __str__(self):
-        return '%s[%s]' % (self.name, self.path)
+        return "%s[%s]" % (self.name, self.path)
 
     def __hash__(self):
         return hash((self.name, self.path))
@@ -34,8 +33,8 @@ def get_sources(dep_files, extra_sources=None):
     if extra_sources:
         sources.update(extra_sources)
     for dep in dep_files:
-        with open(dep, 'r') as dep_file:
-            for name, path in json.load(dep_file)['sources'].items():
+        with open(dep, "r") as dep_file:
+            for name, path in json.load(dep_file)["sources"].items():
                 sources.add(Source(name, path, dep))
 
     # Verify duplicates.
@@ -47,8 +46,8 @@ def get_sources(dep_files, extra_sources=None):
             continue
         print('Error: source "%s" has multiple paths.' % name)
         for src in srcs:
-            print(' - %s (%s)' % (src.path, src.file))
-        raise Exception('Could not aggregate sources')
+            print(" - %s (%s)" % (src.path, src.file))
+        raise Exception("Could not aggregate sources")
 
     return {s.name: s.path for s in sources}
 
@@ -56,34 +55,41 @@ def get_sources(dep_files, extra_sources=None):
 def main():
     parser = argparse.ArgumentParser()
     name_group = parser.add_mutually_exclusive_group(required=True)
-    name_group.add_argument('--name', help='Name of the current library')
+    name_group.add_argument("--name", help="Name of the current library")
     name_group.add_argument(
-        '--name-file',
-        help='Path to a file containing the name of the current library')
+        "--name-file",
+        help="Path to a file containing the name of the current library",
+    )
     parser.add_argument(
-        '--root-build-dir',
-        help='Path to the root build directory',
-        required=True)
+        "--root-build-dir",
+        help="Path to the root build directory",
+        required=True,
+    )
     parser.add_argument(
-        '--source-dir',
-        help='Path to the library\'s source directory',
-        required=True)
+        "--source-dir",
+        help="Path to the library's source directory",
+        required=True,
+    )
     sources_group = parser.add_mutually_exclusive_group(required=True)
     sources_group.add_argument(
-        '--sources', help='List of source files', nargs='*')
+        "--sources", help="List of source files", nargs="*"
+    )
     sources_group.add_argument(
-        '--allow-globbing',
-        action='store_true',
-        help='Allow globbing the entire source directory')
+        "--allow-globbing",
+        action="store_true",
+        help="Allow globbing the entire source directory",
+    )
     parser.add_argument(
-        '--output', help='Path to the file to generate', required=True)
+        "--output", help="Path to the file to generate", required=True
+    )
     parser.add_argument(
-        '--deps', help='Dependencies of the current library', nargs='*')
+        "--deps", help="Dependencies of the current library", nargs="*"
+    )
     args = parser.parse_args()
     if args.name:
         name = args.name
     elif args.name_file:
-        with open(args.name_file, 'r') as name_file:
+        with open(args.name_file, "r") as name_file:
             name = name_file.read()
 
     build_dir = os.path.abspath(args.root_build_dir)
@@ -91,12 +97,12 @@ def main():
     # Find source_root from library source_dir, i.e. do not assume
     # that the build directory is two levels down the source root
     source_root = build_dir
-    while not os.path.exists(os.path.join(source_root, '.jiri_manifest')):
+    while not os.path.exists(os.path.join(source_root, ".jiri_manifest")):
         source_root = os.path.dirname(source_root)
-        if source_root in ('', '/'):
-            parser.error('Cannot find Fuchsia source directory!')
+        if source_root in ("", "/"):
+            parser.error("Cannot find Fuchsia source directory!")
 
-    third_party_dir = os.path.join(source_root, 'third_party')
+    third_party_dir = os.path.join(source_root, "third_party")
 
     # For Fuchsia sources, the declared package name must correspond to the
     # source directory so that raw `go` commands (e.g., as an IDE would use) can
@@ -105,13 +111,20 @@ def main():
     # `FUCHSIA_MODULE`; all packages should use absolute names that start with
     # the module name.
     if name.startswith(FUCHSIA_MODULE) and not os.path.abspath(
-            args.source_dir).startswith((build_dir, third_party_dir)):
-        expected_name = FUCHSIA_MODULE + '/' + os.path.relpath(
-            args.source_dir, source_root).replace(os.path.sep, '/')
-        if name not in (expected_name, expected_name + '/...'):
+        args.source_dir
+    ).startswith((build_dir, third_party_dir)):
+        expected_name = (
+            FUCHSIA_MODULE
+            + "/"
+            + os.path.relpath(args.source_dir, source_root).replace(
+                os.path.sep, "/"
+            )
+        )
+        if name not in (expected_name, expected_name + "/..."):
             raise ValueError(
-                f'go_library name must correspond to the source dir: '
-                f'got {name!r}, expected {expected_name!r}')
+                f"go_library name must correspond to the source dir: "
+                f"got {name!r}, expected {expected_name!r}"
+            )
 
     current_sources = []
     if args.sources:
@@ -119,11 +132,12 @@ def main():
             p = os.path.join(args.source_dir, source)
             # Explicit sources must be files.
             if not os.path.isfile(p):
-                raise ValueError(f'Source {p} is not a file')
+                raise ValueError(f"Source {p} is not a file")
             current_sources.append(
-                Source(os.path.join(name, source), p, args.output))
-        if not name.endswith('/...'):
-            go_sources = {f for f in args.sources if f.endswith('.go')}
+                Source(os.path.join(name, source), p, args.output)
+            )
+        if not name.endswith("/..."):
+            go_sources = {f for f in args.sources if f.endswith(".go")}
 
             # Go sources are constrained to live top-level under `source_dir`;
             # others (e.g., template files) are free to live further down.
@@ -131,35 +145,38 @@ def main():
                 if os.path.dirname(s):
                     raise ValueError(
                         f'Source "{s}" for "{name}" comes from a subdirectory.'
-                        f' Specify source_dir instead.')
+                        f" Specify source_dir instead."
+                    )
 
             # Require all non-generated Go files to be listed as sources.
             if not os.path.abspath(args.source_dir).startswith(build_dir):
                 # TODO: Use `glob.glob("*.go", root_dir=args.source_dir)`
                 # instead of os.listdir after upgrading to Python 3.10.
                 go_files = {
-                    f for f in os.listdir(args.source_dir) if f.endswith('.go')
+                    f for f in os.listdir(args.source_dir) if f.endswith(".go")
                 }
                 missing = go_files - go_sources
                 if missing:
                     raise ValueError(
-                        f'go_library requires that all Go files in source_dir'
-                        f' be listed as sources, but the following files are'
-                        f' missing from sources for target {name}:'
-                        f' {", ".join(sorted(missing))}')
+                        f"go_library requires that all Go files in source_dir"
+                        f" be listed as sources, but the following files are"
+                        f" missing from sources for target {name}:"
+                        f' {", ".join(sorted(missing))}'
+                    )
     elif args.allow_globbing:
         current_sources.append(Source(name, args.source_dir, args.output))
     result = get_sources(args.deps, extra_sources=current_sources)
-    with open(args.output, 'w') as output_file:
+    with open(args.output, "w") as output_file:
         json.dump(
             {
-                'package': name,
-                'sources': result,
+                "package": name,
+                "sources": result,
             },
             output_file,
             indent=2,
-            sort_keys=True)
+            sort_keys=True,
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

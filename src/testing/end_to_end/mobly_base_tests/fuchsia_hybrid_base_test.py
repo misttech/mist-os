@@ -58,12 +58,18 @@ class FuchsiaHybridBaseTest(fuchsia_base_test.FuchsiaBaseTest):
         # Note: Avoid using `ffx` transport in Honeydew as it may be deprecated.
         with tempfile.TemporaryDirectory() as iso_dir:
             cmd = [
-                "ffx", "--isolate-dir", iso_dir, "-t", self.dut.device_name,
-                "test", "run", self.ffx_test_url
+                "ffx",
+                "--isolate-dir",
+                iso_dir,
+                "-t",
+                self.dut.device_name,
+                "test",
+                "run",
+                self.ffx_test_url,
             ] + self.ffx_test_options
             output = subprocess.check_output(
-                cmd, timeout=self.timeout_sec,
-                stderr=subprocess.STDOUT).decode()
+                cmd, timeout=self.timeout_sec, stderr=subprocess.STDOUT
+            ).decode()
             logging.info(output)
 
 

@@ -7,7 +7,6 @@ import json
 
 
 class VMO(object):
-
     def __init__(self, v, names):
         self.koid = int(v[0])
         self.name = names[v[1]]
@@ -29,7 +28,6 @@ class VMO(object):
 
 
 class Process(object):
-
     def __init__(self, p, vmos):
         self.koid = int(p[0])
         self.name = p[1]
@@ -56,7 +54,6 @@ class Process(object):
 
 
 class Kernel(object):
-
     def __init__(self, k):
         self.wired = k["wired"]
         self.total_heap = k["total_heap"]
@@ -67,7 +64,6 @@ class Kernel(object):
 
 
 class Snapshot(object):
-
     @classmethod
     def FromJSON(cls, snap_json):
         return Snapshot(snap_json)

@@ -1,7 +1,7 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-'''Generates a budgets configuration file for size checker tool.
+"""Generates a budgets configuration file for size checker tool.
 
 This tool converts the old size budget file to the new format as part of RFC-0144 migration plan.
 
@@ -28,7 +28,7 @@ package_set_budgets: size limit that applies to one or more packages. It has the
     merge: boolean, when true the packages blobs are deduplicate by hash before accounting.
       This affects the shared blobs accounting, and is intended to approximate merged packages
       such as base_package_manifest.json.
-'''
+"""
 import argparse
 import json
 import sys
@@ -42,37 +42,41 @@ class InvalidInputError(Exception):
 
 
 def convert_budget_format_by_pkg_names(
-        component: Dict[str, Any], all_manifests: Dict[str, str]):
+    component: Dict[str, Any], all_manifests: Dict[str, str]
+):
     """Converts a component budget to the new budget format.
 
-  Args:
-    component: dictionary, size checker configuration entry that specifies
-    packages by name.
-    all_manifests: Dict[string, Path)], list of tuples of package name and manifest
-    path.
-  Returns:
-    dictionary, new configuration with a name, a maximum size and the list of
-    packages manifest to fit in the budget.
-  """
+    Args:
+      component: dictionary, size checker configuration entry that specifies
+      packages by name.
+      all_manifests: Dict[string, Path)], list of tuples of package name and manifest
+      path.
+    Returns:
+      dictionary, new configuration with a name, a maximum size and the list of
+      packages manifest to fit in the budget.
+    """
     packages = sorted(
         [
             all_manifests[pkg_name]
             for pkg_name in set(component["pkgs"])
             if pkg_name in all_manifests
-        ])
+        ]
+    )
     result = dict(
         name=component["component"],
         budget_bytes=component["limit"],
         creep_budget_bytes=component["creep_limit"],
         merge=False,
-        packages=packages)
+        packages=packages,
+    )
     return result
 
 
 def count_packages(budgets, all_manifests):
     """Returns packages that are missing, or present in multiple budgets."""
     package_count = collections.Counter(
-        package for budget in budgets for package in budget["packages"])
+        package for budget in budgets for package in budget["packages"]
+    )
     more_than_once = [
         package for package, count in package_count.most_common() if count > 1
     ]
@@ -84,7 +88,8 @@ def make_package_set_budgets(size_limits, product_config):
     # Convert each budget to the new format and packages from base and cache.
     # Package from system belongs the system budget.
     all_manifests: List[str] = product_config.get(
-        "base", []) + product_config.get("cache", [])
+        "base", []
+    ) + product_config.get("cache", [])
 
     # All package manifest paths are either in the format of:
     #   some/path/to/<package_name>
@@ -95,8 +100,10 @@ def make_package_set_budgets(size_limits, product_config):
     manifests_by_name: Dict[str, str] = {}
     for manifest_path in all_manifests:
         segments = manifest_path.split("/")
-        if segments[-1] == "package_manifest.json" or segments[
-                -1] == "rebased_package_manifest.json":
+        if (
+            segments[-1] == "package_manifest.json"
+            or segments[-1] == "rebased_package_manifest.json"
+        ):
             # packages that have gone through the archive and expansion, such as
             # for use with bazel assembly may have an '_expanded' suffix that
             # should be removed.
@@ -122,7 +129,9 @@ def make_package_set_budgets(size_limits, product_config):
                 budget_bytes=size_limits["core_limit"],
                 creep_budget_bytes=size_limits["core_creep_limit"],
                 merge=False,
-                packages=sorted(zero)))
+                packages=sorted(zero),
+            )
+        )
 
     if more_than_once:
         print("ERROR: Package(s) matched by more than one size budget:")
@@ -134,8 +143,12 @@ def make_package_set_budgets(size_limits, product_config):
     # system package set.
     system_budget = next(
         (
-            budget for budget in packages_budgets
-            if budget["name"] == "/system (drivers and early boot)"), None)
+            budget
+            for budget in packages_budgets
+            if budget["name"] == "/system (drivers and early boot)"
+        ),
+        None,
+    )
     if system_budget:
         # De-duplicate blobs by hash accors the packages of this budget in order to
         # approximate the package merging that happens with base_package_manifest.
@@ -154,8 +167,10 @@ def make_resources_budgets(size_limits):
                 paths=sorted(size_limits["distributed_shlibs"]),
                 budget_bytes=size_limits["distributed_shlibs_limit"],
                 creep_budget_bytes=size_limits[
-                    "distributed_shlibs_creep_limit"],
-            ))
+                    "distributed_shlibs_creep_limit"
+                ],
+            )
+        )
     if "icu_data" in size_limits:
         budgets.append(
             dict(
@@ -163,23 +178,25 @@ def make_resources_budgets(size_limits):
                 paths=sorted(size_limits["icu_data"]),
                 budget_bytes=size_limits["icu_data_limit"],
                 creep_budget_bytes=size_limits["icu_data_creep_limit"],
-            ))
+            )
+        )
     return budgets
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        'Converts the former size_checker.go budget file to the new format as part of RFC-0144'
+        description="Converts the former size_checker.go budget file to the new format as part of RFC-0144"
     )
     parser.add_argument(
-        '--size-limits', type=argparse.FileType('r'), required=True)
+        "--size-limits", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        '--image-assembly-config', type=argparse.FileType('r'), required=True)
-    parser.add_argument('--output', type=argparse.FileType('w'), required=True)
-    parser.add_argument('-v', '--verbose', action='store_true')
-    parser.add_argument('--blobfs-capacity', type=int, required=True)
-    parser.add_argument('--max-blob-contents-size', type=int, required=True)
+        "--image-assembly-config", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("--blobfs-capacity", type=int, required=True)
+    parser.add_argument("--max-blob-contents-size", type=int, required=True)
     args = parser.parse_args()
 
     # Read all input configurations.
@@ -191,12 +208,14 @@ def main():
         # Convert all the budget formats.
         resource_budgets = make_resources_budgets(size_limits)
         package_set_budgets = make_package_set_budgets(
-            size_limits, image_assembly_config)
+            size_limits, image_assembly_config
+        )
 
         output_contents = dict(
             resource_budgets=resource_budgets,
             package_set_budgets=package_set_budgets,
-            total_budget_bytes=args.max_blob_contents_size)
+            total_budget_bytes=args.max_blob_contents_size,
+        )
 
         # Ensure the outputfile is closed early.
         with args.output as output:
@@ -207,5 +226,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

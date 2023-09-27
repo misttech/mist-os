@@ -11,15 +11,14 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class HelloWorldTest(fuchsia_base_test.FuchsiaBaseTest):
-
     def setup_class(self):
         """Initialize all DUT(s)"""
         super().setup_class()
 
     def test_hello_world(self):
         for fuchsia_device in self.fuchsia_devices:
-            _LOGGER.info(f'{fuchsia_device.device_name} says hello!')
+            _LOGGER.info(f"{fuchsia_device.device_name} says hello!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

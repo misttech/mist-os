@@ -28,10 +28,12 @@ def generate_ffi():
     # Copy the generated file into this directory as required by cbindgen.
     subprocess.run(
         [
-            "fx", "gen-cargo",
-            "//src/firmware/lib/fastboot/rust:_fastboot_c_rustc_static"
+            "fx",
+            "gen-cargo",
+            "//src/firmware/lib/fastboot/rust:_fastboot_c_rustc_static",
         ],
-        check=True)
+        check=True,
+    )
 
     # Generate and format the bindings.
     logging.info("Generating C bindings at %s", BINDINGS_PATH)
@@ -58,9 +60,11 @@ def generate_ffi():
         // LINT.ThenChange(../src/lib.rs)
 
         #endif  // FOO_H_
-        """)
+        """
+    )
     subprocess.run(
-        ["fx", "format-code", f"--files={BINDINGS_PATH}"], check=True)
+        ["fx", "format-code", f"--files={BINDINGS_PATH}"], check=True
+    )
 
     # Remove the generated Cargo files.
     logging.info("Removing Cargo files")

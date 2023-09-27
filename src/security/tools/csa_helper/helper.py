@@ -6,12 +6,12 @@
 
 
 def yellow(message):
-  return '\033[1;33;40m%s\033[0m'%(message)
+    return "\033[1;33;40m%s\033[0m" % (message)
 
 
 def white(message):
-  return '\033[37;1;40m%s\033[0m'%(message)
+    return "\033[37;1;40m%s\033[0m" % (message)
 
 
 def red(message):
-  return '\033[1;31;40m%s\033[0m'%(message)
+    return "\033[1;31;40m%s\033[0m" % (message)

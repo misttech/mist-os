@@ -58,11 +58,11 @@ from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FUCHSIA_ROOT = os.path.dirname(  # $root
-    os.path.dirname(  # scripts
-        os.path.dirname(  # sdk
-            SCRIPT_DIR)))  # merger
+    os.path.dirname(os.path.dirname(SCRIPT_DIR))  # scripts  # sdk
+)  # merger
 PIGZ_PATH = os.path.join(
-    FUCHSIA_ROOT, "prebuilt", "third_party", "pigz", "pigz")
+    FUCHSIA_ROOT, "prebuilt", "third_party", "pigz", "pigz"
+)
 
 # Reminder about the layout of each SDK directory:
 #
@@ -106,11 +106,11 @@ Path: TypeAlias = str
 
 @total_ordering
 class Part(object):
-    '''Models a 'parts' array entry from an SDK manifest.'''
+    """Models a 'parts' array entry from an SDK manifest."""
 
     def __init__(self, json: Dict):
-        self.meta = json['meta']
-        self.type = json['type']
+        self.meta = json["meta"]
+        self.type = json["type"]
 
     def __lt__(self, other):
         return (self.meta, self.type) < (other.meta, other.type)
@@ -127,12 +127,12 @@ class Part(object):
 
 
 def _ensure_directory(path: Path):
-    '''Ensures that the directory hierarchy of the given path exists.'''
+    """Ensures that the directory hierarchy of the given path exists."""
     os.makedirs(os.path.dirname(path), exist_ok=True)
 
 
 def _write_file_if_changed(path: Path, data: str):
-    '''Write data to a specific path if it does not exist with the same content.'''
+    """Write data to a specific path if it does not exist with the same content."""
     # Do not do anything if the file exists with the same content.
     if os.path.exists(path):
         with open(path) as f:
@@ -148,128 +148,138 @@ def _write_file_if_changed(path: Path, data: str):
     else:
         _ensure_directory(path)
 
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         f.write(data)
 
 
 class ElementMeta(object):
-    '''Models the metadata of a given SDK element.'''
+    """Models the metadata of a given SDK element."""
 
     def __init__(self, meta: Dict[str, Any]):
         self._meta = meta
 
     @property
     def type(self):
-        '''Returns the SDK element type.'''
-        if 'schema_id' in self._meta:
-            return self._meta['data']['type']
-        return self._meta['type']
+        """Returns the SDK element type."""
+        if "schema_id" in self._meta:
+            return self._meta["data"]["type"]
+        return self._meta["type"]
 
     @property
     def json(self):
-        '''Return the JSON object for this element metadata instance.'''
+        """Return the JSON object for this element metadata instance."""
         return self._meta
 
     def get_files(self) -> Tuple[Set[Path], Dict[str, Set[Path]]]:
-        '''Extracts the files associated with the given element.
+        """Extracts the files associated with the given element.
         Returns a 2-tuple containing:
          - the set of variant-independent files;
          - the sets of variant-dependent files, indexed by architecture.
-        '''
+        """
         type = self.type
         common_files = set()
         variant_files = {}
-        if type == 'cc_prebuilt_library':
-            common_files.update(self._meta['headers'])
-            if 'ifs' in self._meta:
+        if type == "cc_prebuilt_library":
+            common_files.update(self._meta["headers"])
+            if "ifs" in self._meta:
                 common_files.add(
-                    os.path.join(self._meta['root'], self._meta['ifs']))
-            for arch, binaries in self._meta.get('binaries', {}).items():
+                    os.path.join(self._meta["root"], self._meta["ifs"])
+                )
+            for arch, binaries in self._meta.get("binaries", {}).items():
                 contents = set()
-                contents.add(binaries['link'])
-                if 'dist' in binaries:
-                    contents.add(binaries['dist'])
-                if 'debug' in binaries:
-                    contents.add(binaries['debug'])
+                contents.add(binaries["link"])
+                if "dist" in binaries:
+                    contents.add(binaries["dist"])
+                if "debug" in binaries:
+                    contents.add(binaries["debug"])
                 variant_files[arch] = contents
-            for variant in self._meta.get('variants', []):
+            for variant in self._meta.get("variants", []):
                 contents = set()
-                constraint = variant['constraints']['arch'] + '-' + str(
-                    variant['constraints']['api_level'])
-                value = variant['values']
-                contents.add(value['link_lib'])
-                if 'dist_lib' in value:
-                    contents.add(value['dist_lib'])
-                if 'debug' in value:
-                    contents.add(value['debug'])
+                constraint = (
+                    variant["constraints"]["arch"]
+                    + "-"
+                    + str(variant["constraints"]["api_level"])
+                )
+                value = variant["values"]
+                contents.add(value["link_lib"])
+                if "dist_lib" in value:
+                    contents.add(value["dist_lib"])
+                if "debug" in value:
+                    contents.add(value["debug"])
                 variant_files[constraint] = contents
-        elif type == 'cc_source_library':
-            common_files.update(self._meta['headers'])
-            common_files.update(self._meta['sources'])
-        elif type == 'dart_library':
-            common_files.update(self._meta['sources'])
-        elif type == 'ffx_tool':
-            if 'files' in self._meta:
-                for (name, collection) in self._meta["files"].items():
+        elif type == "cc_source_library":
+            common_files.update(self._meta["headers"])
+            common_files.update(self._meta["sources"])
+        elif type == "dart_library":
+            common_files.update(self._meta["sources"])
+        elif type == "ffx_tool":
+            if "files" in self._meta:
+                for name, collection in self._meta["files"].items():
                     if name == "executable" or name == "executable_metadata":
                         common_files.add(collection)
                     else:
                         common_files.update(collection)
-            if 'target_files' in self._meta:
-                for (arch, binaries) in self._meta["target_files"].items():
+            if "target_files" in self._meta:
+                for arch, binaries in self._meta["target_files"].items():
                     variant_files[arch] = set()
-                    for (name, collection) in binaries.items():
-                        if name == "executable" or name == "executable_metadata":
+                    for name, collection in binaries.items():
+                        if (
+                            name == "executable"
+                            or name == "executable_metadata"
+                        ):
                             variant_files[arch].add(collection)
                         else:
                             variant_files[arch].update(collection)
-        elif type == 'fidl_library':
-            common_files.update(self._meta['sources'])
-        elif type in ['host_tool', 'companion_host_tool', 'package']:
-            if 'files' in self._meta:
-                common_files.update(self._meta['files'])
-            if 'target_files' in self._meta:
-                variant_files.update(self._meta['target_files'])
-        elif type == 'loadable_module':
-            common_files.update(self._meta['resources'])
-            variant_files.update(self._meta['binaries'])
-        elif type == 'sysroot':
-            for ifs_file in self._meta['ifs_files']:
+        elif type == "fidl_library":
+            common_files.update(self._meta["sources"])
+        elif type in ["host_tool", "companion_host_tool", "package"]:
+            if "files" in self._meta:
+                common_files.update(self._meta["files"])
+            if "target_files" in self._meta:
+                variant_files.update(self._meta["target_files"])
+        elif type == "loadable_module":
+            common_files.update(self._meta["resources"])
+            variant_files.update(self._meta["binaries"])
+        elif type == "sysroot":
+            for ifs_file in self._meta["ifs_files"]:
                 common_files.add(os.path.join("pkg", "sysroot", ifs_file))
-            for arch, version in self._meta.get('versions', {}).items():
+            for arch, version in self._meta.get("versions", {}).items():
                 contents = set()
-                contents.update(version['headers'])
-                contents.update(version['link_libs'])
-                contents.update(version['dist_libs'])
-                contents.update(version['debug_libs'])
+                contents.update(version["headers"])
+                contents.update(version["link_libs"])
+                contents.update(version["dist_libs"])
+                contents.update(version["debug_libs"])
                 variant_files[arch] = contents
 
-            for variant in self._meta.get('variants', []):
+            for variant in self._meta.get("variants", []):
                 contents = set()
-                constraint = variant['constraints']['arch'] + '-' + str(
-                    variant['constraints']['api_level'])
-                value = variant['values']
-                contents.update(value['headers'])
-                contents.update(value['link_libs'])
-                contents.update(value['dist_libs'])
-                contents.update(value['debug_libs'])
+                constraint = (
+                    variant["constraints"]["arch"]
+                    + "-"
+                    + str(variant["constraints"]["api_level"])
+                )
+                value = variant["values"]
+                contents.update(value["headers"])
+                contents.update(value["link_libs"])
+                contents.update(value["dist_libs"])
+                contents.update(value["debug_libs"])
                 variant_files[constraint] = contents
-        elif type == 'documentation':
-            common_files.update(self._meta['docs'])
-        elif type in ('config', 'license', 'component_manifest'):
-            common_files.update(self._meta['data'])
-        elif type in ('version_history'):
+        elif type == "documentation":
+            common_files.update(self._meta["docs"])
+        elif type in ("config", "license", "component_manifest"):
+            common_files.update(self._meta["data"])
+        elif type in ("version_history"):
             # These types are pure metadata.
             pass
-        elif type == 'bind_library':
-            common_files.update(self._meta['sources'])
+        elif type == "bind_library":
+            common_files.update(self._meta["sources"])
         else:
-            raise Exception('Unknown element type: ' + type)
+            raise Exception("Unknown element type: " + type)
 
         return (common_files, variant_files)
 
     def merge_with(self, other: ElementMeta) -> ElementMeta:
-        '''Merge current instance with another one and return new value.'''
+        """Merge current instance with another one and return new value."""
         meta_one = self._meta
         meta_two = other._meta
 
@@ -278,120 +288,140 @@ class ElementMeta(object):
         type = self.type
         if type != other.type:
             raise Exception(
-                'Incompatible element types (%s vs %s)' % (type, other.type))
+                "Incompatible element types (%s vs %s)" % (type, other.type)
+            )
 
         meta = {}
-        if type == 'cc_prebuilt_library':
+        if type == "cc_prebuilt_library":
             meta = meta_one
-            meta['binaries'].update(meta_two.get('binaries', {}))
-            meta['variants'] = meta_one.get('variants', []) + meta_two.get(
-                'variants', [])
-        elif type == 'loadable_module':
+            meta["binaries"].update(meta_two.get("binaries", {}))
+            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
+                "variants", []
+            )
+        elif type == "loadable_module":
             meta = meta_one
-            meta['binaries'].update(meta_two.get('binaries', {}))
-        elif type == 'package':
+            meta["binaries"].update(meta_two.get("binaries", {}))
+        elif type == "package":
             meta = meta_one
-            meta['package_manifests'] += meta_two['package_manifests']
+            meta["package_manifests"] += meta_two["package_manifests"]
             # Remove duplicate items, and sort final result.
-            meta['package_manifests'] = sorted(
+            meta["package_manifests"] = sorted(
                 [
-                    dict(t) for t in
-                    {tuple(d.items()) for d in meta['package_manifests']}
+                    dict(t)
+                    for t in {
+                        tuple(d.items()) for d in meta["package_manifests"]
+                    }
                 ],
                 key=itemgetter(
-                    'api_level', 'target_architecture', 'manifest_file'))
-            meta['target_files'].update(meta_two['target_files'])
-        elif type == 'sysroot':
+                    "api_level", "target_architecture", "manifest_file"
+                ),
+            )
+            meta["target_files"].update(meta_two["target_files"])
+        elif type == "sysroot":
             meta = meta_one
-            meta['versions'].update(meta_two.get('versions', {}))
-            meta['variants'] = meta_one.get('variants', []) + meta_two.get(
-                'variants', [])
-        elif type in ['ffx_tool', 'host_tool', 'companion_host_tool']:
+            meta["versions"].update(meta_two.get("versions", {}))
+            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
+                "variants", []
+            )
+        elif type in ["ffx_tool", "host_tool", "companion_host_tool"]:
             meta = meta_one
-            if not 'target_files' in meta:
-                meta['target_files'] = {}
-            if 'target_files' in meta_two:
-                meta['target_files'].update(meta_two['target_files'])
-        elif type in ('cc_source_library', 'dart_library', 'fidl_library',
-                      'documentation', 'device_profile', 'config', 'license',
-                      'component_manifest', 'bind_library', 'version_history'):
+            if not "target_files" in meta:
+                meta["target_files"] = {}
+            if "target_files" in meta_two:
+                meta["target_files"].update(meta_two["target_files"])
+        elif type in (
+            "cc_source_library",
+            "dart_library",
+            "fidl_library",
+            "documentation",
+            "device_profile",
+            "config",
+            "license",
+            "component_manifest",
+            "bind_library",
+            "version_history",
+        ):
             # These elements are arch-independent, the metadata does not need any
             # update.
             meta = meta_one
         else:
-            raise Exception('Unknown element type: ' + type)
+            raise Exception("Unknown element type: " + type)
 
         return ElementMeta(meta)
 
 
 def _has_host_content(parts: Set[Part]):
-    '''Returns true if the given list of SDK parts contains an element with
+    """Returns true if the given list of SDK parts contains an element with
     content built for a host.
-    '''
-    return 'host_tool' in [part.type for part in parts]
+    """
+    return "host_tool" in [part.type for part in parts]
 
 
-def _merge_sdk_manifests(manifest_one: SdkManifest,
-                         manifest_two: SdkManifest) -> Optional[SdkManifest]:
+def _merge_sdk_manifests(
+    manifest_one: SdkManifest, manifest_two: SdkManifest
+) -> Optional[SdkManifest]:
     """Merge two SDK manifests into one. Returns None in case of error."""
-    parts_one = set([Part(p) for p in manifest_one['parts']])
-    parts_two = set([Part(p) for p in manifest_two['parts']])
+    parts_one = set([Part(p) for p in manifest_one["parts"]])
+    parts_two = set([Part(p) for p in manifest_two["parts"]])
 
-    manifest: SdkManifest = {'arch': {}}
+    manifest: SdkManifest = {"arch": {}}
 
     # Schema version.
-    if manifest_one['schema_version'] != manifest_two['schema_version']:
-        print('Error: mismatching schema version')
+    if manifest_one["schema_version"] != manifest_two["schema_version"]:
+        print("Error: mismatching schema version")
         return None
-    manifest['schema_version'] = manifest_one['schema_version']
+    manifest["schema_version"] = manifest_one["schema_version"]
 
     # Host architecture.
     host_archs = set()
     if _has_host_content(parts_one):
-        host_archs.add(manifest_one['arch']['host'])
+        host_archs.add(manifest_one["arch"]["host"])
     if _has_host_content(parts_two):
-        host_archs.add(manifest_two['arch']['host'])
+        host_archs.add(manifest_two["arch"]["host"])
     if not host_archs:
         # The archives do not have any host content. The architecture is not
         # meaningful in that case but is still needed: just pick one.
-        host_archs.add(manifest_one['arch']['host'])
+        host_archs.add(manifest_one["arch"]["host"])
     if len(host_archs) != 1:
         print(
-            'Error: mismatching host architecture: %s' % ', '.join(host_archs))
+            "Error: mismatching host architecture: %s" % ", ".join(host_archs)
+        )
         return None
-    manifest['arch']['host'] = list(host_archs)[0]
+    manifest["arch"]["host"] = list(host_archs)[0]
 
     def compare_then_copy(name: str) -> bool:
         """Copy the value of a manifest field after checking for correctness."""
         value1 = manifest_one[name]
         value2 = manifest_two[name]
         if value1 != value2:
-            print(f'Error: mismatching {name}: \'{value1}\' vs \'{value2}\'')
+            print(f"Error: mismatching {name}: '{value1}' vs '{value2}'")
             return False
 
         manifest[name] = value1
         return True
 
     # Id.
-    if not compare_then_copy('id'):
+    if not compare_then_copy("id"):
         return None
 
     # Root.
-    if not compare_then_copy('root'):
+    if not compare_then_copy("root"):
         return None
 
     # Target architectures.
-    manifest['arch']['target'] = sorted(
-        set(manifest_one['arch']['target']) |
-        set(manifest_two['arch']['target']))
+    manifest["arch"]["target"] = sorted(
+        set(manifest_one["arch"]["target"])
+        | set(manifest_two["arch"]["target"])
+    )
 
     # Parts.
-    manifest['parts'] = [vars(p) for p in sorted(parts_one | parts_two)]
+    manifest["parts"] = [vars(p) for p in sorted(parts_one | parts_two)]
     return manifest
 
 
 def tarfile_writer(
-        archive_file: Path, source_dir: Path, compressed: bool = True):
+    archive_file: Path, source_dir: Path, compressed: bool = True
+):
     """Write an archive using the Python tarfile module."""
     all_files: List[Tuple[str, str]] = []
     for root, dirs, files in os.walk(source_dir):
@@ -413,7 +443,7 @@ def tarfile_writer(
             # mtime will be 0 too (January 1st 1970), and type will be
             # tarfile.REGTYPE which is fine since directories or symlinks
             # are never stored in the archive.
-            with open(src_path, 'rb') as f:
+            with open(src_path, "rb") as f:
                 archive.addfile(info, f)
 
 
@@ -446,7 +476,7 @@ class MergeState(object):
 
     def get_temp_dir(self) -> Path:
         """Return new temporary directory path."""
-        temp_dir = tempfile.mkdtemp(prefix='fuchsia-sdk-merger')
+        temp_dir = tempfile.mkdtemp(prefix="fuchsia-sdk-merger")
 
         self._temp_dirs.add(temp_dir)
         return temp_dir
@@ -480,14 +510,16 @@ class MergeState(object):
             self._all_inputs.add(path)
 
     def get_depfile_inputs_and_outputs(
-            self) -> Tuple[Sequence[Path], Sequence[Path]]:
+        self,
+    ) -> Tuple[Sequence[Path], Sequence[Path]]:
         """Return the lists of inputs and outputs that should appear in the depfile."""
 
         def make_relative_paths(paths):
             return sorted([os.path.relpath(os.path.realpath(p)) for p in paths])
 
         return make_relative_paths(self._all_inputs), make_relative_paths(
-            self._all_outputs)
+            self._all_outputs
+        )
 
     def open_archive(self, archive: Path) -> Path:
         """Uncompress an archive and return the path of its temporary extraction directory."""
@@ -508,7 +540,8 @@ class MergeState(object):
         """Write JSON output file."""
         if not dry_run:
             data = json.dumps(
-                content, indent=2, sort_keys=True, separators=(',', ':'))
+                content, indent=2, sort_keys=True, separators=(",", ":")
+            )
             _write_file_if_changed(path, data)
         self.add_output(path)
 
@@ -520,10 +553,10 @@ class InputSdk(object):
         """Initialize instance. Either archive or directory must be set."""
         self._state = state
         if archive:
-            assert not directory, 'Cannot set both archive and directory'
+            assert not directory, "Cannot set both archive and directory"
             self._directory = state.open_archive(archive)
         else:
-            assert directory, 'Either archive or directory must be set'
+            assert directory, "Either archive or directory must be set"
             self._directory = directory
 
     def __enter__(self):
@@ -547,11 +580,11 @@ class InputSdk(object):
 
     def get_manifest(self) -> SdkManifest:
         """Return the manifest for this SDK."""
-        return self._read_json(os.path.join('meta', 'manifest.json'))
+        return self._read_json(os.path.join("meta", "manifest.json"))
 
     def get_api_level(self) -> int:
         """Return the api level for this SDK."""
-        file = os.path.join(self._directory, 'api_level')
+        file = os.path.join(self._directory, "api_level")
         self._state.add_input(source)
         with open(file) as f:
             return int(f.read())
@@ -567,8 +600,8 @@ class OutputSdk(object):
     """Model either an output archive or directory during a merge operation."""
 
     def __init__(
-            self, archive: Path, directory: Path, dry_run: bool,
-            state: MergeState):
+        self, archive: Path, directory: Path, dry_run: bool, state: MergeState
+    ):
         """Initialize instance. Either archive or directory must be set."""
         self._dry_run = dry_run
         self._archive = archive
@@ -588,7 +621,7 @@ class OutputSdk(object):
             # for its content.
             self._directory = state.get_temp_dir()
         else:
-            assert False, 'Either archive or directory must be set'
+            assert False, "Either archive or directory must be set"
 
     def __enter__(self):
         return self
@@ -603,18 +636,22 @@ class OutputSdk(object):
 
     def write_manifest(self, manifest):
         self._state.write_json_output(
-            os.path.join(self._directory, 'meta', 'manifest.json'), manifest,
-            self._dry_run)
+            os.path.join(self._directory, "meta", "manifest.json"),
+            manifest,
+            self._dry_run,
+        )
 
     def write_element_meta(self, element: Path, element_meta: ElementMeta):
         self._state.write_json_output(
-            os.path.join(self._directory, element), element_meta.json,
-            self._dry_run)
+            os.path.join(self._directory, element),
+            element_meta.json,
+            self._dry_run,
+        )
 
     def copy_file(self, file, source_dir):
-        '''Copies a file to a given sub-path, taking care of creating directories if
-       needed.
-       '''
+        """Copies a file to a given sub-path, taking care of creating directories if
+        needed.
+        """
         source = os.path.realpath(os.path.join(source_dir, file))
         destination = os.path.join(self._directory, file)
         if not self._dry_run:
@@ -650,12 +687,14 @@ class OutputSdk(object):
             # a temporary directory, this means it is a real file from a
             # previous merge operation.
             #
-            if self._state.is_temp_file(source) and \
-                    not self._state.is_temp_file(destination):
+            if self._state.is_temp_file(
+                source
+            ) and not self._state.is_temp_file(destination):
                 shutil.copy2(source, destination)
             else:
                 target_path = os.path.relpath(
-                    source, os.path.dirname(destination))
+                    source, os.path.dirname(destination)
+                )
                 os.symlink(target_path, destination)
 
         self._state.add_input(source)
@@ -672,10 +711,15 @@ class OutputSdk(object):
         return True
 
     def copy_element(self, element: Path, source_sdk: InputSdk):
-        '''Copy an entire SDK element to a given directory.'''
+        """Copy an entire SDK element to a given directory."""
         meta = source_sdk.get_element_meta(element)
-        assert meta is not None, 'Could not find metadata for element: %s, %s, %s' % (
-            element, meta, source_sdk)
+        assert (
+            meta is not None
+        ), "Could not find metadata for element: %s, %s, %s" % (
+            element,
+            meta,
+            source_sdk,
+        )
         common_files, variant_files = meta.get_files()
         files = common_files
         for more_files in variant_files.values():
@@ -686,12 +730,12 @@ class OutputSdk(object):
 
 
 def merge_sdks(
-        first_sdk: InputSdk, second_sdk: InputSdk,
-        output_sdk: OutputSdk) -> bool:
+    first_sdk: InputSdk, second_sdk: InputSdk, output_sdk: OutputSdk
+) -> bool:
     first_manifest = first_sdk.get_manifest()
     second_manifest = second_sdk.get_manifest()
-    first_parts = set([Part(p) for p in first_manifest['parts']])
-    second_parts = set([Part(p) for p in second_manifest['parts']])
+    first_parts = set([Part(p) for p in first_manifest["parts"]])
+    second_parts = set([Part(p) for p in second_manifest["parts"]])
     common_parts = first_parts & second_parts
 
     # Copy elements that appear in a single SDK
@@ -709,19 +753,20 @@ def merge_sdks(
         second_common, second_arch = second_meta.get_files()
 
         # Common files should not vary.
-        if not output_sdk.copy_identical_files(first_common, second_common,
-                                               first_sdk.directory):
-            print('Error: different common files for %s' % (element))
+        if not output_sdk.copy_identical_files(
+            first_common, second_common, first_sdk.directory
+        ):
+            print("Error: different common files for %s" % (element))
             return False
 
         # Arch-dependent files need to be merged in the metadata.
         all_arches = set(first_arch.keys()) | set(second_arch.keys())
         for arch in all_arches:
             if arch in first_arch and arch in second_arch:
-                if not output_sdk.copy_identical_files(first_arch[arch],
-                                                       second_arch[arch],
-                                                       first_sdk.directory):
-                    print('Error: different %s files for %s' % (arch, element))
+                if not output_sdk.copy_identical_files(
+                    first_arch[arch], second_arch[arch], first_sdk.directory
+                ):
+                    print("Error: different %s files for %s" % (arch, element))
                     return False
             elif arch in first_arch:
                 output_sdk.copy_files(first_arch[arch], first_sdk.directory)
@@ -740,7 +785,7 @@ def merge_sdks(
 
 
 # A pair used to model either an input archive or an input directory.
-InputInfo = collections.namedtuple('InputInfo', 'archive directory')
+InputInfo = collections.namedtuple("InputInfo", "archive directory")
 
 
 def make_archive_info(archive: Path) -> InputInfo:
@@ -759,15 +804,16 @@ class InputAction(argparse.Action):
     """
 
     def __init__(self, option_strings, dest, **kwargs):
-        dest = 'inputs'
+        dest = "inputs"
         super(InputAction, self).__init__(option_strings, dest, **kwargs)
 
     def __call__(self, parser, namespace, values, option_string=None):
         assert isinstance(
-            values, str), "Unsupported add_argument() 'type' value"
-        if option_string == '--input-directory':
+            values, str
+        ), "Unsupported add_argument() 'type' value"
+        if option_string == "--input-directory":
             input = make_directory_info(values)
-        elif option_string == '--input-archive':
+        elif option_string == "--input-archive":
             input = make_archive_info(values)
         else:
             assert False, "Unsupported options string %s" % option_string
@@ -781,56 +827,64 @@ class InputAction(argparse.Action):
 
 def main(main_args=None):
     parser = argparse.ArgumentParser(
-        description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
+        description=__doc__, formatter_class=argparse.RawTextHelpFormatter
+    )
     parser.add_argument(
-        '--input-directory',
-        help='Path to an input SDK - as a directory',
-        metavar='DIR',
+        "--input-directory",
+        help="Path to an input SDK - as a directory",
+        metavar="DIR",
         action=InputAction,
     )
     parser.add_argument(
-        '--input-archive',
-        help='Path to an input SDK -as an archive',
-        metavar='ARCHIVE',
+        "--input-archive",
+        help="Path to an input SDK -as an archive",
+        metavar="ARCHIVE",
         action=InputAction,
     )
     first_group = parser.add_mutually_exclusive_group()
     first_group.add_argument(
-        '--first-archive',
-        help='Path to the first SDK - as an archive',
-        metavar='ARCHIVE1',
-        default='')
+        "--first-archive",
+        help="Path to the first SDK - as an archive",
+        metavar="ARCHIVE1",
+        default="",
+    )
     first_group.add_argument(
-        '--first-directory',
-        help='Path to the first SDK - as a directory',
-        metavar='DIR1',
-        default='')
+        "--first-directory",
+        help="Path to the first SDK - as a directory",
+        metavar="DIR1",
+        default="",
+    )
     second_group = parser.add_mutually_exclusive_group()
     second_group.add_argument(
-        '--second-archive',
-        help='Path to the second SDK - as an archive',
-        metavar='ARCHIVE2',
-        default='')
+        "--second-archive",
+        help="Path to the second SDK - as an archive",
+        metavar="ARCHIVE2",
+        default="",
+    )
     second_group.add_argument(
-        '--second-directory',
-        help='Path to the second SDK - as a directory',
-        metavar='DIR2',
-        default='')
+        "--second-directory",
+        help="Path to the second SDK - as a directory",
+        metavar="DIR2",
+        default="",
+    )
     parser.add_argument(
-        '--output-archive',
-        help='Path to the merged SDK - as an archive',
-        metavar='OUT_ARCHIVE',
-        default='')
+        "--output-archive",
+        help="Path to the merged SDK - as an archive",
+        metavar="OUT_ARCHIVE",
+        default="",
+    )
     parser.add_argument(
-        '--output-directory',
-        help='Path to the merged SDK - as a directory',
-        metavar='OUT_DIR',
-        default='')
-    parser.add_argument('--stamp-file', help='Path to the stamp file')
+        "--output-directory",
+        help="Path to the merged SDK - as a directory",
+        metavar="OUT_DIR",
+        default="",
+    )
+    parser.add_argument("--stamp-file", help="Path to the stamp file")
     hermetic_group = parser.add_mutually_exclusive_group()
-    hermetic_group.add_argument('--depfile', help='Path to the stamp file')
+    hermetic_group.add_argument("--depfile", help="Path to the stamp file")
     hermetic_group.add_argument(
-        '--hermetic-inputs-file', help='Path to the hermetic inputs file')
+        "--hermetic-inputs-file", help="Path to the hermetic inputs file"
+    )
     args = parser.parse_args(main_args)
 
     # Convert --first-xx and --second-xxx options into the equivalent
@@ -838,7 +892,8 @@ def main(main_args=None):
     if args.first_archive or args.first_directory:
         if args.inputs:
             parser.error(
-                'Cannot use --input-xxx option with --first-xxx option!')
+                "Cannot use --input-xxx option with --first-xxx option!"
+            )
             return 1
 
         if args.first_archive:
@@ -851,30 +906,33 @@ def main(main_args=None):
         elif args.second_directory:
             second_input = make_directory_info(args.second_directory)
         else:
-            parser.error('Using --first-xxx requires --second-xxx too!')
+            parser.error("Using --first-xxx requires --second-xxx too!")
             return 1
 
         args.inputs = [first_input, second_input]
 
     elif args.second_archive or args.second_directory:
-        parser.error('Using --second-xxx requires --first-xxx too!')
+        parser.error("Using --second-xxx requires --first-xxx too!")
         return 1
 
     if not args.inputs:
         parser.error(
-            'At least one of --input-archive or --input directory is required!')
+            "At least one of --input-archive or --input directory is required!"
+        )
 
     if not args.output_archive and not args.output_directory:
         parser.error(
-            'At least one of --output-archive or --output-directory is required!'
+            "At least one of --output-archive or --output-directory is required!"
         )
 
-    if len(args.inputs
-          ) == 1 and args.inputs[0].archive and args.output_directory:
+    if (
+        len(args.inputs) == 1
+        and args.inputs[0].archive
+        and args.output_directory
+    ):
         parser.error(
-            'Using a single input archive as input and an output directory is not supported!\n'
-            +
-            'as the result would contain dangling symlinks. Just uncompress the archive manually!'
+            "Using a single input archive as input and an output directory is not supported!\n"
+            + "as the result would contain dangling symlinks. Just uncompress the archive manually!"
         )
 
     has_hermetic_inputs_file = bool(args.hermetic_inputs_file)
@@ -885,7 +943,8 @@ def main(main_args=None):
         num_inputs = len(args.inputs)
         for n, input in enumerate(args.inputs):
             input_sdk = InputSdk(
-                args.inputs[n].archive, args.inputs[n].directory, state)
+                args.inputs[n].archive, args.inputs[n].directory, state
+            )
 
             if n == 0:
                 previous_input_sdk = input_sdk
@@ -904,8 +963,9 @@ def main(main_args=None):
                 out_directory = state.get_temp_dir()
                 out_dryrun = False
             # Perform the merge operation
-            with OutputSdk(out_archive, out_directory, out_dryrun,
-                           state) as output_sdk:
+            with OutputSdk(
+                out_archive, out_directory, out_dryrun, state
+            ) as output_sdk:
                 if not merge_sdks(previous_input_sdk, input_sdk, output_sdk):
                     return 1
 
@@ -915,21 +975,23 @@ def main(main_args=None):
 
         depfile_inputs, depfile_outputs = state.get_depfile_inputs_and_outputs()
         if args.hermetic_inputs_file:
-            with open(args.hermetic_inputs_file, 'w') as hermetic_inputs_file:
-                hermetic_inputs_file.write('\n'.join(depfile_inputs))
+            with open(args.hermetic_inputs_file, "w") as hermetic_inputs_file:
+                hermetic_inputs_file.write("\n".join(depfile_inputs))
 
         if args.depfile:
-            with open(args.depfile, 'w') as depfile:
+            with open(args.depfile, "w") as depfile:
                 depfile.write(
-                    '{}: {}'.format(
-                        ' '.join(depfile_outputs), ' '.join(depfile_inputs)))
+                    "{}: {}".format(
+                        " ".join(depfile_outputs), " ".join(depfile_inputs)
+                    )
+                )
 
     if args.stamp_file and not has_hermetic_inputs_file:
-        with open(args.stamp_file, 'w') as stamp_file:
-            stamp_file.write('')
+        with open(args.stamp_file, "w") as stamp_file:
+            stamp_file.write("")
 
     return 1 if has_errors else 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

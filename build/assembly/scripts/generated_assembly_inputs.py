@@ -15,19 +15,20 @@ from typing import Dict, Optional
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        'Create a flat list of files included in the images. This is used to inform infrastructure what files to upload'
+        description="Create a flat list of files included in the images. This is used to inform infrastructure what files to upload"
     )
     parser.add_argument(
-        '--product-config',
-        type=argparse.FileType('r'),
-        nargs='+',
-        required=True)
+        "--product-config",
+        type=argparse.FileType("r"),
+        nargs="+",
+        required=True,
+    )
     parser.add_argument(
-        "--assembly-input-bundles", type=argparse.FileType('r'), required=True)
-    parser.add_argument('--sources', type=str, nargs='*')
-    parser.add_argument('--output', type=argparse.FileType('w'), required=True)
-    parser.add_argument('--depfile', type=argparse.FileType('w'), required=True)
+        "--assembly-input-bundles", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument("--sources", type=str, nargs="*")
+    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
     args = parser.parse_args()
 
     # The files to put in the output with source mapped to destination.
@@ -45,7 +46,7 @@ def main():
         source = os.path.relpath(source, os.getcwd())
         prefix = "../../"
         if source.startswith(prefix):
-            destination = source[len(prefix):]
+            destination = source[len(prefix) :]
         else:
             destination = os.path.join("built/artifacts", source)
         file_mapping[source] = destination
@@ -57,7 +58,7 @@ def main():
         manifest = entry["manifest"]
         manifests_for_depfile.append(manifest)
         add_source(manifest)
-        with open(manifest, 'r') as f:
+        with open(manifest, "r") as f:
             manifest = json.load(f)
             for blob in manifest.get("blobs", []):
                 add_source(blob["source_path"])
@@ -95,10 +96,12 @@ def main():
     # Convert the map into a list of maps.
     files = []
     for src, dest in file_mapping.items():
-        files.append({
-            "source": src,
-            "destination": dest,
-        })
+        files.append(
+            {
+                "source": src,
+                "destination": dest,
+            }
+        )
 
     # Write a depfile with any opened package manifests.
     if manifests_for_depfile:
@@ -110,5 +113,5 @@ def main():
     json.dump(files, args.output, indent=2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

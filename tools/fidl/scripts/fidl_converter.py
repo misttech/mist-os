@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 from multiprocessing.dummy import Pool
 
-FUCHSIA_DIR = Path(os.environ['FUCHSIA_DIR'])
+FUCHSIA_DIR = Path(os.environ["FUCHSIA_DIR"])
 
 
 def main(args):
@@ -21,9 +21,9 @@ def main(args):
     """
 
     if args.dryrun:
-        print('\nDRY RUN!')
+        print("\nDRY RUN!")
     else:
-        print('\nREAL RUN!')
+        print("\nREAL RUN!")
 
     if args.rebuild:
         # Note: This includes all of the "kitchen_sink" and "buildbot/core", but
@@ -32,47 +32,53 @@ def main(args):
         # point, but will likely change in the future (ie, the targets could be
         # added to the catch-alls, or removed completely.  Additionally, other
         # targets that are missed by the catch-alls could be added as well).
-        print('\nSETTING ENVIRONMENT...')
+        print("\nSETTING ENVIRONMENT...")
         subprocess.check_call(
             [
-                'fx', '--dir=out/default', 'set', 'workstation_eng.x64',
-                '--with=//bundles/fidl:tests', '--with=//bundles/kitchen_sink',
-                '--with=//bundles/tests', '--with=//bundles/buildbot/core',
-                '--with=//sdk/fidl/fuchsia.firebase.messaging:fuchsia.firebase.messaging',
-                '--with=//sdk/fidl/fuchsia.metricbroker:fuchsia.metricbroker',
-                '--with=//sdk/fidl/fuchsia.process:fuchsia.process',
-                '--with=//sdk/fidl/fuchsia.process.init:fuchsia.process.init',
-                '--with=//sdk/fidl/fuchsia.terminal:fuchsia.terminal',
-                '--with=//src/camera/bin/factory:fuchsia.factory.camera',
-                '--with=//src/media/vnext/fidl/fuchsia.audio:fuchsia.audio',
-                '--with=//src/media/vnext/fidl/fuchsia.media2:fuchsia.media2',
-                '--with=//src/media/vnext/fidl/fuchsia.mediastreams:fuchsia.mediastreams',
-                '--with=//src/media/vnext/fidl/fuchsia.mem2:fuchsia.mem2',
-                '--cargo-toml-gen'
+                "fx",
+                "--dir=out/default",
+                "set",
+                "workstation_eng.x64",
+                "--with=//bundles/fidl:tests",
+                "--with=//bundles/kitchen_sink",
+                "--with=//bundles/tests",
+                "--with=//bundles/buildbot/core",
+                "--with=//sdk/fidl/fuchsia.firebase.messaging:fuchsia.firebase.messaging",
+                "--with=//sdk/fidl/fuchsia.metricbroker:fuchsia.metricbroker",
+                "--with=//sdk/fidl/fuchsia.process:fuchsia.process",
+                "--with=//sdk/fidl/fuchsia.process.init:fuchsia.process.init",
+                "--with=//sdk/fidl/fuchsia.terminal:fuchsia.terminal",
+                "--with=//src/camera/bin/factory:fuchsia.factory.camera",
+                "--with=//src/media/vnext/fidl/fuchsia.audio:fuchsia.audio",
+                "--with=//src/media/vnext/fidl/fuchsia.media2:fuchsia.media2",
+                "--with=//src/media/vnext/fidl/fuchsia.mediastreams:fuchsia.mediastreams",
+                "--with=//src/media/vnext/fidl/fuchsia.mem2:fuchsia.mem2",
+                "--cargo-toml-gen",
             ],
-            stdout=sys.stdout)
+            stdout=sys.stdout,
+        )
 
-        print('\nBUILDING...')
-        subprocess.check_call(['fx', 'build'], stdout=sys.stdout)
+        print("\nBUILDING...")
+        subprocess.check_call(["fx", "build"], stdout=sys.stdout)
 
-    print('\nMATCHING... (takes a few min)')
+    print("\nMATCHING... (takes a few min)")
     converted, unconverted = match_converted_files()
     ready = len(converted)
     total = ready + len(unconverted)
 
-    print('\nCOULD NOT MATCH THE FOLLOWING FILES:')
+    print("\nCOULD NOT MATCH THE FOLLOWING FILES:")
     for u in unconverted:
         print(u)
 
     if args.dryrun:
-        print('MATCHED %s OF %d FIDL FILES' % (ready, total))
+        print("MATCHED %s OF %d FIDL FILES" % (ready, total))
     else:
         for old, new in converted.items():
             try:
-                subprocess.check_call(['cp', '-fT', new, old])
+                subprocess.check_call(["cp", "-fT", new, old])
             except subprocess.CalledProcessError as e:
                 print(e.output)
-        print('SUCCESSFULLY CONVERTED %s OF %d FIDL FILES' % (ready, total))
+        print("SUCCESSFULLY CONVERTED %s OF %d FIDL FILES" % (ready, total))
 
 
 def match_converted_files():
@@ -86,23 +92,25 @@ def match_converted_files():
     unconverted = []
 
     # Match each source file with its converted copy.
-    for path in FUCHSIA_DIR.rglob('*.fidl'):
+    for path in FUCHSIA_DIR.rglob("*.fidl"):
         if not path.is_file():
             continue
         old_syntax_path = path.relative_to(FUCHSIA_DIR)
 
         # These are not fuchsia.git source files - ignore them.
-        if str(old_syntax_path).startswith('out/'):
+        if str(old_syntax_path).startswith("out/"):
             continue
-        if str(old_syntax_path).startswith('prebuilt/'):
+        if str(old_syntax_path).startswith("prebuilt/"):
             continue
-        if str(old_syntax_path).startswith('third_party/'):
+        if str(old_syntax_path).startswith("third_party/"):
             continue
-        if str(old_syntax_path).startswith('vendor/'):
+        if str(old_syntax_path).startswith("vendor/"):
             continue
 
-        new_syntax_path = FUCHSIA_DIR / 'out/default/fidling/gen' / old_syntax_path
-        new_syntax_path = new_syntax_path.with_suffix('.fidl.new')
+        new_syntax_path = (
+            FUCHSIA_DIR / "out/default/fidling/gen" / old_syntax_path
+        )
+        new_syntax_path = new_syntax_path.with_suffix(".fidl.new")
 
         # The default case: the file's output location matches its location in
         # the source, save a slight redirection to the output directory.
@@ -113,7 +121,7 @@ def match_converted_files():
         # Sometimes, a file stored in `foo/fidl/my.fidl` is output into
         # a directory called `foo` rather than `foo/fidl`.  Check for such
         # cases.
-        new_syntax_path = '/'.join(str(new_syntax_path).rsplit('/fidl/', 1))
+        new_syntax_path = "/".join(str(new_syntax_path).rsplit("/fidl/", 1))
         if Path(new_syntax_path).exists():
             converted[str(old_syntax_path)] = str(new_syntax_path)
             continue
@@ -152,13 +160,14 @@ def match_converted_file(old_syntax_path_str):
     failure, and a (old_file_path, converted_file_path) tuple on success.
     """
 
-    new_syntax_path = Path(old_syntax_path_str).with_suffix('.fidl.new')
+    new_syntax_path = Path(old_syntax_path_str).with_suffix(".fidl.new")
     new_file_name = str(new_syntax_path.name)
     result = subprocess.run(
-        ['fx', 'gn', 'outputs', 'out/default', old_syntax_path_str],
-        capture_output=True)
+        ["fx", "gn", "outputs", "out/default", old_syntax_path_str],
+        capture_output=True,
+    )
 
-    for line in result.stdout.decode('utf-8').splitlines():
+    for line in result.stdout.decode("utf-8").splitlines():
         stripped = str(line.strip())
         if stripped.endswith(new_file_name):
             # print(' * ' + old_syntax_path_str + ' [MATCHED]')
@@ -175,25 +184,31 @@ def try_convert_fidl_file(old_syntax_path_str):
     success.
     """
 
-    tmpdir = Path.home() / 'tmp/fidl-migration'
+    tmpdir = Path.home() / "tmp/fidl-migration"
     new_syntax_path = tmpdir / old_syntax_path_str
-    new_syntax_path = new_syntax_path.with_suffix('.fidl.new')
+    new_syntax_path = new_syntax_path.with_suffix(".fidl.new")
     new_syntax_dir = new_syntax_path.parent
-    subprocess.check_call(['mkdir', '-p', new_syntax_dir], stdout=sys.stdout)
+    subprocess.check_call(["mkdir", "-p", new_syntax_dir], stdout=sys.stdout)
 
     # Try to convert the file assuming that it is a standalone library with no
     # imports.  If it works, great.  If not, return None, so that we may record
     # this file as unconvertable.
-    fidlc = FUCHSIA_DIR / 'out/default/host_x64/exe.unstripped/fidlc'
+    fidlc = FUCHSIA_DIR / "out/default/host_x64/exe.unstripped/fidlc"
     old_file = FUCHSIA_DIR / Path(old_syntax_path_str)
     try:
         subprocess.check_call(
             [
-                fidlc, '--experimental', 'old_syntax_only', '--convert-syntax',
-                new_syntax_dir, '--files', old_file
+                fidlc,
+                "--experimental",
+                "old_syntax_only",
+                "--convert-syntax",
+                new_syntax_dir,
+                "--files",
+                old_file,
             ],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL)
+            stderr=subprocess.DEVNULL,
+        )
     except subprocess.CalledProcessError as e:
         # print(' * ' + old_syntax_path_str + ' [ERRORED]')
         return None
@@ -202,15 +217,22 @@ def try_convert_fidl_file(old_syntax_path_str):
     return old_syntax_path_str, str(new_syntax_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description=
-        'Copies files converted by fidlc via a flag-enabled mode back into the source tree.'
+        description="Copies files converted by fidlc via a flag-enabled mode back into the source tree."
     )
-    parser.add_argument('--dry-run', dest='dryrun',
-                        action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--dry-run",
+        dest="dryrun",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     parser.set_defaults(dryrun=True)
-    parser.add_argument('--rebuild', dest='rebuild',
-                        action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument(
+        "--rebuild",
+        dest="rebuild",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     parser.set_defaults(rebuild=True)
     main(parser.parse_args())

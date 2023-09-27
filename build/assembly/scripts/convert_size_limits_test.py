@@ -11,7 +11,6 @@ from parameterized import parameterized, param
 
 
 class ConvertTest(unittest.TestCase):
-
     @parameterized.expand(
         [
             param(
@@ -30,17 +29,20 @@ class ConvertTest(unittest.TestCase):
                             component="b1_2_comp",
                             creep_limit=12,
                             limit=20,
-                            pkgs=["b1_c1", "b1_c2", "b2_c1"]),
+                            pkgs=["b1_c1", "b1_c2", "b2_c1"],
+                        ),
                         dict(
                             component="b_comp",
                             creep_limit=16,
                             limit=22,
-                            pkgs=["b_c2", "b_c1"]),
+                            pkgs=["b_c2", "b_c1"],
+                        ),
                         dict(
                             component="/system (drivers and early boot)",
                             creep_limit=52,
                             limit=53,
-                            pkgs=[])
+                            pkgs=[],
+                        ),
                     ],
                 ),
                 image_assembly_config=dict(
@@ -63,12 +65,14 @@ class ConvertTest(unittest.TestCase):
                             name="Distributed shared libraries",
                             paths=["lib_a", "lib_b"],
                             budget_bytes=31,
-                            creep_budget_bytes=32),
+                            creep_budget_bytes=32,
+                        ),
                         dict(
                             name="ICU Data",
                             paths=["icu"],
                             budget_bytes=41,
-                            creep_budget_bytes=42)
+                            creep_budget_bytes=42,
+                        ),
                     ],
                     package_set_budgets=[
                         dict(
@@ -76,7 +80,8 @@ class ConvertTest(unittest.TestCase):
                             budget_bytes=53,
                             creep_budget_bytes=52,
                             merge=True,
-                            packages=["obj/system/package_manifest.json"]),
+                            packages=["obj/system/package_manifest.json"],
+                        ),
                         dict(
                             name="Core system+services",
                             budget_bytes=21,
@@ -85,32 +90,36 @@ class ConvertTest(unittest.TestCase):
                             packages=[
                                 "obj/is_not_matched_1/package_manifest.json",
                                 "obj/is_not_matched_2/package_manifest.json",
-                            ]),
+                            ],
+                        ),
                         dict(
-                            name='b1_2_comp',
+                            name="b1_2_comp",
                             budget_bytes=20,
                             creep_budget_bytes=12,
                             merge=False,
                             packages=[
-                                'obj/a/b1_c1/package_manifest.json',
-                                'obj/a/b1_c2_expanded/rebased_package_manifest.json',
-                                'obj/a/b2_c1/package_manifest.json',
-                            ]),
+                                "obj/a/b1_c1/package_manifest.json",
+                                "obj/a/b1_c2_expanded/rebased_package_manifest.json",
+                                "obj/a/b2_c1/package_manifest.json",
+                            ],
+                        ),
                         dict(
-                            name='b_comp',
+                            name="b_comp",
                             budget_bytes=22,
                             creep_budget_bytes=16,
                             merge=False,
                             packages=[
-                                'obj/a/b_c1/package_manifest.json',
-                                'obj/a/b_c2/package_manifest.json',
-                            ]),
+                                "obj/a/b_c1/package_manifest.json",
+                                "obj/a/b_c2/package_manifest.json",
+                            ],
+                        ),
                     ],
                     total_budget_bytes=999,
                 ),
                 blobfs_capacity=3000,
                 max_blob_contents_size=999,
-                return_value=0),
+                return_value=0,
+            ),
             param(
                 name="failure_when_manifest_is_matched_twice",
                 size_limits=dict(
@@ -127,36 +136,49 @@ class ConvertTest(unittest.TestCase):
                             component="comp1",
                             creep_limit=12,
                             limit=20,
-                            pkgs=["b_c2"]),
+                            pkgs=["b_c2"],
+                        ),
                         dict(
                             component="comp2",
                             creep_limit=16,
                             limit=22,
-                            pkgs=["b_c2"]),
+                            pkgs=["b_c2"],
+                        ),
                     ],
                 ),
                 image_assembly_config=dict(
-                    base=["obj/a/b_c2/package_manifest.json"]),
+                    base=["obj/a/b_c2/package_manifest.json"]
+                ),
                 expected_output=None,
                 blobfs_capacity=101,
                 max_blob_contents_size=100,
-                return_value=1),
+                return_value=1,
+            ),
             param(
-                name=
-                "success_when_size_limit_and_image_assembly_config_is_empty",
+                name="success_when_size_limit_and_image_assembly_config_is_empty",
                 size_limits=dict(),
                 image_assembly_config=dict(),
                 expected_output=dict(
                     resource_budgets=[],
                     package_set_budgets=[],
-                    total_budget_bytes=200),
+                    total_budget_bytes=200,
+                ),
                 blobfs_capacity=101,
                 max_blob_contents_size=200,
-                return_value=0),
-        ])
+                return_value=0,
+            ),
+        ]
+    )
     def test_run_main(
-            self, name, size_limits, image_assembly_config, expected_output,
-            blobfs_capacity, max_blob_contents_size, return_value):
+        self,
+        name,
+        size_limits,
+        image_assembly_config,
+        expected_output,
+        blobfs_capacity,
+        max_blob_contents_size,
+        return_value,
+    ):
         self.maxDiff = None  # Do not truncate the diff result.
         with tempfile.TemporaryDirectory() as tmpdir:
             platform_aibs_path = os.path.join(tmpdir, "platform_aibs.json")
@@ -168,13 +190,15 @@ class ConvertTest(unittest.TestCase):
                 json.dump(size_limits, file)
 
             image_assembly_config_path = os.path.join(
-                tmpdir, "image_assembly_config.json")
+                tmpdir, "image_assembly_config.json"
+            )
             with open(image_assembly_config_path, "w") as file:
                 json.dump(image_assembly_config, file)
 
             output_path = os.path.join(tmpdir, "output.json")
             non_blobfs_output_path = os.path.join(
-                tmpdir, "non_blobfs_output.json")
+                tmpdir, "non_blobfs_output.json"
+            )
             # The first argument of a command line is the path to the program.
             # It is unused and left empty.
             sys.argv = [

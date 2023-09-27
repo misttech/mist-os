@@ -46,8 +46,7 @@ def main():
     )
     parser.add_argument(
         "--all",
-        help=
-        "if set, includes otherwise ignored, dynamically-specified goldens (i.e., those specified via a build-time manifest)",
+        help="if set, includes otherwise ignored, dynamically-specified goldens (i.e., those specified via a build-time manifest)",
         action="store_true",
     )
     parser.add_argument(

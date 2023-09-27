@@ -13,37 +13,52 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Finds and runs tests affected by current change")
+        description="Finds and runs tests affected by current change"
+    )
     parser.add_argument(
-        "--verbose", action="store_true", help="Print verbose messages")
+        "--verbose", action="store_true", help="Print verbose messages"
+    )
     parser.add_argument(
-        "--dry-run", action="store_true", help="Don't run affected tests")
+        "--dry-run", action="store_true", help="Don't run affected tests"
+    )
     parser.add_argument(
-        "test_args", nargs=argparse.REMAINDER, help="Arguments for `fx test`")
+        "test_args", nargs=argparse.REMAINDER, help="Arguments for `fx test`"
+    )
     parser.add_argument(
-        "--out-dir", required=True, help="Path to the Fuchsia build directory")
+        "--out-dir", required=True, help="Path to the Fuchsia build directory"
+    )
     args = parser.parse_args()
 
     # Find all modified files
     upstream = (
         subprocess.run(
             [
-                "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name",
-                "@{u}"
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{u}",
             ],
             capture_output=True,
             encoding="UTF-8",
-        ).stdout.strip() or "origin/main")
+        ).stdout.strip()
+        or "origin/main"
+    )
     local_commit = subprocess.check_output(
-        ["git", "rev-list", "HEAD", upstream, "--"],
-        encoding="UTF-8").splitlines()[0]
+        ["git", "rev-list", "HEAD", upstream, "--"], encoding="UTF-8"
+    ).splitlines()[0]
     diff_base = (
-        local_commit and subprocess.run(
-            ["git", "rev-parse", local_commit + '^'],
+        local_commit
+        and subprocess.run(
+            ["git", "rev-parse", local_commit + "^"],
             capture_output=True,
-            encoding="UTF-8").stdout.strip() or "HEAD")
+            encoding="UTF-8",
+        ).stdout.strip()
+        or "HEAD"
+    )
     modified = subprocess.check_output(
-        ["git", "diff", "--name-only", diff_base], encoding="UTF-8")
+        ["git", "diff", "--name-only", diff_base], encoding="UTF-8"
+    )
     if not modified:
         print("No modified files")
         return 0
@@ -60,17 +75,20 @@ def main():
 
     # Find stamps for all tests
     stamp_to_test_label = {
-        "touch " + os.path.join(
+        "touch "
+        + os.path.join(
             # Transform GN label to stamp file path, for example:
             # //my/gn:path($my_toolchain) -> obj/my/gn/path.stamp
             "obj",
-            label[2:].partition("(")[0].replace(":", "/") + ".stamp"): label
+            label[2:].partition("(")[0].replace(":", "/") + ".stamp",
+        ): label
         for label in (entry["test"]["label"] for entry in tests)
     }
 
     # Touch all modified files so they're newer than any stamps
     git_base = subprocess.check_output(
-        ["git", "rev-parse", "--show-toplevel"], encoding="UTF-8").strip()
+        ["git", "rev-parse", "--show-toplevel"], encoding="UTF-8"
+    ).strip()
     file_stats = {}
     for path in modified.splitlines():
         p = os.path.join(git_base, path)

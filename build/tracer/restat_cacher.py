@@ -76,18 +76,21 @@ def ensure_file_exists(path):
         time.sleep(delay)
 
     raise FileNotFoundError(
-        f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}")
+        f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}"
+    )
 
 
 def retry_file_op_once_with_delay(
-        fileop: Callable[[], Any], failmsg: str, delay: int):
+    fileop: Callable[[], Any], failmsg: str, delay: int
+):
     """Insanity is doing the same thing and expecting a different result."""
     try:
         fileop()
     except FileNotFoundError:
         # one-time retry
         print(
-            f'[{_SCRIPT_BASENAME}] {failmsg}  (Retrying once after {delay}s.)')
+            f"[{_SCRIPT_BASENAME}] {failmsg}  (Retrying once after {delay}s.)"
+        )
         time.sleep(delay)
         fileop()
         # If this fails again, exception will be raised.
@@ -143,6 +146,7 @@ class TempFileTransform(object):
       is sensitive to the output file extension.
       Example: "foo/bar.txt", with prefix="tmp-" -> foo/tmp-bar.txt
     """
+
     temp_dir: str = ""
     suffix: str = ""
     basename_prefix: str = ""
@@ -153,29 +157,31 @@ class TempFileTransform(object):
 
     def transform(self, path: str) -> str:
         return os.path.join(
-            self.temp_dir, os.path.dirname(path),
-            self.basename_prefix + os.path.basename(path) + self.suffix)
+            self.temp_dir,
+            os.path.dirname(path),
+            self.basename_prefix + os.path.basename(path) + self.suffix,
+        )
 
 
 def env_safe_command(command: Sequence[str]) -> Sequence[str]:
     """Automatically prefix a command with env if needed."""
-    if command and '=' in command[0]:
-        return ['/usr/bin/env'] + command
+    if command and "=" in command[0]:
+        return ["/usr/bin/env"] + command
     return command
 
 
 def record_existing_outputs(
-        outputs: Iterable[str], transform: Callable[[str],
-                                                    str]) -> Dict[str, str]:
+    outputs: Iterable[str], transform: Callable[[str], str]
+) -> Dict[str, str]:
     """Map output file paths to their backup locations, using a transform.
 
-  Args:
-    outputs: collection of output files to backup.
-    transform: name transformation to backup file name.
+    Args:
+      outputs: collection of output files to backup.
+      transform: name transformation to backup file name.
 
-  Returns:
-    Dictionary of outputs that already existed, mapped to their backup paths.
-  """
+    Returns:
+      Dictionary of outputs that already existed, mapped to their backup paths.
+    """
     return {
         f: transform(f)
         for f in outputs
@@ -184,8 +190,8 @@ def record_existing_outputs(
 
 
 def backup_outputs(
-        outputs: FrozenSet[str],
-        tempfile_transform: TempFileTransform) -> Dict[str, str]:
+    outputs: FrozenSet[str], tempfile_transform: TempFileTransform
+) -> Dict[str, str]:
     """Move pre-existing output files to backup locations.
 
     This is move, not copy, so this should be paired with some
@@ -195,7 +201,8 @@ def backup_outputs(
       Dictionary of outputs that already existed, mapped to their backup paths.
     """
     outputs_to_restore = record_existing_outputs(
-        outputs, tempfile_transform.transform)
+        outputs, tempfile_transform.transform
+    )
 
     # mkdir when needed.
     if tempfile_transform.temp_dir:
@@ -205,7 +212,7 @@ def backup_outputs(
     for output, backup in outputs_to_restore.items():
         retry_file_op_once_with_delay(
             lambda: shutil.move(output, backup),
-            f'Failed to backup {output} -> {backup}.',
+            f"Failed to backup {output} -> {backup}.",
             5,
         )
 
@@ -213,7 +220,8 @@ def backup_outputs(
 
 
 def restore_if_unchanged(
-        files_to_restore: Dict[str, str], verbose: bool = False) -> bool:
+    files_to_restore: Dict[str, str], verbose: bool = False
+) -> bool:
     """If backup contents match the new output, restore the backup.
 
     Otherwise remove the backup.
@@ -227,8 +235,9 @@ def restore_if_unchanged(
         try:
             retry_file_op_once_with_delay(
                 lambda: move_if_identical(
-                    src=backup, dest=orig, verbose=verbose),
-                f'Failed to restore {backup} -> {orig}.',
+                    src=backup, dest=orig, verbose=verbose
+                ),
+                f"Failed to restore {backup} -> {orig}.",
                 5,
             )
         except FileNotFoundError as e:
@@ -251,7 +260,7 @@ def restore_all(outputs_to_restore: Dict[str, str]) -> bool:
         try:
             retry_file_op_once_with_delay(
                 lambda: shutil.move(backup, orig),
-                f'Failed to restore {backup} -> {orig}.',
+                f"Failed to restore {backup} -> {orig}.",
                 5,
             )
         except FileNotFoundError as e:
@@ -263,14 +272,14 @@ def restore_all(outputs_to_restore: Dict[str, str]) -> bool:
 @dataclasses.dataclass
 class Action(object):
     """Represents a set of parameters of a single build action."""
+
     command: Sequence[str] = dataclasses.field(default_factory=list)
     outputs: FrozenSet[str] = dataclasses.field(default_factory=set)
     label: str = ""
 
     def run_cached(
-            self,
-            tempfile_transform: TempFileTransform,
-            verbose: bool = False) -> int:
+        self, tempfile_transform: TempFileTransform, verbose: bool = False
+    ) -> int:
         """Runs a modified command and conditionally moves outputs in-place.
 
         Args:
@@ -313,9 +322,9 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--outputs",
         nargs="*",
-        help="An action's declared outputs.  " +
-        "The named output files will be backed-up before the command runs, " +
-        "and compared against after the command finishes successfully.",
+        help="An action's declared outputs.  "
+        + "The named output files will be backed-up before the command runs, "
+        + "and compared against after the command finishes successfully.",
     )
     parser.add_argument(
         "--temp-suffix",
@@ -333,8 +342,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "--temp-dir",
         type=str,
         default="",
-        help=
-        "Temporary directory for writing, can be relative to working directory or absolute.",
+        help="Temporary directory for writing, can be relative to working directory or absolute.",
     )
     parser.add_argument(
         "--verbose",
@@ -374,7 +382,8 @@ def main(argv: Sequence[str]) -> int:
     )
     if not tempfile_transform.valid:
         raise ValueError(
-            "Need either --temp-dir or --temp-suffix, but both are missing.")
+            "Need either --temp-dir or --temp-suffix, but both are missing."
+        )
 
     wrap = args.enable
     # Decided whether or not to wrap the action script.

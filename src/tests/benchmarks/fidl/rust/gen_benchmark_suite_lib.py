@@ -24,7 +24,7 @@ import sys
 def main():
     if len(sys.argv) < 2:
         print(
-            'expect at least 1 argument: [output file] ([package name])*',
+            "expect at least 1 argument: [output file] ([package name])*",
             file=sys.stderr,
         )
         return 2
@@ -33,15 +33,16 @@ def main():
     packages = sys.argv[2:]
 
     with open(output_file, "w") as fo:
-        fo.write('use fuchsia_criterion::criterion::Bencher;\n\n')
+        fo.write("use fuchsia_criterion::criterion::Bencher;\n\n")
         for package in packages:
-            fo.write('use %s;\n' % package)
+            fo.write("use %s;\n" % package)
         fo.write(
-            '\npub const ALL_BENCHMARKS: [&\'static[(&\'static str, fn(&mut Bencher))]; %d] = [\n'
-            % len(packages))
+            "\npub const ALL_BENCHMARKS: [&'static[(&'static str, fn(&mut Bencher))]; %d] = [\n"
+            % len(packages)
+        )
         for package in packages:
-            fo.write('\t&%s::BENCHMARKS,\n' % package)
-        fo.write('];\n')
+            fo.write("\t&%s::BENCHMARKS,\n" % package)
+        fo.write("];\n")
 
 
 if __name__ == "__main__":

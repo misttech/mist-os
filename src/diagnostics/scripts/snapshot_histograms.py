@@ -24,16 +24,16 @@ import sys
 
 
 def extract_buckets(payload, current_path=[]):
-  result = []
-  for (key, child) in payload.items():
-    if type(child) is not dict:
-      continue
-    if 'buckets' in child:
-      path = current_path + [key]
-      result.append(('/'.join(path), child['buckets']))
-      continue
-    result.extend(extract_buckets(child, current_path + [key]))
-  return result
+    result = []
+    for key, child in payload.items():
+        if type(child) is not dict:
+            continue
+        if "buckets" in child:
+            path = current_path + [key]
+            result.append(("/".join(path), child["buckets"]))
+            continue
+        result.extend(extract_buckets(child, current_path + [key]))
+    return result
 
 
 HTML_DATA = """
@@ -124,19 +124,21 @@ HTML_DATA = """
 </html>
 """
 
-if __name__ == '__main__':
-  parser = argparse.ArgumentParser(
-      description='Show histograms in a snapshot.')
-  parser.add_argument(
-      'filepath', metavar='FILE', type=str, help='path to inspect.json file')
-  args = parser.parse_args(sys.argv[1:])
-  results = {}
-  with open(args.filepath) as f:
-    data = json.load(f)
-    for response in data:
-      if response['payload']:
-        buckets = extract_buckets(response['payload'])
-        if buckets:
-          results[response['moniker']] = dict(buckets)
-  html = HTML_DATA.replace('{DATA}', '{}'.format(results))
-  print(html)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Show histograms in a snapshot."
+    )
+    parser.add_argument(
+        "filepath", metavar="FILE", type=str, help="path to inspect.json file"
+    )
+    args = parser.parse_args(sys.argv[1:])
+    results = {}
+    with open(args.filepath) as f:
+        data = json.load(f)
+        for response in data:
+            if response["payload"]:
+                buckets = extract_buckets(response["payload"])
+                if buckets:
+                    results[response["moniker"]] = dict(buckets)
+    html = HTML_DATA.replace("{DATA}", "{}".format(results))
+    print(html)

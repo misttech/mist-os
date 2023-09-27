@@ -3,4 +3,4 @@
 # found in the LICENSE file.
 import lib
 
-print('Fib(5)=%s' % lib.Fib(5))
+print("Fib(5)=%s" % lib.Fib(5))

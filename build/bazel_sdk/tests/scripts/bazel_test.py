@@ -88,8 +88,9 @@ def _run_command(
     args = [str(a) for a in cmd_args]
     if _VERBOSE:
         print(
-            "RUN_COMMAND:%s" %
-            _generate_command_string(cmd_args, env=env, cwd=cwd))
+            "RUN_COMMAND:%s"
+            % _generate_command_string(cmd_args, env=env, cwd=cwd)
+        )
 
     if env:
         new_env = os.environ.copy()
@@ -167,7 +168,8 @@ def _depfile_quote(path: str) -> str:
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--bazel", help="Specify bazel binary.")
     mutex_group = parser.add_mutually_exclusive_group()
     mutex_group.add_argument(
@@ -175,32 +177,38 @@ def main():
         help="Specify Fuchsia build directory (default is auto-detected).",
     )
     mutex_group.add_argument(
-        "--fuchsia_idk_directory", help="Specify Fuchsia IDK directory.")
+        "--fuchsia_idk_directory", help="Specify Fuchsia IDK directory."
+    )
     parser.add_argument(
         "--fuchsia_source_dir",
         help="Specify Fuchsia source directory (default is auto-detected).",
     )
     parser.add_argument(
-        "--output_base", help="Use specific Bazel output base directory.")
+        "--output_base", help="Use specific Bazel output base directory."
+    )
     parser.add_argument(
         "--output_user_root",
-        help="Use specific Bazel output user root directory.")
+        help="Use specific Bazel output user root directory.",
+    )
     parser.add_argument(
-        "--stamp-file", help="Output stamp file, written on success only.")
+        "--stamp-file", help="Output stamp file, written on success only."
+    )
     parser.add_argument("--depfile", help="Output Ninja depfile file.")
     parser.add_argument(
         "--target_cpu",
-        help=
-        "Target cpu name, using Fuchsia conventions (default is auto-detected).",
+        help="Target cpu name, using Fuchsia conventions (default is auto-detected).",
     )
     parser.add_argument(
-        "--verbose", action="store_true", help="Enable verbose mode.")
+        "--verbose", action="store_true", help="Enable verbose mode."
+    )
     parser.add_argument(
         "--quiet",
         action="store_true",
-        help="Do not print anything unless there is an error.")
+        help="Do not print anything unless there is an error.",
+    )
     parser.add_argument(
-        "--clean", action="store_true", help="Force clean build.")
+        "--clean", action="store_true", help="Force clean build."
+    )
     parser.add_argument(
         "--test_target",
         default="//:tests",
@@ -219,7 +227,8 @@ def main():
 
     if args.depfile and not args.stamp_file:
         parser.error(
-            "The --depfile option requires a --stamp-file output path!")
+            "The --depfile option requires a --stamp-file output path!"
+        )
 
     extra_args = []
     if args.extra_args:
@@ -241,7 +250,8 @@ def main():
 
     if not fuchsia_source_dir.exists():
         return _print_error(
-            f"Fuchsia source directory does not exist: {fuchsia_source_dir}")
+            f"Fuchsia source directory does not exist: {fuchsia_source_dir}"
+        )
 
     # Get Fuchsia build directory.
     if args.fuchsia_build_dir:
@@ -265,7 +275,8 @@ def main():
     if has_fuchsia_build_dir:
         if not fuchsia_build_dir.exists():
             return _print_error(
-                f"Fuchsia build directory does not exist: {fuchsia_build_dir}")
+                f"Fuchsia build directory does not exist: {fuchsia_build_dir}"
+            )
 
         fuchsia_build_dir = fuchsia_build_dir.resolve()
 
@@ -294,8 +305,13 @@ def main():
         bazel = Path(args.bazel)
     else:
         bazel = (
-            fuchsia_source_dir / "prebuilt" / "third_party" / "bazel" /
-            host_tag / "bazel")
+            fuchsia_source_dir
+            / "prebuilt"
+            / "third_party"
+            / "bazel"
+            / host_tag
+            / "bazel"
+        )
 
     if not bazel.exists():
         return _print_error(f"Bazel binary does not exist: {bazel}")
@@ -304,7 +320,8 @@ def main():
 
     # Location of the prebuilt python toolchain.
     python_prebuilt_dir = (
-        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag)
+        fuchsia_source_dir / "prebuilt" / "third_party" / "python3" / host_tag
+    )
 
     # The Bazel workspace assumes that the Fuchsia cpu is the host
     # CPU unless --cpu or --platforms is used. Extract the target_cpu
@@ -331,11 +348,13 @@ def main():
     else:
         if not has_fuchsia_build_dir:
             parser.error(
-                "Cannot auto-detect --target_cpu with --fuchsia_idk_directory")
+                "Cannot auto-detect --target_cpu with --fuchsia_idk_directory"
+            )
         args_json = fuchsia_build_dir / "args.json"
         if not args_json.exists():
             return _print_error(
-                "Cannot auto-detect target cpu, please use --target_cpu=CPU")
+                "Cannot auto-detect target cpu, please use --target_cpu=CPU"
+            )
 
         with open(args_json) as f:
             target_cpu = json.load(f)["target_cpu"]
@@ -364,28 +383,32 @@ def main():
         # Get output base from Bazel directly.
         output_base = Path(
             subprocess.check_output(
-                [bazel, 'info', 'output_base'], text=True,
-                cwd=workspace_dir).strip())
+                [bazel, "info", "output_base"], text=True, cwd=workspace_dir
+            ).strip()
+        )
 
     # A map of repository override paths, required to prevent any downloads
     # during build and query operations.
     repo_override_map = {
-        "bazel_skylib":
-            fuchsia_source_dir / "third_party" / "bazel_skylib",
-        "rules_cc":
-            fuchsia_source_dir / "third_party" / "bazel_rules_cc",
-        "rules_python":
-            fuchsia_source_dir / "third_party" / "bazel_rules_python",
-        "rules_license":
-            fuchsia_source_dir / "third_party" / "bazel_rules_license",
-        "platforms":
-            fuchsia_source_dir / "third_party" / "bazel_platforms",
-        "rules_java":
-            fuchsia_source_dir / "build" / "bazel" / "local_repositories" /
-            "rules_java",
-        "remote_coverage_tools":
-            fuchsia_source_dir / "build" / "bazel" / "local_repositories" /
-            "remote_coverage_tools",
+        "bazel_skylib": fuchsia_source_dir / "third_party" / "bazel_skylib",
+        "rules_cc": fuchsia_source_dir / "third_party" / "bazel_rules_cc",
+        "rules_python": fuchsia_source_dir
+        / "third_party"
+        / "bazel_rules_python",
+        "rules_license": fuchsia_source_dir
+        / "third_party"
+        / "bazel_rules_license",
+        "platforms": fuchsia_source_dir / "third_party" / "bazel_platforms",
+        "rules_java": fuchsia_source_dir
+        / "build"
+        / "bazel"
+        / "local_repositories"
+        / "rules_java",
+        "remote_coverage_tools": fuchsia_source_dir
+        / "build"
+        / "bazel"
+        / "local_repositories"
+        / "remote_coverage_tools",
     }
 
     # These options must appear after the Bazel command.
@@ -450,10 +473,12 @@ def main():
     if args.clean:
         # Perform clean build
         ret = _run_command(
-            bazel_startup_args + ["clean", "--expunge"], cwd=workspace_dir)
+            bazel_startup_args + ["clean", "--expunge"], cwd=workspace_dir
+        )
         if ret.returncode != 0:
             return _print_error(
-                "Could not clean bazel output base?\n%s\n" % ret.stderr)
+                "Could not clean bazel output base?\n%s\n" % ret.stderr
+            )
 
     PATH = os.environ["PATH"]
 
@@ -475,16 +500,17 @@ def main():
         # @fuchsia_sdk repository rule. Note that using --action_env will
         # not work because this option only affects Bazel actions, and
         # not repository rules.
-        bazel_env['LOCAL_FUCHSIA_PLATFORM_BUILD'] = str(fuchsia_build_dir)
+        bazel_env["LOCAL_FUCHSIA_PLATFORM_BUILD"] = str(fuchsia_build_dir)
     else:
         # Pass the location of the Fuchsia IDK archive to the @fuchsia_sdk
         # repository rule.
-        bazel_env['LOCAL_FUCHSIA_IDK_DIRECTORY'] = str(
-            fuchsia_idk_directory.resolve())
+        bazel_env["LOCAL_FUCHSIA_IDK_DIRECTORY"] = str(
+            fuchsia_idk_directory.resolve()
+        )
 
     # Setting USER is required to run Bazel, so force it to run on infra bots.
-    if 'USER' not in os.environ:
-        bazel_env['USER'] = 'unused-bazel-build-user'
+    if "USER" not in os.environ:
+        bazel_env["USER"] = "unused-bazel-build-user"
 
     # NOTE: Mapping labels to repository inputs is considerably simpler than
     # //build/bazel/scripts/bazel_action.py because there are way less edge
@@ -495,21 +521,21 @@ def main():
     repo_map = repo_override_map.copy()
     repo_map.update(
         {
-            "fuchsia_sdk_common":
-                fuchsia_source_dir / "build" / "bazel_sdk" /
-                "bazel_rules_fuchsia" / "common",
-            "fuchsia_sdk":
-                fuchsia_source_dir / "build" / "bazel_sdk" /
-                "bazel_rules_fuchsia",
-            "prebuilt_python":
-                IGNORED_REPO,
-            "fuchsia_clang":
-                IGNORED_REPO,
-            "bazel_tools":
-                IGNORED_REPO,
-            "local_config_cc":
-                IGNORED_REPO,
-        })
+            "fuchsia_sdk_common": fuchsia_source_dir
+            / "build"
+            / "bazel_sdk"
+            / "bazel_rules_fuchsia"
+            / "common",
+            "fuchsia_sdk": fuchsia_source_dir
+            / "build"
+            / "bazel_sdk"
+            / "bazel_rules_fuchsia",
+            "prebuilt_python": IGNORED_REPO,
+            "fuchsia_clang": IGNORED_REPO,
+            "bazel_tools": IGNORED_REPO,
+            "local_config_cc": IGNORED_REPO,
+        }
+    )
 
     def decompose_bazel_label(label: str) -> Tuple[str, str, str]:
         """Decompose a Bazel label into repo_name, package_path, target_name."""
@@ -518,13 +544,17 @@ def main():
             repo_name = ""
         elif build_file.startswith("@"):
             pos = build_file.find("//", 1)
-            assert pos > 0, f"build file path has invalid repository root: {build_file}"
+            assert (
+                pos > 0
+            ), f"build file path has invalid repository root: {build_file}"
             repo_name = build_file[1:pos]
-            target_path = build_file[pos + 2:]
+            target_path = build_file[pos + 2 :]
 
             repo_dir = repo_map.get(repo_name, None)
-            assert repo_dir, f"Unknown repository name in build file path: {build_file}\n" + \
-              f"Please modify {__file__} to handle it!"
+            assert repo_dir, (
+                f"Unknown repository name in build file path: {build_file}\n"
+                + f"Please modify {__file__} to handle it!"
+            )
             # A special value of IGNORED means build files from this repository should
             # be ignored.
             if str(repo_dir) == "IGNORED":
@@ -549,13 +579,17 @@ def main():
             repo_name = False
         elif build_file.startswith("@"):
             pos = build_file.find("//", 1)
-            assert pos > 0, f"build file path has invalid repository root: {build_file}"
+            assert (
+                pos > 0
+            ), f"build file path has invalid repository root: {build_file}"
             repo_name = build_file[1:pos]
-            target_path = build_file[pos + 2:]
+            target_path = build_file[pos + 2 :]
 
             repo_dir = repo_map.get(repo_name, None)
-            assert repo_dir, f"Unknown repository name in build file path: {build_file}\n" + \
-              f"Please modify {__file__} to handle it!"
+            assert repo_dir, (
+                f"Unknown repository name in build file path: {build_file}\n"
+                + f"Please modify {__file__} to handle it!"
+            )
             # A special value of IGNORED means build files from this repository should
             # be ignored.
             if str(repo_dir) == "IGNORED":
@@ -589,14 +623,16 @@ def main():
         #     location of that file.
         #
         if repo_name:
-            external_repo_dir = output_base / 'external' / repo_name
+            external_repo_dir = output_base / "external" / repo_name
             final_path = external_repo_dir / target_path
             if final_path.exists():
                 return final_path.resolve()
 
         # This should not happen, but print an error message pointing to this
         # script in case it really does!
-        assert False, f"Unknown input label, please update {__file__} to handle it: {build_file}"
+        assert (
+            False
+        ), f"Unknown input label, please update {__file__} to handle it: {build_file}"
 
     query_target = f"set({args.test_target})"
 
@@ -605,14 +641,19 @@ def main():
         query_env = os.environ.copy()
         query_env.update(bazel_env)
         query_args = (
-            bazel_startup_args + ["query"] + bazel_common_args +
-            bazel_quiet_args + ["buildfiles(deps(%s))" % query_target])
+            bazel_startup_args
+            + ["query"]
+            + bazel_common_args
+            + bazel_quiet_args
+            + ["buildfiles(deps(%s))" % query_target]
+        )
         ret = subprocess.run(
             query_args,
             capture_output=True,
             text=True,
             cwd=workspace_dir,
-            env=query_env)
+            env=query_env,
+        )
         ret.check_returncode()
         build_files = ret.stdout.splitlines()
         result = set()
@@ -628,11 +669,15 @@ def main():
         cquery_env = os.environ.copy()
         cquery_env.update(bazel_env)
         cquery_args = (
-            bazel_startup_args + ["cquery"] + bazel_config_args +
-            bazel_quiet_args + [
+            bazel_startup_args
+            + ["cquery"]
+            + bazel_config_args
+            + bazel_quiet_args
+            + [
                 "--output=label",
                 'kind("source file", deps(%s))' % query_target,
-            ])
+            ]
+        )
         ret = subprocess.run(
             cquery_args,
             capture_output=True,
@@ -646,7 +691,9 @@ def main():
         source_files = set()
         for l in ret.stdout.splitlines():
             path, space, label = l.partition(" ")
-            assert space == " " and label == "(null)", f"Invalid source file line: {l}"
+            assert (
+                space == " " and label == "(null)"
+            ), f"Invalid source file line: {l}"
             resolved = resolve_build_file(path)
             if not resolved:
                 continue
@@ -657,26 +704,33 @@ def main():
         return source_files
 
     ret = _run_command(
-        bazel_startup_args + ["test"] + bazel_config_args + bazel_test_args +
-        [args.test_target] + extra_args,
+        bazel_startup_args
+        + ["test"]
+        + bazel_config_args
+        + bazel_test_args
+        + [args.test_target]
+        + extra_args,
         env=bazel_env,
         cwd=workspace_dir,
     )
     ret.check_returncode()
 
     if args.stamp_file:
-        with open(args.stamp_file, 'w') as f:
-            f.write('')
+        with open(args.stamp_file, "w") as f:
+            f.write("")
 
     if args.depfile:
         outputs = [args.stamp_file]
         implicit_inputs = find_build_files() | find_source_files()
         implicit_inputs = [_relative_path(p) for p in implicit_inputs]
-        with open(args.depfile, 'w') as f:
+        with open(args.depfile, "w") as f:
             f.write(
-                '%s: %s\n' % (
-                    ' '.join(_depfile_quote(p) for p in outputs), ' '.join(
-                        _depfile_quote(str(p)) for p in implicit_inputs)))
+                "%s: %s\n"
+                % (
+                    " ".join(_depfile_quote(p) for p in outputs),
+                    " ".join(_depfile_quote(str(p)) for p in implicit_inputs),
+                )
+            )
 
     return 0
 

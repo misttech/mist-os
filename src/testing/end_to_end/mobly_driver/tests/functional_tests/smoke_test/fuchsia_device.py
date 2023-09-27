@@ -10,8 +10,8 @@ This implements the required APIs to make this module compatible with Mobly.
  - MOBLY_CONTROLLER_CONFIG_NAME
 """
 
-MOBLY_CONTROLLER_CONFIG_NAME = 'FuchsiaDevice'
-CONFIG_KEY_NAME = 'name'
+MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
+CONFIG_KEY_NAME = "name"
 
 
 def create(configs):
@@ -26,7 +26,7 @@ def destroy(unused_devices):
     """Tears down the controller(s)."""
 
 
-class FuchsiaDevice():
+class FuchsiaDevice:
     """Trivial Fuchsia device controller class."""
 
     def __init__(self, config):

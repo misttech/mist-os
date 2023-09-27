@@ -11,7 +11,6 @@ import list_packages
 
 
 class TestPrintPackages(unittest.TestCase):
-
     def validate(self, input, output):
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
@@ -26,16 +25,17 @@ class TestPrintPackages(unittest.TestCase):
         self.validate(
             {
                 "set0": ["package0", "package2"],
-                "set1": ["package1", "package3"]
-            }, """package0
+                "set1": ["package1", "package3"],
+            },
+            """package0
 package1
 package2
 package3
-""")
+""",
+        )
 
 
 class TestPrintPackagesVerbose(unittest.TestCase):
-
     def validate(self, input, output):
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
@@ -50,40 +50,43 @@ class TestPrintPackagesVerbose(unittest.TestCase):
         self.validate(
             {
                 "set0": ["package0", "package2", "package4"],
-                "set1": ["package1", "package3", "package4"]
-            }, """package0 [set0]
+                "set1": ["package1", "package3", "package4"],
+            },
+            """package0 [set0]
 package1 [set1]
 package2 [set0]
 package3 [set1]
 package4 [set0 set1]
-""")
+""",
+        )
 
 
 class TestExtractPackagesFromListing(unittest.TestCase):
-
     def validate(self, listing, filter_, output):
         self.assertEqual(
             list_packages.extract_packages_from_listing(listing, filter_),
-            output)
+            output,
+        )
 
     def test_segment_in_manifests(self):
         self.validate(
-            {"content": {
-                "manifests": ["package"]
-            }}, lambda s: True, ["package"])
+            {"content": {"manifests": ["package"]}}, lambda s: True, ["package"]
+        )
 
     def test_path_in_manifests(self):
         self.validate(
-            {"content": {
-                "manifests": ["prefix/package"]
-            }}, lambda s: True, ["package"])
+            {"content": {"manifests": ["prefix/package"]}},
+            lambda s: True,
+            ["package"],
+        )
 
     def test_filter(self):
         self.validate(
-            {"content": {
-                "manifests": ["package0", "package1"]
-            }}, lambda s: s == "package1", ["package1"])
+            {"content": {"manifests": ["package0", "package1"]}},
+            lambda s: s == "package1",
+            ["package1"],
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

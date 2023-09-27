@@ -12,30 +12,34 @@ import os
 import shutil
 import sys
 
-_HOST_CPUS = ('x64', 'arm64')
+_HOST_CPUS = ("x64", "arm64")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--host_cpu',
+        "--host_cpu",
         required=True,
         choices=_HOST_CPUS,
-        help='Host CPU architecture name')
+        help="Host CPU architecture name",
+    )
     parser.add_argument(
-        '--input',
-        type=argparse.FileType('r'),
+        "--input",
+        type=argparse.FileType("r"),
         required=True,
-        help='Input API manifest file')
+        help="Input API manifest file",
+    )
     parser.add_argument(
-        '--output',
-        type=argparse.FileType('w'),
+        "--output",
+        type=argparse.FileType("w"),
         required=True,
-        help='Output API manifest file')
+        help="Output API manifest file",
+    )
     parser.add_argument(
-        '--host-tool-prefix',
+        "--host-tool-prefix",
         required=True,
-        help='Line prefix for SDK host tool')
+        help="Line prefix for SDK host tool",
+    )
 
     args = parser.parse_args()
 
@@ -44,16 +48,17 @@ def main():
 
     # Any candidate line that begins with this prefix is accepted, all others
     # are rejected.
-    accepted_line_prefix = candidate_line_prefix + args.host_cpu + '/'
+    accepted_line_prefix = candidate_line_prefix + args.host_cpu + "/"
 
     for line in args.input:
-        if line.startswith(candidate_line_prefix) and \
-            not line.startswith(accepted_line_prefix):
+        if line.startswith(candidate_line_prefix) and not line.startswith(
+            accepted_line_prefix
+        ):
             continue
         args.output.write(line)
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

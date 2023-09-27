@@ -12,7 +12,7 @@ import sys
 
 def main():
     if len(sys.argv) != 3:
-        print('usage: copy.py source dest', file=sys.stderr)
+        print("usage: copy.py source dest", file=sys.stderr)
         return 1
     source = sys.argv[1]
     dest = sys.argv[2]
@@ -44,5 +44,5 @@ def main():
     shutil.copy2(source, dest)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

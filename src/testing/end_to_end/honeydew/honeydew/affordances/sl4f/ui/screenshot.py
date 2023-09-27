@@ -46,4 +46,5 @@ class Screenshot(screenshot.Screenshot):
 
         data = base64.decodebytes(img_bytes)
         return screenshot.ScreenshotImage(
-            size=custom_types.Size(width=width, height=height), data=data)
+            size=custom_types.Size(width=width, height=height), data=data
+        )

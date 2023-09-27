@@ -22,7 +22,8 @@ class DictReader:
     def __init__(self, dictionary: Dict[str, Any], location):
         if not isinstance(dictionary, dict):
             raise LicenseException(
-                f"Expected dict but {type(dictionary)}", location)
+                f"Expected dict but {type(dictionary)}", location
+            )
         self._dict = dictionary
         self._location = location
 
@@ -42,10 +43,11 @@ class DictReader:
         return key in self._dict
 
     def get(
-            self,
-            key: str,
-            expected_type: Type = str,
-            verify: Callable[[Any], str] = None):
+        self,
+        key: str,
+        expected_type: Type = str,
+        verify: Callable[[Any], str] = None,
+    ):
         """Get the dictionary value by 'key'.
 
         Args:
@@ -58,16 +60,18 @@ class DictReader:
         if value is None:
             raise LicenseException(
                 f"Required key '{key}' is missing in dict '{self._dict}'",
-                self.location)
+                self.location,
+            )
         return value
 
     def get_or(
-            self,
-            key,
-            default: Any,
-            expected_type: Type = str,
-            verify: Callable[[Any], str] = None,
-            accept_none: bool = False):
+        self,
+        key,
+        default: Any,
+        expected_type: Type = str,
+        verify: Callable[[Any], str] = None,
+        accept_none: bool = False,
+    ):
         """Get the dictionary value by 'key' or fallback to a default value.
 
         Args:
@@ -88,13 +92,15 @@ class DictReader:
             if not isinstance(value, expected_type):
                 raise LicenseException(
                     f"Expected value of type {expected_type} but got {type(value)}, value='{value}'",
-                    self._key_location(key))
+                    self._key_location(key),
+                )
             if verify:
                 msg = verify(value)
                 if msg:
                     raise LicenseException(
                         f"Unverified value '{value}': {msg}",
-                        self._key_location(key))
+                        self._key_location(key),
+                    )
             return value
         return default
 
@@ -104,7 +110,8 @@ class DictReader:
             return DictReader(value, self._key_location(key))
         raise LicenseException(
             f"Expected dict for '{key}' but found {type(value)}",
-            self._key_location(key))
+            self._key_location(key),
+        )
 
     def get_readers_list(self, key, dedup=False):
         output = []
@@ -112,7 +119,8 @@ class DictReader:
             if not isinstance(value, dict):
                 raise LicenseException(
                     f"Expected dict values in list but found {type(value)}",
-                    self._key_location(key))
+                    self._key_location(key),
+                )
             output.append(value)
         # Workaround for b/248101373#comment11. Some SPDX producers
         # produce duplicate json elements with the same SPDX Ref Ids.
@@ -126,17 +134,17 @@ class DictReader:
         return [DictReader(v, self._key_location(key)) for v in output]
 
     def get_string_list(self, key) -> List[str]:
-
         def _verify_string_list(value):
             if not isinstance(value, list):
-                return 'Expected list value'
+                return "Expected list value"
             for v in value:
                 if not isinstance(v, str):
-                    return f'Expected str value but got {type(v)}'
+                    return f"Expected str value but got {type(v)}"
             return None
 
         return self.get_or(
-            key, expected_type=list, default=[], verify=_verify_string_list)
+            key, expected_type=list, default=[], verify=_verify_string_list
+        )
 
 
 def trim_long_str_list(items: List, max_len: int) -> List:

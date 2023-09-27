@@ -10,21 +10,26 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(
         description="Generate response file for FIDL frontend. "
-        "Arguments not mentioned here are forwarded as is to fidlc.")
+        "Arguments not mentioned here are forwarded as is to fidlc."
+    )
     parser.add_argument(
         "--out-response-file",
         help="The path for for the response file to generate",
         type=Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--out-libraries",
         help="The path for for the libraries file to generate",
         type=Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        "--sources", help="List of FIDL source files", nargs="+", required=True)
+        "--sources", help="List of FIDL source files", nargs="+", required=True
+    )
     parser.add_argument(
-        "--dep-libraries", help="List of dependent libraries", nargs="*")
+        "--dep-libraries", help="List of dependent libraries", nargs="*"
+    )
     args, args_to_forward = parser.parse_known_args()
 
     # Each line contains a library's source files separated by spaces.

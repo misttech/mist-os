@@ -9,8 +9,10 @@ from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
 
-TOUCH_APP = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-            "simplest-app-flatland-session.cm"
+TOUCH_APP = (
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+    "simplest-app-flatland-session.cm"
+)
 
 
 class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
@@ -45,7 +47,9 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
                 "input",
                 "gfx",
                 "magma",
-            ], buffer_size=36)
+            ],
+            buffer_size=36,
+        )
 
         # Start tracing.
         self.dut.tracing.start()
@@ -56,14 +60,16 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         self.dut.user_input.tap(
             location=custom_types.Coordinate(x=500, y=500),
             tap_event_count=100,
-            duration=3350)
+            duration=3350,
+        )
 
         # Stop tracing.
         self.dut.tracing.stop()
 
         # Terminate the tracing session.
         self.dut.tracing.terminate_and_download(
-            directory=self.log_path, trace_file="trace.fxt")
+            directory=self.log_path, trace_file="trace.fxt"
+        )
 
         # TODO(b/271467734): Process fxt tracing file.
 

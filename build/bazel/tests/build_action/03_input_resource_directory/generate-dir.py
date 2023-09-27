@@ -25,15 +25,15 @@ def main():
 
     def write_file(name, content):
         out_file = os.path.join(output_dir, name)
-        with open(out_file, 'w') as f:
+        with open(out_file, "w") as f:
             f.write(content)
 
-    write_file('a.txt', 'Hello First!')
-    write_file('b.lst', 'Hello\nSecond!\n')
-    write_file('c.json', '[ "Hello", "Third!" ]')
+    write_file("a.txt", "Hello First!")
+    write_file("b.lst", "Hello\nSecond!\n")
+    write_file("c.json", '[ "Hello", "Third!" ]')
 
-    with open(args.stamp, 'w') as f:
-        f.write('done!\n')
+    with open(args.stamp, "w") as f:
+        f.write("done!\n")
 
     return 0
 

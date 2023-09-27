@@ -10,7 +10,8 @@
 # found in the LICENSE file.
 
 import os, sys
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/..')
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 from bindgen import Bindgen
 
 RAW_LINES = """
@@ -59,51 +60,53 @@ impl<T> From<uaddr> for uref<T> {
 
 # Tell bindgen not to produce records for these types.
 OPAQUE_TYPES = [
-    '__sighandler_t',
-    '__sigrestore_t',
-    'group_filter.*',
-    'sigval',
-    'StdAtomic.*',
+    "__sighandler_t",
+    "__sigrestore_t",
+    "group_filter.*",
+    "sigval",
+    "StdAtomic.*",
 ]
 
 # Cross-architecture include paths (the ArchInfo class also has an arch-specific one to add).
 INCLUDE_DIRS = [
-    'third_party/android/platform/bionic/libc/kernel/uapi',
-    'third_party/android/platform/bionic/libc/kernel/android/uapi',
-    'src/starnix/lib/linux_uapi/stub',
+    "third_party/android/platform/bionic/libc/kernel/uapi",
+    "third_party/android/platform/bionic/libc/kernel/android/uapi",
+    "src/starnix/lib/linux_uapi/stub",
 ]
 
 # Additional traits that should be added to types matching the regexps.
 AUTO_DERIVE_TRAITS = [
-    (r'__IncompleteArrayField', ['Clone', 'AsBytes, FromBytes', 'FromZeroes']),
-    (r'__sifields__bindgen_ty_(2|3|7)', ['AsBytes, FromBytes', 'FromZeroes']),
+    (r"__IncompleteArrayField", ["Clone", "AsBytes, FromBytes", "FromZeroes"]),
+    (r"__sifields__bindgen_ty_(2|3|7)", ["AsBytes, FromBytes", "FromZeroes"]),
     (
-        r'binder_transaction_data__bindgen_ty_2__bindgen_ty_1',
-        ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'binder_transaction_data.*', ['FromBytes', 'FromZeroes']),
+        r"binder_transaction_data__bindgen_ty_2__bindgen_ty_1",
+        ["AsBytes", "FromBytes", "FromZeroes"],
+    ),
+    (r"binder_transaction_data.*", ["FromBytes", "FromZeroes"]),
     (
-        r'bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|15|16|17|18|19)$',
-        ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'bpf_attr.*', ['FromBytes', 'FromZeroes']),
-    (r'flat_binder_object.*', ['FromBytes', 'FromZeroes']),
-    (r'fuse_dirent', ['Clone', 'AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'ifreq.*', ['FromBytes', 'FromZeroes']),
-    (r'if_settings.*', ['FromBytes', 'FromZeroes']),
-    (r'ip6?t_entry', ['FromBytes', 'FromZeroes']),
-    (r'ip6?t_get_entries', ['FromBytes', 'FromZeroes']),
-    (r'ip6?t_replace', ['FromBytes', 'FromZeroes']),
-    (r'in6_addr', ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'in6_pktinfo', ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'inotify_event', ['AsBytes']),
-    (r'ip6t_ip6', ['FromBytes', 'FromZeroes']),
-    (r'robust_list_head', ['FromBytes', 'FromZeroes']),
-    (r'robust_list', ['FromBytes', 'FromZeroes']),
-    (r'sigevent', ['FromBytes', 'FromZeroes']),
-    (r'sigval', ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'sockaddr_in*', ['AsBytes', 'FromBytes', 'FromZeroes']),
-    (r'sock_fprog', ['FromBytes', 'FromZeroes']),
-    (r'sysinfo', ['AsBytes']),
-    (r'xt_counters_info', ['FromBytes', 'FromZeroes']),
+        r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|15|16|17|18|19)$",
+        ["AsBytes", "FromBytes", "FromZeroes"],
+    ),
+    (r"bpf_attr.*", ["FromBytes", "FromZeroes"]),
+    (r"flat_binder_object.*", ["FromBytes", "FromZeroes"]),
+    (r"fuse_dirent", ["Clone", "AsBytes", "FromBytes", "FromZeroes"]),
+    (r"ifreq.*", ["FromBytes", "FromZeroes"]),
+    (r"if_settings.*", ["FromBytes", "FromZeroes"]),
+    (r"ip6?t_entry", ["FromBytes", "FromZeroes"]),
+    (r"ip6?t_get_entries", ["FromBytes", "FromZeroes"]),
+    (r"ip6?t_replace", ["FromBytes", "FromZeroes"]),
+    (r"in6_addr", ["AsBytes", "FromBytes", "FromZeroes"]),
+    (r"in6_pktinfo", ["AsBytes", "FromBytes", "FromZeroes"]),
+    (r"inotify_event", ["AsBytes"]),
+    (r"ip6t_ip6", ["FromBytes", "FromZeroes"]),
+    (r"robust_list_head", ["FromBytes", "FromZeroes"]),
+    (r"robust_list", ["FromBytes", "FromZeroes"]),
+    (r"sigevent", ["FromBytes", "FromZeroes"]),
+    (r"sigval", ["AsBytes", "FromBytes", "FromZeroes"]),
+    (r"sockaddr_in*", ["AsBytes", "FromBytes", "FromZeroes"]),
+    (r"sock_fprog", ["FromBytes", "FromZeroes"]),
+    (r"sysinfo", ["AsBytes"]),
+    (r"xt_counters_info", ["FromBytes", "FromZeroes"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
@@ -114,72 +117,81 @@ REPLACEMENTS = [
     (
         r': &\[u8; [0-9]+(usize)?\] = (b".*\\0");\n',
         ": &'static std::ffi::CStr = "
-        "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n"),
-
+        "unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(\\2) };\n",
+    ),
     # Change `__IncompleteArrayField` representation to `transparent`, which is necessary to
     # allow it to derive `AsBytes`.
     # TODO(https://github.com/google/zerocopy/issues/10): Remove this once zerocopy is updated
     # to allow `AsBytes` for generic structs with `repr(C)`.
     (
-        r'#\[repr\(C\)\]\n'
-        r'#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n'
-        r'pub struct __IncompleteArrayField', '#[repr(transparent)]\n'
-        '#[derive(\\1)]\n'
-        'pub struct __IncompleteArrayField'),
-
+        r"#\[repr\(C\)\]\n"
+        r"#\[derive\((([A-Za-z]+, )*[A-Za-z]+)\)\]\n"
+        r"pub struct __IncompleteArrayField",
+        "#[repr(transparent)]\n"
+        "#[derive(\\1)]\n"
+        "pub struct __IncompleteArrayField",
+    ),
     # Add AsBytes/FromBytes/FromZeroes to every copyable struct regardless of
     # name.
     # TODO(https://github.com/rust-lang/rust-bindgen/issues/2170):
     # Remove in favor of bindgen support for custom derives.
     (
         r"\n#\[derive\(Debug, Default, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"
+        "\n#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n",
     ),
     (
         r"\n#\[derive\(Debug, Copy, Clone(, FromBytes)?\)\]\n",
-        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n"),
-
+        "\n#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]\n",
+    ),
     # Use uaddr/uref in place of pointers for compat with zerocopy traits. Because
     # the target of the pointer is in userspace anyway, treating it as an opaque
     # pointer is harmless.
-    (r'\*mut crate::types::c_void', 'uaddr'),
+    (r"\*mut crate::types::c_void", "uaddr"),
     (
         r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
-        'uaddr'),
-    (r'([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)', '\\1 uref<\\3>'),
-
+        "uaddr",
+    ),
+    (r"([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)", "\\1 uref<\\3>"),
     # Convert atomic wrapper.
-    (r': StdAtomic([UI])(8|16|32|64)', ': std::sync::atomic::Atomic\\1\\2'),
+    (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
 ]
 
-INPUT_FILE = 'src/starnix/lib/linux_uapi/wrapper.h'
+INPUT_FILE = "src/starnix/lib/linux_uapi/wrapper.h"
 
 NO_DEBUG_TYPES = [
-    '__sifields__bindgen_ty_(2|3)',
+    "__sifields__bindgen_ty_(2|3)",
 ]
 
 NO_COPY_TYPES = [
-    'StdAtomic.*',
+    "StdAtomic.*",
 ]
 
-class ArchInfo:
 
+class ArchInfo:
     def __init__(self, name, clang_target, include):
         self.name = name  # Our internal arch name.
         self.clang_target = clang_target  # Clang "triple" name for this arch.
-        self.include = include  # Include directory for the arch-specific uapi files.
+        self.include = (
+            include  # Include directory for the arch-specific uapi files.
+        )
 
 
 ARCH_INFO = [
     ArchInfo(
-        'x86_64', 'x86_64-pc-linux-gnu',
-        'third_party/android/platform/bionic/libc/kernel/uapi/asm-x86'),
+        "x86_64",
+        "x86_64-pc-linux-gnu",
+        "third_party/android/platform/bionic/libc/kernel/uapi/asm-x86",
+    ),
     ArchInfo(
-        'arm64', 'aarch64-linux-gnu',
-        'third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64'),
+        "arm64",
+        "aarch64-linux-gnu",
+        "third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64",
+    ),
     ArchInfo(
-        'riscv64', 'riscv64-linux-gnu',
-        'third_party/android/platform/bionic/libc/kernel/uapi/asm-riscv'),
+        "riscv64",
+        "riscv64-linux-gnu",
+        "third_party/android/platform/bionic/libc/kernel/uapi/asm-riscv",
+    ),
 ]
 
 bindgen = Bindgen()
@@ -195,5 +207,5 @@ for arch in ARCH_INFO:
     bindgen.clang_target = arch.clang_target
     bindgen.raw_lines = RAW_LINES
     bindgen.include_dirs = INCLUDE_DIRS + [arch.include]
-    rust_file = 'src/starnix/lib/linux_uapi/src/' + arch.name + '.rs'
+    rust_file = "src/starnix/lib/linux_uapi/src/" + arch.name + ".rs"
     bindgen.run(INPUT_FILE, rust_file)

@@ -40,7 +40,8 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
         self.wlan_obj = sl4f_wlan_policy.WlanPolicy(
-            device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
+            device_name="fuchsia-emulator", sl4f=self.sl4f_obj
+        )
         self.sl4f_obj.reset_mock()
 
     def test_create_client_controller(self) -> None:
@@ -54,68 +55,65 @@ class WlanPolicySL4FTests(unittest.TestCase):
         [
             (
                 {
-                    "label":
-                        "success_case",
-                    "return_value":
-                        {
-                            "result":
-                                [
-                                    {
-                                        "ssid": "1234abcd",
-                                        "security_type": "wep",
-                                        "credential_type": "password",
-                                        "credential_value": "helloWorld",
-                                    },
-                                    {
-                                        "ssid": "test",
-                                        "security_type": "wpa3",
-                                        "credential_type": "password",
-                                        "credential_value": "helloWorld",
-                                    },
-                                ],
-                        },
-                    "expected_value":
-                        [
-                            NetworkConfig(
-                                "1234abcd", SecurityType.WEP, "password",
-                                "helloWorld"),
-                            NetworkConfig(
-                                "test", SecurityType.WPA3, "password",
-                                "helloWorld"),
+                    "label": "success_case",
+                    "return_value": {
+                        "result": [
+                            {
+                                "ssid": "1234abcd",
+                                "security_type": "wep",
+                                "credential_type": "password",
+                                "credential_value": "helloWorld",
+                            },
+                            {
+                                "ssid": "test",
+                                "security_type": "wpa3",
+                                "credential_type": "password",
+                                "credential_value": "helloWorld",
+                            },
                         ],
-                },),
+                    },
+                    "expected_value": [
+                        NetworkConfig(
+                            "1234abcd", SecurityType.WEP, "password", "helloWorld"
+                        ),
+                        NetworkConfig(
+                            "test", SecurityType.WPA3, "password", "helloWorld"
+                        ),
+                    ],
+                },
+            ),
             (
                 {
                     "label": "response_not_list",
-                    "return_value": {
-                        "result": "not_list"
-                    },
-                },),
+                    "return_value": {"result": "not_list"},
+                },
+            ),
             (
                 {
                     "label": "list_obj_not_dict",
                     "return_value": {
                         "result": [1, True, False],
                     },
-                },),
+                },
+            ),
             (
                 {
                     "label": "dict_value_not_str",
-                    "return_value":
-                        {
-                            "result":
-                                [
-                                    {
-                                        "ssid": 1,
-                                        "security_type": True,
-                                        "credential_type": [],
-                                        "credential_value": 2,
-                                    },
-                                ],
-                        },
-                },),
+                    "return_value": {
+                        "result": [
+                            {
+                                "ssid": 1,
+                                "security_type": True,
+                                "credential_type": [],
+                                "credential_value": 2,
+                            },
+                        ],
+                    },
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     def test_get_saved_networks(self, parameterized_dict) -> None:
         """Test for WlanPolicy.get_saved_networks()."""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
@@ -123,18 +121,18 @@ class WlanPolicySL4FTests(unittest.TestCase):
         if not isinstance(parameterized_dict["return_value"]["result"], list):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_saved_networks()
-        elif not isinstance(parameterized_dict["return_value"]["result"][0],
-                            dict):
+        elif not isinstance(parameterized_dict["return_value"]["result"][0], dict):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_saved_networks()
         elif not isinstance(
-                parameterized_dict["return_value"]["result"][0]["ssid"], str):
+            parameterized_dict["return_value"]["result"][0]["ssid"], str
+        ):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_saved_networks()
         else:
             self.assertEqual(
-                self.wlan_obj.get_saved_networks(),
-                parameterized_dict["expected_value"])
+                self.wlan_obj.get_saved_networks(), parameterized_dict["expected_value"]
+            )
 
         self.sl4f_obj.run.assert_called()
 
@@ -143,61 +141,54 @@ class WlanPolicySL4FTests(unittest.TestCase):
             (
                 {
                     "label": "success_case",
-                    "return_value":
-                        {
-                            "result":
+                    "return_value": {
+                        "result": {
+                            "state": "ConnectionsEnabled",
+                            "networks": [
                                 {
-                                    "state":
-                                        "ConnectionsEnabled",
-                                    "networks":
-                                        [
-                                            {
-                                                "id":
-                                                    {
-                                                        "ssid": "test_b",
-                                                        "type_": "wep",
-                                                    },
-                                                "state": "Connecting",
-                                                "status": "ConnectionFailed",
-                                            },
-                                            {
-                                                "id":
-                                                    {
-                                                        "ssid": "test_a",
-                                                        "type_": "none",
-                                                    },
-                                                "state": "Failed",
-                                                "status": "TimedOut",
-                                            },
-                                        ],
+                                    "id": {
+                                        "ssid": "test_b",
+                                        "type_": "wep",
+                                    },
+                                    "state": "Connecting",
+                                    "status": "ConnectionFailed",
                                 },
+                                {
+                                    "id": {
+                                        "ssid": "test_a",
+                                        "type_": "none",
+                                    },
+                                    "state": "Failed",
+                                    "status": "TimedOut",
+                                },
+                            ],
                         },
-                    "expected_value":
-                        {
-                            "state":
-                                WlanClientState.CONNECTIONS_ENABLED,
-                            "networks":
-                                [
-                                    NetworkState(
-                                        NetworkIdentifier(
-                                            "test_b", SecurityType.WEP),
-                                        ConnectionState.CONNECTING,
-                                        DisconnectStatus.CONNECTION_FAILED),
-                                    NetworkState(
-                                        NetworkIdentifier(
-                                            "test_a", SecurityType.NONE),
-                                        ConnectionState.FAILED,
-                                        DisconnectStatus.TIMED_OUT),
-                                ],
-                        },
-                },),
+                    },
+                    "expected_value": {
+                        "state": WlanClientState.CONNECTIONS_ENABLED,
+                        "networks": [
+                            NetworkState(
+                                NetworkIdentifier("test_b", SecurityType.WEP),
+                                ConnectionState.CONNECTING,
+                                DisconnectStatus.CONNECTION_FAILED,
+                            ),
+                            NetworkState(
+                                NetworkIdentifier("test_a", SecurityType.NONE),
+                                ConnectionState.FAILED,
+                                DisconnectStatus.TIMED_OUT,
+                            ),
+                        ],
+                    },
+                },
+            ),
             (
                 {
                     "label": "response_not_dict",
                     "return_value": {
                         "result": "not_dict",
                     },
-                },),
+                },
+            ),
             (
                 {
                     "label": "response_networks_not_list",
@@ -206,46 +197,41 @@ class WlanPolicySL4FTests(unittest.TestCase):
                             "networks": "not_list",
                         }
                     },
-                },),
+                },
+            ),
             (
                 {
                     "label": "network_no_state_status",
-                    "return_value":
-                        {
-                            "result":
+                    "return_value": {
+                        "result": {
+                            "state": "ConnectionsEnabled",
+                            "networks": [
                                 {
-                                    "state":
-                                        "ConnectionsEnabled",
-                                    "networks":
-                                        [
-                                            {
-                                                "id":
-                                                    {
-                                                        "ssid": "fail",
-                                                        "type_": "wep",
-                                                    },
-                                                "state": None,
-                                                "status": None,
-                                            },
-                                        ],
+                                    "id": {
+                                        "ssid": "fail",
+                                        "type_": "wep",
+                                    },
+                                    "state": None,
+                                    "status": None,
                                 },
+                            ],
                         },
-                    "expected_value":
-                        {
-                            "state":
-                                WlanClientState.CONNECTIONS_ENABLED,
-                            "networks":
-                                [
-                                    NetworkState(
-                                        NetworkIdentifier(
-                                            "fail", SecurityType.WEP),
-                                        ConnectionState.DISCONNECTED,
-                                        DisconnectStatus.CONNECTION_STOPPED),
-                                ],
-                        },
-                },),
+                    },
+                    "expected_value": {
+                        "state": WlanClientState.CONNECTIONS_ENABLED,
+                        "networks": [
+                            NetworkState(
+                                NetworkIdentifier("fail", SecurityType.WEP),
+                                ConnectionState.DISCONNECTED,
+                                DisconnectStatus.CONNECTION_STOPPED,
+                            ),
+                        ],
+                    },
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     def test_get_update(self, parameterized_dict) -> None:
         """Testcase for WlanPolicy.get_update()"""
         self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
@@ -254,16 +240,17 @@ class WlanPolicySL4FTests(unittest.TestCase):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_update()
         elif not isinstance(
-                parameterized_dict["return_value"]["result"]["networks"], list):
+            parameterized_dict["return_value"]["result"]["networks"], list
+        ):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_update()
         else:
             resp = self.wlan_obj.get_update()
 
+            self.assertEqual(resp.state, parameterized_dict["expected_value"]["state"])
             self.assertEqual(
-                resp.state, parameterized_dict["expected_value"]["state"])
-            self.assertEqual(
-                resp.networks, parameterized_dict["expected_value"]["networks"])
+                resp.networks, parameterized_dict["expected_value"]["networks"]
+            )
 
         self.sl4f_obj.run.assert_called()
 
@@ -277,8 +264,7 @@ class WlanPolicySL4FTests(unittest.TestCase):
     def test_save_network(self) -> None:
         """Test for WlanPolicy.save_network()."""
 
-        self.wlan_obj.save_network(
-            target_ssid="test", security_type=SecurityType.NONE)
+        self.wlan_obj.save_network(target_ssid="test", security_type=SecurityType.NONE)
 
         self.sl4f_obj.run.assert_called()
 

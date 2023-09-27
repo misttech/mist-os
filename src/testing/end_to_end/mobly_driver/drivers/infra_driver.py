@@ -31,13 +31,14 @@ class InfraDriver(base_mobly_driver.BaseDriver):
     Mobly test results to be plumbed to Fuchsia's result storage backend.
     """
 
-    _TESTBED_NAME = 'InfraTestbed'
+    _TESTBED_NAME = "InfraTestbed"
 
     def __init__(
-            self,
-            tb_json_path: str,
-            log_path: str,
-            params_path: Optional[str] = None) -> None:
+        self,
+        tb_json_path: str,
+        log_path: str,
+        params_path: Optional[str] = None,
+    ) -> None:
         """Initializes the instance.
 
         Args:
@@ -93,20 +94,25 @@ class InfraDriver(base_mobly_driver.BaseDriver):
                 "ssh_key": "ssh_private_key",
             }
             config = api_mobly.new_testbed_config(
-                self._TESTBED_NAME, self._log_path, tb_config, test_params,
-                botanist_honeydew_translation_map)
+                self._TESTBED_NAME,
+                self._log_path,
+                tb_config,
+                test_params,
+                botanist_honeydew_translation_map,
+            )
             if transport:
                 api_mobly.set_transport_in_config(config, transport)
             return yaml.dump(config)
         except (IOError, OSError) as e:
-            raise common.DriverException('Failed to open file: %')
+            raise common.DriverException("Failed to open file: %")
 
     def teardown(self) -> None:
         """Performs any required clean up upon Mobly test completion."""
         results_path = api_mobly.get_result_path(
-            self._log_path, self._TESTBED_NAME)
+            self._log_path, self._TESTBED_NAME
+        )
         try:
-            with open(results_path, 'r') as f:
+            with open(results_path, "r") as f:
                 # Write test result YAML file to stdout so that Mobly output
                 # integrates with with `testparser`.
                 print(api_infra.TESTPARSER_PREAMBLE)
@@ -121,7 +127,8 @@ class InfraDriver(base_mobly_driver.BaseDriver):
         # bug which can be removed once the following pull request is fixed:
         # https://github.com/bazelbuild/remote-apis-sdks/pull/422
         symlink_path = api_mobly.get_latest_test_output_dir_symlink_path(
-            self._log_path, self._TESTBED_NAME)
+            self._log_path, self._TESTBED_NAME
+        )
         try:
             os.remove(symlink_path)
         except OSError:

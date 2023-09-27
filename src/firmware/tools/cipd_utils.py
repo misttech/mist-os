@@ -44,10 +44,8 @@ class Git:
         self.repo_path = repo_path
 
     def git(
-            self,
-            command: Iterable[str],
-            check=True,
-            capture_output=True) -> subprocess.CompletedProcess:
+        self, command: Iterable[str], check=True, capture_output=True
+    ) -> subprocess.CompletedProcess:
         """Calls `git` in this repo.
 
         Args:
@@ -63,7 +61,8 @@ class Git:
             [_GIT_TOOL, "-C", self.repo_path] + command,
             check=check,
             text=True,
-            capture_output=capture_output)
+            capture_output=capture_output,
+        )
 
     def changelog(self, start: Optional[str], end: str) -> str:
         """Returns the additive changelog between two revisions.
@@ -132,11 +131,14 @@ class Repo:
             check=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True)
+            text=True,
+        )
 
         matches = re.findall(
-            r"Project: (.*?)$\s*Mount path: (.*?)$", repo_info.stdout,
-            re.MULTILINE)
+            r"Project: (.*?)$\s*Mount path: (.*?)$",
+            repo_info.stdout,
+            re.MULTILINE,
+        )
 
         gits = {}
         used_specs = set()
@@ -155,7 +157,8 @@ class Repo:
             # aren't clobbering any other git.
             if name in gits:
                 raise ValueError(
-                    f"Duplicate git '{name}' at {[gits[name], path]}")
+                    f"Duplicate git '{name}' at {[gits[name], path]}"
+                )
 
             gits[name] = Git(path)
 
@@ -181,7 +184,8 @@ def download_cipd(name: str, version: str, path: str):
         check=True,
         capture_output=True,
         text=True,
-        input=f"{name} {version}")
+        input=f"{name} {version}",
+    )
 
 
 def fetch_cipd_tags(name: str, version: str) -> List[str]:
@@ -198,14 +202,20 @@ def fetch_cipd_tags(name: str, version: str) -> List[str]:
         json_path = os.path.join(temp_dir, "metadata.json")
         subprocess.run(
             [
-                CIPD_TOOL, "describe", name, "-version", version,
-                "-json-output", json_path
+                CIPD_TOOL,
+                "describe",
+                name,
+                "-version",
+                version,
+                "-json-output",
+                json_path,
             ],
             check=True,
             capture_output=True,
-            text=True)
+            text=True,
+        )
 
-        with open(json_path, 'r') as json_file:
+        with open(json_path, "r") as json_file:
             metadata = json.load(json_file)
 
     # `cipd describe` JSON looks like:
@@ -225,8 +235,9 @@ def fetch_cipd_tags(name: str, version: str) -> List[str]:
     return [t["tag"] for t in metadata["result"]["tags"]]
 
 
-def get_cipd_version_manifest(package: str,
-                              version_or_path: str) -> Dict[str, str]:
+def get_cipd_version_manifest(
+    package: str, version_or_path: str
+) -> Dict[str, str]:
     """Returns the contents of the manifest.json file in a CIPD package.
 
     We accept a version or a local path here because it's useful to produce
@@ -259,8 +270,12 @@ def get_cipd_version_manifest(package: str,
 
 
 def changelog(
-        repo: Repo, old_package: str, old_version_or_path: str,
-        new_package: str, new_version_or_path: str) -> str:
+    repo: Repo,
+    old_package: str,
+    old_version_or_path: str,
+    new_package: str,
+    new_version_or_path: str,
+) -> str:
     """Generates a changelog between the two versions.
 
     Args:
@@ -340,8 +355,14 @@ def copy(source_package: str, source_version: str, dest_package: str):
         download_cipd(source_package, source_version, temp_dir)
 
         command = [
-            CIPD_TOOL, "create", "-name", dest_package, "-in", temp_dir,
-            "-install-mode", "copy"
+            CIPD_TOOL,
+            "create",
+            "-name",
+            dest_package,
+            "-in",
+            temp_dir,
+            "-install-mode",
+            "copy",
         ]
         for tag in fetch_cipd_tags(source_package, source_version):
             command += ["-tag", tag]
@@ -354,31 +375,37 @@ def copy(source_package: str, source_version: str, dest_package: str):
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
     subparsers = parser.add_subparsers(dest="action", required=True)
 
     changelog_parser = subparsers.add_parser(
         "changelog",
-        help="Generate a source changelog between two CIPD packages")
+        help="Generate a source changelog between two CIPD packages",
+    )
     changelog_parser.add_argument("repo", help="Path to the repo root")
     changelog_parser.add_argument("package", help="The old CIPD package name")
     changelog_parser.add_argument(
-        "old_version", help="The old version: ref, tag, ID, or local path")
+        "old_version", help="The old version: ref, tag, ID, or local path"
+    )
     changelog_parser.add_argument(
         "new_package_or_version",
-        help="The new CIPD package (4-arg form) or version (3-arg form)")
+        help="The new CIPD package (4-arg form) or version (3-arg form)",
+    )
     changelog_parser.add_argument(
         "new_version",
         nargs="?",
-        help="The new version: ref, tag, ID, or local path")
+        help="The new version: ref, tag, ID, or local path",
+    )
     changelog_parser.add_argument(
         "--spec-file",
         help="Repo specification file as a JSON {path, alias} mapping. By"
         " default all git repos in the manifest are used, but if a spec is"
         " provided only the listed git repos are included. Alias is the name"
         " to give the git repo in the changelog, or null to use the project"
-        " name.")
+        " name.",
+    )
 
     copy_parser = subparsers.add_parser("copy", help="Copy a CIPD package")
     copy_parser.add_argument("source_package", help="Source CIPD name")
@@ -408,14 +435,22 @@ def main() -> int:
         if args.new_version:
             # 4-arg format: |new_package_or_version| is a package.
             result = changelog(
-                repo, args.package, args.old_version,
-                args.new_package_or_version, args.new_version)
+                repo,
+                args.package,
+                args.old_version,
+                args.new_package_or_version,
+                args.new_version,
+            )
         else:
             # 3-arg format: re-use |package| for both, |new_package_or_version|
             # is a version.
             result = changelog(
-                repo, args.package, args.old_version, args.package,
-                args.new_package_or_version)
+                repo,
+                args.package,
+                args.old_version,
+                args.package,
+                args.new_package_or_version,
+            )
 
         print(result)
 

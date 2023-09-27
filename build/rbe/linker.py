@@ -26,7 +26,7 @@ _SCRIPT_BASENAME = Path(__file__).name
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 _VERBOSE = False
@@ -42,14 +42,14 @@ def vmsg(text: str):
 # library files we expect to encounter.
 # Source: https://en.wikipedia.org/wiki/List_of_file_signatures
 LIBRARY_FILE_MAGIC_NUMBERS = {
-    b'!<arch>',  # archives (.a) (on Linux, MacOS)
-    b'\x7fELF',  # ELF files
-    b'\xfe\xed\xfa\xce',  # Mach-O 32b
-    b'\xfe\xed\xfa\xcf',  # Mach-O 64b
-    b'\xce\xfa\xed\xfe',  # Mach-O 32b, reverse byte-ordering
-    b'\xcf\xfa\xed\xfe',  # Mach-O 32b, reverse byte-ordering
-    b'\xca\xfe\xfa\xbe',  # Mach-O Fat binary
-    b'\x5a\x4d',  # MS-DOS compatible, Portable Executable (PE-COFF)
+    b"!<arch>",  # archives (.a) (on Linux, MacOS)
+    b"\x7fELF",  # ELF files
+    b"\xfe\xed\xfa\xce",  # Mach-O 32b
+    b"\xfe\xed\xfa\xcf",  # Mach-O 64b
+    b"\xce\xfa\xed\xfe",  # Mach-O 32b, reverse byte-ordering
+    b"\xcf\xfa\xed\xfe",  # Mach-O 32b, reverse byte-ordering
+    b"\xca\xfe\xfa\xbe",  # Mach-O Fat binary
+    b"\x5a\x4d",  # MS-DOS compatible, Portable Executable (PE-COFF)
     # TODO: handle other PE cases: .LIB
 }
 
@@ -66,22 +66,20 @@ class TokenType(enum.Enum):
 
 
 _KEYWORDS_RE = re.compile(
-    r'(INCLUDE|INPUT|GROUP|AS_NEEDED|OUTPUT_FORMAT|OUTPUT|SEARCH_DIR|STARTUP|TARGET)'
+    r"(INCLUDE|INPUT|GROUP|AS_NEEDED|OUTPUT_FORMAT|OUTPUT|SEARCH_DIR|STARTUP|TARGET)"
 )
-_SPACE_RE = re.compile(r'[ \t]+')
-_NEWLINE_RE = re.compile(r'\r?\n')
-_COMMENT_RE = re.compile(r'/\*[^*]*\*/', re.MULTILINE)
-_ARG_RE = re.compile(r'[^, \t\r\n()]+')
+_SPACE_RE = re.compile(r"[ \t]+")
+_NEWLINE_RE = re.compile(r"\r?\n")
+_COMMENT_RE = re.compile(r"/\*[^*]*\*/", re.MULTILINE)
+_ARG_RE = re.compile(r"[^, \t\r\n()]+")
 
 
 class LexError(ValueError):
-
     def __init__(self, msg: str):
         super().__init__(msg)
 
 
 class ParseError(ValueError):
-
     def __init__(self, msg: str):
         super().__init__(msg)
 
@@ -107,17 +105,17 @@ def _lex_linker_script(text: str) -> Iterable[Token]:
     while text:  # is not empty
         next_char = text[0]
 
-        if next_char == '(':
+        if next_char == "(":
             yield Token(text=next_char, type=TokenType.OPEN_PAREN)
             text = text[1:]
             continue
 
-        if next_char == ')':
+        if next_char == ")":
             yield Token(text=next_char, type=TokenType.CLOSE_PAREN)
             text = text[1:]
             continue
 
-        if next_char == ',':
+        if next_char == ",":
             yield Token(text=next_char, type=TokenType.COMMA)
             text = text[1:]
             continue
@@ -126,47 +124,52 @@ def _lex_linker_script(text: str) -> Iterable[Token]:
         if keyword_match:
             keyword_name = keyword_match.group(0)
             yield Token(text=keyword_name, type=TokenType.KEYWORD)
-            text = text[len(keyword_name):]
+            text = text[len(keyword_name) :]
             continue
 
         comment_match = _COMMENT_RE.match(text)
         if comment_match:
             comment_name = comment_match.group(0)
             yield Token(text=comment_name, type=TokenType.COMMENT)
-            text = text[len(comment_name):]
+            text = text[len(comment_name) :]
             continue
 
         space_match = _SPACE_RE.match(text)
         if space_match:
             space_name = space_match.group(0)
             yield Token(text=space_name, type=TokenType.SPACE)
-            text = text[len(space_name):]
+            text = text[len(space_name) :]
             continue
 
         newtext_match = _NEWLINE_RE.match(text)
         if newtext_match:
             newtext_name = newtext_match.group(0)
             yield Token(text=newtext_name, type=TokenType.NEWLINE)
-            text = text[len(newtext_name):]
+            text = text[len(newtext_name) :]
             continue
 
         arg_match = _ARG_RE.match(text)
         if arg_match:
             arg_name = arg_match.group(0)
             yield Token(text=arg_name, type=TokenType.ARG)
-            text = text[len(arg_name):]
+            text = text[len(arg_name) :]
             continue
 
         line_remainder = text.splitlines()[0]
         raise LexError(
-            f'[linker_script.lex] Unrecognized text: "{line_remainder}"')
+            f'[linker_script.lex] Unrecognized text: "{line_remainder}"'
+        )
 
 
 def _filter_tokens(toks: Iterable[Token]) -> Iterable[Token]:
     """Drop un-important tokens like spaces."""
     for tok in toks:
-        if tok.type in {TokenType.KEYWORD, TokenType.ARG, TokenType.OPEN_PAREN,
-                        TokenType.CLOSE_PAREN}:
+        if tok.type in {
+            TokenType.KEYWORD,
+            TokenType.ARG,
+            TokenType.OPEN_PAREN,
+            TokenType.CLOSE_PAREN,
+        }:
             yield tok
 
 
@@ -177,20 +180,20 @@ class Directive(object):
         self.name = keyword  # function name
         # Some Directive arguments contain other directives,
         # e.g. AS_NEEDED inside INPUT or GROUPS.
-        self.args: Sequence[Union[str, 'Directive']] = args or []
+        self.args: Sequence[Union[str, "Directive"]] = args or []
 
     def __str__(self):
-        args_str = ' '.join(str(arg) for arg in self.args)
-        return f'{self.name}({args_str})'
+        args_str = " ".join(str(arg) for arg in self.args)
+        return f"{self.name}({args_str})"
 
 
 def _parse_directive(name: str, toks: Iterable[Token]) -> Directive:
     """Recursively parse a single linker script directive."""
     # Most directives' args are inside parentheses, but not INCLUDE
-    vmsg(f'Parsing {name} directive')
+    vmsg(f"Parsing {name} directive")
     current_directive = Directive(name)
 
-    if name == 'INCLUDE':  # special case
+    if name == "INCLUDE":  # special case
         include_arg = next(toks)  # expect one arg
         current_directive.args.append(include_arg)
         return current_directive
@@ -209,20 +212,22 @@ def _parse_directive(name: str, toks: Iterable[Token]) -> Directive:
 
         if tok.type == TokenType.KEYWORD:
             current_directive.args.append(
-                _parse_directive(tok.text, toks))  # recursive
+                _parse_directive(tok.text, toks)
+            )  # recursive
             continue
 
-        vmsg(f'Appending arg: {tok.text}')
+        vmsg(f"Appending arg: {tok.text}")
         current_directive.args.append(tok.text)
 
     if not got_close:
-        raise ParseError(f'Unterminated linker script directive, {name}')
+        raise ParseError(f"Unterminated linker script directive, {name}")
 
     return current_directive
 
 
 def _parse_linker_script_directives(
-        toks: Iterable[Token]) -> Iterable[Directive]:
+    toks: Iterable[Token],
+) -> Iterable[Directive]:
     while True:
         try:
             tok = next(toks)
@@ -231,15 +236,16 @@ def _parse_linker_script_directives(
 
         if tok.type != TokenType.KEYWORD:
             raise ParseError(
-                f'Expected a linker script keyword, but got: {tok.text}')
+                f"Expected a linker script keyword, but got: {tok.text}"
+            )
         yield _parse_directive(tok.text, toks)
 
 
-_LINKABLE_EXTENSIONS = ('.a', '.so', '.ld', '.dylib')
+_LINKABLE_EXTENSIONS = (".a", ".so", ".ld", ".dylib")
 
 
 def _flatten_as_needed(arg: Union[str, Directive]) -> Iterable[str]:
-    if isinstance(arg, Directive) and arg.name == 'AS_NEEDED':
+    if isinstance(arg, Directive) and arg.name == "AS_NEEDED":
         yield from arg.args
     else:  # is just a str
         yield arg
@@ -247,13 +253,15 @@ def _flatten_as_needed(arg: Union[str, Directive]) -> Iterable[str]:
 
 class LinkerInvocation(object):
     """Mimics a linker invocation."""
-    def __init__(self,
-                 working_dir_abs: Path = None,
-                 search_paths: Sequence[Path] = None,
-                 l_libs: Sequence[str] = None,  # e.g. "c" from "-lc"
-                 direct_files: Sequence[Path] = None,
-                 sysroot: Path = None,
-                 ):
+
+    def __init__(
+        self,
+        working_dir_abs: Path = None,
+        search_paths: Sequence[Path] = None,
+        l_libs: Sequence[str] = None,  # e.g. "c" from "-lc"
+        direct_files: Sequence[Path] = None,
+        sysroot: Path = None,
+    ):
         working_dir_abs = working_dir_abs or Path(os.curdir).absolute()
         assert working_dir_abs.is_absolute()
         self._working_dir_abs = working_dir_abs
@@ -287,7 +295,8 @@ class LinkerInvocation(object):
         if text is None:
             return
         directives = _parse_linker_script_directives(
-            _filter_tokens(_lex_linker_script(text)))
+            _filter_tokens(_lex_linker_script(text))
+        )
         yield from self.handle_directives(directives)
 
     def _include(self, directive: Directive) -> Iterable[Path]:
@@ -299,28 +308,29 @@ class LinkerInvocation(object):
                 yield p
                 p_abs = self.abs_path(p)
                 yield from self.expand_linker_script(
-                    try_linker_script_text(p_abs))
+                    try_linker_script_text(p_abs)
+                )
 
     def _input(self, directive: Directive) -> Iterable[Path]:
         """Directly use these as linker arguments.  These are not linker scripts."""
         for arg in directive.args:
             for lib in _flatten_as_needed(arg):
-                if lib.startswith('-l'):
+                if lib.startswith("-l"):
                     p = self.resolve_lib(lib[2:])
                 else:
                     p = self.resolve_path(Path(lib), check_sysroot=True)
-                    vmsg(f'resolved to {p}')
+                    vmsg(f"resolved to {p}")
                 if p:
                     yield p
 
     def _group(self, directive: Directive) -> Iterable[Path]:
         for arg in directive.args:
             for lib in _flatten_as_needed(arg):
-                vmsg(f'flattened: {lib}')
+                vmsg(f"flattened: {lib}")
                 # All arguments should be archives (no -l).
                 p = self.resolve_path(
-                    Path(lib),
-                    check_sysroot=True)  # should already include file extension
+                    Path(lib), check_sysroot=True
+                )  # should already include file extension
                 if p:
                     yield p
 
@@ -336,18 +346,19 @@ class LinkerInvocation(object):
     def _not_implemented(self, directive: Directive) -> Iterable[Path]:
         """Known unimplemented directive."""
         raise NotImplementedError(
-            f'Encountered unhandled linker script directive: {directive.name}')
+            f"Encountered unhandled linker script directive: {directive.name}"
+        )
 
     def _handle_directive(self, directive: Directive) -> Iterable[Path]:
         handler_map = {
             # Functions can yield Paths or return None
-            'INCLUDE': self._include,
-            'INPUT': self._input,
-            'GROUP': self._group,
-            'OUTPUT': self._ignore,
-            'OUTPUT_FORMAT': self._ignore,
-            'SEARCH_DIR': self._search_dir,
-            'TARGET': self._ignore,
+            "INCLUDE": self._include,
+            "INPUT": self._input,
+            "GROUP": self._group,
+            "OUTPUT": self._ignore,
+            "OUTPUT_FORMAT": self._ignore,
+            "SEARCH_DIR": self._search_dir,
+            "TARGET": self._ignore,
             # Not implemented:
             # 'STARTUP':
         }
@@ -356,17 +367,18 @@ class LinkerInvocation(object):
             handler = handler_map[directive.name]
         except KeyError:
             raise NotImplementedError(
-                f'Encountered unhandled linker script directive: {directive.name}'
+                f"Encountered unhandled linker script directive: {directive.name}"
             )
 
         result = handler(directive)
         if result:
             yield from result
 
-    def handle_directives(self,
-                          directives: Iterable[Directive]) -> Iterable[Path]:
+    def handle_directives(
+        self, directives: Iterable[Directive]
+    ) -> Iterable[Path]:
         for d in directives:
-            vmsg(f'Handling directive: {d}')
+            vmsg(f"Handling directive: {d}")
             yield from self._handle_directive(d)
 
     def abs_path(self, path: Path) -> Path:  # absolute
@@ -394,7 +406,7 @@ class LinkerInvocation(object):
 
         if check_sysroot and self.sysroot:
             p = self.sysroot / path
-            vmsg(f'checking in sysroot {p}')
+            vmsg(f"checking in sysroot {p}")
             if self.path_exists(p):
                 return p
 
@@ -411,11 +423,11 @@ class LinkerInvocation(object):
         """
         force_sysroot = False
         # Entries that start with '=' should only be searched in the sysroot.
-        if lib.startswith('='):
+        if lib.startswith("="):
             force_sysroot = True
-            stem = 'lib' + lib[1:]
+            stem = "lib" + lib[1:]
         else:
-            stem = 'lib' + lib
+            stem = "lib" + lib
 
         if not force_sysroot:
             for s in self.search_paths:
@@ -440,13 +452,13 @@ class LinkerInvocation(object):
           paths to linker input files.
         """
         for lib in self.l_libs:
-            vmsg(f'Expanding: {lib}')
+            vmsg(f"Expanding: {lib}")
             resolved = self.resolve_lib(lib)
             if resolved:
                 yield from self.expand_possible_linker_script(resolved)
 
         for f in self.direct_files:
-            vmsg(f'Expanding: {f}')
+            vmsg(f"Expanding: {f}")
             yield from self.expand_possible_linker_script(f)
 
     def expand_possible_linker_script(self, lib: Path) -> Iterable[Path]:
@@ -458,8 +470,9 @@ class LinkerInvocation(object):
         # Otherwise, it is a regular linker binary file.
         # Nothing else to do.
 
-    def expand_using_lld(self, lld: Path,
-                         inputs: Sequence[Path]) -> Iterable[Path]:
+    def expand_using_lld(
+        self, lld: Path, inputs: Sequence[Path]
+    ) -> Iterable[Path]:
         """Use lld to expand linker inputs, including linker scripts.
 
         Works like clang-scan-deps, but for linking.
@@ -473,31 +486,39 @@ class LinkerInvocation(object):
         Yields:
           linker inputs encountered by lld.
         """
-        lld_command = [
-            str(lld),
-            '-o',
-            '/dev/null',  # Don't want link output
-            '--dependency-file=/dev/stdout',  # avoid temp file
-        ] + ['--sysroot={self.sysroot}'] if self.sysroot else [] + [
-            '-L{path}' for path in self.search_paths
-        ] + self.l_libs + [str(f) for f in self.direct_files + inputs]
+        lld_command = (
+            [
+                str(lld),
+                "-o",
+                "/dev/null",  # Don't want link output
+                "--dependency-file=/dev/stdout",  # avoid temp file
+            ]
+            + ["--sysroot={self.sysroot}"]
+            if self.sysroot
+            else []
+            + ["-L{path}" for path in self.search_paths]
+            + self.l_libs
+            + [str(f) for f in self.direct_files + inputs]
+        )
 
         result = cl_utils.subprocess_call(
-            command=lld_command, cwd=self.working_dir)
+            command=lld_command, cwd=self.working_dir
+        )
 
         if result.returncode != 0:
-            err_msg = '\n'.join(result.stderr)
-            raise RuntimeError(f'lld command failed: {lld_command}\n{err_msg}')
+            err_msg = "\n".join(result.stderr)
+            raise RuntimeError(f"lld command failed: {lld_command}\n{err_msg}")
 
         # newlines are important separators
-        depfile_lines = [line + '\n' for line in result.stdout]
+        depfile_lines = [line + "\n" for line in result.stdout]
         deps = [
-            dep for dep in depfile.parse_lines(depfile_lines)
+            dep
+            for dep in depfile.parse_lines(depfile_lines)
             if not dep.is_phony
         ]
-        assert len(
-            deps
-        ) == 1, f'Expecting only one non-phony dep from lld depfile, but got {len(deps)}'
+        assert (
+            len(deps) == 1
+        ), f"Expecting only one non-phony dep from lld depfile, but got {len(deps)}"
         yield from deps[0].deps_paths
 
 
@@ -511,8 +532,9 @@ def try_linker_script_text(path: Path) -> Optional[str]:
     # It is possible for some binary formats to successfully read as text,
     # so we must check some headers of known library file formats.
     first_bytes = contents[:8].encode()
-    if any(first_bytes.startswith(prefix)
-           for prefix in LIBRARY_FILE_MAGIC_NUMBERS):
+    if any(
+        first_bytes.startswith(prefix) for prefix in LIBRARY_FILE_MAGIC_NUMBERS
+    ):
         # Not a linker script.
         return None
 
@@ -532,13 +554,13 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "-L",
-        dest='link_paths',
+        dest="link_paths",
         action="append",
         help="Add a linker search path.",
     )
     parser.add_argument(
         "-l",
-        dest='libs',
+        dest="libs",
         action="append",
         help="Add a library (searched).",
     )
@@ -577,7 +599,7 @@ def _main(argv: Sequence[str], working_dir_abs: Path) -> int:
     paths = list(link.expand_all())
     for p in paths:
         # make relative to working_dir_abs
-        print(f'{p}')
+        print(f"{p}")
 
     return 0
 

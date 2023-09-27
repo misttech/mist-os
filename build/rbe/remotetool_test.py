@@ -16,7 +16,6 @@ import cl_utils
 
 
 class DictionaryDiffTests(unittest.TestCase):
-
     def test_empty(self):
         left = dict()
         right = dict()
@@ -28,7 +27,7 @@ class DictionaryDiffTests(unittest.TestCase):
         self.assertEqual(list(d.report()), [])
 
     def test_left_only(self):
-        left = {'a': 1}
+        left = {"a": 1}
         right = dict()
         d = remotetool.DictionaryDiff(left, right)
         self.assertEqual(d.left_only, left)
@@ -39,7 +38,7 @@ class DictionaryDiffTests(unittest.TestCase):
 
     def test_right_only(self):
         left = dict()
-        right = {'b': 2}
+        right = {"b": 2}
         d = remotetool.DictionaryDiff(left, right)
         self.assertEqual(d.left_only, dict())
         self.assertEqual(d.right_only, right)
@@ -48,7 +47,7 @@ class DictionaryDiffTests(unittest.TestCase):
         self.assertIn("right only", list(d.report())[0])
 
     def test_matches(self):
-        left = {'e': 5}
+        left = {"e": 5}
         right = left
         d = remotetool.DictionaryDiff(left, right)
         self.assertEqual(d.left_only, dict())
@@ -58,31 +57,31 @@ class DictionaryDiffTests(unittest.TestCase):
         self.assertEqual(list(d.report()), [])
 
     def test_value_diff(self):
-        left = {'c': 3}
-        right = {'c': 4}
+        left = {"c": 3}
+        right = {"c": 4}
         d = remotetool.DictionaryDiff(left, right)
         self.assertEqual(d.left_only, dict())
         self.assertEqual(d.right_only, dict())
-        self.assertEqual(d.value_diffs, {'c': (3, 4)})
+        self.assertEqual(d.value_diffs, {"c": (3, 4)})
         self.assertEqual(d.matches, dict())
         self.assertIn("different values", list(d.report())[0])
 
     def test_mixed(self):
-        left = {'a': 1, 'b': 2, 'c': 3}
-        right = {'b': 2, 'c': 4, 'd': 4}
+        left = {"a": 1, "b": 2, "c": 3}
+        right = {"b": 2, "c": 4, "d": 4}
         d = remotetool.DictionaryDiff(left, right)
-        self.assertEqual(d.left_only, {'a': 1})
-        self.assertEqual(d.right_only, {'d': 4})
-        self.assertEqual(d.value_diffs, {'c': (3, 4)})
-        self.assertEqual(d.matches, {'b': 2})
+        self.assertEqual(d.left_only, {"a": 1})
+        self.assertEqual(d.right_only, {"d": 4})
+        self.assertEqual(d.value_diffs, {"c": (3, 4)})
+        self.assertEqual(d.matches, {"b": 2})
         self.assertEqual(len(list(d.report())), 3)
 
 
 class ShowActionResultDiffTests(unittest.TestCase):
-
     def test_diff_empty(self):
         left = remotetool.ShowActionResult(
-            command=[], platform=dict(), inputs=dict(), output_files=dict())
+            command=[], platform=dict(), inputs=dict(), output_files=dict()
+        )
         diff = left.diff(left)
         self.assertEqual(diff.command_unified_diffs, [])
         self.assertEqual(diff.platform_diffs.left_only, dict())
@@ -94,16 +93,18 @@ class ShowActionResultDiffTests(unittest.TestCase):
 
     def test_diff_platform(self):
         left = remotetool.ShowActionResult(
-            command=[], platform=dict(), inputs=dict(), output_files=dict())
+            command=[], platform=dict(), inputs=dict(), output_files=dict()
+        )
         right = remotetool.ShowActionResult(
             command=[],
-            platform={'xx': 'yy'},
+            platform={"xx": "yy"},
             inputs=dict(),
-            output_files=dict())
+            output_files=dict(),
+        )
         diff = left.diff(right)
         self.assertEqual(diff.command_unified_diffs, [])
         self.assertEqual(diff.platform_diffs.left_only, dict())
-        self.assertEqual(diff.platform_diffs.right_only, {'xx': 'yy'})
+        self.assertEqual(diff.platform_diffs.right_only, {"xx": "yy"})
         self.assertEqual(diff.platform_diffs.value_diffs, dict())
         self.assertEqual(diff.input_diffs.left_only, dict())
         self.assertEqual(diff.input_diffs.right_only, dict())
@@ -111,15 +112,17 @@ class ShowActionResultDiffTests(unittest.TestCase):
 
     def test_diff_command(self):
         left = remotetool.ShowActionResult(
-            command=['f', 'g'],
+            command=["f", "g"],
             platform=dict(),
             inputs=dict(),
-            output_files=dict())
+            output_files=dict(),
+        )
         right = remotetool.ShowActionResult(
-            command=['f', 'h'],
+            command=["f", "h"],
             platform=dict(),
             inputs=dict(),
-            output_files=dict())
+            output_files=dict(),
+        )
         diff = left.diff(right)
         self.assertNotEqual(diff.command_unified_diffs, [])
         self.assertEqual(diff.platform_diffs.left_only, dict())
@@ -133,13 +136,15 @@ class ShowActionResultDiffTests(unittest.TestCase):
         left = remotetool.ShowActionResult(
             command=[],
             platform=dict(),
-            inputs={'j.k': '0123/12'},
-            output_files=dict())
+            inputs={"j.k": "0123/12"},
+            output_files=dict(),
+        )
         right = remotetool.ShowActionResult(
             command=[],
             platform=dict(),
-            inputs={'j.k': '5678/12'},
-            output_files=dict())
+            inputs={"j.k": "5678/12"},
+            output_files=dict(),
+        )
         diff = left.diff(right)
         self.assertEqual(diff.command_unified_diffs, [])
         self.assertEqual(diff.platform_diffs.left_only, dict())
@@ -148,11 +153,11 @@ class ShowActionResultDiffTests(unittest.TestCase):
         self.assertEqual(diff.input_diffs.left_only, dict())
         self.assertEqual(diff.input_diffs.right_only, dict())
         self.assertEqual(
-            diff.input_diffs.value_diffs, {'j.k': ('0123/12', '5678/12')})
+            diff.input_diffs.value_diffs, {"j.k": ("0123/12", "5678/12")}
+        )
 
 
 class ParseShowActionOutputTests(unittest.TestCase):
-
     def test_example(self):
         command = "/usr/bin/env FOO=BAR echo hello world"
         inputs = [
@@ -167,7 +172,7 @@ class ParseShowActionOutputTests(unittest.TestCase):
             ("OSFamily", "Linux"),
             (
                 "container-image",
-                "docker://gcr.io/cloud-marketplace/google/debian11@sha256:aaaaaaaaaaaaa5555555555555aaaaaaaaaaaaa555555555"
+                "docker://gcr.io/cloud-marketplace/google/debian11@sha256:aaaaaaaaaaaaa5555555555555aaaaaaaaaaaaa555555555",
             ),
         ]
         result = remotetool.ShowActionResult(
@@ -220,50 +225,55 @@ Output Files From Directories
 
 
 class ReadConfigFileLinesTests(unittest.TestCase):
-
     def test_empty_file(self):
         self.assertEqual(remotetool.read_config_file_lines([]), dict())
 
     def test_ignore_blank_lines(self):
         self.assertEqual(
-            remotetool.read_config_file_lines(['', '\t', '\n']), dict())
+            remotetool.read_config_file_lines(["", "\t", "\n"]), dict()
+        )
 
     def test_ignore_comments(self):
         self.assertEqual(
-            remotetool.read_config_file_lines(['####', '# comment']), dict())
+            remotetool.read_config_file_lines(["####", "# comment"]), dict()
+        )
 
     def test_ignore_non_key_value_pairs(self):
         self.assertEqual(
-            remotetool.read_config_file_lines(['value-only']), dict())
+            remotetool.read_config_file_lines(["value-only"]), dict()
+        )
 
     def test_key_value(self):
         self.assertEqual(
-            remotetool.read_config_file_lines(['key=value']), {'key': 'value'})
+            remotetool.read_config_file_lines(["key=value"]), {"key": "value"}
+        )
 
     def test_last_wins(self):
         self.assertEqual(
-            remotetool.read_config_file_lines(['key=value-1', 'key=value-2']),
-            {'key': 'value-2'})
+            remotetool.read_config_file_lines(["key=value-1", "key=value-2"]),
+            {"key": "value-2"},
+        )
 
 
 _TEST_CFG = {
-    'service': 'other.remote.service.com:443',
-    'instance': 'projects/your-project/instance/default',
+    "service": "other.remote.service.com:443",
+    "instance": "projects/your-project/instance/default",
 }
 
 
 class ConfigureRemotetoolTests(unittest.TestCase):
-
     def test_configure(self):
-        with mock.patch.object(Path, 'read_text', return_value=''.join(
-            [f'{k}={v}\n' for k, v in _TEST_CFG.items()])) as mock_read:
-            tool = remotetool.configure_remotetool(Path('r.cfg'))
+        with mock.patch.object(
+            Path,
+            "read_text",
+            return_value="".join([f"{k}={v}\n" for k, v in _TEST_CFG.items()]),
+        ) as mock_read:
+            tool = remotetool.configure_remotetool(Path("r.cfg"))
         self.assertEqual(tool.config, _TEST_CFG)
         mock_read.assert_called_once_with()
 
 
 class RemotetoolRunTests(unittest.TestCase):
-
     @property
     def tool(self):
         return remotetool.RemoteTool(reproxy_cfg=_TEST_CFG)
@@ -276,49 +286,63 @@ class RemotetoolRunTests(unittest.TestCase):
     def test_run_success(self):
         exit_code = 0
         with mock.patch.object(
-                cl_utils, 'subprocess_call',
-                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            cl_utils,
+            "subprocess_call",
+            return_value=cl_utils.SubprocessResult(exit_code),
+        ) as mock_call:
             result = self.tool.run(
                 args=[
-                    '--operation', 'show_action', '--digest',
-                    '198273aaabbef87/323'
-                ])
+                    "--operation",
+                    "show_action",
+                    "--digest",
+                    "198273aaabbef87/323",
+                ]
+            )
         self.assertEqual(result.returncode, exit_code)
         mock_call.assert_called_once()
 
     def test_run_failure(self):
         exit_code = 1
         with mock.patch.object(
-                cl_utils, 'subprocess_call',
-                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            cl_utils,
+            "subprocess_call",
+            return_value=cl_utils.SubprocessResult(exit_code),
+        ) as mock_call:
             with self.assertRaises(subprocess.CalledProcessError):
                 self.tool.run(
                     args=[
-                        '--operation',
-                        'show_action',  # missing '--digest'
-                    ])
+                        "--operation",
+                        "show_action",  # missing '--digest'
+                    ]
+                )
         mock_call.assert_called_once()
 
     def test_show_action_uncached(self):
         exit_code = 0
         action_result = remotetool.ShowActionResult(
-            command=[], platform=dict(), inputs=dict(), output_files=dict())
+            command=[], platform=dict(), inputs=dict(), output_files=dict()
+        )
         with tempfile.TemporaryDirectory() as td:
             # Use a temporary directory for the cache, not the real cache dir.
-            with mock.patch.object(tempfile, 'gettempdir',
-                                   return_value=td) as mock_tempdir:
-
-                with mock.patch.object(cl_utils, 'subprocess_call',
-                                       return_value=cl_utils.SubprocessResult(
-                                           exit_code)) as mock_call:
+            with mock.patch.object(
+                tempfile, "gettempdir", return_value=td
+            ) as mock_tempdir:
+                with mock.patch.object(
+                    cl_utils,
+                    "subprocess_call",
+                    return_value=cl_utils.SubprocessResult(exit_code),
+                ) as mock_call:
                     with mock.patch.object(
-                            remotetool, 'parse_show_action_output',
-                            return_value=action_result) as mock_parse:
+                        remotetool,
+                        "parse_show_action_output",
+                        return_value=action_result,
+                    ) as mock_parse:
                         with mock.patch.object(
-                                Path, 'exists',
-                                return_value=False) as mock_exists:
+                            Path, "exists", return_value=False
+                        ) as mock_exists:
                             result = self.tool.show_action(
-                                digest='0abb771b3198273aaabbef87/323')
+                                digest="0abb771b3198273aaabbef87/323"
+                            )
         self.assertEqual(result, action_result)
         mock_tempdir.assert_called_once_with()
         mock_call.assert_called_once()
@@ -328,21 +352,27 @@ class RemotetoolRunTests(unittest.TestCase):
     def test_show_action_cached(self):
         exit_code = 0
         action_result = remotetool.ShowActionResult(
-            command=[], platform=dict(), inputs=dict(), output_files=dict())
+            command=[], platform=dict(), inputs=dict(), output_files=dict()
+        )
         with tempfile.TemporaryDirectory() as td:
             # Use a temporary directory for the cache, not the real cache dir.
-            with mock.patch.object(tempfile, 'gettempdir',
-                                   return_value=td) as mock_tempdir:
-
+            with mock.patch.object(
+                tempfile, "gettempdir", return_value=td
+            ) as mock_tempdir:
                 with mock.patch.object(
-                        remotetool, 'parse_show_action_output',
-                        return_value=action_result) as mock_parse:
-                    with mock.patch.object(Path, 'exists',
-                                           return_value=True) as mock_exists:
-                        with mock.patch.object(Path, 'read_text',
-                                               return_value='\n') as mock_read:
+                    remotetool,
+                    "parse_show_action_output",
+                    return_value=action_result,
+                ) as mock_parse:
+                    with mock.patch.object(
+                        Path, "exists", return_value=True
+                    ) as mock_exists:
+                        with mock.patch.object(
+                            Path, "read_text", return_value="\n"
+                        ) as mock_read:
                             result = self.tool.show_action(
-                                digest='cc8a65a0abb771b3143abbef87/997')
+                                digest="cc8a65a0abb771b3143abbef87/997"
+                            )
         self.assertEqual(result, action_result)
         mock_tempdir.assert_called_once_with()
         mock_parse.assert_called_once()
@@ -352,11 +382,13 @@ class RemotetoolRunTests(unittest.TestCase):
     def test_download_blob(self):
         exit_code = 0
         with mock.patch.object(
-                cl_utils, 'subprocess_call',
-                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            cl_utils,
+            "subprocess_call",
+            return_value=cl_utils.SubprocessResult(exit_code),
+        ) as mock_call:
             result = self.tool.download_blob(
-                path='stash/me/here.txt',
-                digest='17177bbbbe81001bccc/9696',
+                path="stash/me/here.txt",
+                digest="17177bbbbe81001bccc/9696",
             )
         mock_call.assert_called_once()
         self.assertEqual(result.returncode, exit_code)
@@ -364,15 +396,17 @@ class RemotetoolRunTests(unittest.TestCase):
     def test_download_dir(self):
         exit_code = 0
         with mock.patch.object(
-                cl_utils, 'subprocess_call',
-                return_value=cl_utils.SubprocessResult(exit_code)) as mock_call:
+            cl_utils,
+            "subprocess_call",
+            return_value=cl_utils.SubprocessResult(exit_code),
+        ) as mock_call:
             result = self.tool.download_dir(
-                path='stash/me/dir',
-                digest='000abe888ecedbb11/6936',
+                path="stash/me/dir",
+                digest="000abe888ecedbb11/6936",
             )
         mock_call.assert_called_once()
         self.assertEqual(result.returncode, exit_code)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

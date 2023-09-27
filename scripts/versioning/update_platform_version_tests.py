@@ -48,43 +48,51 @@ EXPECTED_DST_FILE_CONTENT = "{ test }"
 
 
 class TestUpdatePlatformVersionMethods(unittest.TestCase):
-
     def setUp(self):
         self.test_dir = tempfile.mkdtemp()
 
         self.fake_version_history_file = os.path.join(
-            self.test_dir, 'version_history.json')
-        with open(self.fake_version_history_file, 'w') as f:
+            self.test_dir, "version_history.json"
+        )
+        with open(self.fake_version_history_file, "w") as f:
             f.write(FAKE_VERSION_HISTORY_FILE_CONTENT)
-        update_platform_version.VERSION_HISTORY_PATH = self.fake_version_history_file
+        update_platform_version.VERSION_HISTORY_PATH = (
+            self.fake_version_history_file
+        )
 
         self.fake_fidl_compability_doc_file = os.path.join(
-            self.test_dir, "fidl_api_compatibility_testing.md")
-        with open(self.fake_fidl_compability_doc_file, 'w') as f:
+            self.test_dir, "fidl_api_compatibility_testing.md"
+        )
+        with open(self.fake_fidl_compability_doc_file, "w") as f:
             f.write(FAKE_FIDL_COMPATIBILITY_DOC_FILE_CONTENT)
-        update_platform_version.FIDL_COMPATIBILITY_DOC_PATH = self.fake_fidl_compability_doc_file
+        update_platform_version.FIDL_COMPATIBILITY_DOC_PATH = (
+            self.fake_fidl_compability_doc_file
+        )
 
         self.test_src_dir = tempfile.mkdtemp()
         self.fake_src_file = os.path.join(
-            self.test_src_dir, 'fuchsia_src.test.json')
-        with open(self.fake_src_file, 'w') as f:
+            self.test_src_dir, "fuchsia_src.test.json"
+        )
+        with open(self.fake_src_file, "w") as f:
             f.write(FAKE_SRC_FILE_CONTENT)
 
         self.test_dst_dir = tempfile.mkdtemp()
         self.fake_dst_file = os.path.join(
-            self.test_dst_dir, 'fuchsia_dst.test.json')
+            self.test_dst_dir, "fuchsia_dst.test.json"
+        )
 
         self.test_dir = tempfile.mkdtemp()
         self.fake_golden_file = os.path.join(
-            self.test_dir, 'compatibility_testing_goldens.json')
+            self.test_dir, "compatibility_testing_goldens.json"
+        )
 
         content = [
             {
-                'dst': self.fake_dst_file,
-                'src': self.fake_src_file,
+                "dst": self.fake_dst_file,
+                "src": self.fake_src_file,
             },
         ]
-        with open(self.fake_golden_file, 'w') as f:
+        with open(self.fake_golden_file, "w") as f:
             json.dump(content, f)
 
     def tearDown(self):
@@ -93,47 +101,61 @@ class TestUpdatePlatformVersionMethods(unittest.TestCase):
     def _version_history_contains_entry_for_api_level(self, api_level):
         with open(self.fake_version_history_file, "r") as f:
             version_history = json.load(f)
-            versions = version_history['data']['api_levels']
+            versions = version_history["data"]["api_levels"]
             return str(api_level) in versions
 
     def test_update_version_history(self):
         self.assertFalse(
-            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
+            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL)
+        )
         self.assertTrue(
             update_platform_version.update_version_history(
-                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH
+            )
+        )
         self.assertTrue(
-            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL))
+            self._version_history_contains_entry_for_api_level(NEW_API_LEVEL)
+        )
         self.assertFalse(
             update_platform_version.update_version_history(
-                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH))
+                NEW_API_LEVEL, update_platform_version.VERSION_HISTORY_PATH
+            )
+        )
 
     def test_update_fidl_compatibility_doc(self):
         with open(self.fake_fidl_compability_doc_file) as f:
             lines = f.readlines()
         self.assertIn(
-            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines)
+            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines
+        )
         self.assertNotIn(
-            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines)
+            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
+        )
 
         self.assertTrue(
             update_platform_version.update_fidl_compatibility_doc(
                 NEW_API_LEVEL,
-                update_platform_version.FIDL_COMPATIBILITY_DOC_PATH))
+                update_platform_version.FIDL_COMPATIBILITY_DOC_PATH,
+            )
+        )
 
         with open(self.fake_fidl_compability_doc_file) as f:
             lines = f.readlines()
         self.assertNotIn(
-            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines)
+            f"{{% set in_development_api_level = {OLD_API_LEVEL} %}}\n", lines
+        )
         self.assertIn(
-            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines)
+            f"{{% set in_development_api_level = {NEW_API_LEVEL} %}}\n", lines
+        )
 
     def test_move_compatibility_test_goldens(self):
         self.assertTrue(
             update_platform_version.copy_compatibility_test_goldens(
-                self.test_dir, NEW_API_LEVEL))
+                self.test_dir, NEW_API_LEVEL
+            )
+        )
         self.assertTrue(filecmp.cmp(self.fake_src_file, self.fake_dst_file))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -16,12 +16,14 @@ expected_value_for_dont_check = "don't check this string!"
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Check the report of configuration produced by scrutiny.")
+        description="Check the report of configuration produced by scrutiny."
+    )
     parser.add_argument(
         "--extracted-config",
         type=pathlib.Path,
         required=True,
-        help="Path to JSON dump of structured configuration from scrutiny.")
+        help="Path to JSON dump of structured configuration from scrutiny.",
+    )
     args = parser.parse_args()
 
     test = unittest.TestCase()
@@ -31,10 +33,11 @@ def main():
 
     test.assertEqual(
         extracted_config[
-            f"fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm"],
+            f"fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm"
+        ],
         {
-            "asserted_by_scrutiny_test":
-                expected_value_in_policy,
-            "verifier_fails_due_to_mutability_parent":
-                expected_value_for_dont_check
-        }, "configuration from system image did not match expectation")
+            "asserted_by_scrutiny_test": expected_value_in_policy,
+            "verifier_fails_due_to_mutability_parent": expected_value_for_dont_check,
+        },
+        "configuration from system image did not match expectation",
+    )

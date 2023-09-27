@@ -25,7 +25,7 @@ def files_from_package_set(package_set: List[FilePath]) -> List[FilePath]:
     paths = []
     for manifest in package_set:
         paths.append(manifest)
-        with open(manifest, 'r') as file:
+        with open(manifest, "r") as file:
             package_manifest = json_load(PackageManifest, file)
             blob_sources = []
             for blob in package_manifest.blobs:
@@ -39,16 +39,18 @@ def files_from_package_set(package_set: List[FilePath]) -> List[FilePath]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        'Generates a file describing the dependencies of the size checker')
-    parser.add_argument('--budgets', type=argparse.FileType('r'), required=True)
-    parser.add_argument('--output', type=argparse.FileType('w'), required=True)
-    parser.add_argument('--with-package-content', action='store_true')
+        description="Generates a file describing the dependencies of the size checker"
+    )
+    parser.add_argument("--budgets", type=argparse.FileType("r"), required=True)
+    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
+    parser.add_argument("--with-package-content", action="store_true")
     args = parser.parse_args()
     budgets = json.load(args.budgets)
     manifests = set(
-        pkg for budget in budgets["package_set_budgets"]
-        for pkg in budget["packages"])
+        pkg
+        for budget in budgets["package_set_budgets"]
+        for pkg in budget["packages"]
+    )
     inputs = set(manifests)  # This copy the set copy.
 
     if args.with_package_content:
@@ -57,5 +59,5 @@ def main():
     args.output.writelines(f"{input}\n" for input in sorted(inputs))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

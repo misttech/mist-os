@@ -26,8 +26,11 @@ class Terminal:
         return Terminal._style(text, 93)
 
     def supports_color() -> bool:
-        return sys.stdout.isatty() and sys.stderr.isatty(
-        ) and not os.environ.get('NO_COLOR')
+        return (
+            sys.stdout.isatty()
+            and sys.stderr.isatty()
+            and not os.environ.get("NO_COLOR")
+        )
 
     def _print(*args, **kwargs) -> None:
         if not Terminal.suppress:
@@ -35,23 +38,26 @@ class Terminal:
 
     def fatal(text: str) -> int:
         Terminal._print(
-            Terminal.red(Terminal.bold('FATAL: ')) + text, file=sys.stderr)
+            Terminal.red(Terminal.bold("FATAL: ")) + text, file=sys.stderr
+        )
         sys.exit(1)
 
     def error(text: str) -> None:
         Terminal._print(
-            Terminal.red(Terminal.bold('ERROR: ')) + text, file=sys.stderr)
+            Terminal.red(Terminal.bold("ERROR: ")) + text, file=sys.stderr
+        )
 
     def warn(text: str) -> None:
         Terminal._print(
-            Terminal.yellow(Terminal.bold('WARNING: ')) + text, file=sys.stderr)
+            Terminal.yellow(Terminal.bold("WARNING: ")) + text, file=sys.stderr
+        )
 
     def info(text: str) -> None:
-        Terminal._print(Terminal.green(Terminal.bold('INFO: ')) + text)
+        Terminal._print(Terminal.green(Terminal.bold("INFO: ")) + text)
 
     def _style(text: str, escape_code: int) -> str:
         if Terminal.supports_color():
-            return f'\033[{escape_code}m{text}\033[0m'
+            return f"\033[{escape_code}m{text}\033[0m"
         else:
             # If neither stdout nor stderr is not a tty then any styles likely
             # won't get rendered correctly when the text is eventually printed,

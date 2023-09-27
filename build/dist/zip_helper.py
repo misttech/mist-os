@@ -13,19 +13,23 @@ from zipfile import ZipFile
 
 parser = ArgumentParser()
 parser.add_argument(
-    'zip',
-    help='extracts a zip file and writes a partial distribution manifest')
+    "zip", help="extracts a zip file and writes a partial distribution manifest"
+)
 parser.add_argument(
-    '--output-dir', help='directory to which to extract', required=True)
+    "--output-dir", help="directory to which to extract", required=True
+)
 parser.add_argument(
-    '--output-manifest',
-    help='path to which to output the distribution manifest',
-    required=True)
+    "--output-manifest",
+    help="path to which to output the distribution manifest",
+    required=True,
+)
 parser.add_argument(
-    '--output-depfile', help='path to the generated depfile', required=True)
+    "--output-depfile", help="path to the generated depfile", required=True
+)
 parser.add_argument(
-    '--dest-path-prefix',
-    help='path to prefix all entries within the zip when writing the manifest')
+    "--dest-path-prefix",
+    help="path to prefix all entries within the zip when writing the manifest",
+)
 
 
 def main():
@@ -35,18 +39,20 @@ def main():
         json_data = []
         depfile_data = []
         for entry in archive.infolist():
-            destination = path.join(
-                args.dest_path_prefix,
-                entry.filename) if args.dest_path_prefix else entry.filename
+            destination = (
+                path.join(args.dest_path_prefix, entry.filename)
+                if args.dest_path_prefix
+                else entry.filename
+            )
             source = path.join(args.output_dir, entry.filename)
-            json_data.append({'destination': destination, 'source': source})
+            json_data.append({"destination": destination, "source": source})
             depfile_data.append(source)
-        with open(args.output_manifest, 'w') as f:
+        with open(args.output_manifest, "w") as f:
             json.dump(json_data, f)
-        with open(args.output_depfile, 'w') as f:
-            f.write(' '.join(depfile_data))
-            f.write(f': {args.zip}\n')
+        with open(args.output_depfile, "w") as f:
+            f.write(" ".join(depfile_data))
+            f.write(f": {args.zip}\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

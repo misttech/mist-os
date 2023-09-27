@@ -13,14 +13,16 @@ import os
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--output',
-        help='Where to write the resulting main()-containing file',
-        required=True)
+        "--output",
+        help="Where to write the resulting main()-containing file",
+        required=True,
+    )
     parser.add_argument(
-        '--comment',
-        help='The file-level comment of the generated file',
-        required=True)
-    parser.add_argument('includes', nargs='*', help='files to #include')
+        "--comment",
+        help="The file-level comment of the generated file",
+        required=True,
+    )
+    parser.add_argument("includes", nargs="*", help="files to #include")
     args = parser.parse_args()
 
     contents = ["// %s" % args.comment]
@@ -41,5 +43,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

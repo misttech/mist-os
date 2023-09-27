@@ -12,12 +12,15 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Generate a script that invokes a Dart application')
+        description="Generate a script that invokes a Dart application"
+    )
     parser.add_argument(
-        '--out', help='Path to the invocation file to generate', required=True)
-    parser.add_argument('--dart', help='Path to the Dart binary', required=True)
+        "--out", help="Path to the invocation file to generate", required=True
+    )
+    parser.add_argument("--dart", help="Path to the Dart binary", required=True)
     parser.add_argument(
-        '--snapshot', help='Path to the app snapshot', required=True)
+        "--snapshot", help="Path to the app snapshot", required=True
+    )
     args = parser.parse_args()
 
     app_file = args.out
@@ -30,19 +33,25 @@ def main():
     rel_dart = os.path.relpath(args.dart, app_path)
     rel_snapshot = os.path.relpath(args.snapshot, app_path)
 
-    script_content = f'''#!/bin/bash
+    script_content = f"""#!/bin/bash
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" >/dev/null 2>&1 && pwd)"
 $SCRIPT_DIR/{rel_dart} \\
   $SCRIPT_DIR/{rel_snapshot} \\
   "$@"
-'''
-    with open(app_file, 'w') as file:
+"""
+    with open(app_file, "w") as file:
         file.write(script_content)
     permissions = (
-        stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP |
-        stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH)
+        stat.S_IRUSR
+        | stat.S_IWUSR
+        | stat.S_IXUSR
+        | stat.S_IRGRP
+        | stat.S_IWGRP
+        | stat.S_IXGRP
+        | stat.S_IROTH
+    )
     os.chmod(app_file, permissions)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

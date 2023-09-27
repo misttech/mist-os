@@ -22,13 +22,14 @@ class MoblyTestFailureException(Exception):
 
 
 def _execute_test(
-        driver: base_mobly_driver.BaseDriver,
-        python_path: str,
-        test_path: str,
-        timeout_sec: int = 0,
-        test_data_path: Optional[str] = None,
-        transport: Optional[str] = None,
-        verbose: bool = False) -> None:
+    driver: base_mobly_driver.BaseDriver,
+    python_path: str,
+    test_path: str,
+    timeout_sec: int = 0,
+    test_data_path: Optional[str] = None,
+    transport: Optional[str] = None,
+    verbose: bool = False,
+) -> None:
     """Executes a Mobly test with the specified Mobly Driver.
 
     Mobly test output is streamed to the console.
@@ -56,26 +57,29 @@ def _execute_test(
         #
         # Order matters here as the test data deps are preferred over
         # binaries of existing names on the system.
-        test_env['PATH'] = os.pathsep.join([test_data_path, test_env['PATH']])
+        test_env["PATH"] = os.pathsep.join([test_data_path, test_env["PATH"]])
 
-    with NamedTemporaryFile(mode='w') as tmp_config:
+    with NamedTemporaryFile(mode="w") as tmp_config:
         config = driver.generate_test_config(transport)
-        print('======== Mobly config content ========')
+        print("======== Mobly config content ========")
         print(config)
-        print('======================================')
+        print("======================================")
         tmp_config.write(config)
         tmp_config.flush()
 
-        cmd = [python_path, test_path, '-c', tmp_config.name]
-        if (verbose):
-            cmd.append('-v')
-        cmd_str = ' '.join(cmd)
+        cmd = [python_path, test_path, "-c", tmp_config.name]
+        if verbose:
+            cmd.append("-v")
+        cmd_str = " ".join(cmd)
         print(f'Executing Mobly test via cmd:\n"$ {cmd_str}"')
 
-        with subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, universal_newlines=True,
-                              env=test_env) as proc:
-
+        with subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            env=test_env,
+        ) as proc:
             timeout_ts = time.time() + timeout_sec
             # Poll the process to stream output.
             while not timeout_sec or time.time() < timeout_ts:
@@ -85,7 +89,7 @@ def _execute_test(
                         return
                     # TODO(fxbug.dev/119651) - differentiate between legitimate
                     # test failures vs unexpected crashes.
-                    raise MoblyTestFailureException('Mobly test failed.')
+                    raise MoblyTestFailureException("Mobly test failed.")
                 output = proc.stdout.readline()
                 if output:
                     # Immediately flush Mobly test output for responsiveness.
@@ -94,17 +98,19 @@ def _execute_test(
             proc.kill()
             proc.wait(timeout=10)
             raise MoblyTestTimeoutException(
-                f'Mobly test timed out after {timeout_sec} seconds.')
+                f"Mobly test timed out after {timeout_sec} seconds."
+            )
 
 
 def run(
-        driver: base_mobly_driver.BaseDriver,
-        python_path: str,
-        test_path: str,
-        timeout_sec: int = 0,
-        test_data_path: Optional[str] = None,
-        transport: Optional[str] = None,
-        verbose: bool = False) -> None:
+    driver: base_mobly_driver.BaseDriver,
+    python_path: str,
+    test_path: str,
+    timeout_sec: int = 0,
+    test_data_path: Optional[str] = None,
+    transport: Optional[str] = None,
+    verbose: bool = False,
+) -> None:
     """Runs the Mobly Driver which handles the lifecycle of a Mobly test.
 
     This method manages the lifecycle of a Mobly test's execution.
@@ -128,14 +134,14 @@ def run(
       ValueError if any argument is invalid.
     """
     if not driver:
-        raise ValueError('|driver| must not be None.')
+        raise ValueError("|driver| must not be None.")
     if not python_path:
-        raise ValueError('|python_path| must not be empty.')
+        raise ValueError("|python_path| must not be empty.")
     if not test_path:
-        raise ValueError('|test_path| must not be empty.')
+        raise ValueError("|test_path| must not be empty.")
     if timeout_sec < 0:
-        raise ValueError('|timeout_sec| must be a positive integer.')
-    print(f'Running [{driver.__class__.__name__}]')
+        raise ValueError("|timeout_sec| must be a positive integer.")
+    print(f"Running [{driver.__class__.__name__}]")
     try:
         _execute_test(
             python_path=python_path,
@@ -144,6 +150,7 @@ def run(
             timeout_sec=timeout_sec,
             test_data_path=test_data_path,
             transport=transport,
-            verbose=verbose)
+            verbose=verbose,
+        )
     finally:
         driver.teardown()

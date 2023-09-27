@@ -37,7 +37,6 @@ def is_pe(filepath):
 
 
 class BootTest(object):
-
     def __init__(self, images_by_label, test_json, build_dir):
         self.build_dir = build_dir
         test = test_json["test"]
@@ -50,10 +49,14 @@ class BootTest(object):
         self.zbi = images_by_label[images["zbi"]] if "zbi" in images else None
         self.qemu_kernel = (
             images_by_label[images["qemu_kernel"]]
-            if "qemu_kernel" in images else None)
+            if "qemu_kernel" in images
+            else None
+        )
         self.efi_disk = (
             images_by_label[images["efi_disk"]]
-            if "efi_disk" in images else None)
+            if "efi_disk" in images
+            else None
+        )
 
         arch_image = self.qemu_kernel or self.efi_disk or self.zbi or None
         self.arch = arch_image.get("cpu", None) if arch_image else None
@@ -116,9 +119,13 @@ def find_bootserver(build_dir):
     with open(os.path.join(build_dir, "tool_paths.json")) as file:
         tool_paths = json.load(file)
     bootservers = [
-        os.path.join(build_dir, tool["path"]) for tool in tool_paths if (
-            tool["name"] == "bootserver" and tool["cpu"] == host_cpu and
-            tool["os"] == host_os)
+        os.path.join(build_dir, tool["path"])
+        for tool in tool_paths
+        if (
+            tool["name"] == "bootserver"
+            and tool["cpu"] == host_cpu
+            and tool["os"] == host_os
+        )
     ]
     if bootservers:
         return bootservers[0]
@@ -135,10 +142,12 @@ way to do this is to add //bundles/boot_tests to your `fx set` invocation.
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="fx run-boot-test", description="Run a boot test.", epilog=EPILOG)
+        prog="fx run-boot-test", description="Run a boot test.", epilog=EPILOG
+    )
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument(
-        "--boot", "-b", action="store_true", help="Run via bootserver")
+        "--boot", "-b", action="store_true", help="Run via bootserver"
+    )
     parser.add_argument(
         "--args",
         "-a",
@@ -196,7 +205,8 @@ def main():
 
     if not boot_tests:
         warning(
-            "no boot tests found. Is //bundles/boot_tests in your GN graph?")
+            "no boot tests found. Is //bundles/boot_tests in your GN graph?"
+        )
         return 0
 
     if not args.name:
@@ -217,7 +227,8 @@ def main():
     elif len(matches) > 1 and matches[0].name != args.name:
         error(
             "no boot tests closely matching a name of '%s' found. Closest matches:"
-            % args.name)
+            % args.name
+        )
         for test in matches:
             test.print()
         return 1

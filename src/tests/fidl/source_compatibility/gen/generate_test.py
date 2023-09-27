@@ -15,14 +15,22 @@ from generate_gn import write_gn
 from generate_sidecar import write_gn_sidecar
 import scaffolding
 from types_ import *
-from util import test_name_to_fidl_name, pink, print_err, print_warning, white, TEST_FILE, prepend_step
+from util import (
+    test_name_to_fidl_name,
+    pink,
+    print_err,
+    print_warning,
+    white,
+    TEST_FILE,
+    prepend_step,
+)
 
-FIDL_DIR = 'fidl'
+FIDL_DIR = "fidl"
 EXTENSIONS = {
-    HLCPP: 'cc',
-    LLCPP: 'cc',
-    RUST: 'rs',
-    GO: 'go',
+    HLCPP: "cc",
+    LLCPP: "cc",
+    RUST: "rs",
+    GO: "go",
 }
 
 
@@ -48,6 +56,7 @@ class TransitionState:
                    This is used to know which file to copy when creating the next
                    FIDL state.
     """
+
     test: CompatTest
     step_kind: Optional[StepKind]
     step_num: int
@@ -81,8 +90,9 @@ class TransitionState:
             test=test,
             step_kind=step_kind,
             step_num=max_step + 1,
-            prev_fidl=f'{prev_fidl}.test.fidl',
-            prev_srcs=prev_srcs)
+            prev_fidl=f"{prev_fidl}.test.fidl",
+            prev_srcs=prev_srcs,
+        )
 
 
 # A State of None represents a test that hasn't been initialized yet.
@@ -90,9 +100,9 @@ State = Optional[TransitionState]
 
 
 def run(test_root: Path, state: State):
-    """ Runs the tool until the user quits. """
+    """Runs the tool until the user quits."""
     print_warning(
-        'Generate test tool: press ^C at any time to quit (progress is saved after each step)'
+        "Generate test tool: press ^C at any time to quit (progress is saved after each step)"
     )
     while True:
         state = step(test_root, state)
@@ -107,30 +117,33 @@ def step(test_root: Path, state: State) -> State:
     """
     # New test, run setup
     if state is None:
-        print(white('Step 0: Define initial FIDL and source states'))
+        print(white("Step 0: Define initial FIDL and source states"))
         (new_test, starting_fidl) = run_test_setup(test_root)
         return TransitionState(
             test=new_test,
             step_kind=None,
             step_num=0,
             prev_fidl=starting_fidl,
-            prev_srcs={b: s.starting_src for b, s in new_test.bindings.items()})
+            prev_srcs={b: s.starting_src for b, s in new_test.bindings.items()},
+        )
     # Initial states have been defined, but we don't know if the first step
     # should be a FIDL change or a bindings change.
     elif state.step_kind is None:
         print(
             white(
-                f'Step 0.5: Define whether the first step is a FIDL change or binding change'
-            ))
+                f"Step 0.5: Define whether the first step is a FIDL change or binding change"
+            )
+        )
         return TransitionState(
             test=state.test,
             step_kind=read_step_kind(),
             step_num=1,
             prev_fidl=state.prev_fidl,
-            prev_srcs=state.prev_srcs)
+            prev_srcs=state.prev_srcs,
+        )
     # Change the FIDL library
     elif state.step_kind == StepKind.FIDL:
-        print(white(f'Step {state.step_num}: Define next FIDL library state'))
+        print(white(f"Step {state.step_num}: Define next FIDL library state"))
         new_test = state.test
         fidl_name = input(
             f'Enter name for next {pink("FIDL")} file (e.g. "during.test.fidl"): '
@@ -143,21 +156,25 @@ def step(test_root: Path, state: State) -> State:
         new_fidl = state.test.fidl
         fidl_ref: FidlRef = stem(fidl_name)
         new_fidl[fidl_ref] = FidlDef(
-            source=f'{FIDL_DIR}/{fidl_name}', instructions=read_instructions())
+            source=f"{FIDL_DIR}/{fidl_name}", instructions=read_instructions()
+        )
         for binding in new_test.bindings:
             new_test.bindings[binding].steps.append(
-                FidlStep(step_num=state.step_num, fidl=fidl_ref))
+                FidlStep(step_num=state.step_num, fidl=fidl_ref)
+            )
 
         return TransitionState(
             test=new_test,
             step_kind=StepKind.BINDING,
             step_num=state.step_num + 1,
             prev_fidl=fidl_name,
-            prev_srcs=state.prev_srcs)
+            prev_srcs=state.prev_srcs,
+        )
     # Change the bindings
     else:
         print(
-            white(f'Step {state.step_num}: Define next state for each binding'))
+            white(f"Step {state.step_num}: Define next state for each binding")
+        )
         new_test = state.test
         prev_srcs = {}
         for binding in new_test.bindings:
@@ -167,7 +184,7 @@ def step(test_root: Path, state: State) -> State:
             if not filename:
                 continue
             filename = prepend_step(filename, state.step_num)
-            path: RelativePath = f'{binding}/{filename}'
+            path: RelativePath = f"{binding}/{filename}"
             scaffolding.add_file(test_root, state.prev_srcs[binding], path)
             prev_srcs[binding] = path
             # for binding source changes, we append a new SourceStep to the list of steps
@@ -175,13 +192,16 @@ def step(test_root: Path, state: State) -> State:
                 SourceStep(
                     step_num=state.step_num,
                     source=path,
-                    instructions=read_instructions()))
+                    instructions=read_instructions(),
+                )
+            )
         return TransitionState(
             test=new_test,
             step_kind=StepKind.FIDL,
             step_num=state.step_num + 1,
             prev_fidl=state.prev_fidl,
-            prev_srcs=prev_srcs)
+            prev_srcs=prev_srcs,
+        )
 
 
 def run_test_setup(test_root: Path) -> (CompatTest, str):
@@ -200,7 +220,8 @@ def run_test_setup(test_root: Path) -> (CompatTest, str):
     fidl_name = prepend_step(fidl_name, step=0)
     fidl_library_name = test_name_to_fidl_name(test_root.name)
     scaffolding.initialize_fidl(
-        test_root / FIDL_DIR / fidl_name, fidl_library_name)
+        test_root / FIDL_DIR / fidl_name, fidl_library_name
+    )
     fidl_ref: FidlRef = stem(fidl_name)
 
     # initialize bindings
@@ -213,22 +234,24 @@ def run_test_setup(test_root: Path) -> (CompatTest, str):
             continue
         filename = prepend_step(filename, step=0)
         scaffolding.initialize_src(
-            test_root / binding / filename, binding, fidl_library_name)
+            test_root / binding / filename, binding, fidl_library_name
+        )
         bindings[binding] = Steps(
             starting_fidl=fidl_ref,
-            starting_src=f'{binding}/{filename}',
-            steps=[])
+            starting_src=f"{binding}/{filename}",
+            steps=[],
+        )
     if not bindings:
-        print_err('Must include at least one binding to define a test')
+        print_err("Must include at least one binding to define a test")
         sys.exit(1)
 
     new_test = CompatTest(
         title=title,
         fidl={
-            fidl_ref: FidlDef(
-                source=f'{FIDL_DIR}/{fidl_name}', instructions=[])
+            fidl_ref: FidlDef(source=f"{FIDL_DIR}/{fidl_name}", instructions=[])
         },
-        bindings=bindings)
+        bindings=bindings,
+    )
 
     return (new_test, fidl_name)
 
@@ -246,14 +269,14 @@ def regen_files(test_root: Path, test: CompatTest):
 
 
 def read_step_kind() -> StepKind:
-    prompt = 'Is the first step in the transition a FIDL change (F) or binding change (B)? (F/B) '
+    prompt = "Is the first step in the transition a FIDL change (F) or binding change (B)? (F/B) "
     kind = input(prompt)
-    while kind not in 'FB':
+    while kind not in "FB":
         print(
             f'Unknown option "{kind}", enter either "F" for FIDL or "B" for binding'
         )
         kind = input(prompt)
-    return StepKind.FIDL if kind == 'F' else StepKind.BINDING
+    return StepKind.FIDL if kind == "F" else StepKind.BINDING
 
 
 def read_instructions() -> List[str]:
@@ -263,12 +286,12 @@ def read_instructions() -> List[str]:
     instructions = []
     while value:
         instructions.append(value)
-        value = input('')
+        value = input("")
     return instructions
 
 
 def stem(p: str) -> str:
-    """ Remove all stems from a filename, e.g. foo.test.golden.fidl -> foo. """
+    """Remove all stems from a filename, e.g. foo.test.golden.fidl -> foo."""
     while Path(p).stem != p:
         p = Path(p).stem
     return p

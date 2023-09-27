@@ -64,7 +64,8 @@ class RebootCapableDevice(abc.ABC):
 
     @abc.abstractmethod
     def wait_for_offline(
-            self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]) -> None:
+        self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]
+    ) -> None:
         """Wait for Fuchsia device to go offline.
 
         Args:
@@ -73,7 +74,8 @@ class RebootCapableDevice(abc.ABC):
 
     @abc.abstractmethod
     def wait_for_online(
-            self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]) -> None:
+        self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]
+    ) -> None:
         """Wait for Fuchsia device to go online.
 
         Args:

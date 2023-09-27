@@ -40,19 +40,21 @@ def main():
         print("Usage: %s <input_file> <output_file>" % (sys.argv[0],))
         exit(-1)
 
-    lines = open(sys.argv[1], 'r').readlines()
-    out = open(sys.argv[2], 'w')
+    lines = open(sys.argv[1], "r").readlines()
+    out = open(sys.argv[2], "w")
     varname = re.sub(
-        '_([a-zA-Z0-9])', lambda m: m.group(1).upper(),
-        'k_' + os.path.splitext(os.path.split(sys.argv[1])[1])[0])
+        "_([a-zA-Z0-9])",
+        lambda m: m.group(1).upper(),
+        "k_" + os.path.splitext(os.path.split(sys.argv[1])[1])[0],
+    )
 
     out.write(HEADER % (varname,))
 
     for i in range(len(lines)):
-        l = lines[i].replace('\n', '')  # Remove the trailing newline
-        l = re.sub('//.*', '', l)  # Remove any comments
-        l = re.sub('(^\s+|\s+$)', '', l)  # Remove leading/trailing whitespace
-        l = l.replace('\\', '\\\\')  # Escape all fwd slash
+        l = lines[i].replace("\n", "")  # Remove the trailing newline
+        l = re.sub("//.*", "", l)  # Remove any comments
+        l = re.sub("(^\s+|\s+$)", "", l)  # Remove leading/trailing whitespace
+        l = l.replace("\\", "\\\\")  # Escape all fwd slash
         l = l.replace('"', '\\"')  # Escape all double-quotes
 
         # Skip empty lines
@@ -60,14 +62,14 @@ def main():
             continue
 
         out.write('    "%s"' % (l,))
-        if ((i + 1) == len(lines)):
-            out.write(';\n')
+        if (i + 1) == len(lines):
+            out.write(";\n")
         else:
-            out.write('\n')
+            out.write("\n")
 
     out.write(FOOTER)
     out.close()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

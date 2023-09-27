@@ -32,6 +32,7 @@ class ServerBase(object):
 
     class StopService(Exception):
         """StopService is used to stop the serving loop, close the channel, and shutdown cleanly."""
+
         pass
 
     class Error:
@@ -105,17 +106,20 @@ class ServerBase(object):
         if info.has_result:
             if type(res) is type(self).Error:
                 res = GenericResult(
-                    fidl_type=info.response_identifier, err=res.error)
+                    fidl_type=info.response_identifier, err=res.error
+                )
             else:
                 res = GenericResult(
-                    fidl_type=info.response_identifier, response=res)
+                    fidl_type=info.response_identifier, response=res
+                )
         if res is not None:
             fidl_msg = encode_fidl_message(
                 ordinal=ordinal,
                 object=res,
                 library=self.library,
                 txid=txid,
-                type_name=res.__fidl_type__)
+                type_name=res.__fidl_type__,
+            )
             self.channel.write(fidl_msg)
         elif info.empty_response:
             fidl_msg = encode_fidl_message(
@@ -123,7 +127,8 @@ class ServerBase(object):
                 object=None,
                 library=self.library,
                 txid=txid,
-                type_name=None)
+                type_name=None,
+            )
             self.channel.write(fidl_msg)
         return True
 
@@ -145,5 +150,6 @@ class ServerBase(object):
         handles = [x.take() for x in raw_msg[1]]
         msg = decode_fidl_request(bytes=raw_msg[0], handles=handles)
         result_obj = construct_response_object(
-            self.method_map[ordinal].request_ident, msg)
+            self.method_map[ordinal].request_ident, msg
+        )
         return result_obj, txid, ordinal

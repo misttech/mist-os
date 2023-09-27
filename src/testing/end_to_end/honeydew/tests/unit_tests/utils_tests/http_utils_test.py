@@ -21,19 +21,16 @@ _PARAMS: Dict[str, Any] = {
     "data": {
         "key1": "value1",
         "key2": "",
-        "key3": {
-            "k.3.1": "v.3.1"
-        },
+        "key3": {"k.3.1": "v.3.1"},
     },
-    "headers":
-        {
-            "Content-Type": "application/json; charset=utf-8",
-            "Content-Length": 58  # len(json.dumps(_PARAMS["data"]))
-        },
+    "headers": {
+        "Content-Type": "application/json; charset=utf-8",
+        "Content-Length": 58,  # len(json.dumps(_PARAMS["data"]))
+    },
     "timeout": http_utils._TIMEOUTS["HTTP_RESPONSE"] + 15,
     "attempts": http_utils._DEFAULTS["ATTEMPTS"] + 5,
     "interval": http_utils._DEFAULTS["INTERVAL"] + 5,
-    "exceptions_to_skip": []
+    "exceptions_to_skip": [],
 }
 
 _MOCK_ARGS: Dict[str, Any] = {
@@ -62,18 +59,19 @@ class HttpUtilsTests(unittest.TestCase):
                     "url": _PARAMS["url"],
                     "optional_params": {},
                     "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
-                },),
+                },
+            ),
             (
                 {
                     "label": "data_and_headers",
                     "url": _PARAMS["url"],
-                    "optional_params":
-                        {
-                            "data": _PARAMS["data"],
-                            "headers": _PARAMS["headers"],
-                        },
+                    "optional_params": {
+                        "data": _PARAMS["data"],
+                        "headers": _PARAMS["headers"],
+                    },
                     "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
-                },),
+                },
+            ),
             (
                 {
                     "label": "data_but_no_headers",
@@ -82,41 +80,42 @@ class HttpUtilsTests(unittest.TestCase):
                         "data": _PARAMS["data"],
                     },
                     "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
-                },),
+                },
+            ),
             (
                 {
                     "label": "all_optional_params",
                     "url": _PARAMS["url"],
-                    "optional_params":
-                        {
-                            "data": _PARAMS["data"],
-                            "headers": _PARAMS["headers"],
-                            "timeout": _PARAMS["timeout"],
-                            "attempts": _PARAMS["attempts"],
-                            "interval": _PARAMS["interval"],
-                            "exceptions_to_skip": _PARAMS["exceptions_to_skip"]
-                        },
+                    "optional_params": {
+                        "data": _PARAMS["data"],
+                        "headers": _PARAMS["headers"],
+                        "timeout": _PARAMS["timeout"],
+                        "attempts": _PARAMS["attempts"],
+                        "interval": _PARAMS["interval"],
+                        "exceptions_to_skip": _PARAMS["exceptions_to_skip"],
+                    },
                     "urlopen_resp": _MOCK_ARGS["urlopen_resp"],
-                },),
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(http_utils.urllib.request, "urlopen", autospec=True)
-    def test_send_http_request_success(
-            self, parameterized_dict, mock_urlopen) -> None:
+    def test_send_http_request_success(self, parameterized_dict, mock_urlopen) -> None:
         """Test case for http_utils.send_http_request() success case."""
 
         urlopen_return_value = mock.MagicMock()
-        urlopen_return_value.read.return_value = parameterized_dict[
-            "urlopen_resp"]
+        urlopen_return_value.read.return_value = parameterized_dict["urlopen_resp"]
         urlopen_return_value.__enter__.return_value = urlopen_return_value
         mock_urlopen.return_value = urlopen_return_value
 
         result: Dict[str, Any] = http_utils.send_http_request(
-            url=parameterized_dict["url"],
-            **parameterized_dict["optional_params"])
+            url=parameterized_dict["url"], **parameterized_dict["optional_params"]
+        )
 
         expected_output: Dict[str, Any] = json.loads(
-            parameterized_dict["urlopen_resp"].decode("utf-8"))
+            parameterized_dict["urlopen_resp"].decode("utf-8")
+        )
 
         self.assertEqual(result, expected_output)
 
@@ -126,14 +125,15 @@ class HttpUtilsTests(unittest.TestCase):
         http_utils.urllib.request,
         "urlopen",
         side_effect=RemoteDisconnected,
-        autospec=True)
-    def test_send_http_request_with_exceptions_to_skip(
-            self, mock_urlopen) -> None:
+        autospec=True,
+    )
+    def test_send_http_request_with_exceptions_to_skip(self, mock_urlopen) -> None:
         """Testcase to make sure http_utils.send_http_request() do not
         fail when it receives an exception that is part of exceptions_to_skip
         input arg"""
         response: Dict[str, Any] = http_utils.send_http_request(
-            url=_PARAMS["url"], exceptions_to_skip=[RemoteDisconnected])
+            url=_PARAMS["url"], exceptions_to_skip=[RemoteDisconnected]
+        )
         self.assertEqual(response, {})
         mock_urlopen.assert_called_once()
 
@@ -142,16 +142,19 @@ class HttpUtilsTests(unittest.TestCase):
         http_utils.urllib.request,
         "urlopen",
         side_effect=RuntimeError("some run time error"),
-        autospec=True)
+        autospec=True,
+    )
     def test_send_http_request_fail_because_of_exception(
-            self, mock_urlopen, mock_sleep) -> None:
+        self, mock_urlopen, mock_sleep
+    ) -> None:
         """Testcase for http_utils.send_http_request() failure case because of
         an exception."""
         with self.assertRaises(errors.HttpRequestError):
             http_utils.send_http_request(
                 url=_PARAMS["url"],
                 interval=_PARAMS["interval"],
-                attempts=_PARAMS["attempts"])
+                attempts=_PARAMS["attempts"],
+            )
 
         self.assertEqual(mock_urlopen.call_count, _PARAMS["attempts"])
         self.assertEqual(mock_sleep.call_count, _PARAMS["attempts"] - 1)

@@ -29,7 +29,10 @@ def do_remap(build_id):
 
 def main():
     if len(sys.argv) != 2:
-        print("expected a single [normally 16 character] build id.", file=sys.stderr)
+        print(
+            "expected a single [normally 16 character] build id.",
+            file=sys.stderr,
+        )
         return 1
     build_id = sys.argv[1].upper()
 

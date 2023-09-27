@@ -22,25 +22,34 @@ import sys
 import platform
 
 from pathlib import Path
-from typing import Any, Callable, Dict, FrozenSet, Iterable, Optional, Sequence, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    FrozenSet,
+    Iterable,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 _SCRIPT_BASENAME = Path(__file__).name
 
 # Local subprocess and remote environment calls need this when a
 # command is prefixed with an X=Y environment variable.
-_ENV = '/usr/bin/env'
+_ENV = "/usr/bin/env"
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 def tfmt(t: datetime.datetime) -> str:
-    return f'{t.hour:02.0f}:{t.minute:02.0f}:{t.second:02.0f}.{t.microsecond:06.0f}'
+    return f"{t.hour:02.0f}:{t.minute:02.0f}:{t.second:02.0f}.{t.microsecond:06.0f}"
 
 
 def tmsg(dt: datetime.datetime, text: str):
-    print(f'[{tfmt(dt)}] {text}')
+    print(f"[{tfmt(dt)}] {text}")
 
 
 # Global control switch for time profiling using timer_cm.
@@ -56,19 +65,19 @@ def timer_cm(text: str):
     try:
         if _ENABLE_TIMERS:
             start_time = datetime.datetime.now()
-            tmsg(start_time, 'start: ' + text)
+            tmsg(start_time, "start: " + text)
         yield
     finally:
         if _ENABLE_TIMERS:
             end_time = datetime.datetime.now()
             elapsed = end_time - start_time
-            tmsg(end_time, 'end  : ' + text + f" (elapsed: {elapsed})")
+            tmsg(end_time, "end  : " + text + f" (elapsed: {elapsed})")
 
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
     if not command:
         return []
-    if '=' in command[0]:
+    if "=" in command[0]:
         # Commands that start with X=Y local environment variables
         # need to be run with 'env'.
         return [_ENV] + command
@@ -83,12 +92,12 @@ def bool_golang_flag(value: str) -> bool:
     This can be used as a 'type' parameter to 'ArgumentParser.add_argument()'
     """
     return {
-        '1': True,
-        '0': False,
-        't': True,
-        'f': False,
-        'true': True,
-        'false': False,
+        "1": True,
+        "0": False,
+        "t": True,
+        "f": False,
+        "true": True,
+        "false": False,
     }[value.lower()]
 
 
@@ -103,8 +112,9 @@ def copy_preserve_subpath(src: Path, dest_dir: Path):
       dest_dir: root directory to copy to (can be absolute or relative to
         working dir).
     """
-    assert not src.is_absolute(
-    ), f'source file to be copied should be relative, but got: {src}'
+    assert (
+        not src.is_absolute()
+    ), f"source file to be copied should be relative, but got: {src}"
     dest_subdir = dest_dir / src.parent
     dest_subdir.mkdir(parents=True, exist_ok=True)
     dest_file = dest_subdir / src.name
@@ -114,7 +124,7 @@ def copy_preserve_subpath(src: Path, dest_dir: Path):
         if not filecmp.cmp(src, dest_file, shallow=True):
             # files are different, keep the existing copy.
             msg(
-                f'[copy_preserve_subpath()] Warning: Files {src} and {dest_file} are different.  Not copying to the latter.'
+                f"[copy_preserve_subpath()] Warning: Files {src} and {dest_file} are different.  Not copying to the latter."
             )
         return
 
@@ -122,8 +132,9 @@ def copy_preserve_subpath(src: Path, dest_dir: Path):
 
 
 # TODO: move this to library for abstract data operations
-def partition_sequence(seq: Sequence[Any],
-                       sep: Any) -> Tuple[Sequence[Any], Any, Sequence[Any]]:
+def partition_sequence(
+    seq: Sequence[Any], sep: Any
+) -> Tuple[Sequence[Any], Any, Sequence[Any]]:
     """Similar to string.partition, but for arbitrary sequences.
 
     Args:
@@ -143,13 +154,14 @@ def partition_sequence(seq: Sequence[Any],
         return seq, None, []
 
     left = seq[:sep_position]
-    remainder = seq[sep_position + 1:]
+    remainder = seq[sep_position + 1 :]
     return left, sep, remainder
 
 
 # TODO: move this to library for abstract data operations
-def split_into_subsequences(seq: Iterable[Any],
-                            sep: Any) -> Iterable[Sequence[Any]]:
+def split_into_subsequences(
+    seq: Iterable[Any], sep: Any
+) -> Iterable[Sequence[Any]]:
     """Similar to string.split, but for arbitrary sequences.
 
     Args:
@@ -172,8 +184,8 @@ def split_into_subsequences(seq: Iterable[Any],
 
 # TODO: move this to library for abstract data operations
 def match_prefix_transform_suffix(
-        text: str, prefix: str, transform: Callable[[str],
-                                                    str]) -> Optional[str]:
+    text: str, prefix: str, transform: Callable[[str], str]
+) -> Optional[str]:
     """If text matches prefix, transform the text after the prefix.
 
     This can be useful for transforming command flags.
@@ -189,13 +201,13 @@ def match_prefix_transform_suffix(
     """
     if not text.startswith(prefix):
         return None
-    suffix = text[len(prefix):]
+    suffix = text[len(prefix) :]
     transformed = transform(suffix)
     return prefix + transformed
 
 
 def command_quoted_str(command: Iterable[str]) -> str:
-    return ' '.join(shlex.quote(t) for t in command)
+    return " ".join(shlex.quote(t) for t in command)
 
 
 def flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
@@ -209,17 +221,18 @@ def flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
       the original sequence..
     """
     for item in items:
-        yield from item.split(',')
+        yield from item.split(",")
 
 
 def remove_hash_comments(lines: Iterable[str]) -> Iterable[str]:
     for line in lines:
-        if not line.startswith('#'):
+        if not line.startswith("#"):
             yield line
 
 
-def expand_response_files(command: Iterable[str],
-                          rspfiles: Sequence[Path]) -> Iterable[str]:
+def expand_response_files(
+    command: Iterable[str], rspfiles: Sequence[Path]
+) -> Iterable[str]:
     """Expand response files in a command into tokens contained therein.
 
     Args:
@@ -230,21 +243,23 @@ def expand_response_files(command: Iterable[str],
       tokens, possibly expanded from response files.
     """
     for tok in command:
-        if tok.startswith('@'):
+        if tok.startswith("@"):
             # remove blanks and comments
             rspfile = Path(tok[1:])
             rspfiles.append(rspfile)
             rsp_lines = rspfile.read_text().splitlines()
             rsp_lines_stripped = (line.strip() for line in rsp_lines)
             filtered_lines = remove_hash_comments(
-                line for line in rsp_lines_stripped if line)
+                line for line in rsp_lines_stripped if line
+            )
             yield from expand_response_files(filtered_lines, rspfiles)
         else:
             yield tok
 
 
-def expand_fused_flags(command: Iterable[str],
-                       flags: Sequence[str]) -> Iterable[str]:
+def expand_fused_flags(
+    command: Iterable[str], flags: Sequence[str]
+) -> Iterable[str]:
     """Expand "fused" flags like '-I/foo/bar' into ('-I', '/foo/bar').
 
     argparse.ArgumentParser does not handle fused flags well,
@@ -266,7 +281,7 @@ def expand_fused_flags(command: Iterable[str],
             if tok.startswith(prefix) and len(tok) > len(prefix):
                 # Separate value from flag to make it easier for argparse.
                 yield prefix
-                yield tok[len(prefix):]
+                yield tok[len(prefix) :]
                 matched = True
                 break
 
@@ -274,8 +289,9 @@ def expand_fused_flags(command: Iterable[str],
             yield tok
 
 
-def fuse_expanded_flags(command: Iterable[str],
-                        flags: FrozenSet[str]) -> Iterable[str]:
+def fuse_expanded_flags(
+    command: Iterable[str], flags: FrozenSet[str]
+) -> Iterable[str]:
     """Turns flags like ('-D' 'foo') into '-Dfoo'.
 
     Reverse transformation of `expand_fused_flags()`.
@@ -302,8 +318,7 @@ def fuse_expanded_flags(command: Iterable[str],
 
 
 def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
-    """Expand paths from files that list other paths.
-    """
+    """Expand paths from files that list other paths."""
     for path_list in files:
         with open(path_list) as f:
             for line in f:
@@ -312,12 +327,12 @@ def expand_paths_from_files(files: Iterable[Path]) -> Iterable[Path]:
                     # Response files can list more than one path per line,
                     # separated by un-escaped whitespace.
                     for p in shlex.split(stripped):
-                        yield Path(p.replace(' ', '\\ '))  # preserve escape
+                        yield Path(p.replace(" ", "\\ "))  # preserve escape
 
 
 def keyed_flags_to_values_dict(
-        flags: Iterable[str],
-        convert_type: Callable[[str], Any] = None) -> Dict[str, Sequence[str]]:
+    flags: Iterable[str], convert_type: Callable[[str], Any] = None
+) -> Dict[str, Sequence[str]]:
     """Convert a series of key[=value]s into a dictionary.
 
     All dictionary values are accumulated sequences of 'value's,
@@ -337,11 +352,11 @@ def keyed_flags_to_values_dict(
     Returns:
       Strings dictionary of key and (possibly multiple) values.
     """
-    partitions = (f.partition('=') for f in flags)
+    partitions = (f.partition("=") for f in flags)
     # each partition is a tuple (left, sep, right)
     d = collections.defaultdict(list)
-    for (key, sep, value) in partitions:
-        if sep == '=':
+    for key, sep, value in partitions:
+        if sep == "=":
             d[key].append(convert_type(value) if convert_type else value)
         else:
             d[key]
@@ -355,7 +370,8 @@ def last_value_or_default(values: Sequence[str], default: str) -> str:
 
 
 def last_value_of_dict_flag(
-        d: Dict[str, Sequence[str]], key: str, default: str = '') -> str:
+    d: Dict[str, Sequence[str]], key: str, default: str = ""
+) -> str:
     """This selects the last value among repeated occurrences of a flag as a winner."""
     return last_value_or_default(d.get(key, []), default)
 
@@ -413,11 +429,15 @@ class FlagForwarder(object):
                 continue
 
             # check for --flag=optarg
-            left, sep, right = tok.partition('=')
-            if sep == '=':
+            left, sep, right = tok.partition("=")
+            if sep == "=":
                 left_flag = self._map.get(left, None)
                 if left_flag:
-                    prefix = left_flag.mapped_name + '=' if left_flag.mapped_name else ''
+                    prefix = (
+                        left_flag.mapped_name + "="
+                        if left_flag.mapped_name
+                        else ""
+                    )
                     forwarded_flags.append(prefix + right)
                     continue
 
@@ -493,9 +513,9 @@ def qualify_tool_path(path: Path) -> str:
         # absolute, no need to adjust
         return str(path)
 
-    if path.parent == Path('.'):
+    if path.parent == Path("."):
         # unqualified, needs './' prepended
-        return os.path.join('.', str(path))
+        return os.path.join(".", str(path))
 
     # else already relative-path qualified
     return str(path)
@@ -547,7 +567,7 @@ class BlockingFileLock(object):
         # Do not remove the lock file:
         # https://stackoverflow.com/questions/17708885/flock-removing-locked-file-without-race-condition
 
-    def __enter__(self) -> 'BlockingFileLock':
+    def __enter__(self) -> "BlockingFileLock":
         self._acquire()
         return self
 
@@ -561,14 +581,14 @@ class BlockingFileLock(object):
 
 
 class SubprocessResult(object):
-
-    def __init__(self,
-                 returncode: int,
-                 stdout: Sequence[str] = None,  # lines
-                 stderr: Sequence[str] = None,  # lines
-                 # The process id may come in handy when looking for logs
-                 pid: int = None,
-                 ):
+    def __init__(
+        self,
+        returncode: int,
+        stdout: Sequence[str] = None,  # lines
+        stderr: Sequence[str] = None,  # lines
+        # The process id may come in handy when looking for logs
+        pid: int = None,
+    ):
         self.returncode = returncode
         self.stdout = stdout or []
         self.stderr = stderr or []
@@ -593,7 +613,7 @@ async def _stream_subprocess(
     **kwargs,
 ) -> SubprocessResult:
     popen_kwargs = {}
-    if platform.system() == 'Windows':
+    if platform.system() == "Windows":
         platform_settings = {"env": os.environ}
     else:
         platform_settings = {}
@@ -608,7 +628,8 @@ async def _stream_subprocess(
         stdin=stdin,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
-        **popen_kwargs)
+        **popen_kwargs,
+    )
     pid = p.pid
 
     out_text = []
@@ -621,11 +642,11 @@ async def _stream_subprocess(
             print(line, file=pipe)
 
     out_task = asyncio.create_task(
-        _read_stream(
-            p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout)))
+        _read_stream(p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout))
+    )
     err_task = asyncio.create_task(
-        _read_stream(
-            p.stderr, lambda l: tee(l, err_text, stderr or sys.stderr)))
+        _read_stream(p.stderr, lambda l: tee(l, err_text, stderr or sys.stderr))
+    )
     # Forward stdout, stderr while capturing them.
     await asyncio.wait([out_task, err_task])
 
@@ -669,7 +690,8 @@ def subprocess_call(
             stderr=stderr,
             quiet=quiet,
             **kwargs,
-        ))
+        )
+    )
     return result
 
 
@@ -678,7 +700,8 @@ def subprocess_call(
 
 
 def subprocess_communicate(
-        cmd: Sequence[str], input_text: str, **kwargs) -> SubprocessResult:
+    cmd: Sequence[str], input_text: str, **kwargs
+) -> SubprocessResult:
     """Pipes text through an external program.
 
     Unlike subprocess_call, this does not come with `tee` capability.
@@ -697,7 +720,8 @@ def subprocess_communicate(
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
-        **kwargs)
+        **kwargs,
+    )
     out, err = p.communicate(input=input_text)
     return SubprocessResult(
         returncode=p.returncode,

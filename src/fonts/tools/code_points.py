@@ -31,8 +31,17 @@ import sys
 
 # Add fuchsia/third_party/fonttools/Lib to the path.
 font_tools_path = os.path.normpath(
-    os.path.join(os.path.realpath(__file__), '..', '..', '..', '..',
-                 'third_party', 'fonttools', 'Lib'))
+    os.path.join(
+        os.path.realpath(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "third_party",
+        "fonttools",
+        "Lib",
+    )
+)
 sys.path.insert(0, font_tools_path)
 
 import argparse
@@ -44,15 +53,14 @@ from range_set import RangeSet
 
 
 class AssetReference(NamedTuple):
-    """Reference to font asset, with file path and optional index into the file.
-    """
+    """Reference to font asset, with file path and optional index into the file."""
+
     path: str
     index: int = 0
 
 
 class FontInfoReader:
-    """Wrapper around ttlib.TTFont for reading font files.
-    """
+    """Wrapper around ttlib.TTFont for reading font files."""
 
     def open_font(self, asset: AssetReference) -> ttLib.TTFont:
         """Opens a font file, optionally with a specific font index."""
@@ -80,17 +88,28 @@ class FontInfoReader:
 
 def main():
     parser = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.description = __doc__
-    parser.add_argument('path', type=str, help='Path to the font file')
-    parser.add_argument('-i', '--index', type=int, default=None,
-                        help=(
-                            'For font files that contain collections of fonts '
-                            '(.ttc), you must supply an index'))
-    parser.add_argument('-m', '--metadata', action='store_true',
-                        help=(
-                            'Instead of the code point offset string, '
-                            'print font metadata.'))
+    parser.add_argument("path", type=str, help="Path to the font file")
+    parser.add_argument(
+        "-i",
+        "--index",
+        type=int,
+        default=None,
+        help=(
+            "For font files that contain collections of fonts "
+            "(.ttc), you must supply an index"
+        ),
+    )
+    parser.add_argument(
+        "-m",
+        "--metadata",
+        action="store_true",
+        help=(
+            "Instead of the code point offset string, " "print font metadata."
+        ),
+    )
     args = parser.parse_args()
 
     reader = FontInfoReader()
@@ -99,14 +118,14 @@ def main():
     as_offset_string = range_set.to_offset_string()
 
     if args.metadata:
-        print('')
-        print('Code points:\n\t%d' % len(range_set))
-        print('Offset string length:\n\t%d' % len(as_offset_string))
-        print('')
+        print("")
+        print("Code points:\n\t%d" % len(range_set))
+        print("Offset string length:\n\t%d" % len(as_offset_string))
+        print("")
     else:
         print(as_offset_string)
     pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -14,27 +14,28 @@ def main():
     """Creates library wrapper"""
 
     parser = argparse.ArgumentParser(
-        'Creates a Python library wrapper for a C extension.')
+        "Creates a Python library wrapper for a C extension."
+    )
     parser.add_argument(
-        '--target_name',
-        help='Name of the build target',
+        "--target_name",
+        help="Name of the build target",
         required=True,
     )
     parser.add_argument(
-        '--shlib_source',
-        help='Path to the shared library',
+        "--shlib_source",
+        help="Path to the shared library",
         required=True,
     )
     parser.add_argument(
-        '--gen_dir',
-        help='Path to gen directory, used to stage temp directories',
+        "--gen_dir",
+        help="Path to gen directory, used to stage temp directories",
         required=True,
     )
-    parser.add_argument('--output', help='Path to output', required=True)
+    parser.add_argument("--output", help="Path to output", required=True)
     parser.add_argument(
-        '--depfile',
-        help='Path to the depfile to generate',
-        type=argparse.FileType('w'),
+        "--depfile",
+        help="Path to the depfile to generate",
+        type=argparse.FileType("w"),
         required=True,
     )
 
@@ -44,15 +45,15 @@ def main():
     main_file = os.path.join(app_dir, "__init__.py")
     shlib_source_dir = os.path.dirname(args.shlib_source)
     if not shlib_source_dir:
-        shlib_source_dir = os.path.join('.')
+        shlib_source_dir = os.path.join(".")
     shlib_source = os.path.basename(args.shlib_source)
 
     # Making this a list in the event that there are more deps.
-    deps = ' '.join([f'{args.shlib_source}.so'])
-    args.depfile.write(f'{args.output}: {deps}\n')
-    with open(main_file, 'w', encoding='utf-8') as main_file_out:
+    deps = " ".join([f"{args.shlib_source}.so"])
+    args.depfile.write(f"{args.output}: {deps}\n")
+    with open(main_file, "w", encoding="utf-8") as main_file_out:
         main_file_out.write(
-            f'''
+            f"""
 import importlib.util
 import importlib.machinery
 
@@ -66,9 +67,10 @@ def _init():
     return mod
 
 __all__ = _init().__dict__
-''')
+"""
+        )
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

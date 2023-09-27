@@ -38,14 +38,17 @@ def force_symlink(target_path, link_path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--out-dir',
-        help='Path to the directory where to install the SDK',
-        required=True)
+        "--out-dir",
+        help="Path to the directory where to install the SDK",
+        required=True,
+    )
     parser.add_argument(
-        '--stamp-file', help='Path to the victory file', required=True)
+        "--stamp-file", help="Path to the victory file", required=True
+    )
     parser.add_argument(
-        '--manifest', help='Path to the SDK\'s manifest file', required=True)
-    parser.add_argument('--depfile', help='Path to depfile', required=True)
+        "--manifest", help="Path to the SDK's manifest file", required=True
+    )
+    parser.add_argument("--depfile", help="Path to depfile", required=True)
     args = parser.parse_args()
 
     # Remove any existing outputs. Manually removing all subdirectories and
@@ -58,8 +61,8 @@ def main():
             for dir in dirs:
                 os.rmdir(os.path.join(root, dir))
 
-    with open(args.manifest, 'r') as manifest_file:
-        mappings = [l.strip().split('=', 1) for l in manifest_file.readlines()]
+    with open(args.manifest, "r") as manifest_file:
+        mappings = [l.strip().split("=", 1) for l in manifest_file.readlines()]
 
     sources, destinations = [], []
     for dest, source in mappings:
@@ -70,14 +73,16 @@ def main():
         sources.append(os.path.relpath(source))
         destinations.append(destination)
 
-    with open(args.stamp_file, 'w') as stamp_file:
-        stamp_file.write('Now go use it\n')
+    with open(args.stamp_file, "w") as stamp_file:
+        stamp_file.write("Now go use it\n")
 
-    with open(args.depfile, 'w') as depfile:
+    with open(args.depfile, "w") as depfile:
         depfile.write(
-            '{} {}: {}\n'.format(
-                args.stamp_file, ' '.join(destinations), ' '.join(sources)))
+            "{} {}: {}\n".format(
+                args.stamp_file, " ".join(destinations), " ".join(sources)
+            )
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

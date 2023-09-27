@@ -32,47 +32,54 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 class TracingFCTests(unittest.TestCase):
     """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
-    @mock.patch.object(
-        fc_transport.fuchsia_controller, "Context", autospec=True)
+    @mock.patch.object(fc_transport.fuchsia_controller, "Context", autospec=True)
     def setUp(self, _mock_fc_context) -> None:
         super().setUp()
         self.device_name: str = "fuchsia-emulator"
-        self.fuchsia_controller: fc_transport.FuchsiaController = \
+        self.fuchsia_controller: fc_transport.FuchsiaController = (
             fc_transport.FuchsiaController(device_name=self.device_name)
+        )
         self.reboot_affordance_obj = mock.MagicMock(
-            spec=affordances_capable.RebootCapableDevice)
+            spec=affordances_capable.RebootCapableDevice
+        )
         self.tracing_obj = fc_tracing.Tracing(
             device_name=self.device_name,
             fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self.reboot_affordance_obj)
+            reboot_affordance=self.reboot_affordance_obj,
+        )
 
         self.fuchsia_controller.create_context()
 
     @parameterized.expand(
         [
-            ({
-                "label": "with_no_categories_and_no_buffer_size",
-            },),
+            (
+                {
+                    "label": "with_no_categories_and_no_buffer_size",
+                },
+            ),
             (
                 {
                     "label": "with_categories_and_buffer_size",
                     "categories": ["category1", "category2"],
                     "buffer_size": 1024,
-                },),
+                },
+            ),
             (
                 {
                     "label": "when_session_already_initialized",
-                    "session_initialized": True
-                },),
+                    "session_initialized": True,
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
     )
     def test_initialize(
-            self, parameterized_dict,
-            mock_tracingcontroller_initialize) -> None:
+        self, parameterized_dict, mock_tracingcontroller_initialize
+    ) -> None:
         """Test for Tracing.initialize() method."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
@@ -86,7 +93,8 @@ class TracingFCTests(unittest.TestCase):
         else:
             self.tracing_obj.initialize(
                 categories=parameterized_dict.get("categories"),
-                buffer_size=parameterized_dict.get("buffer_size"))
+                buffer_size=parameterized_dict.get("buffer_size"),
+            )
             mock_tracingcontroller_initialize.assert_called()
 
     @mock.patch.object(
@@ -97,7 +105,8 @@ class TracingFCTests(unittest.TestCase):
         """Test for Tracing.initialize() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         mock_tracingcontroller_initialize.side_effect = fc.ZxStatus(
-            fc.ZxStatus.ZX_ERR_INVALID_ARGS)
+            fc.ZxStatus.ZX_ERR_INVALID_ARGS
+        )
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.initialize()
 
@@ -108,21 +117,25 @@ class TracingFCTests(unittest.TestCase):
                     "label": "when_session_is_not_initialized",
                     "session_initialized": False,
                     "tracing_active": False,
-                },),
+                },
+            ),
             (
                 {
                     "label": "when_session_is_initialized",
                     "session_initialized": True,
                     "tracing_active": False,
-                },),
+                },
+            ),
             (
                 {
                     "label": "when_tracing_already_started",
                     "session_initialized": True,
                     "tracing_active": True,
-                },),
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
@@ -133,8 +146,8 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_start(
-            self, parameterized_dict, mock_tracingcontroller_start,
-            *unused_args) -> None:
+        self, parameterized_dict, mock_tracingcontroller_start, *unused_args
+    ) -> None:
         """Test for Tracing.start() method."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
@@ -144,9 +157,9 @@ class TracingFCTests(unittest.TestCase):
 
         # Check whether an `errors.FuchsiaStateError` exception is raised when
         # state is not valid.
-        if not parameterized_dict.get(
-                "session_initialized") or parameterized_dict.get(
-                    "tracing_active"):
+        if not parameterized_dict.get("session_initialized") or parameterized_dict.get(
+            "tracing_active"
+        ):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.start()
         else:
@@ -162,14 +175,14 @@ class TracingFCTests(unittest.TestCase):
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
-    def test_start_error(
-            self, mock_tracingcontroller_start, *unused_args) -> None:
+    def test_start_error(self, mock_tracingcontroller_start, *unused_args) -> None:
         """Test for Tracing.start() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.tracing_obj.initialize()
 
         mock_tracingcontroller_start.side_effect = fc.ZxStatus(
-            fc.ZxStatus.ZX_ERR_INVALID_ARGS)
+            fc.ZxStatus.ZX_ERR_INVALID_ARGS
+        )
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.start()
 
@@ -180,21 +193,25 @@ class TracingFCTests(unittest.TestCase):
                     "label": "when_session_is_not_initialized",
                     "session_initialized": False,
                     "tracing_active": False,
-                },),
+                },
+            ),
             (
                 {
                     "label": "when_session_is_initialized",
                     "session_initialized": True,
                     "tracing_active": False,
-                },),
+                },
+            ),
             (
                 {
                     "label": "when_tracing_already_started",
                     "session_initialized": True,
                     "tracing_active": True,
-                },),
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
@@ -210,8 +227,8 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_stop(
-            self, parameterized_dict, mock_tracingcontroller_stop,
-            *unused_args) -> None:
+        self, parameterized_dict, mock_tracingcontroller_stop, *unused_args
+    ) -> None:
         """Test for Tracing.stop() method."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
@@ -222,8 +239,8 @@ class TracingFCTests(unittest.TestCase):
         # Check whether an `errors.FuchsiaStateError` exception is raised when
         # state is not valid.
         if not parameterized_dict.get(
-                "session_initialized") or not parameterized_dict.get(
-                    "tracing_active"):
+            "session_initialized"
+        ) or not parameterized_dict.get("tracing_active"):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.stop()
         else:
@@ -244,15 +261,15 @@ class TracingFCTests(unittest.TestCase):
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
-    def test_stop_error(
-            self, mock_tracingcontroller_stop, *unused_args) -> None:
+    def test_stop_error(self, mock_tracingcontroller_stop, *unused_args) -> None:
         """Test for Tracing.stop() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.tracing_obj.initialize()
         self.tracing_obj.start()
 
         mock_tracingcontroller_stop.side_effect = fc.ZxStatus(
-            fc.ZxStatus.ZX_ERR_INVALID_ARGS)
+            fc.ZxStatus.ZX_ERR_INVALID_ARGS
+        )
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.stop()
 
@@ -261,14 +278,18 @@ class TracingFCTests(unittest.TestCase):
             (
                 {
                     "label": "when_session_is_not_initialized",
-                    "session_initialized": False
-                },),
-            ({
-                "label": "with_no_download",
-                "session_initialized": True,
-            },),
+                    "session_initialized": False,
+                },
+            ),
+            (
+                {
+                    "label": "with_no_download",
+                    "session_initialized": True,
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
@@ -279,8 +300,8 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_terminate(
-            self, parameterized_dict, mock_tracingcontroller_terminate,
-            *unused_args) -> None:
+        self, parameterized_dict, mock_tracingcontroller_terminate, *unused_args
+    ) -> None:
         """Test for Tracing.terminate() method."""
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
@@ -305,13 +326,15 @@ class TracingFCTests(unittest.TestCase):
         new_callable=mock.AsyncMock,
     )
     def test_terminate_error(
-            self, mock_tracingcontroller_terminate, *unused_args) -> None:
+        self, mock_tracingcontroller_terminate, *unused_args
+    ) -> None:
         """Test for Tracing.terminate() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.tracing_obj.initialize()
 
         mock_tracingcontroller_terminate.side_effect = fc.ZxStatus(
-            fc.ZxStatus.ZX_ERR_INVALID_ARGS)
+            fc.ZxStatus.ZX_ERR_INVALID_ARGS
+        )
         with self.assertRaises(errors.FuchsiaControllerError):
             self.tracing_obj.terminate()
 
@@ -320,23 +343,27 @@ class TracingFCTests(unittest.TestCase):
             (
                 {
                     "label": "when_session_is_not_initialized",
-                    "session_initialized": False
-                },),
+                    "session_initialized": False,
+                },
+            ),
             (
                 {
                     "label": "with_tracing_download_default_file_name",
                     "session_initialized": True,
                     "return_value": "samp_trace_data",
-                },),
+                },
+            ),
             (
                 {
                     "label": "with_tracing_download_given_file_name",
                     "session_initialized": True,
                     "trace_file": "trace.fxt",
                     "return_value": "samp_trace_data",
-                },),
+                },
+            ),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     @mock.patch.object(
         f_tracingcontroller.Controller.Client,
         "initialize_tracing",
@@ -348,18 +375,21 @@ class TracingFCTests(unittest.TestCase):
     )
     @mock.patch.object(fc_tracing.fc, "Socket")
     def test_terminate_and_download(
-            self, parameterized_dict, mock_fc_socket,
-            mock_tracingcontroller_terminate, *unused_args) -> None:
+        self,
+        parameterized_dict,
+        mock_fc_socket,
+        mock_tracingcontroller_terminate,
+        *unused_args,
+    ) -> None:
         """Test for Tracing.terminate_and_download() method."""
         # Mock out the tracing Socket.
         return_value: str = parameterized_dict.get("return_value", "")
         mock_client_socket = mock.MagicMock()
         mock_client_socket.read.side_effect = [
             bytes(return_value, encoding="utf-8"),
-            fc.ZxStatus(fc.ZxStatus.ZX_ERR_PEER_CLOSED)
+            fc.ZxStatus(fc.ZxStatus.ZX_ERR_PEER_CLOSED),
         ]
-        mock_fc_socket.create.return_value = (
-            mock.MagicMock(), mock_client_socket)
+        mock_fc_socket.create.return_value = (mock.MagicMock(), mock_client_socket)
 
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):
@@ -373,7 +403,8 @@ class TracingFCTests(unittest.TestCase):
 
             trace_file: str = parameterized_dict.get("trace_file")
             trace_path: str = self.tracing_obj.terminate_and_download(
-                directory=tmpdir, trace_file=trace_file)
+                directory=tmpdir, trace_file=trace_file
+            )
             mock_tracingcontroller_terminate.assert_called()
 
             # Check the return value of the terminate method.

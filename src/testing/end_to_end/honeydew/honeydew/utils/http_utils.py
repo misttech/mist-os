@@ -31,7 +31,7 @@ def send_http_request(
     timeout: float = _TIMEOUTS["HTTP_RESPONSE"],
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
-    exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
+    exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
 ) -> Dict[str, Any]:
     """Send HTTP request and returns the string response.
 
@@ -73,27 +73,32 @@ def send_http_request(
         try:
             _LOGGER.debug(
                 "Sending HTTP request to url=%s with data=%s and headers=%s",
-                url, data, headers)
+                url,
+                data,
+                headers,
+            )
             req = urllib.request.Request(url, data=data_bytes, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as response:
                 response_body: str = response.read().decode("utf-8")
             _LOGGER.debug(
-                "HTTP response received from url=%s is '%s'", url,
-                response_body)
+                "HTTP response received from url=%s is '%s'", url, response_body
+            )
             return json.loads(response_body)
         except Exception as err:  # pylint: disable=broad-except
             for exception_to_skip in exceptions_to_skip:
                 if isinstance(err, exception_to_skip):
                     return {}
 
-            err_msg: str = f"Send the HTTP request to url={url} with " \
-              f"data={data} and headers={headers} failed with error: '{err}'"
+            err_msg: str = (
+                f"Send the HTTP request to url={url} with "
+                f"data={data} and headers={headers} failed with error: '{err}'"
+            )
 
             if attempt < attempts:
-                _LOGGER.warning(
-                    "%s on iteration %s/%s", err_msg, attempt, attempts)
+                _LOGGER.warning("%s on iteration %s/%s", err_msg, attempt, attempts)
                 continue
             raise errors.HttpRequestError(err_msg) from err
     raise errors.HttpRequestError(
-        f"Failed to send the HTTP request to url={url} with data={data} and "\
-        f"headers={headers}.")
+        f"Failed to send the HTTP request to url={url} with data={data} and "
+        f"headers={headers}."
+    )

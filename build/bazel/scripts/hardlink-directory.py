@@ -13,17 +13,19 @@ import shutil
 import sys
 
 _SCRIPT_DIR = os.path.dirname(__file__)
-_FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
+_FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _SCRIPT_NAME = os.path.relpath(os.path.abspath(__file__), _FUCHSIA_DIR)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--fuchsia-dir', help='Specify alternate Fuchsia root path.')
+        "--fuchsia-dir", help="Specify alternate Fuchsia root path."
+    )
     parser.add_argument(
-        'source_dir', help='Source directory, relative to Fuchsia root path.')
-    parser.add_argument('destination_dir', help='Destination directory.')
+        "source_dir", help="Source directory, relative to Fuchsia root path."
+    )
+    parser.add_argument("destination_dir", help="Destination directory.")
     args = parser.parse_args()
 
     if args.fuchsia_dir:
@@ -35,13 +37,14 @@ def main():
     dst_dir = os.path.abspath(args.destination_dir)
 
     if not os.path.exists(src_dir):
-        return parser.error('Source directory does not exist: ' + src_dir)
+        return parser.error("Source directory does not exist: " + src_dir)
 
     # Using hard-links could fail due copying to a different mount point,
     # so first try with hard links, then do a normal copy otherwise.
     try:
         shutil.copytree(
-            src_dir, dst_dir, copy_function=os.link, dirs_exist_ok=True)
+            src_dir, dst_dir, copy_function=os.link, dirs_exist_ok=True
+        )
     except OSError as error:
         shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
 

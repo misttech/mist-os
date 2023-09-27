@@ -70,44 +70,37 @@ class StepError(Exception):
 
 
 def is_pascal_case(input):
-    """Check if a string is PascalCase, aka (upper) CamelCase
-    """
+    """Check if a string is PascalCase, aka (upper) CamelCase"""
     return REGEX_IS_PASCAL_CASE.match(input)
 
 
 def is_snake_case(input):
-    """Check if a string is snake_case.
-    """
+    """Check if a string is snake_case."""
     return REGEX_IS_SNAKE_CASE.match(input)
 
 
 def to_flat_case(input):
-    """Converts a snake_case string to (lower) camelCase, ex "iamflatcase".
-    """
+    """Converts a snake_case string to (lower) camelCase, ex "iamflatcase"."""
     return input.replace("_", "")
 
 
 def to_snake_case(input):
-    """Converts a PascalCase string to snake_case, ex "i_am_snake_case".
-    """
+    """Converts a PascalCase string to snake_case, ex "i_am_snake_case"."""
     return re.sub(REGEX_TO_SNAKE_CASE, r"_\1", input).lower()
 
 
 def to_sentence_case(input):
-    """Converts a snake_case string to a sentence case text case string, ex "I am sentence case".
-    """
+    """Converts a snake_case string to a sentence case text case string, ex "I am sentence case"."""
     return to_text_case(input).capitalize()
 
 
 def to_text_case(input):
-    """Converts a snake_case string to an all lowercase text case string, ex "i am text case".
-    """
+    """Converts a snake_case string to an all lowercase text case string, ex "i am text case"."""
     return re.sub(REGEX_TO_TEXT_CASE, " ", input)
 
 
 def build_subs(series, variant, protocol, bug):
-    """Builds the substitution map.
-    """
+    """Builds the substitution map."""
     if not is_snake_case(series):
         raise InputError("Expected series '%s' to be snake_case" % series)
     if not is_snake_case(variant):
@@ -122,29 +115,27 @@ def build_subs(series, variant, protocol, bug):
 
     # LINT.IfChange
     return {
-        'bug': "%s" % bug if bug else "",
-        'dns': DNS,
-        'protocol_pascal_case': protocol,
-        'protocol_snake_case': to_snake_case(protocol),
-        'series_flat_case': to_flat_case(series),
-        'series_sentence_case': to_sentence_case(series),
-        'series_snake_case': series,
-        'series_text_case': to_text_case(series),
-        'variant_flat_case': to_flat_case(variant),
-        'variant_snake_case': variant,
+        "bug": "%s" % bug if bug else "",
+        "dns": DNS,
+        "protocol_pascal_case": protocol,
+        "protocol_snake_case": to_snake_case(protocol),
+        "series_flat_case": to_flat_case(series),
+        "series_sentence_case": to_sentence_case(series),
+        "series_snake_case": series,
+        "series_text_case": to_text_case(series),
+        "variant_flat_case": to_flat_case(variant),
+        "variant_snake_case": variant,
     }
     # LINT.ThenChange(/tools/fidl/scripts/canonical_example/README.md)
 
 
 def build_doc_subs(series, variant):
-    """Builds the substitution map, but ignores `protocol` and `bug`.
-    """
+    """Builds the substitution map, but ignores `protocol` and `bug`."""
     return build_subs(series, variant, None, None)
 
 
 def get_dns_count(input):
-    """Count `TODO(DNS)` occurrences.
-    """
+    """Count `TODO(DNS)` occurrences."""
     return input.count("TODO(%s)" % DNS)
 
 
@@ -160,13 +151,15 @@ def apply_subs(subdir, subs, source, target):
             # Process the filename, including doing any substitutions necessary.
             temp_path = os.path.join(path, file_name)
             rel_path = os.path.relpath(
-                temp_path[:temp_path.rindex('.')], source)
-            out_path = target / subdir / Template(
-                str(rel_path)).substitute(subs)
+                temp_path[: temp_path.rindex(".")], source
+            )
+            out_path = (
+                target / subdir / Template(str(rel_path)).substitute(subs)
+            )
 
             # Do substitutions on the file text as well.
             out_contents = ""
-            with open(temp_path, 'r') as f:
+            with open(temp_path, "r") as f:
                 out_contents = Template(f.read()).substitute(subs)
 
             # Count DNS occurrences.
@@ -200,10 +193,12 @@ def lines_between_dnrc_tags(lines, src_path, identifier=""):
 
     if opened < 0:
         raise InputError(
-            "Closing /DO_NOT_REMOVE_COMMENT comment missing from '%s'" %
-            src_path)
+            "Closing /DO_NOT_REMOVE_COMMENT comment missing from '%s'"
+            % src_path
+        )
     raise InputError(
-        "DO_NOT_REMOVE_COMMENT comment missing from '%s'" % src_path)
+        "DO_NOT_REMOVE_COMMENT comment missing from '%s'" % src_path
+    )
 
 
 def validate_entry_does_not_already_exist(needle, files):
@@ -216,7 +211,7 @@ def validate_entry_does_not_already_exist(needle, files):
     for path, identifier in files.items():
         # Find `DO_NOT_REMOVE_COMMENT` and `/DO_NOT_REMOVE_COMMENT`
         lines = []
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             lines = f.readlines()
             start, end = lines_between_dnrc_tags(lines, path, identifier)
 
@@ -224,7 +219,8 @@ def validate_entry_does_not_already_exist(needle, files):
         for line in lines:
             if needle in line:
                 raise AlreadyExistsError(
-                    "An entry for '%s' already exists in '%s'" % (needle, path))
+                    "An entry for '%s' already exists in '%s'" % (needle, path)
+                )
 
         ranges[path] = (lines, start, end)
     return ranges
@@ -237,11 +233,14 @@ def validate_todo_md_still_exists(series, variant, subdir):
     """
     # Validate that the TODO.md file is still where we expect it - if not, this step may have
     # already been completed.
-    todo_md_file_path = EXAMPLE_CODE_BASE_DIR / series / variant / subdir / "TODO.md"
+    todo_md_file_path = (
+        EXAMPLE_CODE_BASE_DIR / series / variant / subdir / "TODO.md"
+    )
     if not os.path.exists(todo_md_file_path):
         raise StepError(
             "Cannot scaffold the %s implementation for '%s/%s' because the TODO.md is missing"
-            % (subdir, series, variant))
+            % (subdir, series, variant)
+        )
 
 
 def resolve_create_templates(subs, source_to_target_map):
@@ -254,8 +253,9 @@ def resolve_create_templates(subs, source_to_target_map):
     # we go.
     dns_counts = {}
     for source, target in source_to_target_map.items():
-        for path, count in apply_subs(subs['series_snake_case'], subs, source,
-                                      target).items():
+        for path, count in apply_subs(
+            subs["series_snake_case"], subs, source, target
+        ).items():
             dns_counts[path] = count
     return dns_counts
 
@@ -272,8 +272,9 @@ def resolve_document_templates(subs):
         DOCUMENT_WIDGET_TEMPLATES_DIR: "widgets",
     }
     for source, subdir in source_to_subdir_map.items():
-        for path, count in apply_subs(subdir, subs, source,
-                                      FIDL_DOCS_ROOT_DIR).items():
+        for path, count in apply_subs(
+            subdir, subs, source, FIDL_DOCS_ROOT_DIR
+        ).items():
             dns_counts[path] = count
     return dns_counts
 
@@ -292,57 +293,71 @@ def create_variant(series, variant, protocol, bug):
     series_root_gn_file_path = EXAMPLE_CODE_BASE_DIR / series / "BUILD.gn"
     baseline_code_dir_path = EXAMPLE_CODE_BASE_DIR / series / "baseline"
     series_docs_dir_path = EXAMPLE_DOCS_BASE_DIR / series
-    baseline_fidl_file_path = baseline_code_dir_path / "fidl" / (
-        "%s.test.fidl" % series)
+    baseline_fidl_file_path = (
+        baseline_code_dir_path / "fidl" / ("%s.test.fidl" % series)
+    )
     series_docs_readme_path = series_docs_dir_path / "README.md"
     if not os.path.exists(baseline_code_dir_path):
         raise StepError(
             "Cannot create variant '%s' because its baseline source directory %s does not exist"
-            % (variant, baseline_code_dir_path))
+            % (variant, baseline_code_dir_path)
+        )
     if not os.path.exists(series_docs_dir_path):
         raise StepError(
             "Cannot create variant '%s' because its series example docs directory %s does not exist"
-            % (variant, series_docs_dir_path))
+            % (variant, series_docs_dir_path)
+        )
     if not os.path.exists(baseline_fidl_file_path):
         raise StepError(
             "Cannot create variant '%s' because its baseline FIDL file %s does not exist"
-            % (variant, baseline_fidl_file_path))
+            % (variant, baseline_fidl_file_path)
+        )
 
     if not os.path.exists(series_root_gn_file_path):
         raise StepError(
             "Cannot create variant '%s' because its series BUILD.gn file %s does not exist"
-            % (variant, series_root_gn_file_path))
+            % (variant, series_root_gn_file_path)
+        )
     series_gn_dnrc_lines = validate_entry_does_not_already_exist(
-        "%s:tests" % variant,
-        {series_root_gn_file_path: ''})[series_root_gn_file_path]
+        "%s:tests" % variant, {series_root_gn_file_path: ""}
+    )[series_root_gn_file_path]
 
     if not os.path.exists(series_docs_readme_path):
         raise StepError(
             "Cannot create variant '%s' because its series README.md file %s does not exist"
-            % (variant, series_docs_readme_path))
+            % (variant, series_docs_readme_path)
+        )
     readme_dnrc_lines = validate_entry_does_not_already_exist(
-        "{#%s}" % variant,
-        {series_docs_readme_path: ''})[series_docs_readme_path]
+        "{#%s}" % variant, {series_docs_readme_path: ""}
+    )[series_docs_readme_path]
 
     # Create the raw variant. We'll follow this up by replacing the "raw" FIDL file with a copy
     # of the one from the baseline case.
     dns_counts = resolve_create_templates(
-        subs, {
+        subs,
+        {
             CREATE_DOCS_VARIANT_TEMPLATES_DIR: EXAMPLE_DOCS_BASE_DIR,
             CREATE_CODE_VARIANT_TEMPLATES_DIR: EXAMPLE_CODE_BASE_DIR,
-        })
+        },
+    )
 
     # Copy the FIDL definition from the baseline case, and update the dns count so the user is aware
     # that they need to make further edits.
-    variant_fidl_file_path = EXAMPLE_CODE_BASE_DIR / series / variant / "fidl" / (
-        "%s.test.fidl" % series)
+    variant_fidl_file_path = (
+        EXAMPLE_CODE_BASE_DIR
+        / series
+        / variant
+        / "fidl"
+        / ("%s.test.fidl" % series)
+    )
     with open(baseline_fidl_file_path, "r") as f:
         # Replace the ".baseline" library name suffix with this variant's name.
         lines = f.readlines()
         for i in range(len(lines)):
             if lines[i].startswith("library"):
                 lines[i] = lines[i].replace(
-                    BASELINE, subs['variant_flat_case'], 1)
+                    BASELINE, subs["variant_flat_case"], 1
+                )
                 break
 
         # Add a DNS to the end of the file.
@@ -350,7 +365,10 @@ def create_variant(series, variant, protocol, bug):
             textwrap.dedent(
                 """
                 // TODO(%s): Modify this FIDL to reflect the changes explored by this variant.
-                """ % DNS))
+                """
+                % DNS
+            )
+        )
 
         # Overwrite the raw FIDL file with this transformed baseline version, and update the dns
         # count so the user is aware that they need to make further edits in this file.
@@ -372,7 +390,8 @@ def create_variant(series, variant, protocol, bug):
         lines.insert(end, """<<_%s_tutorial.md>>\n\n""" % variant)
         lines.insert(
             end,
-            """### <!-- TODO(%s): Add title -->{#%s}\n\n""" % (DNS, variant))
+            """### <!-- TODO(%s): Add title -->{#%s}\n\n""" % (DNS, variant),
+        )
         out_contents = "".join(lines)
         dns_counts[str(series_docs_readme_path)] = get_dns_count(out_contents)
         f.write(out_contents)
@@ -391,11 +410,13 @@ def create_new(series, protocol, bug):
 
     # Do a first pass through the files we'll be editing, to ensure that they are in a good state.
     edit_ranges = validate_entry_does_not_already_exist(
-        series, {
-            DOCS_TOC_YAML_FILE: '',
-            DOCS_ROOT_README_FILE: 'examples',
-            CODE_ROOT_BUILD_GN_FILE: '',
-        })
+        series,
+        {
+            DOCS_TOC_YAML_FILE: "",
+            DOCS_ROOT_README_FILE: "examples",
+            CODE_ROOT_BUILD_GN_FILE: "",
+        },
+    )
 
     # Update the _toc.yaml file to include an entry pointing to this canonical example series.
     with open(DOCS_TOC_YAML_FILE, "wt") as f:
@@ -403,9 +424,11 @@ def create_new(series, protocol, bug):
         lines.insert(
             end,
             """    path: /docs/development/languages/fidl/examples/%s/README.md\n"""
-            % series)
+            % series,
+        )
         lines.insert(
-            end, """  - title: "%s"\n""" % subs['series_sentence_case'])
+            end, """  - title: "%s"\n""" % subs["series_sentence_case"]
+        )
         f.write("".join(lines))
 
     # Update the root README to include this series.
@@ -415,25 +438,31 @@ def create_new(series, protocol, bug):
             end,
             """## %s\n\n<!-- TODO(fxbug.dev/%s): DOCUMENT[%s/%s] (brief description) -->\n\n"""
             % (
-                subs['series_sentence_case'], subs['bug'],
-                subs['series_snake_case'], subs['variant_snake_case']))
+                subs["series_sentence_case"],
+                subs["bug"],
+                subs["series_snake_case"],
+                subs["variant_snake_case"],
+            ),
+        )
         f.write("".join(lines))
 
     # Update /examples/fidl/new/BUILD.gn to support this series.
     with open(CODE_ROOT_BUILD_GN_FILE, "wt") as f:
         lines, start, end = edit_ranges[CODE_ROOT_BUILD_GN_FILE]
-        lines.insert(end, """    "%s:tests",\n""" % subs['series_snake_case'])
+        lines.insert(end, """    "%s:tests",\n""" % subs["series_snake_case"])
         f.write("".join(lines))
 
     # Copy over each doc template file, processing substitutions on both file names and contents as
     # we go.
     dns_counts = resolve_create_templates(
-        subs, {
+        subs,
+        {
             CREATE_DOCS_NEW_TEMPLATES_DIR: EXAMPLE_DOCS_BASE_DIR,
             CREATE_DOCS_VARIANT_TEMPLATES_DIR: EXAMPLE_DOCS_BASE_DIR,
             CREATE_CODE_NEW_TEMPLATES_DIR: EXAMPLE_CODE_BASE_DIR,
             CREATE_CODE_VARIANT_TEMPLATES_DIR: EXAMPLE_CODE_BASE_DIR,
-        })
+        },
+    )
 
     return dns_counts
 
@@ -453,8 +482,7 @@ def create(name, protocol, bug, series):
 
 
 def document(name, concepts):
-    """Generate documentation instructions for an already-created canonical example variant.
-    """
+    """Generate documentation instructions for an already-created canonical example variant."""
     # Validate that the variant already exists. The name argument can refer to either a series'
     # baseline case or a named variant, so try both options.
     series = ""
@@ -474,13 +502,14 @@ def document(name, concepts):
                         break
     if not (series and variant):
         raise StepError(
-            "Cannot find already created variant '%s' to document" % name)
+            "Cannot find already created variant '%s' to document" % name
+        )
 
     # Validate that the root docs README.md file exists, and that its concepts section is well
     # marked, since we will need to modify it.
     readme_concepts_lines = validate_entry_does_not_already_exist(
-        "### %s" % variant,
-        {DOCS_ROOT_README_FILE: 'concepts'})[DOCS_ROOT_README_FILE]
+        "### %s" % variant, {DOCS_ROOT_README_FILE: "concepts"}
+    )[DOCS_ROOT_README_FILE]
 
     # Build the substitution dictionary. We don't need to do protocol or bug number substitution, so
     # ignore those arguments.
@@ -489,8 +518,8 @@ def document(name, concepts):
     # Create the files for each concept.
     dns_counts = {}
     for concept in sorted(concepts, reverse=True):
-        subs['concept_snake_case'] = concept
-        subs['concept_sentence_case'] = to_sentence_case(concept)
+        subs["concept_snake_case"] = concept
+        subs["concept_sentence_case"] = to_sentence_case(concept)
 
         # Add an entry to the root docs README.md file's example section for this concept, and update
         # the dns count so the user is aware that they need to make further edits in this file.
@@ -500,12 +529,13 @@ def document(name, concepts):
             line_num = start
             while line_num < end:
                 line = lines[line_num]
-                if line.startswith(prefix) and concept < line[len(prefix):]:
+                if line.startswith(prefix) and concept < line[len(prefix) :]:
                     break
                 line_num = line_num + 1
             lines.insert(line_num, """%s%s.md>>\n\n""" % (prefix, concept))
             lines.insert(
-                line_num, """### %s\n\n""" % subs['concept_sentence_case'])
+                line_num, """### %s\n\n""" % subs["concept_sentence_case"]
+            )
             out_contents = "".join(lines)
             f.write(out_contents)
 
@@ -515,7 +545,8 @@ def document(name, concepts):
 
     # Replace documentation TODOs generated in the create step with DNS ones.
     REGEX_DOCUMENT_TODO = re.compile(
-        "TODO\\(fxbug.dev\\/\\d+\\): DOCUMENT\\[%s\\/%s]" % (series, variant))
+        "TODO\\(fxbug.dev\\/\\d+\\): DOCUMENT\\[%s\\/%s]" % (series, variant)
+    )
     possible_add_doc_files = [
         DOCS_ROOT_README_FILE,
         EXAMPLE_DOCS_BASE_DIR / series / "README.md",
@@ -525,7 +556,8 @@ def document(name, concepts):
         with open(path, "r") as f:
             path_str = str(path)
             replaced, count = re.subn(
-                REGEX_DOCUMENT_TODO, "TODO(%s):" % DNS, f.read())
+                REGEX_DOCUMENT_TODO, "TODO(%s):" % DNS, f.read()
+            )
             if dns_counts.get(path_str):
                 dns_counts[path_str] = dns_counts[path_str] + count
             else:
@@ -537,8 +569,7 @@ def document(name, concepts):
 
 
 def copy_baseline_implementation(series, variant, subdir, subs):
-    """
-    """
+    """ """
     dns_counts = {}
     series_code_root_path = EXAMPLE_CODE_BASE_DIR / series
     baseline_impl_root_path = series_code_root_path / "baseline" / subdir
@@ -552,8 +583,9 @@ def copy_baseline_implementation(series, variant, subdir, subs):
             src_path = Path(os.path.join(path, file_name))
             out_path = Path(
                 str(src_path).replace(
-                    str(baseline_impl_root_path), str(variant_impl_root_path),
-                    1))
+                    str(baseline_impl_root_path), str(variant_impl_root_path), 1
+                )
+            )
             ext = src_path.suffix
             (comment_start, comment_end) = COMMENT_GUARDS[ext]
 
@@ -567,42 +599,60 @@ def copy_baseline_implementation(series, variant, subdir, subs):
                     # series and variant are split by "/" and "_".
                     dns = ""
                     contents = contents.replace(
-                        "%s/%s" % (subs['series_snake_case'], "baseline"),
-                        "%s/%s" %
-                        (subs['series_snake_case'], subs['variant_snake_case']))
+                        "%s/%s" % (subs["series_snake_case"], "baseline"),
+                        "%s/%s"
+                        % (
+                            subs["series_snake_case"],
+                            subs["variant_snake_case"],
+                        ),
+                    )
                     contents = contents.replace(
-                        "%s_%s" % (subs['series_flat_case'], "baseline"),
-                        "%s_%s" %
-                        (subs['series_flat_case'], subs['variant_flat_case']))
+                        "%s_%s" % (subs["series_flat_case"], "baseline"),
+                        "%s_%s"
+                        % (subs["series_flat_case"], subs["variant_flat_case"]),
+                    )
                     contents = contents.replace(
-                        ".baseline", "." + subs['variant_flat_case'])
+                        ".baseline", "." + subs["variant_flat_case"]
+                    )
                 else:
                     dns = textwrap.dedent(
                         """
 
                         %sTODO(%s): Edit this file to reflect the changes needed for this variant.%s
 
-                        """ % (comment_start, DNS, comment_end))
+                        """
+                        % (comment_start, DNS, comment_end)
+                    )
 
                     # Special case: HLCPP uses flat_case in the path to fidl.h.
                     contents = contents.replace(
-                        "%s/%s/cpp/fidl.h" %
-                        (subs['series_snake_case'], "baseline"),
-                        "%s/%s/cpp/fidl.h" %
-                        (subs['series_snake_case'], subs['variant_flat_case']))
+                        "%s/%s/cpp/fidl.h"
+                        % (subs["series_snake_case"], "baseline"),
+                        "%s/%s/cpp/fidl.h"
+                        % (
+                            subs["series_snake_case"],
+                            subs["variant_flat_case"],
+                        ),
+                    )
 
                     contents = contents.replace(
-                        "%s/%s" % (subs['series_snake_case'], "baseline"),
-                        "%s/%s" %
-                        (subs['series_snake_case'], subs['variant_snake_case']))
+                        "%s/%s" % (subs["series_snake_case"], "baseline"),
+                        "%s/%s"
+                        % (
+                            subs["series_snake_case"],
+                            subs["variant_snake_case"],
+                        ),
+                    )
                     contents = contents.replace(
-                        "baseline", subs['variant_flat_case'])
+                        "baseline", subs["variant_flat_case"]
+                    )
 
                 # Do the actual file writes, and update the dns count so the user is aware that they
                 # need to make further edits in this file.
                 os.makedirs(os.path.dirname(out_path), exist_ok=True)
-                dns_counts[str(
-                    out_path)] = get_dns_count(contents) + (1 if dns else 0)
+                dns_counts[str(out_path)] = get_dns_count(contents) + (
+                    1 if dns else 0
+                )
                 with open(out_path, "wt") as f:
                     f.write(contents + dns)
 
@@ -610,8 +660,7 @@ def copy_baseline_implementation(series, variant, subdir, subs):
 
 
 def maybe_implement_test(series, variant, subs, fresh):
-    """Implement the test implementation, and add a TODO to client.cml, if they do not yet exist.
-    """
+    """Implement the test implementation, and add a TODO to client.cml, if they do not yet exist."""
     dns_counts = {}
 
     # Ensure that the to-be-replaced TODO.md still exists.
@@ -629,13 +678,15 @@ def maybe_implement_test(series, variant, subs, fresh):
     if not os.path.exists(variant_root_gn_file_path):
         raise StepError(
             "Cannot scaffold an implementation for '%s/%s' because variant's BUILD.gn is missing"
-            % (series, variant))
+            % (series, variant)
+        )
 
     # Validate that the client.cml file is where we expect it to be.
     if not os.path.exists(client_cml_path):
         raise StepError(
             "Cannot scaffold an implementation for '%s/%s' because the client.cml is missing"
-            % (series, variant))
+            % (series, variant)
+        )
 
     # Update the client.cml file with a TODO telling the user to add some structured config.
     with open(client_cml_path, "r") as f:
@@ -646,7 +697,9 @@ def maybe_implement_test(series, variant, subs, fresh):
             dns = textwrap.dedent(
                 """
             // TODO(%s): Expand the structured config as necessary to set up this variant.
-            """ % DNS)
+            """
+                % DNS
+            )
             f.write(content + dns)
 
     # Update the variant BUILD.gn file with a TODO telling the user to add structured config
@@ -659,22 +712,24 @@ def maybe_implement_test(series, variant, subs, fresh):
             dns = textwrap.dedent(
                 """
             # TODO(%s): Add a `values` field to `client_config_values` after editing client.cml.
-            """ % DNS)
+            """
+                % DNS
+            )
             f.write(content + dns)
 
     # Remove the TODO.md file, then generate the templates in its place.
     os.remove(todo_md_file_path)
     binding_templates_dir = TEMPLATES_DIR / "implement_test"
-    for path, count in apply_subs("test", subs, binding_templates_dir,
-                                  variant_code_root_path).items():
+    for path, count in apply_subs(
+        "test", subs, binding_templates_dir, variant_code_root_path
+    ).items():
         dns_counts[path] = count
 
     return dns_counts
 
 
 def implement(name, binding, protocol, series, fresh):
-    """Implement the canonical example in a single binding language.
-    """
+    """Implement the canonical example in a single binding language."""
     variant = BASELINE
     if series:
         variant = name
@@ -682,24 +737,29 @@ def implement(name, binding, protocol, series, fresh):
         series = name
         fresh = True
 
-    tutorial_md_file_path = EXAMPLE_DOCS_BASE_DIR / series / (
-        "_%s_tutorial.md" % variant)
+    tutorial_md_file_path = (
+        EXAMPLE_DOCS_BASE_DIR / series / ("_%s_tutorial.md" % variant)
+    )
     variant_code_root_path = EXAMPLE_CODE_BASE_DIR / series / variant
     todo_md_file_path = variant_code_root_path / binding / "TODO.md"
     variant_root_gn_file_path = variant_code_root_path / "BUILD.gn"
 
     # Validate the presence of the tutorial markdown file.
-    if not (os.path.exists(tutorial_md_file_path) and
-            os.path.exists(variant_code_root_path)):
+    if not (
+        os.path.exists(tutorial_md_file_path)
+        and os.path.exists(variant_code_root_path)
+    ):
         raise StepError(
             "Cannot scaffold %s binding for '%s/%s' because this variant has not yet been created"
-            % (binding, series, variant))
+            % (binding, series, variant)
+        )
 
     # Ensure that the variant's BUILD.gn file exists.
     if not os.path.exists(variant_root_gn_file_path):
         raise StepError(
             "Cannot scaffold %s binding for '%s/%s' because root BUILD.gn file %s does not exist"
-            % (binding, variant, variant_root_gn_file_path))
+            % (binding, variant, variant_root_gn_file_path)
+        )
 
     # Build the subs, and ensure that the to-be-replaced TODO.md still exists.
     subs = build_subs(series, variant, protocol, None)
@@ -710,8 +770,8 @@ def implement(name, binding, protocol, series, fresh):
 
     # Load this file now, since it was just updated.
     variant_gn_dnrc_lines = validate_entry_does_not_already_exist(
-        "%s:tests" % binding,
-        {variant_root_gn_file_path: ''})[variant_root_gn_file_path]
+        "%s:tests" % binding, {variant_root_gn_file_path: ""}
+    )[variant_root_gn_file_path]
 
     # Add an entry to the root BUILD.gn file for this variant.
     with open(variant_root_gn_file_path, "wt") as f:
@@ -724,12 +784,16 @@ def implement(name, binding, protocol, series, fresh):
     with open(tutorial_md_file_path, "r") as f:
         replaced_client_todo = f.read().replace(
             """%s/TODO.md" region_tag="todo" """ % binding,
-            """%s/client/%s" highlight="TODO(%s)" """ %
-            (binding, BINDINGS[binding], DNS), 1)
+            """%s/client/%s" highlight="TODO(%s)" """
+            % (binding, BINDINGS[binding], DNS),
+            1,
+        )
         replaced_both_todos = replaced_client_todo.replace(
             """%s/TODO.md" region_tag="todo" """ % binding,
-            """%s/server/%s" highlight="TODO(%s)" """ %
-            (binding, BINDINGS[binding], DNS), 1)
+            """%s/server/%s" highlight="TODO(%s)" """
+            % (binding, BINDINGS[binding], DNS),
+            1,
+        )
         dns_counts[tutorial_md_file_path] = 2
         with open(tutorial_md_file_path, "wt") as f:
             f.write(replaced_both_todos)
@@ -743,7 +807,8 @@ def implement(name, binding, protocol, series, fresh):
     if fresh:
         binding_templates_dir = TEMPLATES_DIR / ("implement_%s" % binding)
         generated = apply_subs(
-            binding, subs, binding_templates_dir, variant_code_root_path)
+            binding, subs, binding_templates_dir, variant_code_root_path
+        )
     else:
         generated = copy_baseline_implementation(series, variant, binding, subs)
 
@@ -755,8 +820,7 @@ def implement(name, binding, protocol, series, fresh):
 
 
 def report_success(dns_counts):
-    """Print some useful output to the user describing what they need to do next.
-    """
+    """Print some useful output to the user describing what they need to do next."""
     if len(dns_counts):
         print(
             textwrap.dedent(
@@ -765,7 +829,10 @@ def report_success(dns_counts):
 
             Several generated files contain comments of the form "TODO(%s)".
             Please replace them with the appropriate content, as specified by in their descriptions:
-        """ % DNS))
+        """
+                % DNS
+            )
+        )
         for path, count in dns_counts.items():
             if count > 0:
                 print("    * %d occurrences in %s" % (count, path))
@@ -773,96 +840,84 @@ def report_success(dns_counts):
 
 
 def pascal_case(arg):
-    """Check that command-line argument strings are PascalCase.
-    """
+    """Check that command-line argument strings are PascalCase."""
     if not is_pascal_case(arg):
         raise argparse.ArgumentTypeError("'%s' must be PascalCase" % arg)
     return arg
 
 
 def snake_case(arg):
-    """Check that command-line argument strings are snake_case.
-    """
+    """Check that command-line argument strings are snake_case."""
     if not is_snake_case(arg):
         raise argparse.ArgumentTypeError("'%s' must be snake_case" % arg)
     return arg
 
 
 def snake_case_list(arg):
-    """Check that command-line argument lists are all snake_case strings.
-    """
+    """Check that command-line argument lists are all snake_case strings."""
     as_list = []
     for item in arg.split(","):
         item = item.strip()
         if not is_snake_case(item):
             raise argparse.ArgumentTypeError(
-                "'%s' must be a list of snake_case strings" % arg)
+                "'%s' must be a list of snake_case strings" % arg
+            )
         as_list.append(item)
     return as_list
 
 
 def unsigned_int(arg):
-    """Argument parsing helper to validate unsigned integers.
-    """
+    """Argument parsing helper to validate unsigned integers."""
     as_int = int(arg)
     if as_int <= 0:
         raise argparse.ArgumentTypeError(
-            "'%s' must be an unsigned integer" % as_int)
+            "'%s' must be an unsigned integer" % as_int
+        )
     return as_int
 
 
 def main(args):
-    """Scaffolding scripts for the FIDL canonical examples effort.
-    """
+    """Scaffolding scripts for the FIDL canonical examples effort."""
     if args.command_used == "create":
         return create(args.name, args.protocol, args.bug, args.series)
     if args.command_used == "document":
         return document(args.name, args.concepts[0])
     if args.command_used == "implement":
         return implement(
-            args.name, args.binding, args.protocol, args.series, args.fresh)
+            args.name, args.binding, args.protocol, args.series, args.fresh
+        )
     raise argparse.ArgumentTypeError("Unknown command '%s'" % args.command_used)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     details = {
-        'create':
-            """Create a new canonical example variant, with `TODO.md` placeholders files in place of
+        "create": """Create a new canonical example variant, with `TODO.md` placeholders files in place of
             future implementations.""",
-        'document':
-            """Document a canonical example variant, which enables writing all of the tutorial text
+        "document": """Document a canonical example variant, which enables writing all of the tutorial text
             that accompanies the variant.""",
-        'implement':
-            """Implement a canonical example variant in a single binding language. If this is the
+        "implement": """Implement a canonical example variant in a single binding language. If this is the
             first implementation of the canonical example variant, test scripts will need to be
             filled in as well.""",
     }
     helps = {
-        'binding':
-            """The language binding being implemented.""",
-        'bug':
-            """The bug associated with this canonical example entry.""",
-        'concepts':
-            """The concepts associated with this variant - each will receive its own widget.""",
-        'fresh':
-            """When creating a new variant implementation, enable this flag to create a blank
+        "binding": """The language binding being implemented.""",
+        "bug": """The bug associated with this canonical example entry.""",
+        "concepts": """The concepts associated with this variant - each will receive its own widget.""",
+        "fresh": """When creating a new variant implementation, enable this flag to create a blank
             scaffold, rather than copying the baseline implementation.""",
-        'from':
-            """The name of the canonical example series that this example is an extension of. If
+        "from": """The name of the canonical example series that this example is an extension of. If
             this argument is omitted, the --baseline flag must be specified instead to indicate that
             we are creating the baseline case of a brand new canonical example series of the
             specified name.""",
-        'baseline':
-            """If this is a new canonical example series, this flag needs to be included to indicate
+        "baseline": """If this is a new canonical example series, this flag needs to be included to indicate
             this fact.""",
-        'name':
-            """The name of the canonical example variant being affected by this command.""",
-        'protocol':
-            """The @discoverable protocol that serves as the first contact point for the client and
+        "name": """The name of the canonical example variant being affected by this command.""",
+        "protocol": """The @discoverable protocol that serves as the first contact point for the client and
             server in this example.""",
     }
     args = argparse.ArgumentParser(
-        description="Create or modify FIDL canonical example.")
+        description="Create or modify FIDL canonical example."
+    )
     commands = args.add_subparsers(
         dest="command_used",
         help="Commands (specify command followed by --help for details)",
@@ -872,49 +927,64 @@ if __name__ == '__main__':
     # an already existing one.
     create_cmd = commands.add_parser("create", help=details["create"])
     create_cmd.add_argument(
-        "name", metavar="name", type=snake_case, help=helps['name'])
+        "name", metavar="name", type=snake_case, help=helps["name"]
+    )
     create_cmd.add_argument(
-        "--protocol", type=pascal_case, required=True, help=helps['protocol'])
+        "--protocol", type=pascal_case, required=True, help=helps["protocol"]
+    )
     create_cmd.add_argument(
-        "--bug", type=unsigned_int, required=True, help=helps['bug'])
+        "--bug", type=unsigned_int, required=True, help=helps["bug"]
+    )
 
     create_cmd_baseline_or_extend = create_cmd.add_mutually_exclusive_group(
-        required=True)
+        required=True
+    )
     create_cmd_baseline_or_extend.add_argument(
-        "--from", dest="series", type=snake_case, help=helps['from'])
+        "--from", dest="series", type=snake_case, help=helps["from"]
+    )
     create_cmd_baseline_or_extend.add_argument(
-        "--baseline", action='store_true', help=helps['baseline'])
+        "--baseline", action="store_true", help=helps["baseline"]
+    )
     create_cmd_baseline_or_extend.set_defaults(baseline=True)
 
     # Specify the document command.
     document_cmd = commands.add_parser("document", help=details["document"])
     document_cmd.add_argument(
-        "name", metavar="name", type=snake_case, help=helps['name'])
+        "name", metavar="name", type=snake_case, help=helps["name"]
+    )
     document_cmd.add_argument(
-        "--concepts", nargs='+', type=snake_case_list, help=helps['concepts'])
+        "--concepts", nargs="+", type=snake_case_list, help=helps["concepts"]
+    )
 
     # Specify the implement command.
     implement_cmd = commands.add_parser("implement", help=details["implement"])
     implement_cmd.add_argument(
-        "name", metavar="name", type=snake_case, help=helps['name'])
+        "name", metavar="name", type=snake_case, help=helps["name"]
+    )
     implement_cmd.add_argument(
         "--binding",
         type=snake_case,
         choices=BINDINGS.keys(),
         required=True,
-        help=helps['binding'])
+        help=helps["binding"],
+    )
     implement_cmd.add_argument(
-        "--protocol", type=pascal_case, required=True, help=helps['protocol'])
+        "--protocol", type=pascal_case, required=True, help=helps["protocol"]
+    )
     implement_cmd.add_argument(
-        "--fresh", action='store_true', help=helps['fresh'])
+        "--fresh", action="store_true", help=helps["fresh"]
+    )
     implement_cmd.set_defaults(fresh=False)
 
-    implement_cmd_baseline_or_extend = implement_cmd.add_mutually_exclusive_group(
-        required=True)
+    implement_cmd_baseline_or_extend = (
+        implement_cmd.add_mutually_exclusive_group(required=True)
+    )
     implement_cmd_baseline_or_extend.add_argument(
-        "--from", dest="series", type=snake_case, help=helps['from'])
+        "--from", dest="series", type=snake_case, help=helps["from"]
+    )
     implement_cmd_baseline_or_extend.add_argument(
-        "--baseline", action='store_true', help=helps['baseline'])
+        "--baseline", action="store_true", help=helps["baseline"]
+    )
     implement_cmd_baseline_or_extend.set_defaults(baseline=True)
 
     # Parse arguments.

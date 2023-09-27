@@ -37,39 +37,46 @@ def print_failure_msg(manual_updates, label):
     for update in manual_updates:
         print(
             MANUAL_UPDATE_BODY_ENTRY.format(
-                candidate=update["candidate"], golden=update["golden"]))
+                candidate=update["candidate"], golden=update["golden"]
+            )
+        )
     print(MANUAL_UPDATE_FOOTER.format(label=label))
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--label', help='GN label for this test', required=True)
+    parser.add_argument("--label", help="GN label for this test", required=True)
     parser.add_argument(
-        '--source-root', help='Path to the Fuchsia source root', required=True)
+        "--source-root", help="Path to the Fuchsia source root", required=True
+    )
     parser.add_argument(
-        '--comparisons',
-        metavar='FILE',
-        help='Path at which to find the JSON file containing the comparisons',
+        "--comparisons",
+        metavar="FILE",
+        help="Path at which to find the JSON file containing the comparisons",
         required=True,
     )
     parser.add_argument(
-        '--depfile', help='Path at which to write the depfile', required=True)
+        "--depfile", help="Path at which to write the depfile", required=True
+    )
     parser.add_argument(
-        '--stamp-file',
-        help='Path at which to write the stamp file',
-        required=True)
+        "--stamp-file",
+        help="Path at which to write the stamp file",
+        required=True,
+    )
     parser.add_argument(
-        '--bless',
-        help=
-        "Overwrites the golden with the candidate if they don't match - or creates it if it does not yet exist",
-        action='store_true')
+        "--bless",
+        help="Overwrites the golden with the candidate if they don't match - or creates it if it does not yet exist",
+        action="store_true",
+    )
     parser.add_argument(
-        '--warn',
-        help='Whether API changes should only cause warnings',
-        action='store_true')
+        "--warn",
+        help="Whether API changes should only cause warnings",
+        action="store_true",
+    )
     parser.add_argument(
-        '--err-msg',
-        help="Additional error message to display if files don't match")
+        "--err-msg",
+        help="Additional error message to display if files don't match",
+    )
     args = parser.parse_args()
 
     with open(args.comparisons) as f:
@@ -92,13 +99,14 @@ def main():
 
         if os.path.exists(golden):
             current_comparison_failed = not filecmp.cmp(
-                candidate, formatted_golden or golden)
+                candidate, formatted_golden or golden
+            )
         else:
             current_comparison_failed = True
 
         if current_comparison_failed:
-            type = 'Warning' if args.warn or args.bless else 'Error'
-            str = f'\n{type}: '
+            type = "Warning" if args.warn or args.bless else "Error"
+            str = f"\n{type}: "
             if args.err_msg:
                 str += args.err_msg
             else:
@@ -118,14 +126,14 @@ def main():
         if not args.warn:
             return 1
 
-    with open(args.stamp_file, 'w') as stamp_file:
-        stamp_file.write('Golden!\n')
+    with open(args.stamp_file, "w") as stamp_file:
+        stamp_file.write("Golden!\n")
 
-    with open(args.depfile, 'w') as depfile:
-        depfile.write('%s: %s\n' % (args.stamp_file, ' '.join(inputs)))
+    with open(args.depfile, "w") as depfile:
+        depfile.write("%s: %s\n" % (args.stamp_file, " ".join(inputs)))
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

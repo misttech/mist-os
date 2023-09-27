@@ -2,14 +2,14 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-'''
+"""
 Generates debug symbols directory from a list of ids.txt files.
 
 The input files are a list of single-line ids.txt files in the format of
 "<build ID> <object_file_with_symbols>"
 
 This script should only be invoked by _fuchsia_package_impl in package.bzl.
-'''
+"""
 import argparse
 import os
 import shutil
@@ -20,23 +20,25 @@ from pylib import elf_info
 
 def create_empty(path: str):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, 'w') as f:
-        f.write('')
+    with open(path, "w") as f:
+        f.write("")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--debug', action='store_true', help='Enable debug logs.')
-    parser.add_argument('output_dir', help='Output directory path.')
+        "--debug", action="store_true", help="Enable debug logs."
+    )
+    parser.add_argument("output_dir", help="Output directory path.")
     parser.add_argument(
-        "input_file", nargs='+', help='Input ids.txt file paths.')
+        "input_file", nargs="+", help="Input ids.txt file paths."
+    )
 
     args = parser.parse_args()
 
     log_func = None
     if args.debug:
-        log_func = lambda msg: print('LOG ' + msg, file=sys.stderr)
+        log_func = lambda msg: print("LOG " + msg, file=sys.stderr)
 
     # Read all input files, one line at a time.
     # Each line is: BUILD_ID  ELF_WITH_SYMBOLS_FILE_PATH
@@ -48,8 +50,9 @@ def main():
                 items = line.strip().split()
                 if len(items) != 2:
                     print(
-                        'WARNING: Invalid input line: [%s]' % line,
-                        file=sys.stderr)
+                        "WARNING: Invalid input line: [%s]" % line,
+                        file=sys.stderr,
+                    )
                     continue
 
                 build_id = items[0]
@@ -59,9 +62,10 @@ def main():
                         # Ignore duplicate entries
                         continue
                     print(
-                        'ERROR: Duplicate entries for build-id %s\n  %s\n  %s\n'
+                        "ERROR: Duplicate entries for build-id %s\n  %s\n  %s\n"
                         % (build_dir, debug_map[build_id], elf_with_symbols),
-                        file=sys.stderr)
+                        file=sys.stderr,
+                    )
                     return 1
                 debug_map[build_id] = elf_with_symbols
 
@@ -70,19 +74,22 @@ def main():
     # Check source files for symbols and debug_info
     for build_id, elf_file in debug_map.items():
         build_id_path = os.path.join(
-            args.output_dir, build_id[:2], build_id[2:])
-        debug_path = build_id_path + '.debug'
+            args.output_dir, build_id[:2], build_id[2:]
+        )
+        debug_path = build_id_path + ".debug"
         elf = elf_info.ElfInput.open_file(
-            elf_file, log_func=log_func).ensure_elf64()
+            elf_file, log_func=log_func
+        ).ensure_elf64()
         if not elf:
-            print(f'ERROR: Not an ELF64 file: {elf_file}', file=sys.stderr)
+            print(f"ERROR: Not an ELF64 file: {elf_file}", file=sys.stderr)
             return 1
 
         if elf.is_stripped():
             if False:  # Change to True for debugging
                 print(
-                    f'WARNING: binary is already stripped: {elf_file}',
-                    file=sys.stderr)
+                    f"WARNING: binary is already stripped: {elf_file}",
+                    file=sys.stderr,
+                )
             continue
 
         # If the file is not stripped, add it to the output no matter whether
@@ -94,7 +101,7 @@ def main():
     if not did_copy:
         # Create an empty file if the output directory is empty, as bazel will ignore
         # empty directories
-        create_empty(os.path.join(args.output_dir, '.ensure_there_is_one_file'))
+        create_empty(os.path.join(args.output_dir, ".ensure_there_is_one_file"))
 
     return 0
 

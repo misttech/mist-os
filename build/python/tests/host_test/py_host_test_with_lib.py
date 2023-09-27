@@ -9,7 +9,6 @@ import unittest
 
 
 class PyHostTestWithLibTests(unittest.TestCase):
-
     def test_truthy(self):
         self.assertEqual(lib.truthy(), True)
 
@@ -17,5 +16,5 @@ class PyHostTestWithLibTests(unittest.TestCase):
         self.assertEqual(lib.falsy(), False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

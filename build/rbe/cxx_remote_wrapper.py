@@ -29,7 +29,7 @@ _SCRIPT_DIR = Path(__file__).parent
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 REMOTE_COMPILER_SWAPPER = _SCRIPT_DIR / "cxx-swap-remote-compiler.sh"
@@ -50,9 +50,9 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     group.add_argument(
         "--cpp-strategy",
         type=str,
-        choices=['auto', 'local', 'integrated'],
-        default='auto',
-        metavar='STRATEGY',
+        choices=["auto", "local", "integrated"],
+        default="auto",
+        metavar="STRATEGY",
         help="""Configure how C-preprocessing is done.
     integrated: preprocess and compile in a single step,
     local: preprocess locally, compile remotely,
@@ -66,8 +66,8 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def check_missing_remote_tools(
-        compiler_type: cxx.Compiler,
-        project_root: Path = None) -> Iterable[Path]:
+    compiler_type: cxx.Compiler, project_root: Path = None
+) -> Iterable[Path]:
     """Check for the existence of tools needed for remote execution.
 
     Args:
@@ -91,14 +91,13 @@ def check_missing_remote_tools(
 
 
 class CxxRemoteAction(object):
-
     def __init__(
-            self,
-            argv: Sequence[str],
-            exec_root: Path = None,
-            working_dir: Path = None,
-            host_platform: str = None,
-            auto_reproxy: bool = True,  # can disable for unit-testing
+        self,
+        argv: Sequence[str],
+        exec_root: Path = None,
+        working_dir: Path = None,
+        host_platform: str = None,
+        auto_reproxy: bool = True,  # can disable for unit-testing
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
@@ -113,13 +112,16 @@ class CxxRemoteAction(object):
 
         # forward all unknown flags to rewrapper
         # --help here will result in early exit()
-        self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-            main_argv)
+        (
+            self._main_args,
+            self._main_remote_options,
+        ) = _MAIN_ARG_PARSER.parse_known_args(main_argv)
 
         # Re-launch with reproxy if needed.
         if auto_reproxy:
             remote_action.auto_relaunch_with_reproxy(
-                script=Path(__file__), argv=argv, args=self._main_args)
+                script=Path(__file__), argv=argv, args=self._main_args
+            )
 
         if not filtered_command:  # there is no command, bail out early
             return
@@ -159,13 +161,14 @@ class CxxRemoteAction(object):
 
         if self._main_args.fsatrace_path:
             msg(
-                'Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path.'
+                "Warning: Due to http://fxbug.dev/128947, remote fsatrace does not work with C++ mode as-is, because the fsatrace prefix confuses the re-client C++ input processor.  Automatically disabling --fsatrace-path."
             )
             self._main_args.fsatrace_path = None
 
         # check for required remote tools
         missing_required_tools = list(
-            check_missing_remote_tools(self.compiler_type, self.exec_root_rel))
+            check_missing_remote_tools(self.compiler_type, self.exec_root_rel)
+        )
         if missing_required_tools:
             raise Exception(
                 f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563535 for how to fetch the needed packages."
@@ -174,8 +177,7 @@ class CxxRemoteAction(object):
     @property
     def command_line_inputs(self) -> Sequence[Path]:
         return [
-            Path(p)
-            for p in cl_utils.flatten_comma_list(self._main_args.inputs)
+            Path(p) for p in cl_utils.flatten_comma_list(self._main_args.inputs)
         ]
 
     @property
@@ -188,8 +190,10 @@ class CxxRemoteAction(object):
     @property
     def command_line_output_dirs(self) -> Sequence[Path]:
         return [
-            Path(p) for p in cl_utils.flatten_comma_list(
-                self._main_args.output_directories)
+            Path(p)
+            for p in cl_utils.flatten_comma_list(
+                self._main_args.output_directories
+            )
         ]
 
     def _post_remote_success_action(self) -> int:
@@ -207,12 +211,16 @@ class CxxRemoteAction(object):
         )
 
     def _remote_output_files(self) -> Sequence[Path]:
-        return list(
-            self.cxx_action.output_files()) + self.command_line_output_files
+        return (
+            list(self.cxx_action.output_files())
+            + self.command_line_output_files
+        )
 
     def prepare(self) -> int:
         """Setup everything ahead of remote execution."""
-        assert not self.local_only, "This should not be reached in local-only mode."
+        assert (
+            not self.local_only
+        ), "This should not be reached in local-only mode."
 
         if self._prepare_status is not None:
             return self._prepare_status
@@ -221,31 +229,35 @@ class CxxRemoteAction(object):
 
         # evaluate the separate preprocessing and compile-preprocessed command
         # even if we won't use them.
-        self._local_preprocess_command, self._compile_preprocessed_command = self.cxx_action.split_preprocessing(
-        )
+        (
+            self._local_preprocess_command,
+            self._compile_preprocessed_command,
+        ) = self.cxx_action.split_preprocessing()
 
-        remote_inputs = list(
-            self.cxx_action.input_files()) + self.command_line_inputs
-        if self.cpp_strategy == 'local':
+        remote_inputs = (
+            list(self.cxx_action.input_files()) + self.command_line_inputs
+        )
+        if self.cpp_strategy == "local":
             # preprocess locally, then compile the result remotely
             preprocessed_source = self.cxx_action.preprocessed_output
             self._cleanup_files.append(preprocessed_source)
             remote_inputs.append(preprocessed_source)
-            with cl_utils.timer_cm('CxxRemoteAction.preprocess_locally()'):
+            with cl_utils.timer_cm("CxxRemoteAction.preprocess_locally()"):
                 cpp_status = self.preprocess_locally()
             remote_command = self._compile_preprocessed_command
             if cpp_status != 0:
                 return cpp_status
 
-        elif self.cpp_strategy == 'integrated':
+        elif self.cpp_strategy == "integrated":
             # preprocess driven by the compiler, done remotely
             remote_command = self.cxx_action.command
             # TODO: might need -Wno-constant-logical-operand to workaround
             #   ZX_DEBUG_ASSERT.
 
         # Prepare remote compile action
-        remote_output_dirs = list(
-            self.cxx_action.output_dirs()) + self.command_line_output_dirs
+        remote_output_dirs = (
+            list(self.cxx_action.output_dirs()) + self.command_line_output_dirs
+        )
         remote_options = [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
@@ -259,21 +271,23 @@ class CxxRemoteAction(object):
         # Workaround b/239101612: missing gcc support libexec binaries for remote build
         if self.compiler_type == cxx.Compiler.GCC:
             remote_inputs.extend(
-                list(fuchsia.gcc_support_tools(self.compiler_path)))
+                list(fuchsia.gcc_support_tools(self.compiler_path))
+            )
 
         # Support for remote cross-compilation:
         if self.host_platform != fuchsia.REMOTE_PLATFORM:
             # compiler path is relative to current working dir
             compiler_swapper_rel = os.path.relpath(
-                REMOTE_COMPILER_SWAPPER, start=self.working_dir)
+                REMOTE_COMPILER_SWAPPER, start=self.working_dir
+            )
             remote_inputs.extend([self.remote_compiler, compiler_swapper_rel])
             # Let --remote_wrapper apply the prefix to the command remotely.
-            remote_options.append(f'--remote_wrapper={compiler_swapper_rel}')
+            remote_options.append(f"--remote_wrapper={compiler_swapper_rel}")
 
-        self.vprintlist('remote inputs', remote_inputs)
-        self.vprintlist('remote output files', remote_output_files)
-        self.vprintlist('remote output dirs', remote_output_dirs)
-        self.vprintlist('rewrapper options', remote_options)
+        self.vprintlist("remote inputs", remote_inputs)
+        self.vprintlist("remote output files", remote_output_files)
+        self.vprintlist("remote output dirs", remote_output_dirs)
+        self.vprintlist("rewrapper options", remote_options)
 
         downloads = []
         if self.depfile:  # always fetch the depfile
@@ -340,22 +354,22 @@ class CxxRemoteAction(object):
           items: stream of any type of object that is str-able.
         """
         if self.verbose:
-            msg(f'{desc}: {{')
+            msg(f"{desc}: {{")
             for item in items:
                 text = str(item)
-                print(f'  {text}')
-            print(f'}}  # {desc}')
+                print(f"  {text}")
+            print(f"}}  # {desc}")
 
     def _resolve_cpp_strategy(self) -> str:
         """Resolve preprocessing strategy to 'local' or 'integrated'."""
         cpp_strategy = self._main_args.cpp_strategy
-        if cpp_strategy == 'auto':
+        if cpp_strategy == "auto":
             if self.cxx_action.uses_macos_sdk:
                 # Mac SDK headers reside outside of exec_root,
                 # which doesn't work for remote compiling.
-                cpp_strategy = 'local'
+                cpp_strategy = "local"
             else:
-                cpp_strategy = 'integrated'
+                cpp_strategy = "integrated"
         return cpp_strategy
 
     @property
@@ -369,11 +383,13 @@ class CxxRemoteAction(object):
     def _detect_local_only(self) -> bool:
         if self.cxx_action.sources:
             first_source = self.cxx_action.sources[0]
-            if first_source.file.name.endswith('.S'):
+            if first_source.file.name.endswith(".S"):
                 # Compiling un-preprocessed assembly is not supported remotely.
                 return True
-            elif first_source.dialect not in {cxx.SourceLanguage.C,
-                                              cxx.SourceLanguage.CXX}:
+            elif first_source.dialect not in {
+                cxx.SourceLanguage.C,
+                cxx.SourceLanguage.CXX,
+            }:
                 # e.g. Obj-C must be compiled locally
                 return True
 
@@ -437,13 +453,14 @@ class CxxRemoteAction(object):
                 command=self.original_compile_command,
                 max_attempts=max_attempts,
                 miscomparison_export_dir=(
-                    export_dir / self.build_subdir if export_dir else None),
+                    export_dir / self.build_subdir if export_dir else None
+                ),
                 label=self.label,
             )
             # Both clang and gcc support -Wdate-time to catch nonreproducible
             # builds.  This can induce a failure earlier, without having
             # to build twice and compare.
-            command += ['-Wdate-time']
+            command += ["-Wdate-time"]
         else:
             self.vmsg("Running the original compile command locally.")
             command = self.original_compile_command
@@ -463,7 +480,8 @@ class CxxRemoteAction(object):
     def preprocess_locally(self) -> int:
         # Locally preprocess if needed
         local_cpp_cmd = cl_utils.command_quoted_str(
-            self.local_preprocess_command)
+            self.local_preprocess_command
+        )
         if self.dry_run:
             msg(f"[dry-run only] {local_cpp_cmd}")
             return 0
@@ -483,7 +501,7 @@ class CxxRemoteAction(object):
         if self.local_only:
             return self._run_locally()
 
-        with cl_utils.timer_cm('CxxRemoteAction.prepare()'):
+        with cl_utils.timer_cm("CxxRemoteAction.prepare()"):
             prepare_status = self.prepare()
             if prepare_status != 0:
                 return prepare_status
@@ -497,21 +515,21 @@ class CxxRemoteAction(object):
                 self._cleanup()
 
     def _cleanup(self):
-        with cl_utils.timer_cm('CxxRemoteAction._cleanup()'):
+        with cl_utils.timer_cm("CxxRemoteAction._cleanup()"):
             for f in self._cleanup_files:
                 f.unlink()
 
 
 def main(argv: Sequence[str]) -> int:
-    with cl_utils.timer_cm('cxx_remote_wrapper.main()'):
-        with cl_utils.timer_cm('CxxRemoteAction.__init__()'):
+    with cl_utils.timer_cm("cxx_remote_wrapper.main()"):
+        with cl_utils.timer_cm("CxxRemoteAction.__init__()"):
             cxx_remote_action = CxxRemoteAction(
                 argv,  # [remote options] -- C-compile-command...
                 exec_root=remote_action.PROJECT_ROOT,
                 working_dir=Path(os.curdir),
                 host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
             )
-        with cl_utils.timer_cm('CxxRemoteAction.run()'):
+        with cl_utils.timer_cm("CxxRemoteAction.run()"):
             return cxx_remote_action.run()
 
 

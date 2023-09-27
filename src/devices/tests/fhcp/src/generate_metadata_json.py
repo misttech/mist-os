@@ -19,18 +19,21 @@ def validate(data):
         url = test["url"]
         if not test["test_types"]:
             raise ValueError(
-                f"The test {url} must specify at least one category.")
+                f"The test {url} must specify at least one category."
+            )
         for item in test["test_types"]:
             if item not in test_types:
                 raise ValueError(
-                    f"The test {url} specifies an invalid category '{item}'.")
+                    f"The test {url} specifies an invalid category '{item}'."
+                )
         if not test["device_categories"]:
             raise ValueError(f"The test {url} must specify at least one type.")
         for item in test["device_categories"]:
             item_type = item["category"]
             if item_type not in categories:
                 raise ValueError(
-                    f"The test {url} specifies an invalid type '{item_type}'.")
+                    f"The test {url} specifies an invalid type '{item_type}'."
+                )
             item_sub_type = item["subcategory"]
             if item_sub_type and item_sub_type not in categories[item_type]:
                 raise ValueError(
@@ -38,7 +41,8 @@ def validate(data):
                 )
         if "is_automated" not in test:
             raise ValueError(
-                f"The test {url} must specify an 'is_automated' value.")
+                f"The test {url} must specify an 'is_automated' value."
+            )
     return True
 
 
@@ -47,31 +51,39 @@ def check_required_fhcp_fields(d):
     if "test_types" not in d or not d["test_types"]:
         raise ValueError(
             "The 'test_types' field must have at least one type defined. Missing from:",
-            d)
+            d,
+        )
     if "device_categories" not in d or not d["device_categories"]:
         raise ValueError(
             "The 'device_categories' field must have at least one category defined. Missing from:",
-            d)
+            d,
+        )
     for category in d["device_categories"]:
         if "category" not in category:
             raise ValueError(
-                "Missing 'category' in category definition:", category)
+                "Missing 'category' in category definition:", category
+            )
         if not category["category"]:
             raise ValueError("Category field must have a category value.")
         # Subcategory can be empty, so there is nothing to enforce.
     if "environments" not in d or not d["environments"]:
         raise ValueError(
             "The 'environments' field must have at least one environment defined. Missing from:",
-            d)
+            d,
+        )
     for environment in d["environments"]:
         if "tags" not in environment:
             raise ValueError(
-                "Missing 'tags' in environment definition:", environment)
-        if 'fhcp-automated' not in environment[
-                "tags"] and 'fhcp-manual' not in environment["tags"]:
+                "Missing 'tags' in environment definition:", environment
+            )
+        if (
+            "fhcp-automated" not in environment["tags"]
+            and "fhcp-manual" not in environment["tags"]
+        ):
             raise ValueError(
                 "The 'tags' field must have at least one tag of either 'fhcp-automated' or 'fhcp-manual'. Missing from:",
-                environment["tags"])
+                environment["tags"],
+            )
 
 
 def convert_to_final_dict(appendix, data):
@@ -99,16 +111,19 @@ def convert_to_final_dict(appendix, data):
             raise ValueError(f"Did not find '{entry}' in the tests.")
         test_metadata = test_entries[entry]
         fhcp_metadata = fhcp_entries[entry]
-        is_automated = len(fhcp_metadata["environments"]) > 0 and fhcp_metadata[
-            "environments"][0] and "fhcp-automated" in fhcp_metadata[
-                "environments"][0]["tags"]
+        is_automated = (
+            len(fhcp_metadata["environments"]) > 0
+            and fhcp_metadata["environments"][0]
+            and "fhcp-automated" in fhcp_metadata["environments"][0]["tags"]
+        )
         tests.append(
             {
                 "url": test_metadata["test"]["package_url"],
                 "test_types": fhcp_metadata["test_types"],
                 "device_categories": fhcp_metadata["device_categories"],
                 "is_automated": is_automated,
-            })
+            }
+        )
     appendix["tests"] = tests
     return appendix
 
@@ -116,11 +131,14 @@ def convert_to_final_dict(appendix, data):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--appendix_json', help="Path to the appendix JSON", required=True)
+        "--appendix_json", help="Path to the appendix JSON", required=True
+    )
     parser.add_argument(
-        '--intermediate_json', help="Path to intermediate JSON", required=True)
+        "--intermediate_json", help="Path to intermediate JSON", required=True
+    )
     parser.add_argument(
-        '--output_json', help="Path that we will output to.", required=True)
+        "--output_json", help="Path that we will output to.", required=True
+    )
     args = parser.parse_args()
 
     appendix = {}
@@ -133,10 +151,10 @@ def main():
     final_dict = convert_to_final_dict(appendix, intermediate)
     validate(final_dict)
 
-    with open(args.output_json, 'w') as output:
+    with open(args.output_json, "w") as output:
         output.write(str(json.dumps(final_dict)))
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

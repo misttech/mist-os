@@ -13,7 +13,7 @@ import sys
 # Intentionally ignores the version numbers of the protoc compiler and plugins
 # that are embedded in the files.
 
-MISMATCH_MSG = '''\
+MISMATCH_MSG = """\
 Error: Golden file mismatch! To print the differences, run:
 
   diff -urN {candidate_path} {golden_path}
@@ -22,7 +22,7 @@ To acknowledge this change, please run:
 
   cp {candidate_path} {golden_path}
 
-'''
+"""
 
 
 def filter_line(line):
@@ -42,13 +42,13 @@ def filter_line(line):
     # Note that protoc-gen-go-grpc does not embed its version number
     # in its output, so isn't checked here.
     for version_prefix in (
-            '// \tprotoc ',
-            '// \tprotoc-gen-go ',
-            '// - protoc ',
-            '// - protoc-gen-go-grpc ',
+        "// \tprotoc ",
+        "// \tprotoc-gen-go ",
+        "// - protoc ",
+        "// - protoc-gen-go-grpc ",
     ):
         if line.startswith(version_prefix):
-            return version_prefix + '\n'
+            return version_prefix + "\n"
 
     # Ignore differences in whitespace within comments. For example, the
     # following lines are treated as the same:
@@ -56,11 +56,11 @@ def filter_line(line):
     # someCode() // - foo bar baz
     # someCode() //    -    foo bar     baz
     # someCode() //- foo bar baz
-    comment_match = re.match(r'^(.*\/\/)(\s*)(.*)$', line)
+    comment_match = re.match(r"^(.*\/\/)(\s*)(.*)$", line)
     if comment_match is not None:
-        return (
-            comment_match.group(1) +
-            re.sub(r'\s+', ' ', comment_match.group(3)))
+        return comment_match.group(1) + re.sub(
+            r"\s+", " ", comment_match.group(3)
+        )
 
     return line
 
@@ -74,17 +74,22 @@ def read_file(path):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--golden', help='Path to the golden file', required=True)
+        "--golden", help="Path to the golden file", required=True
+    )
     parser.add_argument(
-        '--candidate', help='Path to the local file', required=True)
+        "--candidate", help="Path to the local file", required=True
+    )
     parser.add_argument(
-        '--fuchsia-dir', help='Path to Fuchsia source directory')
+        "--fuchsia-dir", help="Path to Fuchsia source directory"
+    )
     parser.add_argument(
-        '--stamp', help='Path to the victory file', required=True)
+        "--stamp", help="Path to the victory file", required=True
+    )
     parser.add_argument(
-        '--update',
+        "--update",
         help="Overwrites candidate with golden if they don't match.",
-        action='store_true')
+        action="store_true",
+    )
     args = parser.parse_args()
 
     golden = read_file(args.golden)
@@ -96,21 +101,23 @@ def main():
         else:
             # Compute paths relative to the Fuchsia directory for the message
             # below.
-            fuchsia_dir = args.fuchsia_dir if args.fuchsia_dir else '../..'
+            fuchsia_dir = args.fuchsia_dir if args.fuchsia_dir else "../.."
             fuchsia_dir = os.path.abspath(fuchsia_dir)
             golden_path = os.path.relpath(args.golden, fuchsia_dir)
             candidate_path = os.path.relpath(args.candidate, fuchsia_dir)
             print(
                 MISMATCH_MSG.format(
-                    candidate_path=candidate_path, golden_path=golden_path),
-                file=sys.stderr)
+                    candidate_path=candidate_path, golden_path=golden_path
+                ),
+                file=sys.stderr,
+            )
             return 1
 
-    with open(args.stamp, 'w') as stamp_file:
-        stamp_file.write('Golden!\n')
+    with open(args.stamp, "w") as stamp_file:
+        stamp_file.write("Golden!\n")
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

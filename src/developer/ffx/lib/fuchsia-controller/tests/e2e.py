@@ -13,7 +13,6 @@ from fuchsia_controller_py import Context, IsolateDir, Channel
 
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
-
     def _make_ctx(self):
         isolation_path = None
         tmp_path = os.getenv("TEST_UNDECLARED_OUTPUTS_DIR")
@@ -21,13 +20,14 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             isolation_path = os.path.join(tmp_path, "isolate")
 
         return Context(
-            config={"sdk.root": "."},
-            isolate_dir=IsolateDir(dir=isolation_path))
+            config={"sdk.root": "."}, isolate_dir=IsolateDir(dir=isolation_path)
+        )
 
     async def test_echo_daemon(self):
         ctx = self._make_ctx()
         echo_proxy = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         expected = "this is an echo test"
         result = await echo_proxy.echo_string(value=expected)
         self.assertEqual(result.response, expected)
@@ -35,7 +35,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
     async def test_echo_daemon_parallel(self):
         ctx = self._make_ctx()
         echo_proxy = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         expected1 = "this is an echo test1"
         expected2 = "22222this is an echo test2"
         expected3 = "frobination incoming. Heed the call of the frobe"
@@ -55,9 +56,11 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         (ch0, ch1) = Channel.create()
         echo_proxy1 = ffx_fidl.Echo.Client(ch0)
         echo_proxy2 = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         echo_proxy3 = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         coro = echo_proxy1.echo_string(value="foo")
         buf, _ = ch1.read()
         txid = int.from_bytes(buf[0:4], sys.byteorder)
@@ -67,9 +70,12 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             type_name="fuchsia.developer.ffx/EchoEchoStringRequest",
             txid=txid,
             ordinal=method_ordinal(
-                protocol="fuchsia.developer.ffx/Echo", method="EchoString"))
+                protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+            ),
+        )
         ordinal = method_ordinal(
-            protocol="fuchsia.developer.ffx/Echo", method="EchoString")
+            protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+        )
         self.assertEqual(buf, encoded_bytes)
         msg = encode_fidl_message(
             object=ffx_fidl.EchoEchoStringResponse(response="otherthing"),
@@ -77,7 +83,9 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             type_name="fuchsia.developer.ffx/EchoEchoStringResponse",
             txid=txid,
             ordinal=method_ordinal(
-                protocol="fuchsia.developer.ffx/Echo", method="EchoString"))
+                protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+            ),
+        )
         ch1.write(msg)
         res = asyncio.run(echo_proxy2.echo_string(value="bar"))
         self.assertEqual(res.response, "bar")
@@ -98,7 +106,9 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             type_name="fuchsia.developer.ffx/EchoEchoStringRequest",
             txid=txid,
             ordinal=method_ordinal(
-                protocol="fuchsia.developer.ffx/Echo", method="EchoString"))
+                protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+            ),
+        )
         self.assertEqual(buf, encoded_bytes)
         msg = encode_fidl_message(
             object=ffx_fidl.EchoEchoStringResponse(response="otherthing"),
@@ -106,7 +116,9 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             type_name="fuchsia.developer.ffx/EchoEchoStringResponse",
             txid=txid,
             ordinal=method_ordinal(
-                protocol="fuchsia.developer.ffx/Echo", method="EchoString"))
+                protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+            ),
+        )
         ch1.write(msg)
         result = await coro
         self.assertEqual(result.response, "otherthing")
@@ -128,9 +140,11 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         This ensures these aren't being set globally."""
         ctx = self._make_ctx()
         e1 = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         e2 = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         self.assertNotEqual(e1.channel.as_int(), e2.channel.as_int())
 
     def test_running_multiple_commands(self):
@@ -141,7 +155,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
         """
         ctx = self._make_ctx()
         e = ffx_fidl.Echo.Client(
-            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER))
+            ctx.connect_daemon_protocol(ffx_fidl.Echo.MARKER)
+        )
         res = asyncio.run(e.echo_string(value="foo"))
         self.assertEqual(res.response, "foo")
         res = asyncio.run(e.echo_string(value="barzzz"))

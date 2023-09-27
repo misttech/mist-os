@@ -12,18 +12,20 @@ import tempfile
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract pprof data from inspect.json")
+        description="Extract pprof data from inspect.json"
+    )
     parser.add_argument(
-        "--inspect", required=True, help="Path to inspect.json file")
+        "--inspect", required=True, help="Path to inspect.json file"
+    )
     parser.add_argument(
         "--component",
         required=True,
-        help="Component to extract pprof data for (e.g. core/network/netstack)")
+        help="Component to extract pprof data for (e.g. core/network/netstack)",
+    )
     parser.add_argument(
         "--output",
         type=pathlib.Path,
-        help=
-        "Directory to extract pprof data to; If not specified, a temporary directory will be created"
+        help="Directory to extract pprof data to; If not specified, a temporary directory will be created",
     )
     args = parser.parse_args()
 

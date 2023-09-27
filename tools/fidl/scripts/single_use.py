@@ -3,10 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-'''
+"""
 Looks for types that are never used or are used only once, as a field within
 another type.
-'''
+"""
 
 import sys
 from collections import defaultdict
@@ -19,13 +19,15 @@ fidl_libraries = Libraries()
 type_uses_in_type = defaultdict(lambda: 0)
 type_uses_in_argument = defaultdict(lambda: 0)
 
+
 def count_type(t, d):
-    if t.kind == 'identifier':
-        d[t['identifier']] += 1
-    elif t.kind in ('array', 'vector'):
+    if t.kind == "identifier":
+        d[t["identifier"]] += 1
+    elif t.kind in ("array", "vector"):
         count_type(t.element_type, d)
-    elif t.kind == 'request':
-        d[t['subtype']] += 1
+    elif t.kind == "request":
+        d[t["subtype"]] += 1
+
 
 for struct in fidl_libraries.structs:
     for member in struct.members:
@@ -63,10 +65,10 @@ for union in fidl_libraries.unions:
 once.sort()
 never.sort()
 
-print('Never:')
+print("Never:")
 for t in never:
-    print('  ' + t)
+    print("  " + t)
 
-print('\nOnce:')
+print("\nOnce:")
 for t in once:
-    print('  ' + t)
+    print("  " + t)

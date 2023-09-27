@@ -21,7 +21,7 @@ _SCRIPT_BASENAME = _SCRIPT_PATH.name
 _SCRIPT_DIR = _SCRIPT_PATH.parent
 _SCRIPT_DIR_REL = Path(os.path.relpath(_SCRIPT_DIR, start=os.curdir))
 
-_EXPECTED_ROOT_SUBDIRS = ('boards', 'bundles', 'prebuilt', 'zircon')
+_EXPECTED_ROOT_SUBDIRS = ("boards", "bundles", "prebuilt", "zircon")
 
 
 def _dir_is_fuchsia_root(path: Path) -> bool:
@@ -45,17 +45,17 @@ def project_root_dir() -> Path:
     """
     d = _SCRIPT_DIR.absolute()
     while True:
-        if d.name.endswith('.pyz'):
+        if d.name.endswith(".pyz"):
             # If this point is reached, we are NOT operating in the original
             # location in the source tree as intended.  Treat this like a test
             # and return a fake value.
-            return Path('/FAKE/PROJECT/ROOT/FOR/TESTING')
+            return Path("/FAKE/PROJECT/ROOT/FOR/TESTING")
         elif _dir_is_fuchsia_root(d):
             return d
         next = d.parent
         if next == d:
             raise Exception(
-                f'Unable to find project root searching upward from {_SCRIPT_DIR}.'
+                f"Unable to find project root searching upward from {_SCRIPT_DIR}."
             )
         d = next
 
@@ -70,8 +70,8 @@ REPROXY_WRAP = _SCRIPT_DIR_REL / "fuchsia-reproxy-wrap.sh"
 
 def _prebuilt_platform_subdir() -> str:
     """Naming convention of prebuilt tools."""
-    os_name = {'linux': 'linux', 'darwin': 'mac'}[sys.platform]
-    arch = {'x86_64': 'x64', 'arm64': 'arm64'}[platform.machine()]
+    os_name = {"linux": "linux", "darwin": "mac"}[sys.platform]
+    arch = {"x86_64": "x64", "arm64": "arm64"}[platform.machine()]
     return f"{os_name}-{arch}"
 
 
@@ -81,12 +81,12 @@ HOST_PREBUILT_PLATFORM_SUBDIR = HOST_PREBUILT_PLATFORM
 # RBE workers are only linux-x64 at this time, so all binaries uploaded
 # for remote execution should use this platform.
 # This is also used as a subdir component of prebuilt tool paths.
-REMOTE_PLATFORM = 'linux-x64'
+REMOTE_PLATFORM = "linux-x64"
 
 
 def _path_component_is_platform_subdir(dirname: str) -> bool:
-    os, sep, arch = dirname.partition('-')
-    return sep == '-' and os in {'linux', 'mac'} and arch in {'x64', 'arm64'}
+    os, sep, arch = dirname.partition("-")
+    return sep == "-" and os in {"linux", "mac"} and arch in {"x64", "arm64"}
 
 
 def _remote_executable_components(host_tool: Path) -> Iterable[str]:
@@ -115,27 +115,32 @@ def remote_executable(host_tool: Path) -> Path:
 
 
 RECLIENT_BINDIR = Path(
-    'prebuilt', 'proprietary', 'third_party', 'reclient',
-    HOST_PREBUILT_PLATFORM_SUBDIR)
+    "prebuilt",
+    "proprietary",
+    "third_party",
+    "reclient",
+    HOST_PREBUILT_PLATFORM_SUBDIR,
+)
 
-REMOTE_RUSTC_SUBDIR = Path('prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
-REMOTE_CLANG_SUBDIR = Path('prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
-REMOTE_GCC_SUBDIR = Path('prebuilt', 'third_party', 'gcc', REMOTE_PLATFORM)
+REMOTE_RUSTC_SUBDIR = Path("prebuilt", "third_party", "rust", REMOTE_PLATFORM)
+REMOTE_CLANG_SUBDIR = Path("prebuilt", "third_party", "clang", REMOTE_PLATFORM)
+REMOTE_GCC_SUBDIR = Path("prebuilt", "third_party", "gcc", REMOTE_PLATFORM)
 
 # TODO(http://fxbug.dev/125627): use platform-dependent location
 # Until then, this remote fsatrace only works from linux-x64 hosts.
-FSATRACE_PATH = Path('prebuilt', 'fsatrace', 'fsatrace')
+FSATRACE_PATH = Path("prebuilt", "fsatrace", "fsatrace")
 
-_CHECK_DETERMINISM_SCRIPT = Path('build', 'tracer', 'output_cacher.py')
+_CHECK_DETERMINISM_SCRIPT = Path("build", "tracer", "output_cacher.py")
 
 
 def check_determinism_command(
-        exec_root: Path,
-        outputs: Sequence[Path],
-        command: Sequence[Path] = None,
-        max_attempts: int = None,
-        miscomparison_export_dir: Path = None,
-        label: str = None) -> Sequence[str]:
+    exec_root: Path,
+    outputs: Sequence[Path],
+    command: Sequence[Path] = None,
+    max_attempts: int = None,
+    miscomparison_export_dir: Path = None,
+    label: str = None,
+) -> Sequence[str]:
     """Returns a command that checks for output determinism.
 
     The check runs locally twice, moving outputs out of the way temporarily,
@@ -149,24 +154,36 @@ def check_determinism_command(
       miscomparison_export_dir: location to store mismatched outputs.
       label: build system identifier for diagnostics.
     """
-    return [
-        sys.executable,  # same Python interpreter
-        '-S',
-        str(exec_root / _CHECK_DETERMINISM_SCRIPT),
-    ] + ([f'--label={label}'] if label else []) + [
-        '--check-repeatability',
-    ] + ([f'--max-attempts={max_attempts}'] if max_attempts else []) + (
-        [f'--miscomparison-export-dir={miscomparison_export_dir}']
-        if miscomparison_export_dir else []) + [
-            '--outputs',
-        ] + [str(p) for p in outputs] + ['--'] + (command or [])
+    return (
+        [
+            sys.executable,  # same Python interpreter
+            "-S",
+            str(exec_root / _CHECK_DETERMINISM_SCRIPT),
+        ]
+        + ([f"--label={label}"] if label else [])
+        + [
+            "--check-repeatability",
+        ]
+        + ([f"--max-attempts={max_attempts}"] if max_attempts else [])
+        + (
+            [f"--miscomparison-export-dir={miscomparison_export_dir}"]
+            if miscomparison_export_dir
+            else []
+        )
+        + [
+            "--outputs",
+        ]
+        + [str(p) for p in outputs]
+        + ["--"]
+        + (command or [])
+    )
 
 
 def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
     """Override the maximum number of determinism repetitions for specific files."""
     # For http://fxbug.dev/130161: Increase repetition count to increase
     # chances of repro in infra.
-    if any('libminfs.vnode.cc' in str(path) for path in paths):
+    if any("libminfs.vnode.cc" in str(path) for path in paths):
         # Historically, this failed around 5% of the time in infra.
         return 1000
     return None
@@ -174,35 +191,38 @@ def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
 def remote_rustc_shlibs(root_rel: Path) -> Iterable[Path]:
-    for g in ('librustc_driver-*.so', 'libstd-*.so', 'libLLVM-*-rust-*.so'):
-        yield from (root_rel / REMOTE_RUSTC_SUBDIR / 'lib').glob(g)
+    for g in ("librustc_driver-*.so", "libstd-*.so", "libLLVM-*-rust-*.so"):
+        yield from (root_rel / REMOTE_RUSTC_SUBDIR / "lib").glob(g)
 
 
-def clang_runtime_libdirs(clang_dir_rel: Path,
-                          target_triple: str) -> Sequence[Path]:
+def clang_runtime_libdirs(
+    clang_dir_rel: Path, target_triple: str
+) -> Sequence[Path]:
     """Locate clang runtime libdir from the given toolchain directory."""
-    return (clang_dir_rel / 'lib' / 'clang').glob(
+    return (clang_dir_rel / "lib" / "clang").glob(
         os.path.join(
-            '*',  # a clang version number, like '14.0.0' or '17'
-            'lib',
-            target_triple))
+            "*",  # a clang version number, like '14.0.0' or '17'
+            "lib",
+            target_triple,
+        )
+    )
 
 
 def clang_libcxx_static(clang_dir_rel: Path, clang_lib_triple: str) -> str:
     """Location of libc++.a"""
-    return clang_dir_rel / 'lib' / clang_lib_triple / 'libc++.a'
+    return clang_dir_rel / "lib" / clang_lib_triple / "libc++.a"
 
 
 def gcc_support_tools(gcc_path: Path) -> Iterable[Path]:
     bindir = gcc_path.parent
     # expect compiler to be named like {x64_64,aarch64}-elf-{g++,gcc}
     try:
-        arch, objfmt, tool = gcc_path.name.split('-')
+        arch, objfmt, tool = gcc_path.name.split("-")
     except ValueError:
         raise ValueError(
             f'Expecting compiler to be named like {{arch}}-{{objfmt}}-[gcc|g++], but got "{gcc_path.name}"'
         )
-    target = '-'.join([arch, objfmt])
+    target = "-".join([arch, objfmt])
     install_root = bindir.parent
     yield install_root / target / "bin/as"
     libexec_base = install_root / "libexec/gcc" / target
@@ -237,20 +257,20 @@ def rust_stdlib_subdir(target_triple: str) -> str:
     It is possible that the target libdirs may move to a location separate
     from where the host tools reside.  See https://fxbug.dev/111727.
     """
-    return Path('lib') / 'rustlib' / target_triple / 'lib'
+    return Path("lib") / "rustlib" / target_triple / "lib"
 
 
 def rustc_target_to_sysroot_triple(target: str) -> str:
-    if target.startswith('aarch64-') and '-linux' in target:
-        return 'aarch64-linux-gnu'
-    if target.startswith('riscv64gc-') and '-linux' in target:
-        return 'riscv64-linux-gnu'
-    if target.startswith('x86_64-') and '-linux' in target:
-        return 'x86_64-linux-gnu'
-    if target.endswith('-fuchsia'):
-        return ''
-    if target.startswith('wasm32-'):
-        return ''
+    if target.startswith("aarch64-") and "-linux" in target:
+        return "aarch64-linux-gnu"
+    if target.startswith("riscv64gc-") and "-linux" in target:
+        return "riscv64-linux-gnu"
+    if target.startswith("x86_64-") and "-linux" in target:
+        return "x86_64-linux-gnu"
+    if target.endswith("-fuchsia"):
+        return ""
+    if target.startswith("wasm32-"):
+        return ""
     raise ValueError(f"unhandled case for sysroot target subdir: {target}")
 
 
@@ -259,36 +279,44 @@ def rustc_target_to_clang_target(target: str) -> str:
     # These mappings were determined by examining the options available
     # in the clang lib dir, and verifying against traces of libraries accessed
     # by local builds.
-    if target == 'aarch64-fuchsia' or (target.startswith('aarch64-') and
-                                       target.endswith('-fuchsia')):
+    if target == "aarch64-fuchsia" or (
+        target.startswith("aarch64-") and target.endswith("-fuchsia")
+    ):
         return "aarch64-unknown-fuchsia"
-    if target == 'aarch64-linux-gnu' or (target.startswith('aarch64-') and
-                                         target.endswith('-linux-gnu')):
+    if target == "aarch64-linux-gnu" or (
+        target.startswith("aarch64-") and target.endswith("-linux-gnu")
+    ):
         return "aarch64-unknown-linux-gnu"
-    if target == 'riscv64gc-fuchsia' or (target.startswith('riscv64gc-') and
-                                         target.endswith('-fuchsia')):
+    if target == "riscv64gc-fuchsia" or (
+        target.startswith("riscv64gc-") and target.endswith("-fuchsia")
+    ):
         return "riscv64-unknown-fuchsia"
-    if target == 'riscv64gc-linux-gnu' or (target.startswith('riscv64gc-') and
-                                           target.endswith('-linux-gnu')):
+    if target == "riscv64gc-linux-gnu" or (
+        target.startswith("riscv64gc-") and target.endswith("-linux-gnu")
+    ):
         return "riscv64-unknown-linux-gnu"
-    if target == 'x86_64-fuchsia' or (target.startswith('x86_64-') and
-                                      target.endswith('-fuchsia')):
+    if target == "x86_64-fuchsia" or (
+        target.startswith("x86_64-") and target.endswith("-fuchsia")
+    ):
         return "x86_64-unknown-fuchsia"
-    if target == 'x86_64-linux-gnu' or (target.startswith('x86_64-') and
-                                        target.endswith('-linux-gnu')):
+    if target == "x86_64-linux-gnu" or (
+        target.startswith("x86_64-") and target.endswith("-linux-gnu")
+    ):
         return "x86_64-unknown-linux-gnu"
-    if target == 'wasm32-unknown-unknown':
+    if target == "wasm32-unknown-unknown":
         return "wasm32-unknown-unknown"
 
     if target == "x86_64-apple-darwin":
         return "x86_64-apple-darwin"
 
     raise ValueError(
-        f"Unhandled case for mapping to clang lib target dir: {target}")
+        f"Unhandled case for mapping to clang lib target dir: {target}"
+    )
 
 
 _REMOTE_RUST_LLD_RELPATH = Path(
-    '../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld')
+    "../lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
+)
 
 
 def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
@@ -300,41 +328,43 @@ def remote_rustc_to_rust_lld_path(rustc: Path) -> str:
 # Built lib/{sysroot_triple}/... files
 # Entries here are not already covered by some other linker script.
 _SYSROOT_LIB_FILES = (
-    'libm.so.6',
-    'librt.so.1',
-    'libutil.so.1',
+    "libm.so.6",
+    "librt.so.1",
+    "libutil.so.1",
 )
 
 # Built /usr/lib/{sysroot_triple}/... files
 _SYSROOT_USR_LIB_FILES = (
-    'libpthread.a',
-    'libm.so',
-    'libm.a',
-    'librt.so',
-    'librt.a',
-    'libdl.so',
-    'libdl.a',
-    'libutil.so',
-    'libutil.a',
-    'Scrt1.o',
-    'crt1.o',
-    'crti.o',
-    'crtn.o',
+    "libpthread.a",
+    "libm.so",
+    "libm.a",
+    "librt.so",
+    "librt.a",
+    "libdl.so",
+    "libdl.a",
+    "libutil.so",
+    "libutil.a",
+    "Scrt1.o",
+    "crt1.o",
+    "crti.o",
+    "crtn.o",
 )
 
 # These are known linker scripts that need to be read
 # to locate other underlying files needed.
 _SYSROOT_USR_LIB_LINKER_SCRIPTS = (
-    'libc.so',
-    'libm.so',
-    'libpthread.so',
-    'libmvec.so',
+    "libc.so",
+    "libm.so",
+    "libpthread.so",
+    "libmvec.so",
 )
 
 
 def c_sysroot_files(
-    sysroot_dir: Path, sysroot_triple: str, with_libgcc: bool,
-    linker_script_expander: Callable[[Sequence[Path]], Iterable[Path]]
+    sysroot_dir: Path,
+    sysroot_triple: str,
+    with_libgcc: bool,
+    linker_script_expander: Callable[[Sequence[Path]], Iterable[Path]],
 ) -> Iterable[Path]:
     """Expanded list of sysroot files under the Fuchsia build output dir.
 
@@ -353,45 +383,50 @@ def c_sysroot_files(
     """
     if sysroot_triple:
         for f in _SYSROOT_LIB_FILES:
-            yield sysroot_dir / 'lib' / sysroot_triple / f
+            yield sysroot_dir / "lib" / sysroot_triple / f
         for f in _SYSROOT_USR_LIB_FILES:
-            yield sysroot_dir / 'usr/lib' / sysroot_triple / f
+            yield sysroot_dir / "usr/lib" / sysroot_triple / f
 
         maybe_scripts = (
-            sysroot_dir / 'usr/lib' / sysroot_triple / f
-            for f in _SYSROOT_USR_LIB_LINKER_SCRIPTS)
+            sysroot_dir / "usr/lib" / sysroot_triple / f
+            for f in _SYSROOT_USR_LIB_LINKER_SCRIPTS
+        )
         yield from linker_script_expander(
-            [f_path for f_path in maybe_scripts if f_path.is_file()])
+            [f_path for f_path in maybe_scripts if f_path.is_file()]
+        )
 
         for f in [
-                sysroot_dir / 'usr/lib' / sysroot_triple / 'libmvec.a',
+            sysroot_dir / "usr/lib" / sysroot_triple / "libmvec.a",
         ]:
             if f.is_file():
                 yield f
 
         if with_libgcc:
             yield from [
-                sysroot_dir / 'usr/lib/gcc' / sysroot_triple / '4.9/libgcc.a',
-                sysroot_dir / 'usr/lib/gcc' / sysroot_triple /
-                '4.9/libgcc_eh.a',
+                sysroot_dir / "usr/lib/gcc" / sysroot_triple / "4.9/libgcc.a",
+                sysroot_dir
+                / "usr/lib/gcc"
+                / sysroot_triple
+                / "4.9/libgcc_eh.a",
                 # The toolchain probes (stat) for the existence of crtbegin.o
-                sysroot_dir / 'usr/lib/gcc' / sysroot_triple / '4.9/crtbegin.o',
+                sysroot_dir / "usr/lib/gcc" / sysroot_triple / "4.9/crtbegin.o",
                 # libgcc also needs sysroot libc.a,
                 # although this might be coming from -Cdefault-linker-libraries.
-                sysroot_dir / 'usr/lib' / sysroot_triple / 'libc.a',
+                sysroot_dir / "usr/lib" / sysroot_triple / "libc.a",
             ]
     else:
         yield from linker_script_expander(
             [
-                sysroot_dir / 'lib/libc.so',
-                sysroot_dir / 'lib/libdl.so',
-                sysroot_dir / 'lib/libm.so',
-                sysroot_dir / 'lib/libpthread.so',
-                sysroot_dir / 'lib/librt.so',
-                sysroot_dir / 'lib/Scrt1.o',
-            ])
+                sysroot_dir / "lib/libc.so",
+                sysroot_dir / "lib/libdl.so",
+                sysroot_dir / "lib/libm.so",
+                sysroot_dir / "lib/libpthread.so",
+                sysroot_dir / "lib/librt.so",
+                sysroot_dir / "lib/Scrt1.o",
+            ]
+        )
 
         # Not every sysroot dir has a libzircon.
-        libzircon_so = sysroot_dir / 'lib/libzircon.so'
+        libzircon_so = sysroot_dir / "lib/libzircon.so"
         if libzircon_so.is_file():
             yield libzircon_so

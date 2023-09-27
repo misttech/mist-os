@@ -16,15 +16,17 @@ def main():
 
     args = parser.parse_args()
 
-    with open(args.package_manifest_file, 'r') as f:
+    with open(args.package_manifest_file, "r") as f:
         manifest = json_load(PackageManifest, f)
         try:
             test_hash = next(
-                b.merkle for b in manifest.blobs if b.path == "meta/")
+                b.merkle for b in manifest.blobs if b.path == "meta/"
+            )
         except StopIteration:
             raise ValueError(
-                "manifest %s does not contain an entry for 'meta/'" %
-                args.package_manifest_file)
+                "manifest %s does not contain an entry for 'meta/'"
+                % args.package_manifest_file
+            )
 
     open(args.output_file, "w").write(
         """{ children: [
@@ -47,8 +49,10 @@ def main():
             },
         ],
     }
-        """ % test_hash)
+        """
+        % test_hash
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

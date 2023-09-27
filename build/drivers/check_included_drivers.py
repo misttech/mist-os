@@ -12,27 +12,29 @@ import os
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--allowlist',
-        type=argparse.FileType('r', encoding='UTF-8'),
-        help='Path to the allowlist of driver labels')
-    parser.add_argument(
-        '--allowlist_arch_specific',
-        type=argparse.FileType('r', encoding='UTF-8'),
-        help='Path to the allowlist of architecture specific driver labels')
-    parser.add_argument(
-        '--driver_list',
-        type=argparse.FileType('r', encoding='UTF-8'),
-        help='Path to the list of drivers to check against the allowlist')
-    parser.add_argument(
-        '--output',
-        type=argparse.FileType('w', encoding='UTF-8'),
-        help='The path for the output file. This tool outputs the new allowlist.'
+        "--allowlist",
+        type=argparse.FileType("r", encoding="UTF-8"),
+        help="Path to the allowlist of driver labels",
     )
     parser.add_argument(
-        '--contains_all_drivers',
-        action='store_true',
-        help=
-        'If this flag exists then we will also check that every driver in the allowlist exists in driver_list'
+        "--allowlist_arch_specific",
+        type=argparse.FileType("r", encoding="UTF-8"),
+        help="Path to the allowlist of architecture specific driver labels",
+    )
+    parser.add_argument(
+        "--driver_list",
+        type=argparse.FileType("r", encoding="UTF-8"),
+        help="Path to the list of drivers to check against the allowlist",
+    )
+    parser.add_argument(
+        "--output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        help="The path for the output file. This tool outputs the new allowlist.",
+    )
+    parser.add_argument(
+        "--contains_all_drivers",
+        action="store_true",
+        help="If this flag exists then we will also check that every driver in the allowlist exists in driver_list",
     )
 
     args = parser.parse_args()
@@ -46,17 +48,20 @@ def main():
     full_allowlist = set(allowlist)
     if args.allowlist_arch_specific:
         full_allowlist.update(
-            args.allowlist_arch_specific.read().splitlines(keepends=True))
+            args.allowlist_arch_specific.read().splitlines(keepends=True)
+        )
 
     error = False
     extra_drivers = {
-        driver for driver in driver_list
+        driver
+        for driver in driver_list
         if driver not in full_allowlist and not driver.startswith("//vendor")
     }
 
     if len(extra_drivers) > 0:
         print(
-            "Error: The following drivers are not in the all_drivers_list.txt:")
+            "Error: The following drivers are not in the all_drivers_list.txt:"
+        )
         for driver in sorted(extra_drivers):
             print("  " + driver)
         print(

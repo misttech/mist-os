@@ -8,7 +8,6 @@ from lib import Fib
 
 
 class TestLib(unittest.TestCase):
-
     def test_Fib0(self):
         self.assertEqual(Fib(0), 0)
 

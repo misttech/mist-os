@@ -24,7 +24,9 @@ def main():
     generated_file = build_dir / "clippy_target_mapping.json"
 
     if args.all:
-        clippy_targets = get_targets(generated_file, set(), build_dir, get_all=True)
+        clippy_targets = get_targets(
+            generated_file, set(), build_dir, get_all=True
+        )
     elif args.files:
         input_files = {os.path.relpath(f, build_dir) for f in args.input}
         clippy_targets = get_targets(generated_file, input_files, build_dir)
@@ -84,7 +86,8 @@ def main():
                     continue
                 # filter out lints for files we didn't ask for
                 if args.files and all(
-                    span["file_name"] not in input_files for span in lint["spans"]
+                    span["file_name"] not in input_files
+                    for span in lint["spans"]
                 ):
                     continue
                 lints[fingerprint_diagnostic(lint)] = lint
@@ -103,9 +106,9 @@ def fingerprint_diagnostic(lint):
     code = lint.get("code")
 
     def expand_spans(span):
-      yield span
-      if expansion := span.get("expansion"):
-        yield from expand_spans(expansion["span"])
+        yield span
+        if expansion := span.get("expansion"):
+            yield from expand_spans(expansion["span"])
 
     spans = [x for span in lint["spans"] for x in expand_spans(span)]
 
@@ -131,7 +134,13 @@ def build_targets(output_files, build_dir, fuchsia_dir, verbose, raw):
     prebuilt = PREBUILT_THIRD_PARTY_DIR
     if fuchsia_dir:
         prebuilt = Path(fuchsia_dir) / "prebuilt" / "third_party"
-    ninja = [prebuilt / "ninja" / HOST_PLATFORM / "ninja", "-C", build_dir, "-k", "0"]
+    ninja = [
+        prebuilt / "ninja" / HOST_PLATFORM / "ninja",
+        "-C",
+        build_dir,
+        "-k",
+        "0",
+    ]
     if verbose:
         ninja += ["-v"]
     output = sys.stderr if raw else None
@@ -164,10 +173,16 @@ def parse_args():
     )
     inputs = parser.add_mutually_exclusive_group(required=True)
     inputs.add_argument("input", nargs="*", default=[])
-    inputs.add_argument("--all", action="store_true", help="run on all clippy targets")
+    inputs.add_argument(
+        "--all", action="store_true", help="run on all clippy targets"
+    )
     advanced = parser.add_argument_group("advanced")
-    advanced.add_argument("--out-dir", help="path to the Fuchsia build directory")
-    advanced.add_argument("--fuchsia-dir", help="path to the Fuchsia root directory")
+    advanced.add_argument(
+        "--out-dir", help="path to the Fuchsia build directory"
+    )
+    advanced.add_argument(
+        "--fuchsia-dir", help="path to the Fuchsia root directory"
+    )
     advanced.add_argument(
         "--raw",
         action="store_true",

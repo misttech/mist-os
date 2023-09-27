@@ -26,23 +26,26 @@ def unpack_header(format, file):
     return format.unpack(file.read(format.size))
 
 
-class ZbiHeader(namedtuple("ZbiHeader", [
-        "type",
-        "length",
-        "extra",
-        "flags",
-        "reserved0",
-        "reserved1",
-        "magic",
-        "crc32",
-])):
-
+class ZbiHeader(
+    namedtuple(
+        "ZbiHeader",
+        [
+            "type",
+            "length",
+            "extra",
+            "flags",
+            "reserved0",
+            "reserved1",
+            "magic",
+            "crc32",
+        ],
+    )
+):
     def __new__(cls, file):
         return cls._make(unpack_header(ZBI_HEADER_FORMAT, file))
 
 
 class KernelHeader(namedtuple("ZbiHeader", ["entry", "reserve_memory_size"])):
-
     def __new__(cls, file):
         return cls._make(unpack_header(ZBI_KERNEL_FORMAT, file))
 
@@ -77,17 +80,20 @@ def main():
         "--depfile",
         metavar="FILE",
         required=True,
-        help="Write depfile for inputs used")
+        help="Write depfile for inputs used",
+    )
     parser.add_argument(
         "--rust-cfg-rspfile",
         metavar="FILE",
         required=True,
-        help="Write output file of `--cfg` rustc switch")
+        help="Write output file of `--cfg` rustc switch",
+    )
     parser.add_argument(
         "rspfile",
         metavar="FILE",
         nargs=1,
-        help="Read name of kernel image file from FILE")
+        help="Read name of kernel image file from FILE",
+    )
     args = parser.parse_args()
 
     with open(args.rspfile[0]) as rspfile:
@@ -96,10 +102,11 @@ def main():
     size = kernel_memory_size(kernel_image_file)
     big = size > BIG_KERNEL_SIZE
 
-    rust_cfg = "--cfg=feature=\"big_zircon_kernel\"\n" if big else ""
+    rust_cfg = '--cfg=feature="big_zircon_kernel"\n' if big else ""
 
     write_depfile(
-        args.depfile, args.rust_cfg_rspfile, *args.rspfile, kernel_image_file)
+        args.depfile, args.rust_cfg_rspfile, *args.rspfile, kernel_image_file
+    )
 
     write_if_changed(args.rust_cfg_rspfile, rust_cfg)
 

@@ -62,12 +62,12 @@ class BluetoothAvrcpAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.bluetooth_avrcp.send_avrcp_command(
-                    BluetoothAvrcpCommand.PLAY)
+                    BluetoothAvrcpCommand.PLAY
+                )
             return
         # Currently fails sending commands since we only test single device
         with asserts.assert_raises(Sl4fError):
-            self.device.bluetooth_avrcp.send_avrcp_command(
-                BluetoothAvrcpCommand.PLAY)
+            self.device.bluetooth_avrcp.send_avrcp_command(BluetoothAvrcpCommand.PLAY)
 
     def test_stop_mock_player(self) -> None:
         """Test for Bluetooth.stop_mock_player() method"""

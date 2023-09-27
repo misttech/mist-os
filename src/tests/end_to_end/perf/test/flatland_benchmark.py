@@ -12,8 +12,10 @@ from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import test_runner
 from mobly import asserts
 
-TILE_URL = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-           "flatland-view-provider.cm"
+TILE_URL = (
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+    "flatland-view-provider.cm"
+)
 
 BENCHMARK_DURATION_SEC = 10
 
@@ -55,7 +57,8 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
                 "system_metrics",
                 "system_metrics_logger",
             ],
-            buffer_size=36)
+            buffer_size=36,
+        )
 
         # Start tracing.
         self.dut.tracing.start()
@@ -67,14 +70,17 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         # Terminate the tracing session.
         trace_filename = self.dut.tracing.terminate_and_download(
-            directory=self.log_path, trace_file="trace.fxt")
+            directory=self.log_path, trace_file="trace.fxt"
+        )
 
         expected_trace_filename = os.path.join(self.log_path, "trace.fxt")
 
         asserts.assert_equal(
-            trace_filename, expected_trace_filename, msg="trace not downloaded")
+            trace_filename, expected_trace_filename, msg="trace not downloaded"
+        )
         asserts.assert_true(
-            os.path.exists(expected_trace_filename), msg="trace failed")
+            os.path.exists(expected_trace_filename), msg="trace failed"
+        )
 
         # TODO(b/271467734): Process fxt tracing file.
 

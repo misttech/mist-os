@@ -11,8 +11,10 @@ from mobly import test_runner
 from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.interfaces.device_classes import fuchsia_device
 
-TOUCH_APP = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-            "simplest-app-flatland-session.cm"
+TOUCH_APP = (
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+    "simplest-app-flatland-session.cm"
+)
 
 
 class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -42,14 +44,15 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.user_input.tap(
-                    location=custom_types.Coordinate(x=1, y=2),
-                    tap_event_count=1)
+                    location=custom_types.Coordinate(x=1, y=2), tap_event_count=1
+                )
             return
 
         before = self.device.screenshot.take()
 
         self.device.user_input.tap(
-            location=custom_types.Coordinate(x=1, y=2), tap_event_count=1)
+            location=custom_types.Coordinate(x=1, y=2), tap_event_count=1
+        )
 
         after = self.device.screenshot.take()
 

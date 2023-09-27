@@ -43,10 +43,11 @@ class SpdxLicenseExpression:
             # Note that License- is not part of the SPDX spec, but nevertheless
             # some common SPDX libs use it.
             match = re.match(
-                r"^(LicenseRef|License)-[a-zA-Z0-9-\.]+", remaining_str)
+                r"^(LicenseRef|License)-[a-zA-Z0-9-\.]+", remaining_str
+            )
             if match:
                 assert match.pos == 0
-                remaining_str = remaining_str[match.end():]
+                remaining_str = remaining_str[match.end() :]
                 ref = match.group()
                 if ref not in license_refs:
                     license_refs[ref] = len(license_refs.keys())
@@ -56,27 +57,30 @@ class SpdxLicenseExpression:
             # Try to match other expression tokens: AND, OR, WITH, (, ), + and whitespace...
             match = re.match(r"^AND|^OR|^WITH|^\(|^\)|^\+|^\s+", remaining_str)
             if match:
-                remaining_str = remaining_str[match.end():]
+                remaining_str = remaining_str[match.end() :]
                 assert match.pos == 0
                 expression_template.append(match.group())
                 continue
 
             raise LicenseException(
                 f"Invalid license expression token '{remaining_str}'",
-                location_for_error)
+                location_for_error,
+            )
 
         # Temporary workaround for fxb/117652#c3. Only the last ref is meaningful
         if len(license_refs) > 1:
             key_list = list(license_refs.keys())
             if key_list[0].endswith("NOTICE.txt-0") and key_list[-1].endswith(
-                    "LICENSE-0"):
+                "LICENSE-0"
+            ):
                 return SpdxLicenseExpression.create(
                     f"{key_list[0].replace('NOTICE.txt-0', 'NOTICE.txt')} AND {key_list[-1].replace('LICENSE-0', 'LICENSE')}"
                 )
 
         return SpdxLicenseExpression(
             expression_template="".join(expression_template),
-            license_ids=tuple(license_refs.keys()))
+            license_ids=tuple(license_refs.keys()),
+        )
 
     def serialize(self):
         return self.expression_template.format(*self.license_ids)
@@ -85,7 +89,9 @@ class SpdxLicenseExpression:
         return dataclasses.replace(
             self,
             license_ids=tuple(
-                [id_replacer.get_replaced_id(id) for id in self.license_ids]))
+                [id_replacer.get_replaced_id(id) for id in self.license_ids]
+            ),
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -108,9 +114,11 @@ class SpdxPackage:
 
     def from_json_dict(input: DictReader):
         license_concluded_str = input.get_or("licenseConcluded", None)
-        license_concluded = SpdxLicenseExpression.create(
-            license_concluded_str,
-            input.location) if license_concluded_str else None
+        license_concluded = (
+            SpdxLicenseExpression.create(license_concluded_str, input.location)
+            if license_concluded_str
+            else None
+        )
         homepage = input.get_or("homepage", None)
         copyright_text = input.get_or("copyrightText", None)
         if copyright_text == "NOASSERTION":
@@ -126,10 +134,12 @@ class SpdxPackage:
 
     def replace_license_ids(self, license_id_replacer: "SpdxIdReplacer"):
         if self.license_concluded:
-            replaced_license_concluded = self.license_concluded.replace_license_ids(
-                license_id_replacer)
+            replaced_license_concluded = (
+                self.license_concluded.replace_license_ids(license_id_replacer)
+            )
             return dataclasses.replace(
-                self, license_concluded=replaced_license_concluded)
+                self, license_concluded=replaced_license_concluded
+            )
         else:
             return self
 
@@ -156,9 +166,12 @@ class SpdxExtractedLicensingInfo:
             "extractedText": self.extracted_text,
         }
         if self.cross_refs:
-            output["crossRefs"] = [{
-                "url": u,
-            } for u in self.cross_refs]
+            output["crossRefs"] = [
+                {
+                    "url": u,
+                }
+                for u in self.cross_refs
+            ]
         _maybe_set(output, "seeAlsos", self.see_also)
 
         return output
@@ -177,15 +190,19 @@ class SpdxExtractedLicensingInfo:
             ],
             # 'seeAlso' sometimes appears as 'seeAlsos'
             see_also=input.get_or(
-                "seeAlso", default=input.get_or("seeAlsos", default=[])))
+                "seeAlso", default=input.get_or("seeAlsos", default=[])
+            ),
+        )
 
     def merge_with(self, other: "SpdxExtractedLicensingInfo"):
         unified_cross_refs = _unify_and_sort_lists(
-            other.cross_refs, self.cross_refs)
+            other.cross_refs, self.cross_refs
+        )
         unified_see_also = _unify_and_sort_lists(other.see_also, self.see_also)
 
         return dataclasses.replace(
-            self, cross_refs=unified_cross_refs, see_also=unified_see_also)
+            self, cross_refs=unified_cross_refs, see_also=unified_see_also
+        )
 
     def extracted_text_lines(self):
         return self.extracted_text.splitlines()
@@ -209,14 +226,15 @@ class SpdxRelationship:
         return {
             "spdxElementId": self.spdx_element_id,
             "relatedSpdxElement": self.related_spdx_element,
-            "relationshipType": self.relationship_type
+            "relationshipType": self.relationship_type,
         }
 
     def from_json_dict(input: DictReader):
         return SpdxRelationship(
             spdx_element_id=input.get("spdxElementId"),
             related_spdx_element=input.get("relatedSpdxElement"),
-            relationship_type=input.get("relationshipType"))
+            relationship_type=input.get("relationshipType"),
+        )
 
 
 @dataclasses.dataclass(frozen=True)
@@ -234,8 +252,10 @@ class SpdxDocument:
     spdx_id: str = _spdx_document_ref
 
     def refactor_ids(
-            self, package_id_factory: "SpdxPackageIdFactory",
-            license_id_factory: "SpdxLicenseIdFactory"):
+        self,
+        package_id_factory: "SpdxPackageIdFactory",
+        license_id_factory: "SpdxLicenseIdFactory",
+    ):
         """
         Returns a copy of the document with all ids refactored.
 
@@ -251,7 +271,8 @@ class SpdxDocument:
             new_id = license_id_factory.new_id()
             license_id_replacer.replace_id(old_id=el.license_id, new_id=new_id)
             new_extracted_licenses.append(
-                dataclasses.replace(el, license_id=new_id))
+                dataclasses.replace(el, license_id=new_id)
+            )
 
         new_packages = []
         for p in self.packages:
@@ -267,47 +288,47 @@ class SpdxDocument:
             dataclasses.replace(
                 r,
                 spdx_element_id=package_id_replacer.get_replaced_id(
-                    r.spdx_element_id),
+                    r.spdx_element_id
+                ),
                 related_spdx_element=package_id_replacer.get_replaced_id(
-                    r.related_spdx_element)) for r in self.relationships
+                    r.related_spdx_element
+                ),
+            )
+            for r in self.relationships
         ]
         return dataclasses.replace(
             self,
             describes=new_describes,
             packages=new_packages,
             relationships=new_relationships,
-            extracted_licenses=new_extracted_licenses)
+            extracted_licenses=new_extracted_licenses,
+        )
 
     def to_json(self, spdx_json_file_path):
         json_dict = self.to_json_dict()
-        with open(spdx_json_file_path, 'w') as output_file:
+        with open(spdx_json_file_path, "w") as output_file:
             json.dump(json_dict, output_file, indent=4)
 
     def to_json_dict(self):
         return {
-            "spdxVersion":
-                _default_spdx_json_version,
-            "SPDXID":
-                self.spdx_id,
-            "name":
-                self.name,
-            "documentNamespace":
-                self.namespace,
+            "spdxVersion": _default_spdx_json_version,
+            "SPDXID": self.spdx_id,
+            "name": self.name,
+            "documentNamespace": self.namespace,
             "creationInfo": {
                 "creators": self.creators,
             },
-            "dataLicense":
-                "CC0-1.0",
-            "documentDescribes":
-                self.describes,
+            "dataLicense": "CC0-1.0",
+            "documentDescribes": self.describes,
             "packages": [p.to_json_dict() for p in self.packages],
             "relationships": [r.to_json_dict() for r in self.relationships],
-            "hasExtractedLicensingInfos":
-                [e.to_json_dict() for e in self.extracted_licenses],
+            "hasExtractedLicensingInfos": [
+                e.to_json_dict() for e in self.extracted_licenses
+            ],
         }
 
     def from_json(spdx_json_file_path: str):
-        input_file = open(spdx_json_file_path, 'r')
+        input_file = open(spdx_json_file_path, "r")
         doc_dict = DictReader(json.load(input_file), f"{spdx_json_file_path}")
         return SpdxDocument.from_json_dict(spdx_json_file_path, doc_dict)
 
@@ -321,9 +342,11 @@ class SpdxDocument:
         if spdx_version not in _supported_spdx_json_versions:
             raise LicenseException(
                 f"Only {_supported_spdx_json_versions} are supported but '{spdx_version}' found",
-                doc_dict.location)
+                doc_dict.location,
+            )
         creators = doc_dict.get_reader("creationInfo").get(
-            "creators", expected_type=list)
+            "creators", expected_type=list
+        )
 
         describes = doc_dict.get_or("documentDescribes", [], expected_type=list)
         packages = [
@@ -336,15 +359,17 @@ class SpdxDocument:
         ]
         # Ignore relationships between the document and packages - we don't care for these
         relationships = [
-            r for r in relationships
-            if r.spdx_element_id != document_spdx_id and
-            r.related_spdx_element != document_spdx_id
+            r
+            for r in relationships
+            if r.spdx_element_id != document_spdx_id
+            and r.related_spdx_element != document_spdx_id
         ]
 
         extracted_licenses = [
             SpdxExtractedLicensingInfo.from_json_dict(d)
             for d in doc_dict.get_readers_list(
-                "hasExtractedLicensingInfos", dedup=True)
+                "hasExtractedLicensingInfos", dedup=True
+            )
         ]
 
         return SpdxDocument(
@@ -356,19 +381,22 @@ class SpdxDocument:
             packages=packages,
             relationships=relationships,
             extracted_licenses=extracted_licenses,
-            spdx_id=document_spdx_id)
+            spdx_id=document_spdx_id,
+        )
 
 
 class SpdxIndex:
     """Builds an index for optimized lookup across an SpdxDocument"""
 
     def __init__(
-            self, spdx_doc_file_path: str,
-            license_by_id: Dict[str, SpdxExtractedLicensingInfo],
-            package_by_id: Dict[str, SpdxPackage],
-            packages_by_license_id: Dict[str, Set[str]],
-            child_packages_by_parent_id: Dict[str, Set[str]],
-            parent_packages_by_child_id: Dict[str, Set[str]]):
+        self,
+        spdx_doc_file_path: str,
+        license_by_id: Dict[str, SpdxExtractedLicensingInfo],
+        package_by_id: Dict[str, SpdxPackage],
+        packages_by_license_id: Dict[str, Set[str]],
+        child_packages_by_parent_id: Dict[str, Set[str]],
+        parent_packages_by_child_id: Dict[str, Set[str]],
+    ):
         self._spdx_doc_file_path = spdx_doc_file_path
         self._license_by_id = license_by_id
         self._package_by_id = package_by_id
@@ -378,7 +406,8 @@ class SpdxIndex:
 
     def get_root_packages(self):
         return [
-            p for p in self._package_by_id.values()
+            p
+            for p in self._package_by_id.values()
             if not self.get_parent_packages(p)
         ]
 
@@ -389,21 +418,24 @@ class SpdxIndex:
         else:
             raise LicenseException(
                 f"No packages associated with '{license}",
-                self._spdx_doc_file_path)
+                self._spdx_doc_file_path,
+            )
 
     def get_license_by_id(self, id: str):
         if id in self._license_by_id:
             return self._license_by_id[id]
         else:
             raise LicenseException(
-                f"No license with id '{id}", self._spdx_doc_file_path)
+                f"No license with id '{id}", self._spdx_doc_file_path
+            )
 
     def get_package_by_id(self, id: str):
         if id in self._package_by_id:
             return self._package_by_id[id]
         else:
             raise LicenseException(
-                f"No package with id '{id}", self._spdx_doc_file_path)
+                f"No package with id '{id}", self._spdx_doc_file_path
+            )
 
     def get_packages_by_ids(self, ids: List[str]):
         return [self.get_package_by_id(id) for id in ids]
@@ -412,7 +444,8 @@ class SpdxIndex:
         id = package.spdx_id
         if id in self._parent_packages_by_child_id:
             return self.get_packages_by_ids(
-                self._parent_packages_by_child_id[id])
+                self._parent_packages_by_child_id[id]
+            )
         else:
             return []
 
@@ -420,14 +453,15 @@ class SpdxIndex:
         id = package.spdx_id
         if id in self._child_packages_by_parent_id:
             return self.get_packages_by_ids(
-                self._child_packages_by_parent_id[id])
+                self._child_packages_by_parent_id[id]
+            )
         else:
             return []
 
     def dependency_chains_for_license(
-            self,
-            license: SpdxExtractedLicensingInfo) -> List[List[SpdxPackage]]:
-        """"
+        self, license: SpdxExtractedLicensingInfo
+    ) -> List[List[SpdxPackage]]:
+        """ "
         Computes all the dependencies of a given license.
 
         Returns a list of list of packages. Each list of packages is a dependency chain
@@ -435,7 +469,8 @@ class SpdxIndex:
         """
 
         def path_recursion(
-                current_path: List[SpdxPackage], current_package: SpdxPackage):
+            current_path: List[SpdxPackage], current_package: SpdxPackage
+        ):
             parents = self.get_parent_packages(current_package)
             if not parents:
                 # End of the chain: Output the current path in reverse
@@ -461,7 +496,8 @@ class SpdxIndex:
             if el.license_id in license_by_id:
                 raise LicenseException(
                     f"license id '{el.license_id}' defined multiple times",
-                    input.file_path)
+                    input.file_path,
+                )
             license_by_id[el.license_id] = el
 
         package_by_id = {}
@@ -470,7 +506,8 @@ class SpdxIndex:
             id = p.spdx_id
             if id in package_by_id:
                 raise LicenseException(
-                    f"spdx id {id} defined multiple times", input.file_path)
+                    f"spdx id {id} defined multiple times", input.file_path
+                )
             package_by_id[id] = p
 
             if p.license_concluded:
@@ -478,7 +515,8 @@ class SpdxIndex:
                     if license_id not in license_by_id:
                         raise LicenseException(
                             f"license_conclude '{license_id}' used but no such license defined",
-                            input.file_path)
+                            input.file_path,
+                        )
                     packages_by_license_id[license_id].add(id)
 
         child_packages_by_parent_id = defaultdict(set)
@@ -493,12 +531,14 @@ class SpdxIndex:
             if parent not in package_by_id:
                 raise LicenseException(
                     f"spdx id '{parent}' used in relationship but there is no element with that id",
-                    input.file_path)
+                    input.file_path,
+                )
             if child not in package_by_id:
                 raise LicenseException(
                     f"spdx id '{child}' used in relationship but there is no element with that id",
-                    input.file_path)
-            if r.relationship_type == 'CONTAINS':
+                    input.file_path,
+                )
+            if r.relationship_type == "CONTAINS":
                 child_packages_by_parent_id[parent].add(child)
                 parent_packages_by_child_id[child].add(parent)
 
@@ -561,7 +601,8 @@ class SpdxIdReplacer:
         if old_id in self._replaced_ids:
             raise LicenseException(
                 f"Can't map old_id='{old_id}' to new_id='{new_id}'. It is already mapped to '{self._replaced_ids[old_id]}'",
-                self._doc_location)
+                self._doc_location,
+            )
         self._replaced_ids[old_id] = new_id
 
     def get_replaced_id(self, old_id):
@@ -571,7 +612,8 @@ class SpdxIdReplacer:
         if old_id not in self._replaced_ids:
             raise LicenseException(
                 f"Spdx id '{old_id}' doesn't refer to any known element",
-                self._doc_location)
+                self._doc_location,
+            )
         return self._replaced_ids[old_id]
 
 

@@ -23,7 +23,7 @@ import publish
 
 @contextmanager
 def patch_cwd(path):
-    assert path and os.path.isdir(path), f'Expected {path} to be a directory.'
+    assert path and os.path.isdir(path), f"Expected {path} to be a directory."
     path = Path(path)
     cwd = os.getcwd()
 
@@ -35,7 +35,7 @@ def patch_cwd(path):
 
         # "./{path}" should resolve to an equivalent directory for cwd="{cwd}"
         # and cwd="{working_dir}".
-        target = Path(*['..'] * (len(path.parts) - 1))
+        target = Path(*[".."] * (len(path.parts) - 1))
         symlink = working_dir / path
         symlink.parent.mkdir(parents=True, exist_ok=True)
         symlink.symlink_to(target)
@@ -57,35 +57,44 @@ class FxPublishTest(unittest.TestCase):
 
     def fake_fx_command(self, subcommand: str, *args: str) -> List[str]:
         self.fx_commands[subcommand].append(args)
-        return ['true', subcommand, *args]
+        return ["true", subcommand, *args]
 
     def _test_publish_cache(self, test_dir: str) -> None:
-        with patch('sys.argv', [
+        with patch(
+            "sys.argv",
+            [
                 publish.__file__,
-                'cache',
-                '--quiet',
-        ]), patch('publish.fx_command',
-                  self.fake_fx_command), patch_cwd(test_dir):
+                "cache",
+                "--quiet",
+            ],
+        ), patch(
+            "publish.fx_command", self.fake_fx_command
+        ), patch_cwd(test_dir):
             # Launches the real devshell publish tool under the fake build
             # directory.
             self.assertEqual(publish.main(), 0)
 
             # Check that the right ninja targets are built.
             self.assertEqual(
-                [set(build_args) for build_args in self.fx_commands['build']], [
+                [set(build_args) for build_args in self.fx_commands["build"]],
+                [
                     set(
                         [
-                            'build/images/updates:prepare_publish',
-                            'assembly_cache_packages.list'
-                        ])
-                ])
+                            "build/images/updates:prepare_publish",
+                            "assembly_cache_packages.list",
+                        ]
+                    )
+                ],
+            )
 
             # Check that the required packages are published.
             repo_targets = json.loads(
-                Path('amber-files/repository/targets.json').read_text())
+                Path("amber-files/repository/targets.json").read_text()
+            )
             for cache_package in FxPublishTest.EXPECTED_CACHE_PACKAGES:
                 self.assertIn(
-                    cache_package, repo_targets['signed']['targets'].keys())
+                    cache_package, repo_targets["signed"]["targets"].keys()
+                )
 
     def test_publish_cache(self) -> None:
         self._test_publish_cache(FxPublishTest.TEST_DIR)
@@ -93,21 +102,24 @@ class FxPublishTest(unittest.TestCase):
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description='An integration test for `fx publish`.')
+        description="An integration test for `fx publish`."
+    )
     parser.add_argument(
-        '--test-dir',
+        "--test-dir",
         required=True,
-        help='The fake fx publish working directory.')
+        help="The fake fx publish working directory.",
+    )
     parser.add_argument(
-        '--expect-cache-packages',
-        nargs='*',
+        "--expect-cache-packages",
+        nargs="*",
         default=[],
-        help='A list of cache packages that are expected to be published.')
+        help="A list of cache packages that are expected to be published.",
+    )
     args, unknownargs = parser.parse_known_args()
     FxPublishTest.TEST_DIR = args.test_dir
     FxPublishTest.EXPECTED_CACHE_PACKAGES = args.expect_cache_packages
     unittest.main(argv=[sys.argv[0], *unknownargs])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

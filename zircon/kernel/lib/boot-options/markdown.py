@@ -14,58 +14,65 @@ import sys
 # This map is used to map the type of the boot-option
 # to a string suitable for markdown documentation about the option.
 SPECIAL_TYPES = {
-    'SmallString': r'\<string>',
-    'RedactedHex': r'\<hexadecimal>',
-    'TestOption': 'test',
-    'uart::all::Driver': r'\[none | legacy | qemu | \<type>,\<base>,\<irq>\]',
+    "SmallString": r"\<string>",
+    "RedactedHex": r"\<hexadecimal>",
+    "TestOption": "test",
+    "uart::all::Driver": r"\[none | legacy | qemu | \<type>,\<base>,\<irq>\]",
 }
 
 
 def generate_doc(option):
     # Types that are lists are enumerations of valid values for this option.
     # and are printed as [ <value1> | <value2> |...].
-    if isinstance(option['type'], list):
-        option['type'] = '\[%s\]' % ' | '.join(option['type'])
+    if isinstance(option["type"], list):
+        option["type"] = "\[%s\]" % " | ".join(option["type"])
     else:
         # Non-list types could be a special type, or default to the
         # type passed in. This allows SPECIAL_TYPES to handle non-primitive
         # types and primitive types fall back to themselves as the default.
-        option['type'] = SPECIAL_TYPES.get(
-            option['type'], r'\<%s>' % option['type'])
-    if option['default'] != '':
-        if isinstance(option['default'], bool):
-            option['default'] = 'true' if option['default'] else 'false'
-        elif isinstance(option['default'], int):
-            option['default'] = '%#x' % option['default']
-        option['default'] = '**Default:** `%s`\n' % option['default']
+        option["type"] = SPECIAL_TYPES.get(
+            option["type"], r"\<%s>" % option["type"]
+        )
+    if option["default"] != "":
+        if isinstance(option["default"], bool):
+            option["default"] = "true" if option["default"] else "false"
+        elif isinstance(option["default"], int):
+            option["default"] = "%#x" % option["default"]
+        option["default"] = "**Default:** `%s`\n" % option["default"]
     # Return the multiline string with the values interpolated.
-    return '''
+    return """
 ### {name}={type}
 
 {default}
 {documentation}
-'''.format(**option)
+""".format(
+        **option
+    )
 
 
 def generate_docs(title, options):
-    return '''
+    return """
 ## Options {title}
 {options}
-'''.format(
-        title=title,
-        options=''.join(generate_doc(option) for option in options))
+""".format(
+        title=title, options="".join(generate_doc(option) for option in options)
+    )
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Produce boot-options.md')
+    parser = argparse.ArgumentParser(description="Produce boot-options.md")
     parser.add_argument(
-        'output', help='Output file', metavar='//docs/gen/boot-options.md')
+        "output", help="Output file", metavar="//docs/gen/boot-options.md"
+    )
     parser.add_argument(
-        'json', help='JSON input file', metavar='boot-options.json')
+        "json", help="JSON input file", metavar="boot-options.json"
+    )
     parser.add_argument(
-        'preamble', help='Markdown preamble file', metavar='preamble.md')
+        "preamble", help="Markdown preamble file", metavar="preamble.md"
+    )
     parser.add_argument(
-        'postamble', help='Markdown postamble file', metavar='postamble.md')
+        "postamble", help="Markdown postamble file", metavar="postamble.md"
+    )
     args = parser.parse_args()
 
     with open(args.json) as f:
@@ -79,11 +86,12 @@ def main():
 
     text = preamble
 
-    text += generate_docs('common to all machines', options['common'])
-    del options['common']
+    text += generate_docs("common to all machines", options["common"])
+    del options["common"]
     for arch, arch_options in sorted(options.items()):
         text += generate_docs(
-            'available only on %s machines' % arch, arch_options)
+            "available only on %s machines" % arch, arch_options
+        )
 
     text += postamble
 
@@ -92,11 +100,11 @@ def main():
             if f.read() == text:
                 return 0
 
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         f.write(text)
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

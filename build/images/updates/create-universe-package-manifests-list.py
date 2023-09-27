@@ -18,26 +18,25 @@ def read_manifest_list(manifest_list_file):
         return manifest_list
 
     manifest_list_object = json.loads(contents)
-    for manifest_path in manifest_list_object['content']['manifests']:
+    for manifest_path in manifest_list_object["content"]["manifests"]:
         with open(manifest_path) as f:
             manifest = json.load(f)
-            manifest_list[manifest['package']['name']] = manifest_path
+            manifest_list[manifest["package"]["name"]] = manifest_path
 
     return manifest_list
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--depfile', help='If provided, create this depfile')
+    parser.add_argument("--depfile", help="If provided, create this depfile")
     parser.add_argument(
-        '-o',
-        '--output',
-        help=
-        'If provided, write to this output package manifest list rather than stdout'
+        "-o",
+        "--output",
+        help="If provided, write to this output package manifest list rather than stdout",
     )
-    parser.add_argument('base', help='base package manifest list')
-    parser.add_argument('cache', help='cache package manifest list')
-    parser.add_argument('metadata', help='metadata package manifest list')
+    parser.add_argument("base", help="base package manifest list")
+    parser.add_argument("cache", help="cache package manifest list")
+    parser.add_argument("metadata", help="metadata package manifest list")
     args = parser.parse_args()
 
     with open(args.base) as f:
@@ -53,10 +52,11 @@ def main():
     for name, path in cache_list.items():
         if name in base_list:
             print(
-                'package',
+                "package",
                 name,
-                'is both a base and cache package',
-                file=sys.stderr)
+                "is both a base and cache package",
+                file=sys.stderr,
+            )
             sys.exit(1)
 
     manifest_paths = []
@@ -67,17 +67,15 @@ def main():
         manifest_paths.append(path)
 
     out_package_manifest_list = {
-        'content': {
-            'manifests': manifest_paths
-        },
-        'version': '1'
+        "content": {"manifests": manifest_paths},
+        "version": "1",
     }
 
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         json.dump(out_package_manifest_list, f, indent=2, sort_keys=True)
 
     if args.depfile:
-        with open(args.depfile, 'w') as f:
+        with open(args.depfile, "w") as f:
             deps = list(base_list.values())
             deps.extend(cache_list.values())
             deps.extend(metadata_list.values())

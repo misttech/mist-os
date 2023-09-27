@@ -24,7 +24,7 @@ def check_file(file):
     line_parser = top_level
     for index, line in enumerate(file):
         if "//" in line:
-            line = line[:line.index("//")]
+            line = line[: line.index("//")]
         line = line.strip()
         result = line_parser(line)
         if result:

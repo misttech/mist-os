@@ -19,7 +19,6 @@ import json
 
 
 class Tag(object):
-
     def __init__(self, tag, file, line, column):
         self.tag = tag
         self.file = file
@@ -27,19 +26,20 @@ class Tag(object):
         self.column = column
 
     def __repr__(self):
-        return f'Tag({self.tag}, {self.file}, {self.line}, {self.column})'
+        return f"Tag({self.tag}, {self.file}, {self.line}, {self.column})"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
-        '--build-dir',
-        required=True,
-        help='Fuchsia build dir, e.g. out/default')
+        "--build-dir", required=True, help="Fuchsia build dir, e.g. out/default"
+    )
     parser.add_argument(
-        '--output', default='fidl-tags', help='Output name of the tags file')
+        "--output", default="fidl-tags", help="Output name of the tags file"
+    )
     return parser.parse_args()
 
 
@@ -50,15 +50,15 @@ def strip_library(name):
     >>> strip_library("SomethingGreat")
     'SomethingGreat'
     """
-    return name[name.rfind('/') + 1:]  # -1 + 1 returns the whole thing
+    return name[name.rfind("/") + 1 :]  # -1 + 1 returns the whole thing
 
 
 def get_location_pieces(location_json):
-    file = location_json['filename']
-    if file != 'generated':
-        if file[:6] == '../../':
+    file = location_json["filename"]
+    if file != "generated":
+        if file[:6] == "../../":
             file = file[6:]
-    return (file, location_json['line'], location_json['column'])
+    return (file, location_json["line"], location_json["column"])
 
 
 def extract_consts(json):
@@ -110,8 +110,8 @@ def extract_consts(json):
     """
     result = []
     for c in json:
-        tag = strip_library(c['name'])
-        result.append(Tag(tag, *get_location_pieces(c['location'])))
+        tag = strip_library(c["name"])
+        result.append(Tag(tag, *get_location_pieces(c["location"])))
     return result
 
 
@@ -835,13 +835,14 @@ def extract_name_and_members(json):
     """
     result = []
     for x in json:
-        tag = strip_library(x['name'])
-        result.append(Tag(tag, *get_location_pieces(x['location'])))
-        for member in x['members']:
-            if member.get('reserved'):
+        tag = strip_library(x["name"])
+        result.append(Tag(tag, *get_location_pieces(x["location"])))
+        for member in x["members"]:
+            if member.get("reserved"):
                 continue
             result.append(
-                Tag(member['name'], *get_location_pieces(member['location'])))
+                Tag(member["name"], *get_location_pieces(member["location"]))
+            )
     return result
 
 
@@ -971,37 +972,42 @@ def extract_protocols(json):
     """
 
     def is_transport_syscall(x):
-        attribs = x.get('maybe_attributes', [])
+        attribs = x.get("maybe_attributes", [])
         for attrib in attribs:
-            if attrib.get('name') == 'Transport' and attrib.get(
-                    'value') == 'Syscall':
+            if (
+                attrib.get("name") == "Transport"
+                and attrib.get("value") == "Syscall"
+            ):
                 return True
         return False
 
     result = []
     for i in json:
-        tag = strip_library(i['name'])
+        tag = strip_library(i["name"])
         is_syscall = is_transport_syscall(i)
-        result.append(Tag(tag, *get_location_pieces(i['location'])))
-        for method in i['methods']:
+        result.append(Tag(tag, *get_location_pieces(i["location"])))
+        for method in i["methods"]:
             result.append(
-                Tag(method['name'], *get_location_pieces(method['location'])))
+                Tag(method["name"], *get_location_pieces(method["location"]))
+            )
             if is_syscall:
                 result.append(
                     Tag(
-                        'zx_' + method['name'],
-                        *get_location_pieces(method['location'])))
+                        "zx_" + method["name"],
+                        *get_location_pieces(method["location"]),
+                    )
+                )
     return result
 
 
 def get_tags(json, tags):
-    tags.extend(extract_name_and_members(json['bits_declarations']))
-    tags.extend(extract_consts(json['const_declarations']))
-    tags.extend(extract_name_and_members(json['enum_declarations']))
-    tags.extend(extract_protocols(json['protocol_declarations']))
-    tags.extend(extract_name_and_members(json['struct_declarations']))
-    tags.extend(extract_name_and_members(json['table_declarations']))
-    tags.extend(extract_name_and_members(json['union_declarations']))
+    tags.extend(extract_name_and_members(json["bits_declarations"]))
+    tags.extend(extract_consts(json["const_declarations"]))
+    tags.extend(extract_name_and_members(json["enum_declarations"]))
+    tags.extend(extract_protocols(json["protocol_declarations"]))
+    tags.extend(extract_name_and_members(json["struct_declarations"]))
+    tags.extend(extract_name_and_members(json["table_declarations"]))
+    tags.extend(extract_name_and_members(json["union_declarations"]))
 
 
 def get_syscall_tags(json, tags):
@@ -1013,31 +1019,34 @@ def main():
 
     matches = []
     for root, dirnames, filenames in os.walk(args.build_dir):
-        for filename in fnmatch.filter(filenames, '*.fidl.json'):
+        for filename in fnmatch.filter(filenames, "*.fidl.json"):
             matches.append(os.path.join(root, filename))
 
     # Include the syscalls ir file too.
     matches.append(
-        os.path.join(args.build_dir, 'gen', 'zircon', 'vdso', 'zx.fidl.json'))
+        os.path.join(args.build_dir, "gen", "zircon", "vdso", "zx.fidl.json")
+    )
 
     tags = []
     for filename in matches:
         with open(filename) as f:
             get_tags(json.load(f), tags)
 
-    tags = [x for x in tags if x.file != 'generated']
+    tags = [x for x in tags if x.file != "generated"]
     tags.sort(key=lambda x: x.tag)
 
-    with open(args.output, 'w') as f:
-        f.write('!_TAG_FILE_SORTED\t1\tgenerated by generated-fidl-tags.py\n')
+    with open(args.output, "w") as f:
+        f.write("!_TAG_FILE_SORTED\t1\tgenerated by generated-fidl-tags.py\n")
         for t in tags:
             f.write(
-                '%s\t%s\t/\%%%dl\%%%dc/\n' % (t.tag, t.file, t.line, t.column))
+                "%s\t%s\t/\%%%dl\%%%dc/\n" % (t.tag, t.file, t.line, t.column)
+            )
 
 
-if __name__ == '__main__':
-    if len(sys.argv) > 1 and sys.argv[1] == 'test':
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
         import doctest
+
         doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
     else:
         sys.exit(main())

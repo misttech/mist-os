@@ -10,8 +10,9 @@ from typing import Any, Dict, List, Optional
 import honeydew
 from honeydew import custom_types
 from honeydew import transports
-from honeydew.interfaces.device_classes import \
-    fuchsia_device as fuchsia_device_interface
+from honeydew.interfaces.device_classes import (
+    fuchsia_device as fuchsia_device_interface,
+)
 from honeydew.transports import ffx
 from honeydew.utils import properties
 
@@ -21,8 +22,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def create(
-    configs: List[Dict[str,
-                       Any]]) -> List[fuchsia_device_interface.FuchsiaDevice]:
+    configs: List[Dict[str, Any]]
+) -> List[fuchsia_device_interface.FuchsiaDevice]:
     """Create Fuchsia device controller(s) and returns them.
 
     Required for Mobly controller registration.
@@ -44,7 +45,8 @@ def create(
     """
     _LOGGER.debug(
         "FuchsiaDevice controller configs received in testbed yml file is '%s'",
-        configs)
+        configs,
+    )
 
     test_logs_dir: Optional[str] = _get_log_directory()
     if test_logs_dir:
@@ -62,12 +64,15 @@ def create(
                 ssh_private_key=device_config.get("ssh_private_key"),
                 ssh_user=device_config.get("ssh_user"),
                 transport=device_config.get("transport"),
-                device_ip_port=device_config.get("device_ip_port")))
+                device_ip_port=device_config.get("device_ip_port"),
+            )
+        )
     return fuchsia_devices
 
 
 def destroy(
-        fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice]) -> None:
+    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice],
+) -> None:
     """Closes all created fuchsia devices.
 
     Required for Mobly controller registration.
@@ -85,7 +90,7 @@ def destroy(
 
 
 def get_info(
-    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice]
+    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice],
 ) -> List[Dict[str, Any]]:
     """Gets information from a list of FuchsiaDevice objects.
 
@@ -104,7 +109,7 @@ def get_info(
 
 
 def _get_fuchsia_device_info(
-        fuchsia_device: fuchsia_device_interface.FuchsiaDevice
+    fuchsia_device: fuchsia_device_interface.FuchsiaDevice,
 ) -> Dict[str, Any]:
     """Returns information of a specific fuchsia device object.
 
@@ -151,7 +156,8 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
     """
     _LOGGER.debug(
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
-        config)
+        config,
+    )
 
     # Sample testbed file format for FuchsiaDevice controller used in infra...
     # - Controllers:
@@ -172,22 +178,25 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
         if config_key == "transport":
             if config["transport"] == "sl4f":
                 device_config["transport"] = transports.TRANSPORT.SL4F
-            elif config[
-                    "transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
+            elif (
+                config["transport"] in transports.FUCHSIA_CONTROLLER_TRANSPORTS
+            ):
                 device_config[
-                    "transport"] = transports.TRANSPORT.FUCHSIA_CONTROLLER
+                    "transport"
+                ] = transports.TRANSPORT.FUCHSIA_CONTROLLER
             else:
                 raise ValueError(
-                    f"Invalid transport `{config_value}` passed for " \
+                    f"Invalid transport `{config_value}` passed for "
                     f"{config['name']}"
                 )
         elif config_key == "device_ip_port":
             try:
                 device_config["device_ip_port"] = custom_types.IpPort.parse(
-                    config_value)
+                    config_value
+                )
             except Exception as err:  # pylint: disable=broad-except
                 raise ValueError(
-                    f"Invalid device_ip_port `{config_value}` passed for " \
+                    f"Invalid device_ip_port `{config_value}` passed for "
                     f"{config['name']}"
                 ) from err
         else:
@@ -195,7 +204,8 @@ def _parse_device_config(config: Dict[str, str]) -> Dict[str, Any]:
 
     _LOGGER.debug(
         "Updated FuchsiaDevice controller config after the validation is '%s'",
-        device_config)
+        device_config,
+    )
 
     return device_config
 
@@ -210,4 +220,5 @@ def _get_log_directory() -> Optional[str]:
     return getattr(
         logging,
         "log_path",  # Set by Mobly in base_test.BaseTestClass.run.
-        None)
+        None,
+    )

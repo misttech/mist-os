@@ -27,7 +27,7 @@ class TaskExecutionException(Exception):
 
 
 class Terminal:
-    def if_no_color(text: str, if_colored: str = '') -> str:
+    def if_no_color(text: str, if_colored: str = "") -> str:
         return if_colored if Terminal.supports_color() else text
 
     def bold(text: str) -> str:
@@ -49,16 +49,21 @@ class Terminal:
         return Terminal._style(text, 96)
 
     def supports_color() -> bool:
-        return sys.stdout.isatty() and sys.stderr.isatty() and not os.environ.get('NO_COLOR')
+        return (
+            sys.stdout.isatty()
+            and sys.stderr.isatty()
+            and not os.environ.get("NO_COLOR")
+        )
 
     def _style(text: str, escape_code: int) -> str:
         if Terminal.supports_color():
-            return f'\033[{escape_code}m{text}\033[0m'
+            return f"\033[{escape_code}m{text}\033[0m"
         else:
             # If neither stdout nor stderr is not a tty then any styles likely
             # won't get rendered correctly when the text is eventually printed,
             # so don't apply the style.
             return text
+
 
 @total_ordering
 class ArgumentScope(tuple, Enum):
@@ -70,20 +75,20 @@ class ArgumentScope(tuple, Enum):
     # 1. via command line: `bazel run :workflow -- 'WORKFLOW_MNEMONIC=--foo --bar'`
     # 2. via build rule: `arguments = ["--foo", "--bar"]`
     # 3. Includes any EXPLICIT arguments.
-    WORKFLOW = (*EXPLICIT, '__WORKFLOW_ARGUMENT__')
+    WORKFLOW = (*EXPLICIT, "__WORKFLOW_ARGUMENT__")
     # Captures any top level arguments:
     # 1. via command line: `bazel run :workflow -- --foo --bar`
     # 2. Includes any WORKFLOW and EXPLICIT arguments.
-    GLOBAL = (*WORKFLOW, '__GLOBAL_ARGUMENT__')
+    GLOBAL = (*WORKFLOW, "__GLOBAL_ARGUMENT__")
     # Captures private arguments intended for internal use.
-    META = ('__META_ARGUMENT__',)
+    META = ("__META_ARGUMENT__",)
     # Captures GLOBAL and META arguments.
     ALL = (*GLOBAL, *META)
 
-    def __lt__(self, other: 'ArgumentScope') -> bool:
+    def __lt__(self, other: "ArgumentScope") -> bool:
         return len(self.value) < len(other.value)
 
-    def __eq__(self, other: 'ArgumentScope') -> bool:
+    def __eq__(self, other: "ArgumentScope") -> bool:
         return self.value == other.value
 
     def __hash__(self) -> Any:
@@ -96,8 +101,10 @@ class ScopedArgumentParser:
         return [
             arg
             for i, arg in list(enumerate(sys.argv))[1:]
-            if sys.argv[i] not in ArgumentScope.ALL.value and (
-                sys.argv[i - 1] not in ArgumentScope.ALL.value or sys.argv[i - 1] in scope.value
+            if sys.argv[i] not in ArgumentScope.ALL.value
+            and (
+                sys.argv[i - 1] not in ArgumentScope.ALL.value
+                or sys.argv[i - 1] in scope.value
             )
         ]
 
@@ -113,14 +120,14 @@ class ScopedArgumentParser:
         self._argparse_init_args = argparse_args
         self._argparse_init_kwargs = argparse_kwargs
         self.add_argument(
-            '--default_argument_scope',
+            "--default_argument_scope",
             help=(
-                'The default scope of arguments to use for this task. '
-                'See the ArgumentScope class for additional information.'
+                "The default scope of arguments to use for this task. "
+                "See the ArgumentScope class for additional information."
             ),
             scope=ArgumentScope.META,
-            choices = ['explicit', 'workflow', 'global'],
-            default='explicit',
+            choices=["explicit", "workflow", "global"],
+            default="explicit",
         )
 
     def _get_parser(self, scope: ArgumentScope) -> argparse.ArgumentParser:
@@ -128,35 +135,48 @@ class ScopedArgumentParser:
             self._scoped_parsers[scope] = argparse.ArgumentParser(
                 *self._argparse_init_args,
                 add_help=False,
-                **self._argparse_init_kwargs
+                **self._argparse_init_kwargs,
             )
         return self._scoped_parsers[scope]
 
-    def add_argument(self, *argparse_args: Any, scope: ArgumentScope = None, **argparse_kwargs: Any) -> Any:
+    def add_argument(
+        self,
+        *argparse_args: Any,
+        scope: ArgumentScope = None,
+        **argparse_kwargs: Any,
+    ) -> Any:
         return self._get_parser(
             self.default_argument_scope if scope is None else scope
         ).add_argument(*argparse_args, **argparse_kwargs)
 
-    def parse_args(self, *argparse_args: Any, **argparse_kwargs: Any) -> argparse.Namespace:
+    def parse_args(
+        self, *argparse_args: Any, **argparse_kwargs: Any
+    ) -> argparse.Namespace:
         # TODO(chandarren): Handle `--help`.
         return argparse.Namespace(
-            **reduce(lambda smaller_ns, larger_ns: {**vars(larger_ns), **smaller_ns}, [
-                parser.parse_known_args(
-                    *argparse_args,
-                    args=self.get_arguments(scope),
-                    **argparse_kwargs
-                )[0]
-                for scope, parser
-                in sorted(self._scoped_parsers.items())
-            ], {})
+            **reduce(
+                lambda smaller_ns, larger_ns: {**vars(larger_ns), **smaller_ns},
+                [
+                    parser.parse_known_args(
+                        *argparse_args,
+                        args=self.get_arguments(scope),
+                        **argparse_kwargs,
+                    )[0]
+                    for scope, parser in sorted(self._scoped_parsers.items())
+                ],
+                {},
+            )
         )
 
-    def path_arg(self, type='file'):
+    def path_arg(self, type="file"):
         def arg(path):
             path = Path(path)
-            if path.is_file() != (type == 'file') or path.is_dir() != (type == 'directory'):
+            if path.is_file() != (type == "file") or path.is_dir() != (
+                type == "directory"
+            ):
                 super(self).error(f'Path "{path}" is not a {type}!')
             return path
+
         return arg
 
 
@@ -164,9 +184,9 @@ class FuchsiaTask:
     @classmethod
     def read_workflow_state(cls, file: Optional[Path] = None) -> Dict[str, Any]:
         workflow_state = {
-            'environment_variables': {},
-            'workflow': {
-                'halt_execution': False,
+            "environment_variables": {},
+            "workflow": {
+                "halt_execution": False,
             },
         }
         workflow_state.update(json.loads(file.read_text()) if file else {})
@@ -187,7 +207,9 @@ class FuchsiaTask:
     def apply_environment(self) -> None:
         original_environ = os.environ.copy()
         try:
-            os.environ.update(self.workflow_state['environment_variables'] or {})
+            os.environ.update(
+                self.workflow_state["environment_variables"] or {}
+            )
             yield
         finally:
             os.environ.clear()
@@ -214,33 +236,33 @@ class FuchsiaTask:
         return ScopedArgumentParser.get_arguments(scope)
 
     @classmethod
-    def main(cls, *, task_name: str=None, is_final_task: bool=None) -> None:
+    def main(cls, *, task_name: str = None, is_final_task: bool = None) -> None:
         parser = ScopedArgumentParser()
         parser.add_argument(
-            '--workflow_task_name',
-            help='The mnemonic associated with this task.',
+            "--workflow_task_name",
+            help="The mnemonic associated with this task.",
             scope=ArgumentScope.META,
-            **({} if task_name is None else {'default': task_name})
+            **({} if task_name is None else {"default": task_name}),
         )
         parser.add_argument(
-            '--workflow_previous_state',
-            help='A file to the previous workflow state.',
+            "--workflow_previous_state",
+            help="A file to the previous workflow state.",
             scope=ArgumentScope.META,
             type=parser.path_arg(),
             required=False,
         )
         parser.add_argument(
-            '--workflow_next_state',
-            help='A file write to the next workflow state.',
+            "--workflow_next_state",
+            help="A file write to the next workflow state.",
             scope=ArgumentScope.META,
             type=parser.path_arg(None),
         )
         parser.add_argument(
-            '--workflow_final_task',
-            help='Whether this task is the root (final) task in the workflow.',
-            action='store_true',
+            "--workflow_final_task",
+            help="Whether this task is the root (final) task in the workflow.",
+            action="store_true",
             scope=ArgumentScope.META,
-            **({} if is_final_task is None else {'default': is_final_task})
+            **({} if is_final_task is None else {"default": is_final_task}),
         )
         workflow_args = parser.parse_args()
         task = cls(
@@ -256,13 +278,16 @@ class FuchsiaTask:
         except TaskExecutionException as e:
             print(f'{Terminal.red("Fatal:")} {e}')
             if e.is_caught_failure:
-                task.workflow_state['workflow']['halt_execution'] = True
+                task.workflow_state["workflow"]["halt_execution"] = True
             else:
                 sys.exit(1)
         except KeyboardInterrupt:
             sys.exit(1)
         if workflow_args.workflow_next_state:
-            workflow_args.workflow_next_state.write_text(json.dumps(task.workflow_state))
+            workflow_args.workflow_next_state.write_text(
+                json.dumps(task.workflow_state)
+            )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     FuchsiaTask.main()

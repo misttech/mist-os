@@ -16,23 +16,29 @@ TARGET_EXP = re.compile(r"\/\/([\w\-_]*(?:\/[\w\-_]+)*)(?::([\w\-u]*))?")
 
 def gn_refs(target):
     """Invokes fx gn refs [target] returning the references as a list"""
-    return run_command(["fx", "gn", "refs",
-                        get_out_dir(), target]).strip().splitlines()
+    return (
+        run_command(["fx", "gn", "refs", get_out_dir(), target])
+        .strip()
+        .splitlines()
+    )
 
 
 def gn_desc(target, attributes):
     if attributes is not list:
         attributes = [attributes]
     """Invokes fx gn desc [target] [attributes...] returning each line as a list element"""
-    return run_command(
-        ["fx", "gn", "desc", get_out_dir(), target] +
-        attributes).strip().splitlines()
+    return (
+        run_command(["fx", "gn", "desc", get_out_dir(), target] + attributes)
+        .strip()
+        .splitlines()
+    )
 
 
 def run_command(command):
     """Runs command and returns stdout output"""
     return subprocess.check_output(
-        command, stderr=subprocess.STDOUT, encoding="utf8")
+        command, stderr=subprocess.STDOUT, encoding="utf8"
+    )
 
 
 # functools.cache is more semantically accurate, but requires Python 3.9
@@ -41,8 +47,9 @@ def get_out_dir():
     """Retrieve the build output directory"""
 
     fx_status = run_command(["fx", "status", "--format=json"])
-    return json.loads(
-        fx_status)["environmentInfo"]["items"]["build_dir"]["value"]
+    return json.loads(fx_status)["environmentInfo"]["items"]["build_dir"][
+        "value"
+    ]
 
 
 # TODO(shayba): consider supporting local labels (not just absolutes)
@@ -71,7 +78,8 @@ def is_visible_to(target, visibility):
     target_dirs, _, target_label = target.partition(":")
     visibility_dirs, _, visibility_label = visibility.partition(":")
     for target_dir, visibility_dir in itertools.zip_longest(
-            target_dirs.split("/"), visibility_dirs.split("/")):
+        target_dirs.split("/"), visibility_dirs.split("/")
+    ):
         if visibility_dir == "*":
             return True
         if target_dir != visibility_dir:
@@ -82,9 +90,7 @@ def is_visible_to(target, visibility):
 
 
 class Test(unittest.TestCase):
-
     def test_target_to_dir(self):
-
         def expect(target, build_dir):
             self.assertTrue(target_to_dir(target), build_dir)
 
@@ -93,7 +99,6 @@ class Test(unittest.TestCase):
         expect(r"//foo:bar", "foo/bar")
 
     def test_is_visible_to(self):
-
         def is_visible(src, dst):
             self.assertTrue(is_visible_to(src, dst))
 

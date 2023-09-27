@@ -22,9 +22,9 @@ ANNOTATION_OFFSET = 1
 class DwarfdumpStreamingParser:
     """Helper class to parse streaming output from `llvm-dwarfdump`."""
 
-    DWARF_TAG_MATCHER = re.compile(r'^(0x\S+):\s+(\S+)')
-    SUBPROGRAM_ATTR_MATCHER = re.compile(r'^\s+(\S+)\s+\((.+)\)')
-    SUBPROGRAM_TAG = 'DW_TAG_subprogram'
+    DWARF_TAG_MATCHER = re.compile(r"^(0x\S+):\s+(\S+)")
+    SUBPROGRAM_ATTR_MATCHER = re.compile(r"^\s+(\S+)\s+\((.+)\)")
+    SUBPROGRAM_TAG = "DW_TAG_subprogram"
 
     def __init__(self):
         # Instance variables to track parser state from line to line.
@@ -96,25 +96,27 @@ class FidlApiResolver:
         """
         for _, info in self._subprograms_dict.items():
             # Only care about subprograms with file and line number information.
-            if 'DW_AT_decl_file' not in info or 'DW_AT_decl_line' not in info:
+            if "DW_AT_decl_file" not in info or "DW_AT_decl_line" not in info:
                 continue
 
             # Only process FIDL binding headers.
-            if not info['DW_AT_decl_file'].endswith('fidl.h"'):
+            if not info["DW_AT_decl_file"].endswith('fidl.h"'):
                 continue
 
-            mangled_name = info.get('DW_AT_linkage_name') or info.get(
-                'DW_AT_name')
+            mangled_name = info.get("DW_AT_linkage_name") or info.get(
+                "DW_AT_name"
+            )
             if not mangled_name:
                 # Ignore subprograms with no names.
                 continue
 
             sanitized_mangled_name = mangled_name.strip('"')
             if sanitized_mangled_name not in self._api_mapping_dict:
-                sanitized_filepath = info['DW_AT_decl_file'].strip('"')
-                line_num = int(info['DW_AT_decl_line'])
+                sanitized_filepath = info["DW_AT_decl_file"].strip('"')
+                line_num = int(info["DW_AT_decl_line"])
                 self._add_mapping_entry(
-                    sanitized_mangled_name, sanitized_filepath, line_num)
+                    sanitized_mangled_name, sanitized_filepath, line_num
+                )
 
     def _add_mapping_entry(self, mangled_name, filepath, line_num):
         """Resolve mangled_name to FIDL API mapping and add as mapping entry.
@@ -128,17 +130,17 @@ class FidlApiResolver:
             to the `mangled_name`.
           line_num (int): The line number in the FIDL binding file where the function is declared.
         """
-        fidl_api_annotation = ''
+        fidl_api_annotation = ""
         cur_line = 0
         with open(filepath) as f:
             while cur_line != line_num - ANNOTATION_OFFSET:
                 fidl_api_annotation = f.readline().strip()
                 cur_line += 1
-        if 'cts-coverage-fidl-name' not in fidl_api_annotation:
+        if "cts-coverage-fidl-name" not in fidl_api_annotation:
             # This is not a FIDL API of interest.
             return
         # Annotation format: "// cts-coverage-fidl-name:<API_NAME>"
-        self._api_mapping_dict[mangled_name] = fidl_api_annotation.split(':')[1]
+        self._api_mapping_dict[mangled_name] = fidl_api_annotation.split(":")[1]
 
     def get_mapping(self):
         """Returns the mangled-name-to-FIDL-API mapping.
@@ -153,22 +155,23 @@ class FidlApiResolver:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--input',
-        help=
-        'File that contains filepaths to unstripped libraries & executables relative to the build dir.',
-        required=True)
+        "--input",
+        help="File that contains filepaths to unstripped libraries & executables relative to the build dir.",
+        required=True,
+    )
     parser.add_argument(
-        '--output',
-        help='Path to the output file containing FIDL to mangled name mapping.',
-        required=True)
+        "--output",
+        help="Path to the output file containing FIDL to mangled name mapping.",
+        required=True,
+    )
     parser.add_argument(
-        '--depfile',
-        help='Path to the depfile generated for GN.',
-        required=True)
+        "--depfile", help="Path to the depfile generated for GN.", required=True
+    )
     parser.add_argument(
-        '--dwarfdump',
-        help='Path to `llvm-dwarfdump` executable.',
-        required=True)
+        "--dwarfdump",
+        help="Path to `llvm-dwarfdump` executable.",
+        required=True,
+    )
     args = parser.parse_args()
 
     depfile_inputs = []
@@ -176,8 +179,8 @@ def main():
         depfile_inputs = f.read().splitlines()
 
     # Write depfile.
-    with open(args.depfile, 'w') as f:
-        f.write('%s: %s' % (args.output, ' '.join(sorted(depfile_inputs))))
+    with open(args.depfile, "w") as f:
+        f.write("%s: %s" % (args.output, " ".join(sorted(depfile_inputs))))
 
     # Generate mapping.
     fidl_mangled_name_to_api_mapping = {}
@@ -189,13 +192,14 @@ def main():
             for line in p.stdout:
                 parser.parse_line(line.decode())
         resolver = FidlApiResolver(
-            parser.get_subprograms(), fidl_mangled_name_to_api_mapping)
+            parser.get_subprograms(), fidl_mangled_name_to_api_mapping
+        )
         resolver.add_new_mappings()
 
     # Write output.
-    with open(args.output, 'w') as f:
+    with open(args.output, "w") as f:
         f.write(json.dumps(fidl_mangled_name_to_api_mapping, indent=2))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

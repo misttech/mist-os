@@ -87,9 +87,10 @@ def dest_merkle_pair_for_blobs(blobs, ffx):
 
     srcs = [blob.split("=")[1] for blob in blobs]
     merkles = [
-        v.split(" ")[0].strip() for v in run(
-            ffx, "--isolate-dir", temp_dir.name, "package", "file-hash", *
-            srcs).split("\n")
+        v.split(" ")[0].strip()
+        for v in run(
+            ffx, "--isolate-dir", temp_dir.name, "package", "file-hash", *srcs
+        ).split("\n")
     ]
 
     pairs = []
@@ -119,32 +120,38 @@ def check_contents_for_bind_bytecode(contents, bind):
 
 
 def check_for_abi_revision(contents):
-    #TODO: we should actually check the contents of this file to see if it is valid.
+    # TODO: we should actually check the contents of this file to see if it is valid.
     _assert_in(
-        "meta/fuchsia.abi/abi-revision", contents,
-        "Failed to find abi-revision file")
+        "meta/fuchsia.abi/abi-revision",
+        contents,
+        "Failed to find abi-revision file",
+    )
 
 
 def check_package_name(args):
     contents = json.loads(
         run(
-            args.far, "cat", "--archive=" + args.meta_far,
-            "--file=meta/package"))
+            args.far, "cat", "--archive=" + args.meta_far, "--file=meta/package"
+        )
+    )
 
     _assert_eq(
-        contents["name"], args.package_name, "Package name does not match")
+        contents["name"], args.package_name, "Package name does not match"
+    )
 
 
 def check_package_has_all_blobs(args):
     dest_to_merkle = dest_merkle_pair_for_blobs(args.blobs, args.ffx)
 
     contents = run(
-        args.far, "cat", "--archive=" + args.meta_far,
-        "--file=meta/contents").split("\n")
+        args.far, "cat", "--archive=" + args.meta_far, "--file=meta/contents"
+    ).split("\n")
 
     _assert_eq(
-        sorted(contents), sorted(dest_to_merkle),
-        "Expected blobs not in package contents")
+        sorted(contents),
+        sorted(dest_to_merkle),
+        "Expected blobs not in package contents",
+    )
 
 
 def main():

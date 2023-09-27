@@ -15,12 +15,13 @@ from typing import Any, Dict
 
 def main():
     parser = argparse.ArgumentParser(
-        'Processes version_history.json to return list of supported and in-development API levels.'
+        "Processes version_history.json to return list of supported and in-development API levels."
     )
     parser.add_argument(
-        '--version-history-path',
+        "--version-history-path",
         type=Path,
-        help='Path to the version history JSON file')
+        help="Path to the version history JSON file",
+    )
 
     args = parser.parse_args()
 
@@ -38,37 +39,38 @@ def main():
 
 
 def get_supported_versions(version_history_path: Path) -> Dict[str, Any]:
-    """Reads from version_history.json to get supported and in-development API levels.
-    """
+    """Reads from version_history.json to get supported and in-development API levels."""
 
     try:
         with open(version_history_path) as file:
             data = json.load(file)
     except FileNotFoundError:
         print(
-            """error: Unable to open '{path}'. Did you run this script from the root of the source tree?"""
-            .format(path=version_history_path),
-            file=sys.stderr)
+            """error: Unable to open '{path}'. Did you run this script from the root of the source tree?""".format(
+                path=version_history_path
+            ),
+            file=sys.stderr,
+        )
         return None
 
-    api_levels = data['data']['api_levels']
+    api_levels = data["data"]["api_levels"]
     in_development_api_level = None
     supported_fuchsia_api_levels = []
 
     for api_level, info in api_levels.items():
-        status = info['status']
-        if status == 'in-development':
+        status = info["status"]
+        if status == "in-development":
             in_development_api_level = int(api_level)
-        elif status == 'supported':
+        elif status == "supported":
             supported_fuchsia_api_levels.append(int(api_level))
 
     result = {
         "in_development_api_level": in_development_api_level,
-        "supported_fuchsia_api_levels": supported_fuchsia_api_levels
+        "supported_fuchsia_api_levels": supported_fuchsia_api_levels,
     }
 
     return result
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -56,11 +56,17 @@ def command(args: argparse.Namespace):
     matcher = Matcher(args.threshold)
 
     with TimingTracker("Find matches in tests file"):
-        tests_matches = tests_file_matcher.find_matches(args.match_string, matcher)
+        tests_matches = tests_file_matcher.find_matches(
+            args.match_string, matcher
+        )
     with TimingTracker("Find matches in build files"):
-        build_matches = build_file_matcher.find_matches(args.match_string, matcher)
+        build_matches = build_file_matcher.find_matches(
+            args.match_string, matcher
+        )
 
-    test_match_names = set([suggestion.matched_name for suggestion in tests_matches])
+    test_match_names = set(
+        [suggestion.matched_name for suggestion in tests_matches]
+    )
 
     # Create a list of all matches. If the same value appeared in both a
     # BUILD.gn file and the tests.json file, prefer the tests.json version.
@@ -72,7 +78,9 @@ def command(args: argparse.Namespace):
     # included them as its own suggestions.
     all_matches = list(tests_matches) if not args.omit_test_file else []
     all_matches += [
-        match for match in build_matches if match.matched_name not in test_match_names
+        match
+        for match in build_matches
+        if match.matched_name not in test_match_names
     ]
     all_matches.sort(key=lambda x: x.similarity, reverse=True)
 
@@ -84,7 +92,9 @@ def command(args: argparse.Namespace):
         styled_name = color_output(
             [Fore.WHITE, Style.BRIGHT], suggestion.matched_name, args.color
         )
-        similarity_color = Fore.GREEN if suggestion.similarity > 0.85 else Fore.YELLOW
+        similarity_color = (
+            Fore.GREEN if suggestion.similarity > 0.85 else Fore.YELLOW
+        )
         styled_similarity = color_output(
             [similarity_color, Style.BRIGHT],
             f"{100*suggestion.similarity:.2f}%",
@@ -94,7 +104,8 @@ def command(args: argparse.Namespace):
             [Style.DIM], suggestion.full_suggestion, args.color
         )
         print(
-            f"{styled_name} ({styled_similarity} similar)" f"\n    {styled_suggestion}"
+            f"{styled_name} ({styled_similarity} similar)"
+            f"\n    {styled_suggestion}"
         )
 
     if len(all_matches) > args.max_results:
@@ -142,7 +153,9 @@ class TimingTracker:
     This class is a ContextManager that tracks timing for wrapper operations.
     """
 
-    _tracked_timing: typing.List[typing.Tuple[str, typing.Union[float, None]]] = []
+    _tracked_timing: typing.List[
+        typing.Tuple[str, typing.Union[float, None]]
+    ] = []
 
     def __init__(self, operation_name: str) -> None:
         """Initialize a timing tracker instance.
@@ -286,15 +299,21 @@ class BuildFileMatcher:
                 continue
 
             with TimingTracker(f"..Walking directory {top_dir}"):
-                for root, _, files in os.walk(os.path.join(source_directory, top_dir)):
+                for root, _, files in os.walk(
+                    os.path.join(source_directory, top_dir)
+                ):
                     for file in files:
                         if file == "BUILD.gn":
                             build_file_paths.append(os.path.join(root, file))
 
         self._package_finder = re.compile(r"test_package\(\"([^\"]+)\"\)")
         self._component_finder = re.compile(r"test_component\(\"([^\"]+)\"\)")
-        self._package_name_finder = re.compile(r"package_name\s*=\s*\"([^\"]+)\"")
-        self._component_name_finder = re.compile(r"component_name\s*=\s*\"([^\"]+)\"")
+        self._package_name_finder = re.compile(
+            r"package_name\s*=\s*\"([^\"]+)\""
+        )
+        self._component_name_finder = re.compile(
+            r"component_name\s*=\s*\"([^\"]+)\""
+        )
 
         parse_results: typing.List[typing.Dict[str, typing.List[str]]] = []
         with TimingTracker("..Parse BUILD.gn files"):
@@ -306,7 +325,9 @@ class BuildFileMatcher:
             )
 
         with TimingTracker("..Collect results"):
-            name_to_target: defaultdict[str, typing.List[str]] = defaultdict(list)
+            name_to_target: defaultdict[str, typing.List[str]] = defaultdict(
+                list
+            )
             for result in parse_results:
                 for key, value in result.items():
                     name_to_target[key] += value
@@ -463,7 +484,9 @@ class BuildFileMatcher:
                         ].find(component_target)
                         >= 0
                     ):
-                        name_to_target[component_name].append(package_target_path)
+                        name_to_target[component_name].append(
+                            package_target_path
+                        )
         return dict(name_to_target)
 
     def find_matches(
@@ -492,7 +515,9 @@ class BuildFileMatcher:
             )
             if similarity is not None:
                 for target in sorted(set(targets)):  # deduplicate targets
-                    matches.append(Suggestion(name, similarity, f"--with {target}"))
+                    matches.append(
+                        Suggestion(name, similarity, f"--with {target}")
+                    )
 
         return matches
 
@@ -504,7 +529,9 @@ class TestsFileMatcher:
         with open(tests_json_file, "r") as f:
             contents = json.load(f)
             self.names: typing.Dict[str, typing.List[str]] = dict()
-            TOOLCHAIN_REGEX = re.compile(r"\(//build/toolchain:[^\)]*\)$", re.MULTILINE)
+            TOOLCHAIN_REGEX = re.compile(
+                r"\(//build/toolchain:[^\)]*\)$", re.MULTILINE
+            )
             for entry in contents:
                 labels: typing.List[str] = []
                 test: typing.Dict[str, typing.Any] = entry["test"]
@@ -516,7 +543,9 @@ class TestsFileMatcher:
                 self.names[test["name"]] = labels
 
         # Match the name of Fuchsia packages.
-        self._package_matcher = re.compile(r"fuchsia-pkg://fuchsia\.com/([^/#]+)#?")
+        self._package_matcher = re.compile(
+            r"fuchsia-pkg://fuchsia\.com/([^/#]+)#?"
+        )
 
     def __repr__(self):
         return f"TestFileMatcher(name_count={len(self.names)})"
@@ -569,7 +598,9 @@ class TestsFileMatcher:
             (max_score, max_option) = max(scores) if scores else (None, None)
             if max_score is not None and max_option is not None:
                 matches.append(
-                    Suggestion(max_option, max_score, f"Build includes: {options[0]}")
+                    Suggestion(
+                        max_option, max_score, f"Build includes: {options[0]}"
+                    )
                 )
 
         return matches
@@ -590,7 +621,9 @@ def create_search_locations() -> SearchLocations:
 
     tests_json_file = os.path.join(build_dir, "tests.json")
     if not os.path.isfile(tests_json_file):
-        raise Exception(f"Expected to find a test list file at {tests_json_file}")
+        raise Exception(
+            f"Expected to find a test list file at {tests_json_file}"
+        )
 
     return SearchLocations(fuchsia_directory, tests_json_file)
 

@@ -13,7 +13,8 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Turn a log and a regex into a JSON weighted tree.")
+        description="Turn a log and a regex into a JSON weighted tree."
+    )
     parser.add_argument(
         "--infile",
         type=argparse.FileType("r"),
@@ -24,14 +25,16 @@ def main():
         "--outfile",
         type=argparse.FileType("w"),
         required=True,
-        help="Output JSON file")
+        help="Output JSON file",
+    )
     parser.add_argument(
         "--regex",
         required=True,
         help="Regex whose first capture group will be used to get tree paths",
     )
     parser.add_argument(
-        "--root", required=True, help="Name of root node in the tree")
+        "--root", required=True, help="Name of root node in the tree"
+    )
     args = parser.parse_args()
 
     # Initialize the tree at the root node.
@@ -49,16 +52,12 @@ def main():
             # arriving at the leaf
             for part in path[:-1]:
                 node = node["children"].setdefault(
-                    part, {
-                        "name": part,
-                        "children": {}
-                    })
+                    part, {"name": part, "children": {}}
+                )
             # Create or update leaf node
             leaf = node["children"].setdefault(
-                path[-1], {
-                    "name": path[-1],
-                    "value": 0
-                })
+                path[-1], {"name": path[-1], "value": 0}
+            )
             leaf["value"] += 1
 
     # Transform tree into output format.

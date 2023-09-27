@@ -13,8 +13,9 @@ from mobly import asserts
 from mobly import test_runner
 
 from honeydew import custom_types
-from honeydew.device_classes.fuchsia_controller import \
-    fuchsia_device as fc_fuchsia_device
+from honeydew.device_classes.fuchsia_controller import (
+    fuchsia_device as fc_fuchsia_device,
+)
 from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
 from honeydew.interfaces.device_classes import fuchsia_device
 
@@ -47,17 +48,15 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_device_instance(self) -> None:
         """Test case to make sure DUT is a FuchsiaDevice"""
         if self._is_fuchsia_controller_based_device(self.device):
-            asserts.assert_is_instance(
-                self.device, fc_fuchsia_device.FuchsiaDevice)
+            asserts.assert_is_instance(self.device, fc_fuchsia_device.FuchsiaDevice)
         else:
-            asserts.assert_is_instance(
-                self.device, sl4f_fuchsia_device.FuchsiaDevice)
+            asserts.assert_is_instance(self.device, sl4f_fuchsia_device.FuchsiaDevice)
 
     def test_device_type(self) -> None:
         """Test case for device_type"""
         # TODO(b/293640613): uncomment when we've landed the switch from
         # qemu-x64 to x64 boards
-        #asserts.assert_equal(
+        # asserts.assert_equal(
         #    self.device.device_type,
         #    self.user_params["expected_values"]["device_type"])
 
@@ -65,18 +64,21 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for manufacturer"""
         asserts.assert_equal(
             self.device.manufacturer,
-            self.user_params["expected_values"]["manufacturer"])
+            self.user_params["expected_values"]["manufacturer"],
+        )
 
     def test_model(self) -> None:
         """Test case for model"""
         asserts.assert_equal(
-            self.device.model, self.user_params["expected_values"]["model"])
+            self.device.model, self.user_params["expected_values"]["model"]
+        )
 
     def test_product_name(self) -> None:
         """Test case for product_name"""
         asserts.assert_equal(
             self.device.product_name,
-            self.user_params["expected_values"]["product_name"])
+            self.user_params["expected_values"]["product_name"],
+        )
 
     def test_serial_number(self) -> None:
         """Test case for serial_number"""
@@ -85,7 +87,8 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         # not have a serial_number.
         asserts.assert_equal(
             self.device.serial_number,
-            self.user_params["expected_values"].get("serial_number"))
+            self.user_params["expected_values"].get("serial_number"),
+        )
 
     def test_firmware_version(self) -> None:
         """Test case for firmware_version"""
@@ -94,23 +97,24 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         if "firmware_version" in self.user_params["expected_values"]:
             asserts.assert_equal(
                 self.device.firmware_version,
-                self.user_params["expected_values"]["firmware_version"])
+                self.user_params["expected_values"]["firmware_version"],
+            )
         else:
             asserts.assert_is_instance(self.device.firmware_version, str)
 
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
         self.device.log_message_to_device(
-            message="This is a test ERROR message",
-            level=custom_types.LEVEL.ERROR)
+            message="This is a test ERROR message", level=custom_types.LEVEL.ERROR
+        )
 
         self.device.log_message_to_device(
-            message="This is a test WARNING message",
-            level=custom_types.LEVEL.WARNING)
+            message="This is a test WARNING message", level=custom_types.LEVEL.WARNING
+        )
 
         self.device.log_message_to_device(
-            message="This is a test INFO message",
-            level=custom_types.LEVEL.INFO)
+            message="This is a test INFO message", level=custom_types.LEVEL.INFO
+        )
 
     def test_snapshot(self) -> None:
         """Test case for snapshot()"""

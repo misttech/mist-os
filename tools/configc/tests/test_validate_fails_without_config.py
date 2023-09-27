@@ -13,19 +13,20 @@ COMPONENT = "to_configure.cm"
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Ensure that configc validate-package fails with missing structured config."
+        description="Ensure that configc validate-package fails with missing structured config."
     )
     parser.add_argument(
         "--configc-bin",
         type=pathlib.Path,
         required=True,
-        help="Path to configc binary.")
+        help="Path to configc binary.",
+    )
     parser.add_argument(
         "--package",
         type=pathlib.Path,
         required=True,
-        help="Path to package manifest.")
+        help="Path to package manifest.",
+    )
     args = parser.parse_args()
 
     output = subprocess.run(
@@ -36,9 +37,12 @@ def main():
             "--stamp",
             "/dev/null",
         ],
-        capture_output=True)
+        capture_output=True,
+    )
     stdout, stderr = (
-        output.stdout.decode("UTF-8"), output.stderr.decode("UTF-8"))
+        output.stdout.decode("UTF-8"),
+        output.stderr.decode("UTF-8"),
+    )
 
     test_failed = False
     if output.returncode == 0:

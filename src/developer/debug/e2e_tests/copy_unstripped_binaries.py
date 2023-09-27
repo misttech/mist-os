@@ -9,7 +9,7 @@ import sys
 import time
 
 # Import //build/images/elfinfo.py
-sys.path.insert(0, os.path.dirname(__file__) + '/../../../../build/images')
+sys.path.insert(0, os.path.dirname(__file__) + "/../../../../build/images")
 import elfinfo
 
 
@@ -20,7 +20,7 @@ def try_link(binary: str, build_id_dir: Path):
         return
     dest_dir = build_id_dir / build_id[:2]
     dest_dir.mkdir(exist_ok=True)
-    dest = dest_dir / (build_id[2:] + '.debug')
+    dest = dest_dir / (build_id[2:] + ".debug")
     if not dest.exists():  # When two source binaries resolves to the same.
         os.link(binary, dest)
 
@@ -42,8 +42,8 @@ def main():
     depfile_content = str(build_id_dir) + ":"
     with unstripped_binaries_list_file.open() as f:
         for line in f:
-            binary = line.rstrip('\n')
-            if binary.startswith('host_'):
+            binary = line.rstrip("\n")
+            if binary.startswith("host_"):
                 continue
             depfile_content += " " + binary
             try_link(binary, build_id_dir)
@@ -51,8 +51,8 @@ def main():
     depfile_content += " " + unstripped_libc
     try_link(unstripped_libc, build_id_dir)
 
-    depfile.write_text(depfile_content + '\n')
+    depfile.write_text(depfile_content + "\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

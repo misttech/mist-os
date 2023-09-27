@@ -70,15 +70,14 @@ class SL4F:
         Raises:
             errors.Sl4fError: On failure.
         """
-        sl4f_server_address: custom_types.Sl4fServerAddress = \
+        sl4f_server_address: custom_types.Sl4fServerAddress = (
             self._get_sl4f_server_address()
+        )
 
         if self._get_ip_version(sl4f_server_address.ip) == 6:
-            return \
-                f"http://[{sl4f_server_address.ip}]:{sl4f_server_address.port}"
+            return f"http://[{sl4f_server_address.ip}]:{sl4f_server_address.port}"
         else:
-            return \
-                f"http://{sl4f_server_address.ip}:{sl4f_server_address.port}"
+            return f"http://{sl4f_server_address.ip}:{sl4f_server_address.port}"
 
     # List all the public methods in alphabetical order
     def check_connection(self) -> None:
@@ -88,12 +87,12 @@ class SL4F:
             errors.Sl4fError: If SL4F connection is not successful.
         """
         get_device_name_resp: Dict[str, Any] = self.run(
-            method=_SL4F_METHODS["GetDeviceName"])
+            method=_SL4F_METHODS["GetDeviceName"]
+        )
         device_name: str = get_device_name_resp["result"]
 
         if device_name != self._name:
-            raise errors.Sl4fError(
-                f"Failed to start SL4F server on '{self._name}'.")
+            raise errors.Sl4fError(f"Failed to start SL4F server on '{self._name}'.")
 
     def run(
         self,
@@ -102,7 +101,7 @@ class SL4F:
         timeout: float = _TIMEOUTS["RESPONSE"],
         attempts: int = _DEFAULTS["ATTEMPTS"],
         interval: int = _DEFAULTS["INTERVAL"],
-        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
+        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
     ) -> Dict[str, Any]:
         """Run the SL4F method on Fuchsia device and return the response.
 
@@ -135,7 +134,7 @@ class SL4F:
             "jsonrpc": "2.0",
             "id": "",
             "method": method,
-            "params": params
+            "params": params,
         }
 
         exception_msg: str = f"SL4F method '{method}' failed on '{self._name}'."
@@ -150,7 +149,8 @@ class SL4F:
                     timeout=timeout,
                     attempts=attempts,
                     interval=interval,
-                    exceptions_to_skip=exceptions_to_skip)
+                    exceptions_to_skip=exceptions_to_skip,
+                )
 
                 error: Optional[str] = http_response.get("error")
                 if not error:
@@ -159,7 +159,12 @@ class SL4F:
                 if attempt < attempts:
                     _LOGGER.warning(
                         "SL4F method '%s' failed with error: '%s' on "
-                        "iteration %s/%s", method, error, attempt, attempts)
+                        "iteration %s/%s",
+                        method,
+                        error,
+                        attempt,
+                        attempts,
+                    )
                     continue
                 else:
                     exception_msg = f"{exception_msg} Error: '{error}'."
@@ -201,8 +206,7 @@ class SL4F:
         # Device addr is localhost, assume that means that ports were forwarded
         # from a remote workstation/laptop with a device attached.
         sl4f_port: int = _SL4F_PORT["LOCAL"]
-        if ipaddress.ip_address(
-                self._normalize_ip_addr(sl4f_server_ip)).is_loopback:
+        if ipaddress.ip_address(self._normalize_ip_addr(sl4f_server_ip)).is_loopback:
             sl4f_port = _SL4F_PORT["REMOTE"]
 
         return custom_types.Sl4fServerAddress(ip=sl4f_server_ip, port=sl4f_port)

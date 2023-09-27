@@ -33,8 +33,9 @@ class UserInputSL4FTests(unittest.TestCase):
                 "width": user_input.DEFAULTS["TOUCH_SCREEN_SIZE"].width,
                 "height": user_input.DEFAULTS["TOUCH_SCREEN_SIZE"].height,
                 "tap_event_count": user_input.DEFAULTS["TAP_EVENT_COUNT"],
-                "duration": user_input.DEFAULTS["DURATION"]
-            })
+                "duration": user_input.DEFAULTS["DURATION"],
+            },
+        )
 
     def test_tap_all_params(self) -> None:
         """Test for UserInput.tap() method with all params."""
@@ -42,7 +43,8 @@ class UserInputSL4FTests(unittest.TestCase):
             location=custom_types.Coordinate(x=1, y=2),
             touch_screen_size=custom_types.Size(width=3, height=4),
             tap_event_count=5,
-            duration=6)
+            duration=6,
+        )
         self.sl4f_obj.run.assert_called_once_with(
             method="input_facade.Tap",
             params={
@@ -51,5 +53,6 @@ class UserInputSL4FTests(unittest.TestCase):
                 "width": 3,
                 "height": 4,
                 "tap_event_count": 5,
-                "duration": 6
-            })
+                "duration": 6,
+            },
+        )

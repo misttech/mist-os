@@ -20,6 +20,7 @@ import cl_utils
 import fuchsia
 import remotetool
 import reproxy_logs
+
 # This requires python pb2 in build/rbe/proto (generated).
 
 from pathlib import Path
@@ -35,7 +36,7 @@ _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -48,14 +49,14 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         type=Path,
         default=bbtool._BB_TOOL,
         help="Path to 'bb' CLI tool.",
-        metavar='PATH',
+        metavar="PATH",
     )
     parser.add_argument(
         "--cfg",
         type=Path,
         default=_REPROXY_CFG,
         help="Reproxy configuration file.",
-        metavar='FILE',
+        metavar="FILE",
     )
 
     # Require one of the following:
@@ -63,8 +64,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     input_group.add_argument(
         "--bbid",
         type=str,
-        help=
-        "Buildbucket ID (leading 'b' optional/permitted).  Begin search fore reproxy log here.",
+        help="Buildbucket ID (leading 'b' optional/permitted).  Begin search fore reproxy log here.",
         metavar="ID",
     )
     input_group.add_argument(
@@ -77,8 +77,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--path",
         type=Path,
-        help=
-        "Path of artifact under the build output directory.  If omitted, print the path to the cached reproxy log and exit without downloading anything.",
+        help="Path of artifact under the build output directory.  If omitted, print the path to the cached reproxy log and exit without downloading anything.",
         default=None,
     )
     parser.add_argument(
@@ -86,8 +85,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         dest="output",
         type=Path,
         default=None,
-        help=
-        "Local output location to fetch to.  If omitted, use the basename of the --path argument.",
+        help="Local output location to fetch to.  If omitted, use the basename of the --path argument.",
         metavar="PATH",
     )
     parser.add_argument(
@@ -103,14 +101,14 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def download_artifact(
-        downloader: remotetool.RemoteTool, digest: str,
-        destination: Path) -> int:
+    downloader: remotetool.RemoteTool, digest: str, destination: Path
+) -> int:
     if destination.exists():
         destination.unlink()
 
     dl_result = downloader.download_blob(path=destination, digest=digest)
     if dl_result.returncode != 0:
-        msg(f'Error downloading blob from CAS with digest {digest}')
+        msg(f"Error downloading blob from CAS with digest {digest}")
         return dl_result.returncode
 
     return 0
@@ -146,13 +144,14 @@ def fetch_artifact_from_reproxy_log(
 
 
 def _main(
-        bbpath: Path,
-        cfg: Path,
-        bbid: str = None,
-        reproxy_log: Path = None,
-        artifact_path: Path = None,
-        output: Path = None,
-        verbose: bool = False) -> int:
+    bbpath: Path,
+    cfg: Path,
+    bbid: str = None,
+    reproxy_log: Path = None,
+    artifact_path: Path = None,
+    output: Path = None,
+    verbose: bool = False,
+) -> int:
     reproxy_log = reproxy_log or bbtool.fetch_reproxy_log_from_bbid(
         bbpath=bbpath,
         bbid=bbid,
@@ -163,7 +162,7 @@ def _main(
 
     if artifact_path is None:
         # print the path to the log and exit without downloading anything
-        msg(f'reproxy log: {reproxy_log}')
+        msg(f"reproxy log: {reproxy_log}")
         return 0
 
     return fetch_artifact_from_reproxy_log(
@@ -178,12 +177,12 @@ def _main(
 def main(argv: Sequence[str]) -> int:
     args = _MAIN_ARG_PARSER.parse_args(argv)
     if args.output is not None and args.path is None:
-        _MAIN_ARG_PARSER.error('-o requires --path')
+        _MAIN_ARG_PARSER.error("-o requires --path")
         return 1
     try:
         return _main(
             bbpath=args.bb,
-            bbid=args.bbid.lstrip('b') if args.bbid else None,
+            bbid=args.bbid.lstrip("b") if args.bbid else None,
             artifact_path=args.path,
             reproxy_log=args.reproxy_log,
             cfg=args.cfg,

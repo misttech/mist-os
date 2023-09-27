@@ -10,21 +10,32 @@ import subprocess
 import sys
 from typing import Dict, List, Set, Tuple
 import logging
-from assembly.assembly_input_bundle import CompiledPackageAdditionalShards, CompiledPackageMainDefinition
+from assembly.assembly_input_bundle import (
+    CompiledPackageAdditionalShards,
+    CompiledPackageMainDefinition,
+)
 from depfile import DepFile
-from assembly import AssemblyInputBundle, AIBCreator, DriverDetails, FilePath, PackageManifest, FileEntry
-from serialization.serialization import instance_from_dict, json_dumps, json_load
+from assembly import (
+    AssemblyInputBundle,
+    AIBCreator,
+    DriverDetails,
+    FilePath,
+    PackageManifest,
+    FileEntry,
+)
+from serialization.serialization import (
+    instance_from_dict,
+    json_dumps,
+    json_load,
+)
+
 logger = logging.getLogger()
 
-BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
-    "fshost",
-    "qux"  # test package
-]
+BOOTFS_COMPILED_PACKAGE_ALLOWLIST = ["fshost", "qux"]  # test package
 
 
 def create_bundle(args: argparse.Namespace) -> None:
-    """Create an Assembly Input Bundle (AIB).
-    """
+    """Create an Assembly Input Bundle (AIB)."""
     aib_creator = AIBCreator(args.outdir)
 
     # Add the base and cache packages, if they exist.
@@ -39,7 +50,8 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     if args.bootfs_pkg_list:
         add_pkg_list_from_file(
-            aib_creator, args.bootfs_pkg_list, "bootfs_packages")
+            aib_creator, args.bootfs_pkg_list, "bootfs_packages"
+        )
 
     if args.shell_cmds_list:
         add_shell_commands_from_file(aib_creator, args.shell_cmds_list)
@@ -49,19 +61,24 @@ def create_bundle(args: argparse.Namespace) -> None:
 
     if args.base_drivers_pkg_list:
         add_driver_list_from_file(
-            aib_creator, args.base_drivers_pkg_list,
-            aib_creator.provided_base_driver_details)
+            aib_creator,
+            args.base_drivers_pkg_list,
+            aib_creator.provided_base_driver_details,
+        )
 
     if args.boot_drivers_pkg_list:
         add_driver_list_from_file(
-            aib_creator, args.boot_drivers_pkg_list,
-            aib_creator.provided_boot_driver_details)
+            aib_creator,
+            args.boot_drivers_pkg_list,
+            aib_creator.provided_boot_driver_details,
+        )
 
     if args.config_data_list:
         for config_data_entry_file in args.config_data_list:
             with open(config_data_entry_file) as config_data_entry:
                 add_config_data_entries_from_file(
-                    aib_creator, config_data_entry)
+                    aib_creator, config_data_entry
+                )
 
     if args.bootfs_files_package:
         aib_creator.bootfs_files_package = args.bootfs_files_package
@@ -89,17 +106,20 @@ def create_bundle(args: argparse.Namespace) -> None:
     # package or archive that contains all of the files in the bundle.
     if args.export_manifest:
         assembly_input_bundle.write_fini_manifest(
-            args.export_manifest, base_dir=args.outdir)
+            args.export_manifest, base_dir=args.outdir
+        )
 
 
 def add_pkg_list_from_file(
-        aib_creator: AIBCreator, pkg_list_file, pkg_set_name: str):
+    aib_creator: AIBCreator, pkg_list_file, pkg_set_name: str
+):
     pkg_set: Set = getattr(aib_creator, pkg_set_name)
     pkg_list = _read_json_file(pkg_list_file)
     for pkg_manifest_path in pkg_list:
         if pkg_manifest_path in pkg_set:
             raise ValueError(
-                f"duplicate pkg manifest found: {pkg_manifest_path}")
+                f"duplicate pkg manifest found: {pkg_manifest_path}"
+            )
         pkg_set.add(pkg_manifest_path)
 
 
@@ -112,7 +132,8 @@ def add_kernel_cmdline_from_file(aib_creator: AIBCreator, kernel_cmdline_file):
 
 
 def add_driver_list_from_file(
-        aib_creator: AIBCreator, driver_list_file, driver_list):
+    aib_creator: AIBCreator, driver_list_file, driver_list
+):
     # cross-check the base and bootfs_package sets for the driver before adding
     # it to the target driver_list.
     base_pkg_set: Set = getattr(aib_creator, "base")
@@ -130,11 +151,14 @@ def add_driver_list_from_file(
         driver_list.append(
             DriverDetails(
                 driver_details["package_target"],
-                driver_details["driver_components"]))
+                driver_details["driver_components"],
+            )
+        )
 
 
 def add_shell_commands_from_file(
-        aib_creator: AIBCreator, shell_commands_list_file):
+    aib_creator: AIBCreator, shell_commands_list_file
+):
     """
     [
         {
@@ -151,11 +175,13 @@ def add_shell_commands_from_file(
         package = command["package"]
         components = command["components"]
         aib_creator.shell_commands[package].extend(
-            ["bin/" + component for component in components])
+            ["bin/" + component for component in components]
+        )
 
 
 def add_config_data_entries_from_file(
-        aib_creator: AIBCreator, config_data_entries):
+    aib_creator: AIBCreator, config_data_entries
+):
     """
     config_data_entries schema:
     [
@@ -169,8 +195,8 @@ def add_config_data_entries_from_file(
     _config_data = _read_json_file(config_data_entries)
     for definition in _config_data:
         entry = FileEntry(
-            definition['source'],
-            f"meta/data/{definition['package_name']}/{definition['destination']}"
+            definition["source"],
+            f"meta/data/{definition['package_name']}/{definition['destination']}",
         )
         aib_creator.config_data.append(entry)
 
@@ -187,40 +213,44 @@ def add_compiled_packages_from_file(aib_creator: AIBCreator, compiled_packages):
         if "component_shards" in package_def:
             # Transform from the GN format to the internal format
             shards = {}
-            for definition in package_def['component_shards']:
-                if definition['component_name'] in shards:
+            for definition in package_def["component_shards"]:
+                if definition["component_name"] in shards:
                     raise ValueError(
                         f"Unexpected repeated component name: {definition['component_name']}"
                     )
 
-                shards[definition['component_name']] = definition['shards']
-            package_def['component_shards'] = shards
+                shards[definition["component_name"]] = definition["shards"]
+            package_def["component_shards"] = shards
 
             aib_creator.compiled_package_shards.append(
-                instance_from_dict(
-                    CompiledPackageAdditionalShards, package_def))
+                instance_from_dict(CompiledPackageAdditionalShards, package_def)
+            )
         else:
             shards = {}
-            for definition in package_def['components']:
-                if definition['component_name'] in shards:
+            for definition in package_def["components"]:
+                if definition["component_name"] in shards:
                     raise ValueError(
                         f"Unexpected repeated component name: {definition['component_name']}"
                     )
 
-                shards[definition['component_name']] = definition['shards']
-            package_def['components'] = shards
+                shards[definition["component_name"]] = definition["shards"]
+            package_def["components"] = shards
 
             main_def = instance_from_dict(
-                CompiledPackageMainDefinition, package_def)
+                CompiledPackageMainDefinition, package_def
+            )
 
             # Type unsafe; see assembly_input_bundle.py
-            if (package_def.get("component_includes")):
+            if package_def.get("component_includes"):
                 main_def.includes = [
                     instance_from_dict(FileEntry, x)
                     for x in package_def["component_includes"]
                 ]
 
-            if main_def.bootfs_unpackaged and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST:
+            if (
+                main_def.bootfs_unpackaged
+                and main_def.name not in BOOTFS_COMPILED_PACKAGE_ALLOWLIST
+            ):
                 raise ValueError(
                     f"Compiled package {main_def.name} not in bootfs allowlist!"
                 )
@@ -241,9 +271,10 @@ def add_bootfs_files_from_list(aib_creator: AIBCreator, bootfs_files):
     for entry in _bootfs_files:
         # Not all distribution manifests have the source and destination pairs.
         # For an example see: dart_kernel.gni
-        if 'source' in entry and 'destination' in entry:
+        if "source" in entry and "destination" in entry:
             aib_creator.bootfs_files.add(
-                FileEntry(entry['source'], entry['destination']))
+                FileEntry(entry["source"], entry["destination"])
+            )
 
 
 def _read_json_file(pkg_list_file):
@@ -277,7 +308,7 @@ def generate_package_creation_manifest(args: argparse.Namespace) -> None:
     manifest file by appending the path to the metadata file to the entries in
     the AIB contents manifest.
     """
-    meta_package_content = {'name': args.name, 'version': '0'}
+    meta_package_content = {"name": args.name, "version": "0"}
     json.dump(meta_package_content, args.meta_package)
     contents_manifest = args.contents_manifest.read()
     args.output.write(contents_manifest)
@@ -312,8 +343,7 @@ def generate_archive(args: argparse.Namespace) -> None:
     # creation manifest for the archive.
     contents_manifest = args.contents_manifest.readlines()
     deps.add(args.contents_manifest.name)
-    with open(args.creation_manifest, 'w') as creation_manifest:
-
+    with open(args.creation_manifest, "w") as creation_manifest:
         if args.meta_far:
             # Add the AIB's package meta.far to the creation manifest if one was
             # provided.
@@ -323,14 +353,17 @@ def generate_archive(args: argparse.Namespace) -> None:
         for line in contents_manifest:
             # Split out the lines so that a depfile for the action can be made
             # from the contents_manifest's source paths.
-            src = line.split('=', 1)[1]
+            src = line.split("=", 1)[1]
             deps.add(src.strip())
             creation_manifest.write(line)
 
     # Build the archive itself.
     cmd_args = [
-        args.tarmaker, "-manifest", args.creation_manifest, "-output",
-        args.output
+        args.tarmaker,
+        "-manifest",
+        args.creation_manifest,
+        "-output",
+        args.output,
     ]
     subprocess.run(cmd_args, check=True)
 
@@ -368,9 +401,11 @@ def find_blob(args: argparse.Namespace) -> None:
         pkg_header = "Package"
         path_header = "Path"
         pkg_column_width = max(
-            len(pkg_header), *[len(entry[0]) for entry in found_at])
+            len(pkg_header), *[len(entry[0]) for entry in found_at]
+        )
         path_column_width = max(
-            len(path_header), *[len(entry[1]) for entry in found_at])
+            len(path_header), *[len(entry[1]) for entry in found_at]
+        )
         formatter = f"{{0: <{pkg_column_width}}}  | {{1: <{path_column_width}}}"
         header = formatter.format(pkg_header, path_header)
         print(header)
@@ -380,8 +415,8 @@ def find_blob(args: argparse.Namespace) -> None:
 
 
 def find_blob_in_manifests(
-        blob_to_find: str, bundle_dir: str,
-        manifests_to_search: List[FilePath]) -> List[Tuple[FilePath, FilePath]]:
+    blob_to_find: str, bundle_dir: str, manifests_to_search: List[FilePath]
+) -> List[Tuple[FilePath, FilePath]]:
     found_at: List[Tuple[FilePath, FilePath]] = []
     known_manifests = set(manifests_to_search)
 
@@ -389,8 +424,9 @@ def find_blob_in_manifests(
     while i < len(manifests_to_search):
         pkg_manifest_path = manifests_to_search[i]
         i += 1
-        with open(os.path.join(bundle_dir, pkg_manifest_path),
-                  'r') as pkg_manifest_file:
+        with open(
+            os.path.join(bundle_dir, pkg_manifest_path), "r"
+        ) as pkg_manifest_file:
             manifest = json_load(PackageManifest, pkg_manifest_file)
             if not manifest.blob_sources_relative:
                 raise ValueError(
@@ -401,11 +437,12 @@ def find_blob_in_manifests(
                     found_at.append((pkg_manifest_path, blob.path))
             for subpackage in manifest.subpackages:
                 subpackage_manifest_path = os.path.join(
-                    os.path.dirname(pkg_manifest_path),
-                    subpackage.manifest_path)
+                    os.path.dirname(pkg_manifest_path), subpackage.manifest_path
+                )
                 # remove `<dir>/../` sequences if present
                 subpackage_manifest_path = os.path.relpath(
-                    subpackage_manifest_path)
+                    subpackage_manifest_path
+                )
                 if subpackage_manifest_path not in known_manifests:
                     manifests_to_search.append(subpackage_manifest_path)
                     known_manifests.add(subpackage_manifest_path)
@@ -415,92 +452,97 @@ def find_blob_in_manifests(
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Tool for creating Assembly Input Bundles in-tree, for use with out-of-tree assembly"
+        description="Tool for creating Assembly Input Bundles in-tree, for use with out-of-tree assembly"
     )
     sub_parsers = parser.add_subparsers(
         title="Commands",
-        description="Commands for working with Assembly Input Bundles")
+        description="Commands for working with Assembly Input Bundles",
+    )
 
     ###
     #
     # 'assembly_input_bundle_tool create' subcommand parser
     #
     bundle_creation_parser = sub_parsers.add_parser(
-        "create", help="Create an Assembly Input Bundle")
+        "create", help="Create an Assembly Input Bundle"
+    )
     bundle_creation_parser.add_argument(
         "--outdir",
         required=True,
-        help="Path to the outdir that will contain the AIB")
+        help="Path to the outdir that will contain the AIB",
+    )
     bundle_creation_parser.add_argument(
         "--base-pkg-list",
-        type=argparse.FileType('r'),
-        help=
-        "Path to a json list of package manifests for the 'base' package set")
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'base' package set",
+    )
     bundle_creation_parser.add_argument(
         "--bootfs-pkg-list",
-        type=argparse.FileType('r'),
-        help=
-        "Path to a json list of package manifests for the 'bootfs' package set")
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'bootfs' package set",
+    )
     bundle_creation_parser.add_argument(
         "--boot-drivers-pkg-list",
-        type=argparse.FileType('r'),
-        help="Path to a json list of driver details for the 'bootfs' package set"
+        type=argparse.FileType("r"),
+        help="Path to a json list of driver details for the 'bootfs' package set",
     )
     bundle_creation_parser.add_argument(
         "--base-drivers-pkg-list",
-        type=argparse.FileType('r'),
-        help="Path to a json list of driver details for the 'base' package set")
+        type=argparse.FileType("r"),
+        help="Path to a json list of driver details for the 'base' package set",
+    )
     bundle_creation_parser.add_argument(
         "--shell-cmds-list",
-        type=argparse.FileType('r'),
-        help=
-        "Path to a json list of dictionaries with the manifest path as key and a list of shell_command components as the value"
+        type=argparse.FileType("r"),
+        help="Path to a json list of dictionaries with the manifest path as key and a list of shell_command components as the value",
     )
     bundle_creation_parser.add_argument(
         "--cache-pkg-list",
-        type=argparse.FileType('r'),
-        help=
-        "Path to a json list of package manifests for the 'cache' package set")
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'cache' package set",
+    )
     bundle_creation_parser.add_argument(
         "--system-pkg-list",
-        type=argparse.FileType('r'),
-        help=
-        "Path to a json list of package manifests for the 'system' package set")
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'system' package set",
+    )
     bundle_creation_parser.add_argument(
         "--kernel-cmdline",
-        type=argparse.FileType('r'),
-        help="Path to a json list of kernel cmdline arguments")
+        type=argparse.FileType("r"),
+        help="Path to a json list of kernel cmdline arguments",
+    )
     bundle_creation_parser.add_argument(
-        "--qemu-kernel", help="Path to the qemu kernel")
+        "--qemu-kernel", help="Path to the qemu kernel"
+    )
     bundle_creation_parser.add_argument(
         "--depfile",
-        type=argparse.FileType('w'),
-        help="Path to write a dependency file to")
+        type=argparse.FileType("w"),
+        help="Path to write a dependency file to",
+    )
     bundle_creation_parser.add_argument(
         "--export-manifest",
-        type=argparse.FileType('w'),
-        help="Path to write a FINI manifest of the contents of the AIB")
+        type=argparse.FileType("w"),
+        help="Path to write a FINI manifest of the contents of the AIB",
+    )
     bundle_creation_parser.add_argument(
         "--config-data-list",
         action="append",
-        help=
-        "Path to a json file of config-data entries, may be specified multiple times"
+        help="Path to a json file of config-data entries, may be specified multiple times",
     )
     bundle_creation_parser.add_argument(
         "--bootfs-files-package",
-        help=
-        "Path to a package manifest that points to files to include in bootfs")
+        help="Path to a package manifest that points to files to include in bootfs",
+    )
     bundle_creation_parser.add_argument(
         "--bootfs-files-list",
         action="append",
-        help=
-        "Path to a json file of bootfs-file entries, may be specified multiple times"
+        help="Path to a json file of bootfs-file entries, may be specified multiple times",
     )
     bundle_creation_parser.add_argument(
         "--compiled-packages",
-        type=argparse.FileType('r'),
-        help="Path to a json file of compiled package configuration")
+        type=argparse.FileType("r"),
+        help="Path to a json file of compiled package configuration",
+    )
 
     bundle_creation_parser.set_defaults(handler=create_bundle)
 
@@ -510,16 +552,19 @@ def main():
     #
     diff_bundles_parser = sub_parsers.add_parser(
         "diff",
-        help=
-        "Calculate the difference between the first and second bundles (A-B).")
+        help="Calculate the difference between the first and second bundles (A-B).",
+    )
     diff_bundles_parser.add_argument(
-        "first", help='The first bundle (A)', type=argparse.FileType('r'))
+        "first", help="The first bundle (A)", type=argparse.FileType("r")
+    )
     diff_bundles_parser.add_argument(
-        "second", help='The second bundle (B)', type=argparse.FileType('r'))
+        "second", help="The second bundle (B)", type=argparse.FileType("r")
+    )
     diff_bundles_parser.add_argument(
         "--output",
-        help='A file to write the output to, instead of stdout.',
-        type=argparse.FileType('w'))
+        help="A file to write the output to, instead of stdout.",
+        type=argparse.FileType("w"),
+    )
     diff_bundles_parser.set_defaults(handler=diff_bundles)
 
     ###
@@ -527,17 +572,20 @@ def main():
     # 'assembly_input_bundle_tool intersect' subcommand parser
     #
     intersect_bundles_parser = sub_parsers.add_parser(
-        "intersect", help="Calculate the intersection of the provided bundles.")
+        "intersect", help="Calculate the intersection of the provided bundles."
+    )
     intersect_bundles_parser.add_argument(
         "bundles",
         nargs="+",
         action="extend",
-        help='Paths to the bundle configs.',
-        type=argparse.FileType('r'))
+        help="Paths to the bundle configs.",
+        type=argparse.FileType("r"),
+    )
     intersect_bundles_parser.add_argument(
         "--output",
-        help='A file to write the output to, instead of stdout.',
-        type=argparse.FileType('w'))
+        help="A file to write the output to, instead of stdout.",
+        type=argparse.FileType("w"),
+    )
     intersect_bundles_parser.set_defaults(handler=intersect_bundles)
 
     ###
@@ -547,18 +595,21 @@ def main():
     #
     package_creation_manifest_parser = sub_parsers.add_parser(
         "generate-package-creation-manifest",
-        help=
-        "(build tool) Generate the creation manifest for the package that contains an Assembly Input Bundle."
+        help="(build tool) Generate the creation manifest for the package that contains an Assembly Input Bundle.",
     )
     package_creation_manifest_parser.add_argument(
-        "--contents-manifest", type=argparse.FileType('r'), required=True)
+        "--contents-manifest", type=argparse.FileType("r"), required=True
+    )
     package_creation_manifest_parser.add_argument("--name", required=True)
     package_creation_manifest_parser.add_argument(
-        "--meta-package", type=argparse.FileType('w'), required=True)
+        "--meta-package", type=argparse.FileType("w"), required=True
+    )
     package_creation_manifest_parser.add_argument(
-        "--output", type=argparse.FileType('w'), required=True)
+        "--output", type=argparse.FileType("w"), required=True
+    )
     package_creation_manifest_parser.set_defaults(
-        handler=generate_package_creation_manifest)
+        handler=generate_package_creation_manifest
+    )
 
     ###
     #
@@ -566,17 +617,18 @@ def main():
     #
     archive_creation_parser = sub_parsers.add_parser(
         "generate-archive",
-        help=
-        "(build tool) Generate the tarmaker creation manifest for the tgz that contains an Assembly Input Bundle."
+        help="(build tool) Generate the tarmaker creation manifest for the tgz that contains an Assembly Input Bundle.",
     )
     archive_creation_parser.add_argument("--tarmaker", required=True)
     archive_creation_parser.add_argument(
-        "--contents-manifest", type=argparse.FileType('r'), required=True)
+        "--contents-manifest", type=argparse.FileType("r"), required=True
+    )
     archive_creation_parser.add_argument("--meta-far")
     archive_creation_parser.add_argument("--creation-manifest", required=True)
     archive_creation_parser.add_argument("--output", required=True)
     archive_creation_parser.add_argument(
-        "--depfile", type=argparse.FileType('w'))
+        "--depfile", type=argparse.FileType("w")
+    )
     archive_creation_parser.set_defaults(handler=generate_archive)
 
     ###
@@ -585,15 +637,17 @@ def main():
     #
     find_blob_parser = sub_parsers.add_parser(
         "find-blob",
-        help=
-        "Find what causes a blob to be included in the Assembly Input Bundle.")
+        help="Find what causes a blob to be included in the Assembly Input Bundle.",
+    )
     find_blob_parser.add_argument(
         "--bundle-config",
         required=True,
-        type=argparse.FileType('r'),
-        help="Path to the assembly_config.json for the bundle")
+        type=argparse.FileType("r"),
+        help="Path to the assembly_config.json for the bundle",
+    )
     find_blob_parser.add_argument(
-        "--blob", required=True, help="Merkle of the blob to search for.")
+        "--blob", required=True, help="Merkle of the blob to search for."
+    )
     find_blob_parser.set_defaults(handler=find_blob)
 
     args = parser.parse_args()

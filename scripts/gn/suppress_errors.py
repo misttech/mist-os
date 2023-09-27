@@ -22,7 +22,8 @@ from typing import List, Dict
 
 def run_command(command):
     return subprocess.check_output(
-        command, stderr=subprocess.STDOUT, encoding="utf8")
+        command, stderr=subprocess.STDOUT, encoding="utf8"
+    )
 
 
 # functools.cache is more semantically accurate, but requires Python 3.9
@@ -31,8 +32,9 @@ def get_out_dir():
     """Retrieve the build output directory"""
 
     fx_status = run_command(["fx", "status", "--format=json"])
-    return json.loads(
-        fx_status)["environmentInfo"]["items"]["build_dir"]["value"]
+    return json.loads(fx_status)["environmentInfo"]["items"]["build_dir"][
+        "value"
+    ]
 
 
 def get_common_gn_args():
@@ -55,8 +57,10 @@ def gn_find_refs(files: List[str], raise_if_no_match: bool = True) -> List[str]:
     try:
         refs_out = run_command(refs_command)
     except subprocess.CalledProcessError as e:
-        if ("The input matches no targets, configs, or files." in e.output and
-                not raise_if_no_match):
+        if (
+            "The input matches no targets, configs, or files." in e.output
+            and not raise_if_no_match
+        ):
             return []
         print(f"Failed to resolve references for {files}!", file=sys.stderr)
         print(e.output, file=sys.stderr)
@@ -65,8 +69,8 @@ def gn_find_refs(files: List[str], raise_if_no_match: bool = True) -> List[str]:
 
 
 def gn_find_refs_complete(
-        path: str, sources_that_include_header: Dict[str,
-                                                     List[str]]) -> List[str]:
+    path: str, sources_that_include_header: Dict[str, List[str]]
+) -> List[str]:
     """Returns the targets referencing a path.
     If no targets refer to that path and the path is a header,
     fallback to looking for the targets that reference the source files which
@@ -88,13 +92,15 @@ def gn_find_refs_complete(
     print(
         f"Note: looking for source files which includes {path}, "
         "because the path was not tracked by the build system",
-        file=sys.stderr)
+        file=sys.stderr,
+    )
     sources = sources_that_include_header.get(path, [])
     if not sources:
         print(
             f"Warning: {path} was not tracked by the build system, "
             "and not included by any sources",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         return []
     return gn_find_refs(sources)
 
@@ -148,8 +154,9 @@ def find_cc_file_using_included_from(prev_lines: str):
     source file that led to the error by including a chain of headers.
     """
     # The last line should be a header file reference
-    assert "In file included from" not in prev_lines[
-        -1], f"unexpected {prev_lines}"
+    assert (
+        "In file included from" not in prev_lines[-1]
+    ), f"unexpected {prev_lines}"
     # Go backwards until we hit a '.cc' or '.cpp' file
     for l in reversed(prev_lines[:-1]):
         match = included_from_regex.match(l)
@@ -161,7 +168,8 @@ def find_cc_file_using_included_from(prev_lines: str):
 def main():
     parser = argparse.ArgumentParser(
         description="Adds a given config to all compile targets with "
-        "a given compiler error")
+        "a given compiler error"
+    )
     parser.add_argument(
         "--fx-build-log",
         help="Captured output from a build invocation. "
@@ -175,27 +183,27 @@ def main():
     )
     parser.add_argument(
         "--complete",
-        help=
-        "If true, attempt to produce a complete annotation by attributing errors "
+        help="If true, attempt to produce a complete annotation by attributing errors "
         "in unreferenced headers to source files that include that header.",
         action=argparse.BooleanOptionalAction,
         default=False,
     )
     parser.add_argument(
         "--issue",
-        action='append',
+        action="append",
         required=True,
         help="A regex matching the intended compiler error/warning. "
         "E.g. --issue='error:.*-Wconversion'."
         "Take care to avoid character expansion by the shell, for example "
-        "by using single quotation marks.")
+        "by using single quotation marks.",
+    )
     parser.add_argument("--config", required=True, help="GN config to add")
     parser.add_argument("--comment", help="Comment to add before config")
     args = parser.parse_args()
     fx_build_log = args.fx_build_log
     confirm = args.confirm
     complete = args.complete
-    issue = '|'.join(args.issue)
+    issue = "|".join(args.issue)
     config = args.config
     comment = args.comment
 
@@ -279,8 +287,8 @@ def main():
         target_can_have = zip(
             error_targets,
             p.map(
-                can_have_config,
-                ((target, config) for target in error_targets)),
+                can_have_config, ((target, config) for target in error_targets)
+            ),
         )
         error_targets = {
             target for target, can_have in target_can_have if can_have
@@ -298,7 +306,8 @@ def main():
         match = ref_regex.match(target)
         build_dir, target_name = match.groups()
         target_regex = re.compile(
-            '^\s*\w*\("' + re.escape(target_name) + '"\) {')
+            '^\s*\w*\("' + re.escape(target_name) + '"\) {'
+        )
         build_file = os.path.join(build_dir, "BUILD.gn")
         # Format file before processing
         run_command(["fx", "format-code", "--files=" + build_file])

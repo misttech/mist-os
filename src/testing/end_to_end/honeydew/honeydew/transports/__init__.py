@@ -8,12 +8,15 @@ import enum
 from typing import List
 
 FUCHSIA_CONTROLLER_TRANSPORTS: List[str] = [
-    "fuchsia_controller", "fuchsia-controller", "fc"
+    "fuchsia_controller",
+    "fuchsia-controller",
+    "fc",
 ]
 
 
 class TRANSPORT(enum.Enum):
     """Different Host-(Fuchsia)Target interaction transports supported."""
+
     # use SL4F for Host-(Fuchsia)Target interactions.
     SL4F = "sl4f"
 

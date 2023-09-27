@@ -30,20 +30,25 @@ import textwrap
 logger = logging.getLogger()
 UNSTAGED = "unstaged"
 
-FORMATTED_PARSER_DESCRIPTION = "\n".join(
-    textwrap.wrap(
-        """Validate that a move from the product definition file to an Assembly Input Bundle results
+FORMATTED_PARSER_DESCRIPTION = (
+    "\n".join(
+        textwrap.wrap(
+            """Validate that a move from the product definition file to an Assembly Input Bundle results
          in:""",
-        width=100)) + "\n" + """
+            width=100,
+        )
+    )
+    + "\n"
+    + """
     1. The same number of targets listed in the image_assembly_config.json as compared with
     the same file prior to the move.
     2. A suspected change in path of the target or targets which have moved as defined in
     the image_assembly_config.json"""
+)
 
 
 def setup_path_variables(target_outdir, target="fuchsia"):
-    """Configures various relevant (to Software Assembly) paths for use throughout the program
-    """
+    """Configures various relevant (to Software Assembly) paths for use throughout the program"""
     paths = SimpleNamespace()
     paths.ASSEMBLY_TARGET = target
     paths.TARGET_OUT_DIR = Path(f"{target_outdir}/obj/build/images/{target}")
@@ -51,25 +56,33 @@ def setup_path_variables(target_outdir, target="fuchsia"):
     paths.ASSEMBLY_BUNDLES = Path(f"{paths.TARGET_OUT_DIR}/{target}")
     paths.GENDIR = Path(f"{paths.ASSEMBLY_BUNDLES}/gen")
     paths.LEGACY_ASSEMBLY_INPUT_BUNDLE = Path(
-        f"{paths.ASSEMBLY_BUNDLES}/legacy")
+        f"{paths.ASSEMBLY_BUNDLES}/legacy"
+    )
     paths.LEGACY_AIB_MANIFEST = Path(
-        f"{paths.LEGACY_ASSEMBLY_INPUT_BUNDLE}/assembly_config.json")
+        f"{paths.LEGACY_ASSEMBLY_INPUT_BUNDLE}/assembly_config.json"
+    )
     paths.LEGACY_IMAGE_ASSEMBLY_CONFIG = Path(
-        f"{paths.ASSEMBLY_BUNDLES}.legacy_image_assembly_config.json")
+        f"{paths.ASSEMBLY_BUNDLES}.legacy_image_assembly_config.json"
+    )
     paths.IMAGE_ASSEMBLY_CONFIG = Path(
-        f"{paths.ASSEMBLY_BUNDLES}/image_assembly.json")
+        f"{paths.ASSEMBLY_BUNDLES}/image_assembly.json"
+    )
     paths.IMAGES_CONFIG = Path(f"{paths.ASSEMBLY_BUNDLES}.images_config.json")
     paths.IMAGE_ASSEMBLY_INPUTS = Path(
-        f"{paths.ASSEMBLY_BUNDLES}.image_assembly_inputs")
+        f"{paths.ASSEMBLY_BUNDLES}.image_assembly_inputs"
+    )
     paths.BASE_PACKAGE_MANIFEST = Path(
-        f"{paths.ASSEMBLY_BUNDLES}/base/package_manifest.json")
+        f"{paths.ASSEMBLY_BUNDLES}/base/package_manifest.json"
+    )
     paths.BOOTFS_PACKAGES = Path(f"{paths.GENDIR}/data/bootfs_packages")
     paths.STATIC_PACKAGES = Path(f"{paths.GENDIR}/legacy/data/static_packages")
     paths.CACHE_PACKAGES = Path(
-        f"{paths.GENDIR}/legacy/data/cache_packages.json")
+        f"{paths.GENDIR}/legacy/data/cache_packages.json"
+    )
     paths.ASSEMBLY_MANIFEST = Path(f"{paths.ASSEMBLY_BUNDLES}/images.json")
     paths.ASSEMBLY_INPUT_BUNDLE_MANIFEST = Path(
-        f"{paths.LEGACY_ASSEMBLY_INPUT_BUNDLE}.fini_manifest")
+        f"{paths.LEGACY_ASSEMBLY_INPUT_BUNDLE}.fini_manifest"
+    )
     return paths
 
 
@@ -77,44 +90,46 @@ def cli_args():
     """CLI Argparser setup"""
     parser = argparse.ArgumentParser(
         description=FORMATTED_PARSER_DESCRIPTION,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
         "-y",
         "--auto-confirm",
         action="store_true",
         required=False,
-        default=False)
+        default=False,
+    )
 
     parser.add_argument(
         "--commit-hash",
         required=False,
-        help=
-        "An optional commit-hash prefix (8 or more digits) specifying which stored copy of the\
-        image assembly config to compare against")
+        help="An optional commit-hash prefix (8 or more digits) specifying which stored copy of the\
+        image assembly config to compare against",
+    )
     parser.add_argument(
         "--diff-only",
         required=False,
         action="store_true",
         default=False,
-        help=
-        "An optional flag which when provided will forgo the fx build of any uncommitted changes\
-        and will attempt to use the outdir of the build directory without rebuilding."
+        help="An optional flag which when provided will forgo the fx build of any uncommitted changes\
+        and will attempt to use the outdir of the build directory without rebuilding.",
     )
     parser.add_argument(
         "--use-latest",
         required=False,
         action="store_true",
         default=False,
-        help=
-        "An optional flag which when provided will use the latest historical build artifacts stored\
-        in the 'latest' directory of the tmp dir.")
+        help="An optional flag which when provided will use the latest historical build artifacts stored\
+        in the 'latest' directory of the tmp dir.",
+    )
 
     parser.add_argument(
         "--clean",
         required=False,
         action="store_true",
         default=False,
-        help="An optional flag which when provided forces a clean build.")
+        help="An optional flag which when provided forces a clean build.",
+    )
 
     args = parser.parse_args()
 
@@ -160,9 +175,12 @@ def stash_uncommitted():
         if stash:
             subprocess.run(
                 [
-                    "git", "stash", "save",
-                    '"Stashing during validate_gn_to_aib invocation"'
-                ])
+                    "git",
+                    "stash",
+                    "save",
+                    '"Stashing during validate_gn_to_aib invocation"',
+                ]
+            )
         yield
     finally:
         if stash:
@@ -179,7 +197,8 @@ def compare(old: Path, new: Path):
 
 
 def get_prev_iac_path(
-        tmp_dir: Path, iac_name: str, target_name: str, commit_hash: str):
+    tmp_dir: Path, iac_name: str, target_name: str, commit_hash: str
+):
     """Gets a path to the previous iac.
 
     Optional commit hash allows for comparing against a historically saved
@@ -189,7 +208,8 @@ def get_prev_iac_path(
 
 
 def _create_tmp_dir_if_not_exists(
-        tmp_dir: Path = Path("/tmp/validate_gn_to_aib")):
+    tmp_dir: Path = Path("/tmp/validate_gn_to_aib"),
+):
     """Sets up persistent tmp directory if it doesn't already exist"""
     tmp_dir.mkdir(parents=True, exist_ok=True)
     return tmp_dir
@@ -235,7 +255,8 @@ def _diff_dicts(old, new, path: List):
         path.append(key)
         if key not in new:
             raise Exception(
-                f"Keys should not have changed. Found {key} was missing")
+                f"Keys should not have changed. Found {key} was missing"
+            )
         if isinstance(old[key], dict):
             _diff_dicts(old[key], new[key], path + [key])
         elif isinstance(old[key], list):
@@ -255,22 +276,26 @@ def _diff_dicts(old, new, path: List):
                 getter = lambda x, y: set([obj[y] for obj in x])
                 if path[-1] == "bootfs_files":
                     discrepencies = getter(old[key], "source") ^ getter(
-                        new[key], "source")
+                        new[key], "source"
+                    )
                 elif path[-1] == "kernel":
                     discrepencies = getter(old[key], "path") ^ getter(
-                        new[key], "path")
+                        new[key], "path"
+                    )
                 else:
                     discrepencies = set(old[key]) ^ set(new[key])
                 if discrepencies:
                     print(
-                        f"List at {'.'.join(path)} differs from the comparison")
+                        f"List at {'.'.join(path)} differs from the comparison"
+                    )
                     pprint(
                         f"Discrepancies: {sorted(list(discrepencies), key=lambda x: (Path(x).name, Path(x).absolute()))}"
                     )
 
 
 def attempt_clean_build(
-        outdir_iac, stored_iac_path, latest_iac_path, commit_hash, clean=False):
+    outdir_iac, stored_iac_path, latest_iac_path, commit_hash, clean=False
+):
     if not stored_iac_path.exists():
         with stash_uncommitted():
             if clean:
@@ -284,7 +309,8 @@ def attempt_clean_build(
         logger.info(
             f"The IAC from {commit_hash} already exists, so skipping the clean build.\n\
             If you'd like to trigger a clean build and rewrite the existing config at the given\
-            hash, delete the file at {stored_iac_path}")
+            hash, delete the file at {stored_iac_path}"
+        )
 
 
 def make_latest_iac_path(prev_iac):
@@ -293,14 +319,17 @@ def make_latest_iac_path(prev_iac):
 
 
 def main():
-
     def validate_commit_hash(commit_hash):
-        if len(commit_hash) < 8 or tmp_dir.joinpath(
-                commit_hash[0:8]) not in tmp_dir.iterdir():
+        if (
+            len(commit_hash) < 8
+            or tmp_dir.joinpath(commit_hash[0:8]) not in tmp_dir.iterdir()
+        ):
             t = f"Must pass a commit hash of length >=8 that exists in tmp_dir. Valid options are:"
             sys.exit(
-                "\n".join(textwrap.wrap(t, width=100)) + "\n" +
-                pformat([path.name for path in tmp_dir.iterdir()]))
+                "\n".join(textwrap.wrap(t, width=100))
+                + "\n"
+                + pformat([path.name for path in tmp_dir.iterdir()])
+            )
         return True
 
     args = cli_args()
@@ -316,10 +345,12 @@ def main():
 
     if args.commit_hash and validate_commit_hash(args.commit_hash):
         prev_iac = get_prev_iac_path(
-            tmp_dir, outdir_iac.name, target_outdir.name, args.commit_hash)
+            tmp_dir, outdir_iac.name, target_outdir.name, args.commit_hash
+        )
     else:
         prev_iac = get_prev_iac_path(
-            tmp_dir, outdir_iac.name, target_outdir.name, commit_hash)
+            tmp_dir, outdir_iac.name, target_outdir.name, commit_hash
+        )
 
     latest_iac_path = make_latest_iac_path(prev_iac)
 
@@ -329,14 +360,17 @@ def main():
         prev_iac = latest_iac_path
     else:
         attempt_clean_build(
-            outdir_iac, prev_iac, latest_iac_path, commit_hash, args.clean)
+            outdir_iac, prev_iac, latest_iac_path, commit_hash, args.clean
+        )
 
     if not _uncommitted_changes():
         sys.exit(
-            "Please make changes to the appropriate GN files and try again.")
+            "Please make changes to the appropriate GN files and try again."
+        )
     if not args.diff_only:
         subprocess.run(
-            ["fx", "build"])  # again, this time with uncommitted changes
+            ["fx", "build"]
+        )  # again, this time with uncommitted changes
     compare(prev_iac, outdir_iac)
 
 

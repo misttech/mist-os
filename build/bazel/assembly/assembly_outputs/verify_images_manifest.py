@@ -63,9 +63,9 @@ def vbmeta_info_no_hash(python_path, avbtool_path, image_path):
         raise ValueError(f"Got empty vbmeta info from {image_path}")
 
     def is_salt_or_digest_line(line):
-        return (
-            line.strip().startswith("Salt:") or
-            line.strip().startswith("Digest:"))
+        return line.strip().startswith("Salt:") or line.strip().startswith(
+            "Digest:"
+        )
 
     return "\n".join(line for line in info if not is_salt_or_digest_line(line))
 
@@ -93,7 +93,8 @@ def normalize(
 
             if image["type"] == "vbmeta":
                 image["vbmeta_info"] = vbmeta_info_no_hash(
-                    python_path, avbtool_path, full_path)
+                    python_path, avbtool_path, full_path
+                )
             else:
                 image["path_hash"] = get_file_hash(full_path)
 
@@ -155,7 +156,8 @@ def get_diffs(items1, items2, keyf):
                 (
                     json_format(items1[idx1]) if key1 < key2 else "{}",
                     json_format(items2[idx2]) if key2 < key1 else "{}",
-                ))
+                )
+            )
 
             if key1 < key2:
                 idx1 += 1
@@ -188,19 +190,26 @@ def format_diffs(diffs):
     """Format found diffs for printing"""
     formatted_diffs = list(map("\n---\n".join, diffs))
     return (
-        "Diffs found:\n" + "<<<<\n" + "\n>>>>\n<<<<\n".join(formatted_diffs) +
-        "\n>>>>")
+        "Diffs found:\n"
+        + "<<<<\n"
+        + "\n>>>>\n<<<<\n".join(formatted_diffs)
+        + "\n>>>>"
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compares assembly images configurations")
+        description="Compares assembly images configurations"
+    )
     parser.add_argument(
-        "--images_manifest_gn", type=argparse.FileType("r"), required=True)
+        "--images_manifest_gn", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        "--images_manifest_bzl", type=argparse.FileType("r"), required=True)
+        "--images_manifest_bzl", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        "--path-mapping", type=argparse.FileType("r"), required=True)
+        "--path-mapping", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument("--python-path", required=True)
     parser.add_argument("--avbtool-path", required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
@@ -229,7 +238,8 @@ def main():
         # Keep these suffixes in sync with subtarget suffixes in
         # bazel_product_bundle.gni.
         if gn_path.endswith("_create_system") or gn_path.endswith(
-                "_create_recovery_system"):
+            "_create_recovery_system"
+        ):
             bazel_images_manifest_dir = bazel_path
             break
 
@@ -262,20 +272,22 @@ def main():
     args.output2.write(images_manifest_bzl_str)
 
     args.depfile.write(
-        "{}: {}".format(args.output1.name, " ".join(extra_files_read)))
+        "{}: {}".format(args.output1.name, " ".join(extra_files_read))
+    )
 
     # These files are very large and single-threaded difflib is too slow when in the quadratic case
 
     # First diff the package blobs, if they're there.
     blob1 = get_first(lambda image: image["name"] == "blob", images_manifest_gn)
     blob2 = get_first(
-        lambda image: image["name"] == "blob", images_manifest_bzl)
+        lambda image: image["name"] == "blob", images_manifest_bzl
+    )
     if blob1 and blob2:
         diffs = get_diffs(
-            blob1["contents"]["packages"]["base"] +
-            blob1["contents"]["packages"]["cache"],
-            blob2["contents"]["packages"]["base"] +
-            blob2["contents"]["packages"]["cache"],
+            blob1["contents"]["packages"]["base"]
+            + blob1["contents"]["packages"]["cache"],
+            blob2["contents"]["packages"]["base"]
+            + blob2["contents"]["packages"]["cache"],
             keyf=lambda package: package["name"],
         )
 
@@ -293,13 +305,16 @@ def main():
     # Diff the whole file text just in case. This should never fail,
     # as we should have covered all diffs above -- if it does there's a bug
     # in the diff logic.
-    for line_pair in zip_longest(images_manifest_gn_str.splitlines(),
-                                 images_manifest_bzl_str.splitlines()):
+    for line_pair in zip_longest(
+        images_manifest_gn_str.splitlines(),
+        images_manifest_bzl_str.splitlines(),
+    ):
         if line_pair[0] != line_pair[1]:
             print(f"Unexpected diff found: {line_pair}")
             print(
                 f"Please check {args.output1.name} and {args.output2.name} to compare"
-                " the normalized outputs.")
+                " the normalized outputs."
+            )
             return 1
 
     return 0

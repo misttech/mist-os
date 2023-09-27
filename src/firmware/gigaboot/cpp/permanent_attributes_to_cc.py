@@ -29,7 +29,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "permanent_attributes", help="path to permanent attributes file")
+        "permanent_attributes", help="path to permanent attributes file"
+    )
     parser.add_argument("out", help="path to output file")
 
     return parser.parse_args()
@@ -66,14 +67,19 @@ def main() -> int:
                         return cpp20::span{%s};
                     }
                 }
-                """ % (
+                """
+                % (
                     byte_array_declaration(
-                        attr_data, PERMANENT_ATTRIBUTE_ARRAY_NAME),
+                        attr_data, PERMANENT_ATTRIBUTE_ARRAY_NAME
+                    ),
                     byte_array_declaration(
-                        attr_data_hash, PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME),
+                        attr_data_hash, PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME
+                    ),
                     PERMANENT_ATTRIBUTE_ARRAY_NAME,
                     PERMANENT_ATTRIBUTE_HASH_ARRAY_NAME,
-                )))
+                )
+            )
+        )
 
     return 0
 

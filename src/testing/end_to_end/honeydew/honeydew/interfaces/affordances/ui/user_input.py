@@ -20,12 +20,12 @@ class UserInput(abc.ABC):
 
     @abc.abstractmethod
     def tap(
-            self,
-            location: custom_types.Coordinate,
-            touch_screen_size: custom_types.
-        Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
-            tap_event_count: int = DEFAULTS["TAP_EVENT_COUNT"],
-            duration: int = DEFAULTS["DURATION"]) -> None:
+        self,
+        location: custom_types.Coordinate,
+        touch_screen_size: custom_types.Size = DEFAULTS["TOUCH_SCREEN_SIZE"],
+        tap_event_count: int = DEFAULTS["TAP_EVENT_COUNT"],
+        duration: int = DEFAULTS["DURATION"],
+    ) -> None:
         """Instantiates Taps at coordinates (x, y) for a touchscreen with
            default or custom width, height, duration, and tap event counts.
 

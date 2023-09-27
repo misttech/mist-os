@@ -16,20 +16,20 @@ import cl_utils
 from pathlib import Path
 from typing import AbstractSet, Dict, Iterable, Optional, Sequence, Tuple
 
-_RUSTC_FUSED_FLAGS = {'-C', '-L', '-Z'}
+_RUSTC_FUSED_FLAGS = {"-C", "-L", "-Z"}
 
 
 def _remove_prefix(base: str, prefix: str) -> str:
     # str.removeprefix is only available in Python 3.9+
     if base.startswith(prefix):
-        return base[len(prefix):]
+        return base[len(prefix) :]
     return base
 
 
 def _remove_suffix(base: str, suffix: str) -> str:
     # str.removesuffix is only available in Python 3.9+
     if base.endswith(suffix):
-        return base[:-len(suffix)]
+        return base[: -len(suffix)]
     return base
 
 
@@ -72,14 +72,13 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--emit",
-        action='append',
+        action="append",
         default=[],
-        help=
-        "Types of outputs to produce.  Values can be 'key' or 'key=value' form.",
+        help="Types of outputs to produce.  Values can be 'key' or 'key=value' form.",
     )
     parser.add_argument(
         "--extern",
-        action='append',
+        action="append",
         default=[],
         metavar="LIB:PATH",
         help="Specify where transitive dependencies can be found",
@@ -88,8 +87,8 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
         parser.add_argument(
             f,
             type=str,
-            action='append',
-            dest="{}_flags".format(f.lstrip('-')),
+            action="append",
+            dest="{}_flags".format(f.lstrip("-")),
             default=[],
             help=f"All {f}* flags",
         )
@@ -135,14 +134,15 @@ def is_linkable(f: str) -> bool:
     # f might not be a Path
     return any(
         f.endswith(suffix)
-        for suffix in ('.a', '.o', '.so', '.dylib', '.so.debug', '.ld'))
+        for suffix in (".a", ".o", ".so", ".dylib", ".so.debug", ".ld")
+    )
 
 
 def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
     for tok in command:
-        if tok.endswith('.rs'):
+        if tok.endswith(".rs"):
             yield RustcInput(file=Path(tok), type=InputType.SOURCE)
-        elif tok.startswith('@'):
+        elif tok.startswith("@"):
             yield RustcInput(file=Path(tok[1:]), type=InputType.SOURCE)
         elif is_linkable(tok):
             yield RustcInput(file=Path(tok), type=InputType.LINKABLE)
@@ -150,7 +150,7 @@ def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
 
 def find_compiler_from_command(command: Iterable[str]) -> Path:
     for tok in command:
-        if 'rustc' in tok:
+        if "rustc" in tok:
             return Path(tok)
     return None  # or raise error
 
@@ -166,33 +166,47 @@ class RustAction(object):
         # expand response files
         rsp_files = []
         self._rsp_expanded_command = list(
-            cl_utils.expand_response_files(self.original_command, rsp_files))
+            cl_utils.expand_response_files(self.original_command, rsp_files)
+        )
         self._response_files = set(rsp_files)
 
         # analyze response-file-expanded command using canonical expanded-flag form
-        self._attributes, remaining_args = _RUSTC_COMMAND_SCANNER.parse_known_args(
+        (
+            self._attributes,
+            remaining_args,
+        ) = _RUSTC_COMMAND_SCANNER.parse_known_args(
             list(
                 cl_utils.expand_fused_flags(
-                    self.rsp_expanded_command, _RUSTC_FUSED_FLAGS)))
+                    self.rsp_expanded_command, _RUSTC_FUSED_FLAGS
+                )
+            )
+        )
         self._compiler = find_compiler_from_command(remaining_args)
         self._env = [
-            tok for tok in
-            remaining_args[:remaining_args.index(str(self._compiler))]
-            if '=' in tok
+            tok
+            for tok in remaining_args[
+                : remaining_args.index(str(self._compiler))
+            ]
+            if "=" in tok
         ]
         self._crate_type = parse_crate_type(self._attributes.crate_type)
         self._direct_inputs = list(find_direct_inputs(remaining_args))
         self._C_flags = cl_utils.keyed_flags_to_values_dict(
-            self._attributes.C_flags)
+            self._attributes.C_flags
+        )
         self._Z_flags = cl_utils.keyed_flags_to_values_dict(
-            self._attributes.Z_flags)
+            self._attributes.Z_flags
+        )
         self._L_flags = cl_utils.keyed_flags_to_values_dict(
-            self._attributes.L_flags)
+            self._attributes.L_flags
+        )
         self._emit = cl_utils.keyed_flags_to_values_dict(
-            cl_utils.flatten_comma_list(self._attributes.emit))
+            cl_utils.flatten_comma_list(self._attributes.emit)
+        )
         raw_extern = cl_utils.keyed_flags_to_values_dict(
             cl_utils.flatten_comma_list(self._attributes.extern),
-            convert_type=Path)
+            convert_type=Path,
+        )
         self._extern: Dict[str, Path] = {
             k: v[-1]  # last value wins
             for k, v in raw_extern.items()
@@ -205,17 +219,17 @@ class RustAction(object):
         self._want_sysroot_libgcc = False
         self._link_arg_files: Sequence[Path] = []
         for arg in self._link_arg_flags:
-            if arg == '-lgcc':
+            if arg == "-lgcc":
                 self._want_sysroot_libgcc = True
                 continue
-            left, sep, right = arg.partition('=')
-            if left == '--sysroot':
+            left, sep, right = arg.partition("=")
+            if left == "--sysroot":
                 self._c_sysroot = Path(right)
                 continue
-            if left == '-fuse-ld':
+            if left == "-fuse-ld":
                 self._use_ld = Path(right)
                 continue
-            if left == '--soname':
+            if left == "--soname":
                 # `-Clink-arg=--soname=foo.so` is intended to set the DT_SONAME
                 # for the shared object and is not an input or output file that
                 # needs to be relativized.
@@ -254,14 +268,18 @@ class RustAction(object):
     @property
     def needs_linker(self) -> bool:
         return self.crate_type in {
-            CrateType.BINARY, CrateType.PROC_MACRO, CrateType.DYLIB,
-            CrateType.CDYLIB
+            CrateType.BINARY,
+            CrateType.PROC_MACRO,
+            CrateType.DYLIB,
+            CrateType.CDYLIB,
         }
 
     @property
     def main_output_is_executable(self) -> bool:
         return self.crate_type in {
-            CrateType.BINARY, CrateType.DYLIB, CrateType.CDYLIB
+            CrateType.BINARY,
+            CrateType.DYLIB,
+            CrateType.CDYLIB,
         }
 
     @property
@@ -288,28 +306,32 @@ class RustAction(object):
 
     @property
     def emit_llvm_ir(self) -> bool:
-        return 'llvm-ir' in self.emit
+        return "llvm-ir" in self.emit
 
     @property
     def emit_llvm_bc(self) -> bool:
-        return 'llvm-bc' in self.emit
+        return "llvm-bc" in self.emit
 
     @property
     def save_analysis(self) -> bool:
-        return cl_utils.last_value_of_dict_flag(
-            self._Z_flags, 'save-analysis', 'no') == 'yes'
+        return (
+            cl_utils.last_value_of_dict_flag(
+                self._Z_flags, "save-analysis", "no"
+            )
+            == "yes"
+        )
 
     @property
     def llvm_time_trace(self) -> bool:
-        return 'llvm-time-trace' in self._Z_flags
+        return "llvm-time-trace" in self._Z_flags
 
     @property
     def extra_filename(self) -> str:
-        return cl_utils.last_value_of_dict_flag(self._C_flags, 'extra-filename')
+        return cl_utils.last_value_of_dict_flag(self._C_flags, "extra-filename")
 
     @property
     def depfile(self) -> Optional[Path]:
-        d = cl_utils.last_value_of_dict_flag(self.emit, 'dep-info', '')
+        d = cl_utils.last_value_of_dict_flag(self.emit, "dep-info", "")
         return Path(d) if d else None
 
     @property
@@ -318,12 +340,12 @@ class RustAction(object):
 
     @property
     def linker(self) -> Optional[Path]:
-        d = cl_utils.last_value_of_dict_flag(self._C_flags, 'linker')
+        d = cl_utils.last_value_of_dict_flag(self._C_flags, "linker")
         return Path(d) if d else None
 
     @property
     def _link_arg_flags(self) -> Sequence[str]:
-        return self._C_flags.get('link-arg', [])
+        return self._C_flags.get("link-arg", [])
 
     @property
     def link_arg_files(self) -> Sequence[Path]:
@@ -332,18 +354,19 @@ class RustAction(object):
     @property
     def link_map_output(self) -> Optional[Path]:
         # The linker can produce a .map output file.
-        for arg in self._C_flags.get('link-args', []):
-            if arg.startswith('--Map='):
-                return Path(_remove_prefix(arg, '--Map='))
+        for arg in self._C_flags.get("link-args", []):
+            if arg.startswith("--Map="):
+                return Path(_remove_prefix(arg, "--Map="))
         return None
 
     def default_rust_sysroot(self) -> Path:
         """This is the relative location of rust sysroot, when unspecified."""
-        command = [str(self.compiler), '--print', 'sysroot']
+        command = [str(self.compiler), "--print", "sysroot"]
         result = cl_utils.subprocess_call(
-            command, cwd=self.working_dir, quiet=True)
+            command, cwd=self.working_dir, quiet=True
+        )
         if result.returncode != 0:
-            raise RuntimeError('Error: unable to infer default rust sysroot')
+            raise RuntimeError("Error: unable to infer default rust sysroot")
         # expect one line with the absolute path to the sysroot
         sysroot_abs = Path(result.stdout[0].strip())
         sysroot_rel = cl_utils.relpath(sysroot_abs, start=self.working_dir)
@@ -360,7 +383,7 @@ class RustAction(object):
 
     @property
     def native(self) -> Sequence[Path]:
-        return [Path(p) for p in self._L_flags.get('native', [])]
+        return [Path(p) for p in self._L_flags.get("native", [])]
 
     @property
     def native_link_arg_files(self) -> Iterable[Path]:
@@ -392,7 +415,8 @@ class RustAction(object):
         # wants to append something to the result to form a Path name.
         if not self.output_file:
             raise RuntimeError(
-                'Cannot infer stem name without a named -o output file')
+                "Cannot infer stem name without a named -o output file"
+            )
         return str(self.output_file.parent / self.output_file.stem)
 
     @property
@@ -404,17 +428,18 @@ class RustAction(object):
     def extra_output_files(self) -> Iterable[Path]:
         base = self._auxiliary_output_path
         if self.emit_llvm_ir:
-            yield Path(base + '.ll')
+            yield Path(base + ".ll")
         if self.emit_llvm_bc:
-            yield Path(base + '.bc')
+            yield Path(base + ".bc")
         if self.save_analysis:
             # Path() construction already normalizes away any leading './'
             analysis_file = Path(
-                'save-analysis-temp',
-                Path(self._auxiliary_output_path + '.json').name)
+                "save-analysis-temp",
+                Path(self._auxiliary_output_path + ".json").name,
+            )
             yield analysis_file
         if self.llvm_time_trace:
-            trace_file = Path(self._output_file_base + '.llvm_timings.json')
+            trace_file = Path(self._output_file_base + ".llvm_timings.json")
             yield trace_file
         link_map = self.link_map_output
         if link_map:
@@ -423,7 +448,9 @@ class RustAction(object):
     def dep_only_command(self, depfile_name: str) -> Iterable[str]:
         """Generate a command that only produces a depfile."""
         new_emit_args = [
-            f'--emit=dep-info={depfile_name}', '-Z', 'binary-dep-depinfo'
+            f"--emit=dep-info={depfile_name}",
+            "-Z",
+            "binary-dep-depinfo",
         ]
         replaced_emit = False
         # Use the original command (without response files expanded)
@@ -431,7 +458,7 @@ class RustAction(object):
         # Because of this, this transformation on --emit only works
         # when the --emit argument is not buried inside a response file.
         for tok in self.original_command:
-            if tok.startswith('--emit'):  # replace the original emit
+            if tok.startswith("--emit"):  # replace the original emit
                 if replaced_emit:
                     pass
                 else:

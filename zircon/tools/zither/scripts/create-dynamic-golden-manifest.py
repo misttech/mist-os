@@ -16,17 +16,18 @@ def main():
     parser.add_argument(
         "--source-dir",
         help="A source directory under which to register goldens",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--candidates",
-        help=
-        "A path to a manifest of golden candidates in the form of a JSON list",
-        required=True)
+        help="A path to a manifest of golden candidates in the form of a JSON list",
+        required=True,
+    )
     parser.add_argument(
         "--output",
-        help=
-        "Path at which to write a golden comparison JSON manifest (a la golden_files())",
-        required=True)
+        help="Path at which to write a golden comparison JSON manifest (a la golden_files())",
+        required=True,
+    )
     args = parser.parse_args()
 
     with open(args.candidates) as f:
@@ -36,7 +37,8 @@ def main():
         dict(
             candidate=candidate,
             golden=os.path.join(args.source_dir, os.path.basename(candidate)),
-        ) for candidate in candidates
+        )
+        for candidate in candidates
     ]
 
     with open(args.output, "w") as output:
@@ -45,5 +47,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

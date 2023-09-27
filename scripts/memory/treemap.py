@@ -17,32 +17,34 @@ import sys
 import os.path
 import textwrap
 
-FUCHSIA_DIR = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir, os.pardir))
+FUCHSIA_DIR = os.path.abspath(
+    os.path.join(__file__, os.pardir, os.pardir, os.pardir)
+)
 
 # Magic value for nodes with empty names.
-UNNAMED_NAME = '<unnamed>'
+UNNAMED_NAME = "<unnamed>"
 
 
 class Node(object):
     """A generic node in the kernel/job/process/memory tree."""
 
     def __init__(self):
-        self.type = ''
+        self.type = ""
         self.koid = 0
-        self.name = ''
+        self.name = ""
         self.area = 0
         self.children = []
 
     def html_label(self):
         """Returns a safe HTML string that identifies this Node."""
-        tag = ''
+        tag = ""
         if self.type:
-            tag = ('<span class="treemap-node-type '
-                   'treemap-node-type-{}">{}</span> ').format(
-                           cgi.escape(self.type[0]),
-                           cgi.escape(self.type[0].upper()))
-        if self.name in ('', UNNAMED_NAME):
-            name = '<i>UNNAMED</i> [koid {}]'.format(self.koid)
+            tag = (
+                '<span class="treemap-node-type '
+                'treemap-node-type-{}">{}</span> '
+            ).format(cgi.escape(self.type[0]), cgi.escape(self.type[0].upper()))
+        if self.name in ("", UNNAMED_NAME):
+            name = "<i>UNNAMED</i> [koid {}]".format(self.koid)
         else:
             name = cgi.escape(self.name)
         return tag + name
@@ -78,8 +80,10 @@ def sum_area(node):
     # Area should either be set explicitly or calculated from the children.
     if node.children and (node.area != 0):
         raise AssertionError(
-                'Node {} has {} children and non-zero area {}'.format(
-                        node.name, len(node.children), node.area))
+            "Node {} has {} children and non-zero area {}".format(
+                node.name, len(node.children), node.area
+            )
+        )
     node.area += sum(map(sum_area, node.children))
     return node.area
 
@@ -101,7 +105,7 @@ def format_size(nbytes):
     Returns:
         The formatted string
     """
-    units = 'BkMGTPE'
+    units = "BkMGTPE"
     ui = 0
     r = 0
     whole = True
@@ -114,7 +118,7 @@ def format_size(nbytes):
         nbytes //= 1024
 
     if whole:
-        return '{}{}'.format(nbytes, units[ui])
+        return "{}{}".format(nbytes, units[ui])
 
     round_up = (r % 100) >= 50
     r = (r // 100) + round_up
@@ -122,7 +126,7 @@ def format_size(nbytes):
         nbytes += 1
         r = 0
 
-    return '{}.{}{}'.format(nbytes, r, units[ui])
+    return "{}.{}{}".format(nbytes, r, units[ui])
 
 
 # Enum for tracking VMO reference types.
@@ -140,21 +144,21 @@ def populate_process(process_node, process_record, hide_aggregated=True):
                 that have been aggregated by name into a single Node
     """
     # If there aren't any VMOs, use the sizes in the record.
-    if not process_record.get('vmo_refs', []):
+    if not process_record.get("vmo_refs", []):
         # Get the breakdown.
-        priv = process_record.get('private_bytes', 0)
-        pss = process_record.get('pss_bytes', 0)
+        priv = process_record.get("private_bytes", 0)
+        pss = process_record.get("pss_bytes", 0)
         shared = max(0, pss - priv)  # Kernel calls this "scaled shared"
 
-        pid = process_record['id']
+        pid = process_record["id"]
         if priv:
-            node = lookup(pid + '/priv')
-            node.name = 'Private'
+            node = lookup(pid + "/priv")
+            node.name = "Private"
             node.area = priv
             process_node.children.append(node)
         if shared:
-            node = lookup(pid + '/shared')
-            node.name = 'Proportional shared'
+            node = lookup(pid + "/shared")
+            node.name = "Proportional shared"
             node.area = shared
             process_node.children.append(node)
         # The process's area will be set to the sum of the children.
@@ -163,11 +167,11 @@ def populate_process(process_node, process_record, hide_aggregated=True):
 
     # Build the set of reference types from this process to its VMOs.
     koid_to_ref_types = collections.defaultdict(set)
-    for vmo_ref in process_record.get('vmo_refs', []):
-        ref_types = koid_to_ref_types[vmo_ref['vmo_koid']]
-        if 'HANDLE' in vmo_ref['via']:
+    for vmo_ref in process_record.get("vmo_refs", []):
+        ref_types = koid_to_ref_types[vmo_ref["vmo_koid"]]
+        if "HANDLE" in vmo_ref["via"]:
             ref_types.update([VIA_HANDLE])
-        if 'MAPPING' in vmo_ref['via']:
+        if "MAPPING" in vmo_ref["via"]:
             ref_types.update([VIA_MAPPING])
 
     # De-dup the set of VMOs known to the process, and group them by name. Each
@@ -175,20 +179,20 @@ def populate_process(process_node, process_record, hide_aggregated=True):
     # committed_bytes) because they were snapshotted at different times.
     name_to_vmo = collections.defaultdict(list)
     koid_to_vmo = dict()
-    id_prefix = '{}/vmo'.format(process_record['id'])
-    for vmo in process_record.get('vmos', []):
+    id_prefix = "{}/vmo".format(process_record["id"])
+    for vmo in process_record.get("vmos", []):
         # Although multiple processes may point to the same VMO, we're building
         # a tree and thus need to create unique IDs for VMOs under this process.
-        vmo_koid = vmo['koid']
-        vmo_id = '{}/{}'.format(id_prefix, vmo_koid)
+        vmo_koid = vmo["koid"]
+        vmo_id = "{}/{}".format(id_prefix, vmo_koid)
         vmo_node = lookup(vmo_id)
         if vmo_node.name:
             # This is a duplicate of a VMO we've already seen.
             continue
 
-        vmo_node.type = 'vmo'
+        vmo_node.type = "vmo"
         vmo_node.koid = vmo_koid
-        vmo_node.name = vmo['name'] if vmo['name'] else UNNAMED_NAME
+        vmo_node.name = vmo["name"] if vmo["name"] else UNNAMED_NAME
         name_to_vmo[vmo_node.name].append(vmo_node)
         koid_to_vmo[vmo_koid] = vmo_node
 
@@ -202,7 +206,8 @@ def populate_process(process_node, process_record, hide_aggregated=True):
             # but we're counting all of them. This isn't necessarily wrong,
             # just different.
             vmo_node.area = int(
-                    float(vmo['committed_bytes']) / vmo['share_count'])
+                float(vmo["committed_bytes"]) / vmo["share_count"]
+            )
             # NB: This counts as private memory if share_count is 1.
         else:
             # The process only has a handle to this VMO but does not map it: the
@@ -212,8 +217,9 @@ def populate_process(process_node, process_record, hide_aggregated=True):
             # share_count. This may over-estimate this process's share, because
             # other processes could also have handle-only references that we
             # don't know about.
-            vmo_node.area = int(float(vmo['committed_bytes']) /
-                                (float(vmo['share_count']) + 1))
+            vmo_node.area = int(
+                float(vmo["committed_bytes"]) / (float(vmo["share_count"]) + 1)
+            )
 
     # Create the aggregated VMO nodes.
     children = []
@@ -224,10 +230,10 @@ def populate_process(process_node, process_record, hide_aggregated=True):
             children.extend(vmos)
         else:
             # Create a parent VMO for all of these VMOs with the same name.
-            parent_id = '{}/{}'.format(id_prefix, name)
+            parent_id = "{}/{}".format(id_prefix, name)
             pnode = lookup(parent_id)
-            pnode.name = '{}[{}]'.format(name, len(vmos))
-            pnode.type = 'vmo'
+            pnode.name = "{}[{}]".format(name, len(vmos))
+            pnode.type = "vmo"
             if hide_aggregated:
                 pnode.area = sum(map(sum_area, vmos))
                 # And then drop the vmo nodes on the ground (by not adding
@@ -254,17 +260,17 @@ def build_webtreemap(node):
         A webtreemap-compatible dict representing the tree
     """
     return {
-            'name': '{} ({})'.format(node.html_label(), format_size(node.area)),
-            'data': {
-                    '$area': node.area,
-                    # TODO(dbort): Turn this on and style different node types
-                    # if https://github.com/evmar/webtreemap/pull/15 is
-                    # accepted. Would define a class like
-                    # 'webtreemap-symbol-<type>' but there's a bug in
-                    # webtreemap.js.
-                    # '$symbol': node.type,
-            },
-            'children': list(map(build_webtreemap, node.children))
+        "name": "{} ({})".format(node.html_label(), format_size(node.area)),
+        "data": {
+            "$area": node.area,
+            # TODO(dbort): Turn this on and style different node types
+            # if https://github.com/evmar/webtreemap/pull/15 is
+            # accepted. Would define a class like
+            # 'webtreemap-symbol-<type>' but there's a bug in
+            # webtreemap.js.
+            # '$symbol': node.type,
+        },
+        "children": list(map(build_webtreemap, node.children)),
     }
 
 
@@ -285,82 +291,90 @@ def dump_html_table(node, depth=0, parent_area=None, total_area=None):
 
     if not depth:
         # We're the root node. Dump the headers.
-        lines.extend([
-                '<style>',
-                'table#tree {',
-                '    border-collapse: collapse;',
-                '    border-spacing: 0;',
-                '}',
-                'table#tree tr:nth-child(even) {',
-                '    background-color: #eee;',
-                '}',
-                'table#tree tr:nth-child(odd) {',
-                '    background-color: #fff;',
-                '}',
-                'table#tree tr:hover {',
-                '    background-color: #ff8;',
-                '}',
-                'table#tree td {',
-                '    text-align: right;',
-                '    padding-left: 1em;',
-                '    padding-right: 1em;',
-                '    font-family:Consolas,Monaco,Lucida Console,',
-                '        Liberation Mono,DejaVu Sans Mono,',
-                '        Bitstream Vera Sans Mono,Courier New,monospace;',
-                '}',
-                'table#tree td.name {',
-                '    text-align: left;',
-                '}',
-                '</style>',
+        lines.extend(
+            [
+                "<style>",
+                "table#tree {",
+                "    border-collapse: collapse;",
+                "    border-spacing: 0;",
+                "}",
+                "table#tree tr:nth-child(even) {",
+                "    background-color: #eee;",
+                "}",
+                "table#tree tr:nth-child(odd) {",
+                "    background-color: #fff;",
+                "}",
+                "table#tree tr:hover {",
+                "    background-color: #ff8;",
+                "}",
+                "table#tree td {",
+                "    text-align: right;",
+                "    padding-left: 1em;",
+                "    padding-right: 1em;",
+                "    font-family:Consolas,Monaco,Lucida Console,",
+                "        Liberation Mono,DejaVu Sans Mono,",
+                "        Bitstream Vera Sans Mono,Courier New,monospace;",
+                "}",
+                "table#tree td.name {",
+                "    text-align: left;",
+                "}",
+                "</style>",
                 '<table id="tree">',
-                '<tr>',
-                '<th>Name</th>',
-                '<th>Size<br/>(bytes/1024^n)</th>',
-                '<th>Size (bytes)</th>',
-                '<th>Fraction of parent</th>',
-                '<th>Fraction of total</th>',
-                '</tr>',
-        ])
+                "<tr>",
+                "<th>Name</th>",
+                "<th>Size<br/>(bytes/1024^n)</th>",
+                "<th>Size (bytes)</th>",
+                "<th>Fraction of parent</th>",
+                "<th>Fraction of total</th>",
+                "</tr>",
+            ]
+        )
 
-    lines.extend([
-            '<tr>',
+    lines.extend(
+        [
+            "<tr>",
             # Indent the names based on depth.
             '<td class="name"><span style="color:#bbb">{indent}</span>'
-            '{label}</td>'.format(
-                    indent=('|' + '&nbsp;' * 2) * depth,
-                    label=node.html_label()),
-            '<td>{fsize}</td>'.format(fsize=format_size(node.area)),
-            '<td>{size}</td>'.format(size=node.area),
-    ])
+            "{label}</td>".format(
+                indent=("|" + "&nbsp;" * 2) * depth, label=node.html_label()
+            ),
+            "<td>{fsize}</td>".format(fsize=format_size(node.area)),
+            "<td>{size}</td>".format(size=node.area),
+        ]
+    )
 
     if depth:
         # We're not the root node.
         pfrac = node.area / float(parent_area) if parent_area else 0
         tfrac = node.area / float(total_area) if total_area else 0
         for frac in (pfrac, tfrac):
-            lines.extend([
-                    ('<td>{pct:.3f}%&nbsp;'
-                     '<progress value="{frac}"></progress></td>')
-                    .format(pct=frac * 100, frac=frac)
-            ])
+            lines.extend(
+                [
+                    (
+                        "<td>{pct:.3f}%&nbsp;"
+                        '<progress value="{frac}"></progress></td>'
+                    ).format(pct=frac * 100, frac=frac)
+                ]
+            )
     else:
-        lines.append('<td></td>' * 2)
-    lines.append('</tr>')
+        lines.append("<td></td>" * 2)
+    lines.append("</tr>")
 
     if total_area is None:
         total_area = node.area
 
     # Append children by size, largest to smallest.
     def dump_child(child):
-        return dump_html_table(child, depth=depth+1,
-                               parent_area=node.area, total_area=total_area)
+        return dump_html_table(
+            child, depth=depth + 1, parent_area=node.area, total_area=total_area
+        )
 
     children = sorted(node.children, reverse=True, key=lambda n: n.area)
     for line in [dump_child(c) for c in children]:
         lines.extend(line)
 
     if not depth:
-        lines.append('</table>')
+        lines.append("</table>")
 
     return lines
 
@@ -382,36 +396,36 @@ def build_tree(dataset):
     root_job = None
 
     for record in dataset:
-        record_type = record['type']
+        record_type = record["type"]
         # Only read certain types.
-        if record_type not in ('kernel', 'j', 'p'):
+        if record_type not in ("kernel", "j", "p"):
             continue
-        node = lookup(record['id'])
+        node = lookup(record["id"])
         node.type = record_type
-        node.koid = record.get('koid', 0)
-        node.name = record['name']
-        if record_type == 'kernel':
-            node.area = record.get('size_bytes', 0)
-        elif record_type == 'j':
-            if record['parent'].startswith('kernel/'):
-                assert not root_job, 'Found multiple root jobs'
+        node.koid = record.get("koid", 0)
+        node.name = record["name"]
+        if record_type == "kernel":
+            node.area = record.get("size_bytes", 0)
+        elif record_type == "j":
+            if record["parent"].startswith("kernel/"):
+                assert not root_job, "Found multiple root jobs"
                 root_job = node
-        elif record_type == 'p':
+        elif record_type == "p":
             # Add the process's children, which will determine its area.
             populate_process(node, record)
-        if not record['parent']:
+        if not record["parent"]:
             # The root node has an empty parent.
-            assert not root_node, 'Found multiple root objects'
+            assert not root_node, "Found multiple root objects"
             root_node = node
         else:
-            parent_node = lookup(record['parent'])
+            parent_node = lookup(record["parent"])
             parent_node.children.append(node)
 
-    assert root_node, 'Did not find root object'
-    assert root_job, 'Did not find root job'
+    assert root_node, "Did not find root object"
+    assert root_job, "Did not find root job"
 
     # A better name for physmem.
-    lookup('kernel/physmem').name = 'All physical memory'
+    lookup("kernel/physmem").name = "All physical memory"
 
     # Sum up the job tree. Don't touch kernel entries, which already have
     # the correct sizes.
@@ -419,16 +433,16 @@ def build_tree(dataset):
 
     # The root job is usually named "root";
     # make it more clear that it's a job.
-    root_job.name = 'root job'
+    root_job.name = "root job"
 
     # Give users a hint that processes live in the VMO entry.
-    kvmo_node = lookup('kernel/vmo')
-    kvmo_node.name = 'VMOs/processes'
+    kvmo_node = lookup("kernel/vmo")
+    kvmo_node.name = "VMOs/processes"
 
     # Create a fake entry to cover the portion of kernel/vmo that isn't
     # covered by the job tree.
-    node = lookup('kernel/vmo/unknown')
-    node.name = 'unknown (kernel & unmapped)'
+    node = lookup("kernel/vmo/unknown")
+    node.name = "unknown (kernel & unmapped)"
     node.area = kvmo_node.area - root_job.area
     kvmo_node.children.append(node)
 
@@ -441,7 +455,7 @@ def print_html_document(root_node):
     Args:
         root_node: The Node at the root of the tree to walk
     """
-    html = '''\
+    html = """\
     <!DOCTYPE html>
     <title>Memory usage</title>
     <script>
@@ -497,11 +511,19 @@ def print_html_document(root_node):
 
     <hr>
     %(table)s
-    ''' % {
-            'json': json.dumps(build_webtreemap(root_node)),
-            'table': ' '.join(dump_html_table(root_node)),
-            'css': os.path.join(FUCHSIA_DIR, 'scripts', 'third_party', 'webtreemap', 'webtreemap.css'),
-            'js': os.path.join(FUCHSIA_DIR, 'scripts', 'third_party', 'webtreemap', 'webtreemap.js'),
+    """ % {
+        "json": json.dumps(build_webtreemap(root_node)),
+        "table": " ".join(dump_html_table(root_node)),
+        "css": os.path.join(
+            FUCHSIA_DIR,
+            "scripts",
+            "third_party",
+            "webtreemap",
+            "webtreemap.css",
+        ),
+        "js": os.path.join(
+            FUCHSIA_DIR, "scripts", "third_party", "webtreemap", "webtreemap.js"
+        ),
     }
     print(textwrap.dedent(html))
 
@@ -511,5 +533,5 @@ def main():
     print_html_document(root_node)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

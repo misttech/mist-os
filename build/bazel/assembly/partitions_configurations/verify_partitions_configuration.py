@@ -21,8 +21,8 @@ def file_sha1(path):
 
 def rewrite_legacy_ninja_build_outputs_path(p):
     return p.replace(
-        'workspace/external/legacy_ninja_build_outputs',
-        'output_base/external/legacy_ninja_build_outputs',
+        "workspace/external/legacy_ninja_build_outputs",
+        "output_base/external/legacy_ninja_build_outputs",
     )
 
 
@@ -56,16 +56,19 @@ def normalize(config, root_dir, extra_files_read):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compares assembly partitions configurations")
+        description="Compares assembly partitions configurations"
+    )
     parser.add_argument(
-        "--partitions_config1", type=argparse.FileType("r"), required=True)
+        "--partitions_config1", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
         "--root_dir1",
         help="Directory where paths in --partitions_config1 are relative to",
         required=True,
     )
     parser.add_argument(
-        "--partitions_config2", type=argparse.FileType("r"), required=True)
+        "--partitions_config2", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
         "--root_dir2",
         help="Directory where paths in --partitions_config2 are relative to",
@@ -83,9 +86,11 @@ def main():
     normalize(partitions_config2, args.root_dir2, extra_files_read)
 
     partitions_config1_str = json.dumps(
-        partitions_config1, sort_keys=True, indent=2).splitlines()
+        partitions_config1, sort_keys=True, indent=2
+    ).splitlines()
     partitions_config2_str = json.dumps(
-        partitions_config2, sort_keys=True, indent=2).splitlines()
+        partitions_config2, sort_keys=True, indent=2
+    ).splitlines()
 
     diff = difflib.unified_diff(
         partitions_config1_str,
@@ -99,12 +104,14 @@ def main():
     args.output.write(diffstr)
 
     args.depfile.write(
-        "{}: {}".format(args.output.name, " ".join(extra_files_read)))
+        "{}: {}".format(args.output.name, " ".join(extra_files_read))
+    )
 
     if len(diffstr) != 0:
         print(
             "Error: non-empty diff between canonical json"
-            f" representations:\n{diffstr}")
+            f" representations:\n{diffstr}"
+        )
         return 1
 
     return 0

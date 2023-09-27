@@ -12,7 +12,6 @@ from parameterized import parameterized, param
 
 
 class CompareJsonListTest(unittest.TestCase):
-
     @parameterized.expand(
         [
             param(
@@ -77,7 +76,8 @@ class CompareJsonListTest(unittest.TestCase):
                     ]
                 }""",
             ),
-        ])
+        ]
+    )
     def test_run_main(self, exit_code, key, prefixes, reference, comparison):
         with tempfile.TemporaryDirectory() as tmpdir:
             stamp_path = os.path.join(tmpdir, "stamp")
@@ -88,8 +88,13 @@ class CompareJsonListTest(unittest.TestCase):
             with open(comparison_path, "w") as file:
                 file.write(comparison)
             sys.argv = [
-                "", "--reference", reference_path, "--comparison",
-                comparison_path, "--stamp", stamp_path
+                "",
+                "--reference",
+                reference_path,
+                "--comparison",
+                comparison_path,
+                "--stamp",
+                stamp_path,
             ]
             sys.argv.extend(["--strip-prefix"] + prefixes)
             sys.argv.extend(["--list-key", key])
@@ -117,13 +122,9 @@ class CompareJsonListTest(unittest.TestCase):
 
         prefixes = ["prefix1", "prefix2"]
         one = compare_json_list.make_hashable(
-            {
-                "one": "prefix1/1",
-                "two": 2
-            }, prefixes)
+            {"one": "prefix1/1", "two": 2}, prefixes
+        )
         two = compare_json_list.make_hashable(
-            {
-                "one": "prefix2/1",
-                "two": 2
-            }, prefixes)
+            {"one": "prefix2/1", "two": 2}, prefixes
+        )
         self.assertEqual(1, len(set([one, two])))

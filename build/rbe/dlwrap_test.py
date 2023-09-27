@@ -21,7 +21,6 @@ from typing import Tuple
 
 
 class MainArgParserTests(unittest.TestCase):
-
     def test_defaults(self):
         args = dlwrap._MAIN_ARG_PARSER.parse_args([])
         self.assertFalse(args.verbose)
@@ -32,37 +31,40 @@ class MainArgParserTests(unittest.TestCase):
         self.assertEqual(args.command, [])
 
     def test_verbose(self):
-        args = dlwrap._MAIN_ARG_PARSER.parse_args(['--verbose'])
+        args = dlwrap._MAIN_ARG_PARSER.parse_args(["--verbose"])
         self.assertTrue(args.verbose)
 
     def test_dry_run(self):
-        args = dlwrap._MAIN_ARG_PARSER.parse_args(['--dry-run'])
+        args = dlwrap._MAIN_ARG_PARSER.parse_args(["--dry-run"])
         self.assertTrue(args.dry_run)
 
     def test_undownload(self):
-        args = dlwrap._MAIN_ARG_PARSER.parse_args(['--undownload'])
+        args = dlwrap._MAIN_ARG_PARSER.parse_args(["--undownload"])
         self.assertTrue(args.undownload)
 
     def test_download(self):
         args = dlwrap._MAIN_ARG_PARSER.parse_args(
-            ['--download', 'aa.o', 'bb.o'])
-        self.assertEqual(args.download, [Path('aa.o'), Path('bb.o')])
+            ["--download", "aa.o", "bb.o"]
+        )
+        self.assertEqual(args.download, [Path("aa.o"), Path("bb.o")])
 
     def test_download_list(self):
         args = dlwrap._MAIN_ARG_PARSER.parse_args(
-            ['--download_list', 'f1.rsp', 'f2.rsp'])
-        self.assertEqual(args.download_list, [Path('f1.rsp'), Path('f2.rsp')])
+            ["--download_list", "f1.rsp", "f2.rsp"]
+        )
+        self.assertEqual(args.download_list, [Path("f1.rsp"), Path("f2.rsp")])
 
     def test_command(self):
-        args = dlwrap._MAIN_ARG_PARSER.parse_args(['--', 'cat', 'dog.txt'])
-        self.assertEqual(args.command, ['cat', 'dog.txt'])
+        args = dlwrap._MAIN_ARG_PARSER.parse_args(["--", "cat", "dog.txt"])
+        self.assertEqual(args.command, ["cat", "dog.txt"])
 
 
 _fake_downloader = remotetool.RemoteTool(
     reproxy_cfg={
         "service": "foo.build.service:443",
         "instance": "my-project/remote/instances/default",
-    })
+    }
+)
 
 
 def _fake_download(
@@ -84,146 +86,165 @@ def _fake_download_fail(
 
 
 class DownloadArtifactsTests(unittest.TestCase):
-
     def _stub_info(self, path: Path) -> remote_action.DownloadStubInfo:
         return remote_action.DownloadStubInfo(
             path=path,
             type="file",
-            blob_digest='f33333df44444ce/124',
-            action_digest='47ac8eb38351/41',
-            build_id='50f93-a38e-b112',
+            blob_digest="f33333df44444ce/124",
+            action_digest="47ac8eb38351/41",
+            build_id="50f93-a38e-b112",
         )
 
     def test_success(self):
-        path = 'road/to/perdition.obj'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
+        path = "road/to/perdition.obj"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
         download_status = 0
-        with mock.patch.object(dlwrap, '_download_for_mp',
-                               new=_fake_download) as mock_download:
+        with mock.patch.object(
+            dlwrap, "_download_for_mp", new=_fake_download
+        ) as mock_download:
             status = dlwrap.download_artifacts(
-                [path],
-                downloader=_fake_downloader,
-                working_dir_abs=working_dir)
+                [path], downloader=_fake_downloader, working_dir_abs=working_dir
+            )
         self.assertEqual(status, download_status)
 
     def test_failure(self):
-        path = 'highway/to/hell.obj'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
+        path = "highway/to/hell.obj"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
         download_status = 1
-        with mock.patch.object(dlwrap, '_download_for_mp',
-                               new=_fake_download_fail) as mock_download:
+        with mock.patch.object(
+            dlwrap, "_download_for_mp", new=_fake_download_fail
+        ) as mock_download:
             status = dlwrap.download_artifacts(
-                [path],
-                downloader=_fake_downloader,
-                working_dir_abs=working_dir)
+                [path], downloader=_fake_downloader, working_dir_abs=working_dir
+            )
         self.assertEqual(status, download_status)
 
 
 class MainTests(unittest.TestCase):
-
     def test_dry_run(self):
-        path = 'dir/file.o'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=0) as mock_download:
-            with mock.patch.object(subprocess, 'call') as mock_run:
+        path = "dir/file.o"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=0
+        ) as mock_download:
+            with mock.patch.object(subprocess, "call") as mock_run:
                 status = dlwrap._main(
-                    ['--dry-run', '--', 'cat', 'foo'],
+                    ["--dry-run", "--", "cat", "foo"],
                     downloader=_fake_downloader,
-                    working_dir_abs=working_dir)
+                    working_dir_abs=working_dir,
+                )
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
     def test_download_fail(self):
-        path = 'dir/file.o'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=1) as mock_download:
-            with mock.patch.object(subprocess, 'call') as mock_run:
+        path = "dir/file.o"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=1
+        ) as mock_download:
+            with mock.patch.object(subprocess, "call") as mock_run:
                 status = dlwrap._main(
-                    ['--', 'cat', 'foo'],
+                    ["--", "cat", "foo"],
                     downloader=_fake_downloader,
-                    working_dir_abs=working_dir)
+                    working_dir_abs=working_dir,
+                )
         mock_download.assert_called_once()
         self.assertEqual(status, 1)
         mock_run.assert_not_called()
 
     def test_no_command(self):
-        path = 'dir/file.o'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=0) as mock_download:
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_run:
+        path = "dir/file.o"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=0
+        ) as mock_download:
+            with mock.patch.object(
+                subprocess, "call", return_value=0
+            ) as mock_run:
                 status = dlwrap._main(
-                    [],
-                    downloader=_fake_downloader,
-                    working_dir_abs=working_dir)
+                    [], downloader=_fake_downloader, working_dir_abs=working_dir
+                )
         self.assertEqual(status, 0)
         mock_run.assert_not_called()
 
     def test_success(self):
-        path = 'dir/file.o'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=0) as mock_download:
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_run:
+        path = "dir/file.o"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=0
+        ) as mock_download:
+            with mock.patch.object(
+                subprocess, "call", return_value=0
+            ) as mock_run:
                 status = dlwrap._main(
-                    ['--', 'cat', 'foo'],
+                    ["--", "cat", "foo"],
                     downloader=_fake_downloader,
-                    working_dir_abs=working_dir)
+                    working_dir_abs=working_dir,
+                )
         self.assertEqual(status, 0)
-        mock_run.assert_called_with(['cat', 'foo'])
+        mock_run.assert_called_with(["cat", "foo"])
 
     def test_success_from_list(self):
-        path = 'dir/file.o'
-        rspfile = 'f.rsp'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=0) as mock_download:
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_run:
-                with mock.patch.object(cl_utils, 'expand_paths_from_files',
-                                       return_value=iter(
-                                           [Path(path)])) as mock_expand_files:
+        path = "dir/file.o"
+        rspfile = "f.rsp"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=0
+        ) as mock_download:
+            with mock.patch.object(
+                subprocess, "call", return_value=0
+            ) as mock_run:
+                with mock.patch.object(
+                    cl_utils,
+                    "expand_paths_from_files",
+                    return_value=iter([Path(path)]),
+                ) as mock_expand_files:
                     status = dlwrap._main(
-                        ['--download_list', rspfile, '--', 'cat', 'foo'],
+                        ["--download_list", rspfile, "--", "cat", "foo"],
                         downloader=_fake_downloader,
-                        working_dir_abs=working_dir)
+                        working_dir_abs=working_dir,
+                    )
         self.assertEqual(status, 0)
         mock_expand_files.assert_called_with([Path(rspfile)])
-        mock_run.assert_called_with(['cat', 'foo'])
+        mock_run.assert_called_with(["cat", "foo"])
 
     def test_undownload(self):
-        path = 'dir/file.o'
-        exec_root = Path('/exec/root')
-        working_dir = exec_root / 'work'
-        with mock.patch.object(dlwrap, 'download_artifacts',
-                               return_value=0) as mock_download:
-            with mock.patch.object(remote_action,
-                                   'undownload') as mock_undownload:
-                with mock.patch.object(subprocess, 'call',
-                                       return_value=0) as mock_run:
+        path = "dir/file.o"
+        exec_root = Path("/exec/root")
+        working_dir = exec_root / "work"
+        with mock.patch.object(
+            dlwrap, "download_artifacts", return_value=0
+        ) as mock_download:
+            with mock.patch.object(
+                remote_action, "undownload"
+            ) as mock_undownload:
+                with mock.patch.object(
+                    subprocess, "call", return_value=0
+                ) as mock_run:
                     status = dlwrap._main(
                         [
-                            '--download', 'fetch.me', '--undownload', '--',
-                            'cat', 'foo'
+                            "--download",
+                            "fetch.me",
+                            "--undownload",
+                            "--",
+                            "cat",
+                            "foo",
                         ],
                         downloader=_fake_downloader,
-                        working_dir_abs=working_dir)
+                        working_dir_abs=working_dir,
+                    )
         self.assertEqual(status, 0)
         mock_download.assert_not_called()
         mock_undownload.assert_called()
         mock_run.assert_not_called()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

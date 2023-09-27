@@ -14,7 +14,7 @@ import sys
 _RE_IMPORT = re.compile(r'^\s*import(?:\s+public)?\s+"([^"]+)"\s*;\s*$')
 
 # A regular expression for package lines in protobuf input files
-_RE_PACKAGE = re.compile(r'^\s*package\s+([A-Za-z0-9_.]+)\s*;')
+_RE_PACKAGE = re.compile(r"^\s*package\s+([A-Za-z0-9_.]+)\s*;")
 
 
 def ExtractImports(proto, proto_dir, import_dirs):
@@ -44,8 +44,8 @@ def ExtractImports(proto, proto_dir, import_dirs):
                         imports.add(candidate_path)
                         # Transitively check imports.
                         imports.update(
-                            ExtractImports(
-                                imported, candidate_dir, import_dirs))
+                            ExtractImports(imported, candidate_dir, import_dirs)
+                        )
                         break
 
     return imports
@@ -75,33 +75,40 @@ def ExtractPackages(protos):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--protoc", required=True, help="Path to protoc compiler")
+        "--protoc", required=True, help="Path to protoc compiler"
+    )
     parser.add_argument(
-        "--prost_build", required=True, help="Path to prost_build tool")
+        "--prost_build", required=True, help="Path to prost_build tool"
+    )
     parser.add_argument("--out-dir", required=True, help="Output directory")
     parser.add_argument("--depfile", help="Ninja depfile output path.")
     parser.add_argument(
         "--expected-outputs",
-        nargs='+',
+        nargs="+",
         default=[],
-        help='List of expected outputs')
+        help="List of expected outputs",
+    )
     parser.add_argument(
         "--expected-packages",
-        nargs='+',
+        nargs="+",
         default=[],
-        help='List of expected packages')
+        help="List of expected packages",
+    )
     parser.add_argument(
-        "--gn-target", help='GN target label, used for error messages')
+        "--gn-target", help="GN target label, used for error messages"
+    )
     parser.add_argument(
         "--include-dirs",
-        action='append',
+        action="append",
         default=[],
-        help="Import directory for protos.")
+        help="Import directory for protos.",
+    )
     parser.add_argument(
         "--protos",
-        action='append',
+        action="append",
         default=[],
-        help="Input protobuf definition file(s)")
+        help="Input protobuf definition file(s)",
+    )
 
     args = parser.parse_args()
 
@@ -125,8 +132,11 @@ def main():
     for proto in args.protos:
         imports.update(
             ExtractImports(
-                os.path.basename(proto), os.path.dirname(proto),
-                args.include_dirs))
+                os.path.basename(proto),
+                os.path.dirname(proto),
+                args.include_dirs,
+            )
+        )
 
     # prost-build generates a lib.rs file, plus one <package>.rs file for
     # each package name used by the input protos or their transitive
@@ -134,62 +144,66 @@ def main():
     packages = ExtractPackages(args.protos + sorted(imports))
     if args.expected_packages:
         if not args.gn_target:
-            parser.error('--expected-packages requires --gn-target value!')
+            parser.error("--expected-packages requires --gn-target value!")
 
         expected_packages = sorted(args.expected_packages)
         if expected_packages != packages:
             missing_packages = set(packages) - set(expected_packages)
             if missing_packages:
-                error = f'ERROR: Missing `packages` values from {args.gn_target} definition:\n'
+                error = f"ERROR: Missing `packages` values from {args.gn_target} definition:\n"
                 for p in sorted(missing_packages):
-                    error += f'  {p}\n'
+                    error += f"  {p}\n"
                 print(error, file=sys.stderr)
             extra_packages = set(expected_packages) - set(packages)
             if extra_packages:
-                error = f'ERROR: Obsolete `packages` values from {args.gn_target} definition:\n'
+                error = f"ERROR: Obsolete `packages` values from {args.gn_target} definition:\n"
                 for p in sorted(extra_packages):
-                    error += f'  {p}\n'
+                    error += f"  {p}\n"
                 print(error, file=sys.stderr)
             return 1
 
     outputs = sorted(
-        [os.path.join(args.out_dir, 'lib.rs')] +
-        [os.path.join(args.out_dir, f'{package}.rs') for package in packages])
+        [os.path.join(args.out_dir, "lib.rs")]
+        + [os.path.join(args.out_dir, f"{package}.rs") for package in packages]
+    )
 
     if args.expected_outputs:
         expected_outputs = sorted(args.expected_outputs)
         if expected_outputs != outputs:
             if not args.gn_target:
-                parser.error('--expected-outputs requires --gn-target value!')
+                parser.error("--expected-outputs requires --gn-target value!")
             missing_outputs = set(outputs) - set(expected_outputs)
             if missing_outputs:
-                error = f'ERROR: Missing outputs from {args.gn_target} definition:\n'
+                error = f"ERROR: Missing outputs from {args.gn_target} definition:\n"
                 for out in sorted(missing_outputs):
-                    error += f' {out}\n'
-                error += '\nThis probably means an error in the implementation of rust_proto_library()!'
+                    error += f" {out}\n"
+                error += "\nThis probably means an error in the implementation of rust_proto_library()!"
                 print(error, file=sys.stderr)
                 return 1
             extra_outputs = set(expected_outputs) - set(outputs)
             if extra_outputs:
-                error = f'ERROR: Extra outputs from {args.gn_target} definition:\n'
+                error = (
+                    f"ERROR: Extra outputs from {args.gn_target} definition:\n"
+                )
                 for out in sorted(extra_outputs):
-                    error += f' {out}\n'
-                error += '\nThis probably means an error in the implementation of rust_proto_library()!'
+                    error += f" {out}\n"
+                error += "\nThis probably means an error in the implementation of rust_proto_library()!"
                 print(error, file=sys.stderr)
                 return 1
 
     if args.depfile:
 
         def depfile_quote(path):
-            return path.replace('\\', '\\\\').replace(' ', '\\ ')
+            return path.replace("\\", "\\\\").replace(" ", "\\ ")
 
         def to_depfile_list(args):
-            return ' '.join(depfile_quote(a) for a in args)
+            return " ".join(depfile_quote(a) for a in args)
 
-        with open(args.depfile, 'w') as f:
+        with open(args.depfile, "w") as f:
             f.write(
-                '%s: %s\n' %
-                (to_depfile_list(outputs), to_depfile_list(sorted(imports))))
+                "%s: %s\n"
+                % (to_depfile_list(outputs), to_depfile_list(sorted(imports)))
+            )
 
     return 0
 

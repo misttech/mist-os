@@ -13,25 +13,34 @@ def _get_diff_base():
     that origin/master is the upstream.
     """
     try:
-        with open(os.devnull, 'w') as devnull:
+        with open(os.devnull, "w") as devnull:
             try:
-                upstream = subprocess.check_output([
-                    "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"
-                ], stderr = devnull).strip()
+                upstream = subprocess.check_output(
+                    [
+                        "git",
+                        "rev-parse",
+                        "--abbrev-ref",
+                        "--symbolic-full-name",
+                        "@{u}",
+                    ],
+                    stderr=devnull,
+                ).strip()
             except subprocess.CalledProcessError:
                 upstream = "origin/master"
             # Get local commits not in upstream.
             local_commits = filter(
                 len,
                 subprocess.check_output(
-                    ["git", "rev-list", "HEAD", "^" + upstream, "--"]).split("\n"))
+                    ["git", "rev-list", "HEAD", "^" + upstream, "--"]
+                ).split("\n"),
+            )
             if not local_commits:
                 return "HEAD"
 
             # Return parent of the oldest commit.
             return subprocess.check_output(
-                ["git", "rev-parse", local_commits[-1] + "^"],
-                stderr = devnull).strip()
+                ["git", "rev-parse", local_commits[-1] + "^"], stderr=devnull
+            ).strip()
 
     except subprocess.CalledProcessError:
         return "HEAD"
@@ -39,8 +48,9 @@ def _get_diff_base():
 
 def get_git_root():
     """Returns the path of the root of the git repository."""
-    return subprocess.check_output(["git", "rev-parse",
-                                    "--show-toplevel"]).strip()
+    return subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"]
+    ).strip()
 
 
 def get_diff_files():
@@ -48,13 +58,11 @@ def get_diff_files():
     touched by any commits introduced on the local branch.
     """
 
-    list_command = [
-        "git", "diff-index", "--name-only",
-        _get_diff_base()
-    ]
+    list_command = ["git", "diff-index", "--name-only", _get_diff_base()]
     git_root_path = get_git_root()
     paths = filter(len, subprocess.check_output(list_command).split("\n"))
-    return [ os.path.join(git_root_path, x) for x in paths ]
+    return [os.path.join(git_root_path, x) for x in paths]
+
 
 def get_all_files():
     """Returns absolute paths to all files in the git repo under the current
@@ -62,4 +70,4 @@ def get_all_files():
     """
     list_command = ["git", "ls-files"]
     paths = filter(len, subprocess.check_output(list_command).split("\n"))
-    return [ os.path.abspath(x) for x in paths ]
+    return [os.path.abspath(x) for x in paths]

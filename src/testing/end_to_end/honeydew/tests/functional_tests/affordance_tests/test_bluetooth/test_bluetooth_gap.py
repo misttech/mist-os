@@ -37,8 +37,7 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         output_mode = BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.accept_pairing(
-                    input_mode, output_mode)
+                self.device.bluetooth_gap.accept_pairing(input_mode, output_mode)
             return
 
         self.device.bluetooth_gap.accept_pairing(input_mode, output_mode)

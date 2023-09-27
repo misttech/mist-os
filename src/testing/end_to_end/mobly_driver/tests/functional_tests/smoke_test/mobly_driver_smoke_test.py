@@ -34,18 +34,19 @@ class MoblyDriverSmokeTest(base_test.BaseTestClass):
         # devices controllers for test usage.
         fuchsia_devices = self.register_controller(fuchsia_device)
         asserts.assert_true(
-            fuchsia_devices, 'Expect at least 1 created controller.')
+            fuchsia_devices, "Expect at least 1 created controller."
+        )
 
     def test_params_exist(self):
         """Test case to ensure test params are included in the Mobly config"""
-        asserts.assert_true(self.user_params, 'Test params are missing.')
+        asserts.assert_true(self.user_params, "Test params are missing.")
 
     def test_output_dir(self):
         """Test case to ensure Mobly output dir can be written to"""
-        test_artifact_path = os.path.join(self.log_path, 'artifact.txt')
-        with open(test_artifact_path, 'w+', encoding="utf8") as file_handle:
-            file_handle.write('data')
+        test_artifact_path = os.path.join(self.log_path, "artifact.txt")
+        with open(test_artifact_path, "w+", encoding="utf8") as file_handle:
+            file_handle.write("data")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

@@ -58,8 +58,9 @@ _TYPE_GUID_FROM_NAME = {
 
 
 @dataclasses.dataclass
-class Partition():
+class Partition:
     """GPT partition info."""
+
     # 1-based index in the GPT entry array.
     index: int
     name: str
@@ -79,7 +80,7 @@ class Partition():
 
 @contextlib.contextmanager
 def gen_disk_image(source_gpt: str, image_size_mib: int) -> Iterator[str]:
-    """ Generates empty disk image using the given source GPT."""
+    """Generates empty disk image using the given source GPT."""
     print("Generating disk image")
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -91,7 +92,8 @@ def gen_disk_image(source_gpt: str, image_size_mib: int) -> Iterator[str]:
         subprocess.run(
             ["sgdisk", f"--load-backup={source_gpt}", image_path],
             capture_output=True,
-            check=True)
+            check=True,
+        )
         yield image_path
         print("Deleting disk image")
 
@@ -124,7 +126,8 @@ def get_partitions(disk_file: str) -> List[Partition]:
         ["sgdisk", disk_file, "--print"],
         text=True,
         capture_output=True,
-        check=True).stdout
+        check=True,
+    ).stdout
     indices = re.findall(r"^\s*(\d+)\s+", output, re.MULTILINE)
 
     partitions = []
@@ -145,7 +148,8 @@ def get_partitions(disk_file: str) -> List[Partition]:
             ["sgdisk", disk_file, "--info", index],
             text=True,
             capture_output=True,
-            check=True).stdout
+            check=True,
+        ).stdout
 
         def get_param(pattern):
             return re.search(f"^{pattern}.*?$", output, re.MULTILINE).group(1)
@@ -159,16 +163,19 @@ def get_partitions(disk_file: str) -> List[Partition]:
                 size_lba=int(get_param(r"Partition size: (\d+) sectors")),
                 type_guid=get_param(f"Partition GUID code: ({GUID_RE})"),
                 unique_guid=get_param(f"Partition unique GUID: ({GUID_RE})"),
-                attr_flags=get_param(r"Attribute flags: (\S*)")))
+                attr_flags=get_param(r"Attribute flags: (\S*)"),
+            )
+        )
 
     return partitions
 
 
 def get_partition(
-        disk_file: str,
-        *,
-        part_name: Optional[str] = None,
-        index: Optional[int] = None) -> Partition:
+    disk_file: str,
+    *,
+    part_name: Optional[str] = None,
+    index: Optional[int] = None,
+) -> Partition:
     """Returns a single Partition keyed by name and/or index.
 
     Raises ValueError if the requested partition couldn't be found.
@@ -177,8 +184,9 @@ def get_partition(
         raise ValueError("Must specify either a name or index")
 
     def filter(part):
-        return (part_name is None or part.name
-                == part_name) and (index is None or part.index == index)
+        return (part_name is None or part.name == part_name) and (
+            index is None or part.index == index
+        )
 
     partitions = get_partitions(disk_file)
     try:
@@ -201,12 +209,13 @@ def mib_to_lba(mib: int, blk_size: int) -> int:
 
 
 def save_gpt(
-        disk_path: pathlib.Path,
-        block_size: int,
-        *,
-        mbr_path: Optional[pathlib.Path] = None,
-        primary_path: Optional[pathlib.Path] = None,
-        backup_path: Optional[pathlib.Path] = None):
+    disk_path: pathlib.Path,
+    block_size: int,
+    *,
+    mbr_path: Optional[pathlib.Path] = None,
+    primary_path: Optional[pathlib.Path] = None,
+    backup_path: Optional[pathlib.Path] = None,
+):
     """Extracts and saves the GPT sections from a given disk image.
 
     Args:
@@ -244,7 +253,8 @@ def delete_part(disk_file: str, part_num: int):
     subprocess.run(
         ["sgdisk", "--delete", f"{part_num}", disk_file],
         capture_output=True,
-        check=True)
+        check=True,
+    )
 
 
 def delete_part_by_name(disk_file: str, name: str):
@@ -259,34 +269,43 @@ def new_part(disk_file: str, part_num: int, part: Partition):
     # don't depend on it.
     subprocess.run(
         [
-            "sgdisk", "-a", "1", "--new",
-            f"{part_num}:{part.first_lba}:{part.last_lba}", disk_file
+            "sgdisk",
+            "-a",
+            "1",
+            "--new",
+            f"{part_num}:{part.first_lba}:{part.last_lba}",
+            disk_file,
         ],
         capture_output=True,
-        check=True)
+        check=True,
+    )
 
     subprocess.run(
         ["sgdisk", "--change-name", f"{part_num}:{part.name}", disk_file],
         capture_output=True,
-        check=True)
+        check=True,
+    )
     subprocess.run(
         ["sgdisk", "--typecode", f"{part_num}:{part.type_guid}", disk_file],
         capture_output=True,
-        check=True)
+        check=True,
+    )
 
     # If we don't have a specific UUID to use, "R" creates a random one.
     guid = part.unique_guid or "R"
     subprocess.run(
         ["sgdisk", "--partition-guid", f"{part_num}:{guid}", disk_file],
         capture_output=True,
-        check=True)
+        check=True,
+    )
 
 
 def gpt_rename_part(
-        disk_image: str,
-        old_part_name: str,
-        new_part_name: str,
-        new_part_type_guid: str = None):
+    disk_image: str,
+    old_part_name: str,
+    new_part_name: str,
+    new_part_type_guid: str = None,
+):
     """Rename a partition in the GPT"""
     orig_part = get_partition(disk_image, part_name=old_part_name)
     new_partition = Partition(
@@ -296,7 +315,7 @@ def gpt_rename_part(
         last_lba=orig_part.last_lba,
         size_lba=orig_part.size_lba,
         type_guid=new_part_type_guid or orig_part.type_guid,
-        unique_guid="",  #generate new
+        unique_guid="",  # generate new
         attr_flags=orig_part.attr_flags,
     )
 
@@ -326,7 +345,8 @@ def create_gpt(spec: Dict, out_dir: pathlib.Path):
     # this until we need it.
     if block_size != 512:
         raise NotImplementedError(
-            "Only 512-byte blocks are currently implemented")
+            "Only 512-byte blocks are currently implemented"
+        )
 
     if disk_size % alignment != 0:
         raise ValueError("Disk size must be a multiple of alignment")
@@ -389,7 +409,8 @@ def create_gpt(spec: Dict, out_dir: pathlib.Path):
             block_size,
             mbr_path=out_dir / "mbr.bin",
             primary_path=out_dir / "primary.bin",
-            backup_path=out_dir / "backup.bin")
+            backup_path=out_dir / "backup.bin",
+        )
 
         # Grab a high level summary and the final partition details for the
         # README file.
@@ -397,7 +418,8 @@ def create_gpt(spec: Dict, out_dir: pathlib.Path):
             ["sgdisk", disk_path, "--print"],
             check=True,
             capture_output=True,
-            text=True).stdout.strip()
+            text=True,
+        ).stdout.strip()
 
         partitions = get_partitions(disk_path)
 
@@ -435,38 +457,47 @@ def create_gpt(spec: Dict, out_dir: pathlib.Path):
             {command}
             ```
 
-            """).format(
-                name=out_dir.name,
-                summary=summary,
-                details=json.dumps(
-                    [dataclasses.asdict(p) for p in partitions], indent=2),
-                spec=json.dumps(spec, indent=2),
-                command=" ".join(str(c) for c in command)))
+            """
+        ).format(
+            name=out_dir.name,
+            summary=summary,
+            details=json.dumps(
+                [dataclasses.asdict(p) for p in partitions], indent=2
+            ),
+            spec=json.dumps(spec, indent=2),
+            command=" ".join(str(c) for c in command),
+        )
+    )
 
 
 def parse_args() -> argparse.Namespace:
     """Parses commandline args."""
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
     subparsers = parser.add_subparsers(
         title="Subcommands",
         dest="action",
         help="Action to perform",
-        required=True)
+        required=True,
+    )
 
     create_parser = subparsers.add_parser(
-        "create", help="create GPT images from a given specification")
+        "create", help="create GPT images from a given specification"
+    )
     create_parser.add_argument(
         "spec",
         type=pathlib.Path,
-        help="layout specification JSON file; see --help for details")
+        help="layout specification JSON file; see --help for details",
+    )
     create_parser.add_argument(
         "out_dir",
         type=pathlib.Path,
         help="directory to write the resulting files to, with names:"
-        " [mbr.bin, primary.bin, backup.bin, README.md]")
+        " [mbr.bin, primary.bin, backup.bin, README.md]",
+    )
 
     return parser.parse_args()
 
@@ -495,11 +526,11 @@ if __name__ == "__main__":
         # If we failed with a subprocess that captured stdout/stderr,
         # dump it out to the user so they can see what went wrong.
         logging.error(
-            "Command failed: `%s`", " ".join(str(c) for c in error.cmd))
+            "Command failed: `%s`", " ".join(str(c) for c in error.cmd)
+        )
         if error.stdout or error.stderr:
             logging.error(
-                "\n"
-                "----\n"
-                "%s\n"
-                "----", (error.stdout or "") + (error.stderr or ""))
+                "\n" "----\n" "%s\n" "----",
+                (error.stdout or "") + (error.stderr or ""),
+            )
         raise

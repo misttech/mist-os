@@ -10,8 +10,9 @@ from unittest import mock
 
 from parameterized import parameterized
 
-from honeydew.affordances.sl4f.bluetooth.profiles import \
-    bluetooth_avrcp as sl4f_bluetooth_avrcp
+from honeydew.affordances.sl4f.bluetooth.profiles import (
+    bluetooth_avrcp as sl4f_bluetooth_avrcp,
+)
 from honeydew.custom_types import BluetoothAvrcpCommand
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
@@ -19,7 +20,7 @@ from honeydew.transports import sl4f as sl4f_transport
 _SAMPLE_RECEIVED_REQUESTS: Dict[str, Any] = {
     "id": "",
     "result": ["play"],
-    "error": None
+    "error": None,
 }
 
 
@@ -44,7 +45,8 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
 
         self.sl4f_obj = mock.MagicMock(spec=sl4f_transport.SL4F)
         self.reboot_affordance_obj = mock.MagicMock(
-            spec=affordances_capable.RebootCapableDevice)
+            spec=affordances_capable.RebootCapableDevice
+        )
 
         self.bluetooth_obj = sl4f_bluetooth_avrcp.BluetoothAvrcp(
             device_name="fuchsia-emulator",
@@ -76,21 +78,14 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ({
-                "label": "play_command",
-                "command": BluetoothAvrcpCommand.PLAY
-            },),
-            (
-                {
-                    "label": "pause_command",
-                    "command": BluetoothAvrcpCommand.PAUSE
-                },),
+            ({"label": "play_command", "command": BluetoothAvrcpCommand.PLAY},),
+            ({"label": "pause_command", "command": BluetoothAvrcpCommand.PAUSE},),
         ],
-        name_func=_custom_test_name_func)
+        name_func=_custom_test_name_func,
+    )
     def test_send_avrcp_command(self, parameterized_dict) -> None:
         """Test for Bluetooth.send_avrcp_command() method."""
-        self.bluetooth_obj.send_avrcp_command(
-            command=parameterized_dict["command"])
+        self.bluetooth_obj.send_avrcp_command(command=parameterized_dict["command"])
 
         self.sl4f_obj.run.assert_called()
 

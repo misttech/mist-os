@@ -30,31 +30,71 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(description="Sign a ZBI as a vboot image")
-    parser.add_argument("--zbi", "-z", required=True, metavar="FILE.zbi",
-                        help="path the ZBI to sign.")
-    parser.add_argument("--output", "-o", required=True, metavar="FILE",
-                        help="path to write the signed kernel image to.")
-    parser.add_argument("--tool", required=True, metavar="FILE",
-                        help="Path to signing tool (futility)")
-    parser.add_argument("--args", required=True, action="append",
-                        metavar="ARG", help="Initial arguments to the tool")
-    parser.add_argument("--input-args", required=True, action="append",
-                        metavar="ARG", help="Arguments preceding input file")
-    parser.add_argument("--output-args", required=True, action="append",
-                        metavar="ARG", help="Arguments preceding output file")
-    parser.add_argument("--verbose", action="store_true",
-                        help="Display the command being run")
-    parser.add_argument("--quiet", dest="verbose", action="store_false",
-                        help="Don't display the command being run")
+    parser.add_argument(
+        "--zbi",
+        "-z",
+        required=True,
+        metavar="FILE.zbi",
+        help="path the ZBI to sign.",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        required=True,
+        metavar="FILE",
+        help="path to write the signed kernel image to.",
+    )
+    parser.add_argument(
+        "--tool",
+        required=True,
+        metavar="FILE",
+        help="Path to signing tool (futility)",
+    )
+    parser.add_argument(
+        "--args",
+        required=True,
+        action="append",
+        metavar="ARG",
+        help="Initial arguments to the tool",
+    )
+    parser.add_argument(
+        "--input-args",
+        required=True,
+        action="append",
+        metavar="ARG",
+        help="Arguments preceding input file",
+    )
+    parser.add_argument(
+        "--output-args",
+        required=True,
+        action="append",
+        metavar="ARG",
+        help="Arguments preceding output file",
+    )
+    parser.add_argument(
+        "--verbose", action="store_true", help="Display the command being run"
+    )
+    parser.add_argument(
+        "--quiet",
+        dest="verbose",
+        action="store_false",
+        help="Don't display the command being run",
+    )
     args = parser.parse_args()
 
-    cmd = ([ args.tool ] + args.args +
-           args.output_args + [ args.output ] +
-           args.input_args + [ args.zbi ])
+    cmd = (
+        [args.tool]
+        + args.args
+        + args.output_args
+        + [args.output]
+        + args.input_args
+        + [args.zbi]
+    )
 
     if args.verbose:
-        sys.stderr.write("+ {cmd}\n".format(
-            cmd=" ".join([shlex.quote(arg) for arg in cmd])))
+        sys.stderr.write(
+            "+ {cmd}\n".format(cmd=" ".join([shlex.quote(arg) for arg in cmd]))
+        )
 
     subprocess.run(cmd, check=True)
 

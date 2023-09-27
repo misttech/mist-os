@@ -25,24 +25,29 @@ import os
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Prints a visibility list for gn configs")
+        description="Prints a visibility list for gn configs"
+    )
     parser.add_argument(
         "--all",
         help="gn target that produces a universe of labels to consider",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--allow",
         help="gn target whose current users we want to produce an allowlist for",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--verbose",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Print progress and stats")
+        help="Print progress and stats",
+    )
     parser.add_argument(
         "--ignore-suffix",
         help="comma-separated list of label suffixes to ignore",
-        default="")
+        default="",
+    )
 
     def verbose(*vargs, **kwargs):
         if args.verbose:
@@ -54,8 +59,10 @@ def main():
     verbose(f"Found {len(all_labels)} elements in universe.")
     ignore_suffix = args.ignore_suffix.split(",")
     all_labels = (
-        label for label in all_labels
-        if not any(label.endswith(suffix) for suffix in ignore_suffix))
+        label
+        for label in all_labels
+        if not any(label.endswith(suffix) for suffix in ignore_suffix)
+    )
     allow_labels = gn_util.gn_refs(args.allow)
     verbose(f"Found {len(allow_labels)} elements to allow.")
     tree = Node("/")
@@ -64,7 +71,7 @@ def main():
     for path, include in tree.glob_collect():
         path = "/".join(path)
         if include:
-            print(f"\"{path}\",")
+            print(f'"{path}",')
         else:
             verbose(f"ignored {path}")
 
@@ -72,7 +79,6 @@ def main():
 
 
 class Node:
-
     def __init__(self, name, value=None):
         self.name = name
         self.children = []
@@ -130,10 +136,10 @@ def update_tree(tree, labels, value):
 
 
 class Test(unittest.TestCase):
-
     def test_label_parts(self):
         self.assertEqual(
-            get_label_parts("//foo/bar:baz"), ["foo", "bar", "baz"])
+            get_label_parts("//foo/bar:baz"), ["foo", "bar", "baz"]
+        )
 
     def test_build_tree(self):
         tree = Node("/")
@@ -155,8 +161,10 @@ class Test(unittest.TestCase):
     def test_glob_collect(self):
         tree = Node("/")
         update_tree(
-            tree, ["//foo/bar:baz", "//foo/bar:bar", "//foo/apple:banana"],
-            False)
+            tree,
+            ["//foo/bar:baz", "//foo/bar:bar", "//foo/apple:banana"],
+            False,
+        )
         update_tree(tree, ["//foo/bar:baz", "//foo/bar:bar"], True)
         accepted = []
         denied = []

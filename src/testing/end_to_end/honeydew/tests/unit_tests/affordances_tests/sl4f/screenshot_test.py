@@ -25,9 +25,7 @@ class ScreenshotSL4FTests(unittest.TestCase):
 
     def test_take_screenshot(self) -> None:
         result_value: Dict[str, Any] = {
-            "data":
-                base64.b64encode("this_is_a_img".encode("utf-8")
-                                ).decode("utf-8"),
+            "data": base64.b64encode("this_is_a_img".encode("utf-8")).decode("utf-8"),
             "info": {
                 "width": 10,
                 "height": 11,

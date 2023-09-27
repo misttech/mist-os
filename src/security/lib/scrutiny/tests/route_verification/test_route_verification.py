@@ -11,51 +11,56 @@ import unittest
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Check that a 'bad' capability route is rejected while a good one is not mentioned."
+        description="Check that a 'bad' capability route is rejected while a good one is not mentioned."
     )
     parser.add_argument(
         "--ffx-bin",
         type=pathlib.Path,
         required=True,
-        help="Path to the ffx binary.")
+        help="Path to the ffx binary.",
+    )
     parser.add_argument(
         "--fail-protocol",
         type=str,
         required=True,
-        help="Protocol whose route failed and must exist in output.")
+        help="Protocol whose route failed and must exist in output.",
+    )
     parser.add_argument(
         "--fail-moniker",
         type=str,
         required=True,
-        help="Moniker whose route failed and must exist in output.")
+        help="Moniker whose route failed and must exist in output.",
+    )
     parser.add_argument(
         "--fail-dynamic-moniker",
         type=str,
         required=True,
-        help=
-        "Moniker of component in dynamic collection whose route failed and must exist in output."
+        help="Moniker of component in dynamic collection whose route failed and must exist in output.",
     )
     parser.add_argument(
         "--success-protocol",
         type=str,
         required=True,
-        help="Protocol whose route succeeded and must not exist in output.")
+        help="Protocol whose route succeeded and must not exist in output.",
+    )
     parser.add_argument(
         "--depfile",
         type=pathlib.Path,
         required=True,
-        help="Path to ninja depfile to write.")
+        help="Path to ninja depfile to write.",
+    )
     parser.add_argument(
         "--product-bundle",
         type=pathlib.Path,
         required=True,
-        help="Path to the product bundle.")
+        help="Path to the product bundle.",
+    )
     parser.add_argument(
         "--component-tree-config",
         type=pathlib.Path,
         required=True,
-        help="Path to the component tree configuration.")
+        help="Path to the component tree configuration.",
+    )
     args = parser.parse_args()
 
     # Assume we're in the root build dir right now and that is where we'll find ffx env.
@@ -89,23 +94,31 @@ def main():
 
     output = subprocess.run(ffx_args, capture_output=True)
     test.assertNotEqual(
-        output.returncode, 0, "ffx scrutiny verify must have failed")
+        output.returncode, 0, "ffx scrutiny verify must have failed"
+    )
 
-    stderr = output.stderr.decode('UTF-8')
-
-    test.assertIn(
-        args.fail_protocol, stderr,
-        "error message must contain protocol whose route failed")
+    stderr = output.stderr.decode("UTF-8")
 
     test.assertIn(
-        args.fail_moniker, stderr,
-        "error message must contain moniker whose route failed")
+        args.fail_protocol,
+        stderr,
+        "error message must contain protocol whose route failed",
+    )
 
     test.assertIn(
-        args.fail_dynamic_moniker, stderr,
-        "error message must contain dynamic collection moniker whose route failed"
+        args.fail_moniker,
+        stderr,
+        "error message must contain moniker whose route failed",
+    )
+
+    test.assertIn(
+        args.fail_dynamic_moniker,
+        stderr,
+        "error message must contain dynamic collection moniker whose route failed",
     )
 
     test.assertNotIn(
-        args.success_protocol, stderr,
-        "error message must not contain protocol whose route succeeded")
+        args.success_protocol,
+        stderr,
+        "error message must not contain protocol whose route succeeded",
+    )

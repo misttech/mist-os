@@ -10,10 +10,12 @@ from mobly import asserts
 from mobly import test_runner
 from test_fuchsia_device import test_fuchsia_device
 
-from honeydew.device_classes.fuchsia_controller import \
-    generic_fuchsia_device as fc_generic_fuchsia_device
-from honeydew.device_classes.sl4f import \
-    generic_fuchsia_device as sl4f_generic_fuchsia_device
+from honeydew.device_classes.fuchsia_controller import (
+    generic_fuchsia_device as fc_generic_fuchsia_device,
+)
+from honeydew.device_classes.sl4f import (
+    generic_fuchsia_device as sl4f_generic_fuchsia_device,
+)
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -26,11 +28,13 @@ class GenericFuchsiaDeviceTests(test_fuchsia_device.FuchsiaDeviceTests):
 
         if self._is_fuchsia_controller_based_device(self.device):
             asserts.assert_is_instance(
-                self.device, fc_generic_fuchsia_device.GenericFuchsiaDevice)
+                self.device, fc_generic_fuchsia_device.GenericFuchsiaDevice
+            )
         else:
             asserts.assert_is_instance(
-                self.device, sl4f_generic_fuchsia_device.GenericFuchsiaDevice)
+                self.device, sl4f_generic_fuchsia_device.GenericFuchsiaDevice
+            )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

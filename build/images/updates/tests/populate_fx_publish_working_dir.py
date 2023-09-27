@@ -2,11 +2,11 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-'''
+"""
 This script helps prepare a fake build directory needed for fx publish tests.
 The fake build directory serves as the CWD and root build directory for the
 orchestrated `fx publish` test invocation.
-'''
+"""
 
 import argparse
 import filecmp
@@ -22,9 +22,9 @@ OUTPUTS = []
 
 def copy_build_output(output_dir: Path, build_output: Path) -> None:
     # Resolve the src file.
-    build_dir = Path('.').resolve()
+    build_dir = Path(".").resolve()
     src = build_output.resolve().relative_to(build_dir)
-    assert src.exists(), f'{build_output} does not exist!'
+    assert src.exists(), f"{build_output} does not exist!"
 
     # Prepare dest parent directory.
     dest = output_dir / build_output
@@ -63,47 +63,48 @@ def copy_packages(working_dir: Path) -> None:
     def add_package(manifest_path: Path) -> None:
         copy_build_output(working_dir, manifest_path)
         manifest = json.loads(manifest_path.read_text())
-        assert manifest.get(
-            'blob_sources_relative', None
-        ) == 'file', f'Expected the package manifest {manifest_path} to have file relative blob sources!'
+        assert (
+            manifest.get("blob_sources_relative", None) == "file"
+        ), f"Expected the package manifest {manifest_path} to have file relative blob sources!"
 
-        for blob in manifest['blobs']:
-            blob = Path(manifest_path.parent / blob['source_path'])
+        for blob in manifest["blobs"]:
+            blob = Path(manifest_path.parent / blob["source_path"])
             copy_build_output(working_dir, blob)
 
-        for subpackage in manifest.get('subpackages', []):
+        for subpackage in manifest.get("subpackages", []):
             add_package(
-                Path(manifest_path.parent / subpackage['manifest_path']))
+                Path(manifest_path.parent / subpackage["manifest_path"])
+            )
 
     # Copy the transitive closure of each package.
-    assembly_cache_packages = working_dir / 'assembly_cache_packages.list'
+    assembly_cache_packages = working_dir / "assembly_cache_packages.list"
     INPUTS.append(assembly_cache_packages)
-    for package_manifest in json.loads(
-            assembly_cache_packages.read_text())['content']['manifests']:
+    for package_manifest in json.loads(assembly_cache_packages.read_text())[
+        "content"
+    ]["manifests"]:
         add_package(Path(package_manifest))
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        'Copies assembly_cache_packages.list with all transitively referenced files, and package-tool.'
+        description="Copies assembly_cache_packages.list with all transitively referenced files, and package-tool."
     )
     parser.add_argument(
-        '--working-dir',
+        "--working-dir",
         required=True,
-        help=
-        'The fx publish working directory to populate. Expects `{args.working_dir}/assembly_cache_packages.list` to already exist.'
+        help="The fx publish working directory to populate. Expects `{args.working_dir}/assembly_cache_packages.list` to already exist.",
     )
     parser.add_argument(
-        '--depfile',
-        help='If specified, write a depfile of the files that were touched.')
+        "--depfile",
+        help="If specified, write a depfile of the files that were touched.",
+    )
     args = parser.parse_args()
 
     working_dir = Path(args.working_dir)
 
     copy_packages(working_dir)
 
-    copy_build_output(working_dir, Path('host-tools') / 'package-tool')
+    copy_build_output(working_dir, Path("host-tools") / "package-tool")
 
     if args.depfile:
         depfile = Path(args.depfile)
@@ -115,5 +116,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

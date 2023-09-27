@@ -27,7 +27,7 @@ _SCRIPT_BASENAME = Path(__file__).name
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 @dataclasses.dataclass
@@ -37,8 +37,8 @@ class DownloadEvent(object):
     end_time: float
 
     def distribute_over_intervals(
-            self,
-            interval_seconds: float) -> Iterable[Tuple[int, float, float]]:
+        self, interval_seconds: float
+    ) -> Iterable[Tuple[int, float, float]]:
         """Distribute bytes_downloaded into indexed time intervals.
 
         Args:
@@ -83,7 +83,8 @@ def distribute_bytes_downloaded_over_time(
     concurrent_downloads_per_interval = [0.0] * num_intervals
     for event in events:
         for index, bytes, duty_cycle in event.distribute_over_intervals(
-                interval_seconds):
+            interval_seconds
+        ):
             bytes_per_interval[index] += bytes
             concurrent_downloads_per_interval[index] += duty_cycle
     return list(zip(bytes_per_interval, concurrent_downloads_per_interval))
@@ -122,8 +123,8 @@ class ReproxyLog(object):
             # Not all actions have remote_metadata, due to local/racing.
             # If there happens to be duplicates (due to retries),
             # just keep the last one.
-            if record.HasField('remote_metadata') and
-            record.remote_metadata.action_digest
+            if record.HasField("remote_metadata")
+            and record.remote_metadata.action_digest
         }
 
     @property
@@ -139,8 +140,9 @@ class ReproxyLog(object):
         return self._records_by_action_digest
 
     def diff_by_outputs(
-        self, other: 'ReproxyLog',
-        eq_comparator: Callable[[log_pb2.LogRecord, log_pb2.LogRecord], bool]
+        self,
+        other: "ReproxyLog",
+        eq_comparator: Callable[[log_pb2.LogRecord, log_pb2.LogRecord], bool],
     ) -> Iterable[Tuple[Path, log_pb2.LogRecord, log_pb2.LogRecord]]:
         """Compare actions output-by-output.
 
@@ -166,9 +168,11 @@ class ReproxyLog(object):
             if not eq_comparator(left_record, right_record):
                 yield (k, left_record, right_record)
             left_outputs = set(
-                Path(p) for p in left_record.command.output.output_files)
+                Path(p) for p in left_record.command.output.output_files
+            )
             right_outputs = set(
-                Path(p) for p in right_record.command.output.output_files)
+                Path(p) for p in right_record.command.output.output_files
+            )
             common_outputs = left_outputs & right_outputs
             for p in common_outputs:
                 visited_outputs.add(p)
@@ -177,9 +181,11 @@ class ReproxyLog(object):
         total_upload_bytes = 0
         total_download_bytes = 0
         for record in self.proto.records:
-            if record.HasField('remote_metadata'):
+            if record.HasField("remote_metadata"):
                 total_upload_bytes += record.remote_metadata.real_bytes_uploaded
-                total_download_bytes += record.remote_metadata.real_bytes_downloaded
+                total_download_bytes += (
+                    record.remote_metadata.real_bytes_downloaded
+                )
         return total_download_bytes, total_upload_bytes
 
     def _min_max_event_times(self) -> Tuple[float, float]:
@@ -187,19 +193,26 @@ class ReproxyLog(object):
         min_time = None
         max_time = None
         for record in self.proto.records:
-            if record.HasField('remote_metadata'):
+            if record.HasField("remote_metadata"):
                 rmd = record.remote_metadata
                 for event, times in rmd.event_times.items():
-                    start_time = timestamp_pb_to_float(getattr(times, 'from'))
-                    end_time = timestamp_pb_to_float(getattr(times, 'to'))
-                    min_time = start_time if min_time is None else min(
-                        min_time, start_time)
-                    max_time = end_time if max_time is None else max(
-                        max_time, end_time)
+                    start_time = timestamp_pb_to_float(getattr(times, "from"))
+                    end_time = timestamp_pb_to_float(getattr(times, "to"))
+                    min_time = (
+                        start_time
+                        if min_time is None
+                        else min(min_time, start_time)
+                    )
+                    max_time = (
+                        end_time
+                        if max_time is None
+                        else max(max_time, end_time)
+                    )
         return min_time, max_time
 
-    def _download_events(self,
-                         min_time: float = 0.0) -> Iterable[DownloadEvent]:
+    def _download_events(
+        self, min_time: float = 0.0
+    ) -> Iterable[DownloadEvent]:
         """Extract series of download events from reproxy log.
 
         Args:
@@ -210,7 +223,7 @@ class ReproxyLog(object):
           DownloadEvents
         """
         for record in self.proto.records:
-            if record.HasField('remote_metadata'):
+            if record.HasField("remote_metadata"):
                 rmd = record.remote_metadata
                 download_times = rmd.event_times.get("DownloadResults", None)
                 if download_times is not None:
@@ -218,14 +231,18 @@ class ReproxyLog(object):
                         bytes_downloaded=rmd.real_bytes_downloaded,
                         # 'from' is a Python keyword, so use getattr()
                         start_time=timestamp_pb_to_float(
-                            getattr(download_times, 'from')) - min_time,
+                            getattr(download_times, "from")
+                        )
+                        - min_time,
                         end_time=timestamp_pb_to_float(
-                            getattr(download_times, 'to')) - min_time,
+                            getattr(download_times, "to")
+                        )
+                        - min_time,
                     )
 
     def download_profile(
-            self,
-            interval_seconds: float) -> Sequence[Tuple[float, float, float]]:
+        self, interval_seconds: float
+    ) -> Sequence[Tuple[float, float, float]]:
         """Plots download bandwidth at each point in time.
 
         Assumes that for each DownloadResult event time entry in the
@@ -274,9 +291,9 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
 
     # Otherwise, this is assumed to be a .rrpl or .rpl file.
     # Copy it to a cached location.
-    tmpdir = Path(os.environ.get('TMPDIR', '/tmp'))
+    tmpdir = Path(os.environ.get("TMPDIR", "/tmp"))
 
-    stdin_path = Path('-')
+    stdin_path = Path("-")
 
     if path == stdin_path:
         log_contents = sys.stdin.read().encode()
@@ -284,18 +301,18 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
         log_contents = path.read_bytes()
 
     readable_hash = hashlib.sha256(log_contents).hexdigest()
-    cached_log_dir = tmpdir / 'reproxy_logs_py' / 'cache' / readable_hash
+    cached_log_dir = tmpdir / "reproxy_logs_py" / "cache" / readable_hash
     if verbose:
-        msg(f'Copying log to {cached_log_dir} for logdump processing.')
+        msg(f"Copying log to {cached_log_dir} for logdump processing.")
     cached_log_dir.mkdir(parents=True, exist_ok=True)
 
     # The 'logdump' tool expects there to be a file named 'reproxy_*.rrpl'.
     if path == stdin_path:
-        (cached_log_dir / 'reproxy_from_stdin.rrpl').write_bytes(log_contents)
+        (cached_log_dir / "reproxy_from_stdin.rrpl").write_bytes(log_contents)
     else:
         dest_file = str(path.name)
-        if not dest_file.startswith('reproxy_'):
-            dest_file = 'reproxy_' + dest_file
+        if not dest_file.startswith("reproxy_"):
+            dest_file = "reproxy_" + dest_file
         shutil.copy2(path, cached_log_dir / dest_file)
 
     return cached_log_dir
@@ -303,15 +320,14 @@ def setup_logdir_for_logdump(path: Path, verbose: bool = False) -> Path:
 
 def _log_dump_from_pb(log_pb_file: Path) -> log_pb2.LogDump:
     log_dump = log_pb2.LogDump()
-    with open(log_pb_file, mode='rb') as logf:
+    with open(log_pb_file, mode="rb") as logf:
         log_dump.ParseFromString(logf.read())
     return log_dump
 
 
 def convert_reproxy_actions_log(
-        reproxy_logdir: Path,
-        reclient_bindir: Path,
-        verbose: bool = False) -> log_pb2.LogDump:
+    reproxy_logdir: Path, reclient_bindir: Path, verbose: bool = False
+) -> log_pb2.LogDump:
     log_pb_file = reproxy_logdir / "reproxy_log.pb"
 
     if not log_pb_file.exists():
@@ -336,31 +352,37 @@ def convert_reproxy_actions_log(
 
 
 def parse_log(
-        log_path: Path,
-        reclient_bindir: Path,
-        verbose: bool = False) -> ReproxyLog:
+    log_path: Path, reclient_bindir: Path, verbose: bool = False
+) -> ReproxyLog:
     """Prepare and parse reproxy logs."""
     return ReproxyLog(
         convert_reproxy_actions_log(
             reproxy_logdir=setup_logdir_for_logdump(log_path, verbose=verbose),
             reclient_bindir=reclient_bindir,
             verbose=verbose,
-        ))
+        )
+    )
 
 
 def _action_digest_eq(
-        left: log_pb2.LogRecord, right: log_pb2.LogRecord) -> bool:
-    return left.remote_metadata.action_digest == right.remote_metadata.action_digest
+    left: log_pb2.LogRecord, right: log_pb2.LogRecord
+) -> bool:
+    return (
+        left.remote_metadata.action_digest
+        == right.remote_metadata.action_digest
+    )
 
 
 def _diff_printer(log) -> str:
-    lines = [f'action_digest: {log.remote_metadata.action_digest}']
+    lines = [f"action_digest: {log.remote_metadata.action_digest}"]
     for file, digest in log.remote_metadata.output_file_digests.items():
-        lines.extend([
-            f'file: {file}',
-            f'  digest: {digest}',
-        ])
-    return '\n'.join(lines)
+        lines.extend(
+            [
+                f"file: {file}",
+                f"  digest: {digest}",
+            ]
+        )
+    return "\n".join(lines)
 
 
 # Defined at the module level for multiprocessing to be able to serialize.
@@ -398,13 +420,13 @@ def diff_logs(args: argparse.Namespace) -> int:
     diffs = list(left.diff_by_outputs(right, _action_digest_eq))
 
     if diffs:
-        print('Action differences found.')
+        print("Action differences found.")
         for path, d_left, d_right in diffs:
             left_text = _diff_printer(d_left)
             right_text = _diff_printer(d_right)
-            print('---------------------------------')
-            print(f'{path}: (left)\n{left_text}\n')
-            print(f'{path}: (right)\n{right_text}\n')
+            print("---------------------------------")
+            print(f"{path}: (left)\n{left_text}\n")
+            print(f"{path}: (right)\n{right_text}\n")
 
     return 0
 
@@ -475,20 +497,21 @@ def plot_download_command(args: argparse.Namespace) -> int:
 
 
 def filter_and_apply_records(
-        records: Iterable[log_pb2.LogRecord],
-        predicate: Callable[[log_pb2.LogRecord],
-                            bool], action: Callable[[log_pb2.LogRecord], None]):
+    records: Iterable[log_pb2.LogRecord],
+    predicate: Callable[[log_pb2.LogRecord], bool],
+    action: Callable[[log_pb2.LogRecord], None],
+):
     for record in records:
         if predicate(record):
             action(record)
 
 
 def _action_produces_rlib(record: log_pb2.LogRecord) -> bool:
-    return any(f.endswith('.rlib') for f in record.command.output.output_files)
+    return any(f.endswith(".rlib") for f in record.command.output.output_files)
 
 
 def _print_record(record: log_pb2.LogRecord) -> None:
-    print(str(record) + '\n'),
+    print(str(record) + "\n"),
 
 
 def filter_rlibs_command(args: argparse.Namespace) -> int:
@@ -519,7 +542,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(required=True)
 
     # command: diff
-    diff_parser = subparsers.add_parser('diff', help='diff --help')
+    diff_parser = subparsers.add_parser("diff", help="diff --help")
     diff_parser.set_defaults(func=diff_logs)
     diff_parser.add_argument(
         "reproxy_logs",
@@ -531,11 +554,12 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
     # command: output_file_digest
     output_file_digest_parser = subparsers.add_parser(
-        'output_file_digest',
-        help='prints the digest of a remote action output file',
+        "output_file_digest",
+        help="prints the digest of a remote action output file",
     )
     output_file_digest_parser.set_defaults(
-        func=lookup_output_file_digest_command)
+        func=lookup_output_file_digest_command
+    )
     output_file_digest_parser.add_argument(
         "--log",
         type=Path,
@@ -553,7 +577,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
     # command: bandwidth
     bandwidth_parser = subparsers.add_parser(
-        'bandwidth',
+        "bandwidth",
         help="prints total download and upload",
     )
     bandwidth_parser.set_defaults(func=bandwidth_command)
@@ -566,8 +590,9 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
     # command: plot_download
     plot_download_parser = subparsers.add_parser(
-        'plot_download',
-        help='plot download usage over time, prints csv to stdout')
+        "plot_download",
+        help="plot download usage over time, prints csv to stdout",
+    )
     plot_download_parser.set_defaults(func=plot_download_command)
     plot_download_parser.add_argument(
         "log",
@@ -585,8 +610,8 @@ def _main_arg_parser() -> argparse.ArgumentParser:
 
     # command: filter_rlibs
     filter_rlibs_parser = subparsers.add_parser(
-        'filter_rlibs',
-        help='Keep log records for actions that produce rlibs, print to stdout.',
+        "filter_rlibs",
+        help="Keep log records for actions that produce rlibs, print to stdout.",
     )
     filter_rlibs_parser.set_defaults(func=filter_rlibs_command)
     filter_rlibs_parser.add_argument(

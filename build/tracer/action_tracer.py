@@ -19,15 +19,25 @@ import shlex
 import subprocess
 import sys
 
-from typing import AbstractSet, Any, Callable, Collection, FrozenSet, Iterable, Optional, Sequence, TextIO, Tuple
+from typing import (
+    AbstractSet,
+    Any,
+    Callable,
+    Collection,
+    FrozenSet,
+    Iterable,
+    Optional,
+    Sequence,
+    TextIO,
+    Tuple,
+)
 
 trailing_white_spaces = re.compile("\\\s+\r?\n")
 
 
 def _partition(
-        iterable: Iterable[Any],
-        predicate: Callable[[Any],
-                            bool]) -> Tuple[Sequence[Any], Sequence[Any]]:
+    iterable: Iterable[Any], predicate: Callable[[Any], bool]
+) -> Tuple[Sequence[Any], Sequence[Any]]:
     """Splits sequence into two sequences based on predicate function."""
     trues = []
     falses = []
@@ -63,7 +73,8 @@ class MatchConditions(object):
 
 
 def _find_first_index(
-        iterable: Iterable[Any], pred: Callable[[Any], bool]) -> int:
+    iterable: Iterable[Any], pred: Callable[[Any], bool]
+) -> int:
     """Returns the index of the first element that satisfies the predicate, or -1."""
     for n, item in enumerate(iterable):
         if pred(item):
@@ -80,17 +91,18 @@ class ToolCommand(object):
       * one tool (script or binary in PATH)
       * an optional list of flags and arguments passed to the tool
     """
+
     tokens: Sequence[str] = dataclasses.field(default_factory=list)
 
     @property
     def _tool_index(self) -> int:
         # The first token that isn't 'X=Y' is the tool/script.
-        return _find_first_index(self.tokens, lambda x: '=' not in x)
+        return _find_first_index(self.tokens, lambda x: "=" not in x)
 
     @property
     def env_tokens(self):
         """Returns the environment overrides (X=Y) of a shell command."""
-        return self.tokens[:self._tool_index]
+        return self.tokens[: self._tool_index]
 
     @property
     def tool(self):
@@ -100,13 +112,13 @@ class ToolCommand(object):
     @property
     def args(self):
         """Returns all options and arguments after the tool of the command."""
-        return self.tokens[self._tool_index + 1:]
+        return self.tokens[self._tool_index + 1 :]
 
     @property
     def _end_opts_index(self) -> int:
         # Find the position of '--', which is conventionally used to stop option
         # processing.
-        return _find_first_index(self.tokens, lambda x: x == '--')
+        return _find_first_index(self.tokens, lambda x: x == "--")
 
     def unwrap(self) -> "ToolCommand":
         # Assuming that '--' separates a wrapper from a command, this unwraps
@@ -116,12 +128,13 @@ class ToolCommand(object):
         if end_opts_index == -1:
             # Deduce that the command is not wrapped.
             return self
-        return ToolCommand(tokens=self.tokens[end_opts_index + 1:])
+        return ToolCommand(tokens=self.tokens[end_opts_index + 1 :])
 
 
 @dataclasses.dataclass
 class FSAccess(object):
     """Represents a single file system access."""
+
     # One of: "read", "write" (covers touch), "delete" (covers move-from)
     op: FileAccessType
     # The path accessed
@@ -134,9 +147,8 @@ class FSAccess(object):
         return f"({self.op} {self.path})"
 
     def should_check(
-            self,
-            ignore_conditions: MatchConditions,
-            required_path_prefix: str = "") -> bool:
+        self, ignore_conditions: MatchConditions, required_path_prefix: str = ""
+    ) -> bool:
         """Predicate function use to filter out FSAccesses.
 
         Args:
@@ -153,8 +165,8 @@ class FSAccess(object):
         return not ignore_conditions.matches(self.path)
 
     def allowed(
-            self, allowed_reads: FrozenSet[str],
-            allowed_writes: FrozenSet[str]) -> bool:
+        self, allowed_reads: FrozenSet[str], allowed_writes: FrozenSet[str]
+    ) -> bool:
         """Validates a file system access against a set of allowed accesses.
 
         Args:
@@ -228,7 +240,7 @@ def parse_fsatrace_output(fsatrace_lines: Iterable[str]) -> Iterable[FSAccess]:
         try:
             ret.extend(_parse_fsatrace_line(line))
         except Exception as e:
-            print('\n'.join(fsatrace_lines))
+            print("\n".join(fsatrace_lines))
             raise e
     return ret
 
@@ -240,6 +252,7 @@ def _abspaths(container: Iterable[str]) -> AbstractSet[str]:
 @dataclasses.dataclass
 class AccessConstraints(object):
     """Set of file system accesses constraints."""
+
     allowed_reads: FrozenSet[str] = dataclasses.field(default_factory=set)
     allowed_writes: FrozenSet[str] = dataclasses.field(default_factory=set)
     required_writes: FrozenSet[str] = dataclasses.field(default_factory=set)
@@ -286,6 +299,7 @@ def parse_dep_edges(depfile_line: str) -> DepEdges:
 @dataclasses.dataclass
 class DepFile(object):
     """DepFile represents a collection of dependency edges."""
+
     deps: Collection[DepEdges] = dataclasses.field(default_factory=list)
 
     @property
@@ -322,14 +336,16 @@ def parse_depfile(depfile_lines: Iterable[str]) -> DepFile:
             if current_line:
                 raise ValueError(
                     "Line continuation followed by empty line in depfile line "
-                    + line)
+                    + line
+                )
             continue
         # Ignore comments
         if line.strip().startswith("#"):
             if current_line:
                 raise ValueError(
-                    "Line continuation followed by comment in depfile line " +
-                    line)
+                    "Line continuation followed by comment in depfile line "
+                    + line
+                )
             continue
         # We currently don't allow consecutive backslashes in filenames to
         # simplify depfile parsing. Support can be added if use cases come up.
@@ -362,10 +378,12 @@ def parse_depfile(depfile_lines: Iterable[str]) -> DepFile:
     return DepFile(deps=[parse_dep_edges(line) for line in lines])
 
 
-def abspaths_from_depfile(depfile: DepFile,
-                          allowed_abspaths: FrozenSet[str]) -> Collection[str]:
+def abspaths_from_depfile(
+    depfile: DepFile, allowed_abspaths: FrozenSet[str]
+) -> Collection[str]:
     return [
-        f for f in (depfile.all_ins | depfile.all_outs)
+        f
+        for f in (depfile.all_ins | depfile.all_outs)
         if f not in allowed_abspaths and os.path.isabs(f)
     ]
 
@@ -373,6 +391,7 @@ def abspaths_from_depfile(depfile: DepFile,
 @dataclasses.dataclass
 class Action(object):
     """Represents a set of parameters of a single build action."""
+
     inputs: Sequence[str] = dataclasses.field(default_factory=list)
     outputs: Collection[str] = dataclasses.field(default_factory=list)
     depfile: Optional[str] = None
@@ -380,7 +399,8 @@ class Action(object):
     parsed_depfile: Optional[DepFile] = None
 
     def access_constraints(
-            self, writeable_depfile_inputs=False) -> AccessConstraints:
+        self, writeable_depfile_inputs=False
+    ) -> AccessConstraints:
         """Build AccessConstraints from action attributes."""
         # Action is required to write outputs and depfile, if provided.
         required_writes = {path for path in self.outputs}
@@ -400,7 +420,7 @@ class Action(object):
                 with open(self.depfile, "r") as f:
                     self.parsed_depfile = parse_depfile(f)
 
-                if (writeable_depfile_inputs):
+                if writeable_depfile_inputs:
                     allowed_writes.update(self.parsed_depfile.all_ins)
                 else:
                     allowed_reads.update(self.parsed_depfile.all_ins)
@@ -413,11 +433,13 @@ class Action(object):
             # Follow links in all inputs because fsatrace will log access to link
             # destination instead of the link.
             allowed_reads=_abspaths(
-                os.path.realpath(path) for path in allowed_reads),
+                os.path.realpath(path) for path in allowed_reads
+            ),
             # TODO(fxbug.dev/69049): Should we follow links of outputs as well?
             # What's our stance on writing to soft links?
             allowed_writes=_abspaths(allowed_writes),
-            required_writes=_abspaths(required_writes))
+            required_writes=_abspaths(required_writes),
+        )
 
 
 def _sorted_join(elements: Iterable[str], joiner: str):
@@ -492,7 +514,8 @@ def finalize_filesystem_accesses(accesses: Iterable[FSAccess]) -> FSAccessSet:
 
 
 def check_access_permissions(
-        accesses: FSAccessSet, constraints: AccessConstraints) -> FSAccessSet:
+    accesses: FSAccessSet, constraints: AccessConstraints
+) -> FSAccessSet:
     """Checks a sequence of accesses against permission constraints.
 
     Args:
@@ -515,8 +538,8 @@ def check_access_permissions(
 
 
 def check_missing_writes(
-        accesses: Iterable[FSAccess],
-        required_writes: FrozenSet[str]) -> AbstractSet[str]:
+    accesses: Iterable[FSAccess], required_writes: FrozenSet[str]
+) -> AbstractSet[str]:
     """Tracks sequence of access to verify that required files are written.
 
     Args:
@@ -530,7 +553,10 @@ def check_missing_writes(
     for access in accesses:
         if access.op == FileAccessType.WRITE and access.path in missing_writes:
             missing_writes.remove(access.path)
-        elif access.op == FileAccessType.DELETE and access.path in required_writes:
+        elif (
+            access.op == FileAccessType.DELETE
+            and access.path in required_writes
+        ):
             missing_writes.add(access.path)
 
     return missing_writes
@@ -554,6 +580,7 @@ def _verbose_path(path: str) -> str:
 @dataclasses.dataclass
 class StalenessDiagnostics(object):
     """Just a structure to capture results of diagnosing outputs."""
+
     required_writes: FrozenSet[str] = dataclasses.field(default_factory=set)
     nonexistent_outputs: FrozenSet[str] = dataclasses.field(default_factory=set)
     # If there are stale_outputs, then it must have been compared against a
@@ -572,31 +599,38 @@ class StalenessDiagnostics(object):
           stream: a file stream, like sys.stderr.
         """
         required_writes_formatted = "\n".join(
-            _verbose_path(f) for f in self.required_writes)
+            _verbose_path(f) for f in self.required_writes
+        )
         print(
             f"""
 Required writes:
 {required_writes_formatted}
-""", file=stream)
+""",
+            file=stream,
+        )
         if self.nonexistent_outputs:
             nonexistent_outputs_formatted = "\n".join(
-                _verbose_path(f) for f in self.nonexistent_outputs)
+                _verbose_path(f) for f in self.nonexistent_outputs
+            )
             print(
                 f"""
 Missing outputs:
 {nonexistent_outputs_formatted}
 """,
-                file=stream)
+                file=stream,
+            )
 
         if self.stale_outputs:
             stale_outputs_formatted = "\n".join(
-                _verbose_path(f) for f in self.stale_outputs)
+                _verbose_path(f) for f in self.stale_outputs
+            )
             print(
                 f"""
 Stale outputs: (older than newest input: {self.newest_input})
 {stale_outputs_formatted}
 """,
-                file=stream)
+                file=stream,
+            )
 
 
 def realpath_ctime(path: str) -> int:
@@ -615,8 +649,8 @@ def realpath_ctime(path: str) -> int:
 
 
 def diagnose_stale_outputs(
-        accesses: Iterable[FSAccess],
-        access_constraints: AccessConstraints) -> StalenessDiagnostics:
+    accesses: Iterable[FSAccess], access_constraints: AccessConstraints
+) -> StalenessDiagnostics:
     """Analyzes access stream for missing writes.
 
     Also compares timestamps of inputs relative to outputs
@@ -631,11 +665,13 @@ def diagnose_stale_outputs(
     """
     # Verify that outputs are written as promised.
     missing_writes = check_missing_writes(
-        accesses, access_constraints.required_writes)
+        accesses, access_constraints.required_writes
+    )
 
     # Distinguish stale from nonexistent output files.
     untouched_outputs, nonexistent_outputs = _partition(
-        missing_writes, os.path.exists)
+        missing_writes, os.path.exists
+    )
 
     # Check that timestamps relative to inputs (allowed_reads) are newer,
     # in which case, not-writing outputs is acceptable.
@@ -656,14 +692,16 @@ def diagnose_stale_outputs(
         # Filter out untouched outputs that are still newer than used inputs.
         input_timestamp = os.path.getctime(newest_input)
         stale_outputs = {
-            out for out in untouched_outputs
+            out
+            for out in untouched_outputs
             if realpath_ctime(out) < input_timestamp
         }
     return StalenessDiagnostics(
         required_writes=access_constraints.required_writes,
         nonexistent_outputs=set(nonexistent_outputs),
         newest_input=newest_input,
-        stale_outputs=stale_outputs)
+        stale_outputs=stale_outputs,
+    )
 
 
 def main_arg_parser() -> argparse.ArgumentParser:
@@ -675,18 +713,21 @@ def main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--fsatrace-path",
         default="fsatrace",
-        help=
-        "Path to fsatrace binary.  If omitted, it will search for one in PATH.")
+        help="Path to fsatrace binary.  If omitted, it will search for one in PATH.",
+    )
     parser.add_argument(
-        "--label", required=True, help="The wrapped target's label")
+        "--label", required=True, help="The wrapped target's label"
+    )
 
     parser.add_argument(
-        "--trace-output", required=True, help="Where to store the trace")
+        "--trace-output", required=True, help="Where to store the trace"
+    )
     parser.add_argument(
         "--keep-raw-trace",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Whether to keep trace output after the checks are successful")
+        help="Whether to keep trace output after the checks are successful",
+    )
     parser.add_argument(
         "--target-type",
         choices=["action", "action_foreach"],
@@ -698,24 +739,26 @@ def main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--depfile", help="action#depfile")
     parser.add_argument(
         "--hermetic-inputs-file",
-        help="Path to file listing extra inputs for this command")
+        help="Path to file listing extra inputs for this command",
+    )
     parser.add_argument(
         "--failed-check-status",
         type=int,
         default=1,
-        help=
-        "On failing tracing checks, exit with this code.  Use 0 to report findings without failing.",
+        help="On failing tracing checks, exit with this code.  Use 0 to report findings without failing.",
     )
     parser.add_argument(
         "--ignore-prefix",
         nargs="*",
         default=[],
-        help="Extra file-path prefix that should be ignored.")
+        help="Extra file-path prefix that should be ignored.",
+    )
     parser.add_argument(
         "--check-access-permissions",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="Check permissions on file reads and writes")
+        help="Check permissions on file reads and writes",
+    )
 
     # This affects the set of files that are allowed to be written.
     # TODO(fangism): remove this flag entirely, disallowing writes to inputs
@@ -723,8 +766,7 @@ def main_arg_parser() -> argparse.ArgumentParser:
         "--writeable-depfile-inputs",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help=
-        "Allow writes to inputs found in depfiles.  Only effective with --check-access-permissions."
+        help="Allow writes to inputs found in depfiles.  Only effective with --check-access-permissions.",
     )
 
     # TODO(fangism): This check is blocked on *.py being in the ignored set.
@@ -732,7 +774,8 @@ def main_arg_parser() -> argparse.ArgumentParser:
         "--check-inputs-not-in-ignored-set",
         action="store_true",
         default=False,  # Goal: always True (remove this flag)
-        help="Check that inputs do not belong to the set of ignored files")
+        help="Check that inputs do not belong to the set of ignored files",
+    )
 
     # Positional args are the command (tool+args) to run and trace.
     parser.add_argument("command", nargs="*", help="action#command")
@@ -749,14 +792,17 @@ def get_python_script(command: ToolCommand) -> Optional[str]:
     # Cover both cases when the tool:
     #
     # 1. is executed directly, for example: ./build.py
-    if command.tool.endswith(('.py', '.pyz')):
+    if command.tool.endswith((".py", ".pyz")):
         return command.tool
     # 2. is explicitly executed by an interpreter
     #    for example: path/to/prebuilt/python3 build.py
     elif _tool_is_python(command.tool):
         script_index = _find_first_index(
-            command.args, lambda x: x.endswith(('.py', '.pyz')))
-        assert script_index != -1, f"Expected to find Python script after interpreter: {command.args}"
+            command.args, lambda x: x.endswith((".py", ".pyz"))
+        )
+        assert (
+            script_index != -1
+        ), f"Expected to find Python script after interpreter: {command.args}"
         return command.args[script_index]
     return None
 
@@ -770,7 +816,8 @@ def is_known_wrapper(command: ToolCommand) -> bool:
     """
     if python_script := get_python_script(command):
         return os.path.basename(python_script) in {
-            "action_tracer.py", "output_cacher.py"
+            "action_tracer.py",
+            "output_cacher.py",
         }
     return False
 
@@ -827,7 +874,9 @@ def main():
             "rwmdt",
             args.trace_output,
             "--",
-        ] + command.tokens)
+        ]
+        + command.tokens
+    )
 
     # Identify the intended tool from the original command.
     script = command.tool
@@ -852,7 +901,7 @@ def main():
     implicit_inputs = []
     depfile = args.depfile
     if args.hermetic_inputs_file:
-        assert args.depfile, '--hermetic-inputs-file requires --depfile!'
+        assert args.depfile, "--hermetic-inputs-file requires --depfile!"
         with open(args.hermetic_inputs_file) as f:
             for l in f:
                 line = l.strip()
@@ -864,20 +913,25 @@ def main():
         depfile_dir = os.path.dirname(args.depfile)
         if not os.path.exists(depfile_dir):
             os.makedirs(depfile_dir)
-        with open(args.depfile, 'w') as f:
+        with open(args.depfile, "w") as f:
             f.write(
-                '%s: %s\n' % (
-                    ' '.join(sorted(args.outputs)), ' '.join(
-                        sorted(implicit_inputs))))
+                "%s: %s\n"
+                % (
+                    " ".join(sorted(args.outputs)),
+                    " ".join(sorted(implicit_inputs)),
+                )
+            )
 
     # Compute constraints from action properties (from args).
     action = Action(
         inputs=args.inputs,
         outputs=args.outputs,
         depfile=depfile,
-        hermetic_inputs=hermetic_inputs)
+        hermetic_inputs=hermetic_inputs,
+    )
     access_constraints = action.access_constraints(
-        writeable_depfile_inputs=args.writeable_depfile_inputs)
+        writeable_depfile_inputs=args.writeable_depfile_inputs
+    )
 
     # Limit most access checks to files under src_root.
     src_root = os.path.dirname(os.path.dirname(os.getcwd()))
@@ -889,18 +943,15 @@ def main():
         # this as a dependency so it can't be listed as an input.
         # https://bugs.chromium.org/p/gn/issues/detail?id=313
         os.path.join(os.getcwd(), "compile_commands.json"),
-
         ### C/C++ toolchain-related
         # Specify toolchain/sysroot related exceptions using explicit
         # --ignore-prefix (hermetic_action_ignored_prefixes in GN),
         # instead of hard-coding their paths here.
-
         ### Python
         # Python scripts access Python prebuilts for the interpreter,
         # standard library, and other things that are not strict inputs
         # to Python scripts.  This also covers dirs named python3.x.
         os.path.join(src_root, "prebuilt", "third_party", "python3"),
-
         ### Dart
         # TODO(jayzhuang): flutter's dart_libraries currently don't have sources
         # listed, fix that and remove this exception.
@@ -916,11 +967,9 @@ def main():
         # catching other tools trying to write to $HOME in the future.
         # This only affects local builds.
         os.path.join(os.getcwd(), ".dart/"),
-
         ### Flutter
         # Implicit engine deps
         os.path.join(src_root, "prebuilt", "third_party", "sky_engine", "lib/"),
-
         ### Ninja
         # There is no way to specify this file as an input to a GN action
         # since this file is not known to GN.
@@ -930,22 +979,20 @@ def main():
     # that is the only rebase_path() option from GN that can be used.
     for prefix in args.ignore_prefix:
         ignored_prefixes.add(
-            os.path.normpath(os.path.join(os.getcwd(), prefix)))
+            os.path.normpath(os.path.join(os.getcwd(), prefix))
+        )
     ignored_suffixes = {
         # TODO(jayzhuang): Figure out whether `.dart_tool/package_config.json`
         # should be included in inputs.
         "/.dart_tool/package_config.json",
         # Allow Flutter to read and write tool states.
         "/.config/flutter/tool_state",
-
         # Allow global access to remote action download file locks,
         # which are not consumed by any other builds actions.
         ".dl-lock",
-
         # Downloads stubs can be kept as backups after downloading
         # the real artifact.  No build action consumes these backups.
         ".dl-stub",
-
         # Allow actions to read .fx-build-dir to figure out the current build
         # directory.
         #
@@ -998,9 +1045,12 @@ def main():
     # Ignore directory accesses, including symlinked dirs.
     # Also filter out temporary directories that no longer exist.
     file_accesses = [
-        access for access in all_accesses if not (
-            os.path.isdir(os.path.realpath(access.path)) or
-            access.path in all_dirs)
+        access
+        for access in all_accesses
+        if not (
+            os.path.isdir(os.path.realpath(access.path))
+            or access.path in all_dirs
+        )
     ]
 
     # Filter out accesses we don't want to track.
@@ -1026,12 +1076,15 @@ should not be declared as dependencies.
   {ignored_inputs_formatted}
 
 """,
-            file=sys.stderr)
+            file=sys.stderr,
+        )
         exit_code = 1
 
     # Filter out access we don't want to track.
     filtered_accesses = [
-        access for access in file_accesses if access.should_check(
+        access
+        for access in file_accesses
+        if access.should_check(
             ignore_conditions=ignore_conditions,
             # Ignore accesses that fall outside of the source root.
             required_path_prefix=src_root,
@@ -1045,7 +1098,8 @@ should not be declared as dependencies.
     if args.check_access_permissions and retval == 0:
         # Verify the filesystem access trace.
         unexpected_accesses = check_access_permissions(
-            accesses=file_access_sets, constraints=access_constraints)
+            accesses=file_access_sets, constraints=access_constraints
+        )
 
         if unexpected_accesses.all_accesses:
             unexpected_accesses_formatted = str(unexpected_accesses)
@@ -1059,7 +1113,8 @@ Full access trace in build directory: {args.trace_output}
 See: https://fuchsia.dev/fuchsia-src/development/build/hermetic_actions
 
 """,
-                file=sys.stderr)
+                file=sys.stderr,
+            )
             exit_code = args.failed_check_status
         elif not args.keep_raw_trace:
             os.remove(args.trace_output)
@@ -1067,11 +1122,12 @@ See: https://fuchsia.dev/fuchsia-src/development/build/hermetic_actions
     if action.parsed_depfile:
         allowed_abspaths = {"/usr/bin/env"}
         abspaths = abspaths_from_depfile(
-            action.parsed_depfile, allowed_abspaths)
+            action.parsed_depfile, allowed_abspaths
+        )
 
         if abspaths:
             exit_code = args.failed_check_status
-            one_path_per_line = '\n'.join(sorted(abspaths))
+            one_path_per_line = "\n".join(sorted(abspaths))
             print(
                 f"""
 Found the following files with absolute paths in depfile {action.depfile} for {args.label}:
@@ -1080,7 +1136,8 @@ Found the following files with absolute paths in depfile {action.depfile} for {a
 
 See: https://fuchsia.dev/fuchsia-src/development/build/hermetic_actions#depfiles
 """,
-                file=sys.stderr)
+                file=sys.stderr,
+            )
 
     if retval != 0:
         # Always forward the action's non-zero exit code, regardless of tracer findings.

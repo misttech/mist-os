@@ -34,12 +34,16 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
     """
 
     def __init__(
-            self, device_name: str, sl4f: sl4f_transport.SL4F,
-            reboot_affordance: affordances_capable.RebootCapableDevice) -> None:
+        self,
+        device_name: str,
+        sl4f: sl4f_transport.SL4F,
+        reboot_affordance: affordances_capable.RebootCapableDevice,
+    ) -> None:
         self._name: str = device_name
         self._sl4f: sl4f_transport.SL4F = sl4f
-        self._reboot_affordance: affordances_capable.RebootCapableDevice = \
+        self._reboot_affordance: affordances_capable.RebootCapableDevice = (
             reboot_affordance
+        )
 
         # `sys_init` need to be called on every device bootup
         self._reboot_affordance.register_for_on_device_boot(fn=self.sys_init)
@@ -60,8 +64,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         self._sl4f.run(method=Sl4fMethods.INIT_SYS)
 
     def accept_pairing(
-            self, input_mode: BluetoothAcceptPairing,
-            output_mode: BluetoothAcceptPairing) -> None:
+        self, input_mode: BluetoothAcceptPairing, output_mode: BluetoothAcceptPairing
+    ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
@@ -73,13 +77,10 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         self._sl4f.run(
             method=Sl4fMethods.ACCEPT_PAIRING,
-            params={
-                "input": input_mode,
-                "output": output_mode
-            })
+            params={"input": input_mode, "output": output_mode},
+        )
 
-    def connect_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def connect_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
@@ -93,10 +94,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         self._sl4f.run(
             method=Sl4fMethods.CONNECT_DEVICE,
-            params={
-                "identifier": identifier,
-                "transport": transport.value
-            })
+            params={"identifier": identifier, "transport": transport.value},
+        )
 
     def forget_device(self, identifier: str) -> None:
         """Forget device to target remote device via Bluetooth.
@@ -111,10 +110,11 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
-            method=Sl4fMethods.FORGET_DEVICE, params={"identifier": identifier})
+            method=Sl4fMethods.FORGET_DEVICE, params={"identifier": identifier}
+        )
 
     def get_active_adapter_address(self) -> str:
-        """ Retrieves the active adapter mac address
+        """Retrieves the active adapter mac address
 
         Sample result:
             {"result": "[address (public) 20:1F:3B:62:E9:D2]"}
@@ -132,7 +132,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         return mac_address[2]
 
     def get_connected_devices(self) -> list[str]:
-        """ Retrieves all connected remote devices.
+        """Retrieves all connected remote devices.
 
         Returns:
             A list of all connected devices by identifier. If none,
@@ -158,13 +158,11 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
             KeyError: If the Sl4f call returns no "result".
         """
-        known_devices = self._sl4f.run(
-            method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES)
+        known_devices = self._sl4f.run(method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES)
         return known_devices["result"]
 
     # TODO(b/301499667): Update transport to bluetooth_transport
-    def pair_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def pair_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
@@ -178,10 +176,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         self._sl4f.run(
             method=Sl4fMethods.PAIR_DEVICE,
-            params={
-                "identifier": identifier,
-                "transport": transport.value
-            })
+            params={"identifier": identifier, "transport": transport.value},
+        )
 
     def request_discovery(self, discovery: bool) -> None:
         """Requests Bluetooth Discovery on Bluetooth capable device.
@@ -193,8 +189,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
-            method=Sl4fMethods.REQUEST_DISCOVERY,
-            params={"discovery": discovery})
+            method=Sl4fMethods.REQUEST_DISCOVERY, params={"discovery": discovery}
+        )
 
     def set_discoverable(self, discoverable: bool) -> None:
         """Sets device to be discoverable by others.
@@ -207,5 +203,5 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
-            method=Sl4fMethods.SET_DISCOVERABLE,
-            params={"discoverable": discoverable})
+            method=Sl4fMethods.SET_DISCOVERABLE, params={"discoverable": discoverable}
+        )

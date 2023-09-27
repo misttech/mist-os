@@ -15,18 +15,18 @@ from mobly_controller.fuchsia_device import asynctest
 
 
 class FuchsiaControllerTests(base_test.BaseTestClass):
-
     def setup_class(self) -> None:
         self.fuchsia_devices: List[
-            fuchsia_device.FuchsiaDevice] = self.register_controller(
-                fuchsia_device)
+            fuchsia_device.FuchsiaDevice
+        ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]
 
     @asynctest
     async def test_fuchsia_device_reboot(self) -> None:
         """Attempts to reboot a device."""
         ch = self.device.ctx.connect_device_proxy(
-            "bootstrap/shutdown_shim", power_statecontrol.Admin.MARKER)
+            "bootstrap/shutdown_shim", power_statecontrol.Admin.MARKER
+        )
         admin = power_statecontrol.Admin.Client(ch)
         # Makes a coroutine to ensure that a PEER_CLOSED isn't received from attempting
         # to write to the channel.

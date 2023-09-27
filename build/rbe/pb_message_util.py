@@ -18,10 +18,7 @@ from typing import Any, Callable, Dict, Sequence, Tuple
 
 def _dict_to_key_values(d: Dict[str, Any]) -> Sequence[Dict[str, Any]]:
     return [
-        {
-            "key": k,
-            "value": _value_to_bq_dict(v)
-        } for k, v in sorted(d.items())
+        {"key": k, "value": _value_to_bq_dict(v)} for k, v in sorted(d.items())
     ]
 
 
@@ -33,13 +30,15 @@ def _value_to_bq_dict(val):
         return val
 
 
-def _convert_repeated_bq_value(fd: descriptor.FieldDescriptor,
-                               value: Any) -> Sequence[Any]:
+def _convert_repeated_bq_value(
+    fd: descriptor.FieldDescriptor, value: Any
+) -> Sequence[Any]:
     # proto maps appear as Message types, but are implemented as special classes
     # instead of dictionaries (but still have a dictionary interface).
     if fd.type == descriptor.FieldDescriptor.TYPE_MESSAGE:
         if isinstance(value, proto_containers.MessageMap) or isinstance(
-                value, proto_containers.ScalarMap):
+            value, proto_containers.ScalarMap
+        ):
             return _dict_to_key_values(value)
     return [_convert_scalar_bq_value(fd, v) for v in value]
 

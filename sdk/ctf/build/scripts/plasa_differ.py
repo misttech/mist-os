@@ -24,16 +24,16 @@ class PlasaDiffer:
         diff_file.close()
         args = [
             self.fidl_api_diff_path,
-            '--before-file',
+            "--before-file",
             before,
-            '--after-file',
+            "--after-file",
             after,
-            '--api-diff-file',
+            "--api-diff-file",
             diff_file.name,
         ]
         p = subprocess.run(args, check=True, capture_output=True, text=True)
         diff = []
-        with open(diff_file.name, 'r') as f:
+        with open(diff_file.name, "r") as f:
             output = json.loads(f.read())
             if output:
                 diff = output["api_diff"]
@@ -49,24 +49,28 @@ class PlasaDiffer:
         if not "before" in report_item:
             return "Added: {}".format(report_item["after"])
         return "Changed: {} => {}".format(
-            report_item["before"], report_item["after"])
+            report_item["before"], report_item["after"]
+        )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--before_manifest',
-        help='Path to the old PlaSA manifest file, from the CTS release.',
-        required=True)
+        "--before_manifest",
+        help="Path to the old PlaSA manifest file, from the CTS release.",
+        required=True,
+    )
     parser.add_argument(
-        '--after_manifest',
-        help='Path to the new PlaSA manifest file, from an SDK release.',
-        required=True)
+        "--after_manifest",
+        help="Path to the new PlaSA manifest file, from an SDK release.",
+        required=True,
+    )
     parser.add_argument(
-        '--kinds',
-        nargs='+',
-        help='Type of PlaSA Fragments to diff.',
-        required=True)
+        "--kinds",
+        nargs="+",
+        help="Type of PlaSA Fragments to diff.",
+        required=True,
+    )
     args = parser.parse_args()
     pd = PlasaDiffer(**vars(args))
 

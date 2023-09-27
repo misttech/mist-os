@@ -11,7 +11,6 @@ from fuchsia_controller_py import IsolateDir
 
 
 class IsolateDirectory(unittest.TestCase):
-
     def test_isolate_dir_creation_empty(self):
         isolate_dir = IsolateDir()
 

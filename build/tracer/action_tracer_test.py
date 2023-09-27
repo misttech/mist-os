@@ -14,94 +14,116 @@ import action_tracer
 
 
 class ToolCommandTests(unittest.TestCase):
-
     def test_empty_command(self):
         with self.assertRaises(IndexError):
             action_tracer.ToolCommand().tool
 
     def test_command_no_args(self):
-        command = action_tracer.ToolCommand(tokens=['echo'])
+        command = action_tracer.ToolCommand(tokens=["echo"])
         self.assertEqual(command.env_tokens, [])
-        self.assertEqual(command.tool, 'echo')
+        self.assertEqual(command.tool, "echo")
         self.assertEqual(command.args, [])
 
     def test_command_with_env(self):
-        command = action_tracer.ToolCommand(tokens=['TMPDIR=/my/tmp', 'echo'])
-        self.assertEqual(command.env_tokens, ['TMPDIR=/my/tmp'])
-        self.assertEqual(command.tool, 'echo')
+        command = action_tracer.ToolCommand(tokens=["TMPDIR=/my/tmp", "echo"])
+        self.assertEqual(command.env_tokens, ["TMPDIR=/my/tmp"])
+        self.assertEqual(command.tool, "echo")
         self.assertEqual(command.args, [])
 
     def test_command_with_args(self):
         command = action_tracer.ToolCommand(
-            tokens=['ln', '-f', '-s', 'foo', 'bar'])
+            tokens=["ln", "-f", "-s", "foo", "bar"]
+        )
         self.assertEqual(command.env_tokens, [])
-        self.assertEqual(command.tool, 'ln')
-        self.assertEqual(command.args, ['-f', '-s', 'foo', 'bar'])
+        self.assertEqual(command.tool, "ln")
+        self.assertEqual(command.args, ["-f", "-s", "foo", "bar"])
 
     def test_unwrap_no_change(self):
-        tokens = ['ln', '-f', '-s', 'foo', 'bar']
+        tokens = ["ln", "-f", "-s", "foo", "bar"]
         command = action_tracer.ToolCommand(tokens=tokens)
         self.assertEqual(command.unwrap().tokens, tokens)
 
     def test_unwrap_one_level(self):
-        tokens = ['wrapper', '--opt', 'foo', '--', 'bar.sh', 'arg']
+        tokens = ["wrapper", "--opt", "foo", "--", "bar.sh", "arg"]
         command = action_tracer.ToolCommand(tokens=tokens)
-        self.assertEqual(command.unwrap().tokens, ['bar.sh', 'arg'])
+        self.assertEqual(command.unwrap().tokens, ["bar.sh", "arg"])
 
     def test_unwrap_one_of_many_level(self):
         tokens = [
-            'wrapper', '--opt', 'foo', '--', 'bar.sh', 'arg', '--', 'inner.sh'
+            "wrapper",
+            "--opt",
+            "foo",
+            "--",
+            "bar.sh",
+            "arg",
+            "--",
+            "inner.sh",
         ]
         command = action_tracer.ToolCommand(tokens=tokens)
         command2 = command.unwrap()
-        self.assertEqual(command2.tokens, ['bar.sh', 'arg', '--', 'inner.sh'])
+        self.assertEqual(command2.tokens, ["bar.sh", "arg", "--", "inner.sh"])
         command3 = command2.unwrap()
-        self.assertEqual(command3.tokens, ['inner.sh'])
+        self.assertEqual(command3.tokens, ["inner.sh"])
 
 
 class IsKnownWrapperTests(unittest.TestCase):
-
     def test_action_tracer_is_not_wrapper(self):
         command = action_tracer.ToolCommand(
             tokens=[
-                'path/to/python3.x', 'path/to/not_a_wrapper.py', '--opt1',
-                'arg1'
-            ])
+                "path/to/python3.x",
+                "path/to/not_a_wrapper.py",
+                "--opt1",
+                "arg1",
+            ]
+        )
         self.assertFalse(action_tracer.is_known_wrapper(command))
 
     def test_action_tracer_is_not_wrapper_implicit_interpreter(self):
         command = action_tracer.ToolCommand(
-            tokens=['path/to/not_a_wrapper.py', '--opt1', 'arg1'])
+            tokens=["path/to/not_a_wrapper.py", "--opt1", "arg1"]
+        )
         self.assertFalse(action_tracer.is_known_wrapper(command))
 
     def test_action_tracer_is_wrapper(self):
         command = action_tracer.ToolCommand(
             tokens=[
-                'path/to/python3.x', 'path/to/action_tracer.py', '--', 'foo.sh',
-                'arg1', 'arg2'
-            ])
+                "path/to/python3.x",
+                "path/to/action_tracer.py",
+                "--",
+                "foo.sh",
+                "arg1",
+                "arg2",
+            ]
+        )
         self.assertTrue(action_tracer.is_known_wrapper(command))
 
     def test_action_tracer_is_wrapper_extra_python_flag(self):
         command = action_tracer.ToolCommand(
             tokens=[
-                'path/to/python3.x', '-S', 'path/to/action_tracer.py', '--',
-                'foo.sh', 'arg1', 'arg2'
-            ])
+                "path/to/python3.x",
+                "-S",
+                "path/to/action_tracer.py",
+                "--",
+                "foo.sh",
+                "arg1",
+                "arg2",
+            ]
+        )
         self.assertTrue(action_tracer.is_known_wrapper(command))
 
     def test_action_tracer_is_wrapper_implicit_interpreter(self):
         command = action_tracer.ToolCommand(
-            tokens=['path/to/action_tracer.py', '--', 'foo.sh', 'arg1', 'arg2'])
+            tokens=["path/to/action_tracer.py", "--", "foo.sh", "arg1", "arg2"]
+        )
         self.assertTrue(action_tracer.is_known_wrapper(command))
 
 
 class DepEdgesParseTests(unittest.TestCase):
-
     def test_invalid_input(self):
         with self.assertRaises(ValueError):
             action_tracer.parse_dep_edges(
-                "output.txt input1.txt")  # missing ":"
+                "output.txt input1.txt"
+            )  # missing ":"
 
     def test_output_only(self):
         dep = action_tracer.parse_dep_edges("output.txt:")
@@ -120,25 +142,27 @@ class DepEdgesParseTests(unittest.TestCase):
 
     def test_output_with_multiple_inputs(self):
         dep = action_tracer.parse_dep_edges(
-            "output.txt:input.cc includes/header.h")
+            "output.txt:input.cc includes/header.h"
+        )
         self.assertEqual(dep.ins, {"input.cc", "includes/header.h"})
         self.assertEqual(dep.outs, {"output.txt"})
 
     def test_output_with_multiple_inputs_unusual_spacing(self):
         dep = action_tracer.parse_dep_edges(
-            "  output.txt  :    input.cc   includes/header.h  ")
+            "  output.txt  :    input.cc   includes/header.h  "
+        )
         self.assertEqual(dep.ins, {"input.cc", "includes/header.h"})
         self.assertEqual(dep.outs, {"output.txt"})
 
     def test_file_name_with_escaped_space(self):
         dep = action_tracer.parse_dep_edges(
-            "output.txt:  source\\ input.cc includes/header.h")
+            "output.txt:  source\\ input.cc includes/header.h"
+        )
         self.assertEqual(dep.ins, {"source input.cc", "includes/header.h"})
         self.assertEqual(dep.outs, {"output.txt"})
 
 
 class ParseDepFileTests(unittest.TestCase):
-
     def test_empty(self):
         depfile = action_tracer.parse_depfile([])
         self.assertEqual(depfile.deps, [])
@@ -148,22 +172,28 @@ class ParseDepFileTests(unittest.TestCase):
     def test_multiple_ins_multiple_outs(self):
         depfile = action_tracer.parse_depfile(["a b: c d"])
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"c", "d"}, outs={"a", "b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"c", "d"})
         self.assertEqual(depfile.all_outs, {"a", "b"})
 
     def test_two_deps(self):
-        depfile = action_tracer.parse_depfile([
-            "A: B",
-            "C: D E",
-        ])
+        depfile = action_tracer.parse_depfile(
+            [
+                "A: B",
+                "C: D E",
+            ]
+        )
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"B"}, outs={"A"}),
                 action_tracer.DepEdges(ins={"D", "E"}, outs={"C"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"B", "D", "E"})
         self.assertEqual(depfile.all_outs, {"A", "C"})
 
@@ -174,11 +204,14 @@ class ParseDepFileTests(unittest.TestCase):
                 "b: \\\n",
                 "c \\\n",
                 "d",
-            ])
+            ]
+        )
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"c", "d"}, outs={"a", "b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"c", "d"})
         self.assertEqual(depfile.all_outs, {"a", "b"})
 
@@ -188,20 +221,25 @@ class ParseDepFileTests(unittest.TestCase):
                 "a \\\r\n",
                 "b: c \\\r\n",
                 "d e",
-            ])
+            ]
+        )
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"c", "d", "e"}, outs={"a", "b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"c", "d", "e"})
         self.assertEqual(depfile.all_outs, {"a", "b"})
 
     def test_space_in_filename(self):
         depfile = action_tracer.parse_depfile(["a\\ b: c d"])
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"c", "d"}, outs={"a b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"c", "d"})
         self.assertEqual(depfile.all_outs, {"a b"})
 
@@ -211,61 +249,79 @@ class ParseDepFileTests(unittest.TestCase):
 
     def test_trailing_escaped_whitespace(self):
         with self.assertRaises(ValueError):
-            depfile = action_tracer.parse_depfile([
-                "a \\ \r\n",
-                "b: c",
-            ])
+            depfile = action_tracer.parse_depfile(
+                [
+                    "a \\ \r\n",
+                    "b: c",
+                ]
+            )
         with self.assertRaises(ValueError):
-            depfile = action_tracer.parse_depfile([
-                "a \\ \n",
-                "b: c",
-            ])
+            depfile = action_tracer.parse_depfile(
+                [
+                    "a \\ \n",
+                    "b: c",
+                ]
+            )
         with self.assertRaises(ValueError):
-            depfile = action_tracer.parse_depfile([
-                "a \\    \n",
-                "b: c",
-            ])
+            depfile = action_tracer.parse_depfile(
+                [
+                    "a \\    \n",
+                    "b: c",
+                ]
+            )
 
     def test_unfinished_line_continuation(self):
         with self.assertRaises(ValueError):
-            depfile = action_tracer.parse_depfile([
-                "a \\\n",
-                "b: c \\\n",
-            ])
+            depfile = action_tracer.parse_depfile(
+                [
+                    "a \\\n",
+                    "b: c \\\n",
+                ]
+            )
 
     def test_blank_line(self):
-        depfile = action_tracer.parse_depfile([
-            "a:b",
-            " ",
-            "b:",
-        ])
+        depfile = action_tracer.parse_depfile(
+            [
+                "a:b",
+                " ",
+                "b:",
+            ]
+        )
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins={"b"}, outs={"a"}),
                 action_tracer.DepEdges(ins=set(), outs={"b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, {"b"})
         self.assertEqual(depfile.all_outs, {"a", "b"})
 
     def test_comment(self):
-        depfile = action_tracer.parse_depfile([
-            " # a:b",
-            "b:",
-        ])
+        depfile = action_tracer.parse_depfile(
+            [
+                " # a:b",
+                "b:",
+            ]
+        )
         self.assertEqual(
-            depfile.deps, [
+            depfile.deps,
+            [
                 action_tracer.DepEdges(ins=set(), outs={"b"}),
-            ])
+            ],
+        )
         self.assertEqual(depfile.all_ins, set())
         self.assertEqual(depfile.all_outs, {"b"})
 
     def test_continuation_blank_line(self):
         with self.assertRaises(ValueError):
-            depfile = action_tracer.parse_depfile([
-                "a: \\\n",
-                "",
-                "b",
-            ])
+            depfile = action_tracer.parse_depfile(
+                [
+                    "a: \\\n",
+                    "",
+                    "b",
+                ]
+            )
 
     def test_continuation_comment(self):
         with self.assertRaises(ValueError):
@@ -274,11 +330,11 @@ class ParseDepFileTests(unittest.TestCase):
                     "a: \\\n",
                     "# comment",
                     "b",
-                ])
+                ]
+            )
 
 
 class ParseFsatraceOutputTests(unittest.TestCase):
-
     def test_empty_stream(self):
         self.assertEqual(
             list(action_tracer.parse_fsatrace_output([])),
@@ -318,7 +374,8 @@ class ParseFsatraceOutputTests(unittest.TestCase):
     def test_move(self):
         self.assertEqual(
             list(
-                action_tracer.parse_fsatrace_output(["m|dest.txt|source.txt"])),
+                action_tracer.parse_fsatrace_output(["m|dest.txt|source.txt"])
+            ),
             [
                 action_tracer.Delete("source.txt"),
                 action_tracer.Write("dest.txt"),
@@ -333,7 +390,9 @@ class ParseFsatraceOutputTests(unittest.TestCase):
                         "m|dest.txt|source.txt",
                         "r|input.txt",
                         "w|output.log",
-                    ])),
+                    ]
+                )
+            ),
             [
                 action_tracer.Delete("source.txt"),
                 action_tracer.Write("dest.txt"),
@@ -344,173 +403,229 @@ class ParseFsatraceOutputTests(unittest.TestCase):
 
 
 class MatchConditionsTests(unittest.TestCase):
-
     def test_no_conditions(self):
         self.assertFalse(action_tracer.MatchConditions().matches("foo/bar"))
 
     def test_prefix_matches(self):
         self.assertTrue(
-            action_tracer.MatchConditions(prefixes={"fo"}).matches("foo/bar"))
+            action_tracer.MatchConditions(prefixes={"fo"}).matches("foo/bar")
+        )
 
     def test_suffix_matches(self):
         self.assertTrue(
-            action_tracer.MatchConditions(suffixes={"ar"}).matches("foo/bar"))
+            action_tracer.MatchConditions(suffixes={"ar"}).matches("foo/bar")
+        )
 
     def test_component_matches(self):
         self.assertTrue(
-            action_tracer.MatchConditions(
-                components={"bar", "bq"}).matches("foo/bar/baz.txt"))
+            action_tracer.MatchConditions(components={"bar", "bq"}).matches(
+                "foo/bar/baz.txt"
+            )
+        )
 
 
 class AccessShouldCheckTests(unittest.TestCase):
-
     def test_no_required_prefix(self):
         ignore_conditions = action_tracer.MatchConditions()
         self.assertTrue(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions, required_path_prefix=""))
+                ignore_conditions=ignore_conditions, required_path_prefix=""
+            )
+        )
         self.assertTrue(
             action_tracer.Write("block").should_check(
-                ignore_conditions=ignore_conditions, required_path_prefix=""))
+                ignore_conditions=ignore_conditions, required_path_prefix=""
+            )
+        )
 
     def test_required_prefix_matches(self):
         ignore_conditions = action_tracer.MatchConditions()
         prefix = "/home/project"
         self.assertTrue(
             action_tracer.Read("/home/project/book").should_check(
-                ignore_conditions=ignore_conditions,
-                required_path_prefix=prefix))
+                ignore_conditions=ignore_conditions, required_path_prefix=prefix
+            )
+        )
         self.assertTrue(
             action_tracer.Write("/home/project/out/block").should_check(
-                ignore_conditions=ignore_conditions,
-                required_path_prefix=prefix))
+                ignore_conditions=ignore_conditions, required_path_prefix=prefix
+            )
+        )
 
     def test_required_prefix_no_match(self):
         ignore_conditions = action_tracer.MatchConditions()
         prefix = "/home/project"
         self.assertFalse(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions,
-                required_path_prefix=prefix))
+                ignore_conditions=ignore_conditions, required_path_prefix=prefix
+            )
+        )
         self.assertFalse(
             action_tracer.Write("output/log").should_check(
-                ignore_conditions=ignore_conditions,
-                required_path_prefix=prefix))
+                ignore_conditions=ignore_conditions, required_path_prefix=prefix
+            )
+        )
 
     def test_no_ignored_prefix(self):
         ignore_conditions = action_tracer.MatchConditions(prefixes={})
         self.assertTrue(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertTrue(
             action_tracer.Write("output/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_prefix_matches(self):
         ignore_conditions = action_tracer.MatchConditions(prefixes={"/tmp"})
         self.assertFalse(
             action_tracer.Read("/tmp/book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertFalse(
             action_tracer.Write("/tmp/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_prefix_no_match(self):
         ignore_conditions = action_tracer.MatchConditions(
-            prefixes={"/tmp", "/no/look/here"})
+            prefixes={"/tmp", "/no/look/here"}
+        )
         self.assertTrue(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertTrue(
             action_tracer.Write("out/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_no_ignored_suffix(self):
         ignore_conditions = action_tracer.MatchConditions(suffixes={})
         self.assertTrue(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertTrue(
             action_tracer.Write("output/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_suffix_matches(self):
         # e.g. from compiler --save-temps
         ignore_conditions = action_tracer.MatchConditions(suffixes={".ii"})
         self.assertFalse(
             action_tracer.Read("book.ii").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertFalse(
             action_tracer.Write("tmp/log.ii").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_suffix_no_match(self):
         # e.g. from compiler --save-temps
         ignore_conditions = action_tracer.MatchConditions(
-            suffixes={".ii", ".S"})
+            suffixes={".ii", ".S"}
+        )
         self.assertTrue(
             action_tracer.Read("book.txt").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertTrue(
             action_tracer.Write("out/process.log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_path_components_no_match(self):
         ignore_conditions = action_tracer.MatchConditions(
-            components={"__auto__", ".generated"})
+            components={"__auto__", ".generated"}
+        )
         self.assertTrue(
             action_tracer.Read("book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertTrue(
             action_tracer.Write("out/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
     def test_ignored_path_components_matches(self):
         ignore_conditions = action_tracer.MatchConditions(
-            components={"__auto__", ".generated"})
+            components={"__auto__", ".generated"}
+        )
         self.assertFalse(
             action_tracer.Read("library/__auto__/book").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
         self.assertFalse(
             action_tracer.Write(".generated/out/log").should_check(
-                ignore_conditions=ignore_conditions))
+                ignore_conditions=ignore_conditions
+            )
+        )
 
 
 class CheckAccessAllowedTests(unittest.TestCase):
-
     def test_allowed_read(self):
         self.assertTrue(
             action_tracer.Read("foo.txt").allowed(
-                allowed_reads={"foo.txt"}, allowed_writes={}))
+                allowed_reads={"foo.txt"}, allowed_writes={}
+            )
+        )
 
     def test_forbiddden_read(self):
         self.assertFalse(
             action_tracer.Read("bar.txt").allowed(
-                allowed_reads={}, allowed_writes={}))
+                allowed_reads={}, allowed_writes={}
+            )
+        )
 
     def test_allowed_write(self):
         self.assertTrue(
             action_tracer.Write("foo.txt").allowed(
-                allowed_reads={}, allowed_writes={"foo.txt"}))
+                allowed_reads={}, allowed_writes={"foo.txt"}
+            )
+        )
 
     def test_forbiddden_write(self):
         self.assertFalse(
             action_tracer.Write("baz.txt").allowed(
-                allowed_reads={}, allowed_writes={}))
+                allowed_reads={}, allowed_writes={}
+            )
+        )
 
     def test_allowed_delete(self):
         self.assertTrue(
             action_tracer.Delete("foo.txt").allowed(
-                allowed_reads={}, allowed_writes={"foo.txt"}))
+                allowed_reads={}, allowed_writes={"foo.txt"}
+            )
+        )
 
     def test_forbiddden_delete(self):
         self.assertFalse(
             action_tracer.Delete("baz.txt").allowed(
-                allowed_reads={}, allowed_writes={}))
+                allowed_reads={}, allowed_writes={}
+            )
+        )
 
 
 class FormatAccessSetTest(unittest.TestCase):
-
     def test_empty(self):
         self.assertEqual(str(action_tracer.FSAccessSet()), "[empty accesses]")
 
@@ -522,7 +637,9 @@ class FormatAccessSetTest(unittest.TestCase):
                  Reads:
                    a
                    b
-                   c"""))
+                   c"""
+            ),
+        )
 
     def test_writes(self):
         self.assertEqual(
@@ -532,7 +649,9 @@ class FormatAccessSetTest(unittest.TestCase):
                  Writes:
                    d
                    e
-                   f"""))
+                   f"""
+            ),
+        )
 
     def test_deletes(self):
         self.assertEqual(
@@ -542,7 +661,9 @@ class FormatAccessSetTest(unittest.TestCase):
                  Deletes:
                    p
                    q
-                   r"""))
+                   r"""
+            ),
+        )
 
     def test_reads_writes(self):
         files = {"c", "a", "b"}
@@ -557,7 +678,9 @@ class FormatAccessSetTest(unittest.TestCase):
                  Writes:
                    a
                    b
-                   c"""))
+                   c"""
+            ),
+        )
 
     def test_writes_deletes(self):
         files = {"c", "a", "b"}
@@ -572,15 +695,17 @@ class FormatAccessSetTest(unittest.TestCase):
                  Deletes:
                    a
                    b
-                   c"""))
+                   c"""
+            ),
+        )
 
 
 class FinalizeFileSystemAccessesTest(unittest.TestCase):
-
     def test_no_accesses(self):
         self.assertEqual(
             action_tracer.finalize_filesystem_accesses([]),
-            action_tracer.FSAccessSet())
+            action_tracer.FSAccessSet(),
+        )
 
     def test_reads(self):
         self.assertEqual(
@@ -588,7 +713,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Read("r1.txt"),
                     action_tracer.Read("r2.txt"),
-                ]), action_tracer.FSAccessSet(reads={"r1.txt", "r2.txt"}))
+                ]
+            ),
+            action_tracer.FSAccessSet(reads={"r1.txt", "r2.txt"}),
+        )
 
     def test_writes(self):
         self.assertEqual(
@@ -596,7 +724,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Write("wb.txt"),
                     action_tracer.Write("wa.txt"),
-                ]), action_tracer.FSAccessSet(writes={"wa.txt", "wb.txt"}))
+                ]
+            ),
+            action_tracer.FSAccessSet(writes={"wa.txt", "wb.txt"}),
+        )
 
     def test_reads_writes_no_deletes(self):
         self.assertEqual(
@@ -606,9 +737,12 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                     action_tracer.Write("wb.txt"),
                     action_tracer.Write("wa.txt"),
                     action_tracer.Read("r1.txt"),
-                ]),
+                ]
+            ),
             action_tracer.FSAccessSet(
-                reads={"r1.txt", "r2.txt"}, writes={"wa.txt", "wb.txt"}))
+                reads={"r1.txt", "r2.txt"}, writes={"wa.txt", "wb.txt"}
+            ),
+        )
 
     def test_read_after_write(self):
         self.assertEqual(
@@ -616,7 +750,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Write("temp.txt"),
                     action_tracer.Read("temp.txt"),
-                ]), action_tracer.FSAccessSet(reads=set(), writes={"temp.txt"}))
+                ]
+            ),
+            action_tracer.FSAccessSet(reads=set(), writes={"temp.txt"}),
+        )
 
     def test_delete(self):
         self.assertEqual(
@@ -624,7 +761,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Delete("d1.txt"),
                     action_tracer.Delete("d2.txt"),
-                ]), action_tracer.FSAccessSet(deletes={"d1.txt", "d2.txt"}))
+                ]
+            ),
+            action_tracer.FSAccessSet(deletes={"d1.txt", "d2.txt"}),
+        )
 
     def test_delete_after_write(self):
         self.assertEqual(
@@ -632,7 +772,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Write("temp.txt"),
                     action_tracer.Delete("temp.txt"),
-                ]), action_tracer.FSAccessSet())
+                ]
+            ),
+            action_tracer.FSAccessSet(),
+        )
 
     def test_write_after_delete(self):
         self.assertEqual(
@@ -640,7 +783,10 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                 [
                     action_tracer.Delete("temp.txt"),
                     action_tracer.Write("temp.txt"),
-                ]), action_tracer.FSAccessSet(writes={"temp.txt"}))
+                ]
+            ),
+            action_tracer.FSAccessSet(writes={"temp.txt"}),
+        )
 
     def test_write_read_delete(self):
         self.assertEqual(
@@ -649,15 +795,18 @@ class FinalizeFileSystemAccessesTest(unittest.TestCase):
                     action_tracer.Write("temp.txt"),
                     action_tracer.Read("temp.txt"),
                     action_tracer.Delete("temp.txt"),
-                ]), action_tracer.FSAccessSet())
+                ]
+            ),
+            action_tracer.FSAccessSet(),
+        )
 
 
 class CheckAccessPermissionsTests(unittest.TestCase):
-
     def test_no_accesses(self):
         self.assertEqual(
             action_tracer.check_access_permissions(
-                action_tracer.FSAccessSet(), action_tracer.AccessConstraints()),
+                action_tracer.FSAccessSet(), action_tracer.AccessConstraints()
+            ),
             action_tracer.FSAccessSet(),
         )
 
@@ -665,8 +814,8 @@ class CheckAccessPermissionsTests(unittest.TestCase):
         self.assertEqual(
             action_tracer.check_access_permissions(
                 action_tracer.FSAccessSet(reads={"readable.txt"}),
-                action_tracer.AccessConstraints(
-                    allowed_reads={"readable.txt"})),
+                action_tracer.AccessConstraints(allowed_reads={"readable.txt"}),
+            ),
             action_tracer.FSAccessSet(),
         )
 
@@ -675,7 +824,8 @@ class CheckAccessPermissionsTests(unittest.TestCase):
         self.assertEqual(
             action_tracer.check_access_permissions(
                 action_tracer.FSAccessSet(reads={read}),
-                action_tracer.AccessConstraints()),
+                action_tracer.AccessConstraints(),
+            ),
             action_tracer.FSAccessSet(reads={read}),
         )
 
@@ -684,7 +834,9 @@ class CheckAccessPermissionsTests(unittest.TestCase):
             action_tracer.check_access_permissions(
                 action_tracer.FSAccessSet(writes={"writeable.txt"}),
                 action_tracer.AccessConstraints(
-                    allowed_writes={"writeable.txt"})),
+                    allowed_writes={"writeable.txt"}
+                ),
+            ),
             action_tracer.FSAccessSet(),
         )
 
@@ -697,7 +849,8 @@ class CheckAccessPermissionsTests(unittest.TestCase):
         self.assertEqual(
             action_tracer.check_access_permissions(
                 action_tracer.FSAccessSet(writes=bad_writes),
-                action_tracer.AccessConstraints()),
+                action_tracer.AccessConstraints(),
+            ),
             action_tracer.FSAccessSet(writes=bad_writes),
         )
 
@@ -711,13 +864,13 @@ class CheckAccessPermissionsTests(unittest.TestCase):
         self.assertEqual(
             action_tracer.check_access_permissions(
                 action_tracer.FSAccessSet(reads=reads, writes=writes),
-                action_tracer.AccessConstraints()),
+                action_tracer.AccessConstraints(),
+            ),
             action_tracer.FSAccessSet(reads=set(), writes=writes),
         )
 
 
 class CheckMissingWritesTests(unittest.TestCase):
-
     def test_no_accesses(self):
         self.assertEqual(
             action_tracer.check_missing_writes([], {}),
@@ -802,21 +955,25 @@ def abspaths(container: Iterable[str]) -> AbstractSet[str]:
 
 
 class AccessConstraintsTests(unittest.TestCase):
-
     def test_empty_action(self):
         action = action_tracer.Action(inputs=["script.sh"])
         self.assertEqual(
             action.access_constraints(),
             action_tracer.AccessConstraints(
-                allowed_reads=abspaths({"script.sh"})))
+                allowed_reads=abspaths({"script.sh"})
+            ),
+        )
 
     def test_have_inputs(self):
         action = action_tracer.Action(
-            inputs=["script.sh", "input.txt", "main.cc"])
+            inputs=["script.sh", "input.txt", "main.cc"]
+        )
         self.assertEqual(
             action.access_constraints(),
             action_tracer.AccessConstraints(
-                allowed_reads=abspaths({"script.sh", "input.txt", "main.cc"})))
+                allowed_reads=abspaths({"script.sh", "input.txt", "main.cc"})
+            ),
+        )
 
     def test_have_outputs(self):
         action = action_tracer.Action(inputs=["script.sh"], outputs=["main.o"])
@@ -825,16 +982,22 @@ class AccessConstraintsTests(unittest.TestCase):
             action_tracer.AccessConstraints(
                 allowed_reads=abspaths({"script.sh", "main.o"}),
                 allowed_writes=abspaths({"main.o"}),
-                required_writes=abspaths({"main.o"})))
+                required_writes=abspaths({"main.o"}),
+            ),
+        )
 
     def test_have_depfile_writeable_inputs(self):
         action = action_tracer.Action(inputs=["script.sh"], depfile="foo.d")
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch("builtins.open", mock.mock_open(
-                    read_data="foo.o: foo.cc foo.h\n")) as mock_file:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch(
+                "builtins.open",
+                mock.mock_open(read_data="foo.o: foo.cc foo.h\n"),
+            ) as mock_file:
                 constraints = action.access_constraints(
-                    writeable_depfile_inputs=True)
+                    writeable_depfile_inputs=True
+                )
         mock_exists.assert_called_once()
         mock_file.assert_called_once()
 
@@ -842,17 +1005,24 @@ class AccessConstraintsTests(unittest.TestCase):
             constraints,
             action_tracer.AccessConstraints(
                 allowed_reads=abspaths(
-                    {"script.sh", "foo.d", "foo.o", "foo.cc", "foo.h"}),
-                allowed_writes=abspaths({"foo.d", "foo.o", "foo.cc", "foo.h"})))
+                    {"script.sh", "foo.d", "foo.o", "foo.cc", "foo.h"}
+                ),
+                allowed_writes=abspaths({"foo.d", "foo.o", "foo.cc", "foo.h"}),
+            ),
+        )
 
     def test_have_depfile_nonwritable_inputs(self):
         action = action_tracer.Action(inputs=["script.sh"], depfile="foo.d")
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch("builtins.open", mock.mock_open(
-                    read_data="foo.o: foo.cc foo.h\n")) as mock_file:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch(
+                "builtins.open",
+                mock.mock_open(read_data="foo.o: foo.cc foo.h\n"),
+            ) as mock_file:
                 constraints = action.access_constraints(
-                    writeable_depfile_inputs=False)
+                    writeable_depfile_inputs=False
+                )
         mock_exists.assert_called_once()
         mock_file.assert_called_once()
 
@@ -860,23 +1030,30 @@ class AccessConstraintsTests(unittest.TestCase):
             constraints,
             action_tracer.AccessConstraints(
                 allowed_reads=abspaths(
-                    {"script.sh", "foo.d", "foo.o", "foo.cc", "foo.h"}),
-                allowed_writes=abspaths({"foo.d", "foo.o"})))
+                    {"script.sh", "foo.d", "foo.o", "foo.cc", "foo.h"}
+                ),
+                allowed_writes=abspaths({"foo.d", "foo.o"}),
+            ),
+        )
 
     def test_links_are_followed(self):
-
         def fake_realpath(s: str) -> str:
-            return f'test/realpath/{s}'
+            return f"test/realpath/{s}"
 
         action = action_tracer.Action(inputs=["script.sh"], depfile="foo.d")
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch("builtins.open", mock.mock_open(
-                    read_data="foo.o: foo.cc foo.h\n")) as mock_file:
-                with mock.patch.object(os.path, 'realpath',
-                                       wraps=fake_realpath) as mock_realpath:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch(
+                "builtins.open",
+                mock.mock_open(read_data="foo.o: foo.cc foo.h\n"),
+            ) as mock_file:
+                with mock.patch.object(
+                    os.path, "realpath", wraps=fake_realpath
+                ) as mock_realpath:
                     constraints = action.access_constraints(
-                        writeable_depfile_inputs=False)
+                        writeable_depfile_inputs=False
+                    )
         mock_exists.assert_called_once()
         mock_file.assert_called_once()
         mock_realpath.assert_called()
@@ -891,24 +1068,29 @@ class AccessConstraintsTests(unittest.TestCase):
                         "test/realpath/foo.o",
                         "test/realpath/foo.cc",
                         "test/realpath/foo.h",
-                    }),
-                allowed_writes=abspaths({"foo.d", "foo.o"})))
+                    }
+                ),
+                allowed_writes=abspaths({"foo.d", "foo.o"}),
+            ),
+        )
 
     def test_have_nonexistent_depfile(self):
         action = action_tracer.Action(depfile="foo.d")
-        with mock.patch.object(os.path, 'exists',
-                               return_value=False) as mock_exists:
+        with mock.patch.object(
+            os.path, "exists", return_value=False
+        ) as mock_exists:
             constraints = action.access_constraints()
         mock_exists.assert_called()
         self.assertEqual(
             constraints,
             action_tracer.AccessConstraints(
                 allowed_writes=abspaths({"foo.d"}),
-                allowed_reads=abspaths({"foo.d"})))
+                allowed_reads=abspaths({"foo.d"}),
+            ),
+        )
 
 
 class DiagnoseStaleOutputsTest(unittest.TestCase):
-
     def test_no_accesses_no_constraints(self):
         output_diagnostics = action_tracer.diagnose_stale_outputs(
             accesses=[],
@@ -924,13 +1106,15 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
         output_diagnostics = action_tracer.diagnose_stale_outputs(
             accesses=[],
             access_constraints=action_tracer.AccessConstraints(
-                required_writes=required_writes),
+                required_writes=required_writes
+            ),
         )
         self.assertEqual(
             output_diagnostics,
             action_tracer.StalenessDiagnostics(
                 required_writes=required_writes,
-                nonexistent_outputs={"write.me"}),
+                nonexistent_outputs={"write.me"},
+            ),
         )
 
     def test_missing_write_with_used_input(self):
@@ -947,17 +1131,20 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
             output_diagnostics,
             action_tracer.StalenessDiagnostics(
                 required_writes=required_writes,
-                nonexistent_outputs={"write.me"}),
+                nonexistent_outputs={"write.me"},
+            ),
         )
 
     def test_stale_output_no_inputs(self):
         required_writes = {"write.me"}
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
             output_diagnostics = action_tracer.diagnose_stale_outputs(
                 accesses=[],
                 access_constraints=action_tracer.AccessConstraints(
-                    required_writes=required_writes),
+                    required_writes=required_writes
+                ),
             )
         mock_exists.assert_called_once()
         self.assertEqual(
@@ -966,31 +1153,33 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
         )
 
     def test_stale_output_with_used_input(self):
-
         def fake_read_ctime(path: str):
             if path.startswith("read"):
                 return 200
-            raise ValueError(f'Unexpected path: {path}')
+            raise ValueError(f"Unexpected path: {path}")
 
         def fake_write_ctime(path: str):
             if path.startswith("write"):
                 return 100
-            raise ValueError(f'Unexpected path: {path}')
+            raise ValueError(f"Unexpected path: {path}")
 
         used_input = "read.me"
         required_writes = {"write.me"}
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch.object(os.path, 'getctime',
-                                   wraps=fake_read_ctime) as mock_read_ctime:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch.object(
+                os.path, "getctime", wraps=fake_read_ctime
+            ) as mock_read_ctime:
                 with mock.patch.object(
-                        action_tracer, 'realpath_ctime',
-                        wraps=fake_write_ctime) as mock_write_ctime:
+                    action_tracer, "realpath_ctime", wraps=fake_write_ctime
+                ) as mock_write_ctime:
                     output_diagnostics = action_tracer.diagnose_stale_outputs(
                         accesses=[action_tracer.Read(used_input)],
                         access_constraints=action_tracer.AccessConstraints(
                             allowed_reads={used_input},
-                            required_writes=required_writes),
+                            required_writes=required_writes,
+                        ),
                     )
         mock_exists.assert_called_once()
         mock_read_ctime.assert_called()
@@ -1000,34 +1189,36 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
             action_tracer.StalenessDiagnostics(
                 required_writes=required_writes,
                 newest_input=used_input,
-                stale_outputs={"write.me"}),
+                stale_outputs={"write.me"},
+            ),
         )
 
     def test_stale_output_with_multiple_used_inputs(self):
-
         def fake_read_ctime(path: str):
             if path == "read.me":
                 return 200
             if path == "read.me.newer":
                 return 300
-            raise Exception(f'fake_read_ctime for unexpected path: {path}')
+            raise Exception(f"fake_read_ctime for unexpected path: {path}")
 
         def fake_write_ctime(path: str):
             if path.startswith("write"):
                 return 250
-            raise Exception(f'fake_write_ctime for unexpected path: {path}')
+            raise Exception(f"fake_write_ctime for unexpected path: {path}")
 
         used_input = "read.me"
         # Make sure the timestamp of the newest input is used for comparison.
         used_input_newer = "read.me.newer"
         required_writes = {"write.me"}
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch.object(os.path, 'getctime',
-                                   wraps=fake_read_ctime) as mock_read_ctime:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch.object(
+                os.path, "getctime", wraps=fake_read_ctime
+            ) as mock_read_ctime:
                 with mock.patch.object(
-                        action_tracer, 'realpath_ctime',
-                        wraps=fake_write_ctime) as mock_write_ctime:
+                    action_tracer, "realpath_ctime", wraps=fake_write_ctime
+                ) as mock_write_ctime:
                     output_diagnostics = action_tracer.diagnose_stale_outputs(
                         accesses=[
                             action_tracer.Read(used_input),
@@ -1035,7 +1226,8 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
                         ],
                         access_constraints=action_tracer.AccessConstraints(
                             allowed_reads={used_input, used_input_newer},
-                            required_writes=required_writes),
+                            required_writes=required_writes,
+                        ),
                     )
         mock_exists.assert_called_once()
         mock_read_ctime.assert_called()
@@ -1046,11 +1238,11 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
                 required_writes=required_writes,
                 # newer input is used for comparison
                 newest_input=used_input_newer,
-                stale_outputs={"write.me"}),
+                stale_outputs={"write.me"},
+            ),
         )
 
     def test_fresh_output_with_used_input(self):
-
         def fake_getctime(path: str):
             if path.startswith("read"):
                 return 100
@@ -1060,10 +1252,12 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
 
         used_input = "read.me"
         written_output = "write.me"
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch.object(os.path, 'getctime',
-                                   wraps=fake_getctime) as mock_ctime:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch.object(
+                os.path, "getctime", wraps=fake_getctime
+            ) as mock_ctime:
                 output_diagnostics = action_tracer.diagnose_stale_outputs(
                     accesses=[
                         action_tracer.Read(used_input),
@@ -1071,7 +1265,8 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
                     ],
                     access_constraints=action_tracer.AccessConstraints(
                         allowed_reads={used_input},
-                        required_writes={written_output}),
+                        required_writes={written_output},
+                    ),
                 )
         # There are no untouched outputs, so getctime is never called.
         mock_exists.assert_not_called()
@@ -1086,7 +1281,6 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
         )
 
     def test_fresh_output_with_used_input_readable_output(self):
-
         def fake_getctime(path: str):
             if path.startswith("read"):
                 return 100
@@ -1096,10 +1290,12 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
 
         used_input = "read.me"
         written_output = "write.me"
-        with mock.patch.object(os.path, 'exists',
-                               return_value=True) as mock_exists:
-            with mock.patch.object(os.path, 'getctime',
-                                   wraps=fake_getctime) as mock_ctime:
+        with mock.patch.object(
+            os.path, "exists", return_value=True
+        ) as mock_exists:
+            with mock.patch.object(
+                os.path, "getctime", wraps=fake_getctime
+            ) as mock_ctime:
                 output_diagnostics = action_tracer.diagnose_stale_outputs(
                     accesses=[
                         action_tracer.Read(used_input),
@@ -1108,7 +1304,8 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
                     ],
                     access_constraints=action_tracer.AccessConstraints(
                         allowed_reads={used_input, written_output},
-                        required_writes={written_output}),
+                        required_writes={written_output},
+                    ),
                 )
         # There are no untouched outputs, so getctime is never called.
         mock_exists.assert_not_called()
@@ -1124,7 +1321,6 @@ class DiagnoseStaleOutputsTest(unittest.TestCase):
 
 
 class AllParentDirsTests(unittest.TestCase):
-
     def test_empty_path(self):
         dirs = action_tracer.all_parent_dirs("")
         self.assertEqual(dirs, set())
@@ -1159,7 +1355,6 @@ class AllParentDirsTests(unittest.TestCase):
 
 
 class DetectAllDirs(unittest.TestCase):
-
     def test_empty(self):
         dirs = action_tracer.detect_all_dirs([])
         self.assertEqual(dirs, set())
@@ -1182,7 +1377,6 @@ class DetectAllDirs(unittest.TestCase):
 
 
 class MainArgParserTests(unittest.TestCase):
-
     # These args are required, and there's nothing interesting about them to test.
     required_args = "--trace-output t.out --label //pkg:tgt "
 
@@ -1197,15 +1391,17 @@ class MainArgParserTests(unittest.TestCase):
     def test_check_access_permissions(self):
         parser = action_tracer.main_arg_parser()
         args = parser.parse_args(
-            (self.required_args + "--check-access-permissions").split())
+            (self.required_args + "--check-access-permissions").split()
+        )
         self.assertTrue(args.check_access_permissions)
 
     def test_no_check_access_permissions(self):
         parser = action_tracer.main_arg_parser()
         args = parser.parse_args(
-            (self.required_args + "--no-check-access-permissions").split())
+            (self.required_args + "--no-check-access-permissions").split()
+        )
         self.assertFalse(args.check_access_permissions)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

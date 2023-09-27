@@ -14,9 +14,8 @@ class Tracing(abc.ABC):
     # List all the public methods in alphabetical order
     @abc.abstractmethod
     def initialize(
-            self,
-            categories: Optional[List[str]] = None,
-            buffer_size: Optional[int] = None) -> None:
+        self, categories: Optional[List[str]] = None, buffer_size: Optional[int] = None
+    ) -> None:
         """Initializes a trace sessions.
 
         Args:
@@ -34,12 +33,13 @@ class Tracing(abc.ABC):
 
     @abc.abstractmethod
     def terminate(self) -> None:
-        """ Terminates the trace session.."""
+        """Terminates the trace session.."""
 
     @abc.abstractmethod
     def terminate_and_download(
-            self, directory: str, trace_file: Optional[str] = None) -> str:
-        """ Terminates the trace session and downloads the trace data to the
+        self, directory: str, trace_file: Optional[str] = None
+    ) -> str:
+        """Terminates the trace session and downloads the trace data to the
             specified directory.
 
         Args:

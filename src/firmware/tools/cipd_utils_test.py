@@ -35,7 +35,6 @@ def get_run_commands(mock_run) -> List[List[str]]:
 
 
 class GitTests(unittest.TestCase):
-
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_git_command(self, mock_run):
         git = cipd_utils.Git("path/to/repo/")
@@ -46,7 +45,8 @@ class GitTests(unittest.TestCase):
             ["git", "-C", "path/to/repo/", "foo", "bar"],
             check=True,
             text=True,
-            capture_output=True)
+            capture_output=True,
+        )
 
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_changelog(self, mock_run):
@@ -56,12 +56,18 @@ class GitTests(unittest.TestCase):
         result = git.changelog("start_revision", "end_revision")
 
         self.assertEqual(
-            get_run_commands(mock_run), [
+            get_run_commands(mock_run),
+            [
                 [
-                    "git", "-C", "path/", "log", "--oneline",
-                    "start_revision..end_revision"
+                    "git",
+                    "-C",
+                    "path/",
+                    "log",
+                    "--oneline",
+                    "start_revision..end_revision",
                 ]
-            ])
+            ],
+        )
         self.assertEqual(result, "fake log")
 
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
@@ -73,7 +79,8 @@ class GitTests(unittest.TestCase):
 
         self.assertEqual(
             get_run_commands(mock_run),
-            [["git", "-C", "path/", "log", "--oneline", "end_revision"]])
+            [["git", "-C", "path/", "log", "--oneline", "end_revision"]],
+        )
         self.assertEqual(result, "fake log")
 
 
@@ -96,20 +103,22 @@ _FAKE_REPO_INFO = textwrap.dedent(
     Manifest revision: baz_revision
     Local Branches: 1 [baz_local_branch]
     ----------------------------
-    """)
+    """
+)
 
 
 class RepoTests(unittest.TestCase):
-
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_repo_init(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO)
+            None, 0, _FAKE_REPO_INFO
+        )
 
         repo = cipd_utils.Repo("/repo/root")
 
         self.assertEqual(
-            get_run_commands(mock_run), [["repo", "info", "--local-only"]])
+            get_run_commands(mock_run), [["repo", "info", "--local-only"]]
+        )
         self.assertEqual(len(repo.git_repos), 2)
         self.assertEqual(repo.git_repos["foo"].repo_path, "/repo/root/foo")
         self.assertEqual(repo.git_repos["bar/baz"].repo_path, "/repo/root/baz")
@@ -117,7 +126,8 @@ class RepoTests(unittest.TestCase):
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_repo_init_spec_no_alias(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO)
+            None, 0, _FAKE_REPO_INFO
+        )
 
         repo = cipd_utils.Repo("/repo/root", spec={"foo": None})
 
@@ -127,18 +137,21 @@ class RepoTests(unittest.TestCase):
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_repo_init_spec_with_alias(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO)
+            None, 0, _FAKE_REPO_INFO
+        )
 
         repo = cipd_utils.Repo("/repo/root", spec={"baz": "baz_alias"})
 
         self.assertEqual(len(repo.git_repos), 1)
         self.assertEqual(
-            repo.git_repos["baz_alias"].repo_path, "/repo/root/baz")
+            repo.git_repos["baz_alias"].repo_path, "/repo/root/baz"
+        )
 
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_repo_init_spec_unused(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO)
+            None, 0, _FAKE_REPO_INFO
+        )
 
         with self.assertRaises(ValueError):
             cipd_utils.Repo("/repo/root", spec={"foo": None, "unknown": None})
@@ -146,23 +159,21 @@ class RepoTests(unittest.TestCase):
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_repo_init_spec_name_collision(self, mock_run):
         mock_run.return_value = subprocess.CompletedProcess(
-            None, 0, _FAKE_REPO_INFO)
+            None, 0, _FAKE_REPO_INFO
+        )
 
         with self.assertRaises(ValueError):
             cipd_utils.Repo(
-                "/repo/root", spec={
-                    "foo": "same_alias",
-                    "baz": "same_alias"
-                })
+                "/repo/root", spec={"foo": "same_alias", "baz": "same_alias"}
+            )
 
 
 class CipdTests(unittest.TestCase):
-
     @mock.patch.object(
-        cipd_utils.os.path, "isdir", autospec=True, return_value=False)
+        cipd_utils.os.path, "isdir", autospec=True, return_value=False
+    )
     @mock.patch.object(cipd_utils.subprocess, "run", autospec=True)
     def test_cipd_manifest(self, mock_run, _mock_isdir):
-
         # The code under test will download the CIPD package into a tempdir
         # so we don't know the path ahead of time. In order to inject a fake
         # manifest, this function will write it to disk as a side-effect of
@@ -178,7 +189,9 @@ class CipdTests(unittest.TestCase):
                             "repo1": "revision1",
                             "repo2": "revision2"
                         }
-                        """))
+                        """
+                    )
+                )
 
         mock_run.side_effect = write_cipd_manifest_side_effect
 
@@ -196,7 +209,9 @@ class CipdTests(unittest.TestCase):
                             "repo1": "revision1",
                             "repo2": "revision2"
                         }
-                        """))
+                        """
+                    )
+                )
 
             manifest = cipd_utils.get_cipd_version_manifest("package", temp_dir)
 
@@ -208,8 +223,8 @@ class CipdTests(unittest.TestCase):
 
 
 def set_up_changelog_mocks(
-        mock_get_cipd_version_manifest, cipd_version_a, cipd_version_b,
-        repo_info):
+    mock_get_cipd_version_manifest, cipd_version_a, cipd_version_b, repo_info
+):
     """Configures all the mocks needed to produce a changelog.
 
     There's a lot of mocking that needs to be done to set up the proper
@@ -265,7 +280,8 @@ def set_up_changelog_mocks(
                 elif old_revision == rev_b and new_revision == rev_a:
                     return "\n".join(b_to_a)
                 raise ValueError(
-                    f"Unknown {name} revisions {old_revision}, {new_revision}")
+                    f"Unknown {name} revisions {old_revision}, {new_revision}"
+                )
 
             return changelog
 
@@ -276,32 +292,35 @@ def set_up_changelog_mocks(
 
 
 class ChangelogTests(unittest.TestCase):
-
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
     def test_changelog(self, mock_get_cipd_version_manifest):
         mock_repo = set_up_changelog_mocks(
-            mock_get_cipd_version_manifest, "cipd_ver_A", "cipd_ver_B", {
-                "repo1":
+            mock_get_cipd_version_manifest,
+            "cipd_ver_A",
+            "cipd_ver_B",
+            {
+                "repo1": [
+                    "rev1_A",
+                    "rev1_B",
+                    ["[repo1] commit 1", "[repo1] commit 2"],
+                    [],
+                ],
+                "repo2": [
+                    "rev2_A",
+                    "rev2_B",
                     [
-                        "rev1_A",
-                        "rev1_B",
-                        ["[repo1] commit 1", "[repo1] commit 2"],
-                        [],
+                        "[repo2] commit 1",
+                        "[repo2] commit 2",
+                        "[repo2] commit 3",
                     ],
-                "repo2":
-                    [
-                        "rev2_A",
-                        "rev2_B",
-                        [
-                            "[repo2] commit 1", "[repo2] commit 2",
-                            "[repo2] commit 3"
-                        ],
-                        [],
-                    ]
-            })
+                    [],
+                ],
+            },
+        )
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B"
+        )
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -318,7 +337,9 @@ class ChangelogTests(unittest.TestCase):
 
                 -- Source Revisions --
                 repo1: rev1_B
-                repo2: rev2_B"""))
+                repo2: rev2_B"""
+            ),
+        )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
     def test_changelog_new_repo(self, mock_get_cipd_version_manifest):
@@ -327,17 +348,18 @@ class ChangelogTests(unittest.TestCase):
             "cipd_ver_A",
             "cipd_ver_B",
             {
-                "repo1":
-                    [
-                        None,  # Repo does not exist in the first version.
-                        "rev1_B",
-                        ["[repo1] commit 1", "[repo1] commit 2"],
-                        [],
-                    ],
-            })
+                "repo1": [
+                    None,  # Repo does not exist in the first version.
+                    "rev1_B",
+                    ["[repo1] commit 1", "[repo1] commit 2"],
+                    [],
+                ],
+            },
+        )
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B"
+        )
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -348,7 +370,9 @@ class ChangelogTests(unittest.TestCase):
                 [repo1] commit 2
 
                 -- Source Revisions --
-                repo1: rev1_B"""))
+                repo1: rev1_B"""
+            ),
+        )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
     def test_changelog_deleted_repo(self, mock_get_cipd_version_manifest):
@@ -357,24 +381,24 @@ class ChangelogTests(unittest.TestCase):
             "cipd_ver_A",
             "cipd_ver_B",
             {
-                "repo1":
-                    [
-                        "rev1_A",
-                        "rev1_B",
-                        ["[repo1] commit 1", "[repo1] commit 2"],
-                        [],
-                    ],
-                "repo2":
-                    [
-                        "rev2_A",
-                        None,  # Repo does not exist in the second version.
-                        ["[repo2] this should not be printed"],
-                        ["[repo2] this should not be printed either"],
-                    ]
-            })
+                "repo1": [
+                    "rev1_A",
+                    "rev1_B",
+                    ["[repo1] commit 1", "[repo1] commit 2"],
+                    [],
+                ],
+                "repo2": [
+                    "rev2_A",
+                    None,  # Repo does not exist in the second version.
+                    ["[repo2] this should not be printed"],
+                    ["[repo2] this should not be printed either"],
+                ],
+            },
+        )
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B"
+        )
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -389,7 +413,9 @@ class ChangelogTests(unittest.TestCase):
                 [repo has been removed]
 
                 -- Source Revisions --
-                repo1: rev1_B"""))
+                repo1: rev1_B"""
+            ),
+        )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
     def test_changelog_removed_commits(self, mock_get_cipd_version_manifest):
@@ -398,19 +424,20 @@ class ChangelogTests(unittest.TestCase):
             "cipd_ver_A",
             "cipd_ver_B",
             {
-                "repo1":
-                    [
-                        "rev1_A",
-                        "rev1_B",
-                        ["[repo1] commit 1", "[repo1] commit 2"],
-                        # A is not a direct ancestor of B - it had a commit that
-                        # no longer exists in the new version.
-                        ["[repo1] removed commit"],
-                    ]
-            })
+                "repo1": [
+                    "rev1_A",
+                    "rev1_B",
+                    ["[repo1] commit 1", "[repo1] commit 2"],
+                    # A is not a direct ancestor of B - it had a commit that
+                    # no longer exists in the new version.
+                    ["[repo1] removed commit"],
+                ]
+            },
+        )
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B"
+        )
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -423,21 +450,29 @@ class ChangelogTests(unittest.TestCase):
                 [repo1] removed commit
 
                 -- Source Revisions --
-                repo1: rev1_B"""))
+                repo1: rev1_B"""
+            ),
+        )
 
     @mock.patch.object(cipd_utils, "get_cipd_version_manifest", autospec=True)
     def test_changelog_no_changes(self, mock_get_cipd_version_manifest):
         mock_repo = set_up_changelog_mocks(
-            mock_get_cipd_version_manifest, "cipd_ver_A", "cipd_ver_B",
-            {"repo1": [
-                "rev1_no_change",
-                "rev1_no_change",
-                [],
-                [],
-            ]})
+            mock_get_cipd_version_manifest,
+            "cipd_ver_A",
+            "cipd_ver_B",
+            {
+                "repo1": [
+                    "rev1_no_change",
+                    "rev1_no_change",
+                    [],
+                    [],
+                ]
+            },
+        )
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B"
+        )
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -446,11 +481,12 @@ class ChangelogTests(unittest.TestCase):
                 [no changes]
 
                 -- Source Revisions --
-                repo1: rev1_no_change"""))
+                repo1: rev1_no_change"""
+            ),
+        )
 
 
 class CopyTests(unittest.TestCase):
-
     @mock.patch("cipd_utils.subprocess.run", autospec=True)
     @mock.patch("cipd_utils.download_cipd", autospec=True)
     @mock.patch("cipd_utils.fetch_cipd_tags", autospec=True)
@@ -460,14 +496,26 @@ class CopyTests(unittest.TestCase):
         cipd_utils.copy("source_name", "source_version", "dest_name")
 
         self.assertEqual(
-            get_run_commands(mock_run), [
+            get_run_commands(mock_run),
+            [
                 [
-                    cipd_utils.CIPD_TOOL, "create", "-name", "dest_name", "-in",
-                    mock.ANY, "-install-mode", "copy", "-tag", "tag1:foo",
-                    "-tag", "tag2:bar", "-tag",
-                    "copied_from:source_name/source_version"
+                    cipd_utils.CIPD_TOOL,
+                    "create",
+                    "-name",
+                    "dest_name",
+                    "-in",
+                    mock.ANY,
+                    "-install-mode",
+                    "copy",
+                    "-tag",
+                    "tag1:foo",
+                    "-tag",
+                    "tag2:bar",
+                    "-tag",
+                    "copied_from:source_name/source_version",
                 ]
-            ])
+            ],
+        )
 
 
 if __name__ == "__main__":

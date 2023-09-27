@@ -27,14 +27,14 @@ class FileEntry:
 
     This is a source_path=destination_path mapping type
     """
+
     # TODO(fxbug.dev/98573) Mark these fields to `kw_only=True` after switching
     #   to python 3.10 or later.
     source: FilePath
     destination: FilePath
 
     def get_destination(self) -> str:
-        """Destination accessor method
-        """
+        """Destination accessor method"""
         return str(self.destination)
 
     def __hash__(self):
@@ -42,25 +42,32 @@ class FileEntry:
 
     def __eq__(self, other) -> bool:
         if isinstance(other, self.__class__):
-            return self.source == other.source and self.destination == other.destination
+            return (
+                self.source == other.source
+                and self.destination == other.destination
+            )
         else:
             return False
 
     def __lt__(self, other) -> bool:
         if not isinstance(other, FileEntry):
             raise ValueError("other is not a FileEntry")
-        return (self.source,
-                self.destination) < (other.source, other.destination)
+        return (self.source, self.destination) < (
+            other.source,
+            other.destination,
+        )
 
     def __repr__(self) -> str:
         result = "FileEntry{{ source: {}, destination: {} }}".format(
-            self.source, self.destination)
+            self.source, self.destination
+        )
         return result
 
     # TODO(fxb/89571) Move to python module at //build/python/modules/fini_manfest
     @staticmethod
     def write_fini_manifest(
-            entries: Iterable['FileEntry'], file: TextIO) -> None:
+        entries: Iterable["FileEntry"], file: TextIO
+    ) -> None:
         """Write out the FileEntry instances into a FINI manifest.
 
         The fini manifest is in the format of::

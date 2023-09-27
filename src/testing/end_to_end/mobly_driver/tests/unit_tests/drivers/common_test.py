@@ -16,44 +16,47 @@ import common
 class CommonTest(unittest.TestCase):
     """Common tests"""
 
-    @patch('builtins.open')
-    @patch('yaml.load')
+    @patch("builtins.open")
+    @patch("yaml.load")
     def test_read_yaml_from_file_success(self, *unused_args):
         """Test case for YAML file read success case"""
-        common.read_yaml_from_file('path/to/file')
+        common.read_yaml_from_file("path/to/file")
 
-    @patch('builtins.open', side_effect=IOError)
+    @patch("builtins.open", side_effect=IOError)
     def test_read_yaml_from_file_open_failure_raises_exception(
-            self, *unused_args):
+        self, *unused_args
+    ):
         """Test case for YAML file read file open failure"""
         with self.assertRaises(IOError):
-            common.read_yaml_from_file('path/to/file')
+            common.read_yaml_from_file("path/to/file")
 
-    @patch('builtins.open')
-    @patch('yaml.load', side_effect=yaml.YAMLError)
+    @patch("builtins.open")
+    @patch("yaml.load", side_effect=yaml.YAMLError)
     def test_read_yaml_from_file_yaml_parse_failure_raises_exception(
-            self, *unused_args):
+        self, *unused_args
+    ):
         """Test case for YAML file read YAML parse error"""
         with self.assertRaises(common.InvalidFormatException):
-            common.read_yaml_from_file('path/to/file')
+            common.read_yaml_from_file("path/to/file")
 
-    @patch('builtins.open')
-    @patch('json.load')
+    @patch("builtins.open")
+    @patch("json.load")
     def test_read_json_from_file_success(self, *unused_args):
         """Test case for JSON file read success"""
-        common.read_json_from_file('path/to/file')
+        common.read_json_from_file("path/to/file")
 
-    @patch('builtins.open')
+    @patch("builtins.open")
     def test_read_json_from_file_open_failure_raises_exception(self, mock_open):
         """Test case for JSON file read file open failure"""
         mock_open.side_effect = IOError
         with self.assertRaises(IOError):
-            common.read_json_from_file('path/to/file')
+            common.read_json_from_file("path/to/file")
 
-    @patch('builtins.open')
-    @patch('json.load', side_effect=json.JSONDecodeError('msg', 'doc', 0))
+    @patch("builtins.open")
+    @patch("json.load", side_effect=json.JSONDecodeError("msg", "doc", 0))
     def test_read_json_from_file_json_parse_failure_raises_exception(
-            self, *unused_args):
+        self, *unused_args
+    ):
         """Test case for JSON file read JSON parse error"""
         with self.assertRaises(common.InvalidFormatException):
-            common.read_json_from_file('path/to/file')
+            common.read_json_from_file("path/to/file")

@@ -19,22 +19,26 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Process build force-clean fences.")
+        description="Process build force-clean fences."
+    )
     parser.add_argument(
         "--gn-bin",
         type=pathlib.Path,
         required=True,
-        help="Path to prebuilt GN binary.")
+        help="Path to prebuilt GN binary.",
+    )
     parser.add_argument(
         "--checkout-dir",
         type=pathlib.Path,
         required=True,
-        help="Path to $FUCHSIA_DIR.")
+        help="Path to $FUCHSIA_DIR.",
+    )
     parser.add_argument(
         "--build-dir",
         type=pathlib.Path,
         required=True,
-        help="Path to the root build dir, e.g. $FUCHSIA_DIR/out/default.")
+        help="Path to the root build dir, e.g. $FUCHSIA_DIR/out/default.",
+    )
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -70,7 +74,9 @@ def main():
                 [sys.executable, script],
                 stdout=subprocess.PIPE,
                 text=True,
-                check=True).stdout)
+                check=True,
+            ).stdout
+        )
 
     current_fences = "\n".join(current_fences)
 
@@ -103,5 +109,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

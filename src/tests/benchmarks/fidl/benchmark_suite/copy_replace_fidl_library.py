@@ -28,8 +28,8 @@ def main():
     with open(input_file) as fi:
         with open(output_file, "w") as fo:
             for line in fi:
-                if 'library test.benchmarkfidl;\n' in line:
-                    fo.write('library %s;\n' % new_fidl_library)
+                if "library test.benchmarkfidl;\n" in line:
+                    fo.write("library %s;\n" % new_fidl_library)
                 else:
                     fo.write(line)
 

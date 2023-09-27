@@ -10,25 +10,27 @@ import datetime
 import os
 from pathlib import Path
 
-from types_ import (HLCPP, LLCPP, RUST, GO)
+from types_ import HLCPP, LLCPP, RUST, GO
 
 year = datetime.datetime.now().year
 
-fuchsia_copyright = '''
+fuchsia_copyright = """
 // Copyright {year} The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-'''.format(year=year).strip()
+""".format(
+    year=year
+).strip()
 
-fidl_file = '''
+fidl_file = """
 {lib_decl};
 
 // [START contents]
 // INSERT FIDL HERE
 // [END contents]
-'''
+"""
 
-hlcpp_init = '''
+hlcpp_init = """
 
 #include <fidl/test/{library_name}/cpp/fidl.h>  // nogncheck
 namespace fidl_test = fidl::test::{library_name};
@@ -38,9 +40,9 @@ namespace fidl_test = fidl::test::{library_name};
 // [END contents]
 
 int main(int argc, const char** argv) {{ return 0; }}
-'''
+"""
 
-llcpp_init = '''
+llcpp_init = """
 
 #include <fidl/fidl.test.{library_name}/cpp/wire.h>  // nogncheck
 namespace fidl_test = fidl_test::{library_name};
@@ -50,9 +52,9 @@ namespace fidl_test = fidl_test::{library_name};
 // [END contents]
 
 int main(int argc, const char** argv) {{ return 0; }}
-'''
+"""
 
-rust_init = '''
+rust_init = """
 
 #![allow(dead_code)]
 
@@ -63,9 +65,9 @@ use fidl_fidl_test_{library_name} as fidl_lib;
 // [END contents]
 
 fn main() {{}}
-'''
+"""
 
-go_init = '''
+go_init = """
 
 // +build !build_with_native_toolchain
 
@@ -81,7 +83,7 @@ import (
 // [END contents]
 
 func main() {{}}
-'''
+"""
 
 init_by_binding = {
     HLCPP: hlcpp_init,
@@ -90,7 +92,9 @@ init_by_binding = {
     GO: go_init,
 }
 
-gn_template = f'# Copyright {year}' + ''' The Fuchsia Authors. All rights reserved.
+gn_template = (
+    f"# Copyright {year}"
+    + """ The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -104,7 +108,8 @@ source_compatibility_test("{library_name}") {{
 group("tests") {{
   deps = [ ":{library_name}" ]
 }}
-'''
+"""
+)
 
 
 def initialize_fidl(path: Path, library_name: str):
@@ -120,45 +125,47 @@ def initialize_src(path: Path, binding: str, fidl_library_name: str):
 def initialize_file(path: Path, contents: str):
     if path.exists():
         return
-    with open(path, 'w') as f:
+    with open(path, "w") as f:
         f.write(contents)
     block_on_prompt(
-        f'Add starter code to {path.name} as desired, then press enter to continue '
+        f"Add starter code to {path.name} as desired, then press enter to continue "
     )
 
 
 def add_file(src_dir, prev: str, curr: str):
     if (src_dir / curr).exists():
         return
-    with open(src_dir / prev, 'r') as previous_f:
-        with open(src_dir / curr, 'w+') as current_f:
+    with open(src_dir / prev, "r") as previous_f:
+        with open(src_dir / curr, "w+") as current_f:
             contents = previous_f.read()
             current_f.write(contents)
 
-    block_on_prompt(f'Modify {curr} as desired, then press enter to continue ')
+    block_on_prompt(f"Modify {curr} as desired, then press enter to continue ")
 
 
 def get_fidl(library_name: str) -> str:
     return fuchsia_copyright + fidl_file.format(
-        lib_decl=fidl_lib_decl(library_name))
+        lib_decl=fidl_lib_decl(library_name)
+    )
 
 
 def fidl_lib_decl(library_name: str) -> str:
-    return f'library fidl.test.{library_name}'
+    return f"library fidl.test.{library_name}"
 
 
 def get_src(binding: str, library_name: str) -> str:
     return fuchsia_copyright + init_by_binding[binding].format(
-        library_name=library_name)
+        library_name=library_name
+    )
 
 
 def block_on_prompt(prompt: str):
-    """ Prints the prompt, and blocks on user input, then clears the prompt. """
+    """Prints the prompt, and blocks on user input, then clears the prompt."""
     input(prompt)
     # clear the prompt
     move_cursor_up_n(2)
-    print('\r' + ' ' * len(prompt), end='\r')
+    print("\r" + " " * len(prompt), end="\r")
 
 
 def move_cursor_up_n(n: int):
-    print(f'\033[{n}A')
+    print(f"\033[{n}A")

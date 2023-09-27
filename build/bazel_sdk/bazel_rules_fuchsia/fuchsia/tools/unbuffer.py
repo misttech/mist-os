@@ -10,6 +10,7 @@ import sys
 
 from typing import List
 
+
 def main(command: List[str]) -> int:
     try:
         if sys.stdout.isatty() and sys.stderr.isatty():
@@ -22,13 +23,13 @@ def main(command: List[str]) -> int:
             # appear out of order.
             # We emulate a tty here in order to fix this.
             host_fd, child_fd = pty.openpty()
-            os.environ['NO_COLOR'] = '1'
+            os.environ["NO_COLOR"] = "1"
             proc = subprocess.Popen(command, stdout=child_fd, stderr=child_fd)
             os.close(child_fd)
 
             while True:
                 try:
-                    stdout = os.read(host_fd, 1024).decode('utf-8')
+                    stdout = os.read(host_fd, 1024).decode("utf-8")
                     sys.stdout.write(stdout)
                     sys.stdout.flush()
                 except OSError:
@@ -40,5 +41,6 @@ def main(command: List[str]) -> int:
     except KeyboardInterrupt:
         pass
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

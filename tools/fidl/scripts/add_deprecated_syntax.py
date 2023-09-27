@@ -29,37 +29,40 @@ def main(args):
         if not path.is_file():
             continue
         relpath = str(path.relative_to(root_path))
-        if relpath.startswith('out/default') or relpath.startswith('prebuilt/'):
+        if relpath.startswith("out/default") or relpath.startswith("prebuilt/"):
             continue
-        if relpath.endswith('goodformat.test.fidl'):
+        if relpath.endswith("goodformat.test.fidl"):
             continue
 
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             lines = f.readlines()
             # already converted from a previous run; skip
-            if any(l.startswith('deprecated_syntax;') for l in lines):
+            if any(l.startswith("deprecated_syntax;") for l in lines):
                 continue
 
             lib_line = None
             for i, line in enumerate(lines):
-                is_comment = line.startswith(
-                    '//') and not line.startswith('///')
+                is_comment = line.startswith("//") and not line.startswith(
+                    "///"
+                )
                 if not is_comment:
                     lib_line = i
                     break
             if lib_line is None:
                 print(path)
-            lines.insert(lib_line, 'deprecated_syntax;\n')
+            lines.insert(lib_line, "deprecated_syntax;\n")
 
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             f.writelines(lines)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Add `deprecated_syntax` token '
-        'to all FIDL files in GN-ified a '
-        'repo.')
+        description="Add `deprecated_syntax` token "
+        "to all FIDL files in GN-ified a "
+        "repo."
+    )
     parser.add_argument(
-        'root', help='The root path of the repo being converted')
+        "root", help="The root path of the repo being converted"
+    )
     main(parser.parse_args())

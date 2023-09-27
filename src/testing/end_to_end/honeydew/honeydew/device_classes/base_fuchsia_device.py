@@ -15,8 +15,7 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.interfaces.affordances import session
-from honeydew.interfaces.auxiliary_devices import \
-    power_switch as power_switch_interface
+from honeydew.interfaces.auxiliary_devices import power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.device_classes import transports_capable
@@ -26,28 +25,31 @@ from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
 _TIMEOUTS: Dict[str, float] = {
-    "SLEEP": .5,
+    "SLEEP": 0.5,
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
-                        affordances_capable.RebootCapableDevice,
-                        affordances_capable.SessionCapableDevice,
-                        transports_capable.FastbootCapableDevice,
-                        transports_capable.FFXCapableDevice,
-                        transports_capable.SSHCapableDevice):
+class BaseFuchsiaDevice(
+    fuchsia_device.FuchsiaDevice,
+    affordances_capable.RebootCapableDevice,
+    affordances_capable.SessionCapableDevice,
+    transports_capable.FastbootCapableDevice,
+    transports_capable.FFXCapableDevice,
+    transports_capable.SSHCapableDevice,
+):
     """Common implementation for Fuchsia devices using different transports.
     Every device running Fuchsia contains common functionality as well as the
     FFX and SSH transports. This logic is centralized here.
     """
 
     def __init__(
-            self,
-            device_name: str,
-            ssh_private_key: Optional[str] = None,
-            ssh_user: Optional[str] = None) -> None:
+        self,
+        device_name: str,
+        ssh_private_key: Optional[str] = None,
+        ssh_user: Optional[str] = None,
+    ) -> None:
         _LOGGER.debug("Initializing FuchsiaDevice")
         self._name: str = device_name
         self._ssh_private_key: Optional[str] = ssh_private_key
@@ -141,7 +143,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             Fastboot object.
         """
         fastboot_obj: fastboot_transport.Fastboot = fastboot_transport.Fastboot(
-            device_name=self.device_name, reboot_affordance=self)
+            device_name=self.device_name, reboot_affordance=self
+        )
         return fastboot_obj
 
     @properties.Transport
@@ -167,13 +170,14 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         """
         if not self._ssh_private_key:
             raise errors.SSHCommandError(
-                "ssh_private_key argument need to be passed during device " \
+                "ssh_private_key argument need to be passed during device "
                 "init in-order to SSH into the device"
             )
         ssh_obj: ssh_transport.SSH = ssh_transport.SSH(
             device_name=self.device_name,
             username=self._ssh_user,
-            private_key=self._ssh_private_key)
+            private_key=self._ssh_private_key,
+        )
         return ssh_obj
 
     @properties.Affordance
@@ -192,8 +196,7 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             self.ssh.check_connection()
         self.ffx.check_connection()
 
-    def log_message_to_device(
-            self, message: str, level: custom_types.LEVEL) -> None:
+    def log_message_to_device(self, message: str, level: custom_types.LEVEL) -> None:
         """Log message to fuchsia device at specified level.
 
         Args:
@@ -221,9 +224,10 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             on_device_boot_fn()
 
     def power_cycle(
-            self,
-            power_switch: power_switch_interface.PowerSwitch,
-            outlet: Optional[int] = None) -> None:
+        self,
+        power_switch: power_switch_interface.PowerSwitch,
+        outlet: Optional[int] = None,
+    ) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 
         Args:
@@ -238,7 +242,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         _LOGGER.info("Power cycling %s...", self.device_name)
         self.log_message_to_device(
             message=f"Powering cycling {self.device_name}...",
-            level=custom_types.LEVEL.INFO)
+            level=custom_types.LEVEL.INFO,
+        )
 
         _LOGGER.info("Powering off %s...", self.device_name)
         power_switch.power_off(outlet)
@@ -252,7 +257,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
         self.log_message_to_device(
             message=f"Successfully power cycled {self.device_name}...",
-            level=custom_types.LEVEL.INFO)
+            level=custom_types.LEVEL.INFO,
+        )
 
     def reboot(self) -> None:
         """Soft reboot the device.
@@ -263,8 +269,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         """
         _LOGGER.info("Rebooting %s...", self.device_name)
         self.log_message_to_device(
-            message=f"Rebooting {self.device_name}...",
-            level=custom_types.LEVEL.INFO)
+            message=f"Rebooting {self.device_name}...", level=custom_types.LEVEL.INFO
+        )
 
         self._send_reboot_command()
 
@@ -274,14 +280,14 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
 
         self.log_message_to_device(
             message=f"Successfully rebooted {self.device_name}...",
-            level=custom_types.LEVEL.INFO)
+            level=custom_types.LEVEL.INFO,
+        )
 
     def register_for_on_device_boot(self, fn: Callable[[], None]) -> None:
         """Register a function that will be called in on_device_boot."""
         self._on_device_boot_fns.append(fn)
 
-    def snapshot(
-            self, directory: str, snapshot_file: Optional[str] = None) -> str:
+    def snapshot(self, directory: str, snapshot_file: Optional[str] = None) -> str:
         """Captures the snapshot of the device.
 
         Args:
@@ -323,7 +329,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
         return snapshot_file_path
 
     def wait_for_offline(
-            self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]) -> None:
+        self, timeout: float = fuchsia_device.TIMEOUTS["OFFLINE"]
+    ) -> None:
         """Wait for Fuchsia device to go offline.
 
         Args:
@@ -342,10 +349,12 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             time.sleep(_TIMEOUTS["SLEEP"])
         else:
             raise errors.FuchsiaDeviceError(
-                f"'{self.device_name}' failed to go offline in {timeout}sec.")
+                f"'{self.device_name}' failed to go offline in {timeout}sec."
+            )
 
     def wait_for_online(
-            self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]) -> None:
+        self, timeout: float = fuchsia_device.TIMEOUTS["ONLINE"]
+    ) -> None:
         """Wait for Fuchsia device to go online.
 
         Args:
@@ -366,7 +375,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
             time.sleep(_TIMEOUTS["SLEEP"])
         else:
             raise errors.FuchsiaDeviceError(
-                f"'{self.device_name}' failed to go online in {timeout}sec.")
+                f"'{self.device_name}' failed to go online in {timeout}sec."
+            )
 
     # List all private properties in alphabetical order
     @property
@@ -411,7 +421,8 @@ class BaseFuchsiaDevice(fuchsia_device.FuchsiaDevice,
     # List all private methods, in alphabetical order
     @abc.abstractmethod
     def _send_log_command(
-            self, tag: str, message: str, level: custom_types.LEVEL) -> None:
+        self, tag: str, message: str, level: custom_types.LEVEL
+    ) -> None:
         """Send a device command to write to the syslog.
 
         Args:

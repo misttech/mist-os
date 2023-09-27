@@ -28,7 +28,8 @@ def msg(text: str):
 
 
 def split_transform_join(
-        token: str, sep: str, transform: Callable[[str], str]) -> str:
+    token: str, sep: str, transform: Callable[[str], str]
+) -> str:
     return sep.join(transform(x) for x in token.split(sep))
 
 
@@ -74,7 +75,7 @@ def relativize_path(arg: str, start: Path) -> str:
     # Such flags are fused to their arguments without a delimiter.
     for flag in ("-I", "-L", "-isystem"):
         if arg.startswith(flag):
-            suffix = arg[len(flag):]
+            suffix = arg[len(flag) :]
             return flag + relativize_path(suffix, start=start_abs)
 
     try_path = Path(arg)
@@ -90,8 +91,9 @@ def relativize_path(arg: str, start: Path) -> str:
     return arg
 
 
-def relativize_command(command: Sequence[str],
-                       working_dir: Path) -> Sequence[str]:
+def relativize_command(
+    command: Sequence[str], working_dir: Path
+) -> Sequence[str]:
     """Transform a command to use relative paths.
 
     Args:
@@ -158,7 +160,8 @@ def main(argv: Sequence[str]) -> None:
 
     command = args.command
     relativized_command = relativize_command(
-        command=command, working_dir=args.cwd)
+        command=command, working_dir=args.cwd
+    )
 
     cmd_str = " ".join(relativized_command)
     if args.verbose or args.dry_run:

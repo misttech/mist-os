@@ -35,10 +35,11 @@ class WlanPolicy(abc.ABC):
 
     @abc.abstractmethod
     def save_network(
-            self,
-            target_ssid: str,
-            security_type: SecurityType,
-            target_pwd: str | None = None) -> None:
+        self,
+        target_ssid: str,
+        security_type: SecurityType,
+        target_pwd: str | None = None,
+    ) -> None:
         """Saves a network to the device.
 
         Args:

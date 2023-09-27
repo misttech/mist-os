@@ -10,31 +10,34 @@ import sys
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FUCHSIA_ROOT = os.path.dirname(  # $root
-    os.path.dirname(  # scripts
-        SCRIPT_DIR))  # owner
+    os.path.dirname(SCRIPT_DIR)  # scripts
+)  # owner
 
 
 # $ what_do_i_own.py me@mydomain file_i_own file_i_dont
 # file_i_own
 def main():
     parser = argparse.ArgumentParser(
-        description='Filters `paths` for those owned by `owner`')
-    parser.add_argument('owner')
-    parser.add_argument('paths', nargs='+')
+        description="Filters `paths` for those owned by `owner`"
+    )
+    parser.add_argument("owner")
+    parser.add_argument("paths", nargs="+")
     args = parser.parse_args()
     owner = args.owner
     abspaths = [os.path.abspath(path) for path in args.paths]
 
-    perfile_exp = re.compile('^\s*per-file ([^\s=]*)\s*=\s*' + owner)
+    perfile_exp = re.compile("^\s*per-file ([^\s=]*)\s*=\s*" + owner)
 
     # Find all OWNERS files
     path_to_owners = {}
     for path in abspaths:
         dir = path if os.path.isdir(path) else os.path.dirname(path)
         dir = os.path.abspath(dir)
-        while (os.path.exists(dir) and
-               os.path.commonprefix([dir, FUCHSIA_ROOT]) == FUCHSIA_ROOT):
-            owners_path = os.path.join(dir, 'OWNERS')
+        while (
+            os.path.exists(dir)
+            and os.path.commonprefix([dir, FUCHSIA_ROOT]) == FUCHSIA_ROOT
+        ):
+            owners_path = os.path.join(dir, "OWNERS")
             if os.path.exists(owners_path):
                 path_to_owners[path] = owners_path
                 break
@@ -51,7 +54,8 @@ def main():
                 match = perfile_exp.match(line)
                 if match:
                     filename = os.path.abspath(
-                        os.path.join(os.path.dirname(owners), match.group(1)))
+                        os.path.join(os.path.dirname(owners), match.group(1))
+                    )
                     if filename in abspaths:
                         owned.add(path)
 
@@ -62,5 +66,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -35,18 +35,21 @@ import tempfile
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        'cmd', type=str, help='fint subcommand to run (set or build)')
+        "cmd", type=str, help="fint subcommand to run (set or build)"
+    )
     parser.add_argument(
-        '-f',
-        '--fint-params-path',
-        help='path to fint params file',
-        required=True)
+        "-f",
+        "--fint-params-path",
+        help="path to fint params file",
+        required=True,
+    )
     parser.add_argument(
-        '-c',
-        '--changed-file',
-        action='append',
-        dest='changed_files',
-        default=[])
+        "-c",
+        "--changed-file",
+        action="append",
+        dest="changed_files",
+        default=[],
+    )
 
     args = parser.parse_args()
 
@@ -55,28 +58,29 @@ def main():
 
 
 def execute(args, inputs_dir):
-    checkout_dir = os.environ['FUCHSIA_DIR']
+    checkout_dir = os.environ["FUCHSIA_DIR"]
     os.chdir(checkout_dir)
 
     artifact_dir = tempfile.mkdtemp()
 
-    build_dir = subprocess.check_output(['fx', 'get-build-dir'],
-                                        text=True).strip()
+    build_dir = subprocess.check_output(
+        ["fx", "get-build-dir"], text=True
+    ).strip()
 
-    context_textproto = f'''
+    context_textproto = f"""
 checkout_dir: "{checkout_dir}"
 build_dir: "{build_dir}"
 artifact_dir: "{artifact_dir}"
-'''
+"""
     for changed_file in args.changed_files:
-        context_textproto += f'''
+        context_textproto += f"""
 changed_files {{
     path: "{changed_file}"
 }}
-'''
+"""
 
     context_path = os.path.join(inputs_dir, "context.textproto")
-    with open(context_path, 'w') as f:
+    with open(context_path, "w") as f:
         f.write(context_textproto)
 
     proc = subprocess.run(
@@ -95,5 +99,5 @@ changed_files {{
     print(f"See {artifact_dir} for outputs.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -14,25 +14,28 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Parse assembly create-system output manifest to get package info.")
+        description="Parse assembly create-system output manifest to get package info."
+    )
     parser.add_argument(
         "--package-set",
         type=str,
         required=True,
         choices=["base", "cache"],
-        help="The package set for which to emit metadata.")
+        help="The package set for which to emit metadata.",
+    )
     parser.add_argument("--contents", type=str, choices=["name", "manifest"])
     parser.add_argument(
         "--images-manifest",
-        type=argparse.FileType('r'),
+        type=argparse.FileType("r"),
         required=True,
-        help="Path to images.json created by `ffx assembly create-system`.")
+        help="Path to images.json created by `ffx assembly create-system`.",
+    )
     parser.add_argument(
         "--output",
-        type=argparse.FileType('w'),
+        type=argparse.FileType("w"),
         required=True,
-        help="Path to which to write desired output list.")
+        help="Path to which to write desired output list.",
+    )
     args = parser.parse_args()
 
     images_manifest = json.load(args.images_manifest)
@@ -45,20 +48,20 @@ def main():
             for package in contents["packages"][args.package_set]:
                 # Paths in the manifest are relative to the manifest file itself
                 manifest_paths.append(
-                    os.path.join(manifest_path, package[args.contents]))
+                    os.path.join(manifest_path, package[args.contents])
+                )
 
     out_package_manifest_list = {
-        'content': {
-            'manifests': manifest_paths
-        },
-        'version': '1'
+        "content": {"manifests": manifest_paths},
+        "version": "1",
     }
 
     args.output.write(
-        json.dumps(out_package_manifest_list, indent=2, sort_keys=True))
+        json.dumps(out_package_manifest_list, indent=2, sort_keys=True)
+    )
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

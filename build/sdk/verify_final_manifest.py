@@ -20,7 +20,9 @@ import sys
 from typing import Sequence, TypedDict
 
 HOST_TOOL_SCHEMES: Sequence[str] = [
-    "host_tool", "ffx_tool", "companion_host_tool"
+    "host_tool",
+    "ffx_tool",
+    "companion_host_tool",
 ]
 
 IdkPart = TypedDict("IdkPart", {"meta": str, "type": str})
@@ -41,7 +43,7 @@ def part_to_id(part: IdkPart) -> str:
     if os.path.basename(path) == "meta.json":
         path = os.path.dirname(path)
     elif path.endswith("-meta.json"):
-        path = path[:-len("-meta.json")]
+        path = path[: -len("-meta.json")]
 
     return f'{part["type"]}://{path}'
 
@@ -50,7 +52,8 @@ def part_is_tool_for_other_cpu(part_id: str, host_cpu: str) -> bool:
     """Returns True if a given part is a host tool for a different cpu."""
     for scheme in HOST_TOOL_SCHEMES:
         if part_id.startswith(f"{scheme}://") and not part_id.startswith(
-                f"{scheme}://tools/{host_cpu}/"):
+            f"{scheme}://tools/{host_cpu}/"
+        ):
             return True
     return False
 
@@ -64,20 +67,22 @@ def remove_tools_for_other_cpus(part_ids: set[str], cpu: str) -> set[str]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--manifest", help="Path to the IDK manifest", required=True)
+        "--manifest", help="Path to the IDK manifest", required=True
+    )
     parser.add_argument(
-        "--golden", help="Path to the golden file", required=True)
+        "--golden", help="Path to the golden file", required=True
+    )
     parser.add_argument(
         "--inherit_golden",
         help=(
             "Inherit items from this golden file, if specified, and omit "
-            "any items from this file in the updated golden."),
+            "any items from this file in the updated golden."
+        ),
         required=False,
     )
     parser.add_argument(
         "--only_verify_host_tools_for_cpu",
-        help=
-        "If specified, ignore any host tools that aren't built for the named CPU arch.",
+        help="If specified, ignore any host tools that aren't built for the named CPU arch.",
         required=False,
     )
     parser.add_argument(
@@ -85,14 +90,16 @@ def main() -> int:
         help=(
             "Path where a new version of the golden file will be written. The "
             "contents of this file will be meaningful iff "
-            "--only_verify_host_tools_for_cpu is not specified"),
+            "--only_verify_host_tools_for_cpu is not specified"
+        ),
         required=True,
     )
     parser.add_argument(
         "--label",
         help=(
             "GN label that caused this script to be run. Makes errors easier "
-            "to reproduce."),
+            "to reproduce."
+        ),
     )
 
     args = parser.parse_args()
@@ -117,9 +124,11 @@ def main() -> int:
 
     if args.only_verify_host_tools_for_cpu:
         added_ids = remove_tools_for_other_cpus(
-            added_ids, args.only_verify_host_tools_for_cpu)
+            added_ids, args.only_verify_host_tools_for_cpu
+        )
         removed_ids = remove_tools_for_other_cpus(
-            removed_ids, args.only_verify_host_tools_for_cpu)
+            removed_ids, args.only_verify_host_tools_for_cpu
+        )
 
         # Write the file even if it's not useful as an updated golden, because
         # GN expects it to be there.

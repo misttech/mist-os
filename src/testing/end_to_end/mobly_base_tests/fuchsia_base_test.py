@@ -20,6 +20,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 class SnapshotOn(enum.Enum):
     """How often we need to collect the snapshot"""
+
     TEARDOWN_CLASS = enum.auto()
     ON_FAIL = enum.auto()
     TEARDOWN_TEST = enum.auto()
@@ -48,8 +49,9 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         """
         self._process_user_params()
 
-        self.fuchsia_devices: List[fuchsia_device.FuchsiaDevice] = \
-            self.register_controller(fuchsia_device_mobly_controller)
+        self.fuchsia_devices: List[
+            fuchsia_device.FuchsiaDevice
+        ] = self.register_controller(fuchsia_device_mobly_controller)
 
     def setup_test(self) -> None:
         """setup_test is called once before running each test.
@@ -58,13 +60,15 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Stores the current test case path into self.test_case_path
             * Logs a info message onto device that test case has started.
         """
-        self.test_case_path: str = \
+        self.test_case_path: str = (
             f"{self.log_path}/{self.current_test_info.name}"
+        )
         self._health_check()
         self._log_message_to_devices(
-            message=f"Started executing '{self.current_test_info.name}' " \
-                    f"Lacewing test case...",
-            level=custom_types.LEVEL.INFO)
+            message=f"Started executing '{self.current_test_info.name}' "
+            f"Lacewing test case...",
+            level=custom_types.LEVEL.INFO,
+        )
 
     def teardown_test(self) -> None:
         """teardown_test is called once after running each test.
@@ -78,9 +82,10 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST:
             self._collect_snapshot(directory=self.test_case_path)
         self._log_message_to_devices(
-            message=f"Finished executing '{self.current_test_info.name}' " \
-                    f"Lacewing test case...",
-            level=custom_types.LEVEL.INFO)
+            message=f"Finished executing '{self.current_test_info.name}' "
+            f"Lacewing test case...",
+            level=custom_types.LEVEL.INFO,
+        )
 
     def teardown_class(self) -> None:
         """teardown_class is called once after running all tests.
@@ -118,20 +123,24 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
 
         _LOGGER.info(
             "Collecting snapshots of all the FuchsiaDevice objects in '%s'...",
-            self.snapshot_on.name)
+            self.snapshot_on.name,
+        )
         for fx_device in self.fuchsia_devices:
             try:
                 fx_device.snapshot(directory=directory)
             except NotImplementedError:
                 _LOGGER.warning(
                     "Taking snapshot is not yet supported by %s",
-                    fx_device.device_name)
+                    fx_device.device_name,
+                )
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.warning(
-                    "Unable to take snapshot of %s", fx_device.device_name)
+                    "Unable to take snapshot of %s", fx_device.device_name
+                )
 
-    def _get_controller_configs(self,
-                                controller_type: str) -> List[Dict[str, str]]:
+    def _get_controller_configs(
+        self, controller_type: str
+    ) -> List[Dict[str, str]]:
         """Return testbed config associated with a specific Mobly Controller.
 
         Args:
@@ -168,15 +177,17 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             ]
             ```
         """
-        for controller_name, controller_configs in \
-            self.controller_configs.items():
+        for (
+            controller_name,
+            controller_configs,
+        ) in self.controller_configs.items():
             if controller_name == controller_type:
                 return controller_configs
         return []
 
     def _get_device_config(
-            self, controller_type: str, identifier_key: str,
-            identifier_value: str) -> Dict[str, str]:
+        self, controller_type: str, identifier_key: str, identifier_value: str
+    ) -> Dict[str, str]:
         """Return testbed config associated with a specific device of a
         particular mobly controller type.
 
@@ -227,12 +238,14 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
     def _health_check(self) -> None:
         """Ensure all FuchsiaDevice objects are healthy."""
         _LOGGER.info(
-            "Performing health checks on all the FuchsiaDevice objects...")
+            "Performing health checks on all the FuchsiaDevice objects..."
+        )
         for fx_device in self.fuchsia_devices:
             fx_device.health_check()
 
     def _is_fuchsia_controller_based_device(
-            self, fx_device: fuchsia_device.FuchsiaDevice) -> bool:
+        self, fx_device: fuchsia_device.FuchsiaDevice
+    ) -> bool:
         """Checks the testbed config and returns if the device is using
         Fuchsia-Controller based transport.
 
@@ -245,16 +258,20 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         device_config: Dict[str, str] = self._get_device_config(
             controller_type="FuchsiaDevice",
             identifier_key="name",
-            identifier_value=fx_device.device_name)
+            identifier_value=fx_device.device_name,
+        )
 
-        if device_config.get("transport", transports.DEFAULT_TRANSPORT.value
-                            ) in transports.FUCHSIA_CONTROLLER_TRANSPORTS:
+        if (
+            device_config.get("transport", transports.DEFAULT_TRANSPORT.value)
+            in transports.FUCHSIA_CONTROLLER_TRANSPORTS
+        ):
             return True
 
         return False
 
     def _log_message_to_devices(
-            self, message: str, level: custom_types.LEVEL) -> None:
+        self, message: str, level: custom_types.LEVEL
+    ) -> None:
         """Log message in all the Fuchsia devices.
 
         Args:
@@ -266,25 +283,33 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                 fx_device.log_message_to_device(message, level)
             except Exception:  # pylint: disable=broad-except
                 _LOGGER.warning(
-                    "Unable to log message '%s' on '%s'", message,
-                    fx_device.device_name)
+                    "Unable to log message '%s' on '%s'",
+                    message,
+                    fx_device.device_name,
+                )
 
     def _process_user_params(self) -> None:
         """Reads, processes and stores the test params used by this module."""
         _LOGGER.info(
-            "user_params associated with the test: %s", self.user_params)
+            "user_params associated with the test: %s", self.user_params
+        )
 
         try:
             snapshot_on: str = self.user_params.get(
-                "snapshot_on", SnapshotOn.TEARDOWN_CLASS.name).upper()
+                "snapshot_on", SnapshotOn.TEARDOWN_CLASS.name
+            ).upper()
             self.snapshot_on: SnapshotOn = SnapshotOn[snapshot_on]
         except KeyError as err:
             _LOGGER.warning(
                 "Invalid value %s passed in 'snapshot_on' test param. "
                 "Valid values for this test param include: '%s', '%s','%s'. "
-                "Proceeding with default value: '%s'", err,
-                SnapshotOn.TEARDOWN_CLASS.name, SnapshotOn.TEARDOWN_TEST.name,
-                SnapshotOn.ON_FAIL.name, SnapshotOn.TEARDOWN_CLASS.name)
+                "Proceeding with default value: '%s'",
+                err,
+                SnapshotOn.TEARDOWN_CLASS.name,
+                SnapshotOn.TEARDOWN_TEST.name,
+                SnapshotOn.ON_FAIL.name,
+                SnapshotOn.TEARDOWN_CLASS.name,
+            )
             self.snapshot_on = SnapshotOn.TEARDOWN_CLASS
 
 

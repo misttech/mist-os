@@ -7,7 +7,6 @@ import unittest
 
 
 class FuchsiaControllerTest(unittest.TestCase):
-
     def setUp(self):
         fidl_codec.add_ir_path(
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.test.fidl.json"

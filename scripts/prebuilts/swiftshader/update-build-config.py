@@ -26,28 +26,29 @@ import urllib.request
 
 def get_git_file_data(url, revision, file_path):
     """Download a single file from a git source repository."""
-    if url.startswith('https://github.com/'):
+    if url.startswith("https://github.com/"):
         # Use github-specific URL API:
         data = urllib.request.urlopen(
-            '%s/raw/%s/%s' % (url, revision, file_path))
+            "%s/raw/%s/%s" % (url, revision, file_path)
+        )
         return data.read()
-    if url.find('.googlesource.com') >= 0:
-        url = '%s/+/%s/%s?format=TEXT' % (url, revision, file_path)
+    if url.find(".googlesource.com") >= 0:
+        url = "%s/+/%s/%s?format=TEXT" % (url, revision, file_path)
         data_file = urllib.request.urlopen(url)
         data = data_file.read()
         data = base64.b64decode(data)
         return data
 
-    raise Exception('Unsupported URL type: ' + url)
+    raise Exception("Unsupported URL type: " + url)
 
 
 def get_git_remote_ref(git_url, ref_name):
     """Get the hash of a remote git url reference."""
-    ref_name = 'refs/' + ref_name
-    command = ['git', 'ls-remote', '--refs', git_url, ref_name]
+    ref_name = "refs/" + ref_name
+    command = ["git", "ls-remote", "--refs", git_url, ref_name]
     output = subprocess.check_output(command)
     for line in output.splitlines():
-        commit, _, ref = line.partition(b'\t')
+        commit, _, ref = line.partition(b"\t")
         if ref == ref_name:
             return commit
     return None
@@ -67,17 +68,17 @@ def parse_known_good_file(good_data):
         look like.
     """
     result = {}
-    SITE_MAP = {'github': 'https://github.com'}
+    SITE_MAP = {"github": "https://github.com"}
     deps = json.loads(good_data)
-    assert 'commits' in deps
-    for dep in deps['commits']:
-        name = dep['name']
-        site = dep['site']
+    assert "commits" in deps
+    for dep in deps["commits"]:
+        name = dep["name"]
+        site = dep["site"]
         site_url = SITE_MAP.get(site)
-        assert site_url, 'Unknown site value: %s' % site
-        subrepo = dep['subrepo']
-        revision = dep['commit']
-        result[str(name)] = '{0}/{1}@{2}'.format(site_url, subrepo, revision)
+        assert site_url, "Unknown site value: %s" % site
+        subrepo = dep["subrepo"]
+        revision = dep["commit"]
+        result[str(name)] = "{0}/{1}@{2}".format(site_url, subrepo, revision)
     return result
 
 
@@ -95,17 +96,17 @@ def parse_deps_file(deps_data):
     assert isinstance(deps_data, str)
     var_func = lambda name: safe
     safe_globals = {
-        '__builtins__': {
-            'True': True,
-            'False': False,
+        "__builtins__": {
+            "True": True,
+            "False": False,
         },
         # The Var() function is used to peek into the 'vars' dictionary inside
         # the DEPS file, this can be implemented with a lambda.
-        'Var': lambda name: safe_globals['vars'][name]
+        "Var": lambda name: safe_globals["vars"][name],
     }
 
     exec(deps_data, safe_globals)
-    deps = safe_globals.get('deps')
+    deps = safe_globals.get("deps")
     assert isinstance(deps, dict)
     return deps
 
@@ -124,115 +125,123 @@ def parse_git_submodules(gitmodules_data):
     urls = {}
     branches = {}
     for line in gitmodules_data.splitlines():
-        if line.startswith('['):
+        if line.startswith("["):
             section_name = line[1:-1]
             is_submodule_section = section_name.startswith(submodule_prefix)
             if is_submodule_section:
-                submodule_name = section_name[len(submodule_prefix):-1]
+                submodule_name = section_name[len(submodule_prefix) : -1]
         elif is_submodule_section:
-            key, _, value = line.strip().partition('=')
+            key, _, value = line.strip().partition("=")
             if not value:
                 continue
             key = key.strip()
             value = value.strip()
-            if key == 'url':
+            if key == "url":
                 urls[submodule_name] = value
-            elif key == 'branch':
+            elif key == "branch":
                 branches[submodule_name] = value
 
     result = {}
     for submodule, url in urls.items():
         branch = branches.get(submodule)
         if not branch:
-            branch = get_git_remote_ref(url, 'heads/master')
-        result[submodule] = '%s@%s' % (url, branch)
+            branch = get_git_remote_ref(url, "heads/master")
+        result[submodule] = "%s@%s" % (url, branch)
     return result
 
 
-_SWIFTSHADER_URL = 'https://swiftshader.googlesource.com/SwiftShader'
-_GLSLANG_URL = 'https://github.com/KhronosGroup/glslang'
-_VULKAN_HEADERS_URL = 'https://github.com/KhronosGroup/Vulkan-Headers'
-_VULKAN_LOADER_URL = 'https://github.com/KhronosGroup/Vulkan-Loader'
-_VULKAN_VALIDATION_LAYERS_URL = 'https://github.com/KhronosGroup/Vulkan-ValidationLayers'
+_SWIFTSHADER_URL = "https://swiftshader.googlesource.com/SwiftShader"
+_GLSLANG_URL = "https://github.com/KhronosGroup/glslang"
+_VULKAN_HEADERS_URL = "https://github.com/KhronosGroup/Vulkan-Headers"
+_VULKAN_LOADER_URL = "https://github.com/KhronosGroup/Vulkan-Loader"
+_VULKAN_VALIDATION_LAYERS_URL = (
+    "https://github.com/KhronosGroup/Vulkan-ValidationLayers"
+)
 
-_DEFAULT_SWIFTSHADER_REVISION = '6c5a1c5220d3a90999340b4d2998d49e0c02d54a'
-_DEFAULT_GLSLANG_REVISION = '5755de46b07e4374c05fb1081f65f7ae1f8cca81'
-_DEFAULT_VULKAN_SDK_VERSION = '1.3.232'
+_DEFAULT_SWIFTSHADER_REVISION = "6c5a1c5220d3a90999340b4d2998d49e0c02d54a"
+_DEFAULT_GLSLANG_REVISION = "5755de46b07e4374c05fb1081f65f7ae1f8cca81"
+_DEFAULT_VULKAN_SDK_VERSION = "1.3.232"
 
 
 def make_git_url(site_url, revision):
-    return '{site_url}@{revision}'.format(site_url=site_url, revision=revision)
+    return "{site_url}@{revision}".format(site_url=site_url, revision=revision)
 
 
 def main(args):
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument(
-        '--swiftshader-revision',
+        "--swiftshader-revision",
         default=_DEFAULT_SWIFTSHADER_REVISION,
-        metavar='REVISION',
-        help='SwiftShader revision [%s].' % _DEFAULT_SWIFTSHADER_REVISION[:16])
+        metavar="REVISION",
+        help="SwiftShader revision [%s]." % _DEFAULT_SWIFTSHADER_REVISION[:16],
+    )
 
     parser.add_argument(
-        '--glslang-revision',
+        "--glslang-revision",
         default=_DEFAULT_GLSLANG_REVISION,
-        metavar='REVISION',
-        help='glslang revision [%s].' % _DEFAULT_GLSLANG_REVISION[:16])
+        metavar="REVISION",
+        help="glslang revision [%s]." % _DEFAULT_GLSLANG_REVISION[:16],
+    )
 
     parser.add_argument(
-        '--vulkan-sdk-version',
+        "--vulkan-sdk-version",
         default=_DEFAULT_VULKAN_SDK_VERSION,
-        metavar='VERSION',
-        help='Vulkan SDK version [%s].' % _DEFAULT_VULKAN_SDK_VERSION)
+        metavar="VERSION",
+        help="Vulkan SDK version [%s]." % _DEFAULT_VULKAN_SDK_VERSION,
+    )
 
     args = parser.parse_args(args[1:])
 
-    vulkan_headers_revision = 'sdk-%s.0' % args.vulkan_sdk_version
+    vulkan_headers_revision = "sdk-%s.0" % args.vulkan_sdk_version
     vulkan_loader_revision = vulkan_headers_revision
     vulkan_validation_layers_revision = vulkan_headers_revision
 
     d = {
-        'script_name':
-            os.path.basename(__file__),
-        'swiftshader':
-            make_git_url(_SWIFTSHADER_URL, args.swiftshader_revision),
-        'glslang':
-            make_git_url(_GLSLANG_URL, args.glslang_revision),
-        'vulkan_headers':
-            make_git_url(_VULKAN_HEADERS_URL, vulkan_headers_revision),
-        'vulkan_loader':
-            make_git_url(_VULKAN_LOADER_URL, vulkan_loader_revision),
-        'vulkan_validation_layers':
-            make_git_url(
-                _VULKAN_VALIDATION_LAYERS_URL,
-                vulkan_validation_layers_revision),
+        "script_name": os.path.basename(__file__),
+        "swiftshader": make_git_url(
+            _SWIFTSHADER_URL, args.swiftshader_revision
+        ),
+        "glslang": make_git_url(_GLSLANG_URL, args.glslang_revision),
+        "vulkan_headers": make_git_url(
+            _VULKAN_HEADERS_URL, vulkan_headers_revision
+        ),
+        "vulkan_loader": make_git_url(
+            _VULKAN_LOADER_URL, vulkan_loader_revision
+        ),
+        "vulkan_validation_layers": make_git_url(
+            _VULKAN_VALIDATION_LAYERS_URL, vulkan_validation_layers_revision
+        ),
     }
 
     # Add SwiftShader submodule dependencies.
     swiftshader_gitmodules = get_git_file_data(
-        _SWIFTSHADER_URL, args.swiftshader_revision, '.gitmodules')
+        _SWIFTSHADER_URL, args.swiftshader_revision, ".gitmodules"
+    )
     swiftshader_submodules = parse_git_submodules(swiftshader_gitmodules)
-    d['cppdap'] = swiftshader_submodules['third_party/cppdap']
-    d['json'] = swiftshader_submodules['third_party/json']
-    d['libbacktrace'] = swiftshader_submodules['third_party/libbacktrace/src']
+    d["cppdap"] = swiftshader_submodules["third_party/cppdap"]
+    d["json"] = swiftshader_submodules["third_party/json"]
+    d["libbacktrace"] = swiftshader_submodules["third_party/libbacktrace/src"]
 
     # Add glslang dependencies.
     known_good = get_git_file_data(
-        _GLSLANG_URL, args.glslang_revision, 'known_good.json')
+        _GLSLANG_URL, args.glslang_revision, "known_good.json"
+    )
     glslang_deps = parse_known_good_file(known_good)
-    d['spirv_tools'] = glslang_deps['spirv-tools']
-    d['spirv_headers'] = glslang_deps['spirv-tools/external/spirv-headers']
+    d["spirv_tools"] = glslang_deps["spirv-tools"]
+    d["spirv_headers"] = glslang_deps["spirv-tools/external/spirv-headers"]
 
     # Add SPIRV-Tools dependencies.
-    spirv_tools_url, _, spirv_tools_revision = d['spirv_tools'].partition('@')
+    spirv_tools_url, _, spirv_tools_revision = d["spirv_tools"].partition("@")
     spirv_tools_deps_file = get_git_file_data(
-        spirv_tools_url, spirv_tools_revision, 'DEPS')
+        spirv_tools_url, spirv_tools_revision, "DEPS"
+    )
     spirv_tools_deps = parse_deps_file(spirv_tools_deps_file)
-    d['effcee'] = spirv_tools_deps['external/effcee']
-    d['re2'] = spirv_tools_deps['external/re2']
+    d["effcee"] = spirv_tools_deps["external/effcee"]
+    d["re2"] = spirv_tools_deps["external/re2"]
 
     output = string.Template(
-        r'''# Auto-generated by ${script_name} - DO NOT EDIT!
+        r"""# Auto-generated by ${script_name} - DO NOT EDIT!
 # To be used with $$FUCHSIA_SOURCE/scripts/prebuilts/swiftshader/build-linux-host-prebuilts.sh
 
 SWIFTSHADER_GIT_URL=${swiftshader}
@@ -255,7 +264,8 @@ LIBBACKTRACE_GIT_URL=${libbacktrace}
 # NOTE: effcee and re2 revisions from SPIRV-Tools/DEPS
 EFFCEE_GIT_URL=${effcee}
 RE2_GIT_URL=${re2}
-''').substitute(d)
+"""
+    ).substitute(d)
 
     print(output)
     return 0
@@ -267,7 +277,7 @@ if __name__ == "__main__":
 # Example files for the parser above. No real purpose except documenting what
 # the expected format is.
 
-_EXAMPLE_KNOWN_GOOD_JSON_FILE = r'''
+_EXAMPLE_KNOWN_GOOD_JSON_FILE = r"""
 {
   "commits" : [
     {
@@ -286,9 +296,9 @@ _EXAMPLE_KNOWN_GOOD_JSON_FILE = r'''
     }
   ]
 }
-'''
+"""
 
-_EXAMPLE_DEPS_FILE = r'''
+_EXAMPLE_DEPS_FILE = r"""
 use_relative_paths = True
 
 vars = {
@@ -314,9 +324,9 @@ deps = {
       Var('github') +  '/KhronosGroup/SPIRV-Headers.git@' +
           Var('spirv_headers_revision'),
 }
-'''
+"""
 
-_EXAMPLE_GITMODULES_FILE = r'''
+_EXAMPLE_GITMODULES_FILE = r"""
 [submodule "third_party/cppdap"]
         path = third_party/cppdap
         url = https://github.com/google/cppdap
@@ -336,4 +346,4 @@ _EXAMPLE_GITMODULES_FILE = r'''
 [submodule "third_party/PowerVR_Examples"]
         path = third_party/PowerVR_Examples
         url = https://github.com/powervr-graphics/Native_SDK.git
-'''
+"""

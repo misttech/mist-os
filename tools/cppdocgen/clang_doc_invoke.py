@@ -30,38 +30,45 @@ import zipfile
 
 def main():
     parser = argparse.ArgumentParser(
-        'Runs clang-doc in a temporary directory and zips the output.\n')
+        "Runs clang-doc in a temporary directory and zips the output.\n"
+    )
     parser.add_argument(
-        '--clang-doc', help='Path to clang-doc binary.', required=True)
+        "--clang-doc", help="Path to clang-doc binary.", required=True
+    )
     parser.add_argument(
-        '--temp-dir-parent',
-        help='Parent directory of the unique temp dir to use.',
-        required=True)
+        "--temp-dir-parent",
+        help="Parent directory of the unique temp dir to use.",
+        required=True,
+    )
     parser.add_argument(
-        '--out-zip',
-        help='Name of the .zip file to create from the clang-doc output.',
-        required=True)
+        "--out-zip",
+        help="Name of the .zip file to create from the clang-doc output.",
+        required=True,
+    )
     parser.add_argument(
-        'clang_doc_args',
-        help='Arguments to pass to clang-doc',
-        nargs='+',
-        metavar='clang-doc-args')
+        "clang_doc_args",
+        help="Arguments to pass to clang-doc",
+        nargs="+",
+        metavar="clang-doc-args",
+    )
     args = parser.parse_args()
 
     with tempfile.TemporaryDirectory(dir=args.temp_dir_parent) as temp_dir:
         completed = subprocess.run(
-            [args.clang_doc, '--output', temp_dir] + args.clang_doc_args,
+            [args.clang_doc, "--output", temp_dir] + args.clang_doc_args,
             check=True,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
+            stderr=subprocess.STDOUT,
+        )
 
         file_count = 0
-        with zipfile.ZipFile(args.out_zip, 'w') as outfile:
+        with zipfile.ZipFile(args.out_zip, "w") as outfile:
             for root, dirs, files in os.walk(temp_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     outfile.write(
-                        file_path, arcname=os.path.relpath(file_path, temp_dir))
+                        file_path, arcname=os.path.relpath(file_path, temp_dir)
+                    )
                     file_count = file_count + 1
 
         if file_count == 0:
@@ -70,12 +77,14 @@ def main():
             print(
                 "  This is normally because the target is not in the 'default' build"
             )
-            print("  and the fix is to add the cpp_docgen target to your 'universe'.")
+            print(
+                "  and the fix is to add the cpp_docgen target to your 'universe'."
+            )
             print("\nclang-doc output:\n")
             print(bytes.decode(completed.stdout))
             return 1
         return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -15,11 +15,10 @@ import textpb
 
 def unlex(tokens: Iterable[textpb.Token]) -> str:
     """Concatenates tokens' text."""
-    return ''.join(token.text for token in tokens)
+    return "".join(token.text for token in tokens)
 
 
 class LexTests(unittest.TestCase):
-
     def _test_tokens(self, tokens: Sequence[textpb.Token]):
         text = unlex(tokens)
         lexed = list(textpb._lex_line(text))
@@ -27,108 +26,130 @@ class LexTests(unittest.TestCase):
 
     def test_start_block(self):
         self._test_tokens(
-            [textpb.Token(text='<', type=textpb.TokenType.START_BLOCK)])
+            [textpb.Token(text="<", type=textpb.TokenType.START_BLOCK)]
+        )
         self._test_tokens(
-            [textpb.Token(text='{', type=textpb.TokenType.START_BLOCK)])
+            [textpb.Token(text="{", type=textpb.TokenType.START_BLOCK)]
+        )
 
     def test_end_block(self):
         self._test_tokens(
-            [textpb.Token(text='>', type=textpb.TokenType.END_BLOCK)])
+            [textpb.Token(text=">", type=textpb.TokenType.END_BLOCK)]
+        )
         self._test_tokens(
-            [textpb.Token(text='}', type=textpb.TokenType.END_BLOCK)])
+            [textpb.Token(text="}", type=textpb.TokenType.END_BLOCK)]
+        )
 
     def test_empty_block(self):
         self._test_tokens(
             [
-                textpb.Token(text='<', type=textpb.TokenType.START_BLOCK),
-                textpb.Token(text='>', type=textpb.TokenType.END_BLOCK),
-            ])
+                textpb.Token(text="<", type=textpb.TokenType.START_BLOCK),
+                textpb.Token(text=">", type=textpb.TokenType.END_BLOCK),
+            ]
+        )
         self._test_tokens(
             [
-                textpb.Token(text='{', type=textpb.TokenType.START_BLOCK),
-                textpb.Token(text='}', type=textpb.TokenType.END_BLOCK),
-            ])
+                textpb.Token(text="{", type=textpb.TokenType.START_BLOCK),
+                textpb.Token(text="}", type=textpb.TokenType.END_BLOCK),
+            ]
+        )
 
     def test_spaces(self):
-        self._test_tokens([textpb.Token(text=' ', type=textpb.TokenType.SPACE)])
+        self._test_tokens([textpb.Token(text=" ", type=textpb.TokenType.SPACE)])
         self._test_tokens(
-            [textpb.Token(text='  ', type=textpb.TokenType.SPACE)])
+            [textpb.Token(text="  ", type=textpb.TokenType.SPACE)]
+        )
         self._test_tokens(
-            [textpb.Token(text='\t', type=textpb.TokenType.SPACE)])
+            [textpb.Token(text="\t", type=textpb.TokenType.SPACE)]
+        )
         self._test_tokens(
-            [textpb.Token(text='\t\t', type=textpb.TokenType.SPACE)])
+            [textpb.Token(text="\t\t", type=textpb.TokenType.SPACE)]
+        )
 
     def test_newlines(self):
         self._test_tokens(
-            [textpb.Token(text='\n', type=textpb.TokenType.NEWLINE)])
+            [textpb.Token(text="\n", type=textpb.TokenType.NEWLINE)]
+        )
         self._test_tokens(
-            [textpb.Token(text='\r\n', type=textpb.TokenType.NEWLINE)])
+            [textpb.Token(text="\r\n", type=textpb.TokenType.NEWLINE)]
+        )
 
     def test_field_name(self):
         self._test_tokens(
-            [textpb.Token(text='field:', type=textpb.TokenType.FIELD_NAME)])
+            [textpb.Token(text="field:", type=textpb.TokenType.FIELD_NAME)]
+        )
         self._test_tokens(
-            [textpb.Token(text='key:', type=textpb.TokenType.FIELD_NAME)])
+            [textpb.Token(text="key:", type=textpb.TokenType.FIELD_NAME)]
+        )
         self._test_tokens(
-            [textpb.Token(text='value:', type=textpb.TokenType.FIELD_NAME)])
+            [textpb.Token(text="value:", type=textpb.TokenType.FIELD_NAME)]
+        )
 
     def test_strings(self):
         self._test_tokens(
-            [textpb.Token(text='""', type=textpb.TokenType.STRING_VALUE)])
+            [textpb.Token(text='""', type=textpb.TokenType.STRING_VALUE)]
+        )
         self._test_tokens(
-            [textpb.Token(text='"string"', type=textpb.TokenType.STRING_VALUE)])
-        self._test_tokens(
-            [
-                textpb.Token(
-                    text='"with space"', type=textpb.TokenType.STRING_VALUE)
-            ])
+            [textpb.Token(text='"string"', type=textpb.TokenType.STRING_VALUE)]
+        )
         self._test_tokens(
             [
                 textpb.Token(
-                    text='"\\"escaped\\""', type=textpb.TokenType.STRING_VALUE)
-            ])
+                    text='"with space"', type=textpb.TokenType.STRING_VALUE
+                )
+            ]
+        )
+        self._test_tokens(
+            [
+                textpb.Token(
+                    text='"\\"escaped\\""', type=textpb.TokenType.STRING_VALUE
+                )
+            ]
+        )
 
     def test_nonstring_values(self):
         self._test_tokens(
-            [textpb.Token(text='ENUM', type=textpb.TokenType.OTHER_VALUE)])
+            [textpb.Token(text="ENUM", type=textpb.TokenType.OTHER_VALUE)]
+        )
         self._test_tokens(
-            [
-                textpb.Token(
-                    text='OTHER_ENUM', type=textpb.TokenType.OTHER_VALUE)
-            ])
+            [textpb.Token(text="OTHER_ENUM", type=textpb.TokenType.OTHER_VALUE)]
+        )
         self._test_tokens(
-            [textpb.Token(text='123', type=textpb.TokenType.OTHER_VALUE)])
+            [textpb.Token(text="123", type=textpb.TokenType.OTHER_VALUE)]
+        )
 
     def test_combination(self):
         self._test_tokens(
             [
                 textpb.Token(
-                    text='field_name:', type=textpb.TokenType.FIELD_NAME),
-                textpb.Token(text=' ', type=textpb.TokenType.SPACE),
-                textpb.Token(text='{', type=textpb.TokenType.START_BLOCK),
-                textpb.Token(text='\n', type=textpb.TokenType.NEWLINE),
-                textpb.Token(text='key:', type=textpb.TokenType.FIELD_NAME),
-                textpb.Token(text=' ', type=textpb.TokenType.SPACE),
+                    text="field_name:", type=textpb.TokenType.FIELD_NAME
+                ),
+                textpb.Token(text=" ", type=textpb.TokenType.SPACE),
+                textpb.Token(text="{", type=textpb.TokenType.START_BLOCK),
+                textpb.Token(text="\n", type=textpb.TokenType.NEWLINE),
+                textpb.Token(text="key:", type=textpb.TokenType.FIELD_NAME),
+                textpb.Token(text=" ", type=textpb.TokenType.SPACE),
                 textpb.Token(
                     text='"path/to/something"',
-                    type=textpb.TokenType.STRING_VALUE),
-                textpb.Token(text='\n', type=textpb.TokenType.NEWLINE),
-                textpb.Token(text='value:', type=textpb.TokenType.FIELD_NAME),
-                textpb.Token(text=' ', type=textpb.TokenType.SPACE),
-                textpb.Token(text='9827364', type=textpb.TokenType.OTHER_VALUE),
-                textpb.Token(text='\n', type=textpb.TokenType.NEWLINE),
-                textpb.Token(text='}', type=textpb.TokenType.END_BLOCK),
-                textpb.Token(text='\n', type=textpb.TokenType.NEWLINE),
-            ])
+                    type=textpb.TokenType.STRING_VALUE,
+                ),
+                textpb.Token(text="\n", type=textpb.TokenType.NEWLINE),
+                textpb.Token(text="value:", type=textpb.TokenType.FIELD_NAME),
+                textpb.Token(text=" ", type=textpb.TokenType.SPACE),
+                textpb.Token(text="9827364", type=textpb.TokenType.OTHER_VALUE),
+                textpb.Token(text="\n", type=textpb.TokenType.NEWLINE),
+                textpb.Token(text="}", type=textpb.TokenType.END_BLOCK),
+                textpb.Token(text="\n", type=textpb.TokenType.NEWLINE),
+            ]
+        )
 
 
 class AutoDictTests(unittest.TestCase):
-
     def test_empty(self):
         self.assertEqual(textpb._auto_dict([]), [])
 
     def test_not_dict(self):
-        v = ['VAL1', 'VAL2']
+        v = ["VAL1", "VAL2"]
         self.assertEqual(textpb._auto_dict(v), v)
 
     def test_single(self):
@@ -136,16 +157,16 @@ class AutoDictTests(unittest.TestCase):
             textpb._auto_dict(
                 [
                     {
-                        'key':
-                            [
-                                textpb.Token(
-                                    text='"foo"',
-                                    type=textpb.TokenType.STRING_VALUE)
-                            ],
-                        'value': ['BAR']
+                        "key": [
+                            textpb.Token(
+                                text='"foo"', type=textpb.TokenType.STRING_VALUE
+                            )
+                        ],
+                        "value": ["BAR"],
                     }
-                ]),
-            {'foo': 'BAR'},
+                ]
+            ),
+            {"foo": "BAR"},
         )
 
     def test_multiple(self):
@@ -153,33 +174,31 @@ class AutoDictTests(unittest.TestCase):
             textpb._auto_dict(
                 [
                     {
-                        'key':
-                            [
-                                textpb.Token(
-                                    text='"foo"',
-                                    type=textpb.TokenType.STRING_VALUE)
-                            ],
-                        'value': ['BAR'],
+                        "key": [
+                            textpb.Token(
+                                text='"foo"', type=textpb.TokenType.STRING_VALUE
+                            )
+                        ],
+                        "value": ["BAR"],
                     },
                     {
-                        'key':
-                            [
-                                textpb.Token(
-                                    text='"moo"',
-                                    type=textpb.TokenType.STRING_VALUE)
-                            ],
-                        'value': ['COW'],
+                        "key": [
+                            textpb.Token(
+                                text='"moo"', type=textpb.TokenType.STRING_VALUE
+                            )
+                        ],
+                        "value": ["COW"],
                     },
-                ]),
+                ]
+            ),
             {
-                'foo': 'BAR',
-                'moo': 'COW',
+                "foo": "BAR",
+                "moo": "COW",
             },
         )
 
 
 class ParseTests(unittest.TestCase):
-
     def test_empty(self):
         self.assertEqual(
             textpb.parse([]),
@@ -188,36 +207,37 @@ class ParseTests(unittest.TestCase):
 
     def test_one_field(self):
         self.assertEqual(
-            textpb.parse(['cost: 24']),
+            textpb.parse(["cost: 24"]),
             {
-                'cost':
-                    [
-                        textpb.Token(
-                            text='24', type=textpb.TokenType.OTHER_VALUE)
-                    ]
+                "cost": [
+                    textpb.Token(text="24", type=textpb.TokenType.OTHER_VALUE)
+                ]
             },
         )
 
     def test_one_field_empty_struct(self):
         self.assertEqual(
-            textpb.parse(['tools: {}']),
-            {'tools': [dict()]},
+            textpb.parse(["tools: {}"]),
+            {"tools": [dict()]},
         )
 
     def test_repeated_field(self):
         self.assertEqual(
-            textpb.parse([
-                'alias: "ab"',
-                'alias: "cd"',
-            ]),
+            textpb.parse(
+                [
+                    'alias: "ab"',
+                    'alias: "cd"',
+                ]
+            ),
             {
-                'alias':
-                    [
-                        textpb.Token(
-                            text='"ab"', type=textpb.TokenType.STRING_VALUE),
-                        textpb.Token(
-                            text='"cd"', type=textpb.TokenType.STRING_VALUE),
-                    ]
+                "alias": [
+                    textpb.Token(
+                        text='"ab"', type=textpb.TokenType.STRING_VALUE
+                    ),
+                    textpb.Token(
+                        text='"cd"', type=textpb.TokenType.STRING_VALUE
+                    ),
+                ]
             },
         )
 
@@ -225,30 +245,27 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(
             textpb.parse(
                 [
-                    'outer: {'
-                    '  inner: {',
-                    '    status: GOOD',
-                    '  }',
-                    '}',
-                ]),
+                    "outer: {" "  inner: {",
+                    "    status: GOOD",
+                    "  }",
+                    "}",
+                ]
+            ),
             {
-                'outer':
-                    [
-                        {
-                            'inner':
-                                [
-                                    {
-                                        'status':
-                                            [
-                                                textpb.Token(
-                                                    text='GOOD',
-                                                    type=textpb.TokenType.
-                                                    OTHER_VALUE)
-                                            ]
-                                    }
+                "outer": [
+                    {
+                        "inner": [
+                            {
+                                "status": [
+                                    textpb.Token(
+                                        text="GOOD",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
                                 ]
-                        }
-                    ]
+                            }
+                        ]
+                    }
+                ]
             },
         )
 
@@ -256,47 +273,43 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(
             textpb.parse(
                 [
-                    'outer: {'
-                    '  inner: {',
-                    '    status: GOOD',
-                    '  }',
-                    '  middle: 77',
-                    '  middle: 55',
-                    '}',
+                    "outer: {" "  inner: {",
+                    "    status: GOOD",
+                    "  }",
+                    "  middle: 77",
+                    "  middle: 55",
+                    "}",
                     'magic: "wand"',
-                ]),
+                ]
+            ),
             {
-                'outer':
-                    [
-                        {
-                            'inner':
-                                [
-                                    {
-                                        'status':
-                                            [
-                                                textpb.Token(
-                                                    text='GOOD',
-                                                    type=textpb.TokenType.
-                                                    OTHER_VALUE)
-                                            ]
-                                    }
-                                ],
-                            'middle':
-                                [
+                "outer": [
+                    {
+                        "inner": [
+                            {
+                                "status": [
                                     textpb.Token(
-                                        text='77',
-                                        type=textpb.TokenType.OTHER_VALUE),
-                                    textpb.Token(
-                                        text='55',
-                                        type=textpb.TokenType.OTHER_VALUE)
-                                ],
-                        }
-                    ],
-                'magic':
-                    [
-                        textpb.Token(
-                            text='"wand"', type=textpb.TokenType.STRING_VALUE)
-                    ],
+                                        text="GOOD",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
+                                ]
+                            }
+                        ],
+                        "middle": [
+                            textpb.Token(
+                                text="77", type=textpb.TokenType.OTHER_VALUE
+                            ),
+                            textpb.Token(
+                                text="55", type=textpb.TokenType.OTHER_VALUE
+                            ),
+                        ],
+                    }
+                ],
+                "magic": [
+                    textpb.Token(
+                        text='"wand"', type=textpb.TokenType.STRING_VALUE
+                    )
+                ],
             },
         )
 
@@ -304,137 +317,121 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(
             textpb.parse(
                 [
-                    'outer: {'
-                    '  inner: {',
+                    "outer: {" "  inner: {",
                     '    key: "aaa"',
-                    '    value: {',
-                    '      size: 44',
-                    '      status: BAD',
-                    '      attributes: {',
+                    "    value: {",
+                    "      size: 44",
+                    "      status: BAD",
+                    "      attributes: {",
                     '        key: "secret"',
                     '        value: "de4db33f"',
-                    '      }',
-                    '      attributes: {',
+                    "      }",
+                    "      attributes: {",
                     '        key: "output"',
                     '        value: "ff/gg"',
-                    '      }',
-                    '    }',
-                    '  }',
-                    '  inner: {',
+                    "      }",
+                    "    }",
+                    "  }",
+                    "  inner: {",
                     '    key: "bbb"',
-                    '    value: {',
-                    '      size: 33',
-                    '      status: GOOD',
-                    '      attributes: {',
+                    "    value: {",
+                    "      size: 33",
+                    "      status: GOOD",
+                    "      attributes: {",
                     '        key: "secret"',
                     '        value: "0000aaaa"',
-                    '      }',
-                    '      attributes: {',
+                    "      }",
+                    "      attributes: {",
                     '        key: "output"',
                     '        value: "pp/qq"',
-                    '      }',
-                    '    }',
-                    '  }',
-                    '}',
-                ]),
+                    "      }",
+                    "    }",
+                    "  }",
+                    "}",
+                ]
+            ),
             {
-                'outer':
-                    [
-                        {
-                            'inner':
-                                {
-                                    'aaa':
-                                        {
-                                            'size':
-                                                [
-                                                    textpb.Token(
-                                                        text='44',
-                                                        type=textpb.TokenType.
-                                                        OTHER_VALUE)
-                                                ],
-                                            'status':
-                                                [
-                                                    textpb.Token(
-                                                        text='BAD',
-                                                        type=textpb.TokenType.
-                                                        OTHER_VALUE)
-                                                ],
-                                            'attributes':
-                                                {
-                                                    'secret':
-                                                        textpb.Token(
-                                                            text='"de4db33f"',
-                                                            type=textpb.
-                                                            TokenType.
-                                                            STRING_VALUE),
-                                                    'output':
-                                                        textpb.Token(
-                                                            text='"ff/gg"',
-                                                            type=textpb.
-                                                            TokenType.
-                                                            STRING_VALUE),
-                                                }
-                                        },
-                                    'bbb':
-                                        {
-                                            'size':
-                                                [
-                                                    textpb.Token(
-                                                        text='33',
-                                                        type=textpb.TokenType.
-                                                        OTHER_VALUE)
-                                                ],
-                                            'status':
-                                                [
-                                                    textpb.Token(
-                                                        text='GOOD',
-                                                        type=textpb.TokenType.
-                                                        OTHER_VALUE)
-                                                ],
-                                            'attributes':
-                                                {
-                                                    'secret':
-                                                        textpb.Token(
-                                                            text='"0000aaaa"',
-                                                            type=textpb.
-                                                            TokenType.
-                                                            STRING_VALUE),
-                                                    'output':
-                                                        textpb.Token(
-                                                            text='"pp/qq"',
-                                                            type=textpb.
-                                                            TokenType.
-                                                            STRING_VALUE),
-                                                }
-                                        },
-                                }
+                "outer": [
+                    {
+                        "inner": {
+                            "aaa": {
+                                "size": [
+                                    textpb.Token(
+                                        text="44",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
+                                ],
+                                "status": [
+                                    textpb.Token(
+                                        text="BAD",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
+                                ],
+                                "attributes": {
+                                    "secret": textpb.Token(
+                                        text='"de4db33f"',
+                                        type=textpb.TokenType.STRING_VALUE,
+                                    ),
+                                    "output": textpb.Token(
+                                        text='"ff/gg"',
+                                        type=textpb.TokenType.STRING_VALUE,
+                                    ),
+                                },
+                            },
+                            "bbb": {
+                                "size": [
+                                    textpb.Token(
+                                        text="33",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
+                                ],
+                                "status": [
+                                    textpb.Token(
+                                        text="GOOD",
+                                        type=textpb.TokenType.OTHER_VALUE,
+                                    )
+                                ],
+                                "attributes": {
+                                    "secret": textpb.Token(
+                                        text='"0000aaaa"',
+                                        type=textpb.TokenType.STRING_VALUE,
+                                    ),
+                                    "output": textpb.Token(
+                                        text='"pp/qq"',
+                                        type=textpb.TokenType.STRING_VALUE,
+                                    ),
+                                },
+                            },
                         }
-                    ]
+                    }
+                ]
             },
         )
 
     def test_unbalanced_close_block(self):
-        with self.assertRaisesRegex(textpb.ParseError,
-                                    'Unexpected end-of-block'):
-            textpb.parse(['}'])
+        with self.assertRaisesRegex(
+            textpb.ParseError, "Unexpected end-of-block"
+        ):
+            textpb.parse(["}"])
 
     def test_unbalanced_open_block(self):
-        with self.assertRaisesRegex(textpb.ParseError, 'Unexpected EOF'):
-            textpb.parse(['foo: {'])
+        with self.assertRaisesRegex(textpb.ParseError, "Unexpected EOF"):
+            textpb.parse(["foo: {"])
 
     def test_missing_value(self):
-        with self.assertRaisesRegex(textpb.ParseError, 'Unexpected EOF'):
-            textpb.parse(['foo: '])
+        with self.assertRaisesRegex(textpb.ParseError, "Unexpected EOF"):
+            textpb.parse(["foo: "])
 
     def test_expected_field(self):
-        with self.assertRaisesRegex(textpb.ParseError, 'Expected a field name'):
+        with self.assertRaisesRegex(textpb.ParseError, "Expected a field name"):
             textpb.parse(['"value"'])
 
     def test_expected_value(self):
-        with self.assertRaisesRegex(textpb.ParseError,
-                                    'Unexpected token: .*END_BLOCK'):
-            textpb.parse(['foo: }'])
+        with self.assertRaisesRegex(
+            textpb.ParseError, "Unexpected token: .*END_BLOCK"
+        ):
+            textpb.parse(["foo: }"])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -30,13 +30,16 @@ for gs in group_specs:
 def output_html(buckets):
     nodes = []
     node_id = 1
-    snaphot_name = 'Snapshot'
+    snaphot_name = "Snapshot"
     for b in buckets:
         if b.size == 0:
             continue
         nodes.append([b.name, snaphot_name, 0])
         for processes, vmos in b.processes.items():
-            process_name = "[%d] %s" % (node_id, ",".join([p.name for p in processes]))
+            process_name = "[%d] %s" % (
+                node_id,
+                ",".join([p.name for p in processes]),
+            )
             node_id += 1
             nodes.append([process_name, b.name, 0])
             groups = {}
@@ -53,12 +56,14 @@ def output_html(buckets):
                             nodes.append([group_name, process_name, 0])
                         break
                 vmo_name = "%s<%d>" % (v.name, v.koid)
-                nodes.append([
-                    vmo_name,
-                    process_name if group_name is None else group_name,
-                    v.committed_bytes
-                ])
-    template = '''\
+                nodes.append(
+                    [
+                        vmo_name,
+                        process_name if group_name is None else group_name,
+                        v.committed_bytes,
+                    ]
+                )
+    template = """\
 <html>
   <head>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
@@ -100,26 +105,29 @@ def output_html(buckets):
     <div id="chart_div" style="width: 100%%; height: 100%%;"></div>
   </body>
 </html>
-'''
-    node_strings = '\n'.join([
-        "[\'%s\',\'%s\',%.2g]," % (n[0], n[1], round(n[2] / (1024.0 * 1024), 2))
-        for n in nodes
-    ])
+"""
+    node_strings = "\n".join(
+        [
+            "['%s','%s',%.2g]," % (n[0], n[1], round(n[2] / (1024.0 * 1024), 2))
+            for n in nodes
+        ]
+    )
     print(template % node_strings)
 
 
-
 def main(args):
-    snapshot = Snapshot.FromJSONFile(
-        sys.stdin) if args.snapshot is None else Snapshot.FromJSONFilename(
-            args.snapshot)
+    snapshot = (
+        Snapshot.FromJSONFile(sys.stdin)
+        if args.snapshot is None
+        else Snapshot.FromJSONFilename(args.snapshot)
+    )
     digest = Digest.FromJSONFilename(snapshot, args.digest)
 
     buckets = sorted(digest.buckets.values(), key=lambda b: b.name)
-    if (args.output == "csv"):
+    if args.output == "csv":
         for bucket in buckets:
             print("%s, %d" % (bucket.name, bucket.size))
-    elif (args.output == "html"):
+    elif args.output == "html":
         output_html(buckets)
     else:
         total = 0
@@ -128,7 +136,11 @@ def main(args):
                 continue
             print("%s: %s" % (bucket.name, fmt_size(bucket.size)))
             total += bucket.size
-            if bucket.name != "Undigested" and bucket.processes and args.verbose:
+            if (
+                bucket.name != "Undigested"
+                and bucket.processes
+                and args.verbose
+            ):
                 entries = []
                 for processes, vmos in bucket.processes.items():
                     size = sum([v.committed_bytes for v in vmos])
@@ -149,6 +161,7 @@ def main(args):
                 size = sum([v.committed_bytes for v in vmos])
                 assert size
                 entries.append((processes, size, vmos))
+
             # Sort by largest sharing pool, then size
             def cmp(entry_a, entry_b):
                 if len(entry_b[0]) - len(entry_a[0]):
@@ -168,20 +181,23 @@ def main(args):
                             cnt, ttl = groups.get(v.name, (0, 0))
                             groups[v.name] = (cnt + 1, ttl + v.committed_bytes)
 
-                        for name, (count,
-                                   total) in sorted(groups.items(),
-                                                    key=lambda kv: kv[1][1],
-                                                    reverse=True):
+                        for name, (count, total) in sorted(
+                            groups.items(),
+                            key=lambda kv: kv[1][1],
+                            reverse=True,
+                        ):
                             print(
-                                "\t\t\t%s (%d): %s" %
-                                (name, count, fmt_size(total)))
+                                "\t\t\t%s (%d): %s"
+                                % (name, count, fmt_size(total))
+                            )
                     elif args.extra_verbose:
                         # Print "em all
                         print("\t\t%s VMOs:" % process.full_name)
                         for v in sorted(vmos, key=lambda v: v.name):
                             print(
-                                "\t\t\t%s[%d]: %s" %
-                                (v.name, v.koid, fmt_size(v.committed_bytes)))
+                                "\t\t\t%s[%d]: %s"
+                                % (v.name, v.koid, fmt_size(v.committed_bytes))
+                            )
 
 
 def fmt_size(num, suffix="B"):
@@ -197,11 +213,17 @@ def get_arg_parser():
     parser.add_argument("-s", "--snapshot")
     parser.add_argument("-d", "--digest")
     parser.add_argument(
-        "-o", "--output", default="human", choices=["csv", "human", "html"])
-    parser.add_argument("-v", "--verbose",
-                        action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("-vv", "--extra_verbose",
-                        action=argparse.BooleanOptionalAction, default=False)
+        "-o", "--output", default="human", choices=["csv", "human", "html"]
+    )
+    parser.add_argument(
+        "-v", "--verbose", action=argparse.BooleanOptionalAction, default=False
+    )
+    parser.add_argument(
+        "-vv",
+        "--extra_verbose",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+    )
     return parser
 
 

@@ -25,12 +25,12 @@ class UserInput(user_input.UserInput):
         self._sl4f: sl4f_transport.SL4F = sl4f
 
     def tap(
-            self,
-            location: custom_types.Coordinate,
-            touch_screen_size: custom_types.Size = user_input.
-        DEFAULTS["TOUCH_SCREEN_SIZE"],
-            tap_event_count: int = user_input.DEFAULTS["TAP_EVENT_COUNT"],
-            duration: int = user_input.DEFAULTS["DURATION"]) -> None:
+        self,
+        location: custom_types.Coordinate,
+        touch_screen_size: custom_types.Size = user_input.DEFAULTS["TOUCH_SCREEN_SIZE"],
+        tap_event_count: int = user_input.DEFAULTS["TAP_EVENT_COUNT"],
+        duration: int = user_input.DEFAULTS["DURATION"],
+    ) -> None:
         """Instantiates Taps at coordinates (x, y) for a touchscreen with
            default or custom width, height, duration, and tap event counts.
 

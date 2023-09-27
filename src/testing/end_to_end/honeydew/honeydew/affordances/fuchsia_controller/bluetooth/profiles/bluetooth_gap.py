@@ -8,6 +8,5 @@ from honeydew.affordances.fuchsia_controller.bluetooth import bluetooth_common
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 
 
-class BluetoothGap(bluetooth_common.BluetoothCommon,
-                   bluetooth_gap.BluetoothGap):
+class BluetoothGap(bluetooth_common.BluetoothCommon, bluetooth_gap.BluetoothGap):
     """BluetoothGap affordance implementation using Fuchsia-Controller."""

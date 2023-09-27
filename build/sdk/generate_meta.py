@@ -11,57 +11,70 @@ from sdk_common import Atom
 
 
 def sort_atoms(atoms):
-
     def key(ad):
-        return (ad['meta'], ad['type'])
+        return (ad["meta"], ad["type"])
 
     return sorted(
-        ({
-            'meta': a.metadata,
-            'type': a.type,
-        } for a in atoms), key=key)
+        (
+            {
+                "meta": a.metadata,
+                "type": a.type,
+            }
+            for a in atoms
+        ),
+        key=key,
+    )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--manifest', help='Path to the SDK\'s manifest file', required=True)
+        "--manifest", help="Path to the SDK's manifest file", required=True
+    )
     parser.add_argument(
-        '--meta', help='Path to output metadata file', required=True)
+        "--meta", help="Path to output metadata file", required=True
+    )
     parser.add_argument(
-        '--target-arch',
-        help='Architecture of precompiled target atoms',
-        required=True)
+        "--target-arch",
+        help="Architecture of precompiled target atoms",
+        required=True,
+    )
     parser.add_argument(
-        '--host-arch', help='Architecture of host tools', required=True)
+        "--host-arch", help="Architecture of host tools", required=True
+    )
     parser.add_argument(
-        '--id', help='Opaque identifier for the SDK', default='')
+        "--id", help="Opaque identifier for the SDK", default=""
+    )
     parser.add_argument(
-        '--schema-version',
-        help='Opaque identifier for the metadata schemas',
-        required=True)
+        "--schema-version",
+        help="Opaque identifier for the metadata schemas",
+        required=True,
+    )
     args = parser.parse_args()
 
-    with open(args.manifest, 'r') as manifest_file:
+    with open(args.manifest, "r") as manifest_file:
         manifest = json.load(manifest_file)
 
     # sdk_noop_atoms may contain empty meta, skip them.
-    atoms = [Atom(a) for a in manifest['atoms'] if a['meta']]
+    atoms = [Atom(a) for a in manifest["atoms"] if a["meta"]]
     meta = {
-        'arch': {
-            'host': args.host_arch,
-            'target': [args.target_arch,],
+        "arch": {
+            "host": args.host_arch,
+            "target": [
+                args.target_arch,
+            ],
         },
-        'id': args.id,
-        'parts': sort_atoms(atoms),
-        'root': manifest['root'],
-        'schema_version': args.schema_version,
+        "id": args.id,
+        "parts": sort_atoms(atoms),
+        "root": manifest["root"],
+        "schema_version": args.schema_version,
     }
 
-    with open(args.meta, 'w') as meta_file:
+    with open(args.meta, "w") as meta_file:
         json.dump(
-            meta, meta_file, indent=2, sort_keys=True, separators=(',', ': '))
+            meta, meta_file, indent=2, sort_keys=True, separators=(",", ": ")
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

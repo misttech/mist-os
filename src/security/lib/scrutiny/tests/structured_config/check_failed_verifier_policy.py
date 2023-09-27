@@ -16,27 +16,32 @@ expected_value_in_policy = "check this string!"
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Check that a 'bad' config is rejected.")
+        description="Check that a 'bad' config is rejected."
+    )
     parser.add_argument(
         "--ffx-bin",
         type=pathlib.Path,
         required=True,
-        help="Path to the ffx binary.")
+        help="Path to the ffx binary.",
+    )
     parser.add_argument(
         "--policy",
         type=pathlib.Path,
         required=True,
-        help="Path to JSON5 policy file which should produce errors.")
+        help="Path to JSON5 policy file which should produce errors.",
+    )
     parser.add_argument(
         "--depfile",
         type=pathlib.Path,
         required=True,
-        help="Path to ninja depfile to write.")
+        help="Path to ninja depfile to write.",
+    )
     parser.add_argument(
         "--product-bundle",
         type=pathlib.Path,
         required=True,
-        help="Path to the product bundle.")
+        help="Path to the product bundle.",
+    )
     args = parser.parse_args()
 
     # Assume we're in the root build dir right now and that is where we'll find ffx env.
@@ -70,12 +75,14 @@ def main():
 
     output = subprocess.run(ffx_args, capture_output=True)
     test.assertNotEqual(
-        output.returncode, 0, "ffx scrutiny verify must have failed")
+        output.returncode, 0, "ffx scrutiny verify must have failed"
+    )
 
-    stderr = output.stderr.decode('UTF-8')
+    stderr = output.stderr.decode("UTF-8")
     expected_error = f"""
 └── fuchsia-pkg://fuchsia.com/{package_name}#meta/{component_name}.cm
       └── `asserted_by_scrutiny_test` has a different value ("{expected_value_in_policy}") than expected ("not the string that was packaged").
       └── `verifier_fails_due_to_mutability_parent` has an expected value in the policy which could be overridden at runtime by PARENT."""
     test.assertIn(
-        expected_error, stderr, "error message must contain expected failures")
+        expected_error, stderr, "error message must contain expected failures"
+    )

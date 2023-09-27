@@ -18,15 +18,16 @@ import os
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Prepare a distribution manifest for bootfs files")
-    parser.add_argument('--input', type=argparse.FileType('r'), required=True)
-    parser.add_argument('--output', type=argparse.FileType('w'), required=True)
+        description="Prepare a distribution manifest for bootfs files"
+    )
+    parser.add_argument("--input", type=argparse.FileType("r"), required=True)
+    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
     args = parser.parse_args()
 
     manifest = json.load(args.input)
     for entry in manifest:
-        if 'destination' in entry and entry['destination'].startswith('meta/'):
-            entry['destination'] = os.path.join('bootfs', entry['destination'])
+        if "destination" in entry and entry["destination"].startswith("meta/"):
+            entry["destination"] = os.path.join("bootfs", entry["destination"])
     json.dump(manifest, args.output, indent=4)
 
 

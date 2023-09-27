@@ -38,7 +38,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     update_package_manifest_missing_merkle = json.loads(
         """
@@ -62,7 +63,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     same_package_manifest = json.loads(
         """
@@ -87,7 +89,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     extra_package_manifest = json.loads(
         """
@@ -118,7 +121,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     missing_package_manifest = json.loads(
         """
@@ -143,7 +147,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     bad_version_package_manifest = json.loads(
         """
@@ -168,7 +173,8 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     bad_version_type_package_manifest = json.loads(
         """
@@ -193,46 +199,61 @@ class VerifyUpdatePackageResourcesTests(unittest.TestCase):
             }
         ]
     }
-    """)
+    """
+    )
 
     def test_same(self):
         self.assertIsNone(
             verify_update_package_resources(
                 VerifyUpdatePackageResourcesTests.same_package_manifest,
-                VerifyUpdatePackageResourcesTests.update_package_manifest))
+                VerifyUpdatePackageResourcesTests.update_package_manifest,
+            )
+        )
 
     def test_missing_merkle(self):
         self.assertRaises(
-            Exception, lambda: verify_update_package_resources(
+            Exception,
+            lambda: verify_update_package_resources(
                 VerifyUpdatePackageResourcesTests.same_package_manifest,
-                VerifyUpdatePackageResourcesTests.
-                update_package_manifest_missing_merkle))
+                VerifyUpdatePackageResourcesTests.update_package_manifest_missing_merkle,
+            ),
+        )
 
     def test_extra(self):
         self.assertIsNone(
             verify_update_package_resources(
                 VerifyUpdatePackageResourcesTests.extra_package_manifest,
-                VerifyUpdatePackageResourcesTests.update_package_manifest))
+                VerifyUpdatePackageResourcesTests.update_package_manifest,
+            )
+        )
 
     def test_missing(self):
         self.assertRaises(
-            Exception, lambda: verify_update_package_resources(
+            Exception,
+            lambda: verify_update_package_resources(
                 VerifyUpdatePackageResourcesTests.missing_package_manifest,
-                VerifyUpdatePackageResourcesTests.update_package_manifest))
+                VerifyUpdatePackageResourcesTests.update_package_manifest,
+            ),
+        )
 
     def test_bad_version(self):
         self.assertRaises(
-            ValueError, lambda: verify_update_package_resources(
+            ValueError,
+            lambda: verify_update_package_resources(
                 VerifyUpdatePackageResourcesTests.bad_version_package_manifest,
-                VerifyUpdatePackageResourcesTests.update_package_manifest))
+                VerifyUpdatePackageResourcesTests.update_package_manifest,
+            ),
+        )
 
     def test_bad_version_type(self):
         self.assertRaises(
-            ValueError, lambda: verify_update_package_resources(
-                VerifyUpdatePackageResourcesTests.
-                bad_version_type_package_manifest,
-                VerifyUpdatePackageResourcesTests.update_package_manifest))
+            ValueError,
+            lambda: verify_update_package_resources(
+                VerifyUpdatePackageResourcesTests.bad_version_type_package_manifest,
+                VerifyUpdatePackageResourcesTests.update_package_manifest,
+            ),
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

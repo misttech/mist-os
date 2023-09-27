@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-__all__ = ['STYLES']
+__all__ = ["STYLES"]
 
 from dataclasses import dataclass
 from typing import List, Callable, Tuple
@@ -19,14 +19,14 @@ def style(func):
 
 @style
 def lower(ident):
-    return '_'.join(w.lower() for w in ident)
+    return "_".join(w.lower() for w in ident)
 
 
 @style
 def upper(ident):
-    return '_'.join(w.upper() for w in ident)
+    return "_".join(w.upper() for w in ident)
 
 
 @style
 def camel(ident):
-    return ''.join(w.capitalize() for w in ident)
+    return "".join(w.capitalize() for w in ident)

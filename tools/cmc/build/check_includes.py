@@ -13,69 +13,76 @@ import sys
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--cmc-path',
-        help='Path to cmc binary.',
+        "--cmc-path",
+        help="Path to cmc binary.",
         type=pathlib.Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        '--stamp',
-        help='Path to stamp file to write.',
+        "--stamp",
+        help="Path to stamp file to write.",
         type=pathlib.Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        '--manifest-metadata',
-        help='Path to JSON file with a length-1 list of component manifests.',
-        type=argparse.FileType('r'),
-        required=True)
+        "--manifest-metadata",
+        help="Path to JSON file with a length-1 list of component manifests.",
+        type=argparse.FileType("r"),
+        required=True,
+    )
     parser.add_argument(
-        '--fromfile',
-        help='Path to list of expected includes.',
+        "--fromfile",
+        help="Path to list of expected includes.",
         type=pathlib.Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        '--depfile',
-        help='Path to depfile to write.',
+        "--depfile",
+        help="Path to depfile to write.",
         type=pathlib.Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        '--includeroot',
-        help='Path to root of includes.',
+        "--includeroot",
+        help="Path to root of includes.",
         type=pathlib.Path,
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        '--includepath',
-        help='Additional path for relative includes.',
+        "--includepath",
+        help="Additional path for relative includes.",
         type=pathlib.Path,
-        nargs='+')
+        nargs="+",
+    )
     args = parser.parse_args()
 
     with args.manifest_metadata as f:
         manifest_paths = json.load(f)
 
     if len(manifest_paths) != 1:
-        print('Manifest metadata from GN must include exactly 1 source path.')
+        print("Manifest metadata from GN must include exactly 1 source path.")
         return 1
     manifest_path = manifest_paths[0]
 
     cmc_args = [
         args.cmc_path,
-        '--stamp',
+        "--stamp",
         args.stamp,
-        'check-includes',
+        "check-includes",
         manifest_path,
-        '--fromfile',
+        "--fromfile",
         args.fromfile,
-        '--depfile',
+        "--depfile",
         args.depfile,
-        '--includeroot',
+        "--includeroot",
         args.includeroot,
     ]
 
     for p in args.includepath:
-        cmc_args += ['--includepath', p]
+        cmc_args += ["--includepath", p]
 
     return subprocess.run(cmc_args).returncode
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

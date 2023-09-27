@@ -17,10 +17,12 @@ from honeydew import custom_types
 from honeydew import device_classes
 from honeydew import errors
 from honeydew import transports
-from honeydew.device_classes.fuchsia_controller import \
-    generic_fuchsia_device as fc_generic_fuchsia_device
-from honeydew.device_classes.sl4f import \
-    generic_fuchsia_device as sl4f_generic_fuchsia_device
+from honeydew.device_classes.fuchsia_controller import (
+    generic_fuchsia_device as fc_generic_fuchsia_device,
+)
+from honeydew.device_classes.sl4f import (
+    generic_fuchsia_device as sl4f_generic_fuchsia_device,
+)
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import properties
@@ -38,7 +40,7 @@ def create_device(
     ssh_private_key: Optional[str] = None,
     ssh_user: Optional[str] = None,
     transport: Optional[transports.TRANSPORT] = None,
-    device_ip_port: Optional[custom_types.IpPort] = None
+    device_ip_port: Optional[custom_types.IpPort] = None,
 ) -> fuchsia_device.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -77,17 +79,19 @@ def create_device(
 
     try:
         device_class: Type[fuchsia_device.FuchsiaDevice] = _get_device_class(
-            device_name, transport)
+            device_name, transport
+        )
         return device_class(
-            device_name, ssh_private_key, ssh_user)  # type: ignore[call-arg]
+            device_name, ssh_private_key, ssh_user
+        )  # type: ignore[call-arg]
     except Exception as err:
         raise errors.FuchsiaDeviceError(
-            f"Failed to create device for '{device_name}'") from err
+            f"Failed to create device for '{device_name}'"
+        ) from err
 
 
 def get_all_affordances(
-    device_name: str,
-    transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT
+    device_name: str, transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT
 ) -> List[str]:
     """Returns list of all affordances implemented for this device class.
 
@@ -104,7 +108,8 @@ def get_all_affordances(
         List of affordances implemented for this device class.
     """
     device_class: Type[fuchsia_device.FuchsiaDevice] = _get_device_class(
-        device_name, transport)
+        device_name, transport
+    )
 
     affordances: List[str] = []
     for attr in dir(device_class):
@@ -117,7 +122,7 @@ def get_all_affordances(
 
 
 def get_device_classes(
-        device_classes_path: str, device_classes_module_name: str
+    device_classes_path: str, device_classes_module_name: str
 ) -> Set[Type[fuchsia_device.FuchsiaDevice]]:
     """Get set of all device classes located in specified path and module name.
 
@@ -143,7 +148,8 @@ def get_device_classes(
     """
     fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]] = set()
     for _, module_name, ispkg in pkgutil.walk_packages(
-        [device_classes_path], device_classes_module_name + "."):
+        [device_classes_path], device_classes_module_name + "."
+    ):
         if ispkg:
             continue
 
@@ -151,7 +157,8 @@ def get_device_classes(
             continue
 
         module: types.ModuleType = importlib.import_module(
-            module_name, package=device_classes_module_name)
+            module_name, package=device_classes_module_name
+        )
 
         # Iterate items inside imported python file
         for item in dir(module):
@@ -174,7 +181,7 @@ def get_device_classes(
 
 
 def register_device_classes(
-        fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]]
+    fuchsia_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]],
 ) -> None:
     """Registers a custom fuchsia device classes implementation.
 
@@ -182,13 +189,13 @@ def register_device_classes(
         fuchsia_device_classes: Set of fuchsia device class modules
     """
     _LOGGER.info(
-        "Registering device classes '%s' with HoneyDew", fuchsia_device_classes)
+        "Registering device classes '%s' with HoneyDew", fuchsia_device_classes
+    )
     _REGISTERED_DEVICE_CLASSES.update(fuchsia_device_classes)
 
 
 # List all the private methods in alphabetical order
-def _get_all_register_device_classes(
-) -> Set[Type[fuchsia_device.FuchsiaDevice]]:
+def _get_all_register_device_classes() -> Set[Type[fuchsia_device.FuchsiaDevice]]:
     """Get list of all custom fuchsia device class implementations registered
     with HoneyDew.
 
@@ -196,22 +203,21 @@ def _get_all_register_device_classes(
         Set of all the registered device classes
     """
     device_classes_path: str = os.path.dirname(device_classes.__file__)
-    this_package_device_classes: Set[Type[
-        fuchsia_device.FuchsiaDevice]] = get_device_classes(
-            device_classes_path, _DEVICE_CLASSES_MODULE)
+    this_package_device_classes: Set[
+        Type[fuchsia_device.FuchsiaDevice]
+    ] = get_device_classes(device_classes_path, _DEVICE_CLASSES_MODULE)
 
-    all_device_classes: Set[Type[
-        fuchsia_device.FuchsiaDevice]] = _REGISTERED_DEVICE_CLASSES.union(
-            this_package_device_classes)
+    all_device_classes: Set[
+        Type[fuchsia_device.FuchsiaDevice]
+    ] = _REGISTERED_DEVICE_CLASSES.union(this_package_device_classes)
 
-    _LOGGER.info(
-        "Registered device classes with HoneyDew '%s'", all_device_classes)
+    _LOGGER.info("Registered device classes with HoneyDew '%s'", all_device_classes)
     return all_device_classes
 
 
 def _get_device_class(
-        device_name: str,
-        transport: transports.TRANSPORT) -> Type[fuchsia_device.FuchsiaDevice]:
+    device_name: str, transport: transports.TRANSPORT
+) -> Type[fuchsia_device.FuchsiaDevice]:
     """Returns device class associated with the device for specified transport.
 
     Args:
@@ -225,35 +231,44 @@ def _get_device_class(
     product_type: str = ffx.get_target_type()
 
     for device_class in _get_all_register_device_classes():
-        if product_type.lower() == device_class.__name__.lower() \
-            and transport.value in device_class.__module__:
+        if (
+            product_type.lower() == device_class.__name__.lower()
+            and transport.value in device_class.__module__
+        ):
             _LOGGER.info(
                 "Found matching device class implementation for '%s' as '%s'",
-                device_name, device_class.__name__)
+                device_name,
+                device_class.__name__,
+            )
             return device_class
     _LOGGER.info(
-        "Didn't find any matching device class implementation for '%s'",
-        device_name)
+        "Didn't find any matching device class implementation for '%s'", device_name
+    )
 
     default_device_class: Optional[Type[fuchsia_device.FuchsiaDevice]] = None
     if transport == transports.TRANSPORT.SL4F:
         default_device_class = sl4f_generic_fuchsia_device.GenericFuchsiaDevice
         _LOGGER.info(
-            "Returning '%s' which is the default implementation for '%s' " \
+            "Returning '%s' which is the default implementation for '%s' "
             "using '%s' transport",
-            default_device_class.__name__, device_name, transport.value)
+            default_device_class.__name__,
+            device_name,
+            transport.value,
+        )
         return default_device_class
     else:  # transports.TRANSPORT.FUCHSIA_CONTROLLER
         default_device_class = fc_generic_fuchsia_device.GenericFuchsiaDevice
     _LOGGER.info(
-        "Returning '%s' which is the default implementation for '%s' " \
+        "Returning '%s' which is the default implementation for '%s' "
         "using '%s' transport",
-        default_device_class.__name__, device_name, transport.value)
+        default_device_class.__name__,
+        device_name,
+        transport.value,
+    )
     return default_device_class
 
 
-def _add_and_verify_device(
-        device_name: str, device_ip_port: custom_types.IpPort):
+def _add_and_verify_device(device_name: str, device_ip_port: custom_types.IpPort):
     """Adds the device to the ffx target collection and verifies names match.
 
     If the device is already in the collection, only verifies names match.
@@ -277,7 +292,8 @@ def _add_and_verify_device(
             raise ValueError(
                 f"Target name reported for IpPort {device_ip_port}, "
                 f"{reported_device_name}, did not match provided "
-                f"device_name {device_name}")
+                f"device_name {device_name}"
+            )
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(f"Failed to add {device_name}") from err
 

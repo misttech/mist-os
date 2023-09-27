@@ -40,8 +40,12 @@ def main():
     with open(args.golden, "r") as f:
         golden = json.load(f)
     if sorting(gen) != sorting(golden):
-        print("Comparison failure!. \n Golden:\n" + str(golden) +
-              "\nGenerated:\n" + str(gen))
+        print(
+            "Comparison failure!. \n Golden:\n"
+            + str(golden)
+            + "\nGenerated:\n"
+            + str(gen)
+        )
         exit(1)
 
 

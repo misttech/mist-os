@@ -10,8 +10,9 @@ from mobly import test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 
-EXAMPLE_URL = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-              "flatland-view-provider.cm"
+EXAMPLE_URL = (
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" "flatland-view-provider.cm"
+)
 
 
 class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -46,12 +47,11 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         image = self.device.screenshot.take()
         asserts.assert_greater(image.size.width, 0)
         asserts.assert_greater(image.size.height, 0)
-        asserts.assert_equal(
-            image.size.width * image.size.height * 4, len(image.data))
+        asserts.assert_equal(image.size.width * image.size.height * 4, len(image.data))
 
         # Example app render a colorful image with color HSV(?, 75 or 30, 75).
         # Ensure the top left pixel is not BGRA(0, 0, 0, 255).
-        asserts.assert_equal(image.data[0:4], [0x0, 0x0, 0x0, 0xff])
+        asserts.assert_equal(image.data[0:4], [0x0, 0x0, 0x0, 0xFF])
 
 
 if __name__ == "__main__":

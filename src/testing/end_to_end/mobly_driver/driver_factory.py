@@ -14,7 +14,7 @@ import local_driver
 import common
 
 
-class DriverFactory():
+class DriverFactory:
     """Factory class for BaseDriver implementations.
 
     This class uses the runtime environment to determine the
@@ -24,10 +24,11 @@ class DriverFactory():
     """
 
     def __init__(
-            self,
-            config_path: Optional[str] = None,
-            params_path: Optional[str] = None,
-            ffx_path: Optional[str] = None) -> None:
+        self,
+        config_path: Optional[str] = None,
+        params_path: Optional[str] = None,
+        ffx_path: Optional[str] = None,
+    ) -> None:
         """Initializes the instance.
         Args:
           config_path: absolute path to the Mobly test config file.
@@ -62,4 +63,5 @@ class DriverFactory():
             )
         except KeyError as e:
             raise common.DriverException(
-                'Unexpected execution environment - missing env var: %s', e)
+                "Unexpected execution environment - missing env var: %s", e
+            )

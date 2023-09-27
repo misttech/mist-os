@@ -23,5 +23,5 @@ class X64Tests(test_fuchsia_device.FuchsiaDeviceTests):
             asserts.assert_is_instance(self.device, sl4f_x64.X64)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

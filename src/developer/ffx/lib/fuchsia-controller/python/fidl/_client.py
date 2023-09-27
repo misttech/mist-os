@@ -16,7 +16,6 @@ TXID: TXID_Type = 0
 
 
 class FidlClient(object):
-
     def __init__(self, channel, channel_waker=None):
         if type(channel) == int:
             self.channel = fc.Channel(channel)
@@ -82,9 +81,9 @@ class FidlClient(object):
                     self.channel = None
                     raise RuntimeError(
                         "Received unexpected TXID. Channel closed and invalid. "
-                        +
-                        "Continuing to use this FIDL client after this exception will result "
-                        + "in undefined behavior")
+                        + "Continuing to use this FIDL client after this exception will result "
+                        + "in undefined behavior"
+                    )
                 self._stage_message(recvd_txid, msg)
             except fc.ZxStatus as e:
                 if e.args[0] != fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
@@ -92,14 +91,16 @@ class FidlClient(object):
                     raise e
             loop = asyncio.get_running_loop()
             channel_waker_task = loop.create_task(
-                self.channel_waker.wait_channel_ready(self.channel))
+                self.channel_waker.wait_channel_ready(self.channel)
+            )
             staged_msg_task = loop.create_task(self._get_staged_message(txid))
             done, pending = await asyncio.wait(
                 [
                     channel_waker_task,
                     staged_msg_task,
                 ],
-                return_when=asyncio.FIRST_COMPLETED)
+                return_when=asyncio.FIRST_COMPLETED,
+            )
             # Both notifications happened at the same time.
             if len(done) == 2:
                 # Order of asyncio.wait is not guaranteed.
@@ -124,7 +125,8 @@ class FidlClient(object):
                 return self._decode(txid, msg)
 
     def _send_two_way_fidl_request(
-            self, ordinal, library, msg_obj, response_ident):
+        self, ordinal, library, msg_obj, response_ident
+    ):
         """Sends a two-way asynchronous FIDL request.
 
         Args:
@@ -152,7 +154,8 @@ class FidlClient(object):
         return result(TXID)
 
     def _send_one_way_fidl_request(
-            self, txid: int, ordinal: int, library: str, msg_obj):
+        self, txid: int, ordinal: int, library: str, msg_obj
+    ):
         """Sends a synchronous one-way FIDL request.
 
         Args:
@@ -168,5 +171,6 @@ class FidlClient(object):
             object=msg_obj,
             library=library,
             txid=txid,
-            type_name=type_name)
+            type_name=type_name,
+        )
         self.channel.write(fidl_message)

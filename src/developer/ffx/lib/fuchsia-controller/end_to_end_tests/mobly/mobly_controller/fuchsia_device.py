@@ -33,7 +33,6 @@ TIMEOUTS: Dict[str, float] = {
 
 
 class FuchsiaDevice(object):
-
     def __init__(self, ctx: Context, config: Dict[str, Any]):
         self.config = config
         self.ctx = ctx
@@ -53,7 +52,8 @@ class FuchsiaDevice(object):
         while time.time() < end_time:
             try:
                 logging.debug(
-                    f"Attempting to get proxy info from {self.config['name']}")
+                    f"Attempting to get proxy info from {self.config['name']}"
+                )
                 target = ffx.Target.Client(self.ctx.connect_target_proxy())
                 info = await target.identity()
                 if info.target_info.rcs_state != ffx.RemoteControlState.UP:
@@ -69,7 +69,8 @@ class FuchsiaDevice(object):
             await asyncio.sleep(TIMEOUTS["SLEEP"])
         else:
             raise TimeoutError(
-                f"'{self.config['name']}' failed to go offline in {timeout}s.")
+                f"'{self.config['name']}' failed to go offline in {timeout}s."
+            )
 
     async def wait_online(self, timeout=TIMEOUTS["ONLINE"]) -> None:
         """Waits for the Fuchsia device to come online.
@@ -90,7 +91,8 @@ class FuchsiaDevice(object):
         while time.time() < end_time:
             try:
                 logging.debug(
-                    f"Attempting to get proxy info from {self.config['name']}")
+                    f"Attempting to get proxy info from {self.config['name']}"
+                )
                 target = ffx.Target.Client(self.ctx.connect_target_proxy())
                 info = await target.identity()
                 if info.target_info.rcs_state == ffx.RemoteControlState.UP:
@@ -104,7 +106,8 @@ class FuchsiaDevice(object):
             await asyncio.sleep(TIMEOUTS["SLEEP"])
         else:
             raise TimeoutError(
-                f"'{self.config['name']}' failed to go offline in {timeout}s.")
+                f"'{self.config['name']}' failed to go offline in {timeout}s."
+            )
 
 
 def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:

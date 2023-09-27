@@ -11,69 +11,64 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--distribution_manifest_file',
-        type=argparse.FileType('r', encoding='UTF-8'),
-        help=
-        'Path to a distribution_manifest file which is a JSON file that contains driver paths.'
+        "--distribution_manifest_file",
+        type=argparse.FileType("r", encoding="UTF-8"),
+        help="Path to a distribution_manifest file which is a JSON file that contains driver paths.",
     )
     parser.add_argument(
-        '--output',
-        type=argparse.FileType('w', encoding='UTF-8'),
-        help='The path where this script will output the driver manifest.')
+        "--output",
+        type=argparse.FileType("w", encoding="UTF-8"),
+        help="The path where this script will output the driver manifest.",
+    )
     parser.add_argument(
-        '--is_v1',
-        action='store_const',
+        "--is_v1",
+        action="store_const",
         const=True,
         default=False,
-        help=
-        'Generates a DFv1 component manifest. (If this is not included a DFv2 manifest is generated)'
+        help="Generates a DFv1 component manifest. (If this is not included a DFv2 manifest is generated)",
     )
     parser.add_argument(
-        '--colocate',
-        action='store_true',
-        help='If this exists then the driver should be colocated with its parent'
+        "--colocate",
+        action="store_true",
+        help="If this exists then the driver should be colocated with its parent",
     )
     parser.add_argument(
-        '--device_categories_file',
-        help=
-        'A path to a JSON file of device categories to enlist and run the tests for certification'
+        "--device_categories_file",
+        help="A path to a JSON file of device categories to enlist and run the tests for certification",
     )
     parser.add_argument(
-        '--fallback',
-        action='store_true',
-        help='Whether or not the driver is a fallback driver')
-    parser.add_argument(
-        '--root_resource',
-        action='store_true',
-        help='Whether or not to give the driver access to the root resource')
-    parser.add_argument(
-        '--profile_provider',
-        action='store_true',
-        help=
-        'Whether or not to give the driver access to fuchsia.scheduler.ProfileProvider',
+        "--fallback",
+        action="store_true",
+        help="Whether or not the driver is a fallback driver",
     )
     parser.add_argument(
-        '--sysmem',
-        action='store_true',
-        help=
-        'Whether or not to give the driver access to fuchsia.sysmem.Allocator',
+        "--root_resource",
+        action="store_true",
+        help="Whether or not to give the driver access to the root resource",
     )
     parser.add_argument(
-        '--boot_args',
-        action='store_true',
-        help=
-        'Whether or not to give the driver access to fuchsia.boot.Arguments',
+        "--profile_provider",
+        action="store_true",
+        help="Whether or not to give the driver access to fuchsia.scheduler.ProfileProvider",
     )
     parser.add_argument(
-        '--default_dispatcher_opts',
+        "--sysmem",
+        action="store_true",
+        help="Whether or not to give the driver access to fuchsia.sysmem.Allocator",
+    )
+    parser.add_argument(
+        "--boot_args",
+        action="store_true",
+        help="Whether or not to give the driver access to fuchsia.boot.Arguments",
+    )
+    parser.add_argument(
+        "--default_dispatcher_opts",
         nargs="*",
-        help=
-        'A space separated list of options for creating the default dispatcher',
+        help="A space separated list of options for creating the default dispatcher",
     )
     parser.add_argument(
-        '--default_dispatcher_scheduler_role',
-        help=
-        "The scheduler role to set for the default dispatcher created for the driver",
+        "--default_dispatcher_scheduler_role",
+        help="The scheduler role to set for the default dispatcher created for the driver",
     )
 
     args = parser.parse_args()
@@ -84,20 +79,26 @@ def main():
     bind = False
 
     for entry in distribution_manifest:
-        destination = entry['destination']
+        destination = entry["destination"]
         if destination.startswith("driver/"):
             if destination == "driver/compat.so":
                 continue
             if program:
                 raise Exception(
-                    "fuchsia_driver_component cannot depend on two drivers: " +
-                    program + " " + destination)
+                    "fuchsia_driver_component cannot depend on two drivers: "
+                    + program
+                    + " "
+                    + destination
+                )
             program = destination
         if destination.startswith("meta/bind/"):
             if bind:
                 raise Exception(
                     "fuchsia_driver_component cannot depend on two bind programs: "
-                    + bind + " " + destination)
+                    + bind
+                    + " "
+                    + destination
+                )
             bind = destination
 
     if not program:
@@ -106,21 +107,20 @@ def main():
         raise Exception("fuchsia_driver_component must contain a bind file")
 
     manifest = {
-        'program':
-            {
-                'runner': 'driver',
-                'bind': bind,
-                'fallback': 'true' if args.fallback else 'false',
-                'default_dispatcher_opts': ['allow_sync_calls']
-            },
-        'use': []
+        "program": {
+            "runner": "driver",
+            "bind": bind,
+            "fallback": "true" if args.fallback else "false",
+            "default_dispatcher_opts": ["allow_sync_calls"],
+        },
+        "use": [],
     }
     if args.is_v1:
         manifest["program"]["compat"] = program
         manifest["include"] = [
-            'inspect/client.shard.cml',
-            'syslog/client.shard.cml',
-            '//sdk/lib/driver/compat/compat.shard.cml',
+            "inspect/client.shard.cml",
+            "syslog/client.shard.cml",
+            "//sdk/lib/driver/compat/compat.shard.cml",
         ]
     else:
         manifest["program"]["binary"] = program
@@ -133,20 +133,23 @@ def main():
         manifest["program"]["colocate"] = "true"
 
     if args.root_resource:
-        manifest['use'].append({'protocol': "fuchsia.boot.RootResource"})
+        manifest["use"].append({"protocol": "fuchsia.boot.RootResource"})
     if args.profile_provider:
-        manifest['use'].append(
-            {'protocol': "fuchsia.scheduler.ProfileProvider"})
+        manifest["use"].append(
+            {"protocol": "fuchsia.scheduler.ProfileProvider"}
+        )
     if args.sysmem:
-        manifest['use'].append({'protocol': "fuchsia.sysmem.Allocator"})
+        manifest["use"].append({"protocol": "fuchsia.sysmem.Allocator"})
     if args.boot_args:
-        manifest['use'].append({'protocol': "fuchsia.boot.Arguments"})
+        manifest["use"].append({"protocol": "fuchsia.boot.Arguments"})
     if args.default_dispatcher_opts:
         manifest["program"][
-            "default_dispatcher_opts"] = args.default_dispatcher_opts
+            "default_dispatcher_opts"
+        ] = args.default_dispatcher_opts
     if args.default_dispatcher_scheduler_role:
         manifest["program"][
-            "default_dispatcher_scheduler_role"] = args.default_dispatcher_scheduler_role
+            "default_dispatcher_scheduler_role"
+        ] = args.default_dispatcher_scheduler_role
 
     json_manifest = json.dumps(manifest)
     args.output.write(json_manifest)

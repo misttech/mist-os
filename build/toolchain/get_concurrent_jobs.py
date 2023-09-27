@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-UNITS = {'B': 1, 'KB': 2**10, 'MB': 2**20, 'GB': 2**30, 'TB': 2**40}
+UNITS = {"B": 1, "KB": 2**10, "MB": 2**20, "GB": 2**30, "TB": 2**40}
 
 
 def parse_size(string):
@@ -27,27 +27,26 @@ def parse_size(string):
 
 
 class ParseSize(argparse.Action):
-
     def __call__(self, parser, args, values, option_string=None):
         sizes = getattr(args, self.dest, [])
         for value in values:
-            (k, v) = value.split('=', 1)
+            (k, v) = value.split("=", 1)
             sizes.append((k, parse_size(v)))
         setattr(args, self.dest, sizes)
 
 
 def get_total_memory():
-    if sys.platform.startswith('linux'):
+    if sys.platform.startswith("linux"):
         if os.path.exists("/proc/meminfo"):
             with open("/proc/meminfo") as meminfo:
-                memtotal_re = re.compile(r'^MemTotal:\s*(\d*)\s*kB')
+                memtotal_re = re.compile(r"^MemTotal:\s*(\d*)\s*kB")
                 for line in meminfo:
                     match = memtotal_re.match(line)
                     if match:
                         return float(match.group(1)) * 2**10
-    elif sys.platform == 'darwin':
+    elif sys.platform == "darwin":
         try:
-            return int(subprocess.check_output(['sysctl', '-n', 'hw.memsize']))
+            return int(subprocess.check_output(["sysctl", "-n", "hw.memsize"]))
         except Exception:
             return 0
     else:
@@ -57,7 +56,8 @@ def get_total_memory():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--memory-per-job", action=ParseSize, default=[], nargs='*')
+        "--memory-per-job", action=ParseSize, default=[], nargs="*"
+    )
     parser.add_argument("--reserve-memory", type=parse_size, default=0)
     args = parser.parse_args()
 
@@ -77,5 +77,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -27,7 +27,7 @@ _SCRIPT_DIR = Path(__file__).parent
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -48,12 +48,12 @@ class PrebuiltToolAction(object):
     """Generic remote wrapper for running a tool in Fuchsia's prebuilts."""
 
     def __init__(
-            self,
-            argv: Sequence[str],
-            exec_root: Path = None,
-            working_dir: Path = None,
-            host_platform: str = None,
-            auto_reproxy: bool = True,  # can disable for unit-testing
+        self,
+        argv: Sequence[str],
+        exec_root: Path = None,
+        working_dir: Path = None,
+        host_platform: str = None,
+        auto_reproxy: bool = True,  # can disable for unit-testing
     ):
         self._working_dir = (working_dir or Path(os.curdir)).absolute()
         self._exec_root = (exec_root or remote_action.PROJECT_ROOT).absolute()
@@ -65,17 +65,21 @@ class PrebuiltToolAction(object):
         # not '--flag value' because argparse doesn't know what unhandled flags
         # expect values.
         main_argv, self._local_command = remote_action.forward_remote_flags(
-            argv)
+            argv
+        )
 
         # forward all unknown flags to rewrapper
         # --help here will result in early exit()
-        self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-            main_argv)
+        (
+            self._main_args,
+            self._main_remote_options,
+        ) = _MAIN_ARG_PARSER.parse_known_args(main_argv)
 
         # Re-launch with reproxy if needed.
         if auto_reproxy:
             remote_action.auto_relaunch_with_reproxy(
-                script=Path(__file__), argv=argv, args=self._main_args)
+                script=Path(__file__), argv=argv, args=self._main_args
+            )
 
         if not self.local_command:  # there is no command, bail out early
             return
@@ -108,15 +112,16 @@ class PrebuiltToolAction(object):
     @property
     def command_line_inputs(self) -> Sequence[Path]:
         return [
-            Path(p)
-            for p in cl_utils.flatten_comma_list(self._main_args.inputs)
+            Path(p) for p in cl_utils.flatten_comma_list(self._main_args.inputs)
         ]
 
     @property
     def command_line_inputs_lists(self) -> Sequence[Path]:
         return [
-            Path(p) for p in cl_utils.flatten_comma_list(
-                self._main_args.input_list_paths)
+            Path(p)
+            for p in cl_utils.flatten_comma_list(
+                self._main_args.input_list_paths
+            )
         ]
 
     @property
@@ -129,8 +134,10 @@ class PrebuiltToolAction(object):
     @property
     def command_line_output_dirs(self) -> Sequence[Path]:
         return [
-            Path(p) for p in cl_utils.flatten_comma_list(
-                self._main_args.output_directories)
+            Path(p)
+            for p in cl_utils.flatten_comma_list(
+                self._main_args.output_directories
+            )
         ]
 
     def prepare(self):
@@ -139,7 +146,9 @@ class PrebuiltToolAction(object):
         Raises:
           RuntimeError exception if pre-flight requirements are not met.
         """
-        assert not self.local_only, "This should not be reached in local-only mode."
+        assert (
+            not self.local_only
+        ), "This should not be reached in local-only mode."
 
         self.check_preconditions()
 
@@ -169,12 +178,14 @@ class PrebuiltToolAction(object):
             working_dir=self.working_dir,
             exec_root=self.exec_root,
         )
-        self.vprintlist('remote inputs', action.inputs_relative_to_project_root)
+        self.vprintlist("remote inputs", action.inputs_relative_to_project_root)
         self.vprintlist(
-            'remote output files', action.output_files_relative_to_project_root)
+            "remote output files", action.output_files_relative_to_project_root
+        )
         self.vprintlist(
-            'remote output dirs', action.output_dirs_relative_to_project_root)
-        self.vprintlist('rewrapper options', remote_options)
+            "remote output dirs", action.output_dirs_relative_to_project_root
+        )
+        self.vprintlist("rewrapper options", remote_options)
         return action
 
     @property
@@ -217,11 +228,11 @@ class PrebuiltToolAction(object):
           items: stream of any type of object that is str-able.
         """
         if self.verbose:
-            msg(f'{desc}: {{')
+            msg(f"{desc}: {{")
             for item in items:
                 text = str(item)
-                print(f'  {text}')
-            print(f'}}  # {desc}')
+                print(f"  {text}")
+            print(f"}}  # {desc}")
 
     @property
     def local_only(self) -> bool:
@@ -230,7 +241,7 @@ class PrebuiltToolAction(object):
     @property
     def local_tool(self) -> Optional[Path]:
         for tok in self.local_command:
-            if '=' not in tok:
+            if "=" not in tok:
                 return Path(tok)
 
     @property
@@ -240,7 +251,8 @@ class PrebuiltToolAction(object):
 
     def _run_locally(self) -> int:
         return subprocess.call(
-            cl_utils.auto_env_prefix_command(self.local_command))
+            cl_utils.auto_env_prefix_command(self.local_command)
+        )
 
     def _run_remote_action(self) -> int:
         return self.remote_action.run_with_main_args(self._main_args)

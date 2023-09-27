@@ -19,49 +19,45 @@ import fuchsia_controller_py as fcp
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
-    bluetooth_avrcp as bluetooth_avrcp_fc
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
-    bluetooth_gap as bluetooth_gap_fc
-from honeydew.affordances.fuchsia_controller.ui import \
-    screenshot as screenshot_fc
-from honeydew.affordances.fuchsia_controller.ui import \
-    user_input as user_input_fc
-from honeydew.affordances.fuchsia_controller.wlan import \
-    wlan_policy as wlan_policy_fc
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_avrcp as bluetooth_avrcp_fc,
+)
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_gap as bluetooth_gap_fc,
+)
+from honeydew.affordances.fuchsia_controller.ui import screenshot as screenshot_fc
+from honeydew.affordances.fuchsia_controller.ui import user_input as user_input_fc
+from honeydew.affordances.fuchsia_controller.wlan import wlan_policy as wlan_policy_fc
 from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
-from honeydew.interfaces.affordances.bluetooth.profiles import \
-    bluetooth_avrcp as bluetooth_avrcp_interface
-from honeydew.interfaces.affordances.bluetooth.profiles import \
-    bluetooth_gap as bluetooth_gap_interface
+from honeydew.interfaces.affordances.bluetooth.profiles import (
+    bluetooth_avrcp as bluetooth_avrcp_interface,
+)
+from honeydew.interfaces.affordances.bluetooth.profiles import (
+    bluetooth_gap as bluetooth_gap_interface,
+)
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import \
-    fuchsia_controller as fuchsia_controller_transport
+from honeydew.transports import fuchsia_controller as fuchsia_controller_transport
 from honeydew.utils import properties
 
 _FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
-    "BuildInfo":
-        custom_types.FidlEndpoint(
-            "/core/build-info", "fuchsia.buildinfo.Provider"),
-    "DeviceInfo":
-        custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
-    "Feedback":
-        custom_types.FidlEndpoint(
-            "/core/feedback", "fuchsia.feedback.DataProvider"),
-    "ProductInfo":
-        custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
-    "PowerAdmin":
-        custom_types.FidlEndpoint(
-            "/bootstrap/shutdown_shim",
-            "fuchsia.hardware.power.statecontrol.Admin"),
-    "RemoteControl":
-        custom_types.FidlEndpoint(
-            "/core/remote-control",
-            "fuchsia.developer.remotecontrol.RemoteControl"),
+    "BuildInfo": custom_types.FidlEndpoint(
+        "/core/build-info", "fuchsia.buildinfo.Provider"
+    ),
+    "DeviceInfo": custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Device"),
+    "Feedback": custom_types.FidlEndpoint(
+        "/core/feedback", "fuchsia.feedback.DataProvider"
+    ),
+    "ProductInfo": custom_types.FidlEndpoint("/core/hwinfo", "fuchsia.hwinfo.Product"),
+    "PowerAdmin": custom_types.FidlEndpoint(
+        "/bootstrap/shutdown_shim", "fuchsia.hardware.power.statecontrol.Admin"
+    ),
+    "RemoteControl": custom_types.FidlEndpoint(
+        "/core/remote-control", "fuchsia.developer.remotecontrol.RemoteControl"
+    ),
 }
 
 _LOG_SEVERITIES: Dict[custom_types.LEVEL, f_diagnostics.Severity] = {
@@ -73,13 +69,15 @@ _LOG_SEVERITIES: Dict[custom_types.LEVEL, f_diagnostics.Severity] = {
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
-                    affordances_capable.BluetoothAvrcpCapableDevice,
-                    affordances_capable.BluetoothGapCapableDevice,
-                    affordances_capable.ScreenshotCapableDevice,
-                    affordances_capable.TracingCapableDevice,
-                    affordances_capable.UserInputCapableDevice,
-                    affordances_capable.WlanPolicyCapableDevice):
+class FuchsiaDevice(
+    base_fuchsia_device.BaseFuchsiaDevice,
+    affordances_capable.BluetoothAvrcpCapableDevice,
+    affordances_capable.BluetoothGapCapableDevice,
+    affordances_capable.ScreenshotCapableDevice,
+    affordances_capable.TracingCapableDevice,
+    affordances_capable.UserInputCapableDevice,
+    affordances_capable.WlanPolicyCapableDevice,
+):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
 
@@ -98,18 +96,18 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
     """
 
     def __init__(
-            self,
-            device_name: str,
-            ssh_private_key: Optional[str] = None,
-            ssh_user: Optional[str] = None) -> None:
+        self,
+        device_name: str,
+        ssh_private_key: Optional[str] = None,
+        ssh_user: Optional[str] = None,
+    ) -> None:
         super().__init__(device_name, ssh_private_key, ssh_user)
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
         self.fuchsia_controller.create_context()
 
     # List all the transports in alphabetical order
     @properties.Transport
-    def fuchsia_controller(
-            self) -> fuchsia_controller_transport.FuchsiaController:
+    def fuchsia_controller(self) -> fuchsia_controller_transport.FuchsiaController:
         """Returns the Fuchsia-Controller transport object.
 
         Returns:
@@ -118,9 +116,9 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         Raises:
             errors.FuchsiaControllerError: Failed to instantiate.
         """
-        fuchsia_controller_obj: fuchsia_controller_transport.FuchsiaController \
-            = fuchsia_controller_transport.FuchsiaController(
-                device_name=self.device_name)
+        fuchsia_controller_obj: fuchsia_controller_transport.FuchsiaController = (
+            fuchsia_controller_transport.FuchsiaController(device_name=self.device_name)
+        )
         return fuchsia_controller_obj
 
     # List all the affordances in alphabetical order
@@ -161,7 +159,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         return tracing_fc.Tracing(
             device_name=self.device_name,
             fuchsia_controller=self.fuchsia_controller,
-            reboot_affordance=self)
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def user_input(self) -> user_input.UserInput:
@@ -215,14 +214,14 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             buildinfo_provider_proxy = f_buildinfo.Provider.Client(
-                self.fuchsia_controller.connect_device_proxy(
-                    _FC_PROXIES["BuildInfo"]))
-            build_info_resp = asyncio.run(
-                buildinfo_provider_proxy.get_build_info())
+                self.fuchsia_controller.connect_device_proxy(_FC_PROXIES["BuildInfo"])
+            )
+            build_info_resp = asyncio.run(buildinfo_provider_proxy.get_build_info())
             return build_info_resp.build_info
         except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "Fuchsia Controller FIDL Error") from status
+                "Fuchsia Controller FIDL Error"
+            ) from status
 
     @property
     def _device_info(self) -> Dict[str, Any]:
@@ -236,13 +235,14 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             hwinfo_device_proxy = f_hwinfo.Device.Client(
-                self.fuchsia_controller.connect_device_proxy(
-                    _FC_PROXIES["DeviceInfo"]))
+                self.fuchsia_controller.connect_device_proxy(_FC_PROXIES["DeviceInfo"])
+            )
             device_info_resp = asyncio.run(hwinfo_device_proxy.get_info())
             return device_info_resp.info
         except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "Fuchsia Controller FIDL Error") from status
+                "Fuchsia Controller FIDL Error"
+            ) from status
 
     @property
     def _product_info(self) -> Dict[str, Any]:
@@ -256,17 +256,19 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             hwinfo_product_proxy = f_hwinfo.Product.Client(
-                self.fuchsia_controller.connect_device_proxy(
-                    _FC_PROXIES["ProductInfo"]))
+                self.fuchsia_controller.connect_device_proxy(_FC_PROXIES["ProductInfo"])
+            )
             product_info_resp = asyncio.run(hwinfo_product_proxy.get_info())
             return product_info_resp.info
         except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "Fuchsia Controller FIDL Error") from status
+                "Fuchsia Controller FIDL Error"
+            ) from status
 
     # List all private methods in alphabetical order
     def _send_log_command(
-            self, tag: str, message: str, level: custom_types.LEVEL) -> None:
+        self, tag: str, message: str, level: custom_types.LEVEL
+    ) -> None:
         """Send a device command to write to the syslog.
 
         Args:
@@ -280,10 +282,13 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         try:
             asyncio.run(
                 self.fuchsia_controller.rcs_proxy.log_message(
-                    tag=tag, message=message, severity=_LOG_SEVERITIES[level]))
+                    tag=tag, message=message, severity=_LOG_SEVERITIES[level]
+                )
+            )
         except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "Fuchsia Controller FIDL Error") from status
+                "Fuchsia Controller FIDL Error"
+            ) from status
 
     def _send_reboot_command(self) -> None:
         """Send a device command to trigger a soft reboot.
@@ -293,19 +298,19 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         """
         try:
             power_proxy = fhp_statecontrol.Admin.Client(
-                self.fuchsia_controller.connect_device_proxy(
-                    _FC_PROXIES["PowerAdmin"]))
+                self.fuchsia_controller.connect_device_proxy(_FC_PROXIES["PowerAdmin"])
+            )
             asyncio.run(
-                power_proxy.reboot(
-                    reason=fhp_statecontrol.RebootReason.USER_REQUEST))
+                power_proxy.reboot(reason=fhp_statecontrol.RebootReason.USER_REQUEST)
+            )
         except fcp.ZxStatus as status:
             # ZX_ERR_PEER_CLOSED is expected in this instance because the device
             # powered off.
-            zx_status: Optional[int] = \
-                status.args[0] if len(status.args) > 0 else None
+            zx_status: Optional[int] = status.args[0] if len(status.args) > 0 else None
             if zx_status != fcp.ZxStatus.ZX_ERR_PEER_CLOSED:
                 raise errors.FuchsiaControllerError(
-                    "Fuchsia Controller FIDL Error") from status
+                    "Fuchsia Controller FIDL Error"
+                ) from status
 
     def _read_snapshot_from_channel(self, channel_client: fcp.Channel) -> bytes:
         """Read snapshot data from client end of the transfer channel.
@@ -325,11 +330,11 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
 
         # Get file size for verification later.
         try:
-            attr_resp: f_io.Node1GetAttrResponse = asyncio.run(
-                file_proxy.get_attr())
+            attr_resp: f_io.Node1GetAttrResponse = asyncio.run(file_proxy.get_attr())
             if attr_resp.s != fcp.ZxStatus.ZX_OK:
                 raise errors.FuchsiaControllerError(
-                    f"get_attr() returned status: {attr_resp.s}")
+                    f"get_attr() returned status: {attr_resp.s}"
+                )
         except fcp.ZxStatus as status:
             raise errors.FuchsiaControllerError("get_attr() failed") from status
 
@@ -338,10 +343,12 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         try:
             while True:
                 result: f_io.ReadableReadResult = asyncio.run(
-                    file_proxy.read(count=f_io.MAX_BUF))
+                    file_proxy.read(count=f_io.MAX_BUF)
+                )
                 if result.err:
                     raise errors.FuchsiaControllerError(
-                        "read() failed. Received zx.Status {result.err}")
+                        "read() failed. Received zx.Status {result.err}"
+                    )
                 if not result.response.data:
                     break
                 ret.extend(result.response.data)
@@ -352,7 +359,8 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         expected_size: int = attr_resp.attributes.content_size
         if len(ret) != expected_size:
             raise errors.FuchsiaControllerError(
-                f"Expected {expected_size} bytes, but read {len(ret)} bytes")
+                f"Expected {expected_size} bytes, but read {len(ret)} bytes"
+            )
 
         return bytes(ret)
 
@@ -370,16 +378,16 @@ class FuchsiaDevice(base_fuchsia_device.BaseFuchsiaDevice,
         params = f_feedback.GetSnapshotParameters(
             # Set timeout to 2 minutes in nanoseconds.
             collection_timeout_per_data=2 * 60 * 10**9,
-            response_channel=channel_server.take())
+            response_channel=channel_server.take(),
+        )
 
         try:
             feedback_proxy = f_feedback.DataProvider.Client(
-                self.fuchsia_controller.connect_device_proxy(
-                    _FC_PROXIES["Feedback"]))
+                self.fuchsia_controller.connect_device_proxy(_FC_PROXIES["Feedback"])
+            )
             # The data channel isn't populated until get_snapshot() returns so
             # there's no need to drain the channel in parallel.
             asyncio.run(feedback_proxy.get_snapshot(params=params))
         except fcp.ZxStatus as status:
-            raise errors.FuchsiaControllerError(
-                "get_snapshot() failed") from status
+            raise errors.FuchsiaControllerError("get_snapshot() failed") from status
         return self._read_snapshot_from_channel(channel_client)

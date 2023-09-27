@@ -33,7 +33,7 @@ _PROJECT_ROOT_REL = cl_utils.relpath(_PROJECT_ROOT, start=os.curdir)
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 def vmsg(verbose: bool, text: str):
@@ -62,28 +62,26 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "--undownload",
         action="store_true",
         default=False,
-        help=
-        "Restore download stubs, if they exist, and do not run the command.",
+        help="Restore download stubs, if they exist, and do not run the command.",
     )
     parser.add_argument(
         "--download",
         default=[],
         type=Path,
         nargs="*",
-        help=
-        "Download these files from their stubs.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
+        help="Download these files from their stubs.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
     )
     parser.add_argument(
         "--download_list",
         default=[],
         type=Path,
         nargs="*",
-        help=
-        "Download these files named in these list files.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
+        help="Download these files named in these list files.  Arguments are download stub files produced from 'remote_action.py', relative to the working dir.",
     )
     # Positional args are the command and arguments to run.
     parser.add_argument(
-        "command", nargs="*", help="The command to run remotely")
+        "command", nargs="*", help="The command to run remotely"
+    )
     return parser
 
 
@@ -103,7 +101,8 @@ def _download_for_mp(
             stub=stub_path,
             downloader=downloader,
             working_dir_abs=working_dir_abs,
-        ))
+        ),
+    )
 
 
 def download_artifacts(
@@ -121,7 +120,8 @@ def download_artifacts(
     """
     download_args = [
         # for _download_for_mp()
-        (path, downloader, working_dir_abs) for path in stub_paths
+        (path, downloader, working_dir_abs)
+        for path in stub_paths
     ]
     try:
         with multiprocessing.Pool() as pool:

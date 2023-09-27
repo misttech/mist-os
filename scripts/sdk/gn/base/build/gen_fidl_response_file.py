@@ -30,31 +30,39 @@ def write_libraries(libraries_path, libraries):
 
 def main(args_list=None):
     parser = argparse.ArgumentParser(
-        description="Generate response file for FIDL frontend")
+        description="Generate response file for FIDL frontend"
+    )
     parser.add_argument(
         "--out-response-file",
         help="The path for for the response file to generate",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--out-libraries",
         help="The path for for the libraries file to generate",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        "--json", help="The path for the JSON file to generate, if any")
+        "--json", help="The path for the JSON file to generate, if any"
+    )
     parser.add_argument(
-        "--tables", help="The path for the tables file to generate, if any")
+        "--tables", help="The path for the tables file to generate, if any"
+    )
     parser.add_argument(
-        "--name", help="The name for the generated FIDL library, if any")
+        "--name", help="The name for the generated FIDL library, if any"
+    )
     parser.add_argument(
-        "--sources", help="List of FIDL source files", nargs="*")
+        "--sources", help="List of FIDL source files", nargs="*"
+    )
     parser.add_argument(
-        "--dep-libraries", help="List of dependent libraries", nargs="*")
+        "--dep-libraries", help="List of dependent libraries", nargs="*"
+    )
     parser.add_argument(
-        "--target-api-level", help="The target Fuchsia API level", type=int)
+        "--target-api-level", help="The target Fuchsia API level", type=int
+    )
     parser.add_argument(
-        "--experimental",
-        help="An experimental flag to enable",
-        action="append")
+        "--experimental", help="An experimental flag to enable", action="append"
+    )
     if args_list:
         args = parser.parse_args(args_list)
     else:
@@ -87,7 +95,8 @@ def main(args_list=None):
 
     if args.experimental:
         response_file.extend(
-            "--experimental %s" % flag for flag in args.experimental)
+            "--experimental %s" % flag for flag in args.experimental
+        )
 
     response_file.extend("--files %s" % library for library in target_libraries)
 

@@ -13,7 +13,12 @@ import sys
 
 def extract_build_graph(gn_binary, out_dir):
     args = [
-        gn_binary, 'desc', out_dir, '//*', '--format=json', '--all-toolchains'
+        gn_binary,
+        "desc",
+        out_dir,
+        "//*",
+        "--format=json",
+        "--all-toolchains",
     ]
     return subprocess.check_output(args)
 

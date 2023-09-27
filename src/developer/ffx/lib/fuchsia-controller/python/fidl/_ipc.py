@@ -11,7 +11,6 @@ import fuchsia_controller_py as fc
 
 
 class _QueueWrapper(object):
-
     def __init__(self):
         self.queue = asyncio.Queue()
         try:
@@ -42,7 +41,8 @@ HANDLE_READY_QUEUES: typing.Dict[int, _QueueWrapper] = {}
 
 
 def enqueue_ready_zx_handle_from_fd(
-        fd: int, handle_ready_queues: typing.Dict[int, _QueueWrapper]):
+    fd: int, handle_ready_queues: typing.Dict[int, _QueueWrapper]
+):
     """Reads zx_handle that is ready for reading, and enqueues it in the appropriate ready queue."""
     handle_no = int.from_bytes(os.read(fd, 4), sys.byteorder)
     queue = handle_ready_queues.get(handle_no)

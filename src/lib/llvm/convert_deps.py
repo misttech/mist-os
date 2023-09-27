@@ -11,9 +11,9 @@ while True:
     # line is "libLLVMTextAPI.a: libLLVMSupport.a libLLVMTargetParser.a"
     target, rest = line.split(":", 1)
     deps = [c[3:-2] for c in rest.split() if c]
-    print(f'llvm_library("{target[3:-2]}")' + ' {')
-    print('  deps = [')
+    print(f'llvm_library("{target[3:-2]}")' + " {")
+    print("  deps = [")
     for d in deps:
         print(f'    ":{d}",')
-    print('  ]')
-    print('}\n')
+    print("  ]")
+    print("}\n")

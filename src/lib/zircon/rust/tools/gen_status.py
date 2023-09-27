@@ -9,7 +9,7 @@
 import re
 import sys
 
-status_re = re.compile('#define\s+(ZX_\w+)\s+\((\-?\d+)\)$')
+status_re = re.compile("#define\s+(ZX_\w+)\s+\((\-?\d+)\)$")
 
 
 def parse(in_filename):
@@ -23,34 +23,36 @@ def parse(in_filename):
 
 def to_snake_case(name):
     result = []
-    for element in name.split('_'):
+    for element in name.split("_"):
         result.append(element[0] + element[1:].lower())
-    return ''.join(result)
+    return "".join(result)
 
 
 def out(style, l):
-    print('// Auto-generated using tools/gen_status.py')
+    print("// Auto-generated using tools/gen_status.py")
     longest = max(len(name) for (name, num) in l)
-    if style == 'sys':
-        for (name, num) in l:
+    if style == "sys":
+        for name, num in l:
             print(
-                'pub const %s : zx_status_t = %d;' % (name.ljust(longest), num))
-    if style == 'enum':
-        print('pub enum Status {')
-        for (name, num) in l:
-            print('    %s = %d,' % (to_snake_case(name[3:]), num))
-        print('')
+                "pub const %s : zx_status_t = %d;" % (name.ljust(longest), num)
+            )
+    if style == "enum":
+        print("pub enum Status {")
+        for name, num in l:
+            print("    %s = %d," % (to_snake_case(name[3:]), num))
+        print("")
         print(
-            '    /// Any zx_status_t not in the set above will map to the following:'
+            "    /// Any zx_status_t not in the set above will map to the following:"
         )
-        print('    UnknownOther = -32768,')
-        print('}')
-    if style == 'match':
-        for (name, num) in l:
+        print("    UnknownOther = -32768,")
+        print("}")
+    if style == "match":
+        for name, num in l:
             print(
-                '            sys::%s => Status::%s,' %
-                (name, to_snake_case(name[3:])))
-        print('            _ => Status::UnknownOther,')
+                "            sys::%s => Status::%s,"
+                % (name, to_snake_case(name[3:]))
+            )
+        print("            _ => Status::UnknownOther,")
 
 
 l = parse(sys.argv[1])

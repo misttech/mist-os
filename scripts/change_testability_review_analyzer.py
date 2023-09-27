@@ -31,12 +31,11 @@ FUCHSIA_DIR = os.path.abspath(os.path.join(__file__, os.pardir, os.pardir))
 def parse_date_from_gerrit(date_str):
     # Gerrit returns timestamps with 9 digits of precision, but the %f
     # formatter only expects 6 digits of precision, so truncate to parse.
-    return datetime.datetime.strptime(date_str[:-3],
-                                      "%Y-%m-%d %H:%M:%S.%f")
+    return datetime.datetime.strptime(date_str[:-3], "%Y-%m-%d %H:%M:%S.%f")
 
 
 def cache_dir():
-    dirname = os.path.join(FUCHSIA_DIR, 'local', 'change_id_cache')
+    dirname = os.path.join(FUCHSIA_DIR, "local", "change_id_cache")
     if not os.path.exists(dirname):
         os.makedirs(dirname)
     return dirname
@@ -50,15 +49,15 @@ def cache_change_data(c):
     filename = cache_filename(c)
     if os.path.exists(filename):
         return
-    print('Data for %s not found in cache, fetching from gerrit' % c)
-    url = 'https://fuchsia-review.googlesource.com/changes/%s/detail' % c
+    print("Data for %s not found in cache, fetching from gerrit" % c)
+    url = "https://fuchsia-review.googlesource.com/changes/%s/detail" % c
     r = urllib.request.urlopen(url)
     if r.status != 200:
-        print('Gerrit returned error for %s: %d' % (c, r.status_code))
+        print("Gerrit returned error for %s: %d" % (c, r.status_code))
         return
-    response_json = r.read().decode('utf-8')[5:]  # skip preamble
+    response_json = r.read().decode("utf-8")[5:]  # skip preamble
     data = json.loads(response_json)
-    with open(cache_filename(c), 'w') as f:
+    with open(cache_filename(c), "w") as f:
         json.dump(data, f, indent=2)
 
 
@@ -73,17 +72,17 @@ def process_change(c):
     testability_date = None
     code_review_date = None
     api_review_date = None
-    for message in data['messages']:
-        m = message['message']
-        date = parse_date_from_gerrit(message['date'])
+    for message in data["messages"]:
+        m = message["message"]
+        date = parse_date_from_gerrit(message["date"])
         if testability_date is None:
-            if 'Testability-Review+1' in m or 'Testability-Review-1' in m:
-                testability_reviewer = message['real_author']['email']
-                testability_date = parse_date_from_gerrit(message['date'])
-        if 'Code-Review+2' in message['message']:
+            if "Testability-Review+1" in m or "Testability-Review-1" in m:
+                testability_reviewer = message["real_author"]["email"]
+                testability_date = parse_date_from_gerrit(message["date"])
+        if "Code-Review+2" in message["message"]:
             if code_review_date is None:
                 code_review_date = date
-        if 'API-Review+1' in message['message']:
+        if "API-Review+1" in message["message"]:
             if api_review_date is None:
                 api_review_date = date
     if testability_date is None or code_review_date is None:
@@ -92,35 +91,39 @@ def process_change(c):
     if api_review_date is not None:
         if api_review_date > last_approval_date:
             last_approval_date = api_review_date
-    return (c, testability_date,
-            last_approval_date, testability_reviewer)
+    return (c, testability_date, last_approval_date, testability_reviewer)
 
 
-header = 'ChangeID, First Testability-Review Date, First {Code + API}-Review date, Testability Reviewer'
+header = "ChangeID, First Testability-Review Date, First {Code + API}-Review date, Testability Reviewer"
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Compute Testability-Review stats for set of changes.')
-    parser.add_argument('--output', '-o', default='output.txt',
-                        help='Name of output file')
-    parser.add_argument('changes', default='last_week_change_ids.txt',
-                        help='File containing Change-Id values to analyze')
+        description="Compute Testability-Review stats for set of changes."
+    )
+    parser.add_argument(
+        "--output", "-o", default="output.txt", help="Name of output file"
+    )
+    parser.add_argument(
+        "changes",
+        default="last_week_change_ids.txt",
+        help="File containing Change-Id values to analyze",
+    )
     args = parser.parse_args()
 
     with open(args.changes) as f:
         changes = f.readlines()
-    with open(args.output, 'w') as out:
-        out.write(header + '\n')
+    with open(args.output, "w") as out:
+        out.write(header + "\n")
         for c in changes:
             c = c.strip()
             try:
-                out.write('%s, %s, %s, %s\n' % process_change(c))
+                out.write("%s, %s, %s, %s\n" % process_change(c))
             except KeyboardInterrupt:
                 raise
             except:
-                sys.stderr.write('Could not process %s, skipping\n' % c)
+                sys.stderr.write("Could not process %s, skipping\n" % c)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

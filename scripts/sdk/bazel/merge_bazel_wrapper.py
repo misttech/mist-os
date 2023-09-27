@@ -26,7 +26,7 @@ constants = struct(host_cpus = ["x64"], target_cpus = {target_cpu})
 """
 
 WHITELIST_DIFF_LISTS = []
-PATTERN = r'fuchsia_select\((.*?)\)'
+PATTERN = r"fuchsia_select\((.*?)\)"
 
 
 def merge_fuchsia_select(source_file: str, dest_file: str) -> bool:
@@ -45,7 +45,7 @@ def merge_fuchsia_select(source_file: str, dest_file: str) -> bool:
     source_list = re.findall(PATTERN, source.replace("\n", ""))
     dest_list = re.findall(PATTERN, dest.replace("\n", ""))
     merged_map = {}
-    for (select_source, select_dest) in zip(source_list, dest_list):
+    for select_source, select_dest in zip(source_list, dest_list):
         dict_source = ast.literal_eval(select_source)
         dict_dest = ast.literal_eval(select_dest)
         dict_dest.update(dict_source)
@@ -130,7 +130,8 @@ def main():
                     with open(source_file, "r") as manifest_file:
                         new_manifest = json.load(manifest_file)
                     manifest_json = merge_new_manifest(
-                        manifest_json, new_manifest)
+                        manifest_json, new_manifest
+                    )
                     continue
 
                 # Skip generated_constants.bzl file as we have to update the targets section with merged targets.
@@ -162,7 +163,9 @@ def main():
     with open(dest_file, "w") as f:
         f.write(
             GENERATED_CONTANTS_TEMPLATE.format(
-                target_cpu=manifest_json["arch"]["target"]))
+                target_cpu=manifest_json["arch"]["target"]
+            )
+        )
 
     if args.buildifier_path:
         format_dir(args.buildifier_path, args.source_dir)

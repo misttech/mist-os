@@ -19,17 +19,20 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        'Generates a .cc file that #includes a given set of headers.')
+        "Generates a .cc file that #includes a given set of headers."
+    )
     parser.add_argument(
-        '--out-cc', help='The name of the .cc file to generate.', required=True)
+        "--out-cc", help="The name of the .cc file to generate.", required=True
+    )
     parser.add_argument(
-        'files', help='Header file names to output', nargs='+', metavar='file')
+        "files", help="Header file names to output", nargs="+", metavar="file"
+    )
     args = parser.parse_args()
 
-    with open(args.out_cc, 'w') as output:
+    with open(args.out_cc, "w") as output:
         for f in args.files:
             output.write('#include "%s"\n' % f)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

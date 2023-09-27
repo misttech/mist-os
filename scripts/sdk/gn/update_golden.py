@@ -16,17 +16,17 @@ import sys
 import tempfile
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-GOLDEN_DIR = os.path.join(SCRIPT_DIR, 'golden')
-TMP_DIR_NAME = tempfile.mkdtemp(prefix='tmp_gn_sdk_golden')
+GOLDEN_DIR = os.path.join(SCRIPT_DIR, "golden")
+TMP_DIR_NAME = tempfile.mkdtemp(prefix="tmp_gn_sdk_golden")
 
 
 def main():
-    testdata = os.path.join(SCRIPT_DIR, 'testdata')
+    testdata = os.path.join(SCRIPT_DIR, "testdata")
     # Generator follows bash convention and returns a non-zero value on error.
-    if generate.run_generator(output=TMP_DIR_NAME,
-                              archive='',
-                              directory=testdata):
-        print('generate.py returned an error')
+    if generate.run_generator(
+        output=TMP_DIR_NAME, archive="", directory=testdata
+    ):
+        print("generate.py returned an error")
         return 1
 
     # Remove the existing files.
@@ -34,14 +34,19 @@ def main():
         shutil.rmtree(GOLDEN_DIR)
 
     # Ignore bin and build, which are copied from base.
-    shutil.copytree(src=TMP_DIR_NAME, dst=GOLDEN_DIR,
-        ignore=shutil.ignore_patterns('bin', 'build'))
+    shutil.copytree(
+        src=TMP_DIR_NAME,
+        dst=GOLDEN_DIR,
+        ignore=shutil.ignore_patterns("bin", "build"),
+    )
 
     # Special case: copy build/test_targets.gni from outdir
-    golden_build = os.path.join(GOLDEN_DIR, 'build')
+    golden_build = os.path.join(GOLDEN_DIR, "build")
     os.makedirs(golden_build)
-    shutil.copy2(src=os.path.join(TMP_DIR_NAME, 'build', 'test_targets.gni'),
-        dst=golden_build)
+    shutil.copy2(
+        src=os.path.join(TMP_DIR_NAME, "build", "test_targets.gni"),
+        dst=golden_build,
+    )
 
     # Cleanup.
     if os.path.exists(TMP_DIR_NAME):
@@ -50,5 +55,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

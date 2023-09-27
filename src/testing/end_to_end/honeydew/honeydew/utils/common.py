@@ -13,8 +13,8 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def wait_for_state(
-        state_fn: Callable[[], bool], expected_state: bool,
-        timeout: float) -> None:
+    state_fn: Callable[[], bool], expected_state: bool, timeout: float
+) -> None:
     """Wait for specified time for state_fn to return expected_state.
 
     Args:
@@ -27,8 +27,11 @@ def wait_for_state(
             expected_state with in specified timeout.
     """
     _LOGGER.info(
-        "Waiting for %s sec for %s to return %s...", timeout,
-        state_fn.__qualname__, expected_state)
+        "Waiting for %s sec for %s to return %s...",
+        timeout,
+        state_fn.__qualname__,
+        expected_state,
+    )
 
     start_time: float = time.time()
     end_time: float = start_time + timeout
@@ -38,8 +41,9 @@ def wait_for_state(
         _LOGGER.debug("%s returned %s", state_fn.__qualname__, current_state)
         if current_state == expected_state:
             return
-        time.sleep(.5)
+        time.sleep(0.5)
     else:
         raise errors.HoneyDewTimeoutError(
-            f"{state_fn.__qualname__} didn't return {expected_state} in " \
-            f"{timeout} sec")
+            f"{state_fn.__qualname__} didn't return {expected_state} in "
+            f"{timeout} sec"
+        )

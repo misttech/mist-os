@@ -16,26 +16,30 @@ import fuchsia_controller_py as fuchsia_controller
 
 class LEVEL(enum.Enum):
     """Logging level that need to specified to log a message onto device"""
+
     INFO = enum.auto()
     WARNING = enum.auto()
     ERROR = enum.auto()
 
 
-#TODO(b/301500367): Create bluetooth typing similar to typing/wlan.py
+# TODO(b/301500367): Create bluetooth typing similar to typing/wlan.py
 class BluetoothTransport(enum.Enum):
     """Transport type of Bluetooth pair and/or connections."""
+
     CLASSIC = 1
     LOW_ENERGY = 2
 
 
 class BluetoothAcceptPairing(enum.StrEnum):
     """Pairing modes for Bluetooth Accept Pairing."""
+
     DEFAULT_INPUT_MODE = "NONE"
     DEFAULT_OUTPUT_MODE = "NONE"
 
 
 class BluetoothAvrcpCommand(enum.StrEnum):
     """Commands that the AVRCP service can send."""
+
     PLAY = "Play"
     PAUSE = "Pause"
 
@@ -47,6 +51,7 @@ class IpPort(NamedTuple):
         ip: Ip Address
         port: Port Number
     """
+
     ip: ipaddress.IPv4Address | ipaddress.IPv6Address
     port: int
 
@@ -60,18 +65,18 @@ class IpPort(NamedTuple):
     def parse(target_name: str) -> IpPort:
         """Checks if the given string is an IPAddress Port or not
 
-      Args:
-        target_name: the name of the target to test. This is of format
-                     {ipv4_address}:{port}, or [{ipv6_address}]:{port},
-                     or {ipv6_address}:{port}
+        Args:
+          target_name: the name of the target to test. This is of format
+                       {ipv4_address}:{port}, or [{ipv6_address}]:{port},
+                       or {ipv6_address}:{port}
 
 
-      Returns:
-        A valid IpPort if the str is one. Otherwise None
+        Returns:
+          A valid IpPort if the str is one. Otherwise None
 
-      Raises:
-        ValueError
-      """
+        Raises:
+          ValueError
+        """
         try:
             # If we have something of form
             #     192.168.1.1:8888 ==> ["192.168.1.1", "8888"]
@@ -80,7 +85,7 @@ class IpPort(NamedTuple):
             arr: list[str] = target_name.rsplit(":", 1)
             if len(arr) != 2:
                 raise ValueError(
-                    f"Value: {target_name} was not a valid IpPort (needs " \
+                    f"Value: {target_name} was not a valid IpPort (needs "
                     f"IP Address and Port)"
                 )
             addr_part: str = arr[0]
@@ -90,7 +95,7 @@ class IpPort(NamedTuple):
             port = int(port_part)
             if port < 1:
                 raise ValueError(
-                    f"For IpPort: {target_name}, port number: {port} was " \
+                    f"For IpPort: {target_name}, port number: {port} was "
                     f"not a positive integer)"
                 )
             return IpPort(ipaddress.ip_address(addr_part), port)
@@ -105,6 +110,7 @@ class TargetSshAddress(NamedTuple):
         ip: Target's SSH IP Address
         port: Target's SSH port
     """
+
     ip: str
     port: int
 
@@ -116,6 +122,7 @@ class Sl4fServerAddress(NamedTuple):
         ip: IP Address of SL4F server
         port: Port where SL4F server is listening for SL4F requests
     """
+
     ip: str
     port: int
 
@@ -128,6 +135,7 @@ class FFXConfig:
         isolate_dir: FFX isolation directory
         logs_dir: FFX logs directory
     """
+
     isolate_dir: Optional[fuchsia_controller.IsolateDir] = None
     logs_dir: Optional[str] = None
 
@@ -140,5 +148,6 @@ class FidlEndpoint:
         moniker: moniker pointing to the FIDL end point
         protocol: protocol name of the FIDL end point
     """
+
     moniker: str
     protocol: str

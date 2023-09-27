@@ -107,8 +107,8 @@ class FFX:
 
     @staticmethod
     def add_target(
-            target_ip_port: custom_types.IpPort,
-            timeout: float = _TIMEOUTS["FFX_CLI"]):
+        target_ip_port: custom_types.IpPort, timeout: float = _TIMEOUTS["FFX_CLI"]
+    ):
         """Adds a target to the ffx collection
 
         Args:
@@ -121,13 +121,13 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = FFX._generate_ffx_cmd(
-            target=None, cmd=_FFX_CMDS["TARGET_ADD"])
+        cmd: List[str] = FFX._generate_ffx_cmd(target=None, cmd=_FFX_CMDS["TARGET_ADD"])
         cmd.append(str(target_ip_port))
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(cmd))
             output: str = subprocess.check_output(
-                cmd, stderr=subprocess.STDOUT, timeout=timeout).decode()
+                cmd, stderr=subprocess.STDOUT, timeout=timeout
+            ).decode()
             _LOGGER.debug("`%s` returned: %s", " ".join(cmd), output)
         except subprocess.TimeoutExpired as err:
             _LOGGER.debug(err, exc_info=True)
@@ -135,7 +135,8 @@ class FFX:
         except Exception as err:  # pylint: disable=broad-except
             if isinstance(err, subprocess.CalledProcessError) and err.stdout:
                 _LOGGER.debug(
-                    "stdout/stderr returned by the command is: %s", err.stdout)
+                    "stdout/stderr returned by the command is: %s", err.stdout
+                )
 
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
@@ -155,8 +156,8 @@ class FFX:
             raise errors.FfxCommandError(f"'{self._target}' is not connected.")
 
     def get_target_information(
-            self,
-            timeout: float = _TIMEOUTS["FFX_CLI"]) -> List[Dict[str, Any]]:
+        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+    ) -> List[Dict[str, Any]]:
         """Executed and returns the output of `ffx -t {target} target show`.
 
         Args:
@@ -174,8 +175,7 @@ class FFX:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
             ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
-            _LOGGER.debug(
-                "`%s` returned: %s", " ".join(cmd), ffx_target_show_info)
+            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), ffx_target_show_info)
 
             return ffx_target_show_info
         except subprocess.TimeoutExpired as err:
@@ -185,8 +185,8 @@ class FFX:
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     def get_target_list(
-            self,
-            timeout: float = _TIMEOUTS["FFX_CLI"]) -> List[Dict[str, Any]]:
+        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+    ) -> List[Dict[str, Any]]:
         """Executed and returns the output of `ffx --machine json target list`.
 
         Args:
@@ -203,8 +203,7 @@ class FFX:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
             ffx_target_list_info: List[Dict[str, Any]] = json.loads(output)
-            _LOGGER.debug(
-                "`%s` returned: %s", " ".join(cmd), ffx_target_list_info)
+            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), ffx_target_list_info)
 
             return ffx_target_list_info
         except Exception as err:  # pylint: disable=broad-except
@@ -243,21 +242,23 @@ class FFX:
         #  },
 
         try:
-            ffx_target_show_info: List[Dict[str,
-                                            Any]] = self.get_target_information(
-                                                timeout)
+            ffx_target_show_info: List[Dict[str, Any]] = self.get_target_information(
+                timeout
+            )
             target_entry: Dict[str, Any] = self._get_label_entry(
-                ffx_target_show_info, label_value="target")
+                ffx_target_show_info, label_value="target"
+            )
             name_entry: Dict[str, Any] = self._get_label_entry(
-                target_entry["child"], label_value="name")
+                target_entry["child"], label_value="name"
+            )
             return name_entry["value"]
         except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(
-                f"Failed to get the target name of {self._target}") from err
+                f"Failed to get the target name of {self._target}"
+            ) from err
 
     def get_target_ssh_address(
-            self,
-            timeout: float = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float = _TIMEOUTS["FFX_CLI"]
     ) -> custom_types.TargetSshAddress:
         """Returns the target's ssh ip address and port information.
 
@@ -333,15 +334,17 @@ class FFX:
         #     },
         # ]
         target_show_info: List[Dict[str, Any]] = self.get_target_information(
-            timeout=timeout)
+            timeout=timeout
+        )
         build_entry: Dict[str, Any] = self._get_label_entry(
-            target_show_info, label_value="build")
+            target_show_info, label_value="build"
+        )
         board_entry: Dict[str, Any] = self._get_label_entry(
-            build_entry["child"], label_value="board")
+            build_entry["child"], label_value="board"
+        )
         return board_entry["value"]
 
-    def is_target_connected(
-            self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> bool:
+    def is_target_connected(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> bool:
         """Checks if target is connected to the host according to FFX.
 
             * If device name shows up under `ffx target list` with `rcs_state`
@@ -357,23 +360,21 @@ class FFX:
             True if target is connected, False otherwise.
         """
         try:
-            target_list: List[Dict[str, Any]] = self.get_target_list(
-                timeout=timeout)
+            target_list: List[Dict[str, Any]] = self.get_target_list(timeout=timeout)
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.warning(err)
             return False
 
         for target in target_list:
-            if target["nodename"] == self._target and \
-               target["rcs_state"] == "Y":
+            if target["nodename"] == self._target and target["rcs_state"] == "Y":
                 return True
         return False
 
     def run(
-            self,
-            cmd: List[str],
-            timeout: float = _TIMEOUTS["FFX_CLI"],
-            exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
+        self,
+        cmd: List[str],
+        timeout: float = _TIMEOUTS["FFX_CLI"],
+        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
@@ -395,7 +396,8 @@ class FFX:
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             output: str = subprocess.check_output(
-                ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout).decode()
+                ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
+            ).decode()
 
             _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
 
@@ -413,7 +415,8 @@ class FFX:
 
             if isinstance(err, subprocess.CalledProcessError) and err.stdout:
                 _LOGGER.debug(
-                    "stdout/stderr returned by the command is: %s", err.stdout)
+                    "stdout/stderr returned by the command is: %s", err.stdout
+                )
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
 
@@ -466,8 +469,9 @@ class FFX:
         ffx_args: List[str] = FFX._generate_ffx_args(target)
         return ["ffx"] + ffx_args + cmd
 
-    def _get_label_entry(self, data: List[Dict[str, Any]],
-                         label_value: str) -> Dict[str, Any]:
+    def _get_label_entry(
+        self, data: List[Dict[str, Any]], label_value: str
+    ) -> Dict[str, Any]:
         """Find and return ("label", label_value) entry in (list of dict) data
         provided.
 

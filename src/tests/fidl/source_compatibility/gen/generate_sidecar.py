@@ -17,19 +17,19 @@ from pathlib import Path
 from util import TEST_FILE
 from types_ import CompatTest
 
-GN_SIDECAR = 'test_gn_sidecar.json'
+GN_SIDECAR = "test_gn_sidecar.json"
 
 
 def write_gn_sidecar(test_root: Path, test: CompatTest):
-    test_name = test_root.name.replace('-', '_')
-    with open(test_root / GN_SIDECAR, 'w') as f:
+    test_name = test_root.name.replace("-", "_")
+    with open(test_root / GN_SIDECAR, "w") as f:
         json.dump(create_sidecar(test, test_name), f, indent=4)
 
 
 def create_sidecar(test: CompatTest, test_name: str) -> dict:
     fidl_names = list(test.fidl.keys())
     return {
-        'fidl_names': fidl_names,
-        'fidl_targets': {n: f'{test_name}_{n}' for n in fidl_names},
-        'fidl_sources': {n: test.fidl[n].source for n in fidl_names},
+        "fidl_names": fidl_names,
+        "fidl_targets": {n: f"{test_name}_{n}" for n in fidl_names},
+        "fidl_sources": {n: test.fidl[n].source for n in fidl_names},
     }

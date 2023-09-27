@@ -35,7 +35,8 @@ TEST_DATA_ZBIS = (
         # --compressed=zstd is the default for storage types.
         name="compressed-item",
         payloads=["abcdefghijklmnopqrstuvwxyz"],
-        type=RAMDISK_ITEM_TYPE),
+        type=RAMDISK_ITEM_TYPE,
+    ),
     TestDataZbi(
         name="multiple-small-items",
         payloads=[
@@ -49,7 +50,8 @@ TEST_DATA_ZBIS = (
             "The world will little note, nor long remember what we say here, but it can never forget what they did here.",
             "It is for us the living, rather, to be dedicated here to the unfinished work which they who fought here have thus far so nobly advanced.",
             "It is rather for us to be here dedicated to the great task remaining before us -- that from these honored dead we take increased devotion to that cause for which they gave the last full measure of devotion -- that we here highly resolve that these dead shall not have died in vain -- that this nation, under God, shall have a new birth of freedom -- and that government of the people, by the people, for the people, shall not perish from the earth.",
-        ]),
+        ],
+    ),
     TestDataZbi(
         name="second-item-on-page-boundary",
         # Container header:    [0x0000, 0x0020)
@@ -62,14 +64,16 @@ TEST_DATA_ZBIS = (
     # The resulting ZBI will be modified below to indeed give it a bad CRC value.
     TestDataZbi(name="bad-crc-item", payloads=["hello world"]),
     TestDataZbi(
-        name="bootfs", type=BOOTFS_ITEM_TYPE, files="files/manifest.txt"),
+        name="bootfs", type=BOOTFS_ITEM_TYPE, files="files/manifest.txt"
+    ),
 )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--zbi", help="Path to the zbi host tool", required=True)
+        "--zbi", help="Path to the zbi host tool", required=True
+    )
     args = parser.parse_args()
 
     script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -79,8 +83,13 @@ def main():
         output = "%s.zbi" % os.path.join(script_dir, zbi.name)
         json_output = "%s.json" % output
         cmd = [
-            zbi_tool, "--output", output, "--json-output", json_output,
-            "--type", zbi.type
+            zbi_tool,
+            "--output",
+            output,
+            "--json-output",
+            json_output,
+            "--type",
+            zbi.type,
         ]
         for payload in zbi.payloads:
             cmd.extend(["--entry", payload])

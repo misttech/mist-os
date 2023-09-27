@@ -39,7 +39,8 @@ def main():
                 to a Cargo.toml file of a package for which to generate docs.",
     )
     parser.add_argument(
-        "--target", help="Target triple for which this crate is being compiled")
+        "--target", help="Target triple for which this crate is being compiled"
+    )
     parser.add_argument("--out-dir", help="Path to the Fuchsia build directory")
     parser.add_argument(
         "--no-deps",
@@ -47,9 +48,11 @@ def main():
         help="Disable building of docs for dependencies",
     )
     parser.add_argument(
-        "--doc-private", action="store_true", help="Document private items")
+        "--doc-private", action="store_true", help="Document private items"
+    )
     parser.add_argument(
-        "--open", action="store_true", help="Open the generated documentation")
+        "--open", action="store_true", help="Open the generated documentation"
+    )
 
     args = parser.parse_args()
 
@@ -64,30 +67,37 @@ def main():
     clang = str(clang_prefix / "clang")
     shared_libs_root = ROOT_PATH / build_dir
     fuchsia_sysroot = (
-        ROOT_PATH / build_dir /
-        "zircon_toolchain/obj/zircon/public/sysroot/sysroot")
+        ROOT_PATH
+        / build_dir
+        / "zircon_toolchain/obj/zircon/public/sysroot/sysroot"
+    )
     sysroot = buildtools_dir / "sysroot" / "linux"
 
     env = os.environ.copy()
 
     for target in (
-            "X86_64_APPLE_DARWIN",
-            "X86_64_UNKNOWN_LINUX_GNU",
-            "X86_64_FUCHSIA",
-            "AARCH64_FUCHSIA",
+        "X86_64_APPLE_DARWIN",
+        "X86_64_UNKNOWN_LINUX_GNU",
+        "X86_64_FUCHSIA",
+        "AARCH64_FUCHSIA",
     ):
         env[f"CARGO_TARGET_{target}_LINKER"] = clang
         if "FUCHSIA" in target:
-            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={fuchsia_sysroot} -Lnative={shared_libs_root}"
+            env[
+                f"CARGO_TARGET_{target}_RUSTFLAGS"
+            ] = f"-Clink-arg=--sysroot={fuchsia_sysroot} -Lnative={shared_libs_root}"
         if "LINUX" in target:
-            env[f"CARGO_TARGET_{target}_RUSTFLAGS"] = f"-Clink-arg=--sysroot={sysroot}"
+            env[
+                f"CARGO_TARGET_{target}_RUSTFLAGS"
+            ] = f"-Clink-arg=--sysroot={sysroot}"
     env["CC"] = clang
     env["CXX"] = str(clang_prefix / "clang++")
     env["AR"] = str(clang_prefix / "llvm-ar")
     env["RANLIB"] = str(clang_prefix / "llvm-ranlib")
     env["RUSTC"] = str(rust_dir / "rustc")
     env["RUSTDOC"] = str(
-        ROOT_PATH / "scripts/rust/rustdoc_no_ld_library_path.sh")
+        ROOT_PATH / "scripts/rust/rustdoc_no_ld_library_path.sh"
+    )
     env["RUSTDOCFLAGS"] = "-Z unstable-options --enable-index-page"
     env["RUST_BACKTRACE"] = "1"
     # Ideally this would somehow be automatically handled by the Cargo.toml
@@ -97,7 +107,9 @@ def main():
         env["RUST_ICU_MAJOR_VERSION_NUMBER"] = json.load(f)["major_version"]
 
     call_args = [
-        rust_dir / "cargo", "doc", "--manifest-path=" + str(args.manifest_path)
+        rust_dir / "cargo",
+        "doc",
+        "--manifest-path=" + str(args.manifest_path),
     ]
 
     if args.target:
@@ -126,7 +138,8 @@ def main():
 
     # run cargo from third_party/rust_crates which has an appropriate .cargo/config
     return subprocess.call(
-        call_args, env=env, cwd=ROOT_PATH / "third_party/rust_crates")
+        call_args, env=env, cwd=ROOT_PATH / "third_party/rust_crates"
+    )
 
 
 if __name__ == "__main__":

@@ -8,37 +8,44 @@ import json
 import os
 import sys
 
-from sdk_common import detect_category_violations, detect_collisions, gather_dependencies
+from sdk_common import (
+    detect_category_violations,
+    detect_collisions,
+    gather_dependencies,
+)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--out', help='Path to the output file', required=True)
+    parser.add_argument("--out", help="Path to the output file", required=True)
     parser.add_argument(
-        '--deps',
-        help='List of manifest paths for the included elements',
-        nargs='*')
+        "--deps",
+        help="List of manifest paths for the included elements",
+        nargs="*",
+    )
     parser.add_argument(
-        '--category', help='Minimum publication level', required=False)
+        "--category", help="Minimum publication level", required=False
+    )
     args = parser.parse_args()
 
     (direct_deps, atoms) = gather_dependencies(args.deps)
     if detect_collisions(atoms):
-        print('Name collisions detected!')
+        print("Name collisions detected!")
         return 1
     if args.category:
         if detect_category_violations(args.category, atoms):
-            print('Publication level violations detected!')
+            print("Publication level violations detected!")
             return 1
     manifest = {
-        'ids': [],
-        'atoms': [a.json for a in sorted(list(atoms))],
-        'root': '..',
+        "ids": [],
+        "atoms": [a.json for a in sorted(list(atoms))],
+        "root": "..",
     }
-    with open(os.path.abspath(args.out), 'w') as out:
+    with open(os.path.abspath(args.out), "w") as out:
         json.dump(
-            manifest, out, indent=2, sort_keys=True, separators=(',', ': '))
+            manifest, out, indent=2, sort_keys=True, separators=(",", ": ")
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

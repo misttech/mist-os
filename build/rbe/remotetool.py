@@ -28,11 +28,10 @@ PROJECT_ROOT_REL = cl_utils.relpath(PROJECT_ROOT, start=os.curdir)
 
 _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
-_HOST_REMOTETOOL = fuchsia.RECLIENT_BINDIR / 'remotetool'
+_HOST_REMOTETOOL = fuchsia.RECLIENT_BINDIR / "remotetool"
 
 
 class ParseError(ValueError):
-
     def __init__(self, msg: str):
         super().__init__(msg)
 
@@ -41,28 +40,30 @@ def _must_partition_string(text: str, sep: str) -> Tuple[str, str]:
     before, found_sep, after = text.partition(sep)
     if found_sep != sep:
         raise ParseError(
-            f"Expected but failed to find \"{sep}\" in text \"{text}\".")
+            f'Expected but failed to find "{sep}" in text "{text}".'
+        )
     return before, after
 
 
-def _must_partition_sequence(seq: Sequence[str],
-                             sep: str) -> Tuple[Sequence[str], Sequence[str]]:
+def _must_partition_sequence(
+    seq: Sequence[str], sep: str
+) -> Tuple[Sequence[str], Sequence[str]]:
     before, found_sep, after = cl_utils.partition_sequence(seq, sep)
     if found_sep != sep:
-        raise ParseError(f"Expected but failed to find line == \"{sep}\".")
+        raise ParseError(f'Expected but failed to find line == "{sep}".')
     return before, after
 
 
 def _parse_input_digest(line: str) -> Tuple[Path, str]:
-    path, right = _must_partition_string(line, ':')
-    ignored, right = _must_partition_string(right, ':')
-    digest = right.lstrip().rstrip(']')
+    path, right = _must_partition_string(line, ":")
+    ignored, right = _must_partition_string(right, ":")
+    digest = right.lstrip().rstrip("]")
     return Path(path), digest
 
 
 def _parse_output_digest(line: str) -> Tuple[Path, str]:
-    path, right = _must_partition_string(line, ',')
-    ignored, right = _must_partition_string(right, ':')
+    path, right = _must_partition_string(line, ",")
+    ignored, right = _must_partition_string(right, ":")
     digest = right.lstrip()
     return Path(path), digest
 
@@ -102,7 +103,8 @@ class DictionaryDiff(object):
         yield from (f"right only: {k}: {v}" for k, v in self.right_only.items())
         yield from (
             f"different values: {k}: {v1} vs. {v2}"
-            for k, (v1, v2) in self.value_diffs.items())
+            for k, (v1, v2) in self.value_diffs.items()
+        )
 
 
 @dataclasses.dataclass
@@ -122,9 +124,14 @@ class ShowActionResult(object):
     output_files: Dict[Path, str]
 
     def __eq__(self, other) -> bool:
-        return self.command == other.command and self.platform == other.platform and self.inputs == other.inputs and self.output_files == other.output_files
+        return (
+            self.command == other.command
+            and self.platform == other.platform
+            and self.inputs == other.inputs
+            and self.output_files == other.output_files
+        )
 
-    def diff(self, other: 'ShowActionResult') -> ActionDifferences:
+    def diff(self, other: "ShowActionResult") -> ActionDifferences:
         return ActionDifferences(
             command_unified_diffs=list(
                 difflib.unified_diff(
@@ -132,7 +139,8 @@ class ShowActionResult(object):
                     other.command,
                     fromfile="left action",
                     tofile="right action",
-                )),
+                )
+            ),
             input_diffs=DictionaryDiff(self.inputs, other.inputs),
             platform_diffs=DictionaryDiff(self.platform, other.platform),
         )
@@ -148,13 +156,14 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
       ParseError if there are any parsing errors.
     """
     stripped_lines = [line.rstrip() for line in lines]
-    preamble, remainder = _must_partition_sequence(stripped_lines, 'Command')
-    command_section, remainder = _must_partition_sequence(remainder, 'Platform')
-    platform_section, remainder = _must_partition_sequence(remainder, 'Inputs')
+    preamble, remainder = _must_partition_sequence(stripped_lines, "Command")
+    command_section, remainder = _must_partition_sequence(remainder, "Platform")
+    platform_section, remainder = _must_partition_sequence(remainder, "Inputs")
 
     # Could see 'Action Result' or 'No action result in cache.'.
     inputs_section, result_sep, remainder = cl_utils.partition_sequence(
-        remainder, 'Action Result')
+        remainder, "Action Result"
+    )
 
     # command_section has:
     # [0] '======='
@@ -167,8 +176,10 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     # [0] '======='
     # [1:] key=value (repeated)
     platform_parameters = {
-        k: v for k, _, v in (
-            line.lstrip().partition('=') for line in platform_section[1:-1])
+        k: v
+        for k, _, v in (
+            line.lstrip().partition("=") for line in platform_section[1:-1]
+        )
     }
 
     # inputs_section has:
@@ -181,8 +192,8 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     # Inputs that come from other remote actions, might start with
     # 'set_by_reclient/a' (relative to exec_root, canonicalized).
     inputs = {
-        k: v for k, v in (
-            _parse_input_digest(line) for line in inputs_section[2:-2])
+        k: v
+        for k, v in (_parse_input_digest(line) for line in inputs_section[2:-2])
     }
 
     # result_section:
@@ -192,9 +203,11 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
     output_files = dict()
     if result_sep:
         result_section, remainder = _must_partition_sequence(
-            remainder, 'Output Files')
+            remainder, "Output Files"
+        )
         output_files_section, remainder = _must_partition_sequence(
-            remainder, 'Output Files From Directories')
+            remainder, "Output Files From Directories"
+        )
 
         # output_files_section has:
         # [0] '======='
@@ -202,8 +215,11 @@ def parse_show_action_output(lines: Iterable[str]) -> ShowActionResult:
         # [-1] <blank line>
         # Output file paths are relative to the working_dir (not exec_root).
         output_files = {
-            k: v for k, v in
-            (_parse_output_digest(line) for line in output_files_section[1:-1])
+            k: v
+            for k, v in (
+                _parse_output_digest(line)
+                for line in output_files_section[1:-1]
+            )
         }
 
     return ShowActionResult(
@@ -226,15 +242,14 @@ def read_config_file_lines(lines: Iterable[str]) -> Dict[str, str]:
     result = {}
     for line in lines:
         stripped = line.strip()
-        if stripped and not stripped.startswith('#'):
-            key, sep, value = stripped.partition('=')
-            if sep == '=':
+        if stripped and not stripped.startswith("#"):
+            key, sep, value = stripped.partition("=")
+            if sep == "=":
                 result[key] = value
     return result
 
 
 class RemoteTool(object):
-
     def __init__(self, reproxy_cfg: Path):
         self._reproxy_cfg = reproxy_cfg
 
@@ -264,24 +279,30 @@ class RemoteTool(object):
         service = self.config["service"]
         instance = self.config["instance"]
         auto_args = [
-            f'--service={service}',
-            f'--instance={instance}',
+            f"--service={service}",
+            f"--instance={instance}",
         ]
 
         # Infra builds use GCE credentials instead of ADC.
         gce_creds = os.environ.get("RBE_use_gce_credentials", None)
         if gce_creds:
-            auto_args.append(f'--use_gce_credentials={gce_creds}')
+            auto_args.append(f"--use_gce_credentials={gce_creds}")
         else:
             use_adc = self.config.get(
-                "use_application_default_credentials", None)
+                "use_application_default_credentials", None
+            )
             if use_adc:
                 auto_args.append(
-                    f"--use_application_default_credentials={use_adc}")
+                    f"--use_application_default_credentials={use_adc}"
+                )
 
-        command = [
-            str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
-        ] + auto_args + args
+        command = (
+            [
+                str(PROJECT_ROOT_REL / _HOST_REMOTETOOL),
+            ]
+            + auto_args
+            + args
+        )
         command_str = cl_utils.command_quoted_str(command)
         if show_command:
             print(command_str)
@@ -296,7 +317,7 @@ class RemoteTool(object):
         return result
 
     def _show_action(self, digest: str, **kwargs) -> cl_utils.SubprocessResult:
-        args = ['--operation', 'show_action', '--digest', digest]
+        args = ["--operation", "show_action", "--digest", digest]
         final_kwargs = kwargs
         final_kwargs["quiet"] = True
         return self.run(args, **final_kwargs)
@@ -314,11 +335,12 @@ class RemoteTool(object):
           ShowActionResult describing command, inputs, outputs.
         """
         hash, sep, size = digest.partition(
-            '/')  # actions all have the same "size" 147
+            "/"
+        )  # actions all have the same "size" 147
         tempdir = Path(tempfile.gettempdir())
-        cache_dir = tempdir / _SCRIPT_BASENAME / 'show_action_cache'
+        cache_dir = tempdir / _SCRIPT_BASENAME / "show_action_cache"
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache_file = cache_dir / (hash + '.stdout')
+        cache_file = cache_dir / (hash + ".stdout")
 
         if cache_file.exists():
             show_action_output = cache_file.read_text().splitlines()
@@ -327,13 +349,14 @@ class RemoteTool(object):
 
             show_action_output = result.stdout
             cache_file.write_text(
-                ''.join(line + '\n' for line in show_action_output))
+                "".join(line + "\n" for line in show_action_output)
+            )
 
         return parse_show_action_output(show_action_output)
 
     def download_blob(
-            self, path: Path, digest: str,
-            **kwargs) -> cl_utils.SubprocessResult:
+        self, path: Path, digest: str, **kwargs
+    ) -> cl_utils.SubprocessResult:
         """Downloads a remote artifact.
 
         Args:
@@ -346,16 +369,20 @@ class RemoteTool(object):
         """
         # TODO: use filelock.FileLock to guard against concurrent conflicts
         args = [
-            '--operation', 'download_blob', '--digest', digest, '--path',
-            str(path)
+            "--operation",
+            "download_blob",
+            "--digest",
+            digest,
+            "--path",
+            str(path),
         ]
         final_kwargs = kwargs
         final_kwargs["quiet"] = True
         return self.run(args, **final_kwargs)
 
     def download_dir(
-            self, path: Path, digest: str,
-            **kwargs) -> cl_utils.SubprocessResult:
+        self, path: Path, digest: str, **kwargs
+    ) -> cl_utils.SubprocessResult:
         """Downloads a remote directory of artifacts.
 
         Args:
@@ -368,8 +395,12 @@ class RemoteTool(object):
         """
         # TODO: use filelock.FileLock to guard against concurrent conflicts
         args = [
-            '--operation', 'download_dir', '--digest', digest, '--path',
-            str(path)
+            "--operation",
+            "download_dir",
+            "--digest",
+            digest,
+            "--path",
+            str(path),
         ]
         final_kwargs = kwargs
         final_kwargs["quiet"] = True

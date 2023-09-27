@@ -19,7 +19,7 @@ import sys
 
 def parse_version(version_str):
     """'10.6' => [10, 6]"""
-    return list(map(int, re.findall(r'(\d+)', version_str)))
+    return list(map(int, re.findall(r"(\d+)", version_str)))
 
 
 def main():
@@ -29,31 +29,39 @@ def main():
         action="store_true",
         dest="print_sdk_path",
         default=False,
-        help="Print the path to the SDK")
-    parser.add_argument("--developer-dir", help='Path to Xcode')
+        help="Print the path to the SDK",
+    )
+    parser.add_argument("--developer-dir", help="Path to Xcode")
     parser.add_argument("min_sdk_version", help="Minimum SDK version")
     args = parser.parse_args()
 
     if args.developer_dir:
-        os.environ['DEVELOPER_DIR'] = args.developer_dir
+        os.environ["DEVELOPER_DIR"] = args.developer_dir
 
     # 'xcrun' always returns the latest available SDK
     version = subprocess.check_output(
-        ['xcrun', '--sdk', 'macosx', '--show-sdk-version']).strip()
+        ["xcrun", "--sdk", "macosx", "--show-sdk-version"]
+    ).strip()
     version = version.decode()
     if parse_version(version) < parse_version(args.min_sdk_version):
         raise Exception(
-            'SDK version %s is before minimum version %s' %
-            (version, args.min_sdk_version))
+            "SDK version %s is before minimum version %s"
+            % (version, args.min_sdk_version)
+        )
     if args.print_sdk_path:
-        print(subprocess.check_output(
-            ['xcrun', '--sdk', 'macosx', '--show-sdk-path']).decode().strip())
+        print(
+            subprocess.check_output(
+                ["xcrun", "--sdk", "macosx", "--show-sdk-path"]
+            )
+            .decode()
+            .strip()
+        )
     print(version)
 
     return 0
 
 
-if __name__ == '__main__':
-    if sys.platform != 'darwin':
+if __name__ == "__main__":
+    if sys.platform != "darwin":
         raise Exception("This script only runs on Mac")
     sys.exit(main())

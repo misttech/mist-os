@@ -17,7 +17,8 @@ CPUID_LINE_RE = re.compile(
     "^(0x[a-z0-9]{8})\s(0x[a-z0-9]{2}):\seax=(0x[a-z0-9]{8})\sebx=(0x[a-z0-9]{8})\secx=(0x[a-z0-9]{8})\sedx=(0x[a-z0-9]{8})$"
 )
 
-HEADER = """// Copyright %s The Fuchsia Authors
+HEADER = (
+    """// Copyright %s The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
@@ -29,7 +30,9 @@ HEADER = """// Copyright %s The Fuchsia Authors
 // It is meant to be #include'd with the DEFINE_CPUID_VALUES macro defined.
 // Each line gives (leaf, subleaf, EAX, EBX, ECX, EDX) for a particular set of
 // values, in that order.
-""" % datetime.today().year
+"""
+    % datetime.today().year
+)
 
 
 # Prints to stderr, reserving stdout (via `print`) for the final output.
@@ -49,8 +52,9 @@ def main():
         return 1
     elif not CPU_LINE_RE.match(data[0]):
         Log(
-            "error: expected `%s` for a first line; not \"%s\"" %
-            (CPU_LINE_RE, data[0]))
+            'error: expected `%s` for a first line; not "%s"'
+            % (CPU_LINE_RE, data[0])
+        )
         return 1
     data = data[1:]
 
@@ -69,13 +73,14 @@ def main():
 
         matches = CPUID_LINE_RE.match(line)
         if matches is None:
-            Log("error: could not parse line \"%s\"" % line)
+            Log('error: could not parse line "%s"' % line)
             return 1
         parsed = matches.groups()
         if len(parsed) < 6:
             Log(
-                "error: parsed %s from line \"%s\"; expected more values" %
-                (parsed, line))
+                'error: parsed %s from line "%s"; expected more values'
+                % (parsed, line)
+            )
             return 1
         print("DEFINE_CPUID_VALUES(%s, %s, %s, %s, %s, %s)" % tuple(parsed))
 

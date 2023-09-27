@@ -12,21 +12,21 @@ def parse_args():
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--size-reports',
-        help='Paths to size-reports, separated by comma',
+        "--size-reports",
+        help="Paths to size-reports, separated by comma",
         required=True,
     )
     parser.add_argument(
-        '--verbose-outputs',
-        help='Paths to verbose outputs, separated by comma',
+        "--verbose-outputs",
+        help="Paths to verbose outputs, separated by comma",
         required=True,
     )
     parser.add_argument(
-        '--merged-size-reports',
+        "--merged-size-reports",
         required=True,
     )
     parser.add_argument(
-        '--merged-verbose-outputs',
+        "--merged-verbose-outputs",
         required=True,
     )
     return parser.parse_args()
@@ -36,12 +36,12 @@ def main():
     args = parse_args()
     size_report_table = {}
     for size_report in args.size_reports.split(","):
-        with open(size_report, 'r') as f:
+        with open(size_report, "r") as f:
             size_report_table.update(json.load(f))
 
     verbose_output_table = {}
     for verbose_output in args.verbose_outputs.split(","):
-        with open(verbose_output, 'r') as f:
+        with open(verbose_output, "r") as f:
             verbose_output_table.update(json.load(f))
 
     with open(args.merged_size_reports, "w") as f:
@@ -51,5 +51,5 @@ def main():
         json.dump(verbose_output_table, f, indent=4)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

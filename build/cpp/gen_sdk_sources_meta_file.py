@@ -26,46 +26,52 @@ def resolve_plasa_files(args):
     if not args:
         return plasa
     for arg in args:
-        with open(arg, 'r') as plasa_file:
+        with open(arg, "r") as plasa_file:
             data = json.load(plasa_file)
             for d in data:
-                plasa += [d['path']]
+                plasa += [d["path"]]
     return sorted(set(plasa))
 
 
 def main():
-    parser = argparse.ArgumentParser('Builds a metadata file')
-    parser.add_argument('--out', help='Path to the output file', required=True)
-    parser.add_argument('--name', help='Name of the library', required=True)
+    parser = argparse.ArgumentParser("Builds a metadata file")
+    parser.add_argument("--out", help="Path to the output file", required=True)
+    parser.add_argument("--name", help="Name of the library", required=True)
     parser.add_argument(
-        '--root', help='Root of the library in the SDK', required=True)
+        "--root", help="Root of the library in the SDK", required=True
+    )
     parser.add_argument(
-        '--deps', help='Path to metadata files of dependencies', nargs='*')
+        "--deps", help="Path to metadata files of dependencies", nargs="*"
+    )
     parser.add_argument(
-        '--dep_names', help='List of dependency names', nargs='*')
-    parser.add_argument('--sources', help='List of library sources', nargs='*')
+        "--dep_names", help="List of dependency names", nargs="*"
+    )
+    parser.add_argument("--sources", help="List of library sources", nargs="*")
     # Allowed to have no headers, since SDK libraries included in other SDK
     # libraries could have no headers.
-    parser.add_argument('--headers', help='List of public headers', nargs='*')
+    parser.add_argument("--headers", help="List of public headers", nargs="*")
     parser.add_argument(
-        '--include-dir', help='Path to the include directory', required=True)
+        "--include-dir", help="Path to the include directory", required=True
+    )
     parser.add_argument(
-        '--plasa', help='Path to the plasa fragments list', nargs='*')
+        "--plasa", help="Path to the plasa fragments list", nargs="*"
+    )
     args = parser.parse_args()
 
     if len(args.deps) != len(args.dep_names):
         raise Exception(
-            'Length of deps %s != length of dep_names %s' %
-            (len(args.deps), len(args.dep_names)))
+            "Length of deps %s != length of dep_names %s"
+            % (len(args.deps), len(args.dep_names))
+        )
 
     metadata = {
-        'type': 'cc_source_library',
-        'name': args.name,
-        'root': args.root,
-        'sources': args.sources,
-        'headers': args.headers,
-        'include_dir': args.include_dir,
-        'banjo_deps': [],
+        "type": "cc_source_library",
+        "name": args.name,
+        "root": args.root,
+        "sources": args.sources,
+        "headers": args.headers,
+        "include_dir": args.include_dir,
+        "banjo_deps": [],
     }
 
     deps = []
@@ -74,17 +80,17 @@ def main():
     banjo_deps = []
     fidl_layers = defaultdict(list)
     for idx, spec in enumerate(args.deps):
-        with open(spec, 'r') as spec_file:
+        with open(spec, "r") as spec_file:
             data = json.load(spec_file)
         if not data:
             continue
-        type = data['type']
-        name = data['name']
-        if type == 'cc_source_library' or type == 'cc_prebuilt_library':
+        type = data["type"]
+        name = data["name"]
+        if type == "cc_source_library" or type == "cc_prebuilt_library":
             deps.append(name)
-        elif type == 'fidl_library':
+        elif type == "fidl_library":
             dep_name = args.dep_names[idx]
-            if dep_name.endswith('banjo_cpp'):
+            if dep_name.endswith("banjo_cpp"):
                 banjo_deps.append(name)
             else:
                 # Layer here is defined to be "cpp" plus everything after
@@ -98,29 +104,24 @@ def main():
                     fidl_deps.append(name)
                     fidl_layers["hlcpp"].append(name)
         else:
-            raise Exception('Unsupported dependency type: %s' % type)
+            raise Exception("Unsupported dependency type: %s" % type)
 
-    metadata['deps'] = sorted(set(deps))
-    metadata['banjo_deps'] = sorted(set(banjo_deps))
-    metadata['fidl_deps'] = sorted(set(fidl_deps))
-    metadata['plasa'] = resolve_plasa_files(args.plasa)
-    metadata['fidl_binding_deps'] = [
-        {
-            "binding_type": layer,
-            "deps": sorted(set(dep))
-        } for layer, dep in fidl_layers.items()
+    metadata["deps"] = sorted(set(deps))
+    metadata["banjo_deps"] = sorted(set(banjo_deps))
+    metadata["fidl_deps"] = sorted(set(fidl_deps))
+    metadata["plasa"] = resolve_plasa_files(args.plasa)
+    metadata["fidl_binding_deps"] = [
+        {"binding_type": layer, "deps": sorted(set(dep))}
+        for layer, dep in fidl_layers.items()
     ]
 
-    with open(args.out, 'w') as out_file:
+    with open(args.out, "w") as out_file:
         json.dump(
-            metadata,
-            out_file,
-            indent=2,
-            sort_keys=True,
-            separators=(',', ': '))
+            metadata, out_file, indent=2, sort_keys=True, separators=(",", ": ")
+        )
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

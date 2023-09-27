@@ -67,13 +67,17 @@ def main():
         baseline = data[0][field]
         row = [name, baseline]
         for f in data[1:]:
-            row.extend([f[field], float(f[field]) / baseline if baseline else 0.0])
+            row.extend(
+                [f[field], float(f[field]) / baseline if baseline else 0.0]
+            )
         return row
 
     for path in sorted(files.keys()):
         file = files[path]
         if len(file) < 2:
-            print("%s not present in every elf_sizes.json" % path, file=sys.stderr)
+            print(
+                "%s not present in every elf_sizes.json" % path, file=sys.stderr
+            )
             continue
         if len(set([f["build_id"] for f in file])) == 1:
             print("%s is unchanged" % path, file=sys.stderr)

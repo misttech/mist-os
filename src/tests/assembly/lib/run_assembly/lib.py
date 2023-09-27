@@ -7,15 +7,16 @@ import subprocess
 
 
 def run_product_assembly(
-        ffx_bin,
-        product,
-        board_info,
-        input_bundles,
-        legacy_bundle,
-        outdir,
-        extra_config=[],
-        capture_output=False,
-        **kwargs):
+    ffx_bin,
+    product,
+    board_info,
+    input_bundles,
+    legacy_bundle,
+    outdir,
+    extra_config=[],
+    capture_output=False,
+    **kwargs,
+):
     """
     Run `ffx assembly product ...` with appropriate configuration and arguments for host tests.
 
@@ -62,7 +63,7 @@ def run_product_assembly(
     ]
 
     for arg_name, value in kwargs.items():
-        args.append("--" + arg_name.replace('_', '-'))
+        args.append("--" + arg_name.replace("_", "-"))
         args.append(value)
 
     return subprocess.run(args, capture_output)

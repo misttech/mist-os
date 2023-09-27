@@ -12,35 +12,42 @@ import mobly_driver_lib
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    'mobly_test_path',
-    help='path to the Mobly test archive produced by the GN build system.')
+    "mobly_test_path",
+    help="path to the Mobly test archive produced by the GN build system.",
+)
 parser.add_argument(
-    '-config_yaml_path',
+    "-config_yaml_path",
     default=None,
-    help='path to the Mobly test config YAML file.')
+    help="path to the Mobly test config YAML file.",
+)
 parser.add_argument(
-    '-params_yaml_path',
+    "-params_yaml_path",
     default=None,
-    help='path to the Mobly test params YAML file.')
+    help="path to the Mobly test params YAML file.",
+)
 parser.add_argument(
-    '-test_timeout_sec',
+    "-test_timeout_sec",
     default=0,
-    help='integer to specify number of seconds before a Mobly test times out.')
+    help="integer to specify number of seconds before a Mobly test times out.",
+)
 parser.add_argument(
-    '-test_data_path',
+    "-test_data_path",
     default=None,
-    help='path to directory containing test-time data dependencies.')
-parser.add_argument('-ffx_path', default=None, help='path to FFX.')
+    help="path to directory containing test-time data dependencies.",
+)
+parser.add_argument("-ffx_path", default=None, help="path to FFX.")
 parser.add_argument(
-    '-transport',
+    "-transport",
     default=None,
-    help='value to use in mobly config for host->device transport type.')
+    help="value to use in mobly config for host->device transport type.",
+)
 parser.add_argument(
-    '-v',
-    action='store_const',
+    "-v",
+    action="store_const",
     const=True,
     default=False,
-    help='run the mobly test with the -v flag.')
+    help="run the mobly test with the -v flag.",
+)
 args = parser.parse_args()
 
 
@@ -67,4 +74,5 @@ def main():
         timeout_sec=args.test_timeout_sec,
         test_data_path=args.test_data_path,
         transport=args.transport,
-        verbose=args.v)
+        verbose=args.v,
+    )

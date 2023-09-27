@@ -10,6 +10,7 @@ import os
 import shutil
 import subprocess
 import sys
+
 """
 The sdk is organized as such:
 
@@ -50,18 +51,19 @@ def get_filename_from_ifs(ifs_file):
 
 
 class SysrootGenerator:
-
     def _copy_files(self, other_arch, other_paths, meta_json_key):
         for src_path in other_paths:
             path = src_path.replace(other_arch, self.arch_name, 1)
             os.makedirs(
-                os.path.join(self.sdk_dir, os.path.dirname(path)),
-                exist_ok=True)
+                os.path.join(self.sdk_dir, os.path.dirname(path)), exist_ok=True
+            )
             shutil.copyfile(
                 os.path.join(self.sdk_dir, src_path),
-                os.path.join(self.sdk_dir, path))
+                os.path.join(self.sdk_dir, path),
+            )
             self.sysroot_meta["versions"][self.arch_name][meta_json_key].append(
-                path)
+                path
+            )
 
     def _copy_headers(self, other_arch, other_headers):
         self._copy_files(other_arch, other_headers, "headers")
@@ -74,7 +76,8 @@ class SysrootGenerator:
         # For bringing up new architectures executables won't be run anyway, this just creates
         # an empty Scrt1.o.
         Scrt1 = os.path.join(
-            self.sdk_dir, "arch", self.arch_name, "sysroot", "lib", "Scrt1.o")
+            self.sdk_dir, "arch", self.arch_name, "sysroot", "lib", "Scrt1.o"
+        )
         open(Scrt1, "w")
 
     def __init__(self, sdk_dir, arch_name):
@@ -86,8 +89,10 @@ class SysrootGenerator:
 
         def make_src_dst(dir):
             return os.path.join(
-                self.sdk_dir, "arch", other_arch, "sysroot", dir), os.path.join(
-                    self.sdk_dir, "arch", self.arch_name, "sysroot", dir)
+                self.sdk_dir, "arch", other_arch, "sysroot", dir
+            ), os.path.join(
+                self.sdk_dir, "arch", self.arch_name, "sysroot", dir
+            )
 
         src, dst = make_src_dst("include")
         shutil.copytree(src, dst)
@@ -100,9 +105,12 @@ class SysrootGenerator:
         with open(meta_json) as f:
             self.sysroot_meta = json.load(f)
             other_arch, other_version = next(
-                iter(self.sysroot_meta["versions"].items()))
-            other_headers, other_link_libs = other_version[
-                "headers"], other_version["link_libs"]
+                iter(self.sysroot_meta["versions"].items())
+            )
+            other_headers, other_link_libs = (
+                other_version["headers"],
+                other_version["link_libs"],
+            )
             self.sysroot_meta["versions"][self.arch_name] = {
                 "debug_libs": [],
                 "dist_dir": f"arch/{self.arch_name}/sysroot",
@@ -110,7 +118,7 @@ class SysrootGenerator:
                 "headers": [],
                 "include_dir": f"arch/{self.arch_name}/sysroot/include",
                 "link_libs": [],
-                "root": f"arch/{self.arch_name}/sysroot"
+                "root": f"arch/{self.arch_name}/sysroot",
             }
         self._copy_headers(other_arch, other_headers)
         self._copy_link_libs(other_arch, other_link_libs)
@@ -132,33 +140,46 @@ class SysrootGenerator:
         for ifs_file in self.sysroot_meta["ifs_files"]:
             source = os.path.join(self.sdk_dir, "pkg", "sysroot", ifs_file)
             dest = os.path.join(
-                self.sdk_dir, "arch", self.arch_name, "sysroot", "lib",
-                get_filename_from_ifs(ifs_file))
+                self.sdk_dir,
+                "arch",
+                self.arch_name,
+                "sysroot",
+                "lib",
+                get_filename_from_ifs(ifs_file),
+            )
             create_stub(source, dest)
 
     def finish(self):
         if not self.emit_meta_json:
             return
-        with open(os.path.join(self.sdk_dir, "pkg", "sysroot", "meta.json"),
-                  "w") as f:
+        with open(
+            os.path.join(self.sdk_dir, "pkg", "sysroot", "meta.json"), "w"
+        ) as f:
             json.dump(self.sysroot_meta, f)
 
 
 def create_libs(sdk_dir, arch_name, create_stub):
     dirs = [
-        f for f in os.listdir(os.path.join(sdk_dir, "pkg"))
+        f
+        for f in os.listdir(os.path.join(sdk_dir, "pkg"))
         if os.path.basename(f) != "sysroot"
     ]
     for dir in dirs:
         ifs_file = os.path.join(sdk_dir, "pkg", dir, f"{dir}.ifs")
         if os.path.exists(ifs_file):
             os.makedirs(
-                os.path.join(sdk_dir, "arch", arch_name, "lib"), exist_ok=True)
+                os.path.join(sdk_dir, "arch", arch_name, "lib"), exist_ok=True
+            )
             create_stub(
                 ifs_file,
                 os.path.join(
-                    sdk_dir, "arch", arch_name, "lib",
-                    get_filename_from_ifs(ifs_file)))
+                    sdk_dir,
+                    "arch",
+                    arch_name,
+                    "lib",
+                    get_filename_from_ifs(ifs_file),
+                ),
+            )
 
 
 def main():
@@ -166,9 +187,11 @@ def main():
     parser.add_argument(
         "--sdk-dir",
         required=True,
-        help="Path to sdk, should have arch/ and pkg/ at top level")
+        help="Path to sdk, should have arch/ and pkg/ at top level",
+    )
     parser.add_argument(
-        "--arch", required=True, help="ifs target to use for generating stubs")
+        "--arch", required=True, help="ifs target to use for generating stubs"
+    )
     parser.add_argument("--ifs-path", default="llvm-ifs")
     args = parser.parse_args()
 
@@ -179,9 +202,13 @@ def main():
     def write_stub(src, dest):
         subprocess.check_call(
             [
-                args.ifs_path, "--target", TARGET_TO_TRIPLE[args.arch],
-                f"--output-elf={dest}", src
-            ])
+                args.ifs_path,
+                "--target",
+                TARGET_TO_TRIPLE[args.arch],
+                f"--output-elf={dest}",
+                src,
+            ]
+        )
 
     sysroot_creator = SysrootGenerator(args.sdk_dir, args.arch)
     sysroot_creator.create()
@@ -194,5 +221,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

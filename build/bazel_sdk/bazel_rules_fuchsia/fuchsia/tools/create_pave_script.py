@@ -20,13 +20,13 @@ def parse_args():
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--product-bundle',
-        help='Path to product_bundle.json file.',
+        "--product-bundle",
+        help="Path to product_bundle.json file.",
         required=True,
     )
     parser.add_argument(
-        '--pave-script-path',
-        help='path to created pave script.',
+        "--pave-script-path",
+        help="path to created pave script.",
         required=True,
     )
     return parser.parse_args()
@@ -53,11 +53,15 @@ def main():
             parameters += ["--firmware", rel_path(bootloader["image"])]
 
     for image in product_bundle["system_a"]:
-        if image["type"] == "blk" and os.path.basename(
-                image["path"]) == "fvm.sparse.blk":
+        if (
+            image["type"] == "blk"
+            and os.path.basename(image["path"]) == "fvm.sparse.blk"
+        ):
             parameters += ["--fvm", rel_path(image["path"])]
-        if image["type"] == "blk" and os.path.basename(
-                image["path"]) == "fxfs.sparse.blk":
+        if (
+            image["type"] == "blk"
+            and os.path.basename(image["path"]) == "fxfs.sparse.blk"
+        ):
             parameters += ["--fxfs", rel_path(image["path"])]
         if image["type"] == "zbi":
             parameters += ["--zircona", rel_path(image["path"])]
@@ -74,11 +78,12 @@ def main():
     pave_script = PAVE_SCRIPT_TEMPLATE.format(
         bootserver=bootserver,
         board_name=board_name,
-        additional_args=" ".join(parameters))
+        additional_args=" ".join(parameters),
+    )
 
     with open(args.pave_script_path, "w") as f:
         f.write(pave_script)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

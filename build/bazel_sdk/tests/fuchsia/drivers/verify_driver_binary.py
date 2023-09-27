@@ -63,8 +63,9 @@ def get_exported_symbols(args):
     #      0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT   UND
     #      1: 0000000000000000     0 FUNC    GLOBAL DEFAULT   UND __zx_panic
     #
-    contents = run(args.readelf, "-s", "--demangle", "-W",
-                   args.driver_binary).splitlines()
+    contents = run(
+        args.readelf, "-s", "--demangle", "-W", args.driver_binary
+    ).splitlines()
 
     columns = contents[1].split()
     if columns[-1] != "Name":
@@ -102,7 +103,9 @@ def verify_exported_symbols(symbols):
     if expected_symbols.isdisjoint(symbols):
         _fail(
             "Expected to find one of {} in exported symbols {}".format(
-                expected_symbols, symbols))
+                expected_symbols, symbols
+            )
+        )
 
 
 def verify_needed_libs(args):
@@ -119,23 +122,30 @@ def verify_needed_libs(args):
     # each line.
     needed_libs = [
         l.strip()
-        for l in run(args.readelf, "--needed-libs",
-                     args.driver_binary).splitlines()[1:-1]
+        for l in run(
+            args.readelf, "--needed-libs", args.driver_binary
+        ).splitlines()[1:-1]
     ]
 
     expected_libs = [
-        "libasync-default.so", "libc.so", "libfdio.so", "libsvc.so",
-        "libtrace-engine.so", "libzircon.so"
+        "libasync-default.so",
+        "libc.so",
+        "libfdio.so",
+        "libsvc.so",
+        "libtrace-engine.so",
+        "libzircon.so",
     ]
 
     for lib in expected_libs:
         _assert_in(
-            lib, needed_libs, f"Failed to find {lib} in needed libraries")
+            lib, needed_libs, f"Failed to find {lib} in needed libraries"
+        )
 
     blocked_libs = ["libc++.so.2", "libc++abi.so.1"]
     for lib in blocked_libs:
         _assert_not_in(
-            lib, needed_libs, f"Unexpectedly found {lib} in needed libs.")
+            lib, needed_libs, f"Unexpectedly found {lib} in needed libs."
+        )
 
 
 def main():

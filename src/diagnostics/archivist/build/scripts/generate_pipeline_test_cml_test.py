@@ -39,30 +39,39 @@ EXPECTED_DISABLED_CML = """{
 
 
 class GeneratePipelineTestCml(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
 
     def testGenerateCml(self):
-        out_path = os.path.join(self.temp_dir, 'test.cml')
+        out_path = os.path.join(self.temp_dir, "test.cml")
         generate_pipeline_test_cml.run(
-            'feedback', [
-                'archivist/inspect/archivist.cfg', 'foo/bar/baz',
-                'component_manager/inspect/component_manager.cfg'
-            ], out_path, False)
-        with open(out_path, 'r') as f:
+            "feedback",
+            [
+                "archivist/inspect/archivist.cfg",
+                "foo/bar/baz",
+                "component_manager/inspect/component_manager.cfg",
+            ],
+            out_path,
+            False,
+        )
+        with open(out_path, "r") as f:
             self.assertEqual(f.read(), EXPECTED_CML)
 
     def testGenerateCmlExpectDisabled(self):
-        out_path = os.path.join(self.temp_dir, 'test.cml')
+        out_path = os.path.join(self.temp_dir, "test.cml")
         generate_pipeline_test_cml.run(
-            'feedback', [
-                'archivist/inspect/archivist.cfg', 'foo/bar/baz',
-                'component_manager/inspect/component_manager.cfg'
-            ], out_path, True)
-        with open(out_path, 'r') as f:
+            "feedback",
+            [
+                "archivist/inspect/archivist.cfg",
+                "foo/bar/baz",
+                "component_manager/inspect/component_manager.cfg",
+            ],
+            out_path,
+            True,
+        )
+        with open(out_path, "r") as f:
             self.assertEqual(f.read(), EXPECTED_DISABLED_CML)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

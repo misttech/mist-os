@@ -52,8 +52,7 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.wlan_policy.create_client_controller()
         self.device.wlan_policy.remove_all_networks()
-        networks: list[
-            NetworkConfig] = self.device.wlan_policy.get_saved_networks()
+        networks: list[NetworkConfig] = self.device.wlan_policy.get_saved_networks()
 
         asserts.assert_equal(len(networks), 0)
 
@@ -65,12 +64,14 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
                 ssid="a",
                 security_type=SecurityType.NONE,
                 credential_type="None",
-                credential_value=""),
+                credential_value="",
+            ),
             NetworkConfig(
                 ssid="b",
                 security_type=SecurityType.WPA,
                 credential_type="Password",
-                credential_value="12345678")
+                credential_value="12345678",
+            ),
         ]
 
         networks = self.device.wlan_policy.get_saved_networks()

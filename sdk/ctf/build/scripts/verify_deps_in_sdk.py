@@ -14,7 +14,7 @@ import os
 import re
 import sys
 
-CTF_EXTENSION = '.this_is_ctf'
+CTF_EXTENSION = ".this_is_ctf"
 
 
 class VerifyDepsInSDK:
@@ -34,32 +34,39 @@ class VerifyDepsInSDK:
     """
 
     def __init__(
-            self, root_build_dir, output_file, invoker_label, deps_to_verify,
-            allowed_deps, allowed_dirs, sdk_manifests):
+        self,
+        root_build_dir,
+        output_file,
+        invoker_label,
+        deps_to_verify,
+        allowed_deps,
+        allowed_dirs,
+        sdk_manifests,
+    ):
         if not (root_build_dir and os.path.exists(root_build_dir)):
-            raise ValueError('root_build_dir cannot be empty and must exist.')
+            raise ValueError("root_build_dir cannot be empty and must exist.")
 
         if not output_file:
-            raise ValueError('output_file cannot be empty.')
+            raise ValueError("output_file cannot be empty.")
 
         if not invoker_label:
-            raise ValueError('invoker_label cannot be empty.')
+            raise ValueError("invoker_label cannot be empty.")
 
         if not deps_to_verify:
-            raise ValueError('deps_to_verify cannot be empty.')
+            raise ValueError("deps_to_verify cannot be empty.")
 
         if not allowed_deps:
-            raise ValueError('allowed_deps cannot be empty')
+            raise ValueError("allowed_deps cannot be empty")
 
         if not allowed_dirs:
-            raise ValueError('allowed_dirs cannot be empty')
+            raise ValueError("allowed_dirs cannot be empty")
 
         if sdk_manifests:
             for manifest in sdk_manifests:
                 if not os.path.isfile(manifest):
-                    raise ValueError(f'manifest {manifest} does not exist')
+                    raise ValueError(f"manifest {manifest} does not exist")
         else:
-            raise ValueError('sdk_manifests cannot be empty')
+            raise ValueError("sdk_manifests cannot be empty")
 
         self.root_build_dir = root_build_dir
         self.output_file = output_file
@@ -89,17 +96,24 @@ class VerifyDepsInSDK:
         dep = dep[2:]
 
         # Get the target_name from the label.
-        if ':' in dep:
+        if ":" in dep:
             # path/to/lib:lib
-            dep, target_name = dep.split(':')
-        elif '/' in dep:
+            dep, target_name = dep.split(":")
+        elif "/" in dep:
             # path/to/lib
-            _, target_name = dep.rsplit('/', 1)
+            _, target_name = dep.rsplit("/", 1)
         else:
             # lib
             target_name = dep
 
-        return self.root_build_dir + '/ctf/' + dep + '/' + target_name + CTF_EXTENSION
+        return (
+            self.root_build_dir
+            + "/ctf/"
+            + dep
+            + "/"
+            + target_name
+            + CTF_EXTENSION
+        )
 
     def verify_deps(self):
         """Verifies the element's dependencies are released in a public SDK.
@@ -119,12 +133,13 @@ class VerifyDepsInSDK:
             # contain the FIDL name.
             for suffix in ["_hlcpp", "_rust", "_cpp_wire"]:
                 if dep.endswith(suffix):
-                    dep = dep[:-len(suffix)]
+                    dep = dep[: -len(suffix)]
                     break
 
             dep_found = False
             if dep in self.allowed_deps or os.path.exists(
-                    self.get_ctf_file_path(dep)):
+                self.get_ctf_file_path(dep)
+            ):
                 dep_found = True
             else:
                 # Dep isn't in the allow list and a CTF file doesn't exist. Check if
@@ -151,16 +166,16 @@ class VerifyDepsInSDK:
         """
         # SDK atoms are appended with one of the following suffixes, so we want
         # to ignore them to match against the provided label.
-        sdk_suffixes = ['_sdk_manifest', '_sdk_legacy', '_sdk']
+        sdk_suffixes = ["_sdk_manifest", "_sdk_legacy", "_sdk"]
 
         atoms = set()
         for sdk_manifest in self.sdk_manifests:
-            with open(sdk_manifest, 'r') as manifest:
+            with open(sdk_manifest, "r") as manifest:
                 data = manifest.read().splitlines()
             for atom in data:
                 for suffix in sdk_suffixes:
                     if atom.endswith(suffix):
-                        atom = atom[:-len(suffix)]
+                        atom = atom[: -len(suffix)]
                         break
                 atoms.add(atom)
 
@@ -176,61 +191,69 @@ class VerifyDepsInSDK:
 
         Should only be run after dependencies are verified using verify_deps.
         """
-        target_gen_dir, _ = self.output_file.rsplit('/', 1)
+        target_gen_dir, _ = self.output_file.rsplit("/", 1)
         if not os.path.exists(target_gen_dir):
             os.makedirs(target_gen_dir)
 
-        with open(self.output_file, 'w') as f:
+        with open(self.output_file, "w") as f:
             for dep in self.deps_to_verify:
-                f.write(f'{dep}\n')
+                f.write(f"{dep}\n")
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--root_build_dir',
+        "--root_build_dir",
         required=True,
-        help='Path to the GN $root_build_dir. The default is //out/default.')
-    parser.add_argument(
-        '--output',
-        required=True,
-        help='The path to (including) the file to be generated.')
-    parser.add_argument(
-        '--invoker_label',
-        required=True,
-        help='The label of the invoker of verify_deps_in_sdk.')
-    parser.add_argument(
-        '--deps_to_verify',
-        nargs='+',
-        required=True,
-        help=
-        'A list of at least one GN label representing the target\'s dependencies.'
+        help="Path to the GN $root_build_dir. The default is //out/default.",
     )
     parser.add_argument(
-        '--allowed_deps',
-        nargs='+',
+        "--output",
         required=True,
-        help='A list of allowed dependencies.')
-    parser.add_argument(
-        '--allowed_dirs',
-        nargs='+',
-        required=True,
-        help=
-        'A list of directories where any dependency is allowed. Directories should end in /*'
+        help="The path to (including) the file to be generated.",
     )
     parser.add_argument(
-        '--sdk_manifests',
-        nargs='+',
+        "--invoker_label",
         required=True,
-        help='The list of paths to public and partner SDK manifests')
+        help="The label of the invoker of verify_deps_in_sdk.",
+    )
+    parser.add_argument(
+        "--deps_to_verify",
+        nargs="+",
+        required=True,
+        help="A list of at least one GN label representing the target's dependencies.",
+    )
+    parser.add_argument(
+        "--allowed_deps",
+        nargs="+",
+        required=True,
+        help="A list of allowed dependencies.",
+    )
+    parser.add_argument(
+        "--allowed_dirs",
+        nargs="+",
+        required=True,
+        help="A list of directories where any dependency is allowed. Directories should end in /*",
+    )
+    parser.add_argument(
+        "--sdk_manifests",
+        nargs="+",
+        required=True,
+        help="The list of paths to public and partner SDK manifests",
+    )
     args = parser.parse_args()
     try:
         target = VerifyDepsInSDK(
-            args.root_build_dir, args.output, args.invoker_label,
-            args.deps_to_verify, args.allowed_deps, args.allowed_dirs,
-            args.sdk_manifests)
+            args.root_build_dir,
+            args.output,
+            args.invoker_label,
+            args.deps_to_verify,
+            args.allowed_deps,
+            args.allowed_dirs,
+            args.sdk_manifests,
+        )
     except ValueError as e:
-        print(f'ValueError: {e}')
+        print(f"ValueError: {e}")
         return 1
 
     unaccepted_deps = target.verify_deps()
@@ -245,5 +268,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

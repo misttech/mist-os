@@ -17,20 +17,17 @@ from fuchsia_controller_py import Context, IsolateDir, Channel, ZxStatus
 
 
 class TestEchoer(ffx.Echo.Server):
-
     def echo_string(self, request: ffx.EchoEchoStringRequest):
         return ffx.EchoEchoStringResponse(response=request.value)
 
 
 class AsyncEchoer(ffx.Echo.Server):
-
     async def echo_string(self, request: ffx.EchoEchoStringRequest):
         await asyncio.sleep(0.1)  # This isn't necessary, but it is fun.
         return ffx.EchoEchoStringResponse(response=request.value)
 
 
 class TargetCollectionReaderImpl(ffx.TargetCollectionReader.Server):
-
     def __init__(self, channel: Channel, target_list):
         super().__init__(channel)
         self.target_list = target_list
@@ -42,35 +39,35 @@ class TargetCollectionReaderImpl(ffx.TargetCollectionReader.Server):
 
 
 class TargetCollectionImpl(ffx.TargetCollection.Server):
-
     async def list_targets(
-            self, request: ffx.TargetCollectionListTargetsRequest):
+        self, request: ffx.TargetCollectionListTargetsRequest
+    ):
         reader = ffx.TargetCollectionReader.Client(request.reader)
         await reader.next(
             entry=[
                 ffx.TargetInfo(nodename="foo"),
                 ffx.TargetInfo(nodename="bar"),
-            ])
-        await reader.next(entry=[
-            ffx.TargetInfo(nodename="baz"),
-        ])
+            ]
+        )
+        await reader.next(
+            entry=[
+                ffx.TargetInfo(nodename="baz"),
+            ]
+        )
         await reader.next(entry=[])
 
 
 class StubFileServer(f_io.File.Server):
-
     def read(self, request: f_io.ReadableReadRequest):
         return f_io.ReadableReadResponse(data=[1, 2, 3, 4])
 
 
 class FailingFileServer(f_io.File.Server):
-
     def read(self, _: f_io.ReadableReadRequest):
         return self.Error(ZxStatus.ZX_ERR_PEER_CLOSED)
 
 
 class TestingServer(fc_test.Testing.Server):
-
     def return_union(self):
         res = fc_test.TestingReturnUnionResponse()
         res.y = "foobar"
@@ -83,7 +80,6 @@ class TestingServer(fc_test.Testing.Server):
 
 
 class ServerTests(unittest.IsolatedAsyncioTestCase):
-
     async def test_echo_server_sync(self):
         (tx, rx) = Channel.create()
         server = TestEchoer(rx)
@@ -130,9 +126,11 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         tc_task = loop.create_task(target_collection_server.serve())
         tc_client = ffx.TargetCollection.Client(tc_client_channel)
         tc_client.list_targets(
-            query=ffx.TargetQuery(), reader=reader_client_channel.take())
+            query=ffx.TargetQuery(), reader=reader_client_channel.take()
+        )
         done, pending = await asyncio.wait(
-            [reader_task, tc_task], return_when=asyncio.FIRST_COMPLETED)
+            [reader_task, tc_task], return_when=asyncio.FIRST_COMPLETED
+        )
         # This will just surface exceptions if they happen. For correct behavior this should just
         # return the result of the reader task.
         done.pop().result()
@@ -150,7 +148,8 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         file_proxy = f_io.File.Client(client)
         file_server = StubFileServer(server)
         server_task = asyncio.get_running_loop().create_task(
-            file_server.serve())
+            file_server.serve()
+        )
         res = await file_proxy.read(count=4)
         self.assertEqual(res.response.data, [1, 2, 3, 4])
 
@@ -159,7 +158,8 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         file_proxy = f_io.File.Client(client)
         file_server = FailingFileServer(server)
         server_task = asyncio.get_running_loop().create_task(
-            file_server.serve())
+            file_server.serve()
+        )
         res = await file_proxy.read(count=4)
         self.assertEqual(res.response, None)
         self.assertEqual(res.err, ZxStatus.ZX_ERR_PEER_CLOSED)

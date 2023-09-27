@@ -24,7 +24,8 @@ class SessionFFXTests(unittest.TestCase):
 
         self.ffx_obj = mock.MagicMock(spec=ffx_transport.FFX)
         self.session_obj = ffx_session.Session(
-            device_name="fuchsia-emulator", ffx=self.ffx_obj)
+            device_name="fuchsia-emulator", ffx=self.ffx_obj
+        )
 
     def test_start(self) -> None:
         """Test for Session.start() method."""

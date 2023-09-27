@@ -70,18 +70,18 @@ def strip_toolchain(target):
 
 
 def extract_toolchain(target):
-    """ Return the toolchain part of the provided label, or None if it doesn't have one."""
+    """Return the toolchain part of the provided label, or None if it doesn't have one."""
     if "(" not in target:
         # target has no toolchain specified
         return None
-    substr = target[target.find("(") + 1:]
+    substr = target[target.find("(") + 1 :]
     if not target.endswith(")"):
         raise ValueError("target %s missing closing `)`")
     return substr[:-1]  # remove closing `)`
 
 
 def version_from_toolchain(toolchain):
-    """ Return a version to use to allow host and target crates to coexist. """
+    """Return a version to use to allow host and target crates to coexist."""
     version = "0.0.1"
     if toolchain != None and toolchain.startswith("//build/toolchain:host_"):
         version = "0.0.2"
@@ -134,7 +134,6 @@ def mangle_label(label):
 
 
 class Project(object):
-
     def __init__(self, project_json):
         self.targets = project_json
         self.patches = None
@@ -182,9 +181,11 @@ class Project(object):
 
     def find_test_targets(self, source_root):
         overlapping_targets = self.rust_targets_by_source_root.get(
-            source_root, [])
+            source_root, []
+        )
         return [
-            t for t in overlapping_targets
+            t
+            for t in overlapping_targets
             if "--test" in self.targets[t]["rustflags"]
         ]
 
@@ -211,13 +212,22 @@ def get_cfgs(rustflags):
             if match.group(1) != "__rust_toolchain":
                 cfgs.append(f"{match.group(1)}={match.group(2)}")
         elif flag.startswith("--cfg="):
-            cfgs.append(flag[len("--cfg="):])
+            cfgs.append(flag[len("--cfg=") :])
     return cfgs
 
 
 def write_toml_file(
-        fout, metadata, project, target, lookup, root_path, root_build_dir,
-        gn_cargo_dir, for_workspace, version):
+    fout,
+    metadata,
+    project,
+    target,
+    lookup,
+    root_path,
+    root_build_dir,
+    gn_cargo_dir,
+    for_workspace,
+    version,
+):
     rust_crates_path = os.path.join(root_path, "third_party/rust_crates")
 
     editions = [
@@ -227,8 +237,11 @@ def write_toml_file(
     ]
     edition = editions[0] if editions else "2015"
 
-    if metadata["type"] in ["rust_library", "rust_proc_macro",
-                            "static_library"]:
+    if metadata["type"] in [
+        "rust_library",
+        "rust_proc_macro",
+        "static_library",
+    ]:
         target_type = "[lib]"
     else:
         if "--test" in metadata["rustflags"]:
@@ -246,14 +259,16 @@ def write_toml_file(
 
     crate_type = "rlib"
     package_name = lookup_gn_pkg_name(
-        project, target, for_workspace=for_workspace)
+        project, target, for_workspace=for_workspace
+    )
 
     default_target = ""
     if classify_toolchain(extract_toolchain(target)) == ToolchainType.TARGET:
         default_target = 'default-target = "x86_64-fuchsia"'
 
     fout.write(
-        CARGO_PACKAGE_CONTENTS % {
+        CARGO_PACKAGE_CONTENTS
+        % {
             "target": target,
             "package_name": package_name,
             "crate_name": metadata["crate_name"],
@@ -266,12 +281,14 @@ def write_toml_file(
             "source_root": rebase_gn_path(root_path, metadata["crate_root"]),
             "rust_crates_path": rust_crates_path,
             "default_target": default_target,
-        })
+        }
+    )
 
     env_vars = metadata.get("rustenv", [])
     if extra_configs or env_vars:
-        with open(os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"),
-                  "w") as buildfile:
+        with open(
+            os.path.join(gn_cargo_dir, str(lookup[target]), "build.rs"), "w"
+        ) as buildfile:
             template = textwrap.dedent(
                 """\
                 //! build script for {target}
@@ -282,14 +299,18 @@ def write_toml_file(
                 {body}
                 {env_vars}
                 }}
-            """)
+            """
+            )
             body = "\n".join(
                 f'println!(r#"cargo:rustc-cfg={cfg}"#);'
-                for cfg in extra_configs)
+                for cfg in extra_configs
+            )
             env_vars = "\n".join(
-                f'println!("cargo:rustc-env={env}");' for env in env_vars)
+                f'println!("cargo:rustc-env={env}");' for env in env_vars
+            )
             buildfile.write(
-                template.format(target=target, body=body, env_vars=env_vars))
+                template.format(target=target, body=body, env_vars=env_vars)
+            )
 
     extra_test_deps = set()
     if target_type in {"[lib]", "[[bin]]"}:
@@ -304,11 +325,13 @@ def write_toml_file(
             test_deps.update(project.targets[test_target]["deps"])
 
         unreachable_test_deps = sorted(
-            [dep for dep in test_deps if dep not in project.reachable_targets])
+            [dep for dep in test_deps if dep not in project.reachable_targets]
+        )
         if unreachable_test_deps:
             fout.write(
                 "# Note: disabling tests because test deps are not included in the build: %s\n"
-                % unreachable_test_deps)
+                % unreachable_test_deps
+            )
             fout.write("test = false\n")
         elif not test_targets:
             fout.write(
@@ -318,7 +341,8 @@ def write_toml_file(
         else:
             fout.write(
                 "# Note: using extra deps from discovered test target(s): %s\n"
-                % test_targets)
+                % test_targets
+            )
             extra_test_deps = sorted(test_deps - set(metadata["deps"]))
 
     if not for_workspace:
@@ -330,9 +354,10 @@ def write_toml_file(
         for patch in project.patches:
             path = project.patches[patch]["path"]
             fout.write(
-                "%s = { path = \"%s/%s\"" % (patch, rust_crates_path, path))
+                '%s = { path = "%s/%s"' % (patch, rust_crates_path, path)
+            )
             if package := project.patches[patch].get("package"):
-                fout.write(", package = \"%s\"" % (package,))
+                fout.write(', package = "%s"' % (package,))
             fout.write(" }\n")
         fout.write("\n")
 
@@ -375,11 +400,12 @@ def write_toml_file(
                 crate_name, version = str(match.group(1)).rsplit("-v", 1)
                 dep_crate_names.add(crate_name)
                 version = version.replace("_", ".")
-                fout.write("[%s.\"%s\"]\n" % (dep_type, crate_name))
-                fout.write("version = \"%s\"\n" % version)
+                fout.write('[%s."%s"]\n' % (dep_type, crate_name))
+                fout.write('version = "%s"\n' % version)
                 fout.write("default-features = false\n")
                 if dep_features := get_features(
-                        project.targets[dep]["rustflags"]):
+                    project.targets[dep]["rustflags"]
+                ):
                     fout.write("features = %s\n" % json.dumps(dep_features))
                 if crate_name in features:
                     # Make the dependency optional if there is a feature with
@@ -392,15 +418,18 @@ def write_toml_file(
                 toolchain = extract_toolchain(dep)
                 version = version_from_toolchain(toolchain)
                 crate_name = lookup_gn_pkg_name(
-                    project, dep, for_workspace=for_workspace)
+                    project, dep, for_workspace=for_workspace
+                )
                 dep_dir = os.path.join(gn_cargo_dir, str(lookup[dep]))
                 fout.write(
-                    CARGO_PACKAGE_DEP % {
+                    CARGO_PACKAGE_DEP
+                    % {
                         "dep_type": dep_type,
                         "crate_path": dep_dir,
                         "crate_name": crate_name,
                         "version": version,
-                    })
+                    }
+                )
 
     write_deps(deps, "dependencies")
     write_deps(extra_test_deps, "dev-dependencies")
@@ -476,13 +505,15 @@ def main():
             print("Failed to create directory for Cargo: %s" % cargo_toml_dir)
 
         for_workspace_cargo_toml_dir = os.path.join(
-            gn_cargo_dir, "for_workspace", str(lookup[target]))
+            gn_cargo_dir, "for_workspace", str(lookup[target])
+        )
         try:
             os.makedirs(for_workspace_cargo_toml_dir)
         except OSError:
             print(
-                "Failed to create directory for Cargo: %s" %
-                for_workspace_cargo_toml_dir)
+                "Failed to create directory for Cargo: %s"
+                % for_workspace_cargo_toml_dir
+            )
 
         metadata = project.targets[target]
         with open(os.path.join(cargo_toml_dir, "Cargo.toml"), "w") as fout:
@@ -496,16 +527,21 @@ def main():
                 root_build_dir,
                 gn_cargo_dir,
                 for_workspace=False,
-                version=version)
+                version=version,
+            )
 
-        if (not target.startswith("//third_party/rust_crates:")
-           ) and target in project.reachable_targets:
+        if (
+            not target.startswith("//third_party/rust_crates:")
+        ) and target in project.reachable_targets:
             workspace_dirs_by_toolchain[toolchain].append(
                 (
                     target,
-                    os.path.relpath(for_workspace_cargo_toml_dir, root_path)))
-            with open(os.path.join(for_workspace_cargo_toml_dir, "Cargo.toml"),
-                      "w") as fout:
+                    os.path.relpath(for_workspace_cargo_toml_dir, root_path),
+                )
+            )
+            with open(
+                os.path.join(for_workspace_cargo_toml_dir, "Cargo.toml"), "w"
+            ) as fout:
                 write_toml_file(
                     fout,
                     metadata,
@@ -516,7 +552,8 @@ def main():
                     root_build_dir,
                     os.path.join(gn_cargo_dir, "for_workspace"),
                     for_workspace=True,
-                    version=version)
+                    version=version,
+                )
 
     # TODO: refactor into separate function
     for toolchain, workspace_dirs in workspace_dirs_by_toolchain.items():
@@ -536,8 +573,9 @@ def main():
         except OSError:
             print("Failed to create directory for Cargo: %s" % subdir)
 
-        with open(os.path.join(subdir, "Cargo_for_fuchsia_dir.toml"),
-                  "w") as fout:
+        with open(
+            os.path.join(subdir, "Cargo_for_fuchsia_dir.toml"), "w"
+        ) as fout:
             fout.write("[workspace]\nmembers = [\n")
             for target, dir in workspace_dirs:
                 fout.write("  # %s\n" % target)
@@ -549,12 +587,16 @@ def main():
             for patch in project.patches:
                 path = project.patches[patch]["path"]
                 fout.write(
-                    "%s = { path = %s" % (
+                    "%s = { path = %s"
+                    % (
                         patch,
                         json.dumps(
-                            os.path.join("third_party/rust_crates", path))))
+                            os.path.join("third_party/rust_crates", path)
+                        ),
+                    )
+                )
                 if package := project.patches[patch].get("package"):
-                    fout.write(", package = \"%s\"" % (package,))
+                    fout.write(', package = "%s"' % (package,))
                 fout.write(" }\n")
             fout.write("\n")
 
@@ -566,9 +608,12 @@ def main():
                 "type": project.targets[t]["type"],
                 "cargo_manifest_dir": lookup[t],
                 "crate_root": project.targets[t]["crate_root"],
-            } for t in project.rust_targets if t in project.reachable_targets
+            }
+            for t in project.rust_targets
+            if t in project.reachable_targets
         ],
-        key=lambda t: t["label"])
+        key=lambda t: t["label"],
+    )
 
     # Returns a single rust target per "base" label (not including toolchain),
     # either for fuchsia toolchains or host toolchains. This is used for rustdoc
@@ -580,8 +625,9 @@ def main():
             disable = None
             if meta := project.rust_targets[t["label"]].get("metadata"):
                 disable = meta.get("disable_rustdoc")
-            if disable == [True] or (t["type"] == "executable" and
-                                     disable != [False]):
+            if disable == [True] or (
+                t["type"] == "executable" and disable != [False]
+            ):
                 continue
             l = t["label"].replace(".actual", "")
             base = l.split("(")[0]

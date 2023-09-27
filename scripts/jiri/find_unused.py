@@ -32,14 +32,15 @@ import xml.etree.ElementTree as ET
 
 def run_returncode(*command, **kwargs):
     return subprocess.run(
-        command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        **kwargs).returncode
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, **kwargs
+    ).returncode
 
 
 def check_output(*command, **kwargs):
     try:
         return subprocess.check_output(
-            command, stderr=subprocess.STDOUT, encoding="utf8", **kwargs)
+            command, stderr=subprocess.STDOUT, encoding="utf8", **kwargs
+        )
     except subprocess.CalledProcessError as e:
         print("Failed: " + " ".join(command), file=sys.stderr)
         print(e.output, file=sys.stderr)
@@ -48,14 +49,17 @@ def check_output(*command, **kwargs):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Collects data useful in trimming unused jiri projects")
+        description="Collects data useful in trimming unused jiri projects"
+    )
     parser.add_argument(
-        "--jiri_manifest", help="Input jiri manifest file", required=True)
+        "--jiri_manifest", help="Input jiri manifest file", required=True
+    )
     parser.add_argument(
         "--csv",
         help="Output csv file",
-        type=argparse.FileType('w'),
-        required=True)
+        type=argparse.FileType("w"),
+        required=True,
+    )
     args = parser.parse_args()
 
     URL = re.compile("https:\/\/\S*")
@@ -107,17 +111,21 @@ def main():
         # file bytes.
         # This option is left as an exercise to the reader.
         new_manifest_contents = re.sub(
-            "^\s*<project [^\>]*?path\s*=\s*\"" + re.escape(path) +
-            "\"[\S\s]*?\/>\n",
+            '^\s*<project [^\>]*?path\s*=\s*"'
+            + re.escape(path)
+            + '"[\S\s]*?\/>\n',
             "",
             manifest_contents,
-            flags=re.MULTILINE)
-        open(args.jiri_manifest, 'w').write(new_manifest_contents)
+            flags=re.MULTILINE,
+        )
+        open(args.jiri_manifest, "w").write(new_manifest_contents)
         check_git_command(
-            "commit", "-a", "-m", f"[jiri] Check if {path} is unused")
-        print(f"Sending {path} removal to CQ... ", end='')
+            "commit", "-a", "-m", f"[jiri] Check if {path} is unused"
+        )
+        print(f"Sending {path} removal to CQ... ", end="")
         upload_out = check_output(
-            "jiri", "upload", "-l", "Commit-Queue+1", cwd=manifest_dir)
+            "jiri", "upload", "-l", "Commit-Queue+1", cwd=manifest_dir
+        )
         url = URL.search(upload_out)[0]
         print(url)
         args.csv.write(f"{path},true,{url}\n")

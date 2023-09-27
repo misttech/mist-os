@@ -12,13 +12,16 @@ import sys
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--binaries-json', help='binaries.json file', required=True)
+        "--binaries-json", help="binaries.json file", required=True
+    )
     parser.add_argument(
-        '--root-build-dir', help='Root build directory', required=True)
+        "--root-build-dir", help="Root build directory", required=True
+    )
     parser.add_argument(
-        '--zircon-root-build-dir',
-        help='Zircon root build directory',
-        required=True)
+        "--zircon-root-build-dir",
+        help="Zircon root build directory",
+        required=True,
+    )
     args = parser.parse_args()
 
     with open(args.binaries_json) as f:
@@ -26,17 +29,18 @@ def main():
 
     # Modify labels and paths to be valid in the Fuchsia build instead of the Zircon build.
     for binary in binaries:
-        binary['label'] = binary['label'].replace('//', '//zircon/')
-        for path_prop in ['dist', 'debug', 'elf_build_id', 'breakpad']:
+        binary["label"] = binary["label"].replace("//", "//zircon/")
+        for path_prop in ["dist", "debug", "elf_build_id", "breakpad"]:
             if path_prop in binary:
                 binary[path_prop] = os.path.relpath(
                     os.path.join(args.zircon_root_build_dir, binary[path_prop]),
-                    args.root_build_dir)
+                    args.root_build_dir,
+                )
 
     json.dump(binaries, sys.stdout)
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

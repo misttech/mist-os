@@ -58,6 +58,7 @@ melon/output: \
 from os import PathLike
 import os
 from typing import Iterable, Set, Union
+
 FilePath = Union[str, PathLike]
 
 
@@ -84,7 +85,7 @@ class DepFile:
         """Add an input to the depfile"""
         self.deps.add(self._rebase(input))
 
-    def update(self, other: Union['DepFile', Iterable[FilePath]]) -> None:
+    def update(self, other: Union["DepFile", Iterable[FilePath]]) -> None:
         """Add each input to this depfile"""
         # If other is another DepFile, just snag the values from it's internal
         # dict.
@@ -102,10 +103,11 @@ class DepFile:
 
     @classmethod
     def from_deps(
-            cls,
-            output: FilePath,
-            inputs: Iterable[FilePath],
-            rebase: FilePath = None) -> 'DepFile':
+        cls,
+        output: FilePath,
+        inputs: Iterable[FilePath],
+        rebase: FilePath = None,
+    ) -> "DepFile":
         dep_file = cls(output, rebase)
         dep_file.update(inputs)
         return dep_file
@@ -113,11 +115,11 @@ class DepFile:
     def __repr__(self) -> str:
         if self.deps:
             return "{}: \\\n  {}\n".format(
-                self.output, " \\\n  ".join(sorted(self.deps)))
+                self.output, " \\\n  ".join(sorted(self.deps))
+            )
         else:
             return "{}:\n".format(self.output)
 
     def write_to(self, file) -> None:
-        """Write out the depfile contents to the given writeable `file-like` object.
-        """
+        """Write out the depfile contents to the given writeable `file-like` object."""
         file.write(str(self))

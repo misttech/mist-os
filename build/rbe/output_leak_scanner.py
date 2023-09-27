@@ -38,12 +38,12 @@ PROJECT_ROOT = fuchsia.project_root_dir()
 
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
-_REMOTE_PROJECT_ROOT = Path('/b/f/w')
+_REMOTE_PROJECT_ROOT = Path("/b/f/w")
 
 
 def error_msg(text: str, label: str = None):
-    label_text = f'[{label}]' if label else ''
-    print(f'[{_SCRIPT_BASENAME}]{label_text}: Error: {text}')
+    label_text = f"[{label}]" if label else ""
+    print(f"[{_SCRIPT_BASENAME}]{label_text}: Error: {text}")
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -77,14 +77,14 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def _whole_word_pattern(pattern: str) -> str:
-    boundary = r'\b'
-    left = '' if pattern.startswith(boundary) else boundary
-    right = '' if pattern.endswith(boundary) else boundary
+    boundary = r"\b"
+    left = "" if pattern.startswith(boundary) else boundary
+    right = "" if pattern.endswith(boundary) else boundary
     return left + pattern + right
 
 
 def _literal_dot_pattern(pattern: str) -> str:
-    return pattern.replace('.', r'\.')
+    return pattern.replace(".", r"\.")
 
 
 class PathPattern(object):
@@ -97,7 +97,7 @@ class PathPattern(object):
           path: path, which may be relative or absolute, but not != '.'.
         """
         self._text = str(path)
-        if self._text == '.':
+        if self._text == ".":
             raise ValueError(
                 f'You should skip PathPattern checks when path is just "{self._text}"'
             )
@@ -125,11 +125,11 @@ class PathPattern(object):
 
 # define for easy mocking
 def _open_read_text(f) -> io.TextIOBase:
-    return open(f, 'rt')
+    return open(f, "rt")
 
 
 def _open_read_binary(f) -> io.RawIOBase:
-    return open(f, 'rb', 0)
+    return open(f, "rb", 0)
 
 
 def file_contains_subpath(
@@ -172,8 +172,9 @@ def file_contains_subpath(
     return False
 
 
-def paths_with_build_dir_leaks(paths: Iterable[Path],
-                               pattern: re.Pattern) -> Iterable[Path]:
+def paths_with_build_dir_leaks(
+    paths: Iterable[Path], pattern: re.Pattern
+) -> Iterable[Path]:
     for path in paths:
         if pattern.search(str(path)):
             yield path
@@ -183,19 +184,20 @@ def _c_compiler_flag_expects_abspath(tok: str) -> bool:
     """The following gcc/clang flags remap paths, and expect an absolute
     self-path as option arguments.  Commands will still work remotely,
     but won't cache across build environments."""
-    flag, sep, value = tok.partition('=')
-    if sep != '=':
+    flag, sep, value = tok.partition("=")
+    if sep != "=":
         return False
     return flag in {
-        '-fdebug-prefix-map',
-        '-ffile-prefix-map',
-        '-fmacro-prefix-map',
-        '-fcoverage-prefix-map',
+        "-fdebug-prefix-map",
+        "-ffile-prefix-map",
+        "-fmacro-prefix-map",
+        "-fcoverage-prefix-map",
     }
 
 
-def tokens_with_build_dir_leaks(command: Iterable[str],
-                                pattern: re.Pattern) -> Iterable[str]:
+def tokens_with_build_dir_leaks(
+    command: Iterable[str], pattern: re.Pattern
+) -> Iterable[str]:
     # TODO: lex --KEY=VALUE tokens into parts and match against the parts
     for token in command:
         if pattern.search(token):
@@ -220,18 +222,21 @@ def preflight_checks(
 Adding rebase_path(..., root_build_dir) in GN may fix this to be relative.
 If this command requires an absolute path, mark this action in GN with
 'no_output_dir_leaks = false'.""",
-                label=label)
+                label=label,
+            )
             exit_code = 1
 
     token_path_leaks = list(
-        tokens_with_build_dir_leaks(command, pattern.re_text))
+        tokens_with_build_dir_leaks(command, pattern.re_text)
+    )
     for tok in token_path_leaks:
         error_msg(
             f"""Command token '{tok}' contains '{pattern.text}'.
 Adding rebase_path(..., root_build_dir) in GN may fix this to be relative.
 If this command requires an absolute path, mark this action in GN with
 'no_output_dir_leaks = false'.""",
-            label=label)
+            label=label,
+        )
         exit_code = 1
 
     return exit_code
@@ -250,7 +255,8 @@ def postflight_checks(
                 f"""Output file {f} contains '{subpath.text}'.
 If this cannot be fixed in the tool, mark this action in GN with
 'no_output_dir_leaks = false'.""",
-                label=label)
+                label=label,
+            )
             exit_code = 1
 
     return exit_code
@@ -275,51 +281,55 @@ def scan_leaks(argv: Sequence[str], exec_root: Path, working_dir: Path) -> int:
       0 for success, non-zero if any errors (including the command) occurred.
     """
     try:
-        ddash = argv.index('--')
+        ddash = argv.index("--")
     except ValueError:
         error_msg("Required '--' is missing.")
-        _MAIN_ARG_PARSER.parse_args(['--help'])
+        _MAIN_ARG_PARSER.parse_args(["--help"])
         return 1
 
     script_args = argv[:ddash]
-    command = argv[ddash + 1:]
+    command = argv[ddash + 1 :]
 
     main_args = _MAIN_ARG_PARSER.parse_args(script_args)
     label = main_args.label
 
     build_subdir = cl_utils.relpath(working_dir, start=exec_root)
     pre_scan_exit_code = 0
-    if str(build_subdir) != '.':
+    if str(build_subdir) != ".":
         path_pattern = PathPattern(build_subdir)
 
         pre_scan_exit_code = preflight_checks(
             paths=main_args.outputs,
             command=command,
             pattern=path_pattern,
-            label=label)
+            label=label,
+        )
 
     if not main_args.execute:
         return pre_scan_exit_code
 
     # Invoke the original command.
     command_exit_code = subprocess.call(
-        cl_utils.auto_env_prefix_command(command), cwd=working_dir)
+        cl_utils.auto_env_prefix_command(command), cwd=working_dir
+    )
     if command_exit_code != 0:
         return command_exit_code
 
-    if str(build_subdir) == '.':  # nothing to check
+    if str(build_subdir) == ".":  # nothing to check
         return command_exit_code
 
     # Command succeeded, scan its declared outputs.
     post_scan_exit_code = postflight_checks(
-        main_args.outputs, path_pattern, label=label)
+        main_args.outputs, path_pattern, label=label
+    )
 
     # return code reflects success of command and success of scans
     scan_exit_code = pre_scan_exit_code or post_scan_exit_code
     if scan_exit_code != 0:
         error_msg(
             "(See http://go/remotely-cacheable for more information.)",
-            label=label)
+            label=label,
+        )
 
     return scan_exit_code
 

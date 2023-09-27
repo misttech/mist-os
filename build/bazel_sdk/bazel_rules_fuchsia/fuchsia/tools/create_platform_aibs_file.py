@@ -12,13 +12,13 @@ def parse_args():
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--platform-aibs',
-        help='Path to platform AIBs directory',
+        "--platform-aibs",
+        help="Path to platform AIBs directory",
         required=True,
     )
     parser.add_argument(
-        '--output',
-        help='output platform_aibs.json file',
+        "--output",
+        help="output platform_aibs.json file",
         required=True,
     )
     return parser.parse_args()
@@ -38,5 +38,5 @@ def main():
         json.dump(paths, f, indent=2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

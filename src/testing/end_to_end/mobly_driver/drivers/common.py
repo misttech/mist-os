@@ -36,7 +36,8 @@ def read_yaml_from_file(filepath: str):
             return yaml.load(f, Loader=yaml.SafeLoader)
         except yaml.YAMLError as e:
             raise InvalidFormatException(
-                'Failed to parse local Mobly config YAML: %s' % e)
+                "Failed to parse local Mobly config YAML: %s" % e
+            )
 
 
 def read_json_from_file(filepath: str):
@@ -57,4 +58,4 @@ def read_json_from_file(filepath: str):
         try:
             return json.load(f)
         except json.JSONDecodeError as e:
-            raise InvalidFormatException('Failed to parse Testbed JSON: %s' % e)
+            raise InvalidFormatException("Failed to parse Testbed JSON: %s" % e)

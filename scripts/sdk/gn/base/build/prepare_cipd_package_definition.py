@@ -14,62 +14,71 @@ import sys
 def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--pkg-name', type=str, required=True, help='Name of the CIPD package.')
+        "--pkg-name", type=str, required=True, help="Name of the CIPD package."
+    )
     parser.add_argument(
-        '--description',
+        "--description",
         type=str,
         required=True,
-        help='Description of the CIPD package.')
+        help="Description of the CIPD package.",
+    )
     parser.add_argument(
-        '--pkg-root', type=str, required=True, help='Path to the package root.')
+        "--pkg-root", type=str, required=True, help="Path to the package root."
+    )
     parser.add_argument(
-        '--install-mode',
+        "--install-mode",
         type=str,
-        choices=['copy', 'symlink'],
+        choices=["copy", "symlink"],
         required=True,
-        help='CIPD install mode.')
+        help="CIPD install mode.",
+    )
     parser.add_argument(
-        '--pkg-def',
+        "--pkg-def",
         type=str,
         required=True,
-        help='Path to the output package definition.')
+        help="Path to the output package definition.",
+    )
     parser.add_argument(
-        '--depfile', type=str, required=True, help='Path to the depfile.')
+        "--depfile", type=str, required=True, help="Path to the depfile."
+    )
     parser.add_argument(
-        '--files',
-        nargs='+',
+        "--files",
+        nargs="+",
         default=(),
-        help='Files relative to --pkg-root to include in the '
-        'package definition.')
+        help="Files relative to --pkg-root to include in the "
+        "package definition.",
+    )
     parser.add_argument(
-        '--directories',
-        nargs='+',
+        "--directories",
+        nargs="+",
         default=(),
-        help='Directories relative to --pkg-root to include in '
-        'the package definition.')
+        help="Directories relative to --pkg-root to include in "
+        "the package definition.",
+    )
     parser.add_argument(
-        '--copy-files',
-        nargs='+',
+        "--copy-files",
+        nargs="+",
         default=(),
-        help='Files to be copied into --pkg-root and included '
-        'in the package definition.')
+        help="Files to be copied into --pkg-root and included "
+        "in the package definition.",
+    )
     args = parser.parse_args(args)
 
     pkg_def = {
-        'package': args.pkg_name,
-        'description': args.description,
-        'root': args.pkg_root,
-        'install_mode': args.install_mode,
-        'data': [],
+        "package": args.pkg_name,
+        "description": args.description,
+        "root": args.pkg_root,
+        "install_mode": args.install_mode,
+        "data": [],
     }
 
     deps = set()
     # Include files and directories in the package definition.
     for relpath in args.files:
-        pkg_def['data'].append({'file': relpath})
+        pkg_def["data"].append({"file": relpath})
         deps.add(os.path.join(args.pkg_root, relpath))
     for relpath in args.directories:
-        pkg_def['data'].append({'dir': relpath})
+        pkg_def["data"].append({"dir": relpath})
         deps.add(os.path.join(args.pkg_root, relpath))
 
     # Copy files into the root and include in the package definition.
@@ -79,13 +88,13 @@ def main(args):
             dest = os.path.join(args.pkg_root, basename)
             if not os.path.exists(dest):
                 os.link(filepath, dest)
-            pkg_def['data'].append({'file': basename})
+            pkg_def["data"].append({"file": basename})
             deps.add(dest)
 
-    with open(args.pkg_def, 'w') as f:
+    with open(args.pkg_def, "w") as f:
         print_yaml(pkg_def, f)
-    with open(args.depfile, 'w') as f:
-        f.writelines('%s: %s\n' % (args.pkg_def, ' '.join(sorted(deps))))
+    with open(args.depfile, "w") as f:
+        f.writelines("%s: %s\n" % (args.pkg_def, " ".join(sorted(deps))))
 
     return 0
 
@@ -96,10 +105,10 @@ def print_yaml_item(item, out):
     first = True
     for key in keys:
         if first:
-            out.write('- %s: %s\n' % (key, item[key]))
+            out.write("- %s: %s\n" % (key, item[key]))
             first = False
         else:
-            out.write('  %s: %s\n' % (key, item[key]))
+            out.write("  %s: %s\n" % (key, item[key]))
 
 
 def print_yaml(o, out):
@@ -108,12 +117,12 @@ def print_yaml(o, out):
     for k in keys:
         val = o[k]
         if isinstance(val, (list, set)):
-            out.write('%s:\n' % k)
+            out.write("%s:\n" % k)
             for item in val:
                 print_yaml_item(item, out)
         elif isinstance(val, str):
-            out.write('%s: %s\n' % (k, val))
+            out.write("%s: %s\n" % (k, val))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

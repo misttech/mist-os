@@ -36,94 +36,120 @@ def rmtree(dir):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--root-out-dir', help='Path to root of build output', required=True)
+        "--root-out-dir", help="Path to root of build output", required=True
+    )
     parser.add_argument(
-        '--cc', help='The C compiler to use', required=False, default='cc')
+        "--cc", help="The C compiler to use", required=False, default="cc"
+    )
     parser.add_argument(
-        '--cxx', help='The C++ compiler to use', required=False, default='c++')
+        "--cxx", help="The C++ compiler to use", required=False, default="c++"
+    )
     parser.add_argument(
-        '--ar', help='The archive linker to use', required=False, default='ar')
+        "--ar", help="The archive linker to use", required=False, default="ar"
+    )
     parser.add_argument(
-        '--dump-syms', help='The dump_syms tool to use', required=False)
+        "--dump-syms", help="The dump_syms tool to use", required=False
+    )
     parser.add_argument(
-        '--objcopy',
-        help='The objcopy tool to use',
+        "--objcopy",
+        help="The objcopy tool to use",
         required=False,
-        default='objcopy')
-    parser.add_argument('--sysroot', help='The sysroot to use', required=False)
+        default="objcopy",
+    )
+    parser.add_argument("--sysroot", help="The sysroot to use", required=False)
     parser.add_argument(
-        '--target', help='The compiler target to use', required=False)
+        "--target", help="The compiler target to use", required=False
+    )
     parser.add_argument(
-        '--current-cpu',
-        help='Target architecture.',
-        choices=['x64', 'arm64'],
-        required=True)
+        "--current-cpu",
+        help="Target architecture.",
+        choices=["x64", "arm64"],
+        required=True,
+    )
     parser.add_argument(
-        '--current-os',
-        help='Target operating system.',
-        choices=['fuchsia', 'linux', 'mac', 'win'],
-        required=True)
-    parser.add_argument('--buildidtool', help='The path to the buildidtool.')
+        "--current-os",
+        help="Target operating system.",
+        choices=["fuchsia", "linux", "mac", "win"],
+        required=True,
+    )
+    parser.add_argument("--buildidtool", help="The path to the buildidtool.")
     parser.add_argument(
-        '--build-id-dir', help='The path to the .build-id directory.')
+        "--build-id-dir", help="The path to the .build-id directory."
+    )
     parser.add_argument(
-        '--go-root', help='The go root to use for builds.', required=True)
+        "--go-root", help="The go root to use for builds.", required=True
+    )
     parser.add_argument(
-        '--go-cache', help='Cache directory to use for builds.', required=False)
+        "--go-cache", help="Cache directory to use for builds.", required=False
+    )
     parser.add_argument(
-        '--golibs-dir',
-        help='The directory containing third party libraries.',
-        required=True)
+        "--golibs-dir",
+        help="The directory containing third party libraries.",
+        required=True,
+    )
     parser.add_argument(
-        '--is-test', help='True if the target is a go test', default=False)
+        "--is-test", help="True if the target is a go test", default=False
+    )
     parser.add_argument(
-        '--gcflag',
-        help='Arguments to pass to Go compiler',
-        action='append',
-        default=[])
+        "--gcflag",
+        help="Arguments to pass to Go compiler",
+        action="append",
+        default=[],
+    )
     parser.add_argument(
-        '--ldflag',
-        help='Arguments to pass to Go linker',
-        action='append',
-        default=[])
+        "--ldflag",
+        help="Arguments to pass to Go linker",
+        action="append",
+        default=[],
+    )
     parser.add_argument(
-        '--go-dep-files',
-        help='List of files describing library dependencies',
-        nargs='*',
-        default=[])
-    parser.add_argument('--binname', help='Output file', required=True)
+        "--go-dep-files",
+        help="List of files describing library dependencies",
+        nargs="*",
+        default=[],
+    )
+    parser.add_argument("--binname", help="Output file", required=True)
     parser.add_argument(
-        '--output-path',
-        help='Where to output the (unstripped) binary',
-        required=True)
+        "--output-path",
+        help="Where to output the (unstripped) binary",
+        required=True,
+    )
     parser.add_argument(
-        '--stripped-output-path',
-        help='Where to output a stripped binary, if supplied')
+        "--stripped-output-path",
+        help="Where to output a stripped binary, if supplied",
+    )
     parser.add_argument(
-        '--verbose',
-        help='Tell the go tool to be verbose about what it is doing',
-        action='store_true')
+        "--verbose",
+        help="Tell the go tool to be verbose about what it is doing",
+        action="store_true",
+    )
 
     pkg_group = parser.add_mutually_exclusive_group(required=True)
-    pkg_group.add_argument('--package', help='The package name')
+    pkg_group.add_argument("--package", help="The package name")
     pkg_group.add_argument(
-        '--library-metadata',
+        "--library-metadata",
         help=(
-            'go_deps file containing metadata about the package to build, '
-            'as generated by gen_library_metadata.py'))
+            "go_deps file containing metadata about the package to build, "
+            "as generated by gen_library_metadata.py"
+        ),
+    )
 
     parser.add_argument(
-        '--include-dir',
-        help='-isystem path to add',
-        action='append',
-        default=[])
+        "--include-dir",
+        help="-isystem path to add",
+        action="append",
+        default=[],
+    )
     parser.add_argument(
-        '--lib-dir', help='-L path to add', action='append', default=[])
-    parser.add_argument('--vet', help='Run go vet', action='store_true')
+        "--lib-dir", help="-L path to add", action="append", default=[]
+    )
+    parser.add_argument("--vet", help="Run go vet", action="store_true")
     parser.add_argument(
-        '--tag', help='Add a go build tag', default=[], action='append')
+        "--tag", help="Add a go build tag", default=[], action="append"
+    )
     parser.add_argument(
-        '--cgo', help='Whether to enable CGo', action='store_true')
+        "--cgo", help="Whether to enable CGo", action="store_true"
+    )
     args = parser.parse_args()
 
     try:
@@ -135,37 +161,40 @@ def main():
             raise
 
     goarch = {
-        'x64': 'amd64',
-        'arm64': 'arm64',
+        "x64": "amd64",
+        "arm64": "arm64",
     }[args.current_cpu]
     goos = {
-        'fuchsia': 'fuchsia',
-        'linux': 'linux',
-        'mac': 'darwin',
-        'win': 'windows',
+        "fuchsia": "fuchsia",
+        "linux": "linux",
+        "mac": "darwin",
+        "win": "windows",
     }[args.current_os]
 
     dist = args.stripped_output_path or args.output_path
 
     # Project path is a package specific gopath, also known as a "project" in go parlance.
     project_path = os.path.join(
-        args.root_out_dir, 'gen', 'gopaths', args.binname)
+        args.root_out_dir, "gen", "gopaths", args.binname
+    )
 
     # Clean up any old project path to avoid leaking old dependencies.
-    gopath_src = os.path.join(project_path, 'src')
+    gopath_src = os.path.join(project_path, "src")
     rmtree(gopath_src)
 
-    dst_vendor = os.path.join(gopath_src, 'vendor')
+    dst_vendor = os.path.join(gopath_src, "vendor")
     os.makedirs(dst_vendor)
     # Symlink interprets path against the current working directory, so use
     # absolute path for consistency.
     abs_golibs_dir = os.path.abspath(args.golibs_dir)
-    for src in ['go.mod', 'go.sum']:
+    for src in ["go.mod", "go.sum"]:
         os.symlink(
-            os.path.join(abs_golibs_dir, src), os.path.join(gopath_src, src))
+            os.path.join(abs_golibs_dir, src), os.path.join(gopath_src, src)
+        )
     os.symlink(
-        os.path.join(os.path.join(abs_golibs_dir, 'vendor'), 'modules.txt'),
-        os.path.join(dst_vendor, 'modules.txt'))
+        os.path.join(os.path.join(abs_golibs_dir, "vendor"), "modules.txt"),
+        os.path.join(dst_vendor, "modules.txt"),
+    )
 
     if args.go_dep_files:
         # Create a GOPATH for the packages dependency tree.
@@ -180,9 +209,9 @@ def main():
             if dst.startswith(FUCHSIA_MODULE):
                 dst = os.path.relpath(dst, FUCHSIA_MODULE)
             else:
-                dst = os.path.join('vendor', dst)
+                dst = os.path.join("vendor", dst)
 
-            if dst.endswith('/...'):
+            if dst.endswith("/..."):
                 # When a directory and all its subdirectories must be made available, map
                 # the directory directly.
                 dst = dst[:-4]
@@ -195,9 +224,9 @@ def main():
                 #
                 # The construction of these paths is done in the go list invocation, so we
                 # remove these sentinel values here.
-                dst = dst.replace('/.../', '/')
+                dst = dst.replace("/.../", "/")
             else:
-                raise ValueError(f'Invalid go_dep entry: {dst=}, {src=}')
+                raise ValueError(f"Invalid go_dep entry: {dst=}, {src=}")
 
             dstdir = os.path.join(gopath_src, dst)
 
@@ -223,35 +252,36 @@ def main():
 
     cflags = []
     if args.sysroot:
-        cflags.extend(['--sysroot', os.path.abspath(args.sysroot)])
+        cflags.extend(["--sysroot", os.path.abspath(args.sysroot)])
     if args.target:
-        cflags.extend(['-target', args.target])
+        cflags.extend(["-target", args.target])
 
     ldflags = cflags[:]
-    if args.current_os == 'linux':
+    if args.current_os == "linux":
         ldflags.extend(
             [
-                '-stdlib=libc++',
+                "-stdlib=libc++",
                 # TODO(fxbug.dev/64336): the following flags are not recognized by CGo.
                 # '-rtlib=compiler-rt',
                 # '-unwindlib=libunwind',
-            ])
+            ]
+        )
 
     for dir in args.include_dir:
-        cflags.extend(['-isystem', os.path.abspath(dir)])
-    ldflags.extend(['-L' + os.path.abspath(dir) for dir in args.lib_dir])
+        cflags.extend(["-isystem", os.path.abspath(dir)])
+    ldflags.extend(["-L" + os.path.abspath(dir) for dir in args.lib_dir])
 
-    cflags_joined = ' '.join(cflags)
-    ldflags_joined = ' '.join(ldflags)
+    cflags_joined = " ".join(cflags)
+    ldflags_joined = " ".join(ldflags)
 
     build_goroot = os.path.abspath(args.go_root)
 
     env = {
         # /usr/bin:/bin are required for basic things like bash(1) and env(1). Note
         # that on Mac, ld is also found from /usr/bin.
-        'PATH': os.path.join(build_goroot, 'bin') + ':/usr/bin:/bin',
-        'GOARCH': goarch,
-        'GOOS': goos,
+        "PATH": os.path.join(build_goroot, "bin") + ":/usr/bin:/bin",
+        "GOARCH": goarch,
+        "GOOS": goos,
         # GOPATH won't be used, but Go still insists that we set it. Without it,
         # Go emits the succinct error: `missing $GOPATH`. Go further insists
         # that $GOPATH/go.mod not exist; if we pass `gopath_src` here (which
@@ -263,72 +293,73 @@ def main():
         # For more details see: 'go help gopath'
         #
         # and here we are.
-        'GOPATH': os.path.abspath(project_path),
+        "GOPATH": os.path.abspath(project_path),
         # Disallow downloading modules from any source.
         #
         # See https://golang.org/ref/mod#environment-variables under `GOPROXY`.
-        'GOPROXY': 'off',
+        "GOPROXY": "off",
         # Some users have GOROOT set in their parent environment, which can break
         # things, so it is always set explicitly here.
-        'GOROOT': build_goroot,
+        "GOROOT": build_goroot,
         # GOCACHE, CC and CXX below may be used in different working directories
         # so they have to be absolute.
-        'GOCACHE': os.path.abspath(args.go_cache),
-        'AR': os.path.abspath(args.ar),
-        'CC': os.path.abspath(args.cc),
-        'CXX': os.path.abspath(args.cxx),
-        'CGO_CFLAGS': cflags_joined,
-        'CGO_CPPFLAGS': cflags_joined,
-        'CGO_CXXFLAGS': cflags_joined,
-        'CGO_LDFLAGS': ldflags_joined,
+        "GOCACHE": os.path.abspath(args.go_cache),
+        "AR": os.path.abspath(args.ar),
+        "CC": os.path.abspath(args.cc),
+        "CXX": os.path.abspath(args.cxx),
+        "CGO_CFLAGS": cflags_joined,
+        "CGO_CPPFLAGS": cflags_joined,
+        "CGO_CXXFLAGS": cflags_joined,
+        "CGO_LDFLAGS": ldflags_joined,
     }
 
     # Infra sets $TMPDIR which is cleaned between builds.
-    if os.getenv('TMPDIR'):
-        env['TMPDIR'] = os.getenv('TMPDIR')
+    if os.getenv("TMPDIR"):
+        env["TMPDIR"] = os.getenv("TMPDIR")
 
     if args.cgo:
-        env['CGO_ENABLED'] = '1'
+        env["CGO_ENABLED"] = "1"
     if args.target:
-        env['CC_FOR_TARGET'] = env['CC']
-        env['CXX_FOR_TARGET'] = env['CXX']
+        env["CC_FOR_TARGET"] = env["CC"]
+        env["CXX_FOR_TARGET"] = env["CXX"]
 
-    go_tool = os.path.join(build_goroot, 'bin', 'go')
+    go_tool = os.path.join(build_goroot, "bin", "go")
 
     if args.package:
         package = args.package
     elif args.library_metadata:
         with open(args.library_metadata) as f:
-            package = json.load(f)['package']
+            package = json.load(f)["package"]
 
     if args.vet:
-        subprocess.run([go_tool, 'vet', package], env=env,
-                       cwd=gopath_src).check_returncode()
+        subprocess.run(
+            [go_tool, "vet", package], env=env, cwd=gopath_src
+        ).check_returncode()
 
     cmd = [go_tool]
     if args.is_test:
-        cmd += ['test', '-c']
+        cmd += ["test", "-c"]
     else:
-        cmd += ['build', '-trimpath']
+        cmd += ["build", "-trimpath"]
     if args.verbose:
-        cmd += ['-x']
+        cmd += ["-x"]
     if args.tag:
-        cmd += ['-tags=%s' % ','.join(args.tag)]
+        cmd += ["-tags=%s" % ",".join(args.tag)]
     if args.gcflag:
-        cmd += ['-gcflags=%s' % ' '.join(args.gcflag)]
+        cmd += ["-gcflags=%s" % " ".join(args.gcflag)]
     # Clear the buildid to make the build reproducible
-    ldflag = ['-buildid=']
+    ldflag = ["-buildid="]
     if args.ldflag:
         ldflag += args.ldflag
-    cmd += ['-ldflags=%s' % ' '.join(ldflag)]
+    cmd += ["-ldflags=%s" % " ".join(ldflag)]
 
     cmd += [
         # Omit version control information so that binaries are deterministic
         # based on their source code and don't change on each commit.
-        '-buildvcs=false',
-        '-pkgdir',
-        os.path.join(project_path, 'pkg'),
-        '-o',
+        "-buildvcs=false",
+        "-pkgdir",
+        os.path.join(project_path, "pkg"),
+        "-o",
         os.path.relpath(args.output_path, gopath_src),
         package,
     ]
@@ -343,13 +374,14 @@ def main():
     # We want to both capture stdout/stderr and print it but there isn't an easy
     # way to do that automatically, so we must separately print the captured
     # output.
-    print(proc.stdout, end='')
+    print(proc.stdout, end="")
 
     if proc.returncode:
         if not proc.stdout:
             raise Exception(
-                'go build had an exit code of %d but did not print any output' %
-                proc.returncode)
+                "go build had an exit code of %d but did not print any output"
+                % proc.returncode
+            )
         # Don't raise an exception because that would add a noisy Python
         # traceback that clutters up the relevant output from `go build`.
         return proc.returncode
@@ -365,49 +397,59 @@ def main():
     # previous build, so instead we assume that Go will only print anything if
     # it didn't produce the output file, or otherwise failed in some fatal way.
     if proc.stdout.strip():
-        raise Exception('go build printed unexpected output')
+        raise Exception("go build printed unexpected output")
 
     if args.stripped_output_path:
-        if args.current_os == 'mac':
+        if args.current_os == "mac":
             subprocess.run(
                 [
-                    'xcrun', 'strip', '-x', args.output_path, '-o',
-                    args.stripped_output_path
+                    "xcrun",
+                    "strip",
+                    "-x",
+                    args.output_path,
+                    "-o",
+                    args.stripped_output_path,
                 ],
-                env=env).check_returncode()
+                env=env,
+            ).check_returncode()
         else:
             subprocess.run(
                 [
-                    args.objcopy, '--strip-sections', args.output_path,
-                    args.stripped_output_path
+                    args.objcopy,
+                    "--strip-sections",
+                    args.output_path,
+                    args.stripped_output_path,
                 ],
-                env=env).check_returncode()
+                env=env,
+            ).check_returncode()
 
     # TODO(fxbug.dev/27215): Also invoke the buildidtool in the case of linux
     # once buildidtool knows how to deal in Go's native build ID format.
-    supports_build_id = args.current_os == 'fuchsia'
+    supports_build_id = args.current_os == "fuchsia"
     if args.dump_syms and supports_build_id:
-        if args.current_os == 'fuchsia':
-            with open(dist + '.sym', 'w') as f:
+        if args.current_os == "fuchsia":
+            with open(dist + ".sym", "w") as f:
                 subprocess.run(
-                    [args.dump_syms, '-r', '-o', 'Fuchsia', args.output_path],
-                    stdout=f).check_returncode()
+                    [args.dump_syms, "-r", "-o", "Fuchsia", args.output_path],
+                    stdout=f,
+                ).check_returncode()
 
     if args.buildidtool and supports_build_id:
         if not args.build_id_dir:
-            raise ValueError('Using --buildidtool requires --build-id-dir')
+            raise ValueError("Using --buildidtool requires --build-id-dir")
         subprocess.run(
             [
                 args.buildidtool,
-                '-build-id-dir',
+                "-build-id-dir",
                 args.build_id_dir,
-                '-stamp',
-                dist + '.build-id.stamp',
-                '-entry',
-                '.debug=' + args.output_path,
-                '-entry',
-                '=' + dist,
-            ]).check_returncode()
+                "-stamp",
+                dist + ".build-id.stamp",
+                "-entry",
+                ".debug=" + args.output_path,
+                "-entry",
+                "=" + dist,
+            ]
+        ).check_returncode()
 
     # Clean up the tree of go files assembled in gopath_src to indicate to the
     # action tracer that they were intermediates and not final outputs.
@@ -415,5 +457,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

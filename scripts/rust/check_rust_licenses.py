@@ -12,20 +12,24 @@ import argparse
 import os
 import sys
 
+
 def die(reason):
     raise Exception(reason)
 
 
 def check_subdir_license(subdir):
-    if subdir.startswith('.') or not os.path.isdir(subdir):
+    if subdir.startswith(".") or not os.path.isdir(subdir):
         return
 
     license_files = [
-        file for file in os.listdir(subdir) if file.startswith('LICENSE') or
-        file.startswith('LICENCE') or file.startswith('license')
+        file
+        for file in os.listdir(subdir)
+        if file.startswith("LICENSE")
+        or file.startswith("LICENCE")
+        or file.startswith("license")
     ]
-    if not license_files: # FIXME better way to track whether one exists
-        die('Missing license for %s' % subdir)
+    if not license_files:  # FIXME better way to track whether one exists
+        die("Missing license for %s" % subdir)
 
 
 def check_licenses(directory):
@@ -36,7 +40,7 @@ def check_licenses(directory):
         try:
             check_subdir_license(subdir)
         except Exception as err:
-            print('ERROR    %s' % err)
+            print("ERROR    %s" % err)
             success = False
     print("Done checking licenses.")
     return success
@@ -44,15 +48,17 @@ def check_licenses(directory):
 
 def main():
     parser = argparse.ArgumentParser(
-        'Verifies licenses for third-party Rust crates')
+        "Verifies licenses for third-party Rust crates"
+    )
     parser.add_argument(
-        '--directory',
-        help='Directory containing the crates',
-        default=os.getcwd())
+        "--directory",
+        help="Directory containing the crates",
+        default=os.getcwd(),
+    )
     args = parser.parse_args()
     if not check_licenses(args.directory):
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

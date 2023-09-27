@@ -31,14 +31,15 @@ def go_dep_files_inputs(go_dep_files, is_test):
         # Currently globbing is only used by syzkaller-go (see bug above), which
         # only have .go sources.
         if os.path.isdir(src):
-            inputs += glob.glob(os.path.join(src, '**', '*.go'))
+            inputs += glob.glob(os.path.join(src, "**", "*.go"))
             continue
 
         raise ValueError(
-            f'source "{src}" in go_deps file is neither a file or a directory')
+            f'source "{src}" in go_deps file is neither a file or a directory'
+        )
 
     if not is_test:
-        inputs = [f for f in inputs if not f.endswith('_test.go')]
+        inputs = [f for f in inputs if not f.endswith("_test.go")]
 
     return inputs
 
@@ -47,8 +48,24 @@ def go_dep_files_inputs(go_dep_files, is_test):
 #
 # See https://pkg.go.dev/cmd/go/internal/list#pkg-variables
 GO_SRC_EXTS = {
-    '.go', '.c', '.cc', '.cxx', '.cpp', '.m', '.h', '.hh', '.hpp', '.hxx', '.f',
-    '.F', '.for', '.f90', '.s', '.swig', '.swigcxx', '.syso'
+    ".go",
+    ".c",
+    ".cc",
+    ".cxx",
+    ".cpp",
+    ".m",
+    ".h",
+    ".hh",
+    ".hpp",
+    ".hxx",
+    ".f",
+    ".F",
+    ".for",
+    ".f90",
+    ".s",
+    ".swig",
+    ".swigcxx",
+    ".syso",
 }
 
 
@@ -56,13 +73,13 @@ def goroot_inputs(goroot):
     """Collect all inputs from goroot."""
 
     # The Go compiler is an input, it's used by the build script.
-    inputs = [os.path.join(goroot, 'bin', 'go')]
+    inputs = [os.path.join(goroot, "bin", "go")]
 
-    for f in glob.glob(os.path.join(goroot, '**', '*')):
+    for f in glob.glob(os.path.join(goroot, "**", "*")):
         # Skip all test files from goroot, they won't be used for building.
-        if f.endswith('_test.go'):
+        if f.endswith("_test.go"):
             continue
-        if '/test/' in f:
+        if "/test/" in f:
             continue
         _, ext = os.path.splitext(f)
         if ext in GO_SRC_EXTS:
@@ -74,30 +91,35 @@ def goroot_inputs(goroot):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--go-dep-files',
-        help='List of files describing library dependencies',
-        nargs='*',
-        default=[])
+        "--go-dep-files",
+        help="List of files describing library dependencies",
+        nargs="*",
+        default=[],
+    )
     parser.add_argument(
-        '--output',
-        help='Path to output hermetic inputs file',
+        "--output",
+        help="Path to output hermetic inputs file",
         required=True,
     )
     parser.add_argument(
-        '--go-root',
-        help='Path to GOROOT to use',
+        "--go-root",
+        help="Path to GOROOT to use",
         required=True,
     )
     parser.add_argument(
-        '--is-test', help='True if the target is a go test', default=False)
+        "--is-test", help="True if the target is a go test", default=False
+    )
     args = parser.parse_args()
 
-    inputs = go_dep_files_inputs(args.go_dep_files,
-                                 args.is_test) if args.go_dep_files else []
+    inputs = (
+        go_dep_files_inputs(args.go_dep_files, args.is_test)
+        if args.go_dep_files
+        else []
+    )
     inputs += goroot_inputs(args.go_root)
-    with open(args.output, 'w') as f:
-        f.write('\n'.join(sorted(inputs)))
+    with open(args.output, "w") as f:
+        f.write("\n".join(sorted(inputs)))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

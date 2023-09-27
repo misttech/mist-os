@@ -12,23 +12,26 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        'Convert zbi tool JSON output to d3js-friendly JSON input format')
+        description="Convert zbi tool JSON output to d3js-friendly JSON input format"
+    )
     parser.add_argument(
-        '--input',
+        "--input",
         required=True,
-        type=argparse.FileType('r'),
-        help='Output of `zbi --output-json=...`')
+        type=argparse.FileType("r"),
+        help="Output of `zbi --output-json=...`",
+    )
     parser.add_argument(
-        '--output',
+        "--output",
         required=True,
-        help='Output JSON in d3js-friendly format',
-        type=argparse.FileType('w'))
+        help="Output JSON in d3js-friendly format",
+        type=argparse.FileType("w"),
+    )
     parser.add_argument(
-        '--page-size',
+        "--page-size",
         type=int,
         default=4096,
-        help='Round file sizes up to multiples of this size')
+        help="Round file sizes up to multiples of this size",
+    )
     args = parser.parse_args()
 
     zbi = json.load(args.input)
@@ -53,8 +56,12 @@ def main():
         for path_part in path_parts[:-1]:
             nextdir = next(
                 (
-                    child for child in basedir["children"]
-                    if child["name"] == path_part), None)
+                    child
+                    for child in basedir["children"]
+                    if child["name"] == path_part
+                ),
+                None,
+            )
             if not nextdir:
                 nextdir = {"name": path_part, "children": []}
                 basedir["children"].append(nextdir)
@@ -67,5 +74,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

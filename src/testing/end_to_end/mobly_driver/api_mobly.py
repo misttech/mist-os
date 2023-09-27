@@ -10,13 +10,13 @@ from mobly import keys
 from mobly import records
 from typing import List, Dict, Any
 
-LATEST_RES_SYMLINK_NAME: str = 'latest'
+LATEST_RES_SYMLINK_NAME: str = "latest"
 
 # Fuchsia-specific keys and values used in Mobly configs.
 # Defined and used in
 # https://osscs.corp.google.com/fuchsia/fuchsia/+/main:src/testing/end_to_end/mobly_controller/fuchsia_device.py
-MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = 'FuchsiaDevice'
-TRANSPORT_KEY: str = 'transport'
+MOBLY_CONTROLLER_FUCHSIA_DEVICE: str = "FuchsiaDevice"
+TRANSPORT_KEY: str = "transport"
 
 MoblyConfigComponent = Dict[str, Any]
 
@@ -26,7 +26,8 @@ class ApiException(Exception):
 
 
 def get_latest_test_output_dir_symlink_path(
-        mobly_output_path: str, testbed_name: str) -> str:
+    mobly_output_path: str, testbed_name: str
+) -> str:
     """Returns the absolute path to the Mobly testbed's latest output directory.
 
     Args:
@@ -40,9 +41,10 @@ def get_latest_test_output_dir_symlink_path(
       The absolute path to a Mobly testbed's test output directory.
     """
     if not mobly_output_path or not testbed_name:
-        raise ApiException('Arguments must be non-empty.')
+        raise ApiException("Arguments must be non-empty.")
     return os.path.join(
-        mobly_output_path, testbed_name, LATEST_RES_SYMLINK_NAME)
+        mobly_output_path, testbed_name, LATEST_RES_SYMLINK_NAME
+    )
 
 
 def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
@@ -59,10 +61,13 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
       The absolute path to a Mobly test result file.
     """
     if not mobly_output_path or not testbed_name:
-        raise ApiException('Arguments must be non-empty.')
+        raise ApiException("Arguments must be non-empty.")
     return os.path.join(
         get_latest_test_output_dir_symlink_path(
-            mobly_output_path, testbed_name), records.OUTPUT_FILE_SUMMARY)
+            mobly_output_path, testbed_name
+        ),
+        records.OUTPUT_FILE_SUMMARY,
+    )
 
 
 # TODO(fxbug.dev/119213) - Update |controllers| type to use HoneyDew's
@@ -70,10 +75,12 @@ def get_result_path(mobly_output_path: str, testbed_name: str) -> str:
 # should use that class as the Pytype to reduce the chance of controller
 # instantiation error.
 def new_testbed_config(
-        testbed_name: str, log_path: str, mobly_controllers: List[Dict[str,
-                                                                       Any]],
-        test_params_dict: MoblyConfigComponent,
-        botanist_honeydew_map: Dict[str, str]) -> MoblyConfigComponent:
+    testbed_name: str,
+    log_path: str,
+    mobly_controllers: List[Dict[str, Any]],
+    test_params_dict: MoblyConfigComponent,
+    botanist_honeydew_map: Dict[str, str],
+) -> MoblyConfigComponent:
     """Returns a Mobly testbed config which is required for running Mobly tests.
 
     This method expects the |controller| object to follow the schema of
@@ -132,8 +139,8 @@ def new_testbed_config(
     """
     controllers = {}
     for controller in mobly_controllers:
-        controller_type = controller['type']
-        del controller['type']
+        controller_type = controller["type"]
+        del controller["type"]
         # Convert botanist key names to relative Honeydew key names for fuchsia
         # devices. This is done here so that Honeydew does not have to do
         # the conversions itself.
@@ -147,25 +154,23 @@ def new_testbed_config(
             controllers[controller_type] = [controller]
 
     config_dict = {
-        keys.Config.key_testbed.value:
-            [
-                {
-                    keys.Config.key_testbed_name.value: testbed_name,
-                    keys.Config.key_testbed_controllers.value: controllers,
-                },
-            ],
-        keys.Config.key_mobly_params.value:
+        keys.Config.key_testbed.value: [
             {
-                keys.Config.key_log_path.value: log_path
-            }
+                keys.Config.key_testbed_name.value: testbed_name,
+                keys.Config.key_testbed_controllers.value: controllers,
+            },
+        ],
+        keys.Config.key_mobly_params.value: {
+            keys.Config.key_log_path.value: log_path
+        },
     }
 
     return get_config_with_test_params(config_dict, test_params_dict)
 
 
 def get_config_with_test_params(
-        config_dict: MoblyConfigComponent,
-        params_dict: MoblyConfigComponent) -> MoblyConfigComponent:
+    config_dict: MoblyConfigComponent, params_dict: MoblyConfigComponent
+) -> MoblyConfigComponent:
     """Returns a Mobly config with a populated 'TestParams' field.
 
     Replaces the field if it already exists.
@@ -186,7 +191,7 @@ def get_config_with_test_params(
             tb[keys.Config.key_testbed_test_params.value] = params_dict
         return ret
     except (AttributeError, KeyError, TypeError) as e:
-        raise ApiException('Unexpected Mobly config content: %s' % e)
+        raise ApiException("Unexpected Mobly config content: %s" % e)
 
 
 def set_transport_in_config(mobly_config: MoblyConfigComponent, transport: str):

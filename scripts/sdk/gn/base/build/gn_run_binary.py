@@ -17,7 +17,7 @@ import sys
 # also be on the path.
 path = sys.argv[1]
 if not os.path.isabs(path):
-    path = './' + path
+    path = "./" + path
 
 # The rest of the arguments are passed directly to the executable.
 args = [path] + sys.argv[2:]

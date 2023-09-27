@@ -104,7 +104,7 @@ def run_command(args: List, cwd=None, env=None):
     Returns:
         a subprocess.run() result value.
     """
-    log('RUN: ' + command_args_to_string(args, env))
+    log("RUN: " + command_args_to_string(args, env))
     start_time = time.time()
     if env is not None:
         new_vars = env
@@ -113,7 +113,7 @@ def run_command(args: List, cwd=None, env=None):
             env[name] = value
     result = subprocess.run([str(a) for a in args], cwd=cwd, env=env)
     end_time = time.time()
-    log('DURATION: %.1fs' % (end_time - start_time))
+    log("DURATION: %.1fs" % (end_time - start_time))
     return result
 
 
@@ -137,7 +137,7 @@ def run_checked_command(args: List, cwd=None, env=None):
         return True
 
     args_str = command_args_to_string(args, env)
-    print(f'ERROR: When running command: {args_str}\n', file=sys.stderr)
+    print(f"ERROR: When running command: {args_str}\n", file=sys.stderr)
     return True
 
 
@@ -161,25 +161,28 @@ def main():
     parser.add_argument(
         "--base-build-dir",
         required=True,
-        help="Build directory containing host tools and host_cpu atoms.")
+        help="Build directory containing host tools and host_cpu atoms.",
+    )
     parser.add_argument(
         "--extra-target-cpus",
         nargs="+",
         default=[],
-        help="List of extra target CPU names.")
+        help="List of extra target CPU names.",
+    )
     parser.add_argument(
         "--extra-api-levels",
         nargs="+",
         default=[],
-        help="List of extra API levels.")
+        help="List of extra API levels.",
+    )
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(
-        "--fuchsia-dir", help="Specify Fuchsia source directory.")
+        "--fuchsia-dir", help="Specify Fuchsia source directory."
+    )
     parser.add_argument(
         "--build-dir-prefix",
         default=_DEFAULT_BUILD_DIR_PREFIX,
-        help=
-        f"Specify intermediate build directory prefix (default {_DEFAULT_BUILD_DIR_PREFIX})",
+        help=f"Specify intermediate build directory prefix (default {_DEFAULT_BUILD_DIR_PREFIX})",
     )
     parser.add_argument(
         "--cxx-rbe-enable",
@@ -192,19 +195,22 @@ def main():
         help="Enable remote builds with RBE for Rust targets.",
     )
     parser.add_argument(
-        "--use-goma", action="store_true", help="Whether to use goma or not.")
-    parser.add_argument(
-        "--goma-dir",
-        help="Optional goma directory path, only used with --use-goma.")
-    parser.add_argument(
-        "--compress-debuginfo",
-        help=
-        "Optional value to select compression of debug sections in ELF binaries."
+        "--use-goma", action="store_true", help="Whether to use goma or not."
     )
     parser.add_argument(
-        "--host-tag", help="Fuchsia host os/cpu tag used to find prebuilts.")
+        "--goma-dir",
+        help="Optional goma directory path, only used with --use-goma.",
+    )
     parser.add_argument(
-        "--clean", action="store_true", help="Force clean build.")
+        "--compress-debuginfo",
+        help="Optional value to select compression of debug sections in ELF binaries.",
+    )
+    parser.add_argument(
+        "--host-tag", help="Fuchsia host os/cpu tag used to find prebuilts."
+    )
+    parser.add_argument(
+        "--clean", action="store_true", help="Force clean build."
+    )
     args = parser.parse_args()
 
     if args.fuchsia_dir:
@@ -227,15 +233,17 @@ def main():
     if not gn_path.exists():
         return error(f"Missing gn prebuilt binary: {gn_path}")
 
-    ninja_path = fuchsia_dir / "prebuilt" / "third_party" / "ninja" / host_tag / "ninja"
+    ninja_path = (
+        fuchsia_dir / "prebuilt" / "third_party" / "ninja" / host_tag / "ninja"
+    )
     if not ninja_path.exists():
         return error(f"Missing ninja prebuilt binary: {ninja_path}")
 
     base_build_dir = Path(args.base_build_dir)
 
     # Extract base target_cpu value that is not in args.extra_target_cpus.
-    base_args_json = json.load((base_build_dir / 'args.json').open())
-    base_target_cpu = base_args_json['target_cpu']
+    base_args_json = json.load((base_build_dir / "args.json").open())
+    base_target_cpu = base_args_json["target_cpu"]
 
     # This script creates CPU-specific sub-builds under:
     #
@@ -259,36 +267,39 @@ def main():
         """Split an SDK GN label into a (dir, name) pair."""
         # Expected format is //<dir>:<name>
         path, colon, name = target_label.partition(":")
-        assert colon == ":" and path.startswith("//"), (
-            f'Invalid SDK target label: {target_label}')
+        assert colon == ":" and path.startswith(
+            "//"
+        ), f"Invalid SDK target label: {target_label}"
         return (path[2:], name)
 
     def sdk_label_to_ninja_target(target_label: str) -> str:
         """Convert SDK GN label to Ninja target path."""
         target_dir, target_name = sdk_label_partition(target_label)
-        return f'{target_dir}:{target_name}'
+        return f"{target_dir}:{target_name}"
 
     def sdk_label_to_exported_dir(target_label: str, build_dir: Path) -> Path:
         """Convert SDK GN label to exported directory in build_dir."""
         target_dir, target_name = sdk_label_partition(target_label)
-        return build_dir / 'sdk' / 'exported' / target_name
+        return build_dir / "sdk" / "exported" / target_name
 
     # Compute the list of Ninja targets to build in each sub-build.
     ninja_targets = [
         sdk_label_to_ninja_target(l)
         for l in args.sdk_targets + args.validation_targets
     ]
-    log('Ninja targets to build: %s' % ' '.join(sorted(ninja_targets)))
+    log("Ninja targets to build: %s" % " ".join(sorted(ninja_targets)))
 
     # The list of all input directories for the final merge operation.
     # Start by adding all export SDK directories from the main build dir.
     all_input_dirs: List[Path] = []
     for sdk_target in args.sdk_targets:
         base_exported_dir = sdk_label_to_exported_dir(
-            sdk_target, base_build_dir)
+            sdk_target, base_build_dir
+        )
         if not base_exported_dir.exists():
             parser.error(
-                f'Required base directory does not exist: {base_exported_dir}')
+                f"Required base directory does not exist: {base_exported_dir}"
+            )
         all_input_dirs.append(str(base_exported_dir))
 
     for api_level in [0] + args.extra_api_levels:
@@ -302,18 +313,18 @@ def main():
 
         for target_cpu in target_cpus:
             if api_level != 0:
-                subtype = f'api{api_level}-{target_cpu}'
+                subtype = f"api{api_level}-{target_cpu}"
             else:
                 subtype = target_cpu
 
             build_dir = Path(build_dir_prefix + subtype)
             build_dir.mkdir(exist_ok=True, parents=True)
             log(
-                f'{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}'
+                f"{build_dir}: Preparing sub-build, directory: {build_dir.resolve()}"
             )
 
             if args.clean and build_dir.exists():
-                log(f'{build_dir}: Cleaning build directory')
+                log(f"{build_dir}: Cleaning build directory")
                 run_command([ninja_path, "-C", build_dir, "-t", "clean"])
 
             args_gn_content = _ARGS_GN_TEMPLATE.format(
@@ -321,7 +332,7 @@ def main():
                 cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
                 rust_rbe_enable="true" if args.rust_rbe_enable else "false",
                 use_goma="true" if args.use_goma else "false",
-                sdk_labels_list=', '.join(f'"{l}"' for l in args.sdk_targets),
+                sdk_labels_list=", ".join(f'"{l}"' for l in args.sdk_targets),
             )
             if args.use_goma and args.goma_dir:
                 args_gn_content += f'goma_dir = "{args.goma_dir}"\n'
@@ -329,7 +340,9 @@ def main():
                 args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
 
             if args.compress_debuginfo:
-                args_gn_content += f'compress_debuginfo = "{args.compress_debuginfo}"\n'
+                args_gn_content += (
+                    f'compress_debuginfo = "{args.compress_debuginfo}"\n'
+                )
 
             # Only build host tools in the x64 sub-build, to save
             # considerable time.
@@ -349,31 +362,40 @@ def main():
             if api_level != 0:
                 args_gn_content += f"override_target_api_level = {api_level}\n"
 
-            if write_file_if_unchanged(build_dir / 'args.gn', args_gn_content) or \
-               not (build_dir / 'build.ninja').exists():
-                if run_checked_command([gn_path,
-                                        "--root=%s" % fuchsia_dir.resolve(),
-                                        "gen", build_dir]):
+            if (
+                write_file_if_unchanged(build_dir / "args.gn", args_gn_content)
+                or not (build_dir / "build.ninja").exists()
+            ):
+                if run_checked_command(
+                    [
+                        gn_path,
+                        "--root=%s" % fuchsia_dir.resolve(),
+                        "gen",
+                        build_dir,
+                    ]
+                ):
                     return 1
 
-            log(f'{build_dir}: Generating IDK sub-targets')
+            log(f"{build_dir}: Generating IDK sub-targets")
 
             # Adjust the NINJA_STATUS environment variable before launching Ninja
             # in order to add a prefix distinguishing its build actions from
             # the top-level ones.
-            ninja_status = os.environ.get('NINJA_STATUS', '[%f/%t](%r) ')
+            ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t](%r) ")
             ninja_status = f"IDK_SUBBUILD_{subtype} " + ninja_status
-            ninja_env = {'NINJA_STATUS': ninja_status}
+            ninja_env = {"NINJA_STATUS": ninja_status}
 
-            if run_checked_command([ninja_path, "-C", build_dir] +
-                                   ninja_targets, env=ninja_env):
+            if run_checked_command(
+                [ninja_path, "-C", build_dir] + ninja_targets, env=ninja_env
+            ):
                 return 1
 
             for sdk_target in args.sdk_targets:
                 base_exported_dir = sdk_label_to_exported_dir(
-                    sdk_target, build_dir)
+                    sdk_target, build_dir
+                )
                 all_input_dirs.append(base_exported_dir)
-                api_level_path = base_exported_dir / 'api_level'
+                api_level_path = base_exported_dir / "api_level"
                 api_level_path.write_text(str(api_level))
 
     # Merge everything into the final directory (or archive).

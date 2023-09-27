@@ -20,8 +20,8 @@ class BluetoothCommon(abc.ABC):
 
     @abc.abstractmethod
     def accept_pairing(
-            self, input_mode: BluetoothAcceptPairing,
-            output_mode: BluetoothAcceptPairing) -> None:
+        self, input_mode: BluetoothAcceptPairing, output_mode: BluetoothAcceptPairing
+    ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
@@ -33,8 +33,7 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def connect_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def connect_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
@@ -77,8 +76,7 @@ class BluetoothCommon(abc.ABC):
         """
 
     @abc.abstractmethod
-    def pair_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def pair_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:

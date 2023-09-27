@@ -10,10 +10,10 @@ from typing import Dict, List, Optional, Union
 
 # These string values are not only used in the JSON, but also as the test
 # subdirectory names.
-HLCPP = 'hlcpp'
-LLCPP = 'llcpp'
-RUST = 'rust'
-GO = 'go'
+HLCPP = "hlcpp"
+LLCPP = "llcpp"
+RUST = "rust"
+GO = "go"
 BINDINGS = [HLCPP, LLCPP, RUST, GO]
 
 # Path relative to the test root.
@@ -27,12 +27,13 @@ class FidlDef:
     by a FIDL file located at |source|, and may have accompanying |instructions|
     describing the change between this state and the previous one.
     """
+
     source: RelativePath
     instructions: List[str]
 
     @classmethod
     def fromdict(cls, data: dict):
-        return FidlDef(data['source'], data['instructions'])
+        return FidlDef(data["source"], data["instructions"])
 
 
 # A reference to a FidlDef. The individual steps for each binding needs to be
@@ -44,18 +45,20 @@ FidlRef = str
 
 @dataclass
 class FidlStep:
-    """ A step representing a change to the FIDL library. """
+    """A step representing a change to the FIDL library."""
+
     step_num: int
     fidl: FidlRef
 
     @classmethod
     def fromdict(cls, data: dict):
-        return FidlStep(data['step_num'], data['fidl'])
+        return FidlStep(data["step_num"], data["fidl"])
 
 
 @dataclass
 class SourceStep:
-    """ A step representing a change to a single binding. """
+    """A step representing a change to a single binding."""
+
     step_num: int
     source: RelativePath
     instructions: List[str]
@@ -63,7 +66,8 @@ class SourceStep:
     @classmethod
     def fromdict(cls, data: dict):
         return SourceStep(
-            data['step_num'], data['source'], data['instructions'])
+            data["step_num"], data["source"], data["instructions"]
+        )
 
 
 @dataclass
@@ -73,6 +77,7 @@ class Steps:
     consists of a starting FIDL and source states, followed by a sequence of
     alternative FIDL/source changes (defined in |steps|).
     """
+
     starting_fidl: FidlRef
     starting_src: RelativePath
     steps: List[Union[FidlStep, SourceStep]]
@@ -80,10 +85,13 @@ class Steps:
     @classmethod
     def fromdict(cls, data: dict):
         return cls(
-            data['starting_fidl'], data['starting_src'], [
-                FidlStep.fromdict(s) if 'fidl' in s else SourceStep.fromdict(s)
-                for s in data['steps']
-            ])
+            data["starting_fidl"],
+            data["starting_src"],
+            [
+                FidlStep.fromdict(s) if "fidl" in s else SourceStep.fromdict(s)
+                for s in data["steps"]
+            ],
+        )
 
 
 @dataclass
@@ -99,6 +107,7 @@ class CompatTest:
         bindings: Definition of the source/FIDL steps taken by each binding
                   for this transition.
     """
+
     title: str
     fidl: Dict[FidlRef, FidlDef]
     bindings: Dict[str, Steps]
@@ -106,13 +115,14 @@ class CompatTest:
     @classmethod
     def fromdict(cls, data: dict):
         return CompatTest(
-            data['title'],
-            {k: FidlDef.fromdict(v) for k, v in data['fidl'].items()},
-            {k: Steps.fromdict(v) for k, v in data['bindings'].items()})
+            data["title"],
+            {k: FidlDef.fromdict(v) for k, v in data["fidl"].items()},
+            {k: Steps.fromdict(v) for k, v in data["bindings"].items()},
+        )
 
     def todict(self):
         return asdict(self)
 
     def save(self, path: Path):
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(self.todict(), f, indent=4)

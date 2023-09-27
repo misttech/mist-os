@@ -9,9 +9,9 @@ import shutil
 
 
 def make_dir(file_path):
-    '''Creates the directory hierarchy for the given file and returns the
+    """Creates the directory hierarchy for the given file and returns the
     given path.
-    '''
+    """
     target = os.path.dirname(file_path)
     try:
         os.makedirs(target)
@@ -24,7 +24,7 @@ def make_dir(file_path):
 
 
 def copy_tree(src, dst, allow_overwrite=True):
-    '''Recursively copies a directory into another.
+    """Recursively copies a directory into another.
 
     Differs with shutil.copytree in that it won't fail if the destination
     directory already exists.
@@ -39,7 +39,7 @@ def copy_tree(src, dst, allow_overwrite=True):
         Exception: If allow_overwrite is False and a destination file already
             exists.
 
-    '''
+    """
     if not os.path.isdir(dst):
         os.makedirs(dst)
     for path, directories, files in os.walk(src):
@@ -57,5 +57,6 @@ def copy_tree(src, dst, allow_overwrite=True):
             source, dest = get_path(file)
             if not allow_overwrite and os.path.exists(dest):
                 raise Exception(
-                    "cannot copy file: file '%s': File exists" % dest)
+                    "cannot copy file: file '%s': File exists" % dest
+                )
             shutil.copy2(source, dest)

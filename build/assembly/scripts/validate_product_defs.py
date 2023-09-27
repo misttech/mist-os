@@ -28,10 +28,12 @@ from depfile import DepFile
 from typing import List, Tuple
 
 disallowed_gn_args = [
-    "base_package_labels", "cache_package_labels", "universe_package_labels"
+    "base_package_labels",
+    "cache_package_labels",
+    "universe_package_labels",
 ]
-gn_args_group = '(' + '|'.join(disallowed_gn_args) + ')'
-assignment_matcher_string = r'^\s*' + gn_args_group + r'(?!\s*=\s*\[\])'
+gn_args_group = "(" + "|".join(disallowed_gn_args) + ")"
+assignment_matcher_string = r"^\s*" + gn_args_group + r"(?!\s*=\s*\[\])"
 assignment_matcher = re.compile(assignment_matcher_string)
 
 
@@ -54,7 +56,8 @@ def find_vendor_product_defs(dir: str) -> List[str]:
             for entry in contents:
                 if entry.is_dir():
                     vendor_products_dir = os.path.join(
-                        dir, "vendor", entry.name, "products")
+                        dir, "vendor", entry.name, "products"
+                    )
                     if os.path.isdir(vendor_products_dir):
                         results.extend(find_product_defs(vendor_products_dir))
     return results
@@ -78,15 +81,18 @@ def validate_product_def(path: str) -> List[Tuple[int, str]]:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--source-root", default=".", help="The root Fuchsia source dir")
+        "--source-root", default=".", help="The root Fuchsia source dir"
+    )
     parser.add_argument(
         "--output",
-        type=argparse.FileType('w'),
-        help="A file to write output to.")
+        type=argparse.FileType("w"),
+        help="A file to write output to.",
+    )
     parser.add_argument(
         "--depfile",
-        type=argparse.FileType('w'),
-        help="A depfile of read files, this requires the use of --output")
+        type=argparse.FileType("w"),
+        help="A depfile of read files, this requires the use of --output",
+    )
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -141,7 +147,7 @@ def main():
         error(
             "\nFound use of deprecated / disallowed GN arg in product definition:"
         )
-        for (path, errors) in results.items():
+        for path, errors in results.items():
             error(f"  {format_path(path)}")
             for line_num, error_string in errors:
                 error(f"    {line_num}: {error_string}")

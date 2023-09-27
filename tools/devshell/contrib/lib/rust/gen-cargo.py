@@ -15,7 +15,8 @@ import rust
 
 def main():
     parser = argparse.ArgumentParser(
-        "Generate symlinks to Rust Cargo.toml output files")
+        "Generate symlinks to Rust Cargo.toml output files"
+    )
     parser.add_argument(
         "gn_target",
         type=rust.GnTarget,
@@ -24,9 +25,11 @@ def main():
                               for the current directory or use the \
                               absolute path to the target \
                               (relative to $FUCHSIA_DIR). \
-                              For example: //garnet/bin/foo/bar:baz")
+                              For example: //garnet/bin/foo/bar:baz",
+    )
     parser.add_argument(
-        "--output", help="Path to Cargo.toml to generate", required=False)
+        "--output", help="Path to Cargo.toml to generate", required=False
+    )
     parser.add_argument("--out-dir", help="Path to the Fuchsia build directory")
     args = parser.parse_args()
     args.gn_target.label_name += ".actual"
@@ -57,5 +60,5 @@ def main():
         return 1
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

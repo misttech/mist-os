@@ -14,7 +14,8 @@ import io
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    '--test_dir_path', help='Path to the test data directory.', required=True)
+    "--test_dir_path", help="Path to the test data directory.", required=True
+)
 args = parser.parse_args()
 
 TEST_DIR_PATH = args.test_dir_path
@@ -30,7 +31,6 @@ sys.argv.pop()
 
 
 class MainArgParserTests(unittest.TestCase):
-
     def test_digest(self):
         parser = mem_digest.get_arg_parser()
         snapshot_path = os.path.join(TEST_DIR_PATH, "test_snapshot.json")
@@ -38,9 +38,13 @@ class MainArgParserTests(unittest.TestCase):
         csv_path = os.path.join(TEST_DIR_PATH, "test_output.csv")
         args = parser.parse_args(
             [
-                "--snapshot", snapshot_path, "--digest", digest_path,
-                "--output=csv"
-            ])
+                "--snapshot",
+                snapshot_path,
+                "--digest",
+                digest_path,
+                "--output=csv",
+            ]
+        )
 
         stdout = run_capture_output(mem_digest.main, args)
         with open(csv_path) as csv:
@@ -53,9 +57,13 @@ class MainArgParserTests(unittest.TestCase):
         human_path = os.path.join(TEST_DIR_PATH, "test_human_output.txt")
         args = parser.parse_args(
             [
-                "--snapshot", snapshot_path, "--digest", digest_path,
-                "--output=human"
-            ])
+                "--snapshot",
+                snapshot_path,
+                "--digest",
+                digest_path,
+                "--output=human",
+            ]
+        )
 
         stdout = run_capture_output(mem_digest.main, args)
         with open(human_path) as human:
@@ -78,5 +86,5 @@ def run_capture_output(f, arguments):
     return f.getvalue()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

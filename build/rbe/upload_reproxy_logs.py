@@ -31,11 +31,15 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 # There is never a need to checkout non-host platforms of the reclient tools.
 # This should be unique.  Path may be relative or absolute.
 _DEFAULT_RECLIENT_BINDIR = glob.glob(
-    os.path.join(_PROJECT_ROOT,
-                 "prebuilt/proprietary/third_party/reclient/*"))[0]
+    os.path.join(_PROJECT_ROOT, "prebuilt/proprietary/third_party/reclient/*")
+)[0]
 
-_DEFAULT_REPROXY_LOGS_TABLE = "fuchsia-engprod-metrics-prod:metrics.rbe_client_command_logs_developer"
-_DEFAULT_RBE_METRICS_TABLE = "fuchsia-engprod-metrics-prod:metrics.rbe_client_metrics_developer"
+_DEFAULT_REPROXY_LOGS_TABLE = (
+    "fuchsia-engprod-metrics-prod:metrics.rbe_client_command_logs_developer"
+)
+_DEFAULT_RBE_METRICS_TABLE = (
+    "fuchsia-engprod-metrics-prod:metrics.rbe_client_metrics_developer"
+)
 
 
 def msg(text: str):
@@ -44,10 +48,10 @@ def msg(text: str):
 
 def table_arg(value: str) -> str:
     err_msg = "Table name must be in the form PROJECT:DATASET.TABLE"
-    project, sep, dataset_table = value.partition(':')
+    project, sep, dataset_table = value.partition(":")
     if not sep:
         raise argparse.ArgumentTypeError(err_msg)
-    dataset, sep, table = dataset_table.partition('.')
+    dataset, sep, table = dataset_table.partition(".")
     if not sep:
         raise argparse.ArgumentTypeError(err_msg)
     if not (project and dataset and table):
@@ -88,15 +92,13 @@ def main_arg_parser() -> argparse.ArgumentParser:
         "--bq-logs-table",
         type=table_arg,
         default=_DEFAULT_REPROXY_LOGS_TABLE,
-        help=
-        "BigQuery remote action logs table name in the form 'project:dataset.table'",
+        help="BigQuery remote action logs table name in the form 'project:dataset.table'",
     )
     parser.add_argument(
         "--bq-metrics-table",
         type=table_arg,
         default=_DEFAULT_RBE_METRICS_TABLE,
-        help=
-        "BigQuery remote action metrics table name in the form 'project:dataset.table'",
+        help="BigQuery remote action metrics table name in the form 'project:dataset.table'",
     )
     parser.add_argument(
         "--dry-run",
@@ -120,8 +122,7 @@ def main_arg_parser() -> argparse.ArgumentParser:
         "--auth-only",
         action="store_true",
         default=False,
-        help=
-        "Authenticate by inserting a null entry to a table, and do nothing else.",
+        help="Authenticate by inserting a null entry to a table, and do nothing else.",
     )
 
     # Positional args are the reproxy logdirs to process.
@@ -137,7 +138,7 @@ def main_arg_parser() -> argparse.ArgumentParser:
 
 def read_reproxy_metrics_proto(metrics_file: Path) -> stats_pb2.Stats:
     stats = stats_pb2.Stats()
-    with open(metrics_file, mode='rb') as f:
+    with open(metrics_file, mode="rb") as f:
         stats.ParseFromString(f.read())
     return stats
 
@@ -149,7 +150,7 @@ def bq_table_insert(table: str, data: str) -> int:
     with tempfile.NamedTemporaryFile() as f:
         f.write(data.encode())
         f.flush()
-        return subprocess.call(['bq', 'insert', table, f.name])
+        return subprocess.call(["bq", "insert", table, f.name])
 
 
 def bq_upload_remote_action_logs(
@@ -158,7 +159,8 @@ def bq_upload_remote_action_logs(
     batch_size: int,
 ) -> int:
     batches = (
-        records[i:i + batch_size] for i in range(0, len(records), batch_size))
+        records[i : i + batch_size] for i in range(0, len(records), batch_size)
+    )
     exit_code = 0
     for batch in batches:
         # bq accepts rows as newline-delimited JSON.
@@ -255,7 +257,8 @@ def main_upload_logs(
         {
             "build_id": uuid,
             "log": record,
-        } for record in converted_log["records"]
+        }
+        for record in converted_log["records"]
     ]
 
     if print_sample:
@@ -293,7 +296,6 @@ def main_single_logdir(
     dry_run: bool,
     verbose: bool,
 ) -> int:
-
     # The rbe_metrics.pb file is a sign that a build finished.
     # Skip over unfinished builds.
     metrics_file = reproxy_logdir / "rbe_metrics.pb"
@@ -328,7 +330,7 @@ def main_single_logdir(
         # Some log dirs were created before we started adding build ids.
         # If needed, create one, and write it to the same file.
         build_id = str(uuid.uuid4())
-        with open(build_id_file, 'w') as f:
+        with open(build_id_file, "w") as f:
             f.write(build_id + "\n")
 
     # Upload aggregate metrics.
@@ -358,7 +360,7 @@ def main_single_logdir(
 
     # Leave a stamp-file to indicate we've already uploaded this reproxy_logdir.
     if not dry_run:
-        with open(upload_stamp_file, 'w') as f:
+        with open(upload_stamp_file, "w") as f:
             f.write(
                 "Already uploaded {reproxy_logdir}.  Remove {upload_stamp_file} and re-run to force re-upload."
             )
@@ -396,5 +398,5 @@ def main(argv: Sequence[str]) -> int:
     return exit_code
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))

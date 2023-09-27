@@ -20,33 +20,39 @@ VARIABLE_SUBSTITUTION = {"{test_artifact_dir}": ""}
 
 
 def run_target_test(
-        ffx_bin: str, test_url: str, outdir: str,
-        ffx_test_args: List[str]) -> subprocess.CompletedProcess:
+    ffx_bin: str, test_url: str, outdir: str, ffx_test_args: List[str]
+) -> subprocess.CompletedProcess:
     """Runs 'ffx test run <url> --output-directory outdir [args]'"""
     root_build_dir = os.getcwd()
 
     # use the same configuration in //src/developer/ffx/build/ffx_action.gni
     base_config = [
-        'analytics.disabled=true',
-        'assembly_enabled=true',
-        'sdk.root=' + root_build_dir,
-        'sdk.type=in-tree',
-        'sdk.module=host_tools.internal',
+        "analytics.disabled=true",
+        "assembly_enabled=true",
+        "sdk.root=" + root_build_dir,
+        "sdk.type=in-tree",
+        "sdk.module=host_tools.internal",
     ]
 
     args = [ffx_bin]
     for c in base_config:
-        args += ['--config', c]
+        args += ["--config", c]
     args += [
-        '--env', './.ffx.env', 'test', 'run', test_url, '--output-directory',
-        outdir
+        "--env",
+        "./.ffx.env",
+        "test",
+        "run",
+        test_url,
+        "--output-directory",
+        outdir,
     ]
     args += ffx_test_args
     return subprocess.run(args, text=True, stderr=subprocess.PIPE)
 
 
 def get_test_suite_artifact_dir(
-        output_root: pathlib.Path, test_suite_name: str):
+    output_root: pathlib.Path, test_suite_name: str
+):
     """Parses run_summary.json and reads back 'artifact_dir'.
 
     Raises:
@@ -55,13 +61,13 @@ def get_test_suite_artifact_dir(
     Returns:
        subdir path where test suite artifact path is stored.
     """
-    summary_json = os.path.join(output_root, 'run_summary.json')
-    with open(summary_json, 'r') as f:
+    summary_json = os.path.join(output_root, "run_summary.json")
+    with open(summary_json, "r") as f:
         test_summary = json.load(f)
-        test_summary = test_summary['data']
-        for suite in test_summary['suites']:
-            if test_suite_name in suite['name']:
-                return suite['artifact_dir']
+        test_summary = test_summary["data"]
+        for suite in test_summary["suites"]:
+            if test_suite_name in suite["name"]:
+                return suite["artifact_dir"]
     return ""
 
 
@@ -73,13 +79,15 @@ def do_variable_substitution(input: str) -> str:
 
 
 def run_host_script(
-        script_bin: str, script_args: List[str]) -> subprocess.CompletedProcess:
+    script_bin: str, script_args: List[str]
+) -> subprocess.CompletedProcess:
     """Runs the host script."""
     substituted_args = []
     for arg in script_args:
         substituted_args.append(do_variable_substitution(arg))
     return subprocess.run(
-        [script_bin] + substituted_args, text=True, stderr=subprocess.PIPE)
+        [script_bin] + substituted_args, text=True, stderr=subprocess.PIPE
+    )
 
 
 class RunTargetTestWithHostScript(unittest.TestCase):
@@ -94,66 +102,85 @@ class RunTargetTestWithHostScript(unittest.TestCase):
     def runTest(self):
         """Runs test on target"""
         self.test_status = run_target_test(
-            self.args.ffx_bin, self.args.test_url, self.test_output_dir,
-            self.args.ffx_test_args)
+            self.args.ffx_bin,
+            self.args.test_url,
+            self.test_output_dir,
+            self.args.ffx_test_args,
+        )
         self.assertEqual(
-            self.test_status.returncode, 0,
-            "test returned non-zero status, stderr: %s" %
-            self.test_status.stderr)
+            self.test_status.returncode,
+            0,
+            "test returned non-zero status, stderr: %s"
+            % self.test_status.stderr,
+        )
 
     def tearDown(self):
-        if self.args.host_script_bin and (self.test_status.returncode == 0 or
-                                          self.args.run_host_script_on_fail):
+        if self.args.host_script_bin and (
+            self.test_status.returncode == 0
+            or self.args.run_host_script_on_fail
+        ):
             artifact_subdir = get_test_suite_artifact_dir(
-                self.test_output_dir, self.args.test_url)
-            VARIABLE_SUBSTITUTION['{test_artifact_dir}'] = os.path.join(
-                self.test_output_dir, artifact_subdir)
+                self.test_output_dir, self.args.test_url
+            )
+            VARIABLE_SUBSTITUTION["{test_artifact_dir}"] = os.path.join(
+                self.test_output_dir, artifact_subdir
+            )
             script_status = run_host_script(
-                self.args.host_script_bin, self.args.host_script_args)
+                self.args.host_script_bin, self.args.host_script_args
+            )
             self.assertEqual(
-                script_status.returncode, 0,
-                "host script returned non-zero status, stderr: %s" %
-                script_status.stderr)
+                script_status.returncode,
+                0,
+                "host script returned non-zero status, stderr: %s"
+                % script_status.stderr,
+            )
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--ffx-bin',
+        "--ffx-bin",
         type=pathlib.Path,
         required=True,
-        help='Path to ffx binary.')
-    parser.add_argument('--test-url', type=str, required=True, help='Test URL')
+        help="Path to ffx binary.",
+    )
+    parser.add_argument("--test-url", type=str, required=True, help="Test URL")
     parser.add_argument(
-        '--test-outdir', type=pathlib.Path, help='Dir to store test outputs')
+        "--test-outdir", type=pathlib.Path, help="Dir to store test outputs"
+    )
     parser.add_argument(
-        '--ffx-test-args',
-        action='append',
+        "--ffx-test-args",
+        action="append",
         default=[],
-        help='List of args to be forwarded to ffx test')
+        help="List of args to be forwarded to ffx test",
+    )
     parser.add_argument(
-        '--host-script-bin',
+        "--host-script-bin",
         type=pathlib.Path,
-        help='Path to host script, optional')
+        help="Path to host script, optional",
+    )
     parser.add_argument(
-        '--host-script-args',
-        action='append',
+        "--host-script-args",
+        action="append",
         type=str,
         default=[],
-        help='List of args to be forwarded to host script')
+        help="List of args to be forwarded to host script",
+    )
     parser.add_argument(
-        '--run-host-script-on-fail',
-        help='whether to run the host script if test fails')
+        "--run-host-script-on-fail",
+        help="whether to run the host script if test fails",
+    )
     args = parser.parse_args()
-    test_output_dir = os.getenv('FUCHSIA_TEST_OUTDIR')
+    test_output_dir = os.getenv("FUCHSIA_TEST_OUTDIR")
     if not test_output_dir:
         test_output_dir = args.test_outdir
-    print('storing test output to: ', test_output_dir)
+    print("storing test output to: ", test_output_dir)
     test = RunTargetTestWithHostScript(
-        args=args, test_output_dir=test_output_dir)
+        args=args, test_output_dir=test_output_dir
+    )
     result = unittest.TextTestRunner().run(test)
     sys.exit(not result.wasSuccessful())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

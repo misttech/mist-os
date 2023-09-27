@@ -45,8 +45,9 @@ _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
 _PROJECT_ROOT = _SCRIPT_DIR.resolve().parent.parent
 _PROJECT_ROOT_REL = os.path.relpath(
-    _PROJECT_ROOT, start=Path(os.curdir).absolute())
-_DETAIL_DIFF_SCRIPT = Path('build/rbe/detail-diff.sh')
+    _PROJECT_ROOT, start=Path(os.curdir).absolute()
+)
+_DETAIL_DIFF_SCRIPT = Path("build/rbe/detail-diff.sh")
 
 
 def msg(text: str):
@@ -54,9 +55,8 @@ def msg(text: str):
 
 
 def _partition(
-        iterable: Iterable[Any],
-        predicate: Callable[[Any],
-                            bool]) -> Tuple[Sequence[Any], Sequence[Any]]:
+    iterable: Iterable[Any], predicate: Callable[[Any], bool]
+) -> Tuple[Sequence[Any], Sequence[Any]]:
     """Splits sequence into two sequences based on predicate function."""
     trues = []
     falses = []
@@ -101,7 +101,8 @@ def ensure_file_exists(path: Path):
         time.sleep(delay)
 
     raise FileNotFoundError(
-        f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}")
+        f"[{_SCRIPT_BASENAME}] *** Expected output file not found: {path}"
+    )
 
 
 def detail_diff(left: Path, right: Path):
@@ -112,7 +113,8 @@ def detail_diff(left: Path, right: Path):
             _PROJECT_ROOT_REL / _DETAIL_DIFF_SCRIPT,
             str(left),
             str(right),
-        ])
+        ]
+    )
 
 
 def remove_if_exists(path: Path):
@@ -128,21 +130,23 @@ def execute_main_command(*args, **kwargs) -> int:
 # TODO: de-dupe this from cl_utils after moving this source file
 def copy_preserve_subpath(src: Path, dest_dir: Path):
     """Like copy(), but preserves the relative path of src in the destination."""
-    assert not src.is_absolute(
-    ), f'source file to be copied should be relative, but got: {src}'
+    assert (
+        not src.is_absolute()
+    ), f"source file to be copied should be relative, but got: {src}"
     dest_subdir = dest_dir / src.parent
     dest_subdir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest_subdir)
 
 
 def retry_file_op_once_with_delay(
-        fileop: Callable[[], Any], failmsg: str, delay: int):
+    fileop: Callable[[], Any], failmsg: str, delay: int
+):
     """Insanity is doing the same thing and expecting a different result."""
     try:
         fileop()
     except FileNotFoundError:
         # one-time retry
-        msg(f'{failmsg}  (Retrying once after {delay}s.)')
+        msg(f"{failmsg}  (Retrying once after {delay}s.)")
         time.sleep(delay)
         fileop()
         # If this fails again, exception will be raised.
@@ -187,6 +191,7 @@ class TempFileTransform(object):
       is sensitive to the output file extension.
       Example: "foo/bar.txt", with prefix="tmp-" -> foo/tmp-bar.txt
     """
+
     temp_dir: Path = None
     suffix: str = ""
     basename_prefix: str = ""
@@ -201,7 +206,8 @@ class TempFileTransform(object):
 
 
 def split_transform_join(
-        token: str, sep: str, transform: Callable[[str], str]) -> str:
+    token: str, sep: str, transform: Callable[[str], str]
+) -> str:
     return sep.join(transform(x) for x in token.split(sep))
 
 
@@ -228,7 +234,6 @@ def lexically_rewrite_token(token: str, transform: Callable[[str], str]) -> str:
 
 
 class OutputSubstitution(object):
-
     def __init__(self, spec: str):
         """Constructs an OutputSubstitution.
 
@@ -241,17 +246,18 @@ class OutputSubstitution(object):
             File names may not contain the characters: =:,
             See help for the --output option.
         """
-        if spec.startswith('substitute_after:'):
-            tokens = spec.split(':')
+        if spec.startswith("substitute_after:"):
+            tokens = spec.split(":")
             if len(tokens) != 3:
                 raise ValueError(
-                    f'Expecting a substitution specification FILENAME or ' +
-                    f'substitute_after:OPTION:FILENAME, but got {spec}.')
+                    f"Expecting a substitution specification FILENAME or "
+                    + f"substitute_after:OPTION:FILENAME, but got {spec}."
+                )
             self._match_previous_option = tokens[1]
             self._output_name = tokens[2]
         else:
             # if blank, this will not be used for matching
-            self._match_previous_option = ''
+            self._match_previous_option = ""
             self._output_name = spec
 
     @property
@@ -266,9 +272,11 @@ class OutputSubstitution(object):
 @dataclasses.dataclass
 class Action(object):
     """Represents a set of parameters of a single build action."""
+
     command: Sequence[str] = dataclasses.field(default_factory=list)
     substitutions: Dict[str, str] = dataclasses.field(
-        default_factory=dict)  # FrozenDict
+        default_factory=dict
+    )  # FrozenDict
     label: str = ""
 
     def substitute_command(
@@ -282,7 +290,7 @@ class Action(object):
             if arg in self.substitutions:
                 match_previous = self.substitutions[arg]
                 # Some output filenames requires the previous option to match.
-                if match_previous != '' and prev_opt != match_previous:
+                if match_previous != "" and prev_opt != match_previous:
                     return arg_path
                 new_arg = tempfile_transform.transform(arg_path)
                 if arg_path != new_arg:
@@ -294,22 +302,24 @@ class Action(object):
         substituted_command = []
         # Subprocess calls do not work for commands that start with VAR=VALUE
         # environment variables, which is remedied by prefixing with 'env'.
-        if self.command and '=' in self.command[0]:
-            substituted_command += ['/usr/bin/env']
+        if self.command and "=" in self.command[0]:
+            substituted_command += ["/usr/bin/env"]
 
         substituted_command += [
             lexically_rewrite_token(
-                tok, lambda x: str(replace_output_filename(x, prev_opt)))
-            for prev_opt, tok in zip([''] + self.command[:-1], self.command)
+                tok, lambda x: str(replace_output_filename(x, prev_opt))
+            )
+            for prev_opt, tok in zip([""] + self.command[:-1], self.command)
         ]
 
         return substituted_command, renamed_outputs
 
     def run_cached(
-            self,
-            tempfile_transform: TempFileTransform,
-            verbose: bool = False,
-            dry_run: bool = False) -> int:
+        self,
+        tempfile_transform: TempFileTransform,
+        verbose: bool = False,
+        dry_run: bool = False,
+    ) -> int:
         """Runs a modified command and conditionally moves outputs in-place.
 
         Args:
@@ -320,7 +330,8 @@ class Action(object):
 
         # renamed_outputs: keys: original file names, values: transformed temporary file names
         substituted_command, renamed_outputs = self.substitute_command(
-            tempfile_transform)
+            tempfile_transform
+        )
 
         if verbose or dry_run:
             for orig, renamed in renamed_outputs.items():
@@ -350,8 +361,9 @@ class Action(object):
             try:
                 retry_file_op_once_with_delay(
                     lambda: move_if_different(
-                        src=temp_out, dest=orig_out, verbose=verbose),
-                    f'Failed to update {temp_out} -> {orig_out}.',
+                        src=temp_out, dest=orig_out, verbose=verbose
+                    ),
+                    f"Failed to update {temp_out} -> {orig_out}.",
                     5,
                 )
             except FileNotFoundError as e:
@@ -364,7 +376,8 @@ class Action(object):
 
         if verbose:
             unrenamed_outputs = set(self.substitutions.keys()) - set(
-                renamed_outputs.keys())
+                renamed_outputs.keys()
+            )
             if unrenamed_outputs:
                 # Having un-renamed outputs is not an error, but rather an indicator
                 # of a potentially missed opportunity to cache unchanged outputs.
@@ -374,11 +387,12 @@ class Action(object):
         return 0
 
     def run_repeatedly_and_compare_outputs(
-            self,
-            tempfile_transform: TempFileTransform,
-            diff_action: Callable[[Path, Path], Any],
-            max_attempts: int = 1,
-            verbose: bool = False) -> int:
+        self,
+        tempfile_transform: TempFileTransform,
+        diff_action: Callable[[Path, Path], Any],
+        max_attempts: int = 1,
+        verbose: bool = False,
+    ) -> int:
         """Runs a command N times, copying declared outputs in between.
 
         Compare both sets of outputs, and error out if any differ.
@@ -414,7 +428,8 @@ class Action(object):
             out_path = Path(out)
             if out_path.is_file():
                 renamed_outputs[out_path] = tempfile_transform.transform(
-                    out_path)
+                    out_path
+                )
             # A nonexistent output would be caught by action_tracer.py.
 
         for out, backup in renamed_outputs.items():
@@ -445,7 +460,9 @@ class Action(object):
                 keep_backups=True,
             )
             if verify_status != 0:
-                msg(f"Inconsistent output found on re-run attempt {i}/{max_attempts}.")
+                msg(
+                    f"Inconsistent output found on re-run attempt {i}/{max_attempts}."
+                )
                 # Keep around mismatched outputs.
                 return verify_status
 
@@ -456,10 +473,11 @@ class Action(object):
         return 0
 
     def run_twice_with_substitution_and_compare_outputs(
-            self,
-            tempfile_transform: TempFileTransform,
-            diff_action: Callable[[Path, Path], Any],
-            verbose: bool = False) -> int:
+        self,
+        tempfile_transform: TempFileTransform,
+        diff_action: Callable[[Path, Path], Any],
+        verbose: bool = False,
+    ) -> int:
         """Runs a command twice, the second time with renamed outputs, and compares.
 
         Caveat: If the contents if the outputs are sensitive to the names of the
@@ -476,7 +494,8 @@ class Action(object):
 
         # renamed_outputs: keys: original file names, values: transformed temporary file names
         substituted_command, renamed_outputs = self.substitute_command(
-            tempfile_transform)
+            tempfile_transform
+        )
 
         if verbose:
             cmd_str = " ".join(substituted_command)
@@ -538,7 +557,8 @@ def verify_files_match(
         fileset.items(),
         # If either file is missing, this will fail, which indicates that
         # something is not working as expected.
-        lambda pair: files_match(pair[0], pair[1]))
+        lambda pair: files_match(pair[0], pair[1]),
+    )
 
     if not keep_backups:
         # Remove any files that matched to save space.
@@ -585,16 +605,15 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--outputs",
         nargs="*",
-        help="An action's declared outputs.  " +
-        "When an element is a plain file name, all occurrences of that file name "
-        +
-        "will be substituted in the command that writes temporary outputs.  " +
-        "When an element has the form 'substitute_after:OPTION:FILENAME', " +
-        "only occurrences of FILENAME found in the option argument of OPTION " +
-        "will be substituted (examples: OPTION=-o or OPTION=--out).  " +
-        "The latter form is recommended when an output filename can occur in " +
-        "multiple locations in a command line.  " +
-        "File names must not contain =,: characters.",
+        help="An action's declared outputs.  "
+        + "When an element is a plain file name, all occurrences of that file name "
+        + "will be substituted in the command that writes temporary outputs.  "
+        + "When an element has the form 'substitute_after:OPTION:FILENAME', "
+        + "only occurrences of FILENAME found in the option argument of OPTION "
+        + "will be substituted (examples: OPTION=-o or OPTION=--out).  "
+        + "The latter form is recommended when an output filename can occur in "
+        + "multiple locations in a command line.  "
+        + "File names must not contain =,: characters.",
     )
     parser.add_argument(
         "--temp-suffix",
@@ -612,8 +631,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "--temp-dir",
         type=Path,
         default=None,
-        help=
-        "Temporary directory for writing, can be relative to working directory or absolute.",
+        help="Temporary directory for writing, can be relative to working directory or absolute.",
     )
     parser.add_argument(
         "--verbose",
@@ -638,8 +656,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "--check-repeatability",
         action="store_true",
         default=False,
-        help=
-        "Check for repeatability: run the command twice, with different outputs, and compare.",
+        help="Check for repeatability: run the command twice, with different outputs, and compare.",
     )
     parser.add_argument(
         "--max-attempts",
@@ -651,16 +668,14 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         "--rename-outputs",
         action="store_true",
         default=False,
-        help=
-        "When checking for repeatability: rename command-line outputs on the second run.",
+        help="When checking for repeatability: rename command-line outputs on the second run.",
     )
     parser.add_argument(
         "--miscomparison-export-dir",
         type=Path,
         default=None,
         metavar="DIR",
-        help=
-        "When using --check-repeatability, save unexpectedly different artifacts to this directory, preserving relative path under the working directory.",
+        help="When using --check-repeatability, save unexpectedly different artifacts to this directory, preserving relative path under the working directory.",
     ),
 
     # Positional args are the command and arguments to run.
@@ -672,7 +687,8 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 
 def default_diff_action(
-        left: Path, right: Path, miscomparison_export_dir: Path = None):
+    left: Path, right: Path, miscomparison_export_dir: Path = None
+):
     # Run detailed analysis, using various binary dumps.
     detail_diff(left, right)
 
@@ -692,7 +708,8 @@ def main():
     )
     if not tempfile_transform.valid:
         raise ValueError(
-            "Need either --temp-dir or --temp-suffix, but both are missing.")
+            "Need either --temp-dir or --temp-suffix, but both are missing."
+        )
 
     wrap = args.enable
     # Decided whether or not to wrap the action script.
@@ -747,7 +764,8 @@ def main():
             return action.run_twice_with_substitution_and_compare_outputs(
                 tempfile_transform=tempfile_transform,
                 diff_action=_diff_action,
-                verbose=args.verbose)
+                verbose=args.verbose,
+            )
         else:
             # This check will only find nondeterministic outputs.
             # For example, those affected by the current time.

@@ -39,7 +39,8 @@ def file_sha1(path):
 
 
 def normalize_file_in_config(
-        configuration: Dict[str, Any], item: str, root_dir: str) -> None:
+    configuration: Dict[str, Any], item: str, root_dir: str
+) -> None:
     """Replace an `item` (in "foo.bar.baz" format) in the `configuration` with
     an item that contains the sha1 of the file referenced. The new item will be
     suffixed with '_sha1'
@@ -73,16 +74,16 @@ def normalize_file_in_config(
 
 
 def normalize_files_in_config(
-        configuration: Dict[str, Any], items: List[str], root_dir: str) -> None:
+    configuration: Dict[str, Any], items: List[str], root_dir: str
+) -> None:
     for item in items:
         normalize_file_in_config(configuration, item, root_dir)
 
 
 def remove_empty_items(configuration: Dict[str, Any]) -> None:
-    """Remove all items (recursively) whose value is 'None'
-    """
+    """Remove all items (recursively) whose value is 'None'"""
     items_to_remove = []
-    for (name, value) in configuration.items():
+    for name, value in configuration.items():
         # If the value is None, or the dict is now empty, also remove it.
         if value is None:
             items_to_remove.append(name)
@@ -117,7 +118,8 @@ def normalize_platform(config, root_dir):
     files_to_normalize = []
     files_to_normalize.append("development_support.authorized_ssh_keys_path")
     files_to_normalize.append(
-        "development_support.authorized_ssh_ca_certs_path")
+        "development_support.authorized_ssh_ca_certs_path"
+    )
     files_to_normalize.append("ui.sensor_config")
     files_to_normalize.append("forensics.cobalt.registry")
     files_to_normalize.append("connectivity.network.netcfg_config_path")
@@ -137,7 +139,8 @@ def normalize_platform(config, root_dir):
 
 
 def normalize_product(
-        config, root_dir, extra_files_read, config_data_to_ignore):
+    config, root_dir, extra_files_read, config_data_to_ignore
+):
     if "product" not in config:
         return
 
@@ -191,8 +194,9 @@ def normalize_product(
 
                 new_config_data = []
                 for config_data in pkg["config_data"]:
-                    pkg_name_and_destination = pkg["name"] + ":" + config_data[
-                        "destination"]
+                    pkg_name_and_destination = (
+                        pkg["name"] + ":" + config_data["destination"]
+                    )
                     if pkg_name_and_destination in config_data_to_ignore:
                         continue
 
@@ -235,27 +239,33 @@ def normalize(config, root_dir, extra_files_read, config_data_to_ignore):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Compares assembly product configurations")
+        description="Compares assembly product configurations"
+    )
     parser.add_argument(
-        "--product_config1", type=argparse.FileType("r"), required=True)
+        "--product_config1", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
         "--root_dir1",
         help="Directory where paths in --product_config1 are relative to",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        "--product_config2", type=argparse.FileType("r"), required=True)
+        "--product_config2", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
         "--root_dir2",
         help="Directory where paths in --product_config2 are relative to",
-        required=True)
+        required=True,
+    )
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
     parser.add_argument(
         "--config_data_to_ignore",
-        nargs='*',
+        nargs="*",
         default=[],
         help="""List of config data entries that the verification should ignore.
             The entries should be of the form [package_name]:[destination]""",
-        required=False)
+        required=False,
+    )
     parser.add_argument("--output", type=argparse.FileType("w"), required=True)
 
     args = parser.parse_args()
@@ -265,30 +275,40 @@ def main():
 
     extra_files_read = []
     normalize(
-        product_config_json1, args.root_dir1, extra_files_read,
-        args.config_data_to_ignore)
+        product_config_json1,
+        args.root_dir1,
+        extra_files_read,
+        args.config_data_to_ignore,
+    )
     normalize(
-        product_config_json2, args.root_dir2, extra_files_read,
-        args.config_data_to_ignore)
+        product_config_json2,
+        args.root_dir2,
+        extra_files_read,
+        args.config_data_to_ignore,
+    )
 
     canon1 = json.dumps(
-        product_config_json1, sort_keys=True, indent=2).splitlines()
+        product_config_json1, sort_keys=True, indent=2
+    ).splitlines()
     canon2 = json.dumps(
-        product_config_json2, sort_keys=True, indent=2).splitlines()
+        product_config_json2, sort_keys=True, indent=2
+    ).splitlines()
 
     diff = difflib.unified_diff(
         canon1,
         canon2,
         args.product_config1.name,
         args.product_config2.name,
-        lineterm="")
+        lineterm="",
+    )
     diffstr = "\n".join(diff)
     args.output.write(diffstr)
 
     args.depfile.write(
-        "{}: {}".format(args.output.name, ' '.join(extra_files_read)))
+        "{}: {}".format(args.output.name, " ".join(extra_files_read))
+    )
 
-    if (len(diffstr) != 0):
+    if len(diffstr) != 0:
         print(f"Error: non-empty diff product configs:\n{diffstr}")
         return 1
 

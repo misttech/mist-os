@@ -12,28 +12,29 @@ import tempfile
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('output', help='Write to this file')
-    parser.add_argument('paths', nargs='+', help='package manifest lists')
+    parser.add_argument("output", help="Write to this file")
+    parser.add_argument("paths", nargs="+", help="package manifest lists")
     args = parser.parse_args()
 
     out = tempfile.NamedTemporaryFile(
-        'w', dir=os.path.dirname(args.output), delete=False)
+        "w", dir=os.path.dirname(args.output), delete=False
+    )
     try:
         manifest_paths = []
         for package_manifest_list_path in args.paths:
-            with open(package_manifest_list_path, 'r') as f:
+            with open(package_manifest_list_path, "r") as f:
                 package_manifest_list = json.load(f)
                 manifest_paths.extend(
-                    package_manifest_list['content']['manifests'])
+                    package_manifest_list["content"]["manifests"]
+                )
         out_package_manifest_list = {
-            'content': {
-                'manifests': manifest_paths
-            },
-            'version': '1'
+            "content": {"manifests": manifest_paths},
+            "version": "1",
         }
 
         out.write(
-            json.dumps(out_package_manifest_list, indent=2, sort_keys=True))
+            json.dumps(out_package_manifest_list, indent=2, sort_keys=True)
+        )
         out.close()
 
         os.replace(out.name, args.output)

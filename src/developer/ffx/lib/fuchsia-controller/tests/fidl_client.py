@@ -121,8 +121,10 @@ class FidlClientTests(unittest.IsolatedAsyncioTestCase):
                 type_name="fuchsia.developer.ffx/EchoEchoStringRequest",
                 txid=1,
                 ordinal=method_ordinal(
-                    protocol="fuchsia.developer.ffx/Echo",
-                    method="EchoString")))
+                    protocol="fuchsia.developer.ffx/Echo", method="EchoString"
+                ),
+            ),
+        )
         # Verifies state is cleaned up.
         self.assertEqual(len(proxy.staged_messages), 0)
         self.assertEqual(len(proxy.pending_txids), 0)

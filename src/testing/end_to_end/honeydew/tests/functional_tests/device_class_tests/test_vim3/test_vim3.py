@@ -23,5 +23,5 @@ class Vim3Tests(test_fuchsia_device.FuchsiaDeviceTests):
             asserts.assert_is_instance(self.device, sl4f_vim3.VIM3)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

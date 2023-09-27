@@ -13,11 +13,21 @@ import filecmp
 import json
 import os
 
-from typing import Any, Callable, Iterable, List, Set, DefaultDict, Dict, Optional, Tuple
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    List,
+    Set,
+    DefaultDict,
+    Dict,
+    Optional,
+    Tuple,
+)
 
 # A namedtuple type used to model an entry from a distribution manifest, after
 # expansion.
-Entry = collections.namedtuple('Entry', ['destination', 'source', 'label'])
+Entry = collections.namedtuple("Entry", ["destination", "source", "label"])
 
 
 @dataclasses.dataclass
@@ -50,7 +60,7 @@ PartialEntry = Dict[str, str]
 def expand_manifest_items_inner(
     manifest_items: Iterable[PartialEntry],
     opened_files: Set[str],
-    default_label: Optional[str] = None
+    default_label: Optional[str] = None,
 ) -> Tuple[List[Entry], List[PartialEntry]]:
     """Expand the content of a distribution manifest file.
 
@@ -73,32 +83,33 @@ def expand_manifest_items_inner(
     if manifest_items is None:
         return entries, extras
     for item in manifest_items:
-        if 'label' not in item and default_label is not None:
-            item['label'] = default_label
-        if 'renamed_source' in item:
+        if "label" not in item and default_label is not None:
+            item["label"] = default_label
+        if "renamed_source" in item:
             # A renaming entry, for now just add it to the 'extras' list to
             # be processed by the caller.
             extras.append(item)
-        if 'copy_from' in item:
+        if "copy_from" in item:
             # A copy entry, for now just add it to the 'extras' list.
             extras.append(item)
-        if 'source' in item:
-            if 'elf_runtime_dir' in item:
+        if "source" in item:
+            if "elf_runtime_dir" in item:
                 # Save the entry in 'extras', to be parsed later then delete
                 # the key from the item.
                 extras.append(item.copy())
-                del item['elf_runtime_dir']
+                del item["elf_runtime_dir"]
 
             entries.append(Entry(**item))
 
-        elif 'file' in item:
-            file_path = item['file']
-            item_label = item['label']
+        elif "file" in item:
+            file_path = item["file"]
+            item_label = item["label"]
             opened_files.add(file_path)
             with open(file_path) as data_file:
                 data = json.load(data_file)
             new_entries, new_extras = expand_manifest_items_inner(
-                data, opened_files, item_label)
+                data, opened_files, item_label
+            )
             entries += new_entries
             extras += new_extras
 
@@ -106,9 +117,10 @@ def expand_manifest_items_inner(
 
 
 def expand_partial_manifest_items(
-        manifest_items: Iterable[PartialEntry],
-        opened_files: Set[str],
-        default_label: Optional[str] = None) -> ParseResult:
+    manifest_items: Iterable[PartialEntry],
+    opened_files: Set[str],
+    default_label: Optional[str] = None,
+) -> ParseResult:
     """Expand the content of a distribution manifest file.
 
     Note that this function does not try to de-duplicate identical entries.
@@ -126,17 +138,21 @@ def expand_partial_manifest_items(
         which will be empty on success.
     """
     entries, extras = expand_manifest_items_inner(
-        manifest_items, opened_files, default_label)
+        manifest_items, opened_files, default_label
+    )
 
     # Process extra entries here.
     errors: List[str] = []
-    unknown_renames: List[PartialEntry] = [
-    ]  # rename entries with unknown renamed_source path.
+    unknown_renames: List[
+        PartialEntry
+    ] = []  # rename entries with unknown renamed_source path.
     renamed_entries: List[Entry] = []
-    renamed_sources: Set[str] = set(
-    )  # Source paths of original entries that are renamed.
-    persistent_sources: Set[str] = set(
-    )  # Source paths of original entries that must be preserved.
+    renamed_sources: Set[
+        str
+    ] = set()  # Source paths of original entries that are renamed.
+    persistent_sources: Set[
+        str
+    ] = set()  # Source paths of original entries that must be preserved.
 
     elf_runtime_map: Dict[str, str] = {}  # Map destination path to the
     # corresping elf runtime directory.
@@ -147,19 +163,20 @@ def expand_partial_manifest_items(
 
         # A map that associates with each destination path (e.g. 'bin/foo')
         # the extra items that have an elf_runtime_dir key in it.
-        elf_runtime_entries: Dict[str,
-                                  List[Dict]] = collections.defaultdict(list)
+        elf_runtime_entries: Dict[str, List[Dict]] = collections.defaultdict(
+            list
+        )
 
         # A map built from all copy entries, that maps their destination path
         # to the corresponding source path.
         copy_reverse_map = {
-            e['copy_to']: e['copy_from'] for e in extras if 'copy_from' in e
+            e["copy_to"]: e["copy_from"] for e in extras if "copy_from" in e
         }
 
         for extra in extras:
-            if 'renamed_source' in extra:
-                source = extra['renamed_source']
-                dest = extra['destination']
+            if "renamed_source" in extra:
+                source = extra["renamed_source"]
+                dest = extra["destination"]
 
                 source_entry = source_entry_map.get(source)
                 if source_entry is None:
@@ -174,34 +191,34 @@ def expand_partial_manifest_items(
                     continue
 
                 new_entry = source_entry._replace(destination=dest)
-                extra_label = extra.get('label')
+                extra_label = extra.get("label")
                 if extra_label:
                     new_entry = new_entry._replace(label=extra_label)
                 renamed_entries.append(new_entry)
                 renamed_sources.add(source)
-                if extra.get('keep_original', False):
+                if extra.get("keep_original", False):
                     persistent_sources.add(source)
 
-            elif 'copy_from' in extra:
+            elif "copy_from" in extra:
                 # Already handled by copy_reverse_map above.
                 pass
 
-            elif 'elf_runtime_dir' in extra:
-                dest = extra['destination']
+            elif "elf_runtime_dir" in extra:
+                dest = extra["destination"]
                 elf_runtime_entries[dest].append(extra)
                 pass
 
             else:
                 # Should not happen unless there is a bug in
                 # expand_manifest_entries_inner.
-                assert False, 'Unsupported extra item: %s' % extra
+                assert False, "Unsupported extra item: %s" % extra
 
         if elf_runtime_entries:
             # For each destination path, there should be a single ELF runtime dir,
             # so try to find conflicts here.
             elf_conflicts = []
             for dest, extras in elf_runtime_entries.items():
-                elf_dirs = set(e['elf_runtime_dir'] for e in extras)
+                elf_dirs = set(e["elf_runtime_dir"] for e in extras)
                 if len(elf_dirs) > 1:
                     elf_conflicts += list(extras)
                 else:
@@ -210,22 +227,27 @@ def expand_partial_manifest_items(
 
             if elf_conflicts:
                 errors.append(
-                    'ERROR: Entries with same destination path have different ELF runtime dir:'
+                    "ERROR: Entries with same destination path have different ELF runtime dir:"
                 )
-                for entry in sorted(elf_conflicts,
-                                    key=lambda x: x['destination']):
+                for entry in sorted(
+                    elf_conflicts, key=lambda x: x["destination"]
+                ):
                     errors.append(
-                        '  - destination=%s source=%s label=%s elf_runtime_dir=%s'
+                        "  - destination=%s source=%s label=%s elf_runtime_dir=%s"
                         % (
-                            entry['destination'], entry['source'],
-                            entry['label'], entry['elf_runtime_dir']))
+                            entry["destination"],
+                            entry["source"],
+                            entry["label"],
+                            entry["elf_runtime_dir"],
+                        )
+                    )
 
     if unknown_renames:
         errors.append(
-            'ERROR: Renamed distribution entries have unknown source destination:'
+            "ERROR: Renamed distribution entries have unknown source destination:"
         )
         for extra in unknown_renames:
-            errors.append('  - %s' % json.dumps(extra))
+            errors.append("  - %s" % json.dumps(extra))
 
     # When the source path of a copy entry is actually provided by several
     # regular entries, it means that one of the latter comes from a resource()
@@ -272,8 +294,9 @@ def expand_partial_manifest_items(
     # Since this is a seldom case, detect it here and generate an error
     # message that explains how to solve the issue.
     #
-    source_to_multi_entries: Dict[str,
-                                  Set[Entry]] = collections.defaultdict(set)
+    source_to_multi_entries: Dict[str, Set[Entry]] = collections.defaultdict(
+        set
+    )
     for e in entries:
         source_to_multi_entries[e.source].add(e)
 
@@ -284,16 +307,18 @@ def expand_partial_manifest_items(
 
     if multi_source_entries:
         errors.append(
-            'ERROR: Multiple regular entries with the same source path:')
+            "ERROR: Multiple regular entries with the same source path:"
+        )
         for e in sorted(multi_source_entries):
             errors.append(
-                '  - destination=%s source=%s label=%s' %
-                (e.destination, e.source, e.label))
+                "  - destination=%s source=%s label=%s"
+                % (e.destination, e.source, e.label)
+            )
         errors.append(
-            '\nThis generally means a mix of renamed_binary() and resource() targets\n'
-            +
-            'that reference the same source. Try replacing the resource() targets by\n'
-            + 'renamed_binary() ones to fix the problem\n')
+            "\nThis generally means a mix of renamed_binary() and resource() targets\n"
+            + "that reference the same source. Try replacing the resource() targets by\n"
+            + "renamed_binary() ones to fix the problem\n"
+        )
 
     renamed_sources -= persistent_sources
     entries = [
@@ -301,13 +326,15 @@ def expand_partial_manifest_items(
     ] + renamed_entries
 
     return ParseResult(
-        entries=entries, errors=errors, elf_runtime_map=elf_runtime_map)
+        entries=entries, errors=errors, elf_runtime_map=elf_runtime_map
+    )
 
 
 def expand_manifest_items(
-        manifest_items: Iterable[PartialEntry],
-        opened_files: Set[str],
-        default_label: Optional[str] = None) -> List[Entry]:
+    manifest_items: Iterable[PartialEntry],
+    opened_files: Set[str],
+    default_label: Optional[str] = None,
+) -> List[Entry]:
     """Expand the content of a distribution manifest file.
 
     Note that this function does not try to de-duplicate identical entries.
@@ -323,14 +350,16 @@ def expand_manifest_items(
         An Entry list.
     """
     result = expand_partial_manifest_items(
-        manifest_items, opened_files, default_label)
+        manifest_items, opened_files, default_label
+    )
     if result.errors:
-        raise Exception('\n'.join(result.errors))
+        raise Exception("\n".join(result.errors))
     return result.entries
 
 
 def _entries_have_same_source(
-        entry1: Entry, entry2: Entry, opened_files: Set[str]) -> bool:
+    entry1: Entry, entry2: Entry, opened_files: Set[str]
+) -> bool:
     """Return True iff two entries have the same source.
 
     Args:
@@ -351,8 +380,8 @@ def _entries_have_same_source(
 
 
 def expand_manifest(
-        manifest_items: Iterable[Dict[str, str]],
-        opened_files: Set[str]) -> Tuple[List[Entry], str]:
+    manifest_items: Iterable[Dict[str, str]], opened_files: Set[str]
+) -> Tuple[List[Entry], str]:
     """Expand the content of a distribution manifest into an Entry list.
 
     Note, this removes duplicate entries, if they have the same source
@@ -375,8 +404,9 @@ def expand_manifest(
 
     # Used to record that a given destination path has two or more conflicting
     # entries, with different sources.
-    source_conflicts: DefaultDict[str,
-                                  Set[Entry]] = collections.defaultdict(set)
+    source_conflicts: DefaultDict[str, Set[Entry]] = collections.defaultdict(
+        set
+    )
 
     dest_to_entries: Dict[str, Entry] = {}
     for entry in input_entries:
@@ -400,10 +430,12 @@ def expand_manifest(
             error += "   - source=%s label=%s\n" % (entry.source, entry.label)
 
     if error:
-        error = 'ERROR: Conflicting distribution entries!\n' + error
+        error = "ERROR: Conflicting distribution entries!\n" + error
 
     return (
-        sorted(dest_to_entries.values(), key=lambda x: x.destination), error)
+        sorted(dest_to_entries.values(), key=lambda x: x.destination),
+        error,
+    )
 
 
 def distribution_entries_to_string(entries: List[Entry]) -> str:
@@ -412,11 +444,13 @@ def distribution_entries_to_string(entries: List[Entry]) -> str:
         [e._asdict() for e in sorted(entries)],
         indent=2,
         sort_keys=True,
-        separators=(',', ': '))
+        separators=(",", ": "),
+    )
 
 
 def convert_fini_manifest_to_distribution_entries(
-        fini_manifest_lines: Iterable[str], label: str) -> List[Entry]:
+    fini_manifest_lines: Iterable[str], label: str
+) -> List[Entry]:
     """Convert a FINI manifest into an Entry list.
 
     Args:
@@ -429,7 +463,7 @@ def convert_fini_manifest_to_distribution_entries(
     """
     result: List[Entry] = []
     for line in fini_manifest_lines:
-        dst, _, src = line.strip().partition('=')
+        dst, _, src = line.strip().partition("=")
         entry = Entry(destination=dst, source=src, label=label)
         result.append(entry)
 
@@ -445,14 +479,14 @@ def _rewrite_elf_needed(dep: str) -> Optional[str]:
         None if the dependency should be ignored, or the input dependency name,
         possibly rewritten for specific cases (e.g. 'libc.so' -> 'ld.so.1')
     """
-    if dep == 'libzircon.so':
+    if dep == "libzircon.so":
         # libzircon.so being injected by the kernel into user processes, it should
         # not appear in Fuchsia packages, and thus should be ignored.
         return None
-    if dep == 'libc.so':
+    if dep == "libc.so":
         # ld.so.1 acts as both the dynamic loader and C library, so any reference
         # to libc.so should be rewritten as 'ld.so.1'
-        return 'ld.so.1'
+        return "ld.so.1"
 
     # For all other cases, just return the unmodified dependency name.
     return dep
@@ -463,7 +497,7 @@ def verify_elf_dependencies(
     lib_dir: str,
     deps: Iterable[str],
     get_lib_dependencies: Callable[[str], Optional[List[str]]],
-    visited_libraries: Set[str] = set()
+    visited_libraries: Set[str] = set(),
 ) -> List[str]:
     """Verify the ELF dependencies of a given ELF binary.
 
@@ -509,7 +543,7 @@ def verify_elf_dependencies(
             continue
         subdeps = get_lib_dependencies(dep_path)
         if subdeps is None:
-            errors.append('%s missing dependency %s' % (binary_name, dep_path))
+            errors.append("%s missing dependency %s" % (binary_name, dep_path))
         else:
             visited_libraries.add(dep_path)
             for subdep in subdeps:

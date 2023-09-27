@@ -11,6 +11,7 @@ import argparse
 import errno
 import os
 
+
 def abs_path(path, rel_to):
     assert os.path.isabs(rel_to)
     if os.path.isabs(path):
@@ -18,22 +19,32 @@ def abs_path(path, rel_to):
     else:
         return os.path.abspath(os.path.join(rel_to, path))
 
+
 def read_ids_txt(ids_path, rel_to):
     assert os.path.isabs(rel_to)
     with open(ids_path) as f:
-        return {build_id:abs_path(path, rel_to) for (build_id, path) in (x.split() for x in f.readlines())}
+        return {
+            build_id: abs_path(path, rel_to)
+            for (build_id, path) in (x.split() for x in f.readlines())
+        }
+
 
 def read_build_id_dir(build_id_dir):
     assert os.path.isabs(build_id_dir)
     out = {}
     for root, dirs, files in os.walk(build_id_dir):
         if len(files) != 0 and len(dirs) != 0:
-            raise Exception("%s is not a valid .build-id directory" % build_id_dir)
+            raise Exception(
+                "%s is not a valid .build-id directory" % build_id_dir
+            )
         for f in files:
             suffix = ".debug"
             if f.endswith(suffix):
-                out[os.path.basename(root) + f[:-len(suffix)]] = os.path.join(root, f)
+                out[os.path.basename(root) + f[: -len(suffix)]] = os.path.join(
+                    root, f
+                )
     return out
+
 
 def symlink(src, dst):
     assert os.path.isabs(src)
@@ -41,11 +52,13 @@ def symlink(src, dst):
         os.remove(dst)
     os.symlink(src, dst)
 
+
 def hardlink(src, dst):
     src = os.path.realpath(src)
     if os.path.exists(dst):
         os.remove(dst)
     os.link(src, dst)
+
 
 def mkdir(path):
     try:
@@ -54,17 +67,23 @@ def mkdir(path):
         if e.errno != errno.EEXIST:
             raise e
 
+
 def touch(path):
     if os.path.exists(path):
         os.utime(path, None)
     else:
-        with open(path, 'w'):
+        with open(path, "w"):
             return
+
 
 def write_build_id_dir(build_id_dir, link_func, mods):
     for build_id, path in mods.items():
         mkdir(os.path.join(build_id_dir, build_id[:2]))
-        link_func(path, os.path.join(build_id_dir, build_id[:2], build_id[2:] + ".debug"))
+        link_func(
+            path,
+            os.path.join(build_id_dir, build_id[:2], build_id[2:] + ".debug"),
+        )
+
 
 # if rel_to is None fix_path returns the absolute path. If rel_to
 # is not None it turns the path into a relative path.
@@ -75,6 +94,7 @@ def fix_path(path, rel_to):
         return path
     return os.path.relpath(path, rel_to)
 
+
 def write_ids_txt(ids_path, rel_to, mods):
     assert rel_to is None or os.path.isabs(rel_to)
     with open(ids_path, "w") as f:
@@ -82,48 +102,76 @@ def write_ids_txt(ids_path, rel_to, mods):
             path = fix_path(mods[build_id], rel_to)
             f.write("%s %s\n" % (build_id, path))
 
+
 def main(unparsed_args=None):
     ids_fmt = "ids.txt"
     build_id_fmt = ".build-id"
     symlink_mode = "symlink"
     hardlink_mode = "hardlink"
 
-    parser = argparse.ArgumentParser(description="Convert between ids.txt and .build-id")
-    parser.add_argument("-O", "--output-format", help="Sets the output format.",
-                        metavar="FMT",
-                        choices=[ids_fmt, build_id_fmt])
-    parser.add_argument("--ids-rel-to-in",
-                        help="When reading ids.txt use paths relative to DIR",
-                        metavar="DIR")
-    parser.add_argument("--ids-rel-to-out",
-                        help="When writing ids.txt use paths relative to DIR",
-                        metavar="DIR")
-    parser.add_argument("--build-id-mode",
-                        help="When writing .build-id generate links of this type",
-                        metavar="MODE",
-                        choices=[symlink_mode, hardlink_mode],
-                        default=hardlink_mode)
-    parser.add_argument("--stamp",
-                        help="Touch STAMP after finishing",
-                        metavar="STAMP")
-    parser.add_argument("--input", action="append",
-                        help=".build-id directories or ids.txt files depending on the output format")
+    parser = argparse.ArgumentParser(
+        description="Convert between ids.txt and .build-id"
+    )
+    parser.add_argument(
+        "-O",
+        "--output-format",
+        help="Sets the output format.",
+        metavar="FMT",
+        choices=[ids_fmt, build_id_fmt],
+    )
+    parser.add_argument(
+        "--ids-rel-to-in",
+        help="When reading ids.txt use paths relative to DIR",
+        metavar="DIR",
+    )
+    parser.add_argument(
+        "--ids-rel-to-out",
+        help="When writing ids.txt use paths relative to DIR",
+        metavar="DIR",
+    )
+    parser.add_argument(
+        "--build-id-mode",
+        help="When writing .build-id generate links of this type",
+        metavar="MODE",
+        choices=[symlink_mode, hardlink_mode],
+        default=hardlink_mode,
+    )
+    parser.add_argument(
+        "--stamp", help="Touch STAMP after finishing", metavar="STAMP"
+    )
+    parser.add_argument(
+        "--input",
+        action="append",
+        help=".build-id directories or ids.txt files depending on the output format",
+    )
     parser.add_argument("output")
 
     args = parser.parse_args(unparsed_args)
 
     input_paths = map(os.path.abspath, args.input)
-    input_paths = list(filter(os.path.exists, input_paths)) # conventionally ignore empty inputs
+    input_paths = list(
+        filter(os.path.exists, input_paths)
+    )  # conventionally ignore empty inputs
     input_dirs = list(filter(os.path.isdir, input_paths))
     if len(input_dirs) > 0:
-        assert len(input_dirs) == len(input_paths), "input formats cannot be mixed"
+        assert len(input_dirs) == len(
+            input_paths
+        ), "input formats cannot be mixed"
         in_fmt = build_id_fmt
     else:
         in_fmt = ids_fmt
 
     output_path = args.output
-    rel_to_in = os.path.abspath(args.ids_rel_to_in) if args.ids_rel_to_in is not None else None
-    rel_to_out = os.path.abspath(args.ids_rel_to_out) if args.ids_rel_to_out is not None else None
+    rel_to_in = (
+        os.path.abspath(args.ids_rel_to_in)
+        if args.ids_rel_to_in is not None
+        else None
+    )
+    rel_to_out = (
+        os.path.abspath(args.ids_rel_to_out)
+        if args.ids_rel_to_out is not None
+        else None
+    )
 
     if args.build_id_mode == symlink_mode:
         link_func = symlink
@@ -154,6 +202,7 @@ def main(unparsed_args=None):
 
     if args.stamp is not None:
         touch(args.stamp)
+
 
 if __name__ == "__main__":
     main()

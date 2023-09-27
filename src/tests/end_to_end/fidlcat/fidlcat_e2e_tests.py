@@ -10,27 +10,28 @@ import textwrap
 from threading import Event, Thread
 import unittest
 
-TEST_DATA_DIR = 'host_x64/test_data/fidlcat_e2e_tests'  # relative to $PWD
+TEST_DATA_DIR = "host_x64/test_data/fidlcat_e2e_tests"  # relative to $PWD
 FIDLCAT_TIMEOUT = 60  # timeout when invoking fidlcat
 
 # Convert FUCHSIA_SSH_KEY into an absolute path. Otherwise ffx cannot find
 # key and complains "Timeout attempting to reach target".
 # See fxbug.dev/101081.
 os.environ.update(
-    FUCHSIA_ANALYTICS_DISABLED='1',
-    FUCHSIA_SSH_KEY=os.path.abspath(os.environ['FUCHSIA_SSH_KEY']),
+    FUCHSIA_ANALYTICS_DISABLED="1",
+    FUCHSIA_SSH_KEY=os.path.abspath(os.environ["FUCHSIA_SSH_KEY"]),
 )
 
 
 class Ffx:
-    _path = 'host_x64/ffx'
-    _args = ['--target', os.environ['FUCHSIA_DEVICE_ADDR']]
+    _path = "host_x64/ffx"
+    _args = ["--target", os.environ["FUCHSIA_DEVICE_ADDR"]]
 
     def __init__(self, *args: str):
         self.process = subprocess.Popen(
             [self._path] + self._args + list(args),
             text=True,
-            stdout=subprocess.PIPE)
+            stdout=subprocess.PIPE,
+        )
 
     def wait(self):
         self.process.communicate()
@@ -38,7 +39,7 @@ class Ffx:
 
 
 class Fidlcat:
-    _path = 'host_x64/fidlcat'
+    _path = "host_x64/fidlcat"
     _args = []
     _ffx_bridge = None
 
@@ -46,7 +47,7 @@ class Fidlcat:
         """
         merge_stderr: whether to merge stderr to stdout.
         """
-        assert self._ffx_bridge is not None, 'must call setup first'
+        assert self._ffx_bridge is not None, "must call setup first"
         stderr = subprocess.PIPE
         if merge_stderr:
             stderr = subprocess.STDOUT
@@ -54,9 +55,10 @@ class Fidlcat:
             [self._path] + self._args + list(args),
             text=True,
             stdout=subprocess.PIPE,
-            stderr=stderr)
-        self.stdout = ''  # Contains both stdout and stderr, if merge_stderr.
-        self.stderr = ''
+            stderr=stderr,
+        )
+        self.stdout = ""  # Contains both stdout and stderr, if merge_stderr.
+        self.stderr = ""
         self._timeout_cancel = Event()
         Thread(target=self._timeout_thread).start()
 
@@ -65,7 +67,7 @@ class Fidlcat:
         if not self._timeout_cancel.is_set():
             self.process.kill()
             self.wait()
-            raise TimeoutError('Fidlcat timeouts\n' + self.get_diagnose_msg())
+            raise TimeoutError("Fidlcat timeouts\n" + self.get_diagnose_msg())
 
     def wait(self):
         """Wait for the process to terminate, assert the returncode, fill the stdout and stderr."""
@@ -92,16 +94,26 @@ class Fidlcat:
                 return True
 
     def get_diagnose_msg(self):
-        return '\n=== stdout ===\n' + self.stdout + '\n\n=== stderr===\n' + self.stderr + '\n'
+        return (
+            "\n=== stdout ===\n"
+            + self.stdout
+            + "\n\n=== stderr===\n"
+            + self.stderr
+            + "\n"
+        )
 
     @classmethod
     def setup(cls):
-        cls._ffx_bridge = Ffx('debug', 'connect', '--agent-only')
+        cls._ffx_bridge = Ffx("debug", "connect", "--agent-only")
         socket_path = cls._ffx_bridge.process.stdout.readline().strip()
         assert os.path.exists(socket_path)
         cls._args = [
-            '--unix-connect', socket_path, '--fidl-ir-path', TEST_DATA_DIR,
-            '--symbol-path', TEST_DATA_DIR
+            "--unix-connect",
+            socket_path,
+            "--fidl-ir-path",
+            TEST_DATA_DIR,
+            "--symbol-path",
+            TEST_DATA_DIR,
         ]
 
     @classmethod
@@ -114,12 +126,13 @@ class Fidlcat:
 #
 # Note that the actual echo client is in a standalone component echo_client.cm so we almost always
 # need to specify "--remote-component=echo_client.cm" in the test cases below.
-ECHO_REALM_URL = 'fuchsia-pkg://fuchsia.com/echo_realm_placeholder#meta/echo_realm.cm'
-ECHO_REALM_MONIKER = '/core/ffx-laboratory:fidlcat_test_echo_realm'
+ECHO_REALM_URL = (
+    "fuchsia-pkg://fuchsia.com/echo_realm_placeholder#meta/echo_realm.cm"
+)
+ECHO_REALM_MONIKER = "/core/ffx-laboratory:fidlcat_test_echo_realm"
 
 
 class FidlcatE2eTests(unittest.TestCase):
-
     @classmethod
     def setUpClass(cls):
         Fidlcat.setup()
@@ -133,46 +146,62 @@ class FidlcatE2eTests(unittest.TestCase):
         # FUCHSIA_DEVICE_ADDR and FUCHSIA_SSH_KEY must be defined.
         # FUCHSIA_SSH_PORT is only defined when invoked from `fx test`.
         cmd = [
-            'ssh', '-F', 'none', '-o', 'CheckHostIP=no', '-o',
-            'StrictHostKeyChecking=no', '-o', 'UserKnownHostsFile=/dev/null',
-            '-i', os.environ['FUCHSIA_SSH_KEY']
+            "ssh",
+            "-F",
+            "none",
+            "-o",
+            "CheckHostIP=no",
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-i",
+            os.environ["FUCHSIA_SSH_KEY"],
         ]
-        if os.environ.get('FUCHSIA_SSH_PORT'):
-            cmd += ['-p', os.environ['FUCHSIA_SSH_PORT']]
+        if os.environ.get("FUCHSIA_SSH_PORT"):
+            cmd += ["-p", os.environ["FUCHSIA_SSH_PORT"]]
         cmd += [
-            os.environ['FUCHSIA_DEVICE_ADDR'], 'killall /pkg/bin/debug_agent'
+            os.environ["FUCHSIA_DEVICE_ADDR"],
+            "killall /pkg/bin/debug_agent",
         ]
         res = subprocess.run(
-            cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        if res.returncode == 0 and 'Killed' in res.stdout:
-            print('Killed dangling debug_agent', file=sys.stderr)
+            cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+        )
+        if res.returncode == 0 and "Killed" in res.stdout:
+            print("Killed dangling debug_agent", file=sys.stderr)
         else:
             # The return code will be 255 if no task found so don't check it.
-            assert 'no tasks found' in res.stdout, res.stdout
+            assert "no tasks found" in res.stdout, res.stdout
 
     def test_run_echo(self):
         fidlcat = Fidlcat(
-            '--remote-component=echo_client.cm', 'run', ECHO_REALM_URL)
+            "--remote-component=echo_client.cm", "run", ECHO_REALM_URL
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertIn(
-            'sent request test.placeholders/Echo.EchoString = {\n'
+            "sent request test.placeholders/Echo.EchoString = {\n"
             '    value: string = "hello world"\n'
-            '  }', fidlcat.stdout)
+            "  }",
+            fidlcat.stdout,
+        )
 
     # TODO(fxbug.dev/113425): This test flakes on core.x64-debug, where fidlcat fails to exit after
     # receiving the SIGTERM signal.
     def disabled_test_stay_alive(self):
         fidlcat = Fidlcat(
-            '--remote-name=echo_client', '--stay-alive', merge_stderr=True)
-        fidlcat.read_until('Connected!')
+            "--remote-name=echo_client", "--stay-alive", merge_stderr=True
+        )
+        fidlcat.read_until("Connected!")
 
         self.assertEqual(
-            Ffx('component', 'run', ECHO_REALM_MONIKER, ECHO_REALM_URL).wait(),
-            0)
+            Ffx("component", "run", ECHO_REALM_MONIKER, ECHO_REALM_URL).wait(),
+            0,
+        )
         self.assertEqual(
-            Ffx('component', 'destroy', ECHO_REALM_MONIKER).wait(), 0)
-        fidlcat.read_until('Waiting for more processes to monitor.')
+            Ffx("component", "destroy", ECHO_REALM_MONIKER).wait(), 0
+        )
+        fidlcat.read_until("Waiting for more processes to monitor.")
 
         # Because, with the --stay-alive version, fidlcat never ends,
         # we need to kill it to end the test.
@@ -181,66 +210,90 @@ class FidlcatE2eTests(unittest.TestCase):
 
     def test_extra_component(self):
         fidlcat = Fidlcat(
-            '--remote-component=echo_client.cm',
-            '--extra-component=echo_server.cm', 'run', ECHO_REALM_URL)
+            "--remote-component=echo_client.cm",
+            "--extra-component=echo_server.cm",
+            "run",
+            ECHO_REALM_URL,
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
-        self.assertIn('Monitoring echo_server.cm koid=', fidlcat.stdout)
+        self.assertIn("Monitoring echo_server.cm koid=", fidlcat.stdout)
 
     def test_trigger(self):
         fidlcat = Fidlcat(
-            '--remote-component=echo_client.cm', '--trigger=.*EchoString',
-            'run', ECHO_REALM_URL)
+            "--remote-component=echo_client.cm",
+            "--trigger=.*EchoString",
+            "run",
+            ECHO_REALM_URL,
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         # The first displayed message must be EchoString.
-        lines = fidlcat.stdout.split('\n\n')
+        lines = fidlcat.stdout.split("\n\n")
         self.assertIn(
-            'sent request test.placeholders/Echo.EchoString = {', lines[2])
+            "sent request test.placeholders/Echo.EchoString = {", lines[2]
+        )
 
     def test_messages(self):
         fidlcat = Fidlcat(
-            '--remote-component=echo_client.cm', '--messages=.*EchoString',
-            'run', ECHO_REALM_URL)
+            "--remote-component=echo_client.cm",
+            "--messages=.*EchoString",
+            "run",
+            ECHO_REALM_URL,
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         # The first and second displayed messages must be EchoString (everything else has been
         # filtered out).
-        lines = fidlcat.stdout.split('\n\n')
+        lines = fidlcat.stdout.split("\n\n")
         self.assertIn(
-            'sent request test.placeholders/Echo.EchoString = {\n'
+            "sent request test.placeholders/Echo.EchoString = {\n"
             '    value: string = "hello world"\n'
-            '  }', lines[2])
+            "  }",
+            lines[2],
+        )
         self.assertIn(
-            'received response test.placeholders/Echo.EchoString = {\n'
+            "received response test.placeholders/Echo.EchoString = {\n"
             '      response: string = "hello world"\n'
-            '    }', lines[3])
+            "    }",
+            lines[3],
+        )
 
     def test_save_replay(self):
-        save_path = tempfile.NamedTemporaryFile(suffix='_save.pb')
+        save_path = tempfile.NamedTemporaryFile(suffix="_save.pb")
         fidlcat = Fidlcat(
-            '--remote-component=echo_client.cm', '--to', save_path.name, 'run',
-            ECHO_REALM_URL)
+            "--remote-component=echo_client.cm",
+            "--to",
+            save_path.name,
+            "run",
+            ECHO_REALM_URL,
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
         self.assertIn(
-            'sent request test.placeholders/Echo.EchoString = {\n'
+            "sent request test.placeholders/Echo.EchoString = {\n"
             '    value: string = "hello world"\n'
-            '  }', fidlcat.stdout)
+            "  }",
+            fidlcat.stdout,
+        )
 
-        fidlcat = Fidlcat('--from', save_path.name)
+        fidlcat = Fidlcat("--from", save_path.name)
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
         self.assertIn(
-            'sent request test.placeholders/Echo.EchoString = {\n'
+            "sent request test.placeholders/Echo.EchoString = {\n"
             '    value: string = "hello world"\n'
-            '  }', fidlcat.stdout)
+            "  }",
+            fidlcat.stdout,
+        )
 
     def test_with_summary(self):
         fidlcat = Fidlcat(
-            '--with=summary', '--from', TEST_DATA_DIR + '/echo.pb')
+            "--with=summary", "--from", TEST_DATA_DIR + "/echo.pb"
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertEqual(
-            fidlcat.stdout, """\
+            fidlcat.stdout,
+            """\
 --------------------------------------------------------------------------------echo_client.cm 1934080: 19 handles
 
   Process:eb13d6eb(proc-self)
@@ -362,14 +415,16 @@ class FidlcatE2eTests(unittest.TestCase):
       21320.901025 read  request  test.placeholders/Echo.EchoString
       21320.992007 write response test.placeholders/Echo.EchoString
     closed by zx_handle_close
-""")
+""",
+        )
 
     def test_with_top(self):
-        fidlcat = Fidlcat('--with=top', '--from', TEST_DATA_DIR + '/echo.pb')
+        fidlcat = Fidlcat("--with=top", "--from", TEST_DATA_DIR + "/echo.pb")
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertEqual(
-            fidlcat.stdout, """\
+            fidlcat.stdout,
+            """\
 --------------------------------------------------------------------------------echo_client.cm 1934080: 5 events
   fuchsia.io/Openable: 2 events
     Open: 2 events
@@ -399,28 +454,33 @@ class FidlcatE2eTests(unittest.TestCase):
   fuchsia.io/Node1: 1 event
     Clone: 1 event
       21320.679108 read  request  fuchsia.io/Node1.Clone(Channel:dedc3503(directory-request:/))
-""")
+""",
+        )
 
     def test_with_top_and_unknown_message(self):
         fidlcat = Fidlcat(
-            '--with=top', '--from', TEST_DATA_DIR + '/snapshot.pb')
+            "--with=top", "--from", TEST_DATA_DIR + "/snapshot.pb"
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         self.assertIn(
-            '  unknown interfaces: : 1 event\n'
-            '      6862061079.791403 call   ordinal=36dadb5482dc1d55('
-            'Channel:9b71d5c7(dir:/svc/fuchsia.feedback.DataProvider))\n',
-            fidlcat.stdout)
+            "  unknown interfaces: : 1 event\n"
+            "      6862061079.791403 call   ordinal=36dadb5482dc1d55("
+            "Channel:9b71d5c7(dir:/svc/fuchsia.feedback.DataProvider))\n",
+            fidlcat.stdout,
+        )
 
     def test_with_messages_and_unknown_message(self):
         fidlcat = Fidlcat(
-            '--messages=.*x.*', '--from', TEST_DATA_DIR + '/snapshot.pb')
+            "--messages=.*x.*", "--from", TEST_DATA_DIR + "/snapshot.pb"
+        )
         self.assertEqual(fidlcat.wait(), 0, fidlcat.get_diagnose_msg())
 
         # We only check that fidlcat didn't crash.
         self.assertIn(
-            'Stop monitoring exceptions.cmx koid 19884\n', fidlcat.stdout)
+            "Stop monitoring exceptions.cmx koid 19884\n", fidlcat.stdout
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

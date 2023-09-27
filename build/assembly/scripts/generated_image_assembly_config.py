@@ -10,23 +10,29 @@ import sys
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Create the json configuration blob for image assembly')
-    parser.add_argument('--base-packages-list', type=argparse.FileType('r'))
-    parser.add_argument('--cache-packages-list', type=argparse.FileType('r'))
+        description="Create the json configuration blob for image assembly"
+    )
+    parser.add_argument("--base-packages-list", type=argparse.FileType("r"))
+    parser.add_argument("--cache-packages-list", type=argparse.FileType("r"))
     parser.add_argument(
-        '--extra-files-packages-list', type=argparse.FileType('r'))
+        "--extra-files-packages-list", type=argparse.FileType("r")
+    )
     parser.add_argument(
-        '--extra-deps-files-packages-list', type=argparse.FileType('r'))
+        "--extra-deps-files-packages-list", type=argparse.FileType("r")
+    )
     parser.add_argument(
-        '--kernel-cmdline', type=argparse.FileType('r'), required=True)
+        "--kernel-cmdline", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        '--kernel-clock-backstop', type=argparse.FileType('r'), required=True)
+        "--kernel-clock-backstop", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        '--kernel-image-metadata', type=argparse.FileType('r'), required=True)
-    parser.add_argument('--kernel-image-name', required=True)
-    parser.add_argument('--boot-args', type=argparse.FileType('r'))
-    parser.add_argument('--bootfs-packages-list', type=argparse.FileType('r'))
-    parser.add_argument('--output', type=argparse.FileType('w'), required=True)
+        "--kernel-image-metadata", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument("--kernel-image-name", required=True)
+    parser.add_argument("--boot-args", type=argparse.FileType("r"))
+    parser.add_argument("--bootfs-packages-list", type=argparse.FileType("r"))
+    parser.add_argument("--output", type=argparse.FileType("w"), required=True)
     args = parser.parse_args()
 
     # The config that will be created
@@ -55,7 +61,8 @@ def main():
         extra_packages.extend(extra_file_packages)
     if args.extra_deps_files_packages_list is not None:
         extra_deps_file_packages = json.load(
-            args.extra_deps_files_packages_list)
+            args.extra_deps_files_packages_list
+        )
         for extra_dep in extra_deps_file_packages:
             extra_packages.append(extra_dep["package_manifest"])
     config["system"] = extra_packages
@@ -86,5 +93,5 @@ def main():
     json.dump(config, args.output, indent=2)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

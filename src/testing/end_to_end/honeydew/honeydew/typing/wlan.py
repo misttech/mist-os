@@ -18,6 +18,7 @@ class SecurityType(enum.StrEnum):
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/types.fidl
     """
+
     NONE = "none"
     WEP = "wep"
     WPA = "wpa"
@@ -30,6 +31,7 @@ class WlanClientState(enum.StrEnum):
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/client_provider.fidl
     """
+
     CONNECTIONS_DISABLED = "ConnectionsDisabled"
     CONNECTIONS_ENABLED = "ConnectionsEnabled"
 
@@ -39,6 +41,7 @@ class ConnectionState(enum.StrEnum):
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/client_provider.fidl
     """
+
     FAILED = "Failed"
     DISCONNECTED = "Disconnected"
     CONNECTING = "Connecting"
@@ -50,6 +53,7 @@ class DisconnectStatus(enum.StrEnum):
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/client_provider.fidl
     """
+
     TIMED_OUT = "TimedOut"
     CREDENTIALS_FAILED = "CredentialsFailed"
     CONNECTION_STOPPED = "ConnectionStopped"
@@ -62,6 +66,7 @@ class NetworkConfig:
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/types.fidl
     """
+
     ssid: str
     security_type: SecurityType
     credential_type: str
@@ -78,6 +83,7 @@ class NetworkIdentifier:
     Primary means of distinguishing between available networks.
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/types.fidl
     """
+
     ssid: str
     security_type: SecurityType
 
@@ -91,6 +97,7 @@ class NetworkState:
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/client_provider.fidl
     """
+
     network_identifier: NetworkIdentifier
     connection_state: ConnectionState
     disconnect_status: DisconnectStatus
@@ -108,9 +115,11 @@ class ClientStateSummary:
     and their outcomes.
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.policy/client_provider.fidl
     """
+
     state: WlanClientState
     networks: list[NetworkState]
 
     def __eq__(self, other) -> bool:
         return self.state == other.state and sorted(self.networks) == sorted(
-            other.networks)
+            other.networks
+        )

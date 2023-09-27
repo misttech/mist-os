@@ -47,7 +47,9 @@ class TestClippy(unittest.TestCase):
     def test_unit_test(self):
         lints = read_lints(run_clippy("//build/rust/tests:a_test", "--raw"))
         codes = extract_codes(lints)
-        self.assertEqual(codes, ["clippy::approx_constant", "clippy::needless_return"])
+        self.assertEqual(
+            codes, ["clippy::approx_constant", "clippy::needless_return"]
+        )
 
     def test_file_filtering(self):
         lints = read_lints(
@@ -72,16 +74,20 @@ class TestClippy(unittest.TestCase):
             )
         )
         codes = extract_codes(lints)
-        self.assertEqual(codes, ["clippy::approx_constant", "clippy::needless_return"])
+        self.assertEqual(
+            codes, ["clippy::approx_constant", "clippy::needless_return"]
+        )
 
     def test_depfiles(self):
         with open(FAKE_OUT / TEST_DIR / "a.clippy.deps") as f:
             self.assertEqual(
-                f.read().splitlines(), ["--extern=b=obj/build/rust/tests/libb.rlib"]
+                f.read().splitlines(),
+                ["--extern=b=obj/build/rust/tests/libb.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "b.clippy.deps") as f:
             self.assertEqual(
-                f.read().splitlines(), ["--extern=c=obj/build/rust/tests/libc.rlib"]
+                f.read().splitlines(),
+                ["--extern=c=obj/build/rust/tests/libc.rlib"],
             )
         with open(FAKE_OUT / TEST_DIR / "a.clippy.transdeps") as f:
             self.assertIn(
@@ -98,7 +104,10 @@ class TestClippy(unittest.TestCase):
         output = run_clippy(
             "--get-outputs", "-f", FAKE_ROOT / "build/rust/tests/a/main.rs"
         )
-        for label in {str(TEST_DIR / "a.clippy"), str(TEST_DIR / "a_test.clippy")}:
+        for label in {
+            str(TEST_DIR / "a.clippy"),
+            str(TEST_DIR / "a_test.clippy"),
+        }:
             self.assertIn(label, set(output.splitlines()))
 
     def test_dedup_files(self):
@@ -112,7 +121,10 @@ class TestClippy(unittest.TestCase):
         # normal clippy target, so there should be 2 unique outputs
         self.assertEqual(
             sorted(outputs),
-            ["gen/build/rust/tests/a.clippy", "gen/build/rust/tests/a_test.clippy"],
+            [
+                "gen/build/rust/tests/a.clippy",
+                "gen/build/rust/tests/a_test.clippy",
+            ],
         )
 
     def test_not_found(self):
@@ -124,7 +136,9 @@ class TestClippy(unittest.TestCase):
 
     def test_host_toolchain(self):
         lints = read_lints(
-            run_clippy(f"//build/rust/tests:d(//build/toolchain:{HOST})", "--raw")
+            run_clippy(
+                f"//build/rust/tests:d(//build/toolchain:{HOST})", "--raw"
+            )
         )
         codes = extract_codes(lints)
         self.assertEqual(codes, ["clippy::needless_return"])

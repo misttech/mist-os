@@ -12,59 +12,69 @@ from run_assembly import run_product_assembly
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run ffx assembly with the provided arguments.")
+        description="Run ffx assembly with the provided arguments."
+    )
     parser.add_argument(
         "--ffx-bin",
         type=pathlib.Path,
         required=True,
-        help="Path to ffx binary.")
+        help="Path to ffx binary.",
+    )
     parser.add_argument(
         "--product-assembly-config",
         type=pathlib.Path,
         required=True,
-        help="Path to product assembly configuration input.")
+        help="Path to product assembly configuration input.",
+    )
     parser.add_argument(
         "--board-information",
         type=pathlib.Path,
         required=True,
-        help="Path to board information input.")
+        help="Path to board information input.",
+    )
     parser.add_argument(
         "--input-bundles-dir",
         type=pathlib.Path,
         required=True,
-        help="Path to input bundles directory.")
+        help="Path to input bundles directory.",
+    )
     parser.add_argument(
         "--legacy-bundle",
         type=pathlib.Path,
         required=True,
-        help="Path to the legacy input bundle manifest.")
+        help="Path to the legacy input bundle manifest.",
+    )
     parser.add_argument(
         "--outdir",
         type=pathlib.Path,
         required=True,
-        help="Path to output directory.")
+        help="Path to output directory.",
+    )
     parser.add_argument(
         "--stamp",
         type=pathlib.Path,
         required=True,
-        help="Path to stampfile for telling ninja we're done.")
+        help="Path to stampfile for telling ninja we're done.",
+    )
     parser.add_argument(
         "--additional-packages-path",
         type=pathlib.Path,
         required=False,
-        help="Path to additional packages configuration.")
+        help="Path to additional packages configuration.",
+    )
     parser.add_argument(
         "--config",
         action="append",
         required=False,
-        help="Package config arguments.")
+        help="Package config arguments.",
+    )
     args = parser.parse_args()
 
     kwargs = {}
     if args.additional_packages_path:
-        kwargs['additional_packages_path'] = args.additional_packages_path
+        kwargs["additional_packages_path"] = args.additional_packages_path
     if args.config:
-        kwargs['extra_config'] = args.config
+        kwargs["extra_config"] = args.config
 
     output = run_product_assembly(
         ffx_bin=args.ffx_bin,
@@ -73,9 +83,10 @@ def main():
         input_bundles=args.input_bundles_dir,
         legacy_bundle=args.legacy_bundle,
         outdir=args.outdir,
-        **kwargs)
+        **kwargs,
+    )
     if output.returncode != 0:
         sys.exit(1)
 
-    with open(args.stamp, 'w') as f:
+    with open(args.stamp, "w") as f:
         pass  # creates the file

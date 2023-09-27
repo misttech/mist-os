@@ -10,12 +10,11 @@ import re
 def re_from_string_or_list(input):
     if input is None:
         return None
-    re_str = input if isinstance(input, str) else '|'.join(input)
+    re_str = input if isinstance(input, str) else "|".join(input)
     return re.compile(re_str)
 
 
 class BucketMatch(object):
-
     def __init__(self, name, process, vmo):
         self.name = name
         self.process = re_from_string_or_list(process)
@@ -23,7 +22,6 @@ class BucketMatch(object):
 
 
 class Bucket(object):
-
     def __init__(self, name):
         self.name = name
         self.processes = collections.defaultdict(list)
@@ -31,20 +29,25 @@ class Bucket(object):
 
 
 class Digest(object):
-
     @classmethod
     def FromMatchSpecs(cls, snapshot, match_specs):
         return Digest(
-            snapshot, [BucketMatch(m[0], m[1], m[2]) for m in match_specs])
+            snapshot, [BucketMatch(m[0], m[1], m[2]) for m in match_specs]
+        )
 
     @classmethod
     def FromJSON(cls, snapshot, match_json):
         return Digest(
-            snapshot, [
+            snapshot,
+            [
                 BucketMatch(
-                    m["name"], m["process"] if "process" in m else None,
-                    m["vmo"] if "vmo" in m else None) for m in match_json
-            ])
+                    m["name"],
+                    m["process"] if "process" in m else None,
+                    m["vmo"] if "vmo" in m else None,
+                )
+                for m in match_json
+            ],
+        )
 
     @classmethod
     def FromJSONFile(cls, snapshot, match_file):
@@ -99,8 +102,12 @@ class Digest(object):
 
         kernel = Bucket("Kernel")
         kernel.size = (
-            snapshot.kernel.wired + snapshot.kernel.total_heap +
-            snapshot.kernel.mmu + snapshot.kernel.ipc + snapshot.kernel.other)
+            snapshot.kernel.wired
+            + snapshot.kernel.total_heap
+            + snapshot.kernel.mmu
+            + snapshot.kernel.ipc
+            + snapshot.kernel.other
+        )
         self.buckets["Kernel"] = kernel
         orphaned = Bucket("Orphaned")
         orphaned.size = snapshot.orphaned

@@ -39,7 +39,8 @@ _TEST_DISK_FOO_PARTITION = gpt.Partition(
     size_lba=2048,
     type_guid="9B37FFF6-2E58-466A-983A-F7926D0B04E0",
     unique_guid="A271DF36-BAAC-45B7-B806-A636996DAF75",
-    attr_flags="0000000000000000")
+    attr_flags="0000000000000000",
+)
 _TEST_DISK_BAR_PARTITION = gpt.Partition(
     index=2,
     name="bar",
@@ -48,60 +49,53 @@ _TEST_DISK_BAR_PARTITION = gpt.Partition(
     size_lba=2048,
     type_guid="421A8BFC-85D9-4D85-ACDA-B64EEC0133E9",
     unique_guid="8F1ED054-0475-43FE-AB8D-13C6E709D5A7",
-    attr_flags="0000000000000000")
+    attr_flags="0000000000000000",
+)
 _TEST_DISK_PARTITIONS = [_TEST_DISK_FOO_PARTITION, _TEST_DISK_BAR_PARTITION]
 
 # The matching input spec that should generate the above image.
 _TEST_DISK_SPEC = {
-    "size_mib":
-        4,
-    "block_size":
-        512,
-    "alignment_kib":
-        1024,
-    "partitions":
-        [
-            {
-                "name": "foo",
-                "size_kib": 1024,
-                "unique_guid": "A271DF36-BAAC-45B7-B806-A636996DAF75",
-                "type_guid": "9B37FFF6-2E58-466A-983A-F7926D0B04E0"
-            }, {
-                "name": "bar",
-                "size_kib": 1024,
-                "unique_guid": "8F1ED054-0475-43FE-AB8D-13C6E709D5A7",
-                "type_guid": "421A8BFC-85D9-4D85-ACDA-B64EEC0133E9"
-            }
-        ]
+    "size_mib": 4,
+    "block_size": 512,
+    "alignment_kib": 1024,
+    "partitions": [
+        {
+            "name": "foo",
+            "size_kib": 1024,
+            "unique_guid": "A271DF36-BAAC-45B7-B806-A636996DAF75",
+            "type_guid": "9B37FFF6-2E58-466A-983A-F7926D0B04E0",
+        },
+        {
+            "name": "bar",
+            "size_kib": 1024,
+            "unique_guid": "8F1ED054-0475-43FE-AB8D-13C6E709D5A7",
+            "type_guid": "421A8BFC-85D9-4D85-ACDA-B64EEC0133E9",
+        },
+    ],
 }
 
 
 def default_test_spec(
-        num_partitions: int,
-        *,
-        disk_size_mib: int = 1,
-        part_size_kib: int = 64) -> Dict:
+    num_partitions: int, *, disk_size_mib: int = 1, part_size_kib: int = 64
+) -> Dict:
     """Returns a partition spec for testing.
 
     The idea is that this returns a reasonable default, and tests can then
     modify just the pieces that they want to exercise.
     """
     return {
-        "size_mib":
-            1,
-        "block_size":
-            512,
-        "alignment_kib":
-            1,
-        "partitions":
-            [
-                {
-                    "name": f"part_{i}",
-                    "size_kib": part_size_kib,
-                    "unique_guid": "00000000-1111-2222-3333-444444444444",
-                    "type_guid": "55555555-6666-7777-8888-999999999999"
-                } for i in range(num_partitions)
-            ]
+        "size_mib": 1,
+        "block_size": 512,
+        "alignment_kib": 1,
+        "partitions": [
+            {
+                "name": f"part_{i}",
+                "size_kib": part_size_kib,
+                "unique_guid": "00000000-1111-2222-3333-444444444444",
+                "type_guid": "55555555-6666-7777-8888-999999999999",
+            }
+            for i in range(num_partitions)
+        ],
     }
 
 
@@ -143,25 +137,28 @@ def create_and_read_gpt(spec: Dict) -> Tuple[Dict, str]:
 
 
 class GptTests(unittest.TestCase):
-
     def test_get_partitions(self):
         self.assertEqual(
-            gpt.get_partitions(_TEST_DISK_PATH), _TEST_DISK_PARTITIONS)
+            gpt.get_partitions(_TEST_DISK_PATH), _TEST_DISK_PARTITIONS
+        )
 
     def test_get_partition_by_name(self):
         self.assertEqual(
             gpt.get_partition(_TEST_DISK_PATH, part_name="foo"),
-            _TEST_DISK_FOO_PARTITION)
+            _TEST_DISK_FOO_PARTITION,
+        )
 
     def test_get_partition_by_index(self):
         self.assertEqual(
             gpt.get_partition(_TEST_DISK_PATH, index=2),
-            _TEST_DISK_BAR_PARTITION)
+            _TEST_DISK_BAR_PARTITION,
+        )
 
     def test_get_partition_by_name_and_index(self):
         self.assertEqual(
             gpt.get_partition(_TEST_DISK_PATH, part_name="bar", index=2),
-            _TEST_DISK_BAR_PARTITION)
+            _TEST_DISK_BAR_PARTITION,
+        )
 
     def test_get_partition_by_name_not_found(self):
         with self.assertRaises(ValueError):
@@ -192,7 +189,8 @@ class GptTests(unittest.TestCase):
 
     def test_create_gpt_fill(self):
         spec = default_test_spec(
-            num_partitions=3, disk_size_mib=1, part_size_kib=64)
+            num_partitions=3, disk_size_mib=1, part_size_kib=64
+        )
         spec["partitions"][2]["size_kib"] = "fill"
 
         result, _ = create_and_read_gpt(spec)
@@ -210,11 +208,14 @@ class GptTests(unittest.TestCase):
         result, _ = create_and_read_gpt(spec)
 
         self.assertEqual(
-            result[0].type_guid, "9B37FFF6-2E58-466A-983A-F7926D0B04E0")
+            result[0].type_guid, "9B37FFF6-2E58-466A-983A-F7926D0B04E0"
+        )
         self.assertEqual(
-            result[1].type_guid, "421A8BFC-85D9-4D85-ACDA-B64EEC0133E9")
+            result[1].type_guid, "421A8BFC-85D9-4D85-ACDA-B64EEC0133E9"
+        )
         self.assertEqual(
-            result[2].type_guid, "49FD7CB8-DF15-4E73-B9D9-992070127F0F")
+            result[2].type_guid, "49FD7CB8-DF15-4E73-B9D9-992070127F0F"
+        )
 
     def test_create_gpt_random_unique_guid(self):
         spec = default_test_spec(num_partitions=2)

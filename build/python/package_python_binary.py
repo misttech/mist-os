@@ -15,48 +15,48 @@ import zipapp
 
 def main():
     parser = argparse.ArgumentParser(
-        'Creates a Python zip archive for the input main source')
-
-    parser.add_argument(
-        '--target_name',
-        help='Name of the build target',
-        required=True,
+        "Creates a Python zip archive for the input main source"
     )
 
     parser.add_argument(
-        '--main_source',
-        help='Path to the source containing the main function',
-        required=True,
-    )
-    parser.add_argument(
-        '--main_callable',
-        help=
-        'Name of the the main callable, that is the entry point of the generated archive',
+        "--target_name",
+        help="Name of the build target",
         required=True,
     )
 
     parser.add_argument(
-        '--gen_dir',
-        help='Path to gen directory, used to stage temporary directories',
+        "--main_source",
+        help="Path to the source containing the main function",
         required=True,
     )
-    parser.add_argument('--output', help='Path to output', required=True)
+    parser.add_argument(
+        "--main_callable",
+        help="Name of the the main callable, that is the entry point of the generated archive",
+        required=True,
+    )
 
     parser.add_argument(
-        '--sources',
-        help='Sources of this target, including main source',
-        nargs='*',
+        "--gen_dir",
+        help="Path to gen directory, used to stage temporary directories",
+        required=True,
+    )
+    parser.add_argument("--output", help="Path to output", required=True)
+
+    parser.add_argument(
+        "--sources",
+        help="Sources of this target, including main source",
+        nargs="*",
     )
     parser.add_argument(
-        '--library_infos',
-        help='Path to the library infos JSON file',
-        type=argparse.FileType('r'),
+        "--library_infos",
+        help="Path to the library infos JSON file",
+        type=argparse.FileType("r"),
         required=True,
     )
     parser.add_argument(
-        '--depfile',
-        help='Path to the depfile to generate',
-        type=argparse.FileType('w'),
+        "--depfile",
+        help="Path to the depfile to generate",
+        type=argparse.FileType("w"),
         required=True,
     )
 
@@ -76,9 +76,9 @@ def main():
     # Copy over the sources of this binary.
     for source in args.sources:
         basename = os.path.basename(source)
-        if basename == '__main__.py':
+        if basename == "__main__.py":
             print(
-                '__main__.py in sources of python_binary is not supported, see https://fxbug.dev/73576',
+                "__main__.py in sources of python_binary is not supported, see https://fxbug.dev/73576",
                 file=sys.stderr,
             )
             return 1
@@ -89,12 +89,12 @@ def main():
     files_to_copy = []
     # Make sub directories for all libraries and copy over their sources.
     for info in infos:
-        dest_lib_root = os.path.join(app_dir, info['library_name'])
+        dest_lib_root = os.path.join(app_dir, info["library_name"])
         os.makedirs(dest_lib_root, exist_ok=True)
 
-        src_lib_root = info['source_root']
+        src_lib_root = info["source_root"]
         # Sources are relative to library root.
-        for source in info['sources']:
+        for source in info["sources"]:
             src = os.path.join(src_lib_root, source)
             dest = os.path.join(dest_lib_root, source)
             # Make sub directories if necessary.
@@ -102,7 +102,7 @@ def main():
             files_to_copy.append(src)
             shutil.copy2(src, dest)
 
-    args.depfile.write('{}: {}\n'.format(args.output, ' '.join(files_to_copy)))
+    args.depfile.write("{}: {}\n".format(args.output, " ".join(files_to_copy)))
 
     # Main module is the main source without its extension.
     main_module = os.path.splitext(os.path.basename(args.main_source))[0]
@@ -114,19 +114,20 @@ def main():
     # TODO(https://fxbug.dev/73576): figure out another way to support unit
     # tests when users need to provide their own custom __main__.py.
     main_file = os.path.join(app_dir, "__main__.py")
-    with open(main_file, 'w') as f:
+    with open(main_file, "w") as f:
         f.write(
-            f'''
+            f"""
 import sys
 from {main_module} import *
 
 sys.exit({args.main_callable}())
-''')
+"""
+        )
 
     zipapp.create_archive(
         app_dir,
         target=args.output,
-        interpreter='/usr/bin/env fuchsia-vendored-python',
+        interpreter="/usr/bin/env fuchsia-vendored-python",
         compressed=True,
     )
 
@@ -141,5 +142,5 @@ sys.exit({args.main_callable}())
     os.rmdir(app_dir)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

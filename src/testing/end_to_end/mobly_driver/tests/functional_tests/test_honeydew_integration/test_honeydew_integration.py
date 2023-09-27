@@ -21,8 +21,9 @@ class MoblyDriverHoneydewIntegrationTest(base_test.BaseTestClass):
         """Test case to ensure Mobly controller initializes successfully"""
         fuchsia_devices = self.register_controller(fuchsia_device)
         asserts.assert_true(
-            fuchsia_devices, 'Expect at least 1 created controller.')
+            fuchsia_devices, "Expect at least 1 created controller."
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

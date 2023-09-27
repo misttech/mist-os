@@ -55,7 +55,7 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         self.device.tracing.terminate()
 
     def test_tracing_trace_download(self) -> None:
-        """ This test case tests the following tracing methods and asserts that
+        """This test case tests the following tracing methods and asserts that
             the trace was downloaded successfully.
 
         This test case calls the following tracing methods:
@@ -78,12 +78,13 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         # Terminate the tracing session.
         with tempfile.TemporaryDirectory() as tmpdir:
             res = self.device.tracing.terminate_and_download(
-                directory=tmpdir, trace_file="trace.fxt")
+                directory=tmpdir, trace_file="trace.fxt"
+            )
 
-            asserts.assert_equal(
-                res, f"{tmpdir}/trace.fxt", msg="trace not downloaded")
+            asserts.assert_equal(res, f"{tmpdir}/trace.fxt", msg="trace not downloaded")
             asserts.assert_true(
-                os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed")
+                os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
+            )
 
 
 if __name__ == "__main__":

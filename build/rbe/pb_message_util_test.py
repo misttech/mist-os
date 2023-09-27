@@ -19,7 +19,6 @@ from google.protobuf import timestamp_pb2
 
 
 class ProtoMessageToBQDictTest(unittest.TestCase):
-
     def test_empty_log(self):
         log = log_pb2.LogDump()
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
@@ -32,8 +31,8 @@ class ProtoMessageToBQDictTest(unittest.TestCase):
 
     def test_two_records(self):
         log = log_pb2.LogDump(
-            records=[log_pb2.LogRecord(),
-                     log_pb2.LogRecord()])
+            records=[log_pb2.LogRecord(), log_pb2.LogRecord()]
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(str(converted_log), "{'records': [{}, {}]}")
 
@@ -44,12 +43,14 @@ class ProtoMessageToBQDictTest(unittest.TestCase):
                     command=command_pb2.Command(
                         exec_root="/home",
                         args=["echo", "hello"],
-                    ))
-            ])
+                    )
+                )
+            ]
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(
             str(converted_log),
-            "{'records': [{'command': {'exec_root': '/home', 'args': ['echo', 'hello']}}]}"
+            "{'records': [{'command': {'exec_root': '/home', 'args': ['echo', 'hello']}}]}",
         )
 
     def test_nested_message_map_string_string(self):
@@ -58,16 +59,15 @@ class ProtoMessageToBQDictTest(unittest.TestCase):
             records=[
                 log_pb2.LogRecord(
                     command=command_pb2.Command(
-                        platform={
-                            "foo": "bar",
-                            "baz": "quux"
-                        },
-                    ))
-            ])
+                        platform={"foo": "bar", "baz": "quux"},
+                    )
+                )
+            ]
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(
             str(converted_log),
-            "{'records': [{'command': {'platform': [{'key': 'baz', 'value': 'quux'}, {'key': 'foo', 'value': 'bar'}]}}]}"
+            "{'records': [{'command': {'platform': [{'key': 'baz', 'value': 'quux'}, {'key': 'foo', 'value': 'bar'}]}}]}",
         )
 
     def test_nested_message_map_string_message(self):
@@ -77,21 +77,21 @@ class ProtoMessageToBQDictTest(unittest.TestCase):
                 log_pb2.LogRecord(
                     remote_metadata=log_pb2.RemoteMetadata(
                         event_times={
-                            "birth":
-                                command_pb2.TimeInterval(
-                                    to=timestamp_pb2.Timestamp(
-                                        seconds=1601428537)),
-                            "death":
-                                command_pb2.TimeInterval(
-                                    to=timestamp_pb2.Timestamp(
-                                        seconds=1601439840))
+                            "birth": command_pb2.TimeInterval(
+                                to=timestamp_pb2.Timestamp(seconds=1601428537)
+                            ),
+                            "death": command_pb2.TimeInterval(
+                                to=timestamp_pb2.Timestamp(seconds=1601439840)
+                            ),
                         },
-                    ))
-            ])
+                    )
+                )
+            ]
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(
             str(converted_log),
-            "{'records': [{'remote_metadata': {'event_times': [{'key': 'birth', 'value': {'to': '2020-09-30T01:15:37Z'}}, {'key': 'death', 'value': {'to': '2020-09-30T04:24:00Z'}}]}}]}"
+            "{'records': [{'remote_metadata': {'event_times': [{'key': 'birth', 'value': {'to': '2020-09-30T01:15:37Z'}}, {'key': 'death', 'value': {'to': '2020-09-30T04:24:00Z'}}]}}]}",
         )
 
     def test_nested_message_enum(self):
@@ -99,21 +99,26 @@ class ProtoMessageToBQDictTest(unittest.TestCase):
         log = log_pb2.LogDump(
             records=[
                 log_pb2.LogRecord(
-                    completion_status=log_pb2.CompletionStatus.STATUS_CACHE_HIT)
-            ])
+                    completion_status=log_pb2.CompletionStatus.STATUS_CACHE_HIT
+                )
+            ]
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(
             str(converted_log),
-            "{'records': [{'completion_status': 'STATUS_CACHE_HIT'}]}")
+            "{'records': [{'completion_status': 'STATUS_CACHE_HIT'}]}",
+        )
 
     def test_timestamp(self):
         """Make sure timestamp is formatted, and not (seconds, nanos)"""
         log = command_pb2.TimeInterval(
-            to=timestamp_pb2.Timestamp(seconds=1661472513, nanos=114242156))
+            to=timestamp_pb2.Timestamp(seconds=1661472513, nanos=114242156)
+        )
         converted_log = pb_message_util.proto_message_to_bq_dict(log)
         self.assertEqual(
-            str(converted_log), "{'to': '2022-08-26T00:08:33.114242156Z'}")
+            str(converted_log), "{'to': '2022-08-26T00:08:33.114242156Z'}"
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

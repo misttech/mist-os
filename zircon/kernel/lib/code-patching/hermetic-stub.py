@@ -31,38 +31,44 @@ STUB_CONTENTS = string.Template(
 .function $function_name, global
   .code_patching.blob $size, $case_id
 .end_function
-""")
+"""
+)
 
 ALIAS = string.Template(
     """
 .weak $alias
 .hidden $alias
 $alias = $function_name
-""")
+"""
+)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description=
-        "Creates an assembly file with a single stub functon to be later patched"
+        description="Creates an assembly file with a single stub functon to be later patched"
     )
     parser.add_argument("--name", help="The name of the stub function")
     parser.add_argument(
-        "--header", help="A header containing patch case ID constants")
+        "--header", help="A header containing patch case ID constants"
+    )
     parser.add_argument(
         "--metadata-file",
         metavar="FILE",
-        help="a JSON file of hermetic patch alternative metadata")
+        help="a JSON file of hermetic patch alternative metadata",
+    )
     parser.add_argument(
         "--aliases",
         type=str,
         action="append",
         help="Symbol names to alias to the function as",
-        default=[])
+        default=[],
+    )
     parser.add_argument(
-        "--depfile", metavar="FILE", help="A dependencies file to write to")
+        "--depfile", metavar="FILE", help="A dependencies file to write to"
+    )
     parser.add_argument(
-        "--outfile", metavar="FILE", help="The resulting stub file")
+        "--outfile", metavar="FILE", help="The resulting stub file"
+    )
     args = parser.parse_args()
 
     with open(args.metadata_file, "r") as metadata_file:
@@ -77,7 +83,8 @@ def main():
 
     with open(args.depfile, "w") as depfile:
         depfile.write(
-            "%s: %s\n" % (args.outfile, " ".join(sorted(alternatives))))
+            "%s: %s\n" % (args.outfile, " ".join(sorted(alternatives)))
+        )
 
     with open(args.outfile, "w") as stub:
         stub.write(
@@ -89,7 +96,8 @@ def main():
                 # `case_id_header` parameter.
                 case_id="CASE_ID_%s" % args.name.upper(),
                 size=max_size,
-            ))
+            )
+        )
         for alias in args.aliases:
             stub.write(ALIAS.substitute(alias=alias, function_name=args.name))
 

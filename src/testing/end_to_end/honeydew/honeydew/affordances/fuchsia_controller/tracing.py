@@ -21,9 +21,9 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport
 
 _FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
-    "TracingController":
-        custom_types.FidlEndpoint(
-            "/core/trace_manager", "fuchsia.tracing.controller.Controller"),
+    "TracingController": custom_types.FidlEndpoint(
+        "/core/trace_manager", "fuchsia.tracing.controller.Controller"
+    ),
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -33,14 +33,15 @@ class Tracing(tracing.Tracing):
     """Tracing affordance implementation using Fuchsia-Controller."""
 
     def __init__(
-            self, device_name: str,
-            fuchsia_controller: fc_transport.FuchsiaController,
-            reboot_affordance: affordances_capable.RebootCapableDevice) -> None:
+        self,
+        device_name: str,
+        fuchsia_controller: fc_transport.FuchsiaController,
+        reboot_affordance: affordances_capable.RebootCapableDevice,
+    ) -> None:
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: Optional[
-            f_tracingcontroller.Controller.Client]
+        self._trace_controller_proxy: Optional[f_tracingcontroller.Controller.Client]
         self._trace_socket: Optional[fc.Socket]
         self._session_initialized: bool
         self._tracing_active: bool
@@ -61,9 +62,8 @@ class Tracing(tracing.Tracing):
 
     # List all the public methods in alphabetical order
     def initialize(
-            self,
-            categories: Optional[List[str]] = None,
-            buffer_size: Optional[int] = None) -> None:
+        self, categories: Optional[List[str]] = None, buffer_size: Optional[int] = None
+    ) -> None:
         """Initializes a trace session.
 
         Args:
@@ -77,43 +77,47 @@ class Tracing(tracing.Tracing):
         if self._session_initialized:
             raise errors.FuchsiaStateError(
                 f"Trace session is already initialized on {self._name}. Can be "
-                "initialized only once")
+                "initialized only once"
+            )
         _LOGGER.info("Initializing trace session on '%s'", self._name)
 
         assert self._trace_controller_proxy is None
         self._trace_controller_proxy = f_tracingcontroller.Controller.Client(
-            self._fc_transport.connect_device_proxy(
-                _FC_PROXIES["TracingController"]))
+            self._fc_transport.connect_device_proxy(_FC_PROXIES["TracingController"])
+        )
         trace_socket_server, trace_socket_client = fc.Socket.create()
 
         try:
             # 1-way FIDL calls do not return a Coroutine, so async isn't needed
             self._trace_controller_proxy.initialize_tracing(
                 config=f_tracingcontroller.TraceConfig(
-                    categories=categories,
-                    buffer_size_megabytes_hint=buffer_size),
-                output=trace_socket_server.take())
+                    categories=categories, buffer_size_megabytes_hint=buffer_size
+                ),
+                output=trace_socket_server.take(),
+            )
         except fc.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "fuchsia.tracing.controller.Initialize FIDL Error") from status
+                "fuchsia.tracing.controller.Initialize FIDL Error"
+            ) from status
         self._trace_socket = trace_socket_client
         self._session_initialized = True
 
     def start(self) -> None:
         """Starts tracing.
 
-         Raises:
-            errors.FuchsiaStateError: When trace session is not initialized or
-                already started.
-            errors.FuchsiaControllerError: On FIDL communication failure.
+        Raises:
+           errors.FuchsiaStateError: When trace session is not initialized or
+               already started.
+           errors.FuchsiaControllerError: On FIDL communication failure.
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot start: Trace session is not "
-                f"initialized on {self._name}")
+                "Cannot start: Trace session is not " f"initialized on {self._name}"
+            )
         if self._tracing_active:
             raise errors.FuchsiaStateError(
-                f"Cannot start: Trace already started on {self._name}")
+                f"Cannot start: Trace already started on {self._name}"
+            )
         _LOGGER.info("Starting trace on '%s'", self._name)
 
         try:
@@ -121,52 +125,59 @@ class Tracing(tracing.Tracing):
             asyncio.run(
                 self._trace_controller_proxy.start_tracing(
                     options=f_tracingcontroller.StartOptions(
-                        buffer_disposition=f_tracing.BufferDisposition.
-                        CLEAR_ENTIRE)))
+                        buffer_disposition=f_tracing.BufferDisposition.CLEAR_ENTIRE
+                    )
+                )
+            )
         except fc.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "fuchsia.tracing.controller.Start FIDL Error") from status
+                "fuchsia.tracing.controller.Start FIDL Error"
+            ) from status
         self._tracing_active = True
 
     def stop(self) -> None:
         """Stops the current trace.
 
-         Raises:
-            errors.FuchsiaStateError: When trace session is not initialized or
-                not started.
-            errors.FuchsiaControllerError: On FIDL communication failure.
+        Raises:
+           errors.FuchsiaStateError: When trace session is not initialized or
+               not started.
+           errors.FuchsiaControllerError: On FIDL communication failure.
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot stop: Trace session is not "
-                f"initialized on {self._name}")
+                "Cannot stop: Trace session is not " f"initialized on {self._name}"
+            )
         if not self._tracing_active:
             raise errors.FuchsiaStateError(
-                f"Cannot stop: Trace not started on {self._name}")
+                f"Cannot stop: Trace not started on {self._name}"
+            )
         _LOGGER.info("Stopping trace on '%s'", self._name)
 
         try:
             assert self._trace_controller_proxy is not None
             asyncio.run(
                 self._trace_controller_proxy.stop_tracing(
-                    options=f_tracingcontroller.StopOptions(
-                        write_results=True)))
+                    options=f_tracingcontroller.StopOptions(write_results=True)
+                )
+            )
         except fc.ZxStatus as status:
             raise errors.FuchsiaControllerError(
-                "fuchsia.tracing.controller.Stop FIDL Error") from status
+                "fuchsia.tracing.controller.Stop FIDL Error"
+            ) from status
         self._tracing_active = False
 
     def terminate(self) -> None:
         """Terminates the trace session without saving the trace.
 
-         Raises:
-            errors.FuchsiaStateError: When trace session is not initialized.
-            errors.FuchsiaControllerError: On FIDL communication failure.
+        Raises:
+           errors.FuchsiaStateError: When trace session is not initialized.
+           errors.FuchsiaControllerError: On FIDL communication failure.
         """
         self._terminate(download=False)
 
     def terminate_and_download(
-            self, directory: str, trace_file: Optional[str] = None) -> str:
+        self, directory: str, trace_file: Optional[str] = None
+    ) -> str:
         """Terminates the trace session and downloads the trace data to the
             specified directory.
 
@@ -228,8 +239,9 @@ class Tracing(tracing.Tracing):
                 # writing to the socket.
                 # ZX_ERR_SHOULD_WAIT is expected when the socket has more data
                 # to read.
-                zx_status: Optional[int] = \
+                zx_status: Optional[int] = (
                     status.args[0] if len(status.args) > 0 else None
+                )
                 if zx_status == fc.ZxStatus.ZX_ERR_PEER_CLOSED:
                     break
                 elif zx_status == fc.ZxStatus.ZX_ERR_SHOULD_WAIT:
@@ -262,8 +274,9 @@ class Tracing(tracing.Tracing):
                 drain_task = tg.create_task(self._drain_socket_async())
             tg.create_task(
                 self._trace_controller_proxy.terminate_tracing(
-                    options=f_tracingcontroller.TerminateOptions(
-                        write_results=download)))
+                    options=f_tracingcontroller.TerminateOptions(write_results=download)
+                )
+            )
 
         if drain_task is not None:
             return drain_task.result()
@@ -285,16 +298,18 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot terminate: Trace session is "
-                f"not initialized on {self._name}")
+                "Cannot terminate: Trace session is " f"not initialized on {self._name}"
+            )
         _LOGGER.info("Terminating trace session on '%s'", self._name)
 
         try:
             socket_bytes = asyncio.run(
-                self._terminate_and_drain_async(download=download))
+                self._terminate_and_drain_async(download=download)
+            )
         except ExceptionGroup as grp:
             raise errors.FuchsiaControllerError(
-                "fuchsia.tracing.controller.Terminate FIDL Error") from grp
+                "fuchsia.tracing.controller.Terminate FIDL Error"
+            ) from grp
         finally:
             self._reset_state()
 

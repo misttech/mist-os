@@ -17,7 +17,8 @@ def by_name(x):
 
 def normalize_entry(entry):
     entry["package_breakdown"] = sorted(
-        list(entry["package_breakdown"].values()), key=by_name)
+        list(entry["package_breakdown"].values()), key=by_name
+    )
     for pb in entry["package_breakdown"]:
         # Contents of blobs are verified in other build steps, in size reports we
         # only verify size consistency to reduce noise.
@@ -29,25 +30,31 @@ def normalize_entry(entry):
 
 def normalize(size_report):
     return sorted(
-        [normalize_entry(entry) for entry in size_report.values()], key=by_name)
+        [normalize_entry(entry) for entry in size_report.values()], key=by_name
+    )
 
 
 def main():
     parser = argparse.ArgumentParser(description="Compares size reports")
     parser.add_argument(
-        "--verbose_size_report1", type=argparse.FileType("r"), required=True)
+        "--verbose_size_report1", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
-        "--verbose_size_report2", type=argparse.FileType("r"), required=True)
+        "--verbose_size_report2", type=argparse.FileType("r"), required=True
+    )
     parser.add_argument(
         "--normalized_report_output1",
         type=argparse.FileType("w"),
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--normalized_report_output2",
         type=argparse.FileType("w"),
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        "--diff_output", type=argparse.FileType("w"), required=True)
+        "--diff_output", type=argparse.FileType("w"), required=True
+    )
 
     args = parser.parse_args()
 
@@ -72,12 +79,14 @@ def main():
     if len(diffstr) != 0:
         print(
             f"Error: non-empty diff product configs:\n{diffstr}\n",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
 
         diff_output_path = os.path.abspath(args.diff_output.name)
         print(
             f"This diff can also be found in file {diff_output_path}\n",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
 
         norm1_path = os.path.abspath(args.normalized_report_output1.name)
         norm2_path = os.path.abspath(args.normalized_report_output2.name)
@@ -85,7 +94,8 @@ def main():
             "This diff is based on the following normalized reports:\n\n"
             f"  {norm1_path}\n"
             f"  {norm2_path}\n",
-            file=sys.stderr)
+            file=sys.stderr,
+        )
 
         return 1
 

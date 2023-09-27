@@ -18,10 +18,20 @@ def sort(data):
     if isinstance(data, dict):
         return {
             key: (
-                sort(value) if key not in [
-                    "args", "arguments", "children", "injected-services",
-                    "networks", "setup", "test"
-                ] else value) for key, value in data.items()
+                sort(value)
+                if key
+                not in [
+                    "args",
+                    "arguments",
+                    "children",
+                    "injected-services",
+                    "networks",
+                    "setup",
+                    "test",
+                ]
+                else value
+            )
+            for key, value in data.items()
         }
     elif isinstance(data, list):
         inner = (sort(datum) for datum in data)
@@ -36,16 +46,18 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        'file',
-        type=argparse.FileType('r+'),
-        nargs='+',
-        help='JSON file to be pretty-printed.')
+        "file",
+        type=argparse.FileType("r+"),
+        nargs="+",
+        help="JSON file to be pretty-printed.",
+    )
     parser.add_argument(
-        '--sort-keys',
+        "--sort-keys",
         default=True,
         action=argparse.BooleanOptionalAction,
-        dest='sort_keys',
-        help='Indicates whether object keys should be sorted.')
+        dest="sort_keys",
+        help="Indicates whether object keys should be sorted.",
+    )
 
     args = parser.parse_args()
     for json_file in args.file:
@@ -58,13 +70,14 @@ def main():
                     data,
                     indent=4,
                     sort_keys=args.sort_keys,
-                    separators=(',', ': '))
+                    separators=(",", ": "),
+                )
                 if original != formatted:
                     json_file.seek(0)
                     json_file.truncate()
-                    json_file.write(formatted + '\n')
+                    json_file.write(formatted + "\n")
         except json.JSONDecodeError:
-            print(f'Exception encountered while processing {json_file.name}')
+            print(f"Exception encountered while processing {json_file.name}")
             raise
 
 

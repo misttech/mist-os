@@ -21,11 +21,10 @@ from mobly_controller.fuchsia_device import asynctest
 
 
 class FuchsiaControllerTests(base_test.BaseTestClass):
-
     def setup_class(self) -> None:
         self.fuchsia_devices: List[
-            fuchsia_device.FuchsiaDevice] = self.register_controller(
-                fuchsia_device)
+            fuchsia_device.FuchsiaDevice
+        ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]
 
     @asynctest
@@ -51,7 +50,9 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         """
         device_proxy = device.NameProvider.Client(
             self.device.ctx.connect_device_proxy(
-                "/bootstrap/device_name_provider", device.NameProvider.MARKER))
+                "/bootstrap/device_name_provider", device.NameProvider.MARKER
+            )
+        )
         res = await device_proxy.get_device_name()
         asserts.assert_not_equal(res.response, None, extras=res)
         name = res.response.name
@@ -71,9 +72,11 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         params = feedback.GetSnapshotParameters(
             # Two minutes of timeout time.
             collection_timeout_per_data=(2 * 60 * 10**9),
-            response_channel=server.take())
+            response_channel=server.take(),
+        )
         ch = self.device.ctx.connect_device_proxy(
-            "/core/feedback", "fuchsia.feedback.DataProvider")
+            "/core/feedback", "fuchsia.feedback.DataProvider"
+        )
         provider = feedback.DataProvider.Client(ch)
         await provider.get_snapshot(params=params)
         attr_res = await file.get_attr()

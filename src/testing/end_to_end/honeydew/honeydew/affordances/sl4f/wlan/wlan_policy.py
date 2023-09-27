@@ -57,8 +57,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         self._sl4f.run(method=Sl4fMethods.CREATE_CLIENT_CONTROLLER)
 
     def get_saved_networks(self) -> list[NetworkConfig]:
-        resp: dict[str, object] = self._sl4f.run(
-            method=Sl4fMethods.GET_SAVED_NETWORKS)
+        resp: dict[str, object] = self._sl4f.run(method=Sl4fMethods.GET_SAVED_NETWORKS)
         result: object = resp.get("result", [])
 
         if not isinstance(result, list):
@@ -75,7 +74,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
                     ssid=_get_str(n, "ssid"),
                     security_type=SecurityType(security_type.lower()),
                     credential_type=_get_str(n, "credential_type"),
-                    credential_value=_get_str(n, "credential_value")))
+                    credential_value=_get_str(n, "credential_value"),
+                )
+            )
 
         return networks
 
@@ -100,8 +101,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
         if not isinstance(result["networks"], list):
             raise TypeError(
-                'Expected "networks" to be list, '
-                f'got {type(result["networks"])}')
+                'Expected "networks" to be list, ' f'got {type(result["networks"])}'
+            )
 
         network_states: list[NetworkState] = []
         for n in result["networks"]:
@@ -118,22 +119,26 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             network_states.append(
                 NetworkState(
                     network_identifier=NetworkIdentifier(
-                        ssid=ssid,
-                        security_type=SecurityType(security_type.lower())),
+                        ssid=ssid, security_type=SecurityType(security_type.lower())
+                    ),
                     connection_state=ConnectionState(state),
-                    disconnect_status=DisconnectStatus(status)))
+                    disconnect_status=DisconnectStatus(status),
+                )
+            )
 
         return ClientStateSummary(
-            state=WlanClientState(result["state"]), networks=network_states)
+            state=WlanClientState(result["state"]), networks=network_states
+        )
 
     def remove_all_networks(self) -> None:
         self._sl4f.run(method=Sl4fMethods.REMOVE_ALL_NETWORKS)
 
     def save_network(
-            self,
-            target_ssid: str,
-            security_type: SecurityType,
-            target_pwd: str | None = None) -> None:
+        self,
+        target_ssid: str,
+        security_type: SecurityType,
+        target_pwd: str | None = None,
+    ) -> None:
         if not target_pwd:
             target_pwd = ""
 

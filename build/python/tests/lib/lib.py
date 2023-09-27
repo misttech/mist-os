@@ -6,7 +6,7 @@
 
 
 def f():
-    print('lib.f')
+    print("lib.f")
 
 
 def truthy():

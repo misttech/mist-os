@@ -12,13 +12,13 @@ def parse_args():
     """Parses command-line arguments."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--product-bundle',
-        help='Path to product_bundle dir.',
+        "--product-bundle",
+        help="Path to product_bundle dir.",
         required=True,
     )
     parser.add_argument(
-        '--flash-manifest-path',
-        help='path to created flash manifest.',
+        "--flash-manifest-path",
+        help="path to created flash manifest.",
         required=True,
     )
     return parser.parse_args()
@@ -51,5 +51,5 @@ def main():
         json.dump(flash_manifest, f, indent=4)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

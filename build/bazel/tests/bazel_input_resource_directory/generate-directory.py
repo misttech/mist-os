@@ -12,29 +12,30 @@ import sys
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument("--output-dir", required=True, help="Output directory")
     parser.add_argument("--stamp", required=True, help="Output stamp file")
     args = parser.parse_args()
 
     # Create new directory with desired content.
-    new_dir = args.output_dir + '.new'
+    new_dir = args.output_dir + ".new"
     if os.path.exists(new_dir):
         shutil.rmtree(new_dir)
     os.makedirs(new_dir)
 
     # Create ${output_dir}/foo.txt
-    with open(os.path.join(new_dir, 'foo.txt'), 'w') as f:
-        f.write('This is foo.txt!\n')
+    with open(os.path.join(new_dir, "foo.txt"), "w") as f:
+        f.write("This is foo.txt!\n")
 
     # Create ${output_dir}/bar/bar.txt
-    os.makedirs(os.path.join(new_dir, 'bar'))
-    with open(os.path.join(new_dir, 'bar', 'bar.txt'), 'w') as f:
-        f.write('This is bar.txt!\n')
+    os.makedirs(os.path.join(new_dir, "bar"))
+    with open(os.path.join(new_dir, "bar", "bar.txt"), "w") as f:
+        f.write("This is bar.txt!\n")
 
     old_present = os.path.exists(args.output_dir)
     if old_present:
-        old_dir = args.output_dir + '.old'
+        old_dir = args.output_dir + ".old"
         if os.path.exists(old_dir):
             shutil.rmtree(old_dir)
         os.rename(args.output_dir, old_dir)
@@ -45,11 +46,11 @@ def main():
         shutil.rmtree(old_dir)
 
     # Create empty stsamp file.
-    with open(args.stamp, 'w') as f:
+    with open(args.stamp, "w") as f:
         pass
 
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

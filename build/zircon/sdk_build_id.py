@@ -8,11 +8,13 @@ import json
 import os
 import sys
 
-sys.path.append(os.path.join(
-    os.path.dirname(__file__),
-    os.pardir,
-    "cpp",
-))
+sys.path.append(
+    os.path.join(
+        os.path.dirname(__file__),
+        os.pardir,
+        "cpp",
+    )
+)
 import binaries
 
 
@@ -29,29 +31,29 @@ def rewrite(debug, manifest):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        '--input',
-        type=argparse.FileType('r'),
-        help='Input JSON file',
+        "--input",
+        type=argparse.FileType("r"),
+        help="Input JSON file",
         required=True,
     )
     parser.add_argument(
-        '--output',
-        type=argparse.FileType('w'),
-        help='Output JSON file',
+        "--output",
+        type=argparse.FileType("w"),
+        help="Output JSON file",
         required=True,
     )
     parser.add_argument(
-        '--manifest',
-        type=argparse.FileType('w'),
-        help='Output manifest file',
+        "--manifest",
+        type=argparse.FileType("w"),
+        help="Output manifest file",
         required=True,
     )
     parser.add_argument(
-        '--depfile',
-        type=argparse.FileType('w'),
+        "--depfile",
+        type=argparse.FileType("w"),
         required=True,
     )
-    parser.add_argument('--location', help='JSON pointer', required=False)
+    parser.add_argument("--location", help="JSON pointer", required=False)
     args = parser.parse_args()
 
     # Read in the original JSON tree.
@@ -60,13 +62,14 @@ def main():
     # Poor man's JSON pointer: /foo/bar/baz looks up in dicts.
     manifest = {}
     if args.location:
-        ptr = args.location.split('/')
-        assert ptr[
-            0] == '', '%s should be absolute JSON pointer' % args.location
+        ptr = args.location.split("/")
+        assert ptr[0] == "", (
+            "%s should be absolute JSON pointer" % args.location
+        )
 
         # Follow the pointer steps until the last one, so walk[ptr[0]] points
         # at the requested location in the JSON tree.
-        walk = {'': data}
+        walk = {"": data}
         while len(ptr) > 1:
             walk = walk[ptr[0]]
             ptr = ptr[1:]
@@ -75,8 +78,8 @@ def main():
         walk[ptr[0]] = rewrite(walk[ptr[0]], manifest)
     else:
         # If no location argument is passed in, we will find the value from the variants section
-        debug = data['variants'][0]['values']['debug_libs']
-        data['variants'][0]['values']['debug_libs'] = rewrite(debug, manifest)
+        debug = data["variants"][0]["values"]["debug_libs"]
+        data["variants"][0]["values"]["debug_libs"] = rewrite(debug, manifest)
 
     # Write out the manifest collected while rewriting original debug files
     # names to .build-id/... names for publication.
@@ -86,12 +89,14 @@ def main():
     mappings = []
     deps = []
     for dest, source in manifest.items():
-        mappings.append(f'{dest}={source}')
+        mappings.append(f"{dest}={source}")
         deps.append(os.path.relpath(source))
-    args.manifest.write('\n'.join(mappings))
+    args.manifest.write("\n".join(mappings))
     args.depfile.write(
-        '{} {}: {}\n'.format(
-            args.manifest.name, args.output.name, ' '.join(deps)))
+        "{} {}: {}\n".format(
+            args.manifest.name, args.output.name, " ".join(deps)
+        )
+    )
 
     # Write out the modified JSON tree.
     json.dump(data, args.output, indent=2, sort_keys=True)
@@ -99,5 +104,5 @@ def main():
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

@@ -94,14 +94,29 @@ import inspect
 import json
 
 from typing import (
-    Any, Callable, Dict, List, Optional, Set, Type, TypeVar, Union,
-    get_type_hints)
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Set,
+    Type,
+    TypeVar,
+    Union,
+    get_type_hints,
+)
 import typing
 
 __all__ = [
-    'instance_from_dict', 'instance_to_dict', 'json_dump', 'json_dumps',
-    'json_load', 'json_loads', 'serialize_dict', 'serialize_json',
-    'serialize_fields_as'
+    "instance_from_dict",
+    "instance_to_dict",
+    "json_dump",
+    "json_dumps",
+    "json_load",
+    "json_loads",
+    "serialize_dict",
+    "serialize_json",
+    "serialize_fields_as",
 ]
 
 # The placeholder for the Class of the object that's being serialized or
@@ -139,8 +154,9 @@ def instance_from_dict(cls: Type[C], a_dict: Dict[str, Any]) -> C:
     # If any fields weren't set via the constructor, set those attributes on the
     # class directly.  For classes that use @dataclass, this is likely to be
     # empty.
-    for field_name, value in _get_named_values_from(a_dict, fields_to_read,
-                                                    cls):
+    for field_name, value in _get_named_values_from(
+        a_dict, fields_to_read, cls
+    ):
         setattr(instance, field_name, value)
 
     return instance
@@ -156,13 +172,15 @@ def _get_fn_param_types(cls: Type[Any], fn_name: str) -> Dict[str, Type[Any]]:
     return {
         name: parameter.annotation
         for name, parameter in fn_sig.parameters.items()
-        if name != 'self'
+        if name != "self"
     }
 
 
 def _get_named_values_from(
-        entries: Dict[str, Any], names_and_types: Dict[str, Type[Any]],
-        for_cls: Type[Any]) -> Dict[str, Any]:
+    entries: Dict[str, Any],
+    names_and_types: Dict[str, Type[Any]],
+    for_cls: Type[Any],
+) -> Dict[str, Any]:
     """Take a Dict of name:value, and a dict of name:types, and return a dict of
     name to instantiated-type-for-value, for the class given by `for_cls`.
 
@@ -185,7 +203,9 @@ def _get_named_values_from(
             if not has_default:
                 raise KeyError(
                     "unable to find required value for '{}' in: {}".format(
-                        name, entries.keys()))
+                        name, entries.keys()
+                    )
+                )
 
     return values
 
@@ -195,10 +215,12 @@ def _has_default_value(cls: Type[Any], field: str) -> Any:
     @dataclass-based class, others will silently return 'False')
     """
     dataclass_fields: Optional[Dict] = getattr(
-        cls, "__dataclass_fields__", None)
+        cls, "__dataclass_fields__", None
+    )
     if dataclass_fields:
         field_entry: Optional[dataclasses.Field] = dataclass_fields.get(
-            field, None)
+            field, None
+        )
         if field_entry:
             has_value = field_entry.default is not dataclasses.MISSING
             has_factory = field_entry.default_factory is not dataclasses.MISSING
@@ -210,8 +232,7 @@ def _parse_value_into(
     value: Any,
     cls: Type[Union[Dict, List, Set, C]],
 ) -> Union[Dict, List, Set, C]:
-    """For a class, attempt to parse it from the value.
-    """
+    """For a class, attempt to parse it from the value."""
     if typing.get_origin(cls) is dict:
         # dict values need to have a type
         type_args = typing.get_args(cls)
@@ -240,7 +261,8 @@ def _parse_value_into(
             return [_parse_value_into(item, list_item_type) for item in value]
         else:
             raise TypeError(
-                f'cannot parse {cls} from a non-list value({type(value)})')
+                f"cannot parse {cls} from a non-list value({type(value)})"
+            )
 
     elif typing.get_origin(cls) is set:
         # Set items need to have a type
@@ -248,10 +270,12 @@ def _parse_value_into(
         # the value for a Set type needs to be a List or a Set.
         if (type(value) is list) or (type(value) is set):
             return set(
-                [_parse_value_into(item, set_item_type) for item in value])
+                [_parse_value_into(item, set_item_type) for item in value]
+            )
         else:
             raise TypeError(
-                f'cannot parse {cls} from a non-list value ({type(value)})')
+                f"cannot parse {cls} from a non-list value ({type(value)})"
+            )
 
     elif _has_field_types(cls):
         # Create an object from this value
@@ -271,7 +295,8 @@ def _parse_value_into(
             except ValueError as ve:
                 errors.append(ve)
         raise TypeError(
-            f"Unable to create an instance of {cls}, from {value}: {errors}")
+            f"Unable to create an instance of {cls}, from {value}: {errors}"
+        )
 
     else:
         # It's probably a simple type, so directly instantiate it
@@ -307,7 +332,7 @@ def instance_to_dict(instance: Any) -> Dict[str, Any]:
         class FooClass:
             some_field: int
             some_other_field: Optional[str]
-     """
+    """
     # Get the type hints for the class, not the instance, because it's only
     # meant to be used with 'function, method, module, or class object' per the
     # documentation.
@@ -320,7 +345,8 @@ def instance_to_dict(instance: Any) -> Dict[str, Any]:
             # If a serializer fn was added via metadata, use that. Otherwise use
             # the "default" handler
             metadata: Optional[Dict] = getattr(
-                instance.__class__, '__SERIALIZE_AS__', None)
+                instance.__class__, "__SERIALIZE_AS__", None
+            )
             serializer: Optional[Callable] = None
             if metadata:
                 serializer = metadata.get(name)
@@ -383,7 +409,7 @@ def json_loads(cls: Type[C], s: str) -> C:
         class FooClass:
             some_field: int
             some_other_field: Optional[str]
-     """
+    """
     return instance_from_dict(cls, json.loads(s))
 
 
@@ -605,7 +631,7 @@ def _process_metadata(cls: Type[C], **kwargs) -> Type[C]:
         if not hasattr(cls, name):
             annotations = get_type_hints(cls)
             if name not in annotations:
-                raise ValueError(f'{cls} does not have a field named: {name}:')
+                raise ValueError(f"{cls} does not have a field named: {name}:")
     if kwargs:
         setattr(cls, "__SERIALIZE_AS__", kwargs)
     return cls

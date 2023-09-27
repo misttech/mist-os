@@ -119,7 +119,8 @@ def construct_from_name_and_type(constructed_obj, sub_parsed_obj, name, ty):
     unwrapped_module = unwrapped_ty.__module__
     if unwrapped_module.startswith("fidl."):
         obj = get_type_from_import(
-            f"{unwrapped_module}.{unwrapped_ty.__name__}")
+            f"{unwrapped_module}.{unwrapped_ty.__name__}"
+        )
         if isinstance(sub_parsed_obj, dict):
             sub_obj = make_default_obj(obj)
             construct_result(sub_obj, sub_parsed_obj)
@@ -144,7 +145,8 @@ def construct_result(constructed_obj, parsed_obj):
         sub_parsed_obj = parsed_obj[key]
         setattr(constructed_obj, key, None)
         construct_from_name_and_type(
-            constructed_obj, sub_parsed_obj, key, sub_obj_type)
+            constructed_obj, sub_parsed_obj, key, sub_obj_type
+        )
         # Since there is only one item for the union, no need to continue with iterating
         # elements.
         return

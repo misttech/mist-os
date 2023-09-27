@@ -15,8 +15,7 @@ class PowerSwitch(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def from_station_config(
-            cls, config: Dict[str, str | float | int]) -> PowerSwitch:
+    def from_station_config(cls, config: Dict[str, str | float | int]) -> PowerSwitch:
         """Class method to instantiate the power switch class.
 
         Args:

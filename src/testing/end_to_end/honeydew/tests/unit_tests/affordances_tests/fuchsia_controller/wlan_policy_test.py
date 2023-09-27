@@ -6,8 +6,7 @@
 
 import unittest
 
-from honeydew.affordances.fuchsia_controller.wlan import \
-    wlan_policy as fc_wlan_policy
+from honeydew.affordances.fuchsia_controller.wlan import wlan_policy as fc_wlan_policy
 from honeydew.typing.wlan import SecurityType
 
 
@@ -46,7 +45,8 @@ class ComponentFCTests(unittest.TestCase):
         """Test for WlanPolicy.save_network()."""
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.save_network(
-                target_ssid="test", security_type=SecurityType.NONE)
+                target_ssid="test", security_type=SecurityType.NONE
+            )
 
     def test_set_new_update_listener(self) -> None:
         """Test for WlanPolicy.set_new_update_listener()."""

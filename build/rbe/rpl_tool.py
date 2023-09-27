@@ -34,12 +34,12 @@ _REPROXY_CFG = _SCRIPT_DIR / "fuchsia-reproxy.cfg"
 
 
 def msg(text: str):
-    print(f'[{_SCRIPT_BASENAME}] {text}')
+    print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
 # Abstract representation of files in the working dir or remote working dir,
 # which can be a subdir of exec_root.
-_WORKING_DIR_SYMBOL = '${working_directory}'
+_WORKING_DIR_SYMBOL = "${working_directory}"
 
 
 def normalize_input_path_prefix(path: Path, working_dirs: Iterable[str]) -> str:
@@ -57,7 +57,8 @@ def normalize_input_path_prefix(path: Path, working_dirs: Iterable[str]) -> str:
 
 
 def infer_record_command_and_inputs(
-        record: log_pb2.LogRecord, rtool: remotetool.RemoteTool):
+    record: log_pb2.LogRecord, rtool: remotetool.RemoteTool
+):
     """Adds command and inputs to a reduced reproxy log record.
 
     Args:
@@ -76,13 +77,16 @@ def infer_record_command_and_inputs(
     record.command.input.inputs.extend(
         sorted(
             normalize_input_path_prefix(path, working_dirs)
-            for path in show_action_details.inputs.keys()))
+            for path in show_action_details.inputs.keys()
+        )
+    )
 
 
 def expand_to_rpl(
-        logdump: log_pb2.LogDump,
-        rtool: remotetool.RemoteTool,
-        action: Callable[[log_pb2.LogRecord], None] = None) -> log_pb2.LogDump:
+    logdump: log_pb2.LogDump,
+    rtool: remotetool.RemoteTool,
+    action: Callable[[log_pb2.LogRecord], None] = None,
+) -> log_pb2.LogDump:
     """Expands .rrpl to .rpl, adding data for command and inputs.
 
     Args:
@@ -94,7 +98,7 @@ def expand_to_rpl(
       logdump, modified.
     """
     for record in logdump.records:
-        if record.HasField('remote_metadata'):
+        if record.HasField("remote_metadata"):
             infer_record_command_and_inputs(record, rtool)
         if action:
             action(record)
@@ -122,15 +126,16 @@ def expand_to_rpl_command(args: argparse.Namespace) -> int:
 
     # Stream records out to avoid losing data in the event of an error.
     if args.output:
-        outf = open(args.output, 'w')
+        outf = open(args.output, "w")
 
         def printer(record: log_pb2.LogRecord):
-            outf.write(str(record) + '\n')
+            outf.write(str(record) + "\n")
+
     else:
         outf = contextlib.nullcontext()
 
         def printer(record: log_pb2.LogRecord):
-            print(str(record) + '\n')  # print to stdout
+            print(str(record) + "\n")  # print to stdout
 
     with outf:
         expand_to_rpl(rrpl.proto, rtool, action=printer)
@@ -146,7 +151,8 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(required=True)
 
     expand_parser = subparsers.add_parser(
-        'expand_to_rpl', help='Convert .rrpl to .rpl')
+        "expand_to_rpl", help="Convert .rrpl to .rpl"
+    )
     expand_parser.set_defaults(func=expand_to_rpl_command)
     expand_parser.add_argument(
         "rrpl",
@@ -164,7 +170,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
     expand_parser.add_argument(
         "-o",
         type=Path,
-        dest='output',
+        dest="output",
         help="output to write .rpl",
         default=None,
     )

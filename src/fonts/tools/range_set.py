@@ -13,6 +13,7 @@ class RangeSet:
     This implementation is append-only. It uses Python's built-in `range`, so
     all the ranges are [closed, open).
     """
+
     ranges: List[range]
 
     def __init__(self, ranges: Iterable[range] = None):
@@ -33,7 +34,7 @@ class RangeSet:
         if self.ranges:
             last_range = self.ranges[-1]
             if code_point <= last_range[-1]:
-                raise IndexError('Can\'t append to the middle of the range set')
+                raise IndexError("Can't append to the middle of the range set")
             if last_range[-1] + 1 == code_point:
                 self.ranges[-1] = range(last_range[0], code_point + 1)
                 return
@@ -62,24 +63,24 @@ class RangeSet:
             relative_start = r[0] - prev_start
             range_size = len(r)
             if range_size == 1:
-                segments.append('%d' % relative_start)
+                segments.append("%d" % relative_start)
             else:
-                segments.append('%d+%d' % (relative_start, range_size - 1))
+                segments.append("%d+%d" % (relative_start, range_size - 1))
             prev_start = r[-1]
-        return ','.join(segments)
+        return ",".join(segments)
 
     @classmethod
-    def from_offset_string(cls, offsets: str) -> 'RangeSet':
+    def from_offset_string(cls, offsets: str) -> "RangeSet":
         """Construct a RangeSet from an offset string.
 
         See `to_offset_string` for a description of the format.
         """
         ranges = []
-        split_offsets = offsets.split(',')
+        split_offsets = offsets.split(",")
         last_end = 0
         for s in split_offsets:
-            if '+' in s:
-                endpoints = s.split('+')
+            if "+" in s:
+                endpoints = s.split("+")
                 start = last_end + int(endpoints[0])
                 end = start + int(endpoints[1])
                 ranges.append(range(start, end + 1))

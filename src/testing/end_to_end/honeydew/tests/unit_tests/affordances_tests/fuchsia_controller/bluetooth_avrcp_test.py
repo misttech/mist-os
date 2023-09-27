@@ -6,8 +6,9 @@
 
 import unittest
 
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import \
-    bluetooth_avrcp as fc_bluetooth_avrcp
+from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
+    bluetooth_avrcp as fc_bluetooth_avrcp,
+)
 from honeydew.custom_types import BluetoothAvrcpCommand
 
 
@@ -20,8 +21,7 @@ class BluetoothFCTests(unittest.TestCase):
 
         self.bluetooth_obj = fc_bluetooth_avrcp.BluetoothAvrcp()
 
-        self.assertIsInstance(
-            self.bluetooth_obj, fc_bluetooth_avrcp.BluetoothAvrcp)
+        self.assertIsInstance(self.bluetooth_obj, fc_bluetooth_avrcp.BluetoothAvrcp)
 
     def test_avrcp_init(self) -> None:
         """Test for Bluetooth.init_avrcp() method."""
@@ -41,8 +41,7 @@ class BluetoothFCTests(unittest.TestCase):
     def test_send_avrcp_command(self) -> None:
         """Test for Bluetooth.send_avrcp_command() method."""
         with self.assertRaises(NotImplementedError):
-            self.bluetooth_obj.send_avrcp_command(
-                command=BluetoothAvrcpCommand.PLAY)
+            self.bluetooth_obj.send_avrcp_command(command=BluetoothAvrcpCommand.PLAY)
 
     def test_stop_mock_player(self) -> None:
         """Test for Bluetooth.stop_mock_player() method."""

@@ -11,8 +11,9 @@ from mobly import test_runner
 from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device
 
-TILE_URL = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-           "flatland-view-provider.cm"
+TILE_URL = (
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" "flatland-view-provider.cm"
+)
 
 
 class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -46,9 +47,9 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_add_component_without_started_session(self) -> None:
         """Test case for calling session.add_component() without started
-           session.
+        session.
 
-           Ensure it is not a timeout error.
+        Ensure it is not a timeout error.
         """
 
         with asserts.assert_raises(errors.SessionError):
@@ -59,8 +60,10 @@ class SessionAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.session.start()
 
-        wrong_url = "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" \
-                    "flatland-view-provider.cm"
+        wrong_url = (
+            "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+            "flatland-view-provider.cm"
+        )
 
         with asserts.assert_raises(errors.SessionError):
             self.device.session.add_component(wrong_url)

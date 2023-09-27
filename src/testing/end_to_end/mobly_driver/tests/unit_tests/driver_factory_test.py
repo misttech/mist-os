@@ -22,15 +22,20 @@ class DriverFactoryTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ('local_env', {}, local_driver.LocalDriver),
+            ("local_env", {}, local_driver.LocalDriver),
             (
-                'infra_env', {
-                    api_infra.BOT_ENV_TESTBED_CONFIG: 'botanist.json',
-                    api_infra.BOT_ENV_TEST_OUTDIR: '/tmp/log',
-                }, infra_driver.InfraDriver),
-        ])
+                "infra_env",
+                {
+                    api_infra.BOT_ENV_TESTBED_CONFIG: "botanist.json",
+                    api_infra.BOT_ENV_TEST_OUTDIR: "/tmp/log",
+                },
+                infra_driver.InfraDriver,
+            ),
+        ]
+    )
     def test_get_driver_success(
-            self, unused_name, test_env, expected_driver_type):
+        self, unused_name, test_env, expected_driver_type
+    ):
         """Test case to ensure driver resolution success"""
         factory = driver_factory.DriverFactory()
         with mock.patch.dict(os.environ, test_env, clear=True):
@@ -42,7 +47,7 @@ class DriverFactoryTest(unittest.TestCase):
         factory = driver_factory.DriverFactory()
 
         # Undefined "api_infra.BOT_ENV_TEST_OUTDIR".
-        invalid_infra_env = {api_infra.BOT_ENV_TESTBED_CONFIG: 'botanist.json'}
+        invalid_infra_env = {api_infra.BOT_ENV_TESTBED_CONFIG: "botanist.json"}
         with mock.patch.dict(os.environ, invalid_infra_env, clear=True):
             with self.assertRaises(common.DriverException):
                 factory.get_driver()

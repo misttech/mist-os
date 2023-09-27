@@ -34,8 +34,7 @@ class Rle:
     (repeat, value) byte pairs. Total copes of the value is (repeat + 1).
     """
 
-    class Entry():
-
+    class Entry:
         def __init__(self, value):
             self.repeat = 0
             self.value = value
@@ -49,8 +48,11 @@ class Rle:
         if not 0 <= value <= 0xFF:
             raise ValueError(f"Out-of-bounds RLE value: {value}")
 
-        if (self.entries and self.entries[-1].value == value and
-                self.entries[-1].repeat < 0xFF):
+        if (
+            self.entries
+            and self.entries[-1].value == value
+            and self.entries[-1].repeat < 0xFF
+        ):
             self.entries[-1].repeat += 1
         else:
             self.entries.append(Rle.Entry(value))
@@ -64,7 +66,8 @@ class Rle:
     def get_data(self) -> bytes:
         """Returns the RLE data."""
         return b"".join(
-            [struct.pack("BB", e.repeat, e.value) for e in self.entries])
+            [struct.pack("BB", e.repeat, e.value) for e in self.entries]
+        )
 
 
 def color_to_rle(color: Tuple[int, int, int, int]) -> int:
@@ -115,7 +118,8 @@ def convert_to_rle(path: str) -> bytes:
     if rle.count != pixels:
         raise RuntimeError(
             f"Internal error: input has {pixels} pixels,"
-            f" but RLE encoded {rle.count}")
+            f" but RLE encoded {rle.count}"
+        )
 
     return rle.get_data()
 
@@ -131,8 +135,8 @@ def _parse_args():
 
 def main():
     logging.basicConfig(
-        format="\x1b[0;36m%(levelname)s: %(message)s\x1b[0m",
-        level=logging.INFO)
+        format="\x1b[0;36m%(levelname)s: %(message)s\x1b[0m", level=logging.INFO
+    )
     args = _parse_args()
 
     with open(args.out, "wb") as out_file:

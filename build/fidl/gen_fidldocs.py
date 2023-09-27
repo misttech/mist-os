@@ -38,20 +38,26 @@ def walk_rmtree(directory):
 
 
 def read_fidl_packages(build_dir):
-    fidldoc = os.path.join(build_dir, 'sdk_fidl_json.json')
-    with open(fidldoc, 'r') as fdl_json:
+    fidldoc = os.path.join(build_dir, "sdk_fidl_json.json")
+    with open(fidldoc, "r") as fdl_json:
         fidl_pkgs = json.load(fdl_json)
     return [pkg["ir"] for pkg in fidl_pkgs]
 
 
 def run_fidl_doc(build_dir, out_dir, fidl_files, zipped_result=False):
-    fidldoc_path = os.path.join(build_dir, 'host-tools', 'fidldoc')
-    out_fidl = os.path.join(out_dir, 'fidldoc')
+    fidldoc_path = os.path.join(build_dir, "host-tools", "fidldoc")
+    out_fidl = os.path.join(out_dir, "fidldoc")
     gen_fidl = subprocess.run(
         [
-            fidldoc_path, "--silent", "--path", "/reference/fidl/", "--out",
-            out_fidl
-        ] + fidl_files)
+            fidldoc_path,
+            "--silent",
+            "--path",
+            "/reference/fidl/",
+            "--out",
+            out_fidl,
+        ]
+        + fidl_files
+    )
 
     if gen_fidl.returncode:
         print(gen_fidl.stderr)
@@ -59,48 +65,58 @@ def run_fidl_doc(build_dir, out_dir, fidl_files, zipped_result=False):
 
     if zipped_result:
         shutil.make_archive(
-            os.path.join(out_dir, 'fidldoc'),
-            'zip',
+            os.path.join(out_dir, "fidldoc"),
+            "zip",
             root_dir=out_dir,
-            base_dir='fidldoc')
+            base_dir="fidldoc",
+        )
         walk_rmtree(out_fidl)
 
 
 def main():
     parser = argparse.ArgumentParser(
         description=__doc__,  # Prepend help doc with this file's docstring.
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument(
-        '-z',
-        '--zipped-result',
-        action='store_true',
+        "-z",
+        "--zipped-result",
+        action="store_true",
         help=(
-            'If set will zip output documentation and delete md files.'
-            'This is to make the doc generation process hermetic'))
+            "If set will zip output documentation and delete md files."
+            "This is to make the doc generation process hermetic"
+        ),
+    )
     parser.add_argument(
-        '--dep-file', type=argparse.FileType('w'), required=True)
+        "--dep-file", type=argparse.FileType("w"), required=True
+    )
     parser.add_argument(
-        '-o',
-        '--out-dir',
+        "-o",
+        "--out-dir",
         type=str,
         required=True,
-        help='Output location where generated docs should go')
+        help="Output location where generated docs should go",
+    )
     parser.add_argument(
-        '-b',
-        '--build-dir',
+        "-b",
+        "--build-dir",
         type=str,
         required=True,
-        help='Directory location of previously built artifacts')
+        help="Directory location of previously built artifacts",
+    )
 
     args = parser.parse_args()
     input_fidl_files = read_fidl_packages(args.build_dir)
     args.dep_file.write(
-        '{}: {}\n'.format(
-            os.path.join(args.out_dir, 'fidldoc.zip'),
-            ' '.join(input_fidl_files)))
+        "{}: {}\n".format(
+            os.path.join(args.out_dir, "fidldoc.zip"),
+            " ".join(input_fidl_files),
+        )
+    )
     run_fidl_doc(
-        args.build_dir, args.out_dir, input_fidl_files, args.zipped_result)
+        args.build_dir, args.out_dir, input_fidl_files, args.zipped_result
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     sys.exit(main())

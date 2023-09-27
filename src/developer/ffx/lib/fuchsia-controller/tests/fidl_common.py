@@ -52,7 +52,8 @@ class FidlCommon(unittest.TestCase):
         # we're making an import with two levels.
         fooer_type = type("Fooer", (object,), {})
         mod = types.ModuleType(
-            'foo.bar', "The foobinest foober that ever foob'd")
+            "foo.bar", "The foobinest foober that ever foob'd"
+        )
         setattr(mod, "Fooer", fooer_type)
         sys.modules["foo.bar"] = mod
         expected = fooer_type
@@ -62,30 +63,25 @@ class FidlCommon(unittest.TestCase):
     def test_construct_response_object(self):
         raw_object = {"entry": [{"nodename": "foobar"}]}
         expected = ffx.TargetCollectionReaderNextRequest(
-            entry=[ffx.TargetInfo(nodename="foobar")])
+            entry=[ffx.TargetInfo(nodename="foobar")]
+        )
         got = construct_response_object(
             "fuchsia.developer.ffx/TargetCollectionReaderNextRequest",
-            raw_object)
+            raw_object,
+        )
         self.assertEqual(expected, got)
 
     def test_construct_response_with_unions(self):
         raw_object = {
-            "nodename":
-                "foobar",
-            "addresses":
-                [
-                    {
-                        "ip":
-                            {
-                                "ip": {
-                                    "ipv4": {
-                                        "addr": [192, 168, 1, 1]
-                                    }
-                                },
-                                "scope_id": 3
-                            }
+            "nodename": "foobar",
+            "addresses": [
+                {
+                    "ip": {
+                        "ip": {"ipv4": {"addr": [192, 168, 1, 1]}},
+                        "scope_id": 3,
                     }
-                ]
+                }
+            ],
         }
         ip = fnet.IpAddress()
         ip.ipv4 = fnet.Ipv4Address(addr=[192, 168, 1, 1])
@@ -93,7 +89,8 @@ class FidlCommon(unittest.TestCase):
         addrinfo.ip = ffx.TargetIp(ip=ip, scope_id=3)
         expected = ffx.TargetInfo(nodename="foobar", addresses=[addrinfo])
         got = construct_response_object(
-            "fuchsia.developer.ffx/TargetInfo", raw_object)
+            "fuchsia.developer.ffx/TargetInfo", raw_object
+        )
         self.assertEqual(expected, got)
 
     def test_construct_response_empty_object(self):

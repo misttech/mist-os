@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from serialization import serialize_fields_as
 
-__all__ = ['PackageManifest', 'PackageMetaData', 'BlobEntry', 'SubpackageEntry']
+__all__ = ["PackageManifest", "PackageMetaData", "BlobEntry", "SubpackageEntry"]
 
 from .common import FilePath
 
@@ -20,6 +20,7 @@ class PackageMetaData:
     intrinsic data like abi_revision, and extrinsic data like the name that it's
     published under and repo that it's for publishing to, etc.
     """
+
     name: str
     version: int = 0
 
@@ -41,15 +42,15 @@ class BlobEntry:
     source_path - The path to where the blob was found when the package was
                   being created.
     """
+
     path: FilePath
     merkle: str
     size: Optional[int] = None
     source_path: Optional[FilePath] = None
 
     def compare_with(
-            self,
-            other: "BlobEntry",
-            allow_source_path_differences=False) -> List[str]:
+        self, other: "BlobEntry", allow_source_path_differences=False
+    ) -> List[str]:
         """Compare this BlobEntry with the other, reporting any differences.
 
         If 'allow_source_path_differences' is True, then the source_paths of
@@ -80,6 +81,7 @@ class SubpackageEntry:
     merkle - The subpackage's package hash
     manifest_path - The filesystem path to the subpackage PackageManifest
     """
+
     name: str
     merkle: str
     manifest_path: FilePath
@@ -88,6 +90,7 @@ class SubpackageEntry:
 @dataclass
 class PackageManifest:
     """The output manifest for a Fuchsia package."""
+
     package: PackageMetaData
     blobs: List[BlobEntry]
     version: str = "1"
@@ -98,15 +101,16 @@ class PackageManifest:
     repository: Optional[str] = None
 
     def set_paths_relative(self, relative_to_file: bool):
-        self.blob_sources_relative = "file" if relative_to_file else "working_dir"
+        self.blob_sources_relative = (
+            "file" if relative_to_file else "working_dir"
+        )
 
     def blobs_by_path(self) -> Dict[FilePath, BlobEntry]:
         return {blob.path: blob for blob in self.blobs}
 
     def compare_with(
-            self,
-            other: "PackageManifest",
-            allow_source_path_differences=False) -> List[str]:
+        self, other: "PackageManifest", allow_source_path_differences=False
+    ) -> List[str]:
         """Compare this package manifest with the other, reporting any
         differences.
 
@@ -128,11 +132,14 @@ class PackageManifest:
         other_blobs_by_path = other.blobs_by_path()
 
         missing_paths = set(self_blobs_by_path.keys()).difference(
-            other_blobs_by_path.keys())
+            other_blobs_by_path.keys()
+        )
         extra_paths = set(other_blobs_by_path.keys()).difference(
-            self_blobs_by_path.keys())
+            self_blobs_by_path.keys()
+        )
         common_paths = set(self_blobs_by_path.keys()).intersection(
-            other_blobs_by_path.keys())
+            other_blobs_by_path.keys()
+        )
 
         for missing_path in missing_paths:
             errors.append(f"missing a blob for path: {missing_path}")
@@ -146,6 +153,8 @@ class PackageManifest:
 
             errors.extend(
                 self_blob.compare_with(
-                    other_blob, allow_source_path_differences))
+                    other_blob, allow_source_path_differences
+                )
+            )
 
         return errors

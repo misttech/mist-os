@@ -18,8 +18,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def accept_pairing(
-            self, input_mode: BluetoothAcceptPairing,
-            output_mode: BluetoothAcceptPairing) -> None:
+        self, input_mode: BluetoothAcceptPairing, output_mode: BluetoothAcceptPairing
+    ) -> None:
         """Sets device to accept Bluetooth pairing.
 
         Args:
@@ -28,8 +28,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         raise NotImplementedError
 
-    def connect_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def connect_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
@@ -52,7 +51,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def get_active_adapter_address(self) -> str:
-        """ Retrieves the active adapter mac address
+        """Retrieves the active adapter mac address
 
         Returns:
             The mac address of the active adapter
@@ -60,7 +59,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def get_connected_devices(self) -> list:
-        """ Retrieves all connected remote devices.
+        """Retrieves all connected remote devices.
 
         Returns:
             A list of all connected devices by identifier.
@@ -75,8 +74,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         raise NotImplementedError
 
-    def pair_device(
-            self, identifier: str, transport: BluetoothTransport) -> None:
+    def pair_device(self, identifier: str, transport: BluetoothTransport) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:

@@ -17,30 +17,35 @@ def main():
     parser.add_argument(
         "--source_dir",
         help="Path to the directory containing the package sources",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
         "--stamp",
         help="File to touch when source checking succeeds",
-        required=True)
+        required=True,
+    )
     parser.add_argument(
-        "sources", help="source files", nargs=argparse.REMAINDER)
+        "sources", help="source files", nargs=argparse.REMAINDER
+    )
     args = parser.parse_args()
 
     actual_sources = set()
     # Get all dart sources from source directory.
     src_dir_path = pathlib.Path(args.source_dir)
-    for (dirpath, dirnames, filenames) in os.walk(src_dir_path, topdown=True):
+    for dirpath, dirnames, filenames in os.walk(src_dir_path, topdown=True):
         relpath_to_src_root = pathlib.Path(dirpath).relative_to(src_dir_path)
         actual_sources.update(
             os.path.normpath(relpath_to_src_root.joinpath(filename))
             for filename in filenames
-            if pathlib.Path(filename).suffix == ".dart")
+            if pathlib.Path(filename).suffix == ".dart"
+        )
 
     expected_sources = set(args.sources)
     # It is possible for sources to include dart files outside of source_dir.
     actual_sources.update(
         [
-            s for s in (expected_sources - actual_sources)
+            s
+            for s in (expected_sources - actual_sources)
             if src_dir_path.joinpath(s).resolve().exists()
         ],
     )
@@ -56,14 +61,16 @@ def main():
     missing_sources = actual_sources - expected_sources
     if missing_sources:
         print(
-            '\nSource files found that were missing from the "sources" parameter:\n{}\n'
-            .format("\n".join(sources_to_abs_path(missing_sources))),
+            '\nSource files found that were missing from the "sources" parameter:\n{}\n'.format(
+                "\n".join(sources_to_abs_path(missing_sources))
+            ),
         )
     nonexistent_sources = expected_sources - actual_sources
     if nonexistent_sources:
         print(
-            '\nSource files listed in "sources" parameter but not found:\n{}\n'.
-            format("\n".join(sources_to_abs_path(nonexistent_sources))),
+            '\nSource files listed in "sources" parameter but not found:\n{}\n'.format(
+                "\n".join(sources_to_abs_path(nonexistent_sources))
+            ),
         )
     return 1
 

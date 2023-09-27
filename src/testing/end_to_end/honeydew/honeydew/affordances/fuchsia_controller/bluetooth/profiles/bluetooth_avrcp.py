@@ -9,8 +9,7 @@ from honeydew.custom_types import BluetoothAvrcpCommand
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
 
 
-class BluetoothAvrcp(bluetooth_common.BluetoothCommon,
-                     bluetooth_avrcp.BluetoothAvrcp):
+class BluetoothAvrcp(bluetooth_common.BluetoothCommon, bluetooth_avrcp.BluetoothAvrcp):
     """Fuchsia-Controller for BluetoothAvrcp Profile affordance."""
 
     # List all the public methods in alphabetical order

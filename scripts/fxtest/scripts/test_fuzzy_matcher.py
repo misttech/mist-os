@@ -47,7 +47,9 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             with self.assertRaises(Exception) as ex:
                 fuzzy_matcher.create_search_locations()
 
-            self.assertEqual(str(ex.exception), f"Path {path} should be a directory")
+            self.assertEqual(
+                str(ex.exception), f"Path {path} should be a directory"
+            )
 
     def test_missing_tests_json(self):
         with tempfile.TemporaryDirectory() as dir:
@@ -64,7 +66,8 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             expected = os.path.join(dir, "out", "other", "tests.json")
 
             self.assertEqual(
-                str(ex.exception), f"Expected to find a test list file at {expected}"
+                str(ex.exception),
+                f"Expected to find a test list file at {expected}",
             )
 
     def test_success(self):
@@ -73,7 +76,9 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
             with open(os.path.join(dir, ".fx-build-dir"), "w") as f:
                 f.write("out/other")
             os.makedirs(os.path.join(dir, "out", "other"))
-            with open(os.path.join(dir, "out", "other", "tests.json"), "w") as f:
+            with open(
+                os.path.join(dir, "out", "other", "tests.json"), "w"
+            ) as f:
                 pass
 
             os.environ["FUCHSIA_DIR"] = str(dir)
@@ -97,7 +102,10 @@ class TestTestsFileMatcher(unittest.TestCase):
             if names and isinstance(names[0], str):
                 l = [{"test": {"name": name}} for name in names]
             elif names and isinstance(names[0], tuple):
-                l = [{"test": {"name": value[0], "label": value[1]}} for value in names]
+                l = [
+                    {"test": {"name": value[0], "label": value[1]}}
+                    for value in names
+                ]
             json.dump(l, f)
         return path
 
@@ -122,7 +130,9 @@ class TestTestsFileMatcher(unittest.TestCase):
             self.assertEqual(
                 [
                     val.matched_name
-                    for val in tests_matcher.find_matches("my_component", matcher)
+                    for val in tests_matcher.find_matches(
+                        "my_component", matcher
+                    )
                 ],
                 ["my-component"],
             )
@@ -136,21 +146,26 @@ class TestTestsFileMatcher(unittest.TestCase):
             self.assertEqual(
                 [
                     val.matched_name
-                    for val in tests_matcher.find_matches("my_host_test", matcher)
+                    for val in tests_matcher.find_matches(
+                        "my_host_test", matcher
+                    )
                 ],
                 ["my-host-test"],
             )
 
     def test_labels(self):
-       with tempfile.TemporaryDirectory() as dir:
+        with tempfile.TemporaryDirectory() as dir:
             path = self._write_names(
                 dir,
                 [
-                    ("fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm", "//src/sys:my_component"),
+                    (
+                        "fuchsia-pkg://fuchsia.com/my-package#meta/my-component.cm",
+                        "//src/sys:my_component",
+                    ),
                 ],
             )
             tests_matcher = fuzzy_matcher.TestsFileMatcher(path)
-            matcher = fuzzy_matcher.Matcher(threshold=.7)
+            matcher = fuzzy_matcher.Matcher(threshold=0.7)
             self.assertEqual(
                 [
                     val.matched_name
@@ -218,7 +233,9 @@ class TestBuildFileMatcher(unittest.TestCase):
             with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
                 f.write(TEST_PACKAGE("my-test-package"))
                 f.write(
-                    TEST_PACKAGE_WITH_PACKAGE_NAME("other-package", "other-real-name")
+                    TEST_PACKAGE_WITH_PACKAGE_NAME(
+                        "other-package", "other-real-name"
+                    )
                 )
                 f.write(
                     TEST_PACKAGE_WITH_COMPONENT_NAME(
@@ -232,7 +249,9 @@ class TestBuildFileMatcher(unittest.TestCase):
             self.assertEqual(
                 [
                     (val.matched_name, val.full_suggestion)
-                    for val in build_matcher.find_matches("my-test-package", matcher)
+                    for val in build_matcher.find_matches(
+                        "my-test-package", matcher
+                    )
                 ],
                 [("my-test-package", "--with //src:my-test-package")],
             )
@@ -240,7 +259,9 @@ class TestBuildFileMatcher(unittest.TestCase):
             self.assertEqual(
                 [
                     (val.matched_name, val.full_suggestion)
-                    for val in build_matcher.find_matches("other-real-name", matcher)
+                    for val in build_matcher.find_matches(
+                        "other-real-name", matcher
+                    )
                 ],
                 [("other-real-name", "--with //src:other-package")],
             )
@@ -261,7 +282,9 @@ class TestBuildFileMatcher(unittest.TestCase):
             with open(os.path.join(dir, "src", "BUILD.gn"), "w") as f:
                 f.write(TEST_PACKAGE("my-test-package"))
                 f.write(
-                    TEST_PACKAGE_WITH_PACKAGE_NAME("other-package", "other-real-name")
+                    TEST_PACKAGE_WITH_PACKAGE_NAME(
+                        "other-package", "other-real-name"
+                    )
                 )
                 f.write(
                     TEST_PACKAGE_WITH_COMPONENT_NAME(
@@ -270,7 +293,7 @@ class TestBuildFileMatcher(unittest.TestCase):
                 )
 
             build_matcher = fuzzy_matcher.BuildFileMatcher(dir)
-            matcher = fuzzy_matcher.Matcher(threshold=.4)
+            matcher = fuzzy_matcher.Matcher(threshold=0.4)
 
             self.assertEqual(
                 [
@@ -280,8 +303,10 @@ class TestBuildFileMatcher(unittest.TestCase):
                 [
                     ("my-test-package", "--with //src:my-test-package"),
                     ("other-real-name", "--with //src:other-package"),
-                    ("yet-another-real-name", "--with //src:yet-another-package"),
-
+                    (
+                        "yet-another-real-name",
+                        "--with //src:yet-another-package",
+                    ),
                 ],
             )
 
@@ -297,7 +322,8 @@ class TestBuildFileMatcher(unittest.TestCase):
                 )
                 f.write(
                     TEST_PACKAGE_WITH_TEST_COMPONENTS(
-                        "test-package", [":my-test-component", ":another-component"]
+                        "test-package",
+                        [":my-test-component", ":another-component"],
                     )
                 )
 
@@ -307,7 +333,9 @@ class TestBuildFileMatcher(unittest.TestCase):
             self.assertEqual(
                 [
                     (val.matched_name, val.full_suggestion)
-                    for val in build_matcher.find_matches("my_test_component", matcher)
+                    for val in build_matcher.find_matches(
+                        "my_test_component", matcher
+                    )
                 ],
                 [("my-test-component", "--with //src/nested:test-package")],
             )
@@ -368,15 +396,21 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
                 ],
                 f,
             )
-        with open(os.path.join(self.dir.name, "src", "nested", "BUILD.gn"), "w") as f:
+        with open(
+            os.path.join(self.dir.name, "src", "nested", "BUILD.gn"), "w"
+        ) as f:
             f.write(TEST_COMPONENT("foo-test-component"))
             f.write(
-                TEST_PACKAGE_WITH_TEST_COMPONENTS("foo-tests", [":foo-test-component"])
+                TEST_PACKAGE_WITH_TEST_COMPONENTS(
+                    "foo-tests", [":foo-test-component"]
+                )
             )
         with open(os.path.join(self.dir.name, "src", "BUILD.gn"), "w") as f:
             f.write(TEST_PACKAGE_WITH_COMPONENT_NAME("tests", "kernel-tests"))
             f.write(
-                TEST_PACKAGE_WITH_PACKAGE_NAME("component-tests", "my-component-tests")
+                TEST_PACKAGE_WITH_PACKAGE_NAME(
+                    "component-tests", "my-component-tests"
+                )
             )
             f.write(TEST_PACKAGE("integration-tests"))
 
@@ -389,7 +423,9 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
     def test_bad_arguments(self):
         with self.assertRaises(Exception) as ex:
             fuzzy_matcher.main(["foo", "--threshold", "3"])
-        self.assertEqual(str(ex.exception), "--threshold must be between 0 and 1")
+        self.assertEqual(
+            str(ex.exception), "--threshold must be between 0 and 1"
+        )
 
     def test_without_matches(self):
         fuzzy_matcher.main(["afkdjsflkejkgh"])
@@ -399,7 +435,9 @@ class TestCommand(PreserveEnvAndCaptureOutputTestCase):
         )
 
     def test_component_match(self):
-        fuzzy_matcher.main(["foo-test-component", "--threshold", "1", "--no-color"])
+        fuzzy_matcher.main(
+            ["foo-test-component", "--threshold", "1", "--no-color"]
+        )
 
         self.assertEqual(
             self.stdout.getvalue().strip(),
@@ -439,9 +477,17 @@ integration-tests (59.22% similar)
         )
 
     def test_with_without_tests_json_match(self):
-        fuzzy_matcher.main(["foo-test-component", "--threshold", "1", "--no-color"])
         fuzzy_matcher.main(
-            ["foo-test-component", "--threshold", "1", "--no-color", "--omit-test-file"]
+            ["foo-test-component", "--threshold", "1", "--no-color"]
+        )
+        fuzzy_matcher.main(
+            [
+                "foo-test-component",
+                "--threshold",
+                "1",
+                "--no-color",
+                "--omit-test-file",
+            ]
         )
 
         self.assertEqual(

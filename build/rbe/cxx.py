@@ -18,7 +18,7 @@ from typing import Iterable, Optional, Sequence, Tuple
 def _remove_suffix(text: str, suffix: str) -> str:
     """string.removesuffix is in Python 3.9+"""
     if text.endswith(suffix):
-        return text[:-len(suffix)]
+        return text[: -len(suffix)]
     return text
 
 
@@ -99,13 +99,13 @@ class Source(object):
 
 def _compile_action_sources(command: Iterable[str]) -> Iterable[Source]:
     for tok in command:
-        if tok.endswith('.c'):
+        if tok.endswith(".c"):
             yield Source(file=Path(tok), dialect=SourceLanguage.C)
-        if tok.endswith('.cc') or tok.endswith('.cxx') or tok.endswith('.cpp'):
+        if tok.endswith(".cc") or tok.endswith(".cxx") or tok.endswith(".cpp"):
             yield Source(file=Path(tok), dialect=SourceLanguage.CXX)
-        if tok.endswith('.s') or tok.endswith('.S'):
+        if tok.endswith(".s") or tok.endswith(".S"):
             yield Source(file=Path(tok), dialect=SourceLanguage.ASM)
-        if tok.endswith('.mm'):
+        if tok.endswith(".mm"):
             yield Source(file=Path(tok), dialect=SourceLanguage.OBJC)
 
 
@@ -125,10 +125,10 @@ class CompilerTool(object):
 
 def _find_compiler_from_command(command: Iterable[str]) -> Optional[Path]:
     for tok in command:
-        if 'clang' in tok:  # matches clang++
+        if "clang" in tok:  # matches clang++
             return CompilerTool(tool=Path(tok), type=Compiler.CLANG)
         # 'g++' matches 'clang++', so this clause must come second:
-        if 'gcc' in tok or 'g++' in tok:
+        if "gcc" in tok or "g++" in tok:
             return CompilerTool(tool=Path(tok), type=Compiler.GCC)
     return None  # or raise error
 
@@ -147,7 +147,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         "-D",
         type=str,
         dest="defines",
-        action='append',
+        action="append",
         default=[],
         help="preprocessing defines",
     )
@@ -155,7 +155,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         "-I",
         type=Path,
         dest="includes",
-        action='append',
+        action="append",
         default=[],
         metavar="DIR",
         help="preprocessing include paths",
@@ -164,7 +164,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         "-L",
         type=Path,
         dest="libdirs",
-        action='append',
+        action="append",
         default=[],
         metavar="DIR",
         help="linking search paths",
@@ -173,14 +173,14 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         "-U",
         type=str,
         dest="undefines",
-        action='append',
+        action="append",
         default=[],
         help="preprocessing undefines",
     )
     parser.add_argument(
         "-isystem",
         type=Path,
-        action='append',
+        action="append",
         default=[],
         metavar="DIR",
         help="system include paths",
@@ -198,7 +198,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "-include",
         type=Path,
-        action='append',
+        action="append",
         default=[],
         metavar="FILE",
         help="prepend include file",
@@ -270,7 +270,7 @@ _C_PREPROCESS_ARG_PARSER = _c_preprocess_arg_parser()
 
 # These are flags that are joined with their arguments with
 # no separator (no '=' or space).
-_CPP_FUSED_FLAGS = {'-I', '-D', '-L', '-U', '-isystem'}
+_CPP_FUSED_FLAGS = {"-I", "-D", "-L", "-U", "-isystem"}
 
 
 class CxxAction(object):
@@ -281,16 +281,21 @@ class CxxAction(object):
 
     def __init__(self, command: Sequence[str]):
         self._command = command  # keep a copy of the original command
-        self._attributes, remaining_args = _CXX_COMMAND_SCANNER.parse_known_args(
-            command)
+        (
+            self._attributes,
+            remaining_args,
+        ) = _CXX_COMMAND_SCANNER.parse_known_args(command)
         self._compiler = _find_compiler_from_command(remaining_args)
         self._sources = list(_compile_action_sources(remaining_args))
         self._dialect = _infer_dialect_from_sources(self._sources)
 
         canonical_command = cl_utils.expand_fused_flags(
-            self._command, _CPP_FUSED_FLAGS)
-        self._cpp_attributes, self._command_without_cpp_options = _C_PREPROCESS_ARG_PARSER.parse_known_args(
-            canonical_command)
+            self._command, _CPP_FUSED_FLAGS
+        )
+        (
+            self._cpp_attributes,
+            self._command_without_cpp_options,
+        ) = _C_PREPROCESS_ARG_PARSER.parse_known_args(canonical_command)
 
     @property
     def command(self) -> Sequence[str]:
@@ -351,9 +356,9 @@ class CxxAction(object):
     @property
     def preprocessed_suffix(self) -> str:
         if self._dialect == SourceLanguage.CXX:
-            return '.ii'
+            return ".ii"
         else:
-            return '.i'
+            return ".i"
 
     @property
     def preprocessed_output(self) -> Path:
@@ -375,11 +380,11 @@ class CxxAction(object):
           A Path stem, to which extensions like .ii can be appended.
         """
         name = self.output_file.name
-        return Path(_remove_suffix(name, ''.join(self.output_file.suffixes)))
+        return Path(_remove_suffix(name, "".join(self.output_file.suffixes)))
 
     @property
     def uses_macos_sdk(self) -> bool:
-        return str(self.sysroot).startswith('/Library/Developer/')
+        return str(self.sysroot).startswith("/Library/Developer/")
 
     # TODO: scan command for absolute paths (C++-specific)
 
@@ -402,7 +407,7 @@ class CxxAction(object):
 
             if self.save_temps:
                 stem = self.save_temps_output_stem
-                for suffix in (self.preprocessed_suffix, '.bc', '.s'):
+                for suffix in (self.preprocessed_suffix, ".bc", ".s"):
                     yield stem.with_suffix(suffix)
 
     def output_dirs(self) -> Iterable[Path]:
@@ -414,27 +419,33 @@ class CxxAction(object):
         for tok in self._command:
             if tok == str(self.output_file):
                 yield str(self.preprocessed_output)
-            elif tok == '--save-temps':  # no need during preprocessing
+            elif tok == "--save-temps":  # no need during preprocessing
                 pass
             else:
                 # TODO: discard irrelevant flags, like linker flags
                 yield tok
 
         # -E tells the compiler to stop after preprocessing
-        yield '-E'
+        yield "-E"
 
         # -fno-blocks works around in issue where preprocessing includes
         # blocks-featured code when it is not wanted.
         if self.compiler_is_clang:
-            yield '-fno-blocks'
+            yield "-fno-blocks"
 
     def _compile_with_preprocessed_input_command(self) -> Iterable[str]:
         # replace the first named source file with the preprocessed output
         used_preprocessed_input = False
         for tok in self._command_without_cpp_options:
-            if tok.endswith('.c') or tok.endswith('.cc') or tok.endswith(
-                    '.cxx') or tok.endswith('.cpp'):
-                if used_preprocessed_input:  # ignore other sources after the first
+            if (
+                tok.endswith(".c")
+                or tok.endswith(".cc")
+                or tok.endswith(".cxx")
+                or tok.endswith(".cpp")
+            ):
+                if (
+                    used_preprocessed_input
+                ):  # ignore other sources after the first
                     continue
                 yield str(self.preprocessed_output)
                 used_preprocessed_input = True

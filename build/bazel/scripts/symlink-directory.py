@@ -13,7 +13,7 @@ import shutil
 import sys
 
 _SCRIPT_DIR = os.path.dirname(__file__)
-_FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
+_FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, "..", "..", ".."))
 _SCRIPT_NAME = os.path.relpath(os.path.abspath(__file__), _FUCHSIA_DIR)
 
 
@@ -32,12 +32,15 @@ def force_symlink(target_path, link_path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        '--fuchsia-dir', help='Specify alternate Fuchsia root path.')
+        "--fuchsia-dir", help="Specify alternate Fuchsia root path."
+    )
     parser.add_argument(
-        'source_dir', help='Source directory, relative to Fuchsia root path.')
-    parser.add_argument('destination_dir', help='Destination directory.')
+        "source_dir", help="Source directory, relative to Fuchsia root path."
+    )
+    parser.add_argument("destination_dir", help="Destination directory.")
     parser.add_argument(
-        '--recursive', action='store_true', help='Perform recursive walk')
+        "--recursive", action="store_true", help="Perform recursive walk"
+    )
     args = parser.parse_args()
 
     if args.fuchsia_dir:
@@ -49,11 +52,12 @@ def main():
     dst_dir = os.path.abspath(args.destination_dir)
 
     if not os.path.exists(src_dir):
-        return parser.error('Source directory does not exist: ' + src_dir)
+        return parser.error("Source directory does not exist: " + src_dir)
 
     if args.recursive:
         shutil.copytree(
-            src_dir, dst_dir, copy_function=force_symlink, dirs_exist_ok=True)
+            src_dir, dst_dir, copy_function=force_symlink, dirs_exist_ok=True
+        )
     else:
         for entry in os.listdir(src_dir):
             src_path = os.path.join(src_dir, entry)

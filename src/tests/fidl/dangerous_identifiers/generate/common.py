@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-__all__ = ['Deny', 'Identifier', 'ScopedIdentifier', 'Style', 'Use']
+__all__ = ["Deny", "Identifier", "ScopedIdentifier", "Style", "Use"]
 
 from dataclasses import dataclass, field
 from typing import List, Callable, IO, Optional, Tuple
@@ -15,10 +15,13 @@ class Deny:
     uses: List[str] = field(default_factory=list)
     bindings: List[str] = field(default_factory=list)
 
-    def matches(self, style: 'Style', use: 'Use') -> bool:
+    def matches(self, style: "Style", use: "Use") -> bool:
         return not (
-            self.styles and style.name not in self.styles or
-            self.uses and use.name not in self.uses)
+            self.styles
+            and style.name not in self.styles
+            or self.uses
+            and use.name not in self.uses
+        )
 
 
 @dataclass
@@ -28,9 +31,9 @@ class Identifier:
 
     @property
     def parts(self) -> List[str]:
-        return self.name.split('_')
+        return self.name.split("_")
 
-    def scoped(self, style: 'Style', use: 'Use') -> 'ScopedIdentifier':
+    def scoped(self, style: "Style", use: "Use") -> "ScopedIdentifier":
         # All the deny rules for this style & use
         denies = [deny for deny in self.deny if deny.matches(style, use)]
         # Bindings deny list
@@ -39,16 +42,19 @@ class Identifier:
         ]
 
         return ScopedIdentifier(
-            style(self.parts), style, use,
+            style(self.parts),
+            style,
+            use,
             any(d.bindings == [] for d in denies),
-            ','.join(sorted(set(bindings_denylist))))
+            ",".join(sorted(set(bindings_denylist))),
+        )
 
 
 @dataclass
 class ScopedIdentifier:
     name: str
-    style: 'Style'
-    use: 'Use'
+    style: "Style"
+    use: "Use"
     denied: bool
     bindings_denylist: str
 
@@ -57,11 +63,11 @@ class ScopedIdentifier:
 
     @property
     def decl_attributes(self) -> str:
-        '''Attributes to put on a declaration with this name.'''
+        """Attributes to put on a declaration with this name."""
         if self.bindings_denylist:
             return f'@bindings_denylist("{self.bindings_denylist}")\n'
         else:
-            return ''
+            return ""
 
 
 @dataclass

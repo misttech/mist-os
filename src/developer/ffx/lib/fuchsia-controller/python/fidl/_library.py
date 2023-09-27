@@ -14,7 +14,20 @@ import re
 import sys
 import types
 
-from typing import Dict, List, Optional, Mapping, ForwardRef, Set, Union, Sequence, Tuple, Callable, Iterable, Any
+from typing import (
+    Dict,
+    List,
+    Optional,
+    Mapping,
+    ForwardRef,
+    Set,
+    Union,
+    Sequence,
+    Tuple,
+    Callable,
+    Iterable,
+    Any,
+)
 from fidl_codec import add_ir_path
 from ._client import FidlClient
 from ._server import ServerBase, MethodInfo
@@ -108,8 +121,17 @@ class IR(dict):
             # they can be programmatically looked up through reflection.
             #
             # See _sorted_type_declarations for an example of looking these fields up.
-            for decl in ["bits", "enum", "struct", "table", "union", "const",
-                         "alias", "protocol", "experimental_resource"]:
+            for decl in [
+                "bits",
+                "enum",
+                "struct",
+                "table",
+                "union",
+                "const",
+                "alias",
+                "protocol",
+                "experimental_resource",
+            ]:
                 setattr(self, f"{decl}_decls", self._decl_dict(decl))
 
     def __getitem__(self, key):
@@ -213,7 +235,8 @@ class IR(dict):
             kind = ir.declaration(key)
         return (
             kind,
-            next(d for d in ir[f"{kind}_declarations"] if d["name"] == key))
+            next(d for d in ir[f"{kind}_declarations"] if d["name"] == key),
+        )
 
 
 def fidl_ir_prefix_path() -> str:
@@ -253,16 +276,20 @@ def get_fidl_ir_map() -> Mapping[str, str]:
     # again that is only available in tree). This hinders users who are out-of-tree and who wish to
     # simply "play around" with fuchsia controller in an interactive way.
     prefix = fidl_ir_prefix_path()
-    with open(os.path.join(prefix, "all_fidl_json.txt"), "r",
-              encoding="UTF-8") as f:
+    with open(
+        os.path.join(prefix, "all_fidl_json.txt"), "r", encoding="UTF-8"
+    ) as f:
         while lib := f.readline().strip():
             full_path = os.path.join(prefix, lib)
             try:
                 with open(full_path, "r", encoding="UTF-8") as ir_file:
                     while line := ir_file.readline().strip():
                         if line.startswith(string_start) and line.endswith(
-                                string_end):
-                            lib_name = line[len(string_start):-len(string_end)]
+                            string_end
+                        ):
+                            lib_name = line[
+                                len(string_start) : -len(string_end)
+                            ]
                             # This does not check for any conflicts.
                             LIB_MAP[lib_name] = os.path.join(prefix, full_path)
                             break
@@ -295,7 +322,7 @@ def string_to_basetype(t: str) -> type:
 def fidl_import_to_fidl_library(name: str) -> str:
     """Converts a fidl import, e.g. fidl.foo_bar_baz, to a fidl library: 'foo.bar.baz'"""
     assert name.startswith("fidl.")
-    short_name = name[len("fidl."):]
+    short_name = name[len("fidl.") :]
     short_name = short_name.replace("_", ".")
     return short_name
 
@@ -306,8 +333,8 @@ def fidl_import_to_library_path(name: str) -> str:
         return get_fidl_ir_map()[fidl_import_to_fidl_library(name)]
     except KeyError:
         raise RuntimeError(
-            f"Unable to import library {name}." +
-            " Please ensure that the FIDL IR for this library has been created."
+            f"Unable to import library {name}."
+            + " Please ensure that the FIDL IR for this library has been created."
         )
 
 
@@ -341,17 +368,21 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         return wrap_optional(str)
     elif kind == "vector" or kind == "array":
         element_type = type_ir["element_type"]
-        if element_type["kind"] == "primitive" and element_type[
-                "subtype"] == "uint8":
+        if (
+            element_type["kind"] == "primitive"
+            and element_type["subtype"] == "uint8"
+        ):
             return wrap_optional(bytes)
         else:
             ty = type_annotation(element_type, root_ir, recurse_guard)
             return wrap_optional(Sequence[ty])
     elif kind == "request":
         return wrap_optional(
-            fidl_ident_to_py_library_member(type_ir["subtype"]) + ".Server")
+            fidl_ident_to_py_library_member(type_ir["subtype"]) + ".Server"
+        )
     raise TypeError(
-        f"As yet unsupported type in library {root_ir['name']}: {kind}")
+        f"As yet unsupported type in library {root_ir['name']}: {kind}"
+    )
 
 
 def fidl_library_to_py_module_path(name: str) -> str:
@@ -389,8 +420,10 @@ def docstring(decl, default: Optional[str] = None) -> Optional[str]:
     """Constructs docstring from a fidl's IR documentation declaration if it exists."""
     doc_attr = next(
         (
-            attr for attr in decl.get("maybe_attributes", [])
-            if attr["name"] == "doc"),
+            attr
+            for attr in decl.get("maybe_attributes", [])
+            if attr["name"] == "doc"
+        ),
         None,
     )
     if doc_attr is None:
@@ -440,9 +473,9 @@ def enum_type(ir) -> enum.EnumMeta:
 def _union_get_value(self):
     """Helper function that attempts to get the union value."""
     items = [
-        m[0].replace('_type', '')
+        m[0].replace("_type", "")
         for m in inspect.getmembers(self)
-        if m[0].endswith('_type')
+        if m[0].endswith("_type")
     ]
     got = None
     item = None
@@ -513,16 +546,21 @@ def union_type(ir, root_ir, recurse_guard=None) -> type:
         member_name = member["name"]
         member_type_name = member_name + "_type"
         member_type = dataclasses.make_dataclass(
-            member_type_name, [
+            member_type_name,
+            [
                 (
                     "value",
-                    type_annotation(member["type"], root_ir, recurse_guard))
-            ])
+                    type_annotation(member["type"], root_ir, recurse_guard),
+                )
+            ],
+        )
         setattr(member_type, "__doc__", docstring(member))
         setattr(member_type, "__repr__", lambda self: self.value.__repr__())
         setattr(
-            base, member_type_name,
-            type_annotation(member["type"], root_ir, recurse_guard))
+            base,
+            member_type_name,
+            type_annotation(member["type"], root_ir, recurse_guard),
+        )
         setattr(base, member_name, None)
     return base
 
@@ -546,7 +584,8 @@ def struct_type(ir, root_ir, recurse_guard=None) -> type:
     members = [
         (
             normalize_member_name(member["name"]),
-            type_annotation(member["type"], root_ir, recurse_guard))
+            type_annotation(member["type"], root_ir, recurse_guard),
+        )
         for member in ir["members"]
     ]
     ty = dataclasses.make_dataclass(name, members)
@@ -565,9 +604,11 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
         if member["reserved"]:
             continue
         optional_ty = type_annotation(member["type"], root_ir, recurse_guard)
-        new_member = normalize_member_name(
-            member["name"]), Optional[optional_ty], dataclasses.field(
-                default=None)
+        new_member = (
+            normalize_member_name(member["name"]),
+            Optional[optional_ty],
+            dataclasses.field(default=None),
+        )
         members.append(new_member)
     it: Iterable[Tuple[str, type, Any]] = members
     ty = dataclasses.make_dataclass(name, it)
@@ -579,7 +620,6 @@ def table_type(ir, root_ir, recurse_guard=None) -> type:
 
 
 class FIDLConstant(object):
-
     def __init__(self, name, value):
         self.name = name
         self.value = value
@@ -615,7 +655,8 @@ def const_declaration(ir, root_ir, recurse_guard=None) -> FIDLConstant:
     elif kind == "string":
         return FIDLConstant(name, ir["value"]["value"])
     raise TypeError(
-        f"As yet unsupported type in library '{root_ir['name']}': {kind}")
+        f"As yet unsupported type in library '{root_ir['name']}': {kind}"
+    )
 
 
 def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
@@ -646,8 +687,10 @@ def alias_declaration(ir, root_ir, recurse_guard=None) -> type:
             setattr(ty, "__fidl_kind__", "alias")
             setattr(ty, "__fidl_type__", ir.name())
             setattr(
-                ty, "__members_for_aliasing__",
-                base_type.__members_for_aliasing__)
+                ty,
+                "__members_for_aliasing__",
+                base_type.__members_for_aliasing__,
+            )
             return ty
         base_params = {
             "__doc__": docstring(ir),
@@ -687,7 +730,8 @@ def protocol_server_type(ir: IR, root_ir) -> type:
             continue
         method_snake_case = camel_case_to_snake_case(method.name())
         properties[method_snake_case] = protocol_method(
-            method, root_ir, get_fidl_request_server_lambda)
+            method, root_ir, get_fidl_request_server_lambda
+        )
         ident = ""
         if "maybe_request_payload" in method:
             ident = method.request_payload_identifier()
@@ -696,12 +740,13 @@ def protocol_server_type(ir: IR, root_ir) -> type:
         properties["method_map"][method.ordinal()] = MethodInfo(
             name=method_snake_case,
             request_ident=ident,
-            requires_response=method.has_response() and
-            "maybe_response_payload" in method,
-            empty_response=method.has_response() and
-            "maybe_response_payload" not in method,
+            requires_response=method.has_response()
+            and "maybe_response_payload" in method,
+            empty_response=method.has_response()
+            and "maybe_response_payload" not in method,
             has_result=method.has_result(),
-            response_identifier=method.response_payload_raw_identifier())
+            response_identifier=method.response_payload_raw_identifier(),
+        )
     return type(name, (ServerBase,), properties)
 
 
@@ -717,7 +762,8 @@ def protocol_client_type(ir: IR, root_ir) -> type:
             continue
         method_snake_case = camel_case_to_snake_case(method.name())
         properties[method_snake_case] = protocol_method(
-            method, root_ir, get_fidl_request_client_lambda)
+            method, root_ir, get_fidl_request_client_lambda
+        )
     return type(name, (FidlClient,), properties)
 
 
@@ -741,14 +787,18 @@ def get_fidl_request_client_lambda(ir: Method, root_ir, msg) -> Callable:
         response_ident = get_fidl_method_response_payload_ident(ir, root_ir)
         if msg:
             return lambda self, **args: self._send_two_way_fidl_request(
-                ir["ordinal"], root_ir.name(), msg(**args), response_ident)
+                ir["ordinal"], root_ir.name(), msg(**args), response_ident
+            )
         return lambda self: self._send_two_way_fidl_request(
-            ir["ordinal"], root_ir.name(), msg, response_ident)
+            ir["ordinal"], root_ir.name(), msg, response_ident
+        )
     if msg:
         return lambda self, **args: self._send_one_way_fidl_request(
-            0, ir["ordinal"], root_ir.name(), msg(**args))
+            0, ir["ordinal"], root_ir.name(), msg(**args)
+        )
     return lambda self: self._send_one_way_fidl_request(
-        0, ir["ordinal"], root_ir.name(), msg)
+        0, ir["ordinal"], root_ir.name(), msg
+    )
 
 
 def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
@@ -757,14 +807,16 @@ def get_fidl_request_server_lambda(ir: Method, root_ir, msg) -> Callable:
 
         def server_lambda(self, request):
             raise NotImplementedError(
-                f"Method {snake_case_name} not implemented")
+                f"Method {snake_case_name} not implemented"
+            )
 
         return lambda self, request: server_lambda(self, request)
     else:
 
         def server_lambda(self):
             raise NotImplementedError(
-                f"Method {snake_case_name} not implemented")
+                f"Method {snake_case_name} not implemented"
+            )
 
         return lambda self: server_lamdba(self)
 
@@ -783,10 +835,8 @@ def normalize_identifier(identifier: str) -> str:
 
 
 def protocol_method(
-        method: Method,
-        root_ir,
-        lambda_constructor: Callable,
-        recurse_guard=None) -> Callable:
+    method: Method, root_ir, lambda_constructor: Callable, recurse_guard=None
+) -> Callable:
     assert method.has_request()
     if "maybe_request_payload" in method:
         req_id = method.request_payload_identifier()
@@ -800,11 +850,14 @@ def protocol_method(
                 normalize_member_name(member["name"]),
                 inspect.Parameter.KEYWORD_ONLY,
                 annotation=type_annotation(
-                    member["type"], root_ir, recurse_guard),
-            ) for member in req_ir["members"]
+                    member["type"], root_ir, recurse_guard
+                ),
+            )
+            for member in req_ir["members"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir))
+            method, root_ir, get_type_by_identifier(req_id, root_ir)
+        )
     elif req_kind == "table":
         params = [
             inspect.Parameter(
@@ -812,23 +865,30 @@ def protocol_method(
                 inspect.Parameter.KEYWORD_ONLY,
                 default=None,
                 annotation=type_annotation(
-                    member["type"], root_ir, recurse_guard),
-            ) for member in req_ir["members"] if not member["reserved"]
+                    member["type"], root_ir, recurse_guard
+                ),
+            )
+            for member in req_ir["members"]
+            if not member["reserved"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir))
+            method, root_ir, get_type_by_identifier(req_id, root_ir)
+        )
     elif req_kind == "union":
         params = [
             inspect.Parameter(
                 member["name"],
                 inspect.Parameter.POSITIONAL_ONLY,
                 annotation=type_annotation(
-                    member['type'], root_ir, recurse_guard))
+                    member["type"], root_ir, recurse_guard
+                ),
+            )
             for member in req_ir["members"]
             if not member["reserved"]
         ]
         method_impl = lambda_constructor(
-            method, root_ir, get_type_by_identifier(req_id, root_ir))
+            method, root_ir, get_type_by_identifier(req_id, root_ir)
+        )
     elif req_kind == None:
         params = []
     else:
@@ -876,7 +936,8 @@ def get_type_by_identifier(ident: str, loader_ir, recurse_guard=None) -> type:
         # IR for library.name/Ident
         ty_decl = getattr(mod.__ir__, f"{ty}_decls")[ident]
         ty_definition = globals()[f"{ty}_type"](
-            ty_decl, mod.__ir__, recurse_guard=True)
+            ty_decl, mod.__ir__, recurse_guard=True
+        )
         if ty == "const":
             # This line might not actually be possible to hit.
             mod.export_const(ty_definition)
@@ -892,7 +953,6 @@ def load_module(fullname: str) -> types.ModuleType:
 
 
 class FIDLLibraryModule(types.ModuleType):
-
     def __init__(self, fullname: str):
         # Shove ourselves into the import map so that composite types can be looked up as they are
         # exported.
@@ -905,7 +965,8 @@ class FIDLLibraryModule(types.ModuleType):
         self.__fullname__ = fullname
         super().__init__(
             fullname,
-            docstring(self.__ir__, f"FIDL library {self.__ir__.name()}"))
+            docstring(self.__ir__, f"FIDL library {self.__ir__.name()}"),
+        )
         self.__all__: List[str] = []
 
         self.export_bits()

@@ -27,10 +27,11 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         raise NotImplementedError
 
     def save_network(
-            self,
-            target_ssid: str,
-            security_type: SecurityType,
-            target_pwd: str | None = None) -> None:
+        self,
+        target_ssid: str,
+        security_type: SecurityType,
+        target_pwd: str | None = None,
+    ) -> None:
         raise NotImplementedError
 
     def set_new_update_listener(self) -> None:
