@@ -27,7 +27,7 @@ use {
 
 pub fn fake_serving_ap_info() -> ServingApInfo {
     ServingApInfo {
-        bssid: Bssid([55, 11, 22, 3, 9, 70]),
+        bssid: Bssid([0x37, 0x0a, 0x16, 0x03, 0x09, 0x46]),
         ssid: Ssid::try_from("foo").unwrap(),
         rssi_dbm: 0,
         snr_db: 0,

@@ -516,6 +516,7 @@ mod tests {
         crate::client::test_utils,
         diagnostics_assertions::{assert_data_tree, AnyProperty},
         fuchsia_inspect::Inspector,
+        ieee80211_testutils::{BSSID_HASH_REGEX, SSID_HASH_REGEX},
         std::convert::TryFrom,
     };
 
@@ -547,7 +548,7 @@ mod tests {
                 last_updated: AnyProperty,
                 status: {
                     status_str: "connecting",
-                    connecting_to: { ssid: "<ssid-666f6f>", ssid_hash: AnyProperty }
+                    connecting_to: { ssid: "<ssid-666f6f>", ssid_hash: &*SSID_HASH_REGEX }
                 },
             }
         });
@@ -566,9 +567,9 @@ mod tests {
                     status_str: "connected",
                     connected_to: contains {
                         ssid: "<ssid-666f6f>",
-                        ssid_hash: AnyProperty,
-                        bssid: AnyProperty,
-                        bssid_hash: AnyProperty,
+                        ssid_hash: &*SSID_HASH_REGEX,
+                        bssid: "37:0a:16:03:09:46",
+                        bssid_hash: &*BSSID_HASH_REGEX,
                     },
                 },
             }
@@ -587,9 +588,9 @@ mod tests {
                     status_str: "idle",
                     prev_connected_to: contains {
                         ssid: "<ssid-666f6f>",
-                        ssid_hash: AnyProperty,
-                        bssid: AnyProperty,
-                        bssid_hash: AnyProperty,
+                        ssid_hash: &*SSID_HASH_REGEX,
+                        bssid: "37:0a:16:03:09:46",
+                        bssid_hash: &*BSSID_HASH_REGEX,
                     },
                 },
             }
