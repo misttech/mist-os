@@ -265,7 +265,7 @@ pub fn build_fake_bss_description_creator__(
     protection_cfg: FakeProtectionCfg,
 ) -> BssDescriptionCreator {
     BssDescriptionCreator {
-        bssid: [7, 1, 2, 77, 53, 8],
+        bssid: [0x07, 0x01, 0x02, 0x4d, 0x35, 0x08],
         bss_type: fidl_common::BssType::Infrastructure,
         beacon_period: 100,
         channel: Channel::new(3, Cbw::Cbw40),
