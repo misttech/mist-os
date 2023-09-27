@@ -406,10 +406,20 @@ impl StorageAdmin {
                     }
                 }
                 fsys::StorageAdminRequest::DeleteComponentStorage {
-                    relative_moniker,
+                    relative_moniker: moniker_str,
                     responder,
                 } => {
-                    let response = match InstancedMoniker::try_from(relative_moniker.as_str()) {
+                    // Tolerate either an instanced moniker or a "normal" moniker here.
+                    // Most code-paths below and within `delete_isolated_storage()` ignore the instance
+                    // IDs, save for one. Those clients that require that level of specificity (unlikely)
+                    // will be able to specify them.
+                    let parsed_moniker =
+                        InstancedMoniker::try_from(moniker_str.as_str()).or_else(|_| {
+                            Moniker::try_from(moniker_str.as_str()).and_then(|m| {
+                                Ok(InstancedMoniker::from_moniker_with_zero_value_instance_ids(&m))
+                            })
+                        });
+                    let response = match parsed_moniker {
                         Err(error) => {
                             warn!(
                                 ?error,

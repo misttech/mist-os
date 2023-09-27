@@ -29,6 +29,14 @@ pub struct InstancedMoniker {
 }
 
 impl InstancedMoniker {
+    /// Create a new InstancedMoniker with zero-value InstanceIds for all path parts
+    /// in `moniker`.
+    pub fn from_moniker_with_zero_value_instance_ids(moniker: &Moniker) -> InstancedMoniker {
+        let path: Vec<InstancedChildName> =
+            moniker.path().iter().map(|p| InstancedChildName::from_child_moniker(p, 0)).collect();
+        InstancedMoniker::new(path)
+    }
+
     /// Convert an InstancedMoniker into an allocated Moniker without InstanceIds
     pub fn without_instance_ids(&self) -> Moniker {
         let path: Vec<ChildName> = self.path().iter().map(|p| p.without_instance_id()).collect();
@@ -107,11 +115,20 @@ impl fmt::Debug for InstancedMoniker {
 }
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+
     use {
         super::*,
         cm_types::Name,
         moniker::{ChildNameBase, MonikerBase, MonikerError},
     };
+
+    #[test]
+    fn from_moniker() {
+        let m = Moniker::from_str("foo/bar").unwrap();
+        let instanced = InstancedMoniker::from_moniker_with_zero_value_instance_ids(&m);
+        assert_eq!(instanced.to_string(), "foo:0/bar:0");
+    }
 
     #[test]
     fn instanced_monikers() {

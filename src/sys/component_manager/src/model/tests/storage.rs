@@ -985,8 +985,10 @@ async fn storage_persistence_moniker_path() {
     >(&namespace, &"/svc/fuchsia.sys2.StorageAdmin".parse().unwrap())
     .await;
     let _ = storage_admin_proxy
-        // the instance ids in the moniker for the request to destroy persistent storage do not matter
-        .delete_component_storage("./b:0/persistent_coll:c:0")
+        // StorageAdmin::DeleteComponentStorage tolerates both regular old monikers and instanced
+        // monikers ("b:0/persistent_col:c:0"). Use the regular moniker here since the IDs would be
+        // ignored anyway.
+        .delete_component_storage("b/persistent_coll:c")
         .await
         .unwrap()
         .unwrap();

@@ -69,8 +69,9 @@ closed protocol StorageAdmin {
         object server_end:fuchsia.io.Node;
     }) -> () error fuchsia.component.Error;
 
-    /// Deletes the contents of the storage for this component. Does not delete the component's
-    /// subdirectory itself from the backing directory.
+    /// Deletes the contents of the storage for this component. The moniker can be a regular
+    /// moniker (ie, "foo/bar") or a moniker with internal instance IDs (unusual, ie, "foo:0/bar:0").
+    /// Preserves the component's subdirectory itself within the storage backing directory.
     strict DeleteComponentStorage(struct {
         relative_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> () error fuchsia.component.Error;
