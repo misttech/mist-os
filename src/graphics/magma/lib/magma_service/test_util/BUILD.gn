@@ -55,3 +55,16 @@ source_set("msd_stubs") {
   public_deps = [ "//src/graphics/magma:msd" ]
   public_configs = [ "../../..:src_config" ]
 }
+
+source_set("pci_driver_gtest") {
+  testonly = true
+
+  sources = [ "pci_driver_test_gtest.cc" ]
+
+  deps = [
+    "//src/graphics/magma/lib/magma/platform:device",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
+    "//src/graphics/magma/lib/magma_service/test_util:platform_pci_device_helper",
+    "//third_party/googletest:gtest",
+  ]
+}

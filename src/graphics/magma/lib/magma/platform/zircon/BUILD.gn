@@ -386,19 +386,6 @@ source_set("trace_provider_with_fdio") {
   public_deps = [ "//sdk/lib/fit" ]
 }
 
-source_set("pci_driver_gtest") {
-  testonly = true
-
-  sources = [ "pci_driver_test_gtest.cc" ]
-
-  deps = [
-    "//src/graphics/magma/lib/magma/platform:device",
-    "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
-    "//src/graphics/magma/lib/magma_service/test_util:platform_pci_device_helper",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 source_set("status") {
   sources = [ "zircon_platform_status.h" ]
 
