@@ -230,7 +230,6 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
       geometry_provider_(),
       observer_registry_(geometry_provider_),
       scoped_observer_registry_(geometry_provider_),
-      annotation_registry_(app_context_.get()),
       watchdog_("Scenic main thread", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
                 async_get_default_dispatcher()) {
   fpromise::bridge<escher::EscherUniquePtr> escher_bridge;

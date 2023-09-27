@@ -15,7 +15,6 @@
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
-#include "src/ui/scenic/lib/annotation/annotation_registry.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
 #include "src/ui/scenic/lib/display/display_manager.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
@@ -135,8 +134,6 @@ class App {
 
   uint64_t flatland_frame_count_ = 0;
   uint64_t skipped_frame_count_ = 0;
-
-  AnnotationRegistry annotation_registry_;
 
   async_watchdog::Watchdog watchdog_;
 

@@ -19,7 +19,6 @@ executable("bin") {
     "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/async-watchdog",
     "//src/ui/scenic:scenic_structured_config",
-    "//src/ui/scenic/lib/annotation:annotation_registry",
     "//src/ui/scenic/lib/display",
     "//src/ui/scenic/lib/display:singleton_display_service",
     "//src/ui/scenic/lib/flatland/engine",

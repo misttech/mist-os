@@ -336,7 +336,6 @@ hlcpp_visibility = [
   "//src/ui/lib/escher:*",
   "//src/ui/scenic/bin:*",
   "//src/ui/scenic/lib/allocation:*",
-  "//src/ui/scenic/lib/annotation:*",
   "//src/ui/scenic/lib/display/*",
   "//src/ui/scenic/lib/flatland/*",
   "//src/ui/scenic/lib/focus:*",
