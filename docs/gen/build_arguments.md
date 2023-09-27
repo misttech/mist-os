@@ -7073,7 +7073,19 @@ pw_unit_test:light, which implements a subset of GoogleTest.
 Type: string (GN path to a source set)
 Usage: toolchain-controlled only
 
-**Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:light"`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/googletest:gmock"`
+
+From //.gn:118
+
+**Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
+
+From //third_party/pigweed/src/pw_unit_test/test.gni:31
+
+**Current value for `target_cpu = "x64"`:** `"//third_party/googletest:gmock"`
+
+From //.gn:118
+
+**Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:light"`
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:31
 
@@ -7085,7 +7097,19 @@ be set to an appropriate target for the pw_unit_test backend.
 Type: string (GN path to a source set)
 Usage: toolchain-controlled only
 
-**Current value (from the default):** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
+**Current value for `target_cpu = "arm64"`:** `"//src/lib/fxl/test:gtest_main"`
+
+From //.gn:117
+
+**Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
+
+From //third_party/pigweed/src/pw_unit_test/test.gni:38
+
+**Current value for `target_cpu = "x64"`:** `"//src/lib/fxl/test:gtest_main"`
+
+From //.gn:117
+
+**Overridden from the default:** `"//third_party/pigweed/src/pw_unit_test:simple_printing_main"`
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:38
 
@@ -7128,7 +7152,19 @@ If true, the pw_unit_test target, pw_test targets, and pw_test_group targets
 will define `testonly = true`.  This is false by default for backwards
 compatibility.
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `true`
+
+From //.gn:119
+
+**Overridden from the default:** `false`
+
+From //third_party/pigweed/src/pw_unit_test/test.gni:107
+
+**Current value for `target_cpu = "x64"`:** `true`
+
+From //.gn:119
+
+**Overridden from the default:** `false`
 
 From //third_party/pigweed/src/pw_unit_test/test.gni:107
 
