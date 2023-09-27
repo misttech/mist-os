@@ -28,6 +28,7 @@ use {
         self as fio, FilesystemInfo, MutableNodeAttributes, NodeAttributeFlags, NodeAttributes,
         NodeMarker, WatchMask,
     },
+    fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_merkle::{MerkleTree, MerkleTreeBuilder},
     fuchsia_zircon::Status,
@@ -74,6 +75,15 @@ impl RootDir for BlobDirectory {
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
         self as Arc<dyn FxNode>
+    }
+
+    fn on_open(self: Arc<Self>) {
+        fasync::Task::spawn(async move {
+            if let Err(e) = self.prefetch_blobs().await {
+                warn!("Failed to prefetch blobs: {:?}", e);
+            }
+        })
+        .detach();
     }
 
     async fn handle_blob_creator_requests(self: Arc<Self>, mut requests: BlobCreatorRequestStream) {
@@ -127,6 +137,47 @@ impl BlobDirectory {
 
     fn store(&self) -> &ObjectStore {
         self.directory.store()
+    }
+
+    async fn prefetch_blobs(self: &Arc<Self>) -> Result<(), Error> {
+        let store = self.store();
+        let fs = store.filesystem();
+
+        let dirents = {
+            let _guard = fs
+                .lock_manager()
+                .read_lock(lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    self.directory.object_id()
+                )])
+                .await;
+            let mut dirents = vec![];
+            let layer_set = store.tree().layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = self.directory.directory().iter(&mut merger).await?;
+            let mut num = 0;
+            let limit = self.directory.directory().owner().dirent_cache().limit();
+            while let Some((name, object_id, _)) = iter.get() {
+                dirents.push((name.to_string(), object_id));
+                iter.advance().await?;
+                num += 1;
+                if num >= limit {
+                    break;
+                }
+            }
+            dirents
+        };
+
+        for (name, object_id) in dirents {
+            if let Ok(node) = self.get_or_load_node(object_id, &name).await {
+                self.directory.directory().owner().dirent_cache().insert(
+                    self.directory.object_id(),
+                    name,
+                    node,
+                );
+            }
+        }
+        Ok(())
     }
 
     pub async fn lookup(
