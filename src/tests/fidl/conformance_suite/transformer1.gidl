@@ -11,23 +11,6 @@ success("Sandwich1Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich1.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.before (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich1.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.after (padding)
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Aligned4.data, i.e. Sandwich1.the_union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich1.before
             0x00, 0x00, 0x00, 0x00, // Sandwich1.before (padding)
@@ -60,28 +43,6 @@ success("Sandwich1Case1WithHdr") {
         },
     },
     bytes = {
-        v1 = [
-            0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
-            0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
-            0xf8, 0xf9, 0xfa, 0xfb, // [cont.]
-            0xfc, 0xfd, 0xfe, 0xff, // [cont.]
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich1.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.before (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich1.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.after (padding)
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Aligned4.data, i.e. Sandwich1.the_union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
             0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
@@ -111,23 +72,6 @@ success("Sandwich1WithOptUnionPresent") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich1WithOptUnion.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.before (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1WithOptUnion.union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.env.presence (present)
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.presence (present) [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich1WithOptUnion.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.after (padding)
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Aligned4.data, i.e. Sandwich1WithOptUnion.union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich1WithOptUnion.before
             0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.before (padding)
@@ -149,20 +93,6 @@ success("Sandwich1WithOptUnionAbsent") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich1WithOptUnion.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.before (padding)
-
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1WithOptUnion.opt_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.presence (absent)
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.presence (absent) [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich1WithOptUnion.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.after (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich1WithOptUnion.before
             0x00, 0x00, 0x00, 0x00, // Sandwich1WithOptUnion.before (padding)
@@ -187,23 +117,6 @@ success("Sandwich2Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich2.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich2.before (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionSize16Aligned4.tag, i.e. Sandwich2.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize16Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize16Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize16Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize16Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize16Aligned4.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich2.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich2.after (padding)
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionSize16Aligned4.data, i.e. Sandwich2.the_union.data
-            0xa4, 0xa5, 0x00, 0x00, // UnionSize16Aligned4.data [cont.] and padding
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich2.before
             0x00, 0x00, 0x00, 0x00, // Sandwich2.before (padding)
@@ -228,7 +141,7 @@ success("StructSize16Align8_randomly_generated") {
         f2: 3921240220962863111,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(8119191415388800797):8, // f1
             num(3921240220962863111):8, // f2
         ],
@@ -247,25 +160,6 @@ success("Sandwich3Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich3.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich3.before (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionSize24Alignement8.tag, i.e. Sandwich2.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize24Alignement8.padding
-            0x10, 0x00, 0x00, 0x00, // UnionSize24Alignement8.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize24Alignement8.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize24Alignement8.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize24Alignement8.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich3.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich3.after (padding)
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionSize24Alignement8.data, i.e Sandwich2.the_union.data
-            0xa4, 0xa5, 0xa6, 0xa7, // UnionSize24Alignement8.data [cont.]
-            0xa8, 0xa9, 0xaa, 0xab, // UnionSize24Alignement8.data [cont.]
-            0xac, 0xad, 0xae, 0xaf, // UnionSize24Alignement8.data [cont.]
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich3.before
             0x00, 0x00, 0x00, 0x00, // Sandwich3.before (padding)
@@ -304,29 +198,6 @@ success("Sandwich4Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich4.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich4.before (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionSize36Align4.tag, i.e. Sandwich4.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize36Align4.tag (padding)
-            0x20, 0x00, 0x00, 0x00, // UnionSize36Align4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize36Align4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize36Align4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize36Align4.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich4.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich4.after (padding)
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionSize36Align4.data, i.e. Sandwich4.the_union.data
-            0xa4, 0xa5, 0xa6, 0xa7, // UnionSize36Align4.data [cont.]
-            0xa8, 0xa9, 0xaa, 0xab, // UnionSize36Align4.data [cont.]
-            0xac, 0xad, 0xae, 0xaf, // UnionSize36Align4.data [cont.]
-            0xb0, 0xb1, 0xb2, 0xb3, // UnionSize36Align4.data [cont.]
-            0xb4, 0xb5, 0xb6, 0xb7, // UnionSize36Align4.data [cont.]
-            0xb8, 0xb9, 0xba, 0xbb, // UnionSize36Align4.data [cont.]
-            0xbc, 0xbd, 0xbe, 0xbf, // UnionSize36Align4.data [cont.]
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich4.before
             0x00, 0x00, 0x00, 0x00, // Sandwich4.before (padding)
@@ -377,34 +248,6 @@ success("Sandwich4Case1WithHdr") {
         },
     },
     bytes = {
-        v1 = [
-            0x00, 0x00, 0x00, 0x00, // Fake transaction header  0x00
-            0x00, 0x00, 0x00, 0x00, //
-            0x00, 0x00, 0x00, 0x00, //
-            0x00, 0x00, 0x00, 0x00, //
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich4.before  0x10
-            0x00, 0x00, 0x00, 0x00, // Sandwich4.before (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionSize36Alignment4.tag, i.e. Sandwich4.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize36Alignment4.tag (padding)
-            0x20, 0x00, 0x00, 0x00, // UnionSize36Alignment4.env.num_bytes  0x20
-            0x00, 0x00, 0x00, 0x00, // UnionSize36Alignment4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize36Alignment4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize36Alignment4.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich4.after  0x30
-            0x00, 0x00, 0x00, 0x00, // Sandwich4.after (padding)
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionSize36Alignment4.data, i.e. Sandwich4.the_union.data
-            0xa4, 0xa5, 0xa6, 0xa7, // UnionSize36Alignment4.data [cont.]
-            0xa8, 0xa9, 0xaa, 0xab, // UnionSize36Alignment4.data [cont.]  0x40
-            0xac, 0xad, 0xae, 0xaf, // UnionSize36Alignment4.data [cont.]
-            0xb0, 0xb1, 0xb2, 0xb3, // UnionSize36Alignment4.data [cont.]
-            0xb4, 0xb5, 0xb6, 0xb7, // UnionSize36Alignment4.data [cont.]
-            0xb8, 0xb9, 0xba, 0xbb, // UnionSize36Alignment4.data [cont.]  0x50
-            0xbc, 0xbd, 0xbe, 0xbf, // UnionSize36Alignment4.data [cont.]
-        ],
         v2 = [
             0x00, 0x00, 0x00, 0x00, // Fake transaction header  0x00
             0x00, 0x00, 0x00, 0x00, //
@@ -445,30 +288,6 @@ success("Sandwich5Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich5.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
-
-            0x02, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.ordinal
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.padding
-            0x20, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich5.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.after (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.ordinal
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize8Aligned4.env.presence [cont.]
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionOfUnion.UnionSize8Aligned4.data
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich5.before
             0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
@@ -508,35 +327,6 @@ success("Sandwich5Case1WithHdr") {
         },
     },
     bytes = {
-        v1 = [
-            0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
-            0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
-            0xf8, 0xf9, 0xfa, 0xfb, // [cont.]
-            0xfc, 0xfd, 0xfe, 0xff, // [cont.]
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich5.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
-
-            0x02, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.ordinal
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.padding
-            0x20, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich5.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.after (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.ordinal
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize8Aligned4.env.presence [cont.]
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionOfUnion.UnionSize8Aligned4.data
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
             0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
@@ -576,32 +366,6 @@ success("Sandwich5Case2") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich5.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
-
-            0x05, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.ordinal
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.padding
-            0x28, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich5.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.after (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Align8.ordinal
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Align8.padding
-            0x10, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Align8.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Align8.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize24Align8.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize24Align8.env.presence [cont.]
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionOfUnion.UnionSize24Align8.data
-            0xa4, 0xa5, 0xa6, 0xa7, // UnionOfUnion.UnionSize24Align8.data [cont.]
-            0xa8, 0xa9, 0xaa, 0xab, // UnionOfUnion.UnionSize24Align8.data [cont.]
-            0xac, 0xad, 0xae, 0xaf, // UnionOfUnion.UnionSize24Align8.data [cont.]
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich5.before
             0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
@@ -649,37 +413,6 @@ success("Sandwich5Case2WithHdr") {
         },
     },
     bytes = {
-        v1 = [
-            0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
-            0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
-            0xf8, 0xf9, 0xfa, 0xfb, // [cont.]
-            0xfc, 0xfd, 0xfe, 0xff, // [cont.]
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich5.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.before (padding)
-
-            0x05, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.ordinal
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.padding
-            0x28, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.UnionOfUnion.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich5.UnionOfUnion.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich5.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich5.after (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Alignment8.ordinal
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Alignment8.padding
-            0x10, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Alignment8.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionOfUnion.UnionSize24Alignment8.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize24Alignment8.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionOfUnion.UnionSize24Alignment8.env.presence [cont.]
-
-            0xa0, 0xa1, 0xa2, 0xa3, // UnionOfUnion.UnionSize24Alignment8.data
-            0xa4, 0xa5, 0xa6, 0xa7, // UnionOfUnion.UnionSize24Alignment8.data [cont.]
-            0xa8, 0xa9, 0xaa, 0xab, // UnionOfUnion.UnionSize24Alignment8.data [cont.]
-            0xac, 0xad, 0xae, 0xaf, // UnionOfUnion.UnionSize24Alignment8.data [cont.]
-        ],
         v2 = [
             0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
             0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
@@ -716,7 +449,7 @@ success("StructSize3Align2_randomly_generated") {
         f2: 203,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(8940):2, // f1
             203, // f2
             padding:5,
@@ -735,28 +468,6 @@ success("Sandwich6Case1") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x02, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x18, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x06, 0x00, 0x00, 0x00, // vector<uint8>.size, i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<uint8>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence [cont.]
-
-            0xa0, 0xa1, 0xa2, 0xa3, // vector<uint8>.data
-            0xa4, 0xa5, 0x00, 0x00, // vector<uint8>.data [cont.] + padding
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -789,25 +500,6 @@ success("Sandwich6Case1AbsentVector") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x02, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x10, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x00, 0x00, 0x00, 0x00, // vector<uint8>.size, i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<uint8>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence [cont.]
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -837,32 +529,6 @@ success("Sandwich6Case2") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x03, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x28, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x15, 0x00, 0x00, 0x00, // vector<uint8>.size (21), i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<uint8>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<uint8>.presence [cont.]
-
-            0x73, 0x6f, 0x66, 0x74, // vector<uint8>.data
-            0x20, 0x6d, 0x69, 0x67, // vector<uint8>.data [cont.]
-            0x72, 0x61, 0x74, 0x69, // vector<uint8>.data [cont.]
-            0x6f, 0x6e, 0x73, 0x20, // vector<uint8>.data [cont.]
-            0x72, 0x6f, 0x63, 0x6b, // vector<uint8>.data [cont.]
-            0x21, 0x00, 0x00, 0x00, // vector<uint8>.data [cont.] + padding
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -909,30 +575,6 @@ success("Sandwich6Case3") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x04, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x20, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x03, 0x00, 0x00, 0x00, // vector<struct>.size (21), i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<struct>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<struct>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<struct>.presence [cont.]
-
-            0x73, 0x6f, 0x66, 0x20, // StructSize3Align1 (element #1 & start of element #2)
-            0x6d, 0x69, 0x72, 0x61, // StructSize3Align1 (element #2 [cont.] & start of element #3)
-            0x74, 0x00, 0x00, 0x00, // StructSize3Align1 (element #3 [cont.d])
-            0x00, 0x00, 0x00, 0x00, // (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -980,30 +622,6 @@ success("Sandwich6Case4") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x05, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x20, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x03, 0x00, 0x00, 0x00, // vector<struct>.size (21), i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<struct>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<struct>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<struct>.presence [cont.]
-
-            0x73, 0x6f, 0x66, 0x00, // StructSize3Align2 (start of vector<struct>.data)
-            0x20, 0x6d, 0x69, 0x00, // StructSize3Align2 (element #2)
-            0x72, 0x61, 0x74, 0x00, // StructSize3Align2 (element #3)
-            0x00, 0x00, 0x00, 0x00, // (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -1043,30 +661,6 @@ success("Sandwich6Case5") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x06, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x20, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x03, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x03, 0x00, 0x00, 0x00, // vector<handle>.size, i.e. Sandwich6.the_union.data
-            0x00, 0x00, 0x00, 0x00, // vector<handle>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<handle>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<handle>.presence [cont.]
-
-            0xff, 0xff, 0xff, 0xff, // vector<handle>.data
-            0xff, 0xff, 0xff, 0xff, // vector<handle>.data
-            0xff, 0xff, 0xff, 0xff, // vector<handle>.data
-            0x00, 0x00, 0x00, 0x00, // vector<handle>.data (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -1091,7 +685,7 @@ success("Sandwich6Case5") {
         ],
     },
     handles = {
-        v1, v2 = [#0, #1, #2],
+        v2 = [#0, #1, #2],
     },
 }
 
@@ -1115,23 +709,6 @@ success("Sandwich6Case6") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x07, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x08, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0xa1, 0xa2, 0xa3, 0xa4, // array<StructSize3Align1>:2, i.e. Sandwich6.the_union.data
-            0xa5, 0xa6, 0x00, 0x00, // array<StructSize3Align1>:2
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -1168,23 +745,6 @@ success("Sandwich6Case7") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x08, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x08, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0xa1, 0xa2, 0xa3, 0x00, // array<StructSize3Align2>:2, i.e. Sandwich6.the_union.data
-            0xa4, 0xa5, 0xa6, 0x00, // array<StructSize3Align2>:2
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -1216,35 +776,6 @@ success("Sandwich6Case8") {
         after: 0x08070605,
     },
     bytes = {
-        v1 = [
-            0x01, 0x02, 0x03, 0x04, // Sandwich6.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
-
-            0x09, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (start of Sandwich6.the_union)
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.ordinal (padding)
-            0x30, 0x00, 0x00, 0x00, // UnionWithVector.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionWithVector.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionWithVector.env.presence [cont.]
-
-            0x05, 0x06, 0x07, 0x08, // Sandwich6.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich6.after (padding)
-
-            0x01, 0x00, 0x00, 0x00, // vector<UnionSize8Align4>.size (start of Sandwich6.the_union.data)
-            0x00, 0x00, 0x00, 0x00, // vector<UnionSize8Align4>.size [cont.]
-            0xff, 0xff, 0xff, 0xff, // vector<UnionSize8Align4>.presence
-            0xff, 0xff, 0xff, 0xff, // vector<UnionSize8Align4>.presence [cont.]
-
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Align4.ordinal (first element, outer vector)
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Align4.ordinal (padding)
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Align4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Align4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Align4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Align4.env.presence [cont.]
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Align4.data, i.e. Sandwich1.the_union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Align4.data (padding)
-        ],
         v2 = [
             0x01, 0x02, 0x03, 0x04, // Sandwich6.before
             0x00, 0x00, 0x00, 0x00, // Sandwich6.before (padding)
@@ -1283,28 +814,6 @@ success("Sandwich7Case1") {
         after: 0x24232221,
     },
     bytes = {
-        v1 = [
-            0x11, 0x12, 0x13, 0x14, // Sandwich7.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich7.before (padding)
-            0xff, 0xff, 0xff, 0xff, // Sandwich7.opt_sandwich1.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich7.opt_sandwich1.presence [cont.]
-            0x21, 0x22, 0x23, 0x24, // Sandwich7.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich7.after (padding)
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich1.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.before (padding)
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.presence [cont.]
-            0x05, 0x06, 0x07, 0x08, // Sandwich1.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.after (padding)
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Aligned4.data, i.e. Sandwich1.the_union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0x11, 0x12, 0x13, 0x14, // Sandwich7.before
             0x00, 0x00, 0x00, 0x00, // Sandwich7.before (padding)
@@ -1346,33 +855,6 @@ success("Sandwich7Case1WithHdr") {
         },
     },
     bytes = {
-        v1 = [
-            0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
-            0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
-            0xf8, 0xf9, 0xfa, 0xfb, // [cont.]
-            0xfc, 0xfd, 0xfe, 0xff, // [cont.]
-
-            0x11, 0x12, 0x13, 0x14, // Sandwich7.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich7.before (padding)
-            0xff, 0xff, 0xff, 0xff, // Sandwich7.opt_sandwich1.presence
-            0xff, 0xff, 0xff, 0xff, // Sandwich7.opt_sandwich1.presence [cont.]
-            0x21, 0x22, 0x23, 0x24, // Sandwich7.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich7.after (padding)
-
-            0x01, 0x02, 0x03, 0x04, // Sandwich1.before
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.before (padding)
-            0x03, 0x00, 0x00, 0x00, // UnionSize8Aligned4.tag, i.e. Sandwich1.the_union
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.padding
-            0x08, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_bytes
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.env.num_handle
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.env.presence
-            0xff, 0xff, 0xff, 0xff, // UnionSize8Aligned4.presence [cont.]
-            0x05, 0x06, 0x07, 0x08, // Sandwich1.after
-            0x00, 0x00, 0x00, 0x00, // Sandwich1.after (padding)
-
-            0x09, 0x0a, 0x0b, 0x0c, // UnionSize8Aligned4.data, i.e. Sandwich1.the_union.data
-            0x00, 0x00, 0x00, 0x00, // UnionSize8Aligned4.data (padding)
-        ],
         v2 = [
             0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
             0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
@@ -1404,7 +886,7 @@ success("Sandwich7Case2") {
         after: 0x24232221,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x11, 0x12, 0x13, 0x14, // Sandwich7.before
             0x00, 0x00, 0x00, 0x00, // Sandwich7.before (padding)
             0x00, 0x00, 0x00, 0x00, // Sandwich7.opt_sandwich1.absence
@@ -1429,7 +911,7 @@ success("Sandwich7Case2WithHdr") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xf0, 0xf1, 0xf2, 0xf3, // Fake transaction header
             0xf4, 0xf5, 0xf6, 0xf7, // [cont.]
             0xf8, 0xf9, 0xfa, 0xfb, // [cont.]
@@ -1455,7 +937,7 @@ success("Regression1") {
         f6: 0x06,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, // f1 and padding
             0x02, 0x00, 0x00, 0x00, // f2 and padding
             0x03, 0x00, 0x04, 0x00, // f3, f3 padding and f4
@@ -1481,7 +963,7 @@ success("Regression2") {
         f7: 0x07,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, // f1 and padding
             0x02, 0x00, 0x00, 0x00, // f2 and padding
             0x03, 0x00, 0x04, 0x00, // f3, f3 padding and f4
@@ -1499,7 +981,7 @@ success("Regression2") {
 success("Regression3Absent") {
     value = Regression3{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, // opt_value.absence
             0x00, 0x00, 0x00, 0x00, // opt_value.absence [cont.]
         ],
@@ -1521,7 +1003,7 @@ success("Regression3Present") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xFF, 0xFF, 0xFF, 0xFF, // opt_value.presence
             0xFF, 0xFF, 0xFF, 0xFF, // opt_value.presence [cont.]
             0x01, 0x00, 0x00, 0x00, // f1 and padding
@@ -1553,7 +1035,7 @@ success("Size5Alignment1Array") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x02, 0x03, 0x04, // a.data[0]
             0x05, 0x06, 0x07, 0x08, // a.data[0] & a.data[1]
             0x09, 0x0a, 0x0b, 0x0c, // a.data[1] & a.data[2]
@@ -1568,7 +1050,7 @@ success("Size5Alignment4_randomly_generated") {
         one: 225,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1063731487):4, // four
             225, // one
             padding:3,
@@ -1594,7 +1076,7 @@ success("Size5Alignment4Array") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x02, 0x03, 0x04, // a[0].four
             0x05, 0x00, 0x00, 0x00, // a[0].one + padding
             0x06, 0x07, 0x08, 0x09, // a[1].four
@@ -1617,7 +1099,7 @@ success("Size5Alignment1Vector") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x00, 0x00, 0x00, // v.size
             0x00, 0x00, 0x00, 0x00, // v.size [cont.]
             0xFF, 0xFF, 0xFF, 0xFF, // v.presence
@@ -1644,7 +1126,7 @@ success("Size5Alignment4Vector") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x00, 0x00, 0x00, // v.size
             0x00, 0x00, 0x00, 0x00, // v.size [cont.]
             0xFF, 0xFF, 0xFF, 0xFF, // v.presence

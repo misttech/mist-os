@@ -816,7 +816,7 @@ func TestParseSuccessCase(t *testing.T) {
 			first: "four",
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
@@ -838,7 +838,7 @@ func TestParseSuccessCase(t *testing.T) {
 				},
 			},
 			Encodings: []ir.HandleDispositionEncoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes: []byte{
 					0, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -860,7 +860,7 @@ func TestParseSuccessCase(t *testing.T) {
 				},
 			},
 			Encodings: []ir.Encoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes: []byte{
 					0, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -883,13 +883,13 @@ func TestParseEncodeSuccessCase(t *testing.T) {
 			stuff: [#1, #0],
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
 		},
 		handle_dispositions = {
-			v1 = [
+			v2 = [
 				{ #0, type: event, rights: basic + signal },
 				{ #1 },
 			],
@@ -921,7 +921,7 @@ func TestParseEncodeSuccessCase(t *testing.T) {
 				},
 			},
 			Encodings: []ir.HandleDispositionEncoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes: []byte{
 					0, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -953,12 +953,12 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 			#1 = channel(),
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
 		},
-		handles = { v1 = [ #0, #1 ] },
+		handles = { v2 = [ #0, #1 ] },
 		value = OneStringOfMaxLengthFive {
 			first: "four",
 			handle0: #0,
@@ -1001,7 +1001,7 @@ func TestParseDecodeSuccessCase(t *testing.T) {
 				},
 			},
 			Encodings: []ir.Encoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes: []byte{
 					0, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1047,7 +1047,7 @@ func TestParseDecodeFailureCase(t *testing.T) {
 	decode_failure("OneStringOfMaxLengthFive-wrong-length") {
 		type = TypeName,
 		bytes = {
-			v1 = [
+			v2 = [
 				1, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 				// one character missing
@@ -1061,7 +1061,7 @@ func TestParseDecodeFailureCase(t *testing.T) {
 			Name: "OneStringOfMaxLengthFive-wrong-length",
 			Type: "TypeName",
 			Encodings: []ir.Encoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes: []byte{
 					1, 0, 0, 0, 0, 0, 0, 0, // length
 					255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1107,7 +1107,7 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 			first: "four",
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
@@ -1117,7 +1117,7 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
 		Languages:   []string{"go", "rust", "dart"},
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1137,7 +1137,7 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 					},
 				},
 				Encodings: []ir.HandleDispositionEncoding{{
-					WireFormat: ir.V1WireFormat,
+					WireFormat: ir.V2WireFormat,
 					Bytes: []byte{
 						0, 0, 0, 0, 0, 0, 0, 0, // length
 						255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1163,7 +1163,7 @@ func TestParseSucceedsBindingsAllowlistAndDenylist(t *testing.T) {
 					},
 				},
 				Encodings: []ir.Encoding{{
-					WireFormat: ir.V1WireFormat,
+					WireFormat: ir.V2WireFormat,
 					Bytes: []byte{
 						0, 0, 0, 0, 0, 0, 0, 0, // length
 						255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1184,7 +1184,7 @@ func TestParseFailsBindingsAllowlist(t *testing.T) {
 			first: "four",
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
@@ -1194,7 +1194,7 @@ func TestParseFailsBindingsAllowlist(t *testing.T) {
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
 		Languages:   []string{"rust", "dart"},
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1208,7 +1208,7 @@ func TestParseFailsBindingsDenylist(t *testing.T) {
 			first: "four",
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
@@ -1218,7 +1218,7 @@ func TestParseFailsBindingsDenylist(t *testing.T) {
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
 		Languages:   []string{"rust", "go"},
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1287,7 +1287,7 @@ func TestParseFailsExtraKind(t *testing.T) {
 			first: "four",
 		},
 		bytes = {
-			v1 = [
+			v2 = [
 				0, 0, 0, 0, 0, 0, 0, 0, // length
 				255, 255, 255, 255, 255, 255, 255, 255, // alloc present
 			],
@@ -1335,8 +1335,8 @@ func TestParseFailsDuplicateWireFormat(t *testing.T) {
 	success("DuplicateWireFormat") {
 		value = DuplicateWireFormat {},
 		bytes = {
-			v1 = [],
-			v1 = [],
+			v2 = [],
+			v2 = [],
 		}
 	}`
 	_, err := parse(gidl)
@@ -1351,14 +1351,14 @@ func TestParseSucceedsHandles(t *testing.T) {
 		},
 		value = HasHandles { h: #0 },
 		bytes = {
-			v1 = [ repeat(0xff):4, padding:4 ],
+			v2 = [ repeat(0xff):4, padding:4 ],
 		},
 		handles = {
-			v1 = [ #0 ],
+			v2 = [ #0 ],
 		},
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1375,7 +1375,7 @@ func TestParseSucceedsHandles(t *testing.T) {
 				},
 			},
 			Encodings: []ir.HandleDispositionEncoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes:      []byte{255, 255, 255, 255, 0, 0, 0, 0},
 				HandleDispositions: []ir.HandleDisposition{
 					{
@@ -1401,7 +1401,7 @@ func TestParseSucceedsHandles(t *testing.T) {
 				},
 			},
 			Encodings: []ir.Encoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes:      []byte{255, 255, 255, 255, 0, 0, 0, 0},
 				Handles:    []ir.Handle{0},
 			}},
@@ -1420,14 +1420,14 @@ func TestParseSucceedsHandlesBeforeBytes(t *testing.T) {
 		},
 		value = HasHandles { h: #0 },
 		handles = {
-			v1 = [ #0 ],
+			v2 = [ #0 ],
 		},
 		bytes = {
-			v1 = [ repeat(0xff):4, padding:4 ],
+			v2 = [ repeat(0xff):4, padding:4 ],
 		},
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1441,10 +1441,10 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 	success("HasHandles") {
 		value = HasHandles { h: #0 },
 		bytes = {
-			v1 = [ repeat(0xff):4, padding:4 ],
+			v2 = [ repeat(0xff):4, padding:4 ],
 		},
 		handles = {
-			v1 = [ #0 ],
+			v2 = [ #0 ],
 		},
 		// handle_defs at the end.
 		handle_defs = {
@@ -1452,7 +1452,7 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 		},
 	}`
 	p := NewParser("", strings.NewReader(gidl), Config{
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)
@@ -1469,7 +1469,7 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 				},
 			},
 			Encodings: []ir.HandleDispositionEncoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes:      []byte{255, 255, 255, 255, 0, 0, 0, 0},
 				HandleDispositions: []ir.HandleDisposition{
 					{
@@ -1495,7 +1495,7 @@ func TestParseSucceedsHandlesDefsAfterHandles(t *testing.T) {
 				},
 			},
 			Encodings: []ir.Encoding{{
-				WireFormat: ir.V1WireFormat,
+				WireFormat: ir.V2WireFormat,
 				Bytes:      []byte{255, 255, 255, 255, 0, 0, 0, 0},
 				Handles:    []ir.Handle{0},
 			}},
@@ -1511,7 +1511,7 @@ func TestParseFailsUndefinedHandleInValue(t *testing.T) {
 	gidl := `
 	success("UndefinedHandleInValue") {
 		value = Value { h: #0 },
-		bytes = { v1 = [] },
+		bytes = { v2 = [] },
 	}`
 	_, err := parse(gidl)
 	checkFailure(t, err, "missing definition for handle #0")
@@ -1521,8 +1521,8 @@ func TestParseFailsUndefinedHandleInHandles(t *testing.T) {
 	gidl := `
 	success("UndefinedHandleInHandles") {
 		value = Value {},
-		bytes = { v1 = [] },
-		handles = { v1 = [ #0 ] },
+		bytes = { v2 = [] },
+		handles = { v2 = [ #0 ] },
 	}`
 	_, err := parse(gidl)
 	checkFailure(t, err, "missing definition for handle #0")
@@ -1533,7 +1533,7 @@ func TestParseFailsHandleUsedTwiceInValue(t *testing.T) {
 	success("HandleUsedTwiceInValue") {
 		handle_defs = { #0 = event() },
 		value = Value { h0: #0, h1: #0 },
-		bytes = { v1 = [] },
+		bytes = { v2 = [] },
 	}`
 	_, err := parse(gidl)
 	checkFailure(t, err, "handle #0 used more than once in 'value' section")
@@ -1544,8 +1544,8 @@ func TestParseFailsHandleUsedTwiceInHandles(t *testing.T) {
 	success("HandleUsedTwiceInHandles") {
 		handle_defs = { #0 = event() },
 		value = Value {},
-		bytes = { v1 = [] },
-		handles = { v1 = [ #0, #0 ] },
+		bytes = { v2 = [] },
+		handles = { v2 = [ #0, #0 ] },
 	}`
 	_, err := parse(gidl)
 	checkFailure(t, err, "handle #0 used more than once in 'handles' section")
@@ -1556,7 +1556,7 @@ func TestParseFailsUnusedHandle(t *testing.T) {
 	success("UnusedHandle") {
 		handle_defs = { #0 = event() },
 		value = Value {},
-		bytes = { v1 = [] },
+		bytes = { v2 = [] },
 	}`
 	_, err := parse(gidl)
 	checkFailure(t, err, "unused handle #0")
@@ -1564,7 +1564,7 @@ func TestParseFailsUnusedHandle(t *testing.T) {
 
 func parse(gidlInput string) (ir.All, error) {
 	p := NewParser("", strings.NewReader(gidlInput), Config{
-		WireFormats: []ir.WireFormat{ir.V1WireFormat},
+		WireFormats: []ir.WireFormat{ir.V2WireFormat},
 	})
 	var all ir.All
 	err := p.parseSection(&all)

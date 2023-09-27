@@ -10,12 +10,12 @@ success("SingleHandle") {
         h: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -30,7 +30,7 @@ encode_failure("AbsentNonOptionalHandle") {
 
 decode_failure("AbsentNonOptionalHandle") {
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):4, padding:4,
         ],
     },
@@ -46,12 +46,12 @@ success("SingleOptionalHandlePresent") {
         h: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -60,7 +60,7 @@ success("SingleOptionalHandlePresent") {
 success("SingleOptionalHandleAbsent") {
     value = SingleOptionalHandle{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):4, padding:4,
         ],
     },
@@ -69,7 +69,7 @@ success("SingleOptionalHandleAbsent") {
 decode_failure("SingleHandleMissingAndInvalidPresenceIndicator") {
     bindings_denylist = [dart],
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xab):4, padding:4,
         ],
     },
@@ -83,11 +83,11 @@ decode_failure("SingleHandleInvalidPresenceIndicator") {
         #0 = event(),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xab):4, padding:4,
         ],
     },
-    handles = {v1, v2 = [#0]},
+    handles = {v2 = [#0]},
     type = SingleOptionalHandle,
     err = INVALID_HANDLE_PRESENCE_INDICATOR,
 }
@@ -102,12 +102,12 @@ success("ArrayOfHandles") {
         a: [#2, #0, #1],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, repeat(0xff):4, repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #2, #0, #1,
         ],
     },
@@ -121,12 +121,12 @@ success("ArrayOfOptionalHandles") {
         a: [null, #0, null],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):4, repeat(0xff):4, repeat(0x00):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -142,13 +142,13 @@ success("VectorOfHandles") {
         v: [#2, #0, #1],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(3):8, repeat(0xff):8,
             repeat(0xff):4, repeat(0xff):4, repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #2, #0, #1,
         ],
     },
@@ -164,13 +164,13 @@ success("BoxOfSingleHandlePresentBox") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -179,7 +179,7 @@ success("BoxOfSingleHandlePresentBox") {
 success("BoxOfSingleHandleAbsentBox") {
     value = BoxOfSingleHandle{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):8,
         ],
     },
@@ -195,13 +195,13 @@ success("BoxOfSingleOptionalHandlePresentBoxPresentHandle") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -212,7 +212,7 @@ success("BoxOfSingleOptionalHandlePresentBoxAbsentHandle") {
         b: SingleOptionalHandle{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             repeat(0x00):4, padding:4,
         ],
@@ -222,7 +222,7 @@ success("BoxOfSingleOptionalHandlePresentBoxAbsentHandle") {
 success("BoxOfSingleOptionalHandleAbsentBox") {
     value = BoxOfSingleOptionalHandle{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):8,
         ],
     },
@@ -238,18 +238,13 @@ success("StructOfOptionalUnionOfHandlePresent") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(1):4, repeat(0xff):8, // present envelope
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):4, num(1):2, num(1):2, // inlined envelope
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -258,10 +253,6 @@ success("StructOfOptionalUnionOfHandlePresent") {
 success("StructOfOptionalUnionOfHandleAbsent") {
     value = StructOfOptionalUnionOfHandle{},
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // empty envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, num(0):2, // empty envelope
@@ -306,7 +297,7 @@ decode_failure("HandlesBeforeAndAfterFailureAreClosed") {
     },
     type = AlternatingHandlesAndFailures,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4, // h1
             num(3):8, // failure_trigger1
             repeat(0xff):8,
@@ -320,7 +311,7 @@ decode_failure("HandlesBeforeAndAfterFailureAreClosed") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -366,13 +357,13 @@ success("VectorOfOptionalHandles") {
         v: [null, #0, null],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(3):8, repeat(0xff):8,
             repeat(0x00):4, repeat(0xff):4, repeat(0x00):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -390,12 +381,12 @@ success("MultipleHandleSubtypes") {
         channel: #2,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, repeat(0xff):4, repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -409,12 +400,12 @@ decode_failure("TooManyHandles") {
     },
     type = SingleHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1,
         ],
     },
@@ -424,7 +415,7 @@ decode_failure("TooManyHandles") {
 decode_failure("TooFewHandles") {
     type = SingleHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
@@ -464,7 +455,7 @@ success("ChannelMaxHandles") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(64):8, repeat(0xff):8,
             repeat(0xff):4, repeat(0xff):4, repeat(0xff):4, repeat(0xff):4,
             repeat(0xff):4, repeat(0xff):4, repeat(0xff):4, repeat(0xff):4,
@@ -485,7 +476,7 @@ success("ChannelMaxHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7,
             #8, #9, #10, #11, #12, #13, #14, #15,
             #16, #17, #18, #19, #20, #21, #22, #23,
@@ -524,11 +515,6 @@ decode_success("ChannelMaxUnknownHandlesDropped") {
         table: ReservedFieldTable{},
     },
     bytes = {
-        v1 = [
-            num(1):8, repeat(0xff):8, // Table header
-            num(256):4, num(64):4, repeat(0xff):8, // Reserved envelope
-            repeat(0xff):256, // Handle values.
-        ],
         v2 = [
             num(1):8, repeat(0xff):8, // Table header
             num(256):4, num(64):2, num(0):2, // Reserved envelope
@@ -536,7 +522,7 @@ decode_success("ChannelMaxUnknownHandlesDropped") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7,
             #8, #9, #10, #11, #12, #13, #14, #15,
             #16, #17, #18, #19, #20, #21, #22, #23,
@@ -596,7 +582,7 @@ encode_success("ChannelMaxUnknownHandlesDropped") {
         }),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8, repeat(0xff):8, // Table header
         ],
     },
@@ -646,11 +632,6 @@ success("ChannelMaxUnknownHandlesStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8, repeat(0xff):8, // Table header
-            num(256):4, num(64):4, repeat(0xff):8, // Reserved envelope
-            repeat(0xff):256, // Handle values.
-        ],
         v2 = [
             num(1):8, repeat(0xff):8, // Table header
             num(256):4, num(64):2, num(0):2, // Reserved envelope
@@ -658,7 +639,7 @@ success("ChannelMaxUnknownHandlesStored") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7,
             #8, #9, #10, #11, #12, #13, #14, #15,
             #16, #17, #18, #19, #20, #21, #22, #23,
@@ -680,12 +661,12 @@ encode_success("EncodeHandleTypeAndRightsComeFromFIDL") {
         h: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: event_default},
         ],
     },
@@ -697,12 +678,12 @@ decode_success("DecodeHandleHasExactTypeAndRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -718,12 +699,12 @@ decode_failure("DecodeHandleHasWrongType") {
     },
     type = EventWithDefaultRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -737,12 +718,12 @@ decode_success("DecodeHandleHasExtraRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -758,12 +739,12 @@ decode_failure("DecodeHandleHasTooFewRights") {
     },
     type = EventWithDefaultRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -779,7 +760,7 @@ encode_success("EncodeArrayOfVectorOfEventInStruct") {
     },
     value = ArrayOfVectorOfEventInStructWithReducedRights{h: [[#0]]},
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -787,7 +768,7 @@ encode_success("EncodeArrayOfVectorOfEventInStruct") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -802,7 +783,7 @@ encode_success("EncodeVectorOfArrayOfEventInStruct") {
     },
     value = VectorOfArrayOfEventInStructWithReducedRights{h: [[#0]]},
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -810,7 +791,7 @@ encode_success("EncodeVectorOfArrayOfEventInStruct") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -829,18 +810,6 @@ encode_success("EncodeArrayOfVectorOfEventInTable") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -854,7 +823,7 @@ encode_success("EncodeArrayOfVectorOfEventInTable") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -873,18 +842,6 @@ encode_success("EncodeVectorOfArrayOfEventInTable") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -898,7 +855,7 @@ encode_success("EncodeVectorOfArrayOfEventInTable") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -917,16 +874,6 @@ encode_success("EncodeArrayOfVectorOfEventInUnion") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(24):4, num(1):2, num(0):2,
@@ -938,7 +885,7 @@ encode_success("EncodeArrayOfVectorOfEventInUnion") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -957,16 +904,6 @@ encode_success("EncodeVectorOfArrayOfEventInUnion") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(24):4, num(1):2, num(0):2,
@@ -978,7 +915,7 @@ encode_success("EncodeVectorOfArrayOfEventInUnion") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -996,7 +933,7 @@ decode_success("DecodeArrayOfVectorOfEventInStructExtraRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1004,7 +941,7 @@ decode_success("DecodeArrayOfVectorOfEventInStructExtraRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1020,7 +957,7 @@ decode_failure("DecodeArrayOfVectorOfEventInStructHasTooFewRights") {
     },
     type = ArrayOfVectorOfEventInStructWithDefaultRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1028,7 +965,7 @@ decode_failure("DecodeArrayOfVectorOfEventInStructHasTooFewRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1047,7 +984,7 @@ decode_failure("DecodeArrayOfVectorOfEventInStructType") {
     },
     type = ArrayOfVectorOfEventInStructWithReducedRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1055,7 +992,7 @@ decode_failure("DecodeArrayOfVectorOfEventInStructType") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1074,7 +1011,7 @@ decode_success("DecodeVectorOfArrayOfEventInStructExtraRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1082,7 +1019,7 @@ decode_success("DecodeVectorOfArrayOfEventInStructExtraRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1098,7 +1035,7 @@ decode_failure("DecodeVectorOfArrayOfEventInStructHasTooFewRights") {
     },
     type = VectorOfArrayOfEventInStructWithDefaultRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1106,7 +1043,7 @@ decode_failure("DecodeVectorOfArrayOfEventInStructHasTooFewRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1125,7 +1062,7 @@ decode_failure("DecodeVectorOfArrayOfEventInStructType") {
     },
     type = VectorOfArrayOfEventInStructWithReducedRights,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
             repeat(0xff):4,
@@ -1133,7 +1070,7 @@ decode_failure("DecodeVectorOfArrayOfEventInStructType") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1152,18 +1089,6 @@ decode_success("DecodeArrayOfVectorOfEventInTableExtraRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -1177,7 +1102,7 @@ decode_success("DecodeArrayOfVectorOfEventInTableExtraRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1195,18 +1120,6 @@ decode_failure("DecodeArrayOfVectorOfEventInTableHasTooFewRights") {
     },
     type = ArrayOfVectorOfEventInTableWithDefaultRightsStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -1220,7 +1133,7 @@ decode_failure("DecodeArrayOfVectorOfEventInTableHasTooFewRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1239,18 +1152,6 @@ decode_failure("DecodeArrayOfVectorOfEventInTableType") {
     },
     type = ArrayOfVectorOfEventInTableWithReducedRightsStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -1264,7 +1165,7 @@ decode_failure("DecodeArrayOfVectorOfEventInTableType") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1283,16 +1184,6 @@ decode_success("DecodeArrayOfVectorOfEventInUnionExtraRights") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(24):4, num(1):2, num(0):2,
@@ -1304,7 +1195,7 @@ decode_success("DecodeArrayOfVectorOfEventInUnionExtraRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1322,16 +1213,6 @@ decode_failure("DecodeArrayOfVectorOfEventInUnionHasTooFewRights") {
     },
     type = ArrayOfVectorOfEventInUnionWithDefaultRightsStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(24):4, num(1):2, num(0):2,
@@ -1343,7 +1224,7 @@ decode_failure("DecodeArrayOfVectorOfEventInUnionHasTooFewRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -1362,16 +1243,6 @@ decode_failure("DecodeArrayOfVectorOfEventInUnionType") {
     },
     type = ArrayOfVectorOfEventInUnionWithReducedRightsStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            num(24):4, num(1):4,
-            repeat(0xff):8,
-
-            num(1):8,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(24):4, num(1):2, num(0):2,
@@ -1383,7 +1254,7 @@ decode_failure("DecodeArrayOfVectorOfEventInUnionType") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },

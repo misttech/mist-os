@@ -40,7 +40,6 @@ var corpusLanguages = map[string][]string{
 }
 
 var allWireFormats = []ir.WireFormat{
-	ir.V1WireFormat,
 	ir.V2WireFormat,
 }
 

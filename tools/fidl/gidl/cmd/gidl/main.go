@@ -95,7 +95,6 @@ var allLanguages = func() []string {
 }()
 
 var allWireFormats = []ir.WireFormat{
-	ir.V1WireFormat,
 	ir.V2WireFormat,
 }
 

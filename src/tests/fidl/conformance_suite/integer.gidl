@@ -7,7 +7,7 @@ success("ByteZero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -18,7 +18,7 @@ success("Byte255") {
         value: 255,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -29,7 +29,7 @@ success("Int8Min") {
         value: -128,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -40,7 +40,7 @@ success("Int8Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -51,7 +51,7 @@ success("Int8Max") {
         value: 127,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -62,7 +62,7 @@ success("Int16Min") {
         value: -32768,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -73,7 +73,7 @@ success("Int16Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -84,7 +84,7 @@ success("Int16Max") {
         value: 32767,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -95,7 +95,7 @@ success("Int32Min") {
         value: -2147483648,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -106,7 +106,7 @@ success("Int32Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -117,7 +117,7 @@ success("Int32Max") {
         value: 2147483647,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -128,7 +128,7 @@ success("Int64Min") {
         value: -9223372036854775808,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
         ],
     },
@@ -139,7 +139,7 @@ success("Int64Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -150,7 +150,7 @@ success("Int64Max") {
         value: 9223372036854775807,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
         ],
     },
@@ -161,7 +161,7 @@ success("Uint8Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -172,7 +172,7 @@ success("Uint8Max") {
         value: 255,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -183,7 +183,7 @@ success("Uint16Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -194,7 +194,7 @@ success("Uint16Max") {
         value: 65535,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -205,7 +205,7 @@ success("Uint32Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -216,7 +216,7 @@ success("Uint32Max") {
         value: 4294967295,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -227,7 +227,7 @@ success("Uint64Zero") {
         value: 0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -238,7 +238,7 @@ success("Uint64Max") {
         value: 18446744073709551615,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
         ],
     },

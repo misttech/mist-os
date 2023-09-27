@@ -5,7 +5,7 @@
 success("EmptyStruct") {
     value = EmptyStruct{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, padding:7,
         ],
     },
@@ -14,7 +14,7 @@ success("EmptyStruct") {
 decode_failure("EmptyStructNonZeroBytes") {
     type = EmptyStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, padding:7,
         ],
     },
@@ -26,7 +26,7 @@ success("OneEmptyStructInStruct") {
         v: EmptyStruct{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, padding:7,
         ],
     },
@@ -36,7 +36,7 @@ decode_failure("OneEmptyStructInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
     type = OneEmptyStructInStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, padding:7,
         ],
     },
@@ -49,7 +49,7 @@ success("TwoEmptyStructsInStruct") {
         b: EmptyStruct{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, padding:6,
         ],
     },
@@ -59,7 +59,7 @@ decode_failure("TwoEmptyStructsInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
     type = TwoEmptyStructsInStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x01, padding:6,
         ],
     },
@@ -76,7 +76,7 @@ success("EmptyStructsInArrayInStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, padding:4,
         ],
     },
@@ -86,7 +86,7 @@ decode_failure("EmptyStructsInArrayInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
     type = EmptyStructsInArrayInStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x01, padding:4,
         ],
     },
@@ -104,7 +104,7 @@ success("EmptyStructsInVectorInStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(4):8,
             repeat(0xff):8,
             0x00, 0x00, 0x00, 0x00, padding:4,
@@ -117,7 +117,7 @@ decode_failure("EmptyStructsInVectorInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
     type = EmptyStructsInVectorInStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(4):8,
             repeat(0xff):8,
             0x00, 0x00, 0x00, 0x01, padding:4,
@@ -145,7 +145,7 @@ success("TwoEmptyStructsInStructInVectorInStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(3):8,
             repeat(0xff):8,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, padding:2,
@@ -158,7 +158,7 @@ decode_failure("TwoEmptyStructsInStructInVectorInStructNonZeroBytes") {
     bindings_denylist = [llcpp, hlcpp],
     type = TwoEmptyStructsInStructInVectorInStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(3):8,
             repeat(0xff):8,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x01, padding:2,
@@ -172,7 +172,7 @@ success("OptionalEmptyStructPresent") {
         s: EmptyStruct{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             0x00, padding:7,
         ],
@@ -182,7 +182,7 @@ success("OptionalEmptyStructPresent") {
 success("OptionalEmptyStructAbsent") {
     value = OptionalEmptyStructWrapper{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):8,
         ],
     },
@@ -191,7 +191,7 @@ success("OptionalEmptyStructAbsent") {
 decode_failure("OptionalEmptyStructInvalidPresenceIndicator") {
     bindings_denylist = [dart],
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xab):8,
         ],
     },

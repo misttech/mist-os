@@ -12,7 +12,7 @@ decode_failure("VectorWithHugeCount") {
     // If a binding is written to use uint32 sizes AND also forget to check for
     // overflows, it would incorrectly finish decoding the 16 byte vector payload.
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1073741828):8, // count
             repeat(0xff):8, // presence
             repeat(0):16, // payload of 16 bytes
@@ -32,7 +32,7 @@ success("PresentNonnullableVectorOfHandles") {
         vh0: [#0, #1, #2, #3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count and presence
             num(4):8, repeat(0xff):8,
             // Four handles
@@ -43,7 +43,7 @@ success("PresentNonnullableVectorOfHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -62,7 +62,7 @@ success("PresentNullableVectorOfHandles") {
         vh0: [#0, #1, #2, #3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count and presence
             num(4):8, repeat(0xff):8,
             // Four handles
@@ -73,7 +73,7 @@ success("PresentNullableVectorOfHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -90,13 +90,13 @@ decode_failure("AbsentNonnullableVectorOfHandlesError") {
     },
     type = UnboundedNonnullableVectorOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -114,7 +114,7 @@ decode_failure("InvalidAbsentNonnullableVectorOfHandlesError") {
     },
     type = UnboundedNonnullableVectorOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, absent marker.
             num(4):8, repeat(0):8,
             // Four absent handles.
@@ -125,7 +125,7 @@ decode_failure("InvalidAbsentNonnullableVectorOfHandlesError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -135,7 +135,7 @@ decode_failure("InvalidAbsentNonnullableVectorOfHandlesError") {
 success("AbsentNullableVectorOfHandles") {
     value = UnboundedNullableVectorOfHandles{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
@@ -153,7 +153,7 @@ success("PresentNonnullableBoundedVectorOfHandles") {
         vh0: [#0, #1, #2, #3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, present marker.
             num(4):8, repeat(0xff):8,
             // Four present handles.
@@ -164,7 +164,7 @@ success("PresentNonnullableBoundedVectorOfHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -183,7 +183,7 @@ success("PresentNullableBoundedVectorOfHandles") {
         vh0: [#0, #1, #2, #3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, present marker.
             num(4):8, repeat(0xff):8,
             // Four present handles.
@@ -194,7 +194,7 @@ success("PresentNullableBoundedVectorOfHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -211,13 +211,13 @@ decode_failure("AbsentNonnullableBoundedVectorOfHandlesError") {
     },
     type = Bounded32NonnullableVectorOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -235,7 +235,7 @@ decode_failure("InvalidAbsentNonnullableBoundedVectorOfHandlesError") {
     },
     type = Bounded32NonnullableVectorOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, absent marker.
             num(4):8, repeat(0):8,
             // Four absent handles.
@@ -246,7 +246,7 @@ decode_failure("InvalidAbsentNonnullableBoundedVectorOfHandlesError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -256,7 +256,7 @@ decode_failure("InvalidAbsentNonnullableBoundedVectorOfHandlesError") {
 success("AbsentNullableBoundedVectorOfHandles") {
     value = Bounded32NullableVectorOfHandles{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
@@ -278,7 +278,7 @@ decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
     },
     type = MultipleBoundedNonnullableVectorsOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vh0 count, presence
             num(4):8, repeat(0xff):8,
             // vh1 count, presence
@@ -296,7 +296,7 @@ decode_failure("PresentNonnullableBoundedVectorOfHandlesShortError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7,
         ],
     },
@@ -318,7 +318,7 @@ decode_failure("PresentNullableBoundedVectorOfHandlesShortError") {
     },
     type = MultipleBoundedNullableVectorsOfHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vh0 count, presence
             num(4):8, repeat(0xff):8,
             // vh1 count, presence
@@ -336,7 +336,7 @@ decode_failure("PresentNullableBoundedVectorOfHandlesShortError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7,
         ],
     },
@@ -348,7 +348,7 @@ success("PresentNonnullableVectorOfUint32") {
         vu0: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count and presence
             num(4):8, repeat(0xff):8,
             // Vector values
@@ -367,7 +367,7 @@ success("PresentNullableVectorOfUint32") {
         vu0: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count and presence
             num(4):8, repeat(0xff):8,
             // Vector values
@@ -382,7 +382,7 @@ success("PresentNullableVectorOfUint32") {
 decode_failure("AbsentNonnullableVectorOfUint32Error") {
     type = UnboundedNonnullableVectorOfUint32s,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
@@ -393,7 +393,7 @@ decode_failure("AbsentNonnullableVectorOfUint32Error") {
 decode_failure("AbsentNullableVectorOfUint32NonZeroLengthError") {
     type = UnboundedNullableVectorOfUint32s,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, absent marker.
             num(4):8, repeat(0):8,
         ],
@@ -404,7 +404,7 @@ decode_failure("AbsentNullableVectorOfUint32NonZeroLengthError") {
 success("AbsentNullableVectorOfUint32") {
     value = UnboundedNullableVectorOfUint32s{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
@@ -416,7 +416,7 @@ success("PresentNonnullableBoundedVectorOfUint32") {
         vu0: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, present marker.
             num(4):8, repeat(0xff):8,
             // Vector values.
@@ -435,7 +435,7 @@ success("PresentNullableBoundedVectorOfUint32") {
         vu0: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, present marker.
             num(4):8, repeat(0xff):8,
             // Vector values
@@ -450,7 +450,7 @@ success("PresentNullableBoundedVectorOfUint32") {
 decode_failure("AbsentNonnullableBoundedVectorOfUint32Error") {
     type = UnboundedNonnullableVectorOfUint32s,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of four, absent marker.
             num(4):8, repeat(0):8,
         ],
@@ -461,7 +461,7 @@ decode_failure("AbsentNonnullableBoundedVectorOfUint32Error") {
 success("AbsentNullableBoundedVectorOfUint32") {
     value = Bounded32NullableVectorOfUint32s{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Count of zero, absent marker.
             num(0):8, repeat(0):8,
         ],
@@ -474,7 +474,7 @@ success("MultipleBoundedNonnullableVectorsOfUint32s_randomly_generated") {
         vu1: [1151223630, 483621226, 3773133636, 3428471921, 3913167363, 3828621297, 1893799997],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8, repeat(0xFF):8, // vu0 length, presence
             num(7):8, repeat(0xFF):8, // vu1 length, presence
 
@@ -491,7 +491,7 @@ success("MultipleBoundedNonnullableVectorsOfUint32s_randomly_generated") {
 decode_failure("PresentNonnullableBoundedVectorOfUint32ShortError") {
     type = MultipleBoundedNonnullableVectorsOfUint32s,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vh0 count, presence
             num(4):8, repeat(0xff):8,
             // vh1 count, presence
@@ -514,7 +514,7 @@ decode_failure("PresentNonnullableBoundedVectorOfUint32ShortError") {
 decode_failure("PresentNullableBoundedVectorOfUint32ShortError") {
     type = MultipleBoundedNullableVectorsOfUint32s,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vh0 count, presence
             num(4):8, repeat(0xff):8,
             // vh1 count, presence
@@ -546,7 +546,7 @@ success("MultipleNonnullableVectorsOfUint32s_randomly_generated") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(7):8, repeat(0xFF):8, // vu0 length, presence
             num(8):8, repeat(0xFF):8, // vu1 length, presence
 

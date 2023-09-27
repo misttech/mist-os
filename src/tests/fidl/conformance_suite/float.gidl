@@ -10,7 +10,7 @@ success("Float32PositiveZero") {
         value: 0.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -21,7 +21,7 @@ success("Float32NegativeZero") {
         value: raw_float(0b1_00000000_00000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -32,7 +32,7 @@ success("Float32PositiveOne") {
         value: 1.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0x3f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -43,7 +43,7 @@ success("Float32NegativeOne") {
         value: -1.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0xbf, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -54,7 +54,7 @@ success("Float32Min") {
         value: -3.40282346638528859811704183484516925440e+38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0x7f, 0xff, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -65,7 +65,7 @@ success("Float32Max") {
         value: 3.40282346638528859811704183484516925440e+38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0x7f, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -76,7 +76,7 @@ success("Float32SmallestNormalizedPositive") {
         value: 1.1754943508222875e-38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -87,7 +87,7 @@ success("Float32SmallestNormalizedNegative") {
         value: -1.1754943508222875e-38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0x80, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -98,7 +98,7 @@ success("Float32LargestDenormalizedPositive") {
         value: 1.1754942106924411e-38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -109,7 +109,7 @@ success("Float32LargestDenormalizedNegative") {
         value: -1.1754942106924411e-38,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0x7f, 0x80, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -120,7 +120,7 @@ success("Float32SmallestDenormalizedPositive") {
         value: 1.401298464324817e-45,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -131,7 +131,7 @@ success("Float32SmallestDenormalizedNegative") {
         value: -1.401298464324817e-45,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -142,7 +142,7 @@ success("Float32PositiveInfinity") {
         value: raw_float(0b0_11111111_00000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -153,7 +153,7 @@ success("Float32NegativeInfinity") {
         value: raw_float(0b1_11111111_00000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x80, 0xff, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -165,7 +165,7 @@ encode_success("Float32QuietNaN") {
         value: raw_float(0b0_11111111_10000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0xc0, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -178,7 +178,7 @@ encode_success("Float32SignallingNaN") {
         value: raw_float(0b0_11111111_01000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0xa0, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -197,7 +197,7 @@ encode_success("Float32SignallingNaNCovertedToQuiet") {
         value: raw_float(0b0_11111111_01000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // 0xe0 instead of 0xa0: quiet bit set
             0x00, 0x00, 0xe0, 0x7f, 0x00, 0x00, 0x00, 0x00,
         ],
@@ -209,7 +209,7 @@ success("Float64PositiveZero") {
         value: 0.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -220,7 +220,7 @@ success("Float64NegativeZero") {
         value: raw_float(0b1_00000000000_0000000000000000000000000000000000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
         ],
     },
@@ -231,7 +231,7 @@ success("Float64PositiveOne") {
         value: 1.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f,
         ],
     },
@@ -242,7 +242,7 @@ success("Float64NegativeOne") {
         value: -1.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0xbf,
         ],
     },
@@ -253,7 +253,7 @@ success("Float64Min") {
         value: -1.797693134862315708145274237317043567981e+308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0xff,
         ],
     },
@@ -264,7 +264,7 @@ success("Float64Max") {
         value: 1.797693134862315708145274237317043567981e+308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xef, 0x7f,
         ],
     },
@@ -275,7 +275,7 @@ success("Float64SmallestNormalizedPositive") {
         value: 2.2250738585072014e-308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00,
         ],
     },
@@ -286,7 +286,7 @@ success("Float64SmallestNormalizedNegative") {
         value: -2.2250738585072014e-308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x80,
         ],
     },
@@ -297,7 +297,7 @@ success("Float64LargestDenormalizedPositive") {
         value: 2.225073858507201e-308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x00,
         ],
     },
@@ -308,7 +308,7 @@ success("Float64LargestDenormalizedNegative") {
         value: -2.225073858507201e-308,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x0f, 0x80,
         ],
     },
@@ -319,7 +319,7 @@ success("Float64SmallestDenormalizedPositive") {
         value: 5.0e-324,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -330,7 +330,7 @@ success("Float64SmallestDenormalizedNegative") {
         value: -5.0e-324,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
         ],
     },
@@ -341,7 +341,7 @@ success("Float64PositiveInfinity") {
         value: raw_float(0b0_11111111111_0000000000000000000000000000000000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x7f,
         ],
     },
@@ -352,7 +352,7 @@ success("Float64NegativeInfinity") {
         value: raw_float(0b1_11111111111_0000000000000000000000000000000000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0xff,
         ],
     },
@@ -364,7 +364,7 @@ encode_success("Float64QuietNaN") {
         value: raw_float(0b0_11111111111_1000000000000000000000000000000000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0x7f,
         ],
     },
@@ -376,7 +376,7 @@ encode_success("Float64SignallingNaN") {
         value: raw_float(0b0_11111111111_0100000000000000000000000000000000000000000000000000),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf4, 0x7f,
         ],
     },

@@ -7,7 +7,7 @@ success("Length2String") {
         length_2_string: "ab",
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8, // count
             repeat(0xFF):8, // presence
             0x61, 0x62, // length_2_string
@@ -28,7 +28,7 @@ decode_failure("EmptyStringWithNullPtrBody") {
     bindings_denylist = [rust],
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -41,7 +41,7 @@ success("EmptyOptionalStringWithNullPtrBody") {
         str: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -51,7 +51,7 @@ success("EmptyOptionalStringWithNullPtrBody") {
 decode_failure("OptionalStringWithInvalidPresenceIndicator") {
     bindings_denylist = [dart],
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):8, // length of string data
             repeat(0xab):8, // invalid null pointer to content
         ],
@@ -63,7 +63,7 @@ decode_failure("OptionalStringWithInvalidPresenceIndicator") {
 decode_failure("NonEmptyStringWithNullPtrBody") {
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -74,7 +74,7 @@ decode_failure("NonEmptyStringWithNullPtrBody") {
 decode_failure("NonEmptyOptionalStringWithNullPtrBody") {
     type = OptionalStringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -87,7 +87,7 @@ decode_failure("StringWrongPointerValue") {
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // invalid pointer to content
         ],
@@ -100,7 +100,7 @@ decode_failure("OptionalStringWrongPointerValue") {
     bindings_denylist = [dart],
     type = OptionalStringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // invalid pointer to content
         ],
@@ -112,7 +112,7 @@ decode_failure("OptionalStringWrongPointerValue") {
 decode_failure("StringCountExceedsLimitByALot") {
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0xffffffffffffffff):8, // length of string data
             repeat(0xff):8, // presence marker
         ],
@@ -124,7 +124,7 @@ decode_failure("StringCountExceedsLimitByALot") {
 decode_failure("StringCountExceedsLimitByOne") {
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0x100000000):8, // length of string data
             repeat(0xff):8, // presence marker
         ],
@@ -137,7 +137,7 @@ decode_failure("StringCountExceedsLimitByOne") {
 decode_failure("StringCountExceedsTotalMessageSize") {
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(25):8, // length of string data (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // string data
@@ -151,7 +151,7 @@ decode_failure("StringCountExceedsTotalMessageSize") {
 decode_failure("StringCountExceedsRemainingMessageSize") {
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(9):8, // length of string data (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // string data

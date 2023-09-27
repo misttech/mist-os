@@ -13,12 +13,12 @@ success("SinglePresentHandle") {
         h: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -33,12 +33,12 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_0") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, 0xaa, padding:3,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -53,12 +53,12 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_1") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:1, 0xaa, padding:2,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -73,12 +73,12 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_2") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:2, 0xaa, padding:1,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -93,12 +93,12 @@ decode_failure("SinglePresentHandleCheckTrailingPadding_3") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:3, 0xaa,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -112,12 +112,12 @@ decode_failure("TooManyHandlesSpecifiedError") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1,
         ],
     },
@@ -134,13 +134,13 @@ decode_failure("TooManyBytesSpecifiedError") {
     },
     type = NonnullableHandle,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
             padding:8,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1,
         ],
     },
@@ -162,7 +162,7 @@ success("MultiplePresentHandles") {
         data2: 2,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):4,
             repeat(0xff):4,
             num(1):8,
@@ -172,7 +172,7 @@ success("MultiplePresentHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -181,7 +181,7 @@ success("MultiplePresentHandles") {
 success("SingleAbsentHandle") {
     value = NullableHandle{},
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0):4,
             padding:4,
         ],
@@ -195,7 +195,7 @@ success("MultipleAbsentHandles") {
         data2: 2,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):4,
             repeat(0):4,
             num(1):8,
@@ -217,7 +217,7 @@ success("ArrayOfPresentHandles") {
         handles: [#0, #1, #2, #3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -225,7 +225,7 @@ success("ArrayOfPresentHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -240,7 +240,7 @@ decode_failure("ArrayOfPresentHandlesTooFewError") {
     },
     type = ArrayOfNonnullableHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -248,7 +248,7 @@ decode_failure("ArrayOfPresentHandlesTooFewError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1,
         ],
     },
@@ -265,7 +265,7 @@ decode_failure("ArrayOfNonnullableHandlesSomeAbsentError") {
     },
     type = ArrayOfNonnullableHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -273,7 +273,7 @@ decode_failure("ArrayOfNonnullableHandlesSomeAbsentError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -290,7 +290,7 @@ success("ArrayOfNullableHandles") {
         handles: [#0, null, #1, null, #2],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0):4,
             repeat(0xff):4,
@@ -300,7 +300,7 @@ success("ArrayOfNullableHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -315,7 +315,7 @@ decode_failure("ArrayOfNullableHandlesWithInsufficientHandlesError") {
     },
     type = ArrayOfNullableHandles,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0):4,
             repeat(0xff):4,
@@ -325,7 +325,7 @@ decode_failure("ArrayOfNullableHandlesWithInsufficientHandlesError") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1,
         ],
     },
@@ -357,7 +357,7 @@ success("ArrayOfArrayOfPresentHandles") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -373,7 +373,7 @@ success("ArrayOfArrayOfPresentHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11,
         ],
     },
@@ -394,7 +394,7 @@ success("OutOfLineArrayOfNonnullableHandles") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // Presence marker
             repeat(0xff):8,
             // Out-of-line object
@@ -405,7 +405,7 @@ success("OutOfLineArrayOfNonnullableHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },

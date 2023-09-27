@@ -15,7 +15,7 @@ success("GoldenBoolStruct") {
         v: true,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):1, padding:7,
         ],
     },
@@ -26,7 +26,7 @@ success("GoldenIntStruct") {
         v: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2, padding:6,
         ],
     },
@@ -37,7 +37,7 @@ success("GoldenUintStruct") {
         v: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2, padding:6,
         ],
     },
@@ -48,7 +48,7 @@ success("GoldenFloatStruct") {
         v: 0.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):4, padding:4,
         ],
     },
@@ -59,7 +59,7 @@ success("GoldenDoubleStruct") {
         v: 0.0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8,
         ],
     },
@@ -70,7 +70,7 @@ success("GoldenStringStruct") {
         v: "abcd",
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(4):8,
             repeat(0xff):8,
             0x61, 0x62, 0x63, 0x64, padding:4,
@@ -83,7 +83,7 @@ success("GoldenNullableStringStructNonNull") {
         v: "abcd",
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(4):8,
             repeat(0xff):8,
             0x61, 0x62, 0x63, 0x64, padding:4,
@@ -96,7 +96,7 @@ success("GoldenNullableStringStructNull") {
         v: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8,
             repeat(0x00):8,
         ],
@@ -108,7 +108,7 @@ success("GoldenEnumStruct") {
         v: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2, padding:6,
         ],
     },
@@ -119,7 +119,7 @@ success("GoldenBitsStruct") {
         v: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2, padding:6,
         ],
     },
@@ -132,13 +132,6 @@ success("GoldenTableStruct") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-            num(1):4, padding:4,
-        ],
         v2 = [
             num(1):8, // len
             repeat(0xff):8, // presence
@@ -155,12 +148,6 @@ success("GoldenUnionStruct") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-            num(1):2, padding:6,
-        ],
         v2 = [
             num(1):8,
             num(1):4, num(0):2, num(1):2,
@@ -175,12 +162,6 @@ success("GoldenNullableUnionStructNonNull") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-            num(1):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             num(1):4, num(0):2, num(1):2,
@@ -193,11 +174,6 @@ success("GoldenNullableUnionStructNull") {
         v: null,
     },
     bytes = {
-        v1 = [
-            num(0):8,
-            num(0):4, num(0):4,
-            repeat(0x00):8,
-        ],
         v2 = [
             num(0):8,
             num(0):4, num(0):2, num(0):2,
@@ -210,7 +186,7 @@ success("GoldenByteArrayStruct") {
         v: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x02, 0x03, 0x04, padding:4,
         ],
     },
@@ -226,7 +202,7 @@ success("GoldenStructArrayStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x02, 0x00, padding:4,
         ],
     },
@@ -237,7 +213,7 @@ success("GoldenByteVectorStruct") {
         v: [1, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(12):8,
             repeat(0xff):8,
             0x01, 0x02, 0x03, 0x04, 0x01, 0x02, 0x03, 0x04,
@@ -251,7 +227,7 @@ success("GoldenByteNullableVectorStructNonNull") {
         v: [1, 2, 3, 4],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(4):8,
             repeat(0xff):8,
             0x01, 0x02, 0x03, 0x04, padding:4,
@@ -264,7 +240,7 @@ success("GoldenNullableByteVectorStructNull") {
         v: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8,
             repeat(0x00):8,
         ],
@@ -281,7 +257,7 @@ success("GoldenStructVectorStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8,
             repeat(0xff):8,
             0x01, 0x00, 0x02, 0x00, padding:4,
@@ -296,7 +272,7 @@ success("GoldenNullableStructNonNull") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             num(1):1, padding:7,
         ],
@@ -308,7 +284,7 @@ success("GoldenNullableStructNull") {
         v: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):8,
         ],
     },
@@ -322,12 +298,12 @@ encode_success("GoldenHandleBasicRightsStruct") {
         v: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },
@@ -339,12 +315,12 @@ decode_success("GoldenHandleBasicRightsStruct") {
         #0 = event(rights: event_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -361,12 +337,12 @@ success("GoldenNullableHandleStructNonNull") {
         v: #0,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -377,7 +353,7 @@ success("GoldenNullableHandleStructNull") {
         v: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0x00):4, padding:4,
         ],
     },
@@ -395,7 +371,7 @@ encode_failure("GoldenStringWithMaxSize2") {
 decode_failure("GoldenStringStructNullBody") {
     type = GoldenStringStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of string data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -427,12 +403,12 @@ encode_success("GoldenHandleBasicRightsStructReEncode") {
         },
     }),
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4, padding:4,
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: event, rights: basic},
         ],
     },

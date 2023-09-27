@@ -999,7 +999,7 @@ func (p *Parser) parseDecode(scope scope) (ir.DecodedRecord, error) {
 }
 
 // This is not expressed in terms of parseBody because it parses bytes/handles
-// without wire formats (e.g. `bytes = [...]`, not `bytes = { v1 = [...] }`).
+// without wire formats (e.g. `bytes = [...]`, not `bytes = { v2 = [...] }`).
 func (p *Parser) parseUnknownData() (ir.UnknownData, error) {
 	var result ir.UnknownData
 	parsedKinds := make(map[bodyElement]struct{})

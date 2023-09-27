@@ -11,15 +11,6 @@ success("TableFieldInlined") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            num(123):8,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -41,15 +32,6 @@ success("TableFieldInlinedHandle") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(8):4, num(1):4,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -58,7 +40,7 @@ success("TableFieldInlinedHandle") {
         ],
     },
     handles = {
-        v1, v2 = [#0],
+        v2 = [#0],
     },
 }
 
@@ -146,23 +128,6 @@ success("TableFieldUnsetFlexibleEnumInlinedSigned") {
         },
     },
     bytes = {
-        v1 = [
-            num(3):8, // max ordinal
-            repeat(0xff):8, // alloc present
-
-            num(0):8, // empty `signed_enum` envelope
-            num(0):8, // absent `signed_enum` pointer
-
-            num(8):8, // set 8-byte `unsigned_enum` envelope
-            repeat(0xff):8, // present `unsigned_enum` pointer
-
-            num(8):8, // set 8-byte `always_set` envelope
-            repeat(0xff):8, // present `always_set` pointer
-
-            num(1):8, // `unsigned_enum` out-of-line value
-
-            num(0):8, // `always_set` out-of-line value
-        ],
         v2 = [
             num(3):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -184,23 +149,6 @@ success("TableFieldUnsetFlexibleEnumInlinedUnsigned") {
         },
     },
     bytes = {
-        v1 = [
-            num(3):8, // max ordinal
-            repeat(0xff):8, // alloc present
-
-            num(8):8, // set 8-byte `signed_enum` envelope
-            repeat(0xff):8, // present `signed_enum` pointer
-
-            num(0):8, // empty `unsigned_enum` envelope
-            num(0):8, // absent `unsigned_enum` pointer
-
-            num(8):8, // set 8-byte `always_set` envelope
-            repeat(0xff):8, // present `always_set` pointer
-
-            num(1):8, // `signed_enum` out-of-line value
-
-            num(0):8, // `always_set` out-of-line value
-        ],
         v2 = [
             num(3):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -220,15 +168,6 @@ success("TableFieldOutOfLine") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            num(123):8,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -439,15 +378,6 @@ success("TableFieldUnknownOutOfLineStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            num(123):8,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -467,15 +397,6 @@ decode_success("TableFieldUnknownOutOfLineDropped") {
         t: TableFieldUnknown{},
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            repeat(0xff):8,
-
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            num(123):8,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):8,
@@ -507,7 +428,7 @@ encode_success("TableFieldUnknownOutOfLineDropped") {
         }),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8, repeat(0xff):8,
         ],
     },
@@ -549,7 +470,7 @@ decode_failure("TableInlineEnvelopeWhenOutOfLineRequired") {
 decode_failure("TableCountExceedsLimitByALot") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0xffffffffffffffff):8, // table field count
             repeat(0xff):8, // presence marker
         ],
@@ -561,7 +482,7 @@ decode_failure("TableCountExceedsLimitByALot") {
 decode_failure("TableCountExceedsLimitByOne") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0x100000000):8, // table field count
             repeat(0xff):8, // presence marker
         ],
@@ -574,7 +495,7 @@ decode_failure("TableCountExceedsLimitByOne") {
 decode_failure("TableCountExceedsTotalMessageSize") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(25):8, // table field count (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // table data
@@ -588,7 +509,7 @@ decode_failure("TableCountExceedsTotalMessageSize") {
 decode_failure("TableCountExceedsRemainingMessageSize") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(9):8, // table field count (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // table data
@@ -602,7 +523,7 @@ success("EmptyTable") {
         table: EmptyTable{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
         ],
@@ -612,7 +533,7 @@ success("EmptyTable") {
 decode_failure("TableWithAbsentAlloc") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8, // max ordinal
             repeat(0x00):8, // alloc absent
         ],
@@ -623,7 +544,7 @@ decode_failure("TableWithAbsentAlloc") {
 decode_failure("TableWithInvalidAlloc") {
     type = StructOfEmptyTable,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8, // max ordinal
             repeat(0xab):8, // alloc absent
         ],
@@ -636,7 +557,7 @@ success("SimpleTableEmpty") {
         table: SimpleTable{},
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
         ],
@@ -651,22 +572,6 @@ success("SimpleTableXAndY") {
         },
     },
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -688,13 +593,6 @@ success("SimpleTableJustX") {
         },
     },
     bytes = {
-        v1 = [
-            1, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-        ],
         v2 = [
             1, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -711,21 +609,6 @@ success("SimpleTableJustY") {
         },
     },
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -747,18 +630,6 @@ success("TableWithStringAndVectorNoVectorContent") {
         },
     },
     bytes = {
-        v1 = [
-            2, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            24, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // envelope 1: alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // envelope 2: alloc present
-            5, 0, 0, 0, 0, 0, 0, 0, // element 1: length
-            255, 255, 255, 255, 255, 255, 255, 255, // element 1: alloc present
-            104, 101, 108, 108, 111, 0, 0, 0, // element 1: hello
-            27, 0, 0, 0, 0, 0, 0, 0, // element 2: value
-        ],
         v2 = [
             2, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -782,23 +653,6 @@ success("SimpleTableThenUint64") {
         number: 0xdeadbeefdeadbeef,
     },
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0xef, 0xbe, 0xad, 0xde, 0xef, 0xbe, 0xad, 0xde, // uint64 number
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -823,27 +677,6 @@ success("ReverseOrdinalTable") {
         },
     },
     bytes = {
-        v1 = [
-            // table
-            0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // max ordinal 4
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
-            // z envelope (ordinal 1)
-            0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 8 bytes, 0 handles
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
-            // y envelope (ordinal 2)
-            0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 8 bytes, 0 handles
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
-            // empty envelope (reserved ordinal 3)
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0 bytes, 0 handles
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // null
-            // x envelope (ordinal 4)
-            0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 8 bytes, 0 handles
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // present
-
-            0xcc, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // z
-            0xbb, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // y
-            0xaa, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // x
-        ],
         v2 = [
             // table
             0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // max ordinal 4
@@ -872,15 +705,6 @@ success("TableWithGaps") {
         },
     },
     bytes = {
-        v1 = [
-            num(4):8, repeat(0xff):8, // max ordinal, present
-            num(0):4, num(0):4, repeat(0x00):8, // envelope #1: empty
-            num(8):4, num(0):4, repeat(0xff):8, // envelope #2: second
-            num(0):4, num(0):4, repeat(0x00):8, // envelope #3: empty
-            num(8):4, num(0):4, repeat(0xff):8, // envelope #2: fourth
-            num(1):4, padding:4, // second
-            num(2):4, padding:4, // fourth
-        ],
         v2 = [
             num(4):8, repeat(0xff):8, // max ordinal, present
             num(0):4, num(0):2, num(0):2, // envelope #1: empty
@@ -895,23 +719,6 @@ decode_success("ValueTableUnknownReservedDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -975,23 +782,6 @@ decode_success("ResourceTableUnknownReservedDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1055,23 +845,6 @@ success("ValueTableUnknownReservedStored") {
     // TODO(fxbug.dev/85383): Remove in favor of ValueTableUnknownReservedDropped.
     bindings_allowlist = [dart, go],
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1100,23 +873,6 @@ success("ResourceTableUnknownReservedStored") {
     // TODO(fxbug.dev/85383): Remove in favor of ResourceTableUnknownReservedDropped.
     bindings_allowlist = [dart, go],
     bytes = {
-        v1 = [
-            5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 3
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-        ],
         v2 = [
             5, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1145,25 +901,6 @@ decode_success("ValueTableUnknownTrailingDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
-        v1 = [
-            6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
-        ],
         v2 = [
             6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1229,25 +966,6 @@ decode_success("ResourceTableUnknownTrailingDropped") {
     // TODO(fxbug.dev/85383): Drop unknown data in all bindings.
     bindings_denylist = [dart, go],
     bytes = {
-        v1 = [
-            6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
-        ],
         v2 = [
             6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1313,25 +1031,6 @@ success("ValueTableUnknownTrailingStored") {
     // TODO(fxbug.dev/85383): Remove in favor of ValueTableUnknownTrailingDropped.
     bindings_allowlist = [dart, go],
     bytes = {
-        v1 = [
-            6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
-        ],
         v2 = [
             6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1361,25 +1060,6 @@ success("ResourceTableUnknownTrailingStored") {
     // TODO(fxbug.dev/85383): Remove in favor of ResourceTableUnknownTrailingDropped.
     bindings_allowlist = [dart, go],
     bytes = {
-        v1 = [
-            6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 1: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 2: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 3: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            0, 0, 0, 0, 0, 0, 0, 0, // envelope 4: num bytes / num handles
-            0, 0, 0, 0, 0, 0, 0, 0, // no alloc
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 5: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            8, 0, 0, 0, 0, 0, 0, 0, // envelope 6: num bytes / num handles
-            255, 255, 255, 255, 255, 255, 255, 255, // alloc present
-            42, 0, 0, 0, 0, 0, 0, 0, // field X
-            67, 0, 0, 0, 0, 0, 0, 0, // field Y
-            1, 2, 3, 4, 5, 6, 7, 8, // 8 unknown bytes for envelope 6
-        ],
         v2 = [
             6, 0, 0, 0, 0, 0, 0, 0, // max ordinal
             255, 255, 255, 255, 255, 255, 255, 255, // alloc present
@@ -1419,18 +1099,6 @@ decode_success("ValueTableUnknownTrailingHandlesDropped") {
         },
     },
     bytes = {
-        v1 = [
-            num(6):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 2
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 3
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 4
-            num(8):4, num(0):4, repeat(0xff):8, // envelope 5 (field Y)
-            num(24):4, num(3):4, repeat(0xff):8, // envelope 6 (unknown)
-            num(67):8, // field Y
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(6):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -1445,7 +1113,7 @@ decode_success("ValueTableUnknownTrailingHandlesDropped") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -1512,18 +1180,6 @@ decode_success("ResourceTableUnknownTrailingHandlesDropped") {
         },
     },
     bytes = {
-        v1 = [
-            num(6):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 2
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 3
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 4
-            num(8):4, num(0):4, repeat(0xff):8, // envelope 5 (field Y)
-            num(24):4, num(3):4, repeat(0xff):8, // envelope 6 (unknown)
-            num(67):8, // field Y
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(6):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -1538,7 +1194,7 @@ decode_success("ResourceTableUnknownTrailingHandlesDropped") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -1601,18 +1257,6 @@ decode_failure("ValueTableUnknownTrailingHandlesRejected") {
     },
     type = StructOfSimpleTable,
     bytes = {
-        v1 = [
-            num(6):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 2
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 3
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 4
-            num(8):4, num(0):4, repeat(0xff):8, // envelope 5 (field Y)
-            num(24):4, num(3):4, repeat(0xff):8, // envelope 6 (unknown)
-            num(67):8, // field Y
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(6):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -1627,7 +1271,7 @@ decode_failure("ValueTableUnknownTrailingHandlesRejected") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -1652,18 +1296,6 @@ success("ResourceTableUnknownTrailingHandlesStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(6):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 2
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 3
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 4
-            num(8):4, num(0):4, repeat(0xff):8, // envelope 5 (field Y)
-            num(24):4, num(3):4, repeat(0xff):8, // envelope 6 (unknown)
-            num(67):8, // field Y
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(6):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -1678,7 +1310,7 @@ success("ResourceTableUnknownTrailingHandlesStored") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2,
         ],
     },
@@ -1687,13 +1319,6 @@ success("ResourceTableUnknownTrailingHandlesStored") {
 decode_failure("ValueTableUnknownBytesNonMultipleOf8") {
     type = StructOfSimpleTable,
     bytes = {
-        v1 = [
-            num(2):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(20):4, num(0):4, repeat(0xff):8, // envelope 2 (unknown)
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(2):8, // max ordinal
             repeat(0xff):8, // alloc present
@@ -1708,13 +1333,6 @@ decode_failure("ValueTableUnknownBytesNonMultipleOf8") {
 decode_failure("ResourceTableUnknownBytesNonMultipleOf8") {
     type = StructOfSimpleResourceTable,
     bytes = {
-        v1 = [
-            num(2):8, // max ordinal
-            repeat(0xff):8, // alloc present
-            num(0):4, num(0):4, repeat(0):8, // absent envelope 1
-            num(20):4, num(0):4, repeat(0xff):8, // envelope 2 (unknown)
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(2):8, // max ordinal
             repeat(0xff):8, // alloc present

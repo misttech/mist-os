@@ -18,7 +18,7 @@ encode_success("EncodeStructOfEndpoints_ExpectedRights") {
         optional_server_end: #3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -26,7 +26,7 @@ encode_success("EncodeStructOfEndpoints_ExpectedRights") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: channel, rights: channel_default},
             {#1, type: channel, rights: channel_default},
             {#2, type: channel, rights: channel_default},
@@ -53,7 +53,7 @@ encode_success("EncodeStructOfEndpoints_TypeAndRightsComeFromFIDL") {
         optional_server_end: #3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -61,7 +61,7 @@ encode_success("EncodeStructOfEndpoints_TypeAndRightsComeFromFIDL") {
         ],
     },
     handle_dispositions = {
-        v1, v2 = [
+        v2 = [
             {#0, type: channel, rights: channel_default},
             {#1, type: channel, rights: channel_default},
             {#2, type: channel, rights: channel_default},
@@ -80,7 +80,7 @@ decode_success("DecodeStructOfEndpoints_ExpectedRights") {
         #3 = channel(rights: channel_default),
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -88,7 +88,7 @@ decode_success("DecodeStructOfEndpoints_ExpectedRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -111,7 +111,7 @@ decode_failure("DecodeStructOfEndpoints_WrongType") {
     },
     type = StructOfEndpoints,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -119,7 +119,7 @@ decode_failure("DecodeStructOfEndpoints_WrongType") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -137,7 +137,7 @@ decode_failure("DecodeStructOfEndpoints_InsufficientRights") {
     },
     type = StructOfEndpoints,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0xff):4,
             repeat(0xff):4,
@@ -145,7 +145,7 @@ decode_failure("DecodeStructOfEndpoints_InsufficientRights") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -164,7 +164,7 @@ success("StructOfEndpoints_Absent") {
         server_end: #1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):4,
             repeat(0x00):4,
             repeat(0xff):4,
@@ -172,7 +172,7 @@ success("StructOfEndpoints_Absent") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
             #1,
         ],
@@ -193,20 +193,6 @@ success("TableOfEndpoints") {
         },
     },
     bytes = {
-        v1 = [
-            // Table header
-            num(2):8,
-            repeat(0xff):8,
-
-            // Envelope headers
-            num(8):4, num(1):4,
-            repeat(0xff):8,
-            num(8):4, num(1):4,
-            repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             // Header
             num(2):8,
@@ -220,7 +206,7 @@ success("TableOfEndpoints") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
             #1,
         ],
@@ -239,19 +225,13 @@ success("UnionOfEndpoints_ClientEnd") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(1):4, repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(1):8,
             repeat(0xff):4, num(1):2, num(1):2,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },
@@ -269,19 +249,13 @@ success("UnionOfEndpoints_ServerEnd") {
         },
     },
     bytes = {
-        v1 = [
-            num(2):8,
-            num(8):4, num(1):4, repeat(0xff):8,
-
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             num(2):8,
             repeat(0xff):4, num(1):2, num(1):2,
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0,
         ],
     },

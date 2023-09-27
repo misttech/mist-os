@@ -73,7 +73,7 @@ success("RecursiveOptionalStructUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):256, // 0 - 31
             repeat(0x00):8, // 32
         ],
@@ -158,7 +158,7 @@ encode_failure("RecursiveOptionalStructExceedLimit") {
 decode_failure("RecursiveOptionalStructExceedLimit") {
     type = RecursiveOptionalStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):264, // 0 - 32
             repeat(0x00):8, // 32
         ],
@@ -241,7 +241,7 @@ success("RecursiveOptionalStructArrayWrapperUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):256, // 0 - 31
             repeat(0x00):8, // 32
         ],
@@ -330,7 +330,7 @@ encode_failure("RecursiveOptionalStructArrayWrapperExceedLimit") {
 decode_failure("RecursiveOptionalStructArrayWrapperExceedLimit") {
     type = RecursiveOptionalStructArrayWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):264, // 0 - 32
             repeat(0x00):8, // 32
         ],
@@ -411,13 +411,6 @@ success("RecursiveOptionalAndUnionUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1 = [
-            num(1):4, padding:4, // ordinal, padding
-            num(256):4, num(0):4, // num bytes, num handles
-            repeat(0xff):8, // union data
-            repeat(0xff):248, // 1 - 31
-            repeat(0x00):8, // 32
-        ],
         v2 = [
             num(1):4, padding:4, // ordinal, padding
             num(256):4, num(0):2, num(0):2, // num bytes, num handles, inlined?
@@ -507,13 +500,6 @@ encode_failure("RecursiveOptionalAndUnionExceedLimit") {
 decode_failure("RecursiveOptionalAndUnionExceedLimit") {
     type = RecursiveOptionalAndUnionStruct,
     bytes = {
-        v1 = [
-            num(1):4, padding:4, // ordinal, padding
-            num(264):4, num(0):4, // num bytes, num handles
-            repeat(0xff):8, // union data
-            repeat(0xff):256, // 1 - 32
-            repeat(0x00):8, // 33
-        ],
         v2 = [
             num(1):4, padding:4, // ordinal, padding
             num(264):4, num(0):2, num(0):2, // num bytes, num handles, inlined?
@@ -595,14 +581,6 @@ success("RecursiveOptionalAndTableUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1 = [
-            num(1):8, // table max ordinal
-            repeat(0xff):8, // table vector body
-            num(248):4, num(0):4, // num bytes, num handles
-            repeat(0xff):8, // envelope data
-            repeat(0xff):240, // 2 - 31
-            repeat(0x00):8, // 32
-        ],
         v2 = [
             num(1):8, // table max ordinal
             repeat(0xff):8, // table vector body
@@ -689,13 +667,14 @@ encode_failure("RecursiveOptionalAndTableExceedLimit") {
 }
 
 decode_failure("RecursiveOptionalAndTableExceedLimit") {
+    // TODO(fxbug.dev/134227): Fix in C++.
+    bindings_denylist = [cpp],
     type = RecursiveOptionalAndTableStruct,
     bytes = {
-        v1 = [
+        v2 = [
             num(1):8, // table max ordinal
             repeat(0xff):8, // table vector body
-            num(256):4, num(0):4, // num bytes, num handles
-            repeat(0xff):8, // envelope data
+            num(256):4, num(0):2, num(0):2, // envelope
             repeat(0xff):248, // 2 - 32
             repeat(0x00):8, // 33
         ],
@@ -775,7 +754,7 @@ success("RecursiveOptionalAndVectorUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8, // vector count
             repeat(0xff):8, // vector data
             repeat(0xff):248, // 1 - 31
@@ -863,7 +842,7 @@ encode_failure("RecursiveOptionalAndVectorExceedLimit") {
 decode_failure("RecursiveOptionalAndVectorExceedLimit") {
     type = RecursiveOptionalAndVectorStruct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8, // vector count
             repeat(0xff):8, // vector data
             repeat(0xff):256, // 1 - 32
@@ -942,7 +921,7 @@ success("RecursiveOptionalStructWithStringUnderLimit") {
     },
     // gidl-format on
     bytes = {
-        v1, v2 = [
+        v2 = [
             // 0
             repeat(0xff):8, // inner,
             num(0):8, // string count
@@ -1153,7 +1132,7 @@ encode_failure("RecursiveOptionalStructWithStringExceedLimit") {
 decode_failure("RecursiveOptionalStructWithStringExceedLimit") {
     type = RecursiveOptionalStructWithString,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // 0
             repeat(0xff):8, // inner,
             num(0):8, // string count

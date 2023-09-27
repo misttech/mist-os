@@ -11,7 +11,7 @@ success("RecursiveOptionalStruct") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             repeat(0xff):8,
             repeat(0xff):8,
             repeat(0x00):8,
@@ -34,7 +34,7 @@ success("RecursiveVectorStruct") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):8,
             repeat(0xff):8,
 

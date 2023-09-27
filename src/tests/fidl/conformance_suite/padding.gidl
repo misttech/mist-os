@@ -10,7 +10,7 @@ success("CorrectPaddingBetweenFieldsInt8Int16") {
         b: 0x0203,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:1,
             0x03, 0x02,
@@ -22,7 +22,7 @@ success("CorrectPaddingBetweenFieldsInt8Int16") {
 decode_failure("BadPaddingBetweenFieldsInt8Int16") {
     type = PaddingBetweenFieldsInt8Int16,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             0xee, // should be padding:1
             0x03, 0x02,
@@ -38,7 +38,7 @@ success("CorrectPaddingBetweenFieldsInt8Int32") {
         b: 0x02030405,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:3,
             0x05, 0x04, 0x03, 0x02,
@@ -49,7 +49,7 @@ success("CorrectPaddingBetweenFieldsInt8Int32") {
 decode_failure("BadPaddingBetweenFieldsInt8Int32LowerByte") {
     type = PaddingBetweenFieldsInt8Int32,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             0xee, padding:2, // should be padding:3
             0x05, 0x04, 0x03, 0x02,
@@ -61,7 +61,7 @@ decode_failure("BadPaddingBetweenFieldsInt8Int32LowerByte") {
 decode_failure("BadPaddingBetweenFieldsInt8Int32MiddleByte") {
     type = PaddingBetweenFieldsInt8Int32,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:1, 0xee, padding:1, // should be padding:3
             0x05, 0x04, 0x03, 0x02,
@@ -73,7 +73,7 @@ decode_failure("BadPaddingBetweenFieldsInt8Int32MiddleByte") {
 decode_failure("BadPaddingBetweenFieldsInt8Int32UpperByte") {
     type = PaddingBetweenFieldsInt8Int32,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:2, 0xee, // should be padding:3
             0x05, 0x04, 0x03, 0x02,
@@ -88,7 +88,7 @@ success("CorrectPaddingBetweenFieldsInt8Int64") {
         b: 0x0203040506070809,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:7,
             0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
@@ -99,7 +99,7 @@ success("CorrectPaddingBetweenFieldsInt8Int64") {
 decode_failure("BadPaddingBetweenFieldsInt8Int64LowerByte") {
     type = PaddingBetweenFieldsInt8Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             0xee, padding:6, // should be padding:7
             0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
@@ -111,7 +111,7 @@ decode_failure("BadPaddingBetweenFieldsInt8Int64LowerByte") {
 decode_failure("BadPaddingBetweenFieldsInt8Int64MiddleByte") {
     type = PaddingBetweenFieldsInt8Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:3, 0xee, padding:3, // should be padding:7
             0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
@@ -123,7 +123,7 @@ decode_failure("BadPaddingBetweenFieldsInt8Int64MiddleByte") {
 decode_failure("BadPaddingBetweenFieldsInt8Int64UpperByte") {
     type = PaddingBetweenFieldsInt8Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:6, 0xee, // should be padding:7
             0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03, 0x02,
@@ -138,7 +138,7 @@ success("CorrectPaddingBetweenFieldsInt16Int32") {
         b: 0x03040506,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:2,
             0x06, 0x05, 0x04, 0x03,
@@ -149,7 +149,7 @@ success("CorrectPaddingBetweenFieldsInt16Int32") {
 decode_failure("BadPaddingBetweenFieldsInt16Int32LowerByte") {
     type = PaddingBetweenFieldsInt16Int32,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0xee, padding:1, // should be padding:2
             0x06, 0x05, 0x04, 0x04,
@@ -161,7 +161,7 @@ decode_failure("BadPaddingBetweenFieldsInt16Int32LowerByte") {
 decode_failure("BadPaddingBetweenFieldsInt16Int32UpperByte") {
     type = PaddingBetweenFieldsInt16Int32,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:1, 0xee, // should be padding:2
             0x06, 0x05, 0x04, 0x04,
@@ -176,7 +176,7 @@ success("CorrectPaddingBetweenFieldsInt16Int64") {
         b: 0x030405060708090a,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:6,
             0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03,
@@ -187,7 +187,7 @@ success("CorrectPaddingBetweenFieldsInt16Int64") {
 decode_failure("BadPaddingBetweenFieldsInt16Int64LowerByte") {
     type = PaddingBetweenFieldsInt16Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0xee, padding:5, // should be padding:6
             0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03,
@@ -199,7 +199,7 @@ decode_failure("BadPaddingBetweenFieldsInt16Int64LowerByte") {
 decode_failure("BadPaddingBetweenFieldsInt16Int64MiddleByte") {
     type = PaddingBetweenFieldsInt16Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:2, 0xee, padding:3, // should be padding:6
             0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03,
@@ -211,7 +211,7 @@ decode_failure("BadPaddingBetweenFieldsInt16Int64MiddleByte") {
 decode_failure("BadPaddingBetweenFieldsInt16Int64UpperByte") {
     type = PaddingBetweenFieldsInt16Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:5, 0xee, // should be padding:6
             0x0a, 0x09, 0x08, 0x07, 0x06, 0x05, 0x04, 0x03,
@@ -226,7 +226,7 @@ success("CorrectPaddingBetweenFieldsInt32Int64") {
         b: 0x05060708090a0b0c,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             padding:4,
             0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05,
@@ -237,7 +237,7 @@ success("CorrectPaddingBetweenFieldsInt32Int64") {
 decode_failure("BadPaddingBetweenFieldsInt32Int64LowerByte") {
     type = PaddingBetweenFieldsInt32Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0xee, padding:3, // should be padding:4
             0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05,
@@ -249,7 +249,7 @@ decode_failure("BadPaddingBetweenFieldsInt32Int64LowerByte") {
 decode_failure("BadPaddingBetweenFieldsInt32Int64MiddleByte") {
     type = PaddingBetweenFieldsInt32Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             padding:1, 0xee, padding:2, // should be padding:4
             0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05,
@@ -261,7 +261,7 @@ decode_failure("BadPaddingBetweenFieldsInt32Int64MiddleByte") {
 decode_failure("BadPaddingBetweenFieldsInt32Int64UpperByte") {
     type = PaddingBetweenFieldsInt32Int64,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             padding:3, 0xee, // should be padding:4
             0x0c, 0x0b, 0x0a, 0x09, 0x08, 0x07, 0x06, 0x05,
@@ -277,7 +277,7 @@ success("CorrectPaddingEndOfInlineObject1Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:7,
         ],
@@ -287,7 +287,7 @@ success("CorrectPaddingEndOfInlineObject1Byte") {
 decode_failure("BadPaddingEndOfInlineObject1ByteLowerByte") {
     type = PaddingEndOfInlineObject1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             0xee, padding:6, // should be padding:7
         ],
@@ -298,7 +298,7 @@ decode_failure("BadPaddingEndOfInlineObject1ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject1ByteUpperByte") {
     type = PaddingEndOfInlineObject1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01,
             padding:6, 0xee, // should be padding:7
         ],
@@ -313,7 +313,7 @@ success("CorrectPaddingEndOfInlineObject2Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:6,
         ],
@@ -323,7 +323,7 @@ success("CorrectPaddingEndOfInlineObject2Byte") {
 decode_failure("BadPaddingEndOfInlineObject2ByteLowerByte") {
     type = PaddingEndOfInlineObject2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0xee, padding:5, // should be padding:6
         ],
@@ -334,7 +334,7 @@ decode_failure("BadPaddingEndOfInlineObject2ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject2ByteUpperByte") {
     type = PaddingEndOfInlineObject2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             padding:5, 0xee, // should be padding:6
         ],
@@ -348,7 +348,7 @@ success("Struct3Byte_randomly_generated") {
         b: 93,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(25110):2, // a
             93, // b
             padding:5,
@@ -365,7 +365,7 @@ success("CorrectPaddingEndOfInlineObject3Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0x03,
             padding:5,
@@ -376,7 +376,7 @@ success("CorrectPaddingEndOfInlineObject3Byte") {
 decode_failure("BadPaddingEndOfInlineObject3ByteLowerByte") {
     type = PaddingEndOfInlineObject3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0x03,
             0xee, padding:4, // should be padding:5
@@ -388,7 +388,7 @@ decode_failure("BadPaddingEndOfInlineObject3ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject3ByteUpperByte") {
     type = PaddingEndOfInlineObject3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x02, 0x01,
             0x03,
             padding:4, 0xee, // should be padding:5
@@ -404,7 +404,7 @@ success("CorrectPaddingEndOfInlineObject4Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             padding:4,
         ],
@@ -414,7 +414,7 @@ success("CorrectPaddingEndOfInlineObject4Byte") {
 decode_failure("BadPaddingEndOfInlineObject4ByteLowerByte") {
     type = PaddingEndOfInlineObject4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0xee, padding:3, // should be padding:4
         ],
@@ -425,7 +425,7 @@ decode_failure("BadPaddingEndOfInlineObject4ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject4ByteUpperByte") {
     type = PaddingEndOfInlineObject4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             padding:3, 0xee, // should be padding:4
         ],
@@ -439,7 +439,7 @@ success("Struct5Byte_randomly_generated") {
         b: -21,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(-686561937):4, // a
             num(-21):1, // b
             padding:3,
@@ -455,7 +455,7 @@ success("CorrectPaddingEndOfInlineObject5Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x05,
             padding:3,
@@ -466,7 +466,7 @@ success("CorrectPaddingEndOfInlineObject5Byte") {
 decode_failure("BadPaddingEndOfInlineObject5ByteLowerByte") {
     type = PaddingEndOfInlineObject5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x05,
             0xee, padding:2, // should be padding:3
@@ -478,7 +478,7 @@ decode_failure("BadPaddingEndOfInlineObject5ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject5ByteUpperByte") {
     type = PaddingEndOfInlineObject5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x05,
             padding:2, 0xee, // should be padding:3
@@ -493,7 +493,7 @@ success("Struct6Byte_randomly_generated") {
         b: 977,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(990827621):4, // a
             num(977):2, // b
             padding:2,
@@ -509,7 +509,7 @@ success("CorrectPaddingEndOfInlineObject6Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x06, 0x05,
             padding:2,
@@ -520,7 +520,7 @@ success("CorrectPaddingEndOfInlineObject6Byte") {
 decode_failure("BadPaddingEndOfInlineObject6ByteLowerByte") {
     type = PaddingEndOfInlineObject6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x06, 0x05,
             0xee, padding:1, // should be padding:2
@@ -532,7 +532,7 @@ decode_failure("BadPaddingEndOfInlineObject6ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObject6ByteUpperByte") {
     type = PaddingEndOfInlineObject6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x06, 0x05,
             padding:1, 0xee, // should be padding:2
@@ -550,7 +550,7 @@ success("CorrectPaddingEndOfInlineObject7Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x06, 0x05,
             0x07,
@@ -562,7 +562,7 @@ success("CorrectPaddingEndOfInlineObject7Byte") {
 decode_failure("BadPaddingEndOfInlineObject7Byte") {
     type = PaddingEndOfInlineObject7Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x03, 0x02, 0x01,
             0x06, 0x05,
             0x07,
@@ -577,7 +577,7 @@ success("Struct8Byte_randomly_generated") {
         a: 5134020299206246228,
     },
     bytes = {
-        v1, v2 = [num(5134020299206246228):8],
+        v2 = [num(5134020299206246228):8],
     },
 }
 
@@ -591,7 +591,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject1Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x09,
@@ -605,7 +605,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject1Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject1ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x09,
@@ -620,7 +620,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject1ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject1ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x09,
@@ -642,7 +642,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject2Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -656,7 +656,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject2Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject2ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -671,7 +671,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject2ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject2ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -694,7 +694,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject3Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -709,7 +709,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject3Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject3ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -725,7 +725,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject3ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject3ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0a, 0x09,
@@ -748,7 +748,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject4Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -762,7 +762,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject4Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject4ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -777,7 +777,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject4ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject4ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -800,7 +800,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject5Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -815,7 +815,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject5Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject5ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -831,7 +831,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject5ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject5ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -855,7 +855,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject6Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -870,7 +870,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject6Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject6ByteLowerByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -886,7 +886,7 @@ decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject6ByteLowerByte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject6ByteUpperByte") {
     type = PaddingEndOfInlineObjectBeforeNextObject6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -911,7 +911,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject7Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -927,7 +927,7 @@ success("CorrectPaddingEndOfInlineObjectBeforeNextObject7Byte") {
 decode_failure("BadPaddingEndOfInlineObjectBeforeNextObject7Byte") {
     type = PaddingEndOfInlineObjectBeforeNextObject7Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
             0x0c, 0x0b, 0x0a, 0x09,
@@ -951,7 +951,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects1Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -966,7 +966,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects1Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects1ByteLower") {
     type = PaddingInBetweenOutOfLineObjects1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -982,7 +982,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects1ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects1ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects1Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1005,7 +1005,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects2Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1020,7 +1020,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects2Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects2ByteLower") {
     type = PaddingInBetweenOutOfLineObjects2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1036,7 +1036,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects2ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects2ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects2Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1060,7 +1060,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects3Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1076,7 +1076,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects3Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects3ByteLower") {
     type = PaddingInBetweenOutOfLineObjects3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1093,7 +1093,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects3ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects3ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects3Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1117,7 +1117,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects4Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1132,7 +1132,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects4Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects4ByteLower") {
     type = PaddingInBetweenOutOfLineObjects4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1148,7 +1148,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects4ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects4ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects4Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1172,7 +1172,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects5Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1188,7 +1188,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects5Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects5ByteLower") {
     type = PaddingInBetweenOutOfLineObjects5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1205,7 +1205,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects5ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects5ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects5Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1230,7 +1230,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects6Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1246,7 +1246,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects6Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects6ByteLower") {
     type = PaddingInBetweenOutOfLineObjects6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1263,7 +1263,7 @@ decode_failure("BadPaddingInBetweenOutOfLineObjects6ByteLower") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects6ByteUpper") {
     type = PaddingInBetweenOutOfLineObjects6Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1289,7 +1289,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects7Byte") {
         },
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1306,7 +1306,7 @@ success("CorrectPaddingInBetweenOutOfLineObjects7Byte") {
 decode_failure("BadPaddingInBetweenOutOfLineObjects7Byte") {
     type = PaddingInBetweenOutOfLineObjects7Byte,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 
@@ -1328,14 +1328,6 @@ success("CorrectPaddedUnionStruct") {
         },
     },
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            0x01,
-            padding:7,
-        ],
         v2 = [
             num(1):8,
             num(1):4, num(0):2, num(1):2,
@@ -1346,14 +1338,6 @@ success("CorrectPaddedUnionStruct") {
 decode_failure("BadPaddedUnionStructLowerByte") {
     type = PaddedUnionStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            0x01,
-            0xee, padding:6, // should be padding:7
-        ],
         v2 = [
             num(1):8,
             // 0xee below should be 0x00.
@@ -1366,14 +1350,6 @@ decode_failure("BadPaddedUnionStructLowerByte") {
 decode_failure("BadPaddedUnionStructUpperByte") {
     type = PaddedUnionStruct,
     bytes = {
-        v1 = [
-            num(1):8,
-            num(8):4, num(0):4,
-            repeat(0xff):8,
-
-            0x01,
-            padding:6, 0xee, // should be padding:7
-        ],
         v2 = [
             num(1):8,
             // 0xee below should be 0x00.
@@ -1390,16 +1366,6 @@ success("CorrectPaddedTableStruct") {
         },
     },
     bytes = {
-        v1 = [
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x01,
-            padding:7,
-        ],
         v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -1412,16 +1378,6 @@ success("CorrectPaddedTableStruct") {
 decode_failure("BadPaddedTableStructLowerByte") {
     type = PaddedTableStruct,
     bytes = {
-        v1 = [
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x01,
-            0xee, padding:6, // should be padding:7
-        ],
         v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -1436,16 +1392,6 @@ decode_failure("BadPaddedTableStructLowerByte") {
 decode_failure("BadPaddedTableStructUpperByte") {
     type = PaddedTableStruct,
     bytes = {
-        v1 = [
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-
-            0x01,
-            padding:6, 0xee, // should be padding:7
-        ],
         v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -1533,7 +1479,7 @@ decode_failure("BadPaddedString_LowerByte") {
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(6):8,
             repeat(0xff):8,
             0x41, 0x42, 0x43, 0x44, 0x45, 0x46,
@@ -1547,7 +1493,7 @@ decode_failure("BadPaddedString_UpperByte") {
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(6):8,
             repeat(0xff):8,
             0x41, 0x42, 0x43, 0x44, 0x45, 0x46,
@@ -1561,7 +1507,7 @@ decode_failure("BadPaddedVector_LowerByte") {
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(6):8,
             repeat(0xff):8,
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
@@ -1575,7 +1521,7 @@ decode_failure("BadPaddedVector_UpperByte") {
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(6):8,
             repeat(0xff):8,
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
@@ -1601,7 +1547,7 @@ success("PaddingAlignment2MaskMayBe4Bytes") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8,
             repeat(0xff):8,
             num(1):1, padding:1, num(2):2, num(3):2, // 6 bytes
@@ -1627,7 +1573,7 @@ success("PaddingAlignment4MaskMayBe8Bytes") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8,
             repeat(0xff):8,
             num(1):1, padding:3, num(2):4, num(3):4, // 12 bytes

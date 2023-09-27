@@ -13,7 +13,7 @@ success("TwoLayerStructNoPaddingAlign4") {
         a: 5,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2,
             num(2):1,
             num(3):1,
@@ -34,7 +34,7 @@ success("TwoLayerStructInnerPaddingAlign4") {
         a: 4,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2,
             num(2):1,
             padding:1,
@@ -48,7 +48,7 @@ success("TwoLayerStructInnerPaddingAlign4") {
 decode_failure("TwoLayerStructInnerPaddingAlign4BadPadding") {
     type = TwoLayerStructInnerPaddingAlign4,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2,
             num(2):1,
             num(100):1,
@@ -71,7 +71,7 @@ success("TwoLayerStructNoPaddingAlign8") {
         a: 5,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):4,
             num(2):2,
             num(3):2,
@@ -91,7 +91,7 @@ success("TwoLayerStructInnerPaddingAlign8") {
         a: 4,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):4,
             num(2):2,
             padding:2,
@@ -104,7 +104,7 @@ success("TwoLayerStructInnerPaddingAlign8") {
 decode_failure("TwoLayerStructInnerPaddingAlign8BadPadding") {
     type = TwoLayerStructInnerPaddingAlign8,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):4,
             num(2):2,
             num(100):2,
@@ -126,7 +126,7 @@ success("TwoLayerStructInnerBool") {
         a: 5,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):1,
             num(2):1,
             num(3):2,
@@ -139,7 +139,7 @@ success("TwoLayerStructInnerBool") {
 decode_failure("TwoLayerStructInnerBoolBadValue") {
     type = TwoLayerStructInnerBool,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(100):1,
             num(2):1,
             num(3):2,
@@ -166,7 +166,7 @@ success("CorrectArrayWithInternalPadding") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(1):2, num(2):1, padding:1, num(3):4,
             num(4):2, num(5):1, padding:1, num(6):4,
         ],
@@ -176,7 +176,7 @@ success("CorrectArrayWithInternalPadding") {
 decode_failure("BadPaddedArrayWithInternalPadding") {
     type = ArrayWithInternalPadding,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // 0xee is the bad padding byte.
             num(1):2, num(2):1, padding:1, num(3):4,
             num(4):2, num(5):1, 0xee, num(6):4,

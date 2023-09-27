@@ -7,7 +7,7 @@ success("VectorWithLimit_randomly_generated") {
         v: [113, 200],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(2):8, repeat(0xFF):8, // v length, presence
             113, 200, // v
             padding:6,
@@ -20,7 +20,7 @@ success("VectorWrapper_randomly_generated") {
         v: [218, 190, 69, 67, 101, 72, 44, 22],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(8):8, repeat(0xFF):8, // v length, presence
             // v
             218, 190, 69, 67, 101, 72, 44, 22,
@@ -40,7 +40,7 @@ decode_failure("EmptyVectorWithNullPtrBody") {
     bindings_denylist = [rust],
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -53,7 +53,7 @@ success("EmptyOptionalVectorWithNullPtrBody") {
         v: null,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -65,7 +65,7 @@ decode_failure("NonEmptyVectorWithNullPtrBody") {
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -78,7 +78,7 @@ decode_failure("NonEmptyOptionalVectorWithNullPtrBody") {
     bindings_denylist = [dart],
     type = OptionalVectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // invalid null pointer to content
         ],
@@ -91,7 +91,7 @@ decode_failure("VectorWrongPointerValue") {
     bindings_denylist = [dart],
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // invalid pointer to content
         ],
@@ -104,7 +104,7 @@ decode_failure("OptionalVectorWrongPointerValue") {
     bindings_denylist = [dart],
     type = OptionalVectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // length of vector data
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // invalid pointer to content
         ],
@@ -116,7 +116,7 @@ decode_failure("OptionalVectorWrongPointerValue") {
 decode_failure("VectorCountExceedsLimitByALot") {
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0xffffffffffffffff):8, // length of vector data
             repeat(0xff):8, // presence marker
         ],
@@ -128,7 +128,7 @@ decode_failure("VectorCountExceedsLimitByALot") {
 decode_failure("VectorCountExceedsLimitByOne") {
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0x100000000):8, // length of vector data
             repeat(0xff):8, // presence marker
         ],
@@ -141,7 +141,7 @@ decode_failure("VectorCountExceedsLimitByOne") {
 decode_failure("VectorCountExceedsTotalMessageSize") {
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(25):8, // length of vector data (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // vector data
@@ -155,7 +155,7 @@ decode_failure("VectorCountExceedsTotalMessageSize") {
 decode_failure("VectorCountExceedsRemainingMessageSize") {
     type = VectorWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(9):8, // length of vector data (invalid, should be 8)
             repeat(0xff):8, // presence marker
             repeat(0xab):8, // vector data
@@ -169,7 +169,7 @@ success("EmptyByteVector") {
         v: [],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(0):8,
             repeat(0xff):8,
         ],
@@ -186,7 +186,7 @@ success("SmallVectorNon8ByteAligned") {
         v: [1, 2, 3],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(3):8,
             repeat(0xff):8,
 
@@ -203,7 +203,7 @@ success("SmallVector8ByteAligned") {
         v: [1, 2, 3, 4, 5, 6, 7, 8],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(8):8,
             repeat(0xff):8,
 
@@ -220,7 +220,7 @@ success("LargeVectorNon8ByteAligned") {
         v: [repeat(1):514],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(514):8,
             repeat(0xff):8,
 
@@ -237,7 +237,7 @@ success("LargeVector8ByteAligned") {
         v: [repeat(1):512],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(512):8,
             repeat(0xff):8,
 
@@ -255,7 +255,7 @@ success("VectorOfByteVector") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vector primary object's length, presence indicator
             num(3):8, repeat(0xff):8,
 
@@ -290,7 +290,7 @@ success("VectorOfStrings_AFewStrings") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vector primary object's length, presence indicator
             num(4):8, repeat(0xff):8,
 
@@ -336,7 +336,7 @@ success("LotsOfVectors_AFewVectors") {
         v9: [true, false, true],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // vector lengths & presences
             num(2):8, repeat(0xff):8, // v1
             num(2):8, repeat(0xff):8, // v2
@@ -418,7 +418,7 @@ success("ByteVectors15") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(15):8,
             repeat(0xff):8,
 
@@ -502,7 +502,7 @@ success("ByteVectors16") {
         ],
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             num(16):8,
             repeat(0xff):8,
 

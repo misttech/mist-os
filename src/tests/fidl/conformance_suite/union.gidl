@@ -9,17 +9,6 @@ success("UnionWithBoundString") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(1):8, // ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object 1: union
-            num(4):8, repeat(0xff):8, // boundFiveStr size, present
-
-            // secondary object 2: boundFiveStr
-            'a', 'b', 'c', 'd', padding:4,
-        ],
         v2 = [
             // primary object
             num(1):8, // ordinal
@@ -50,14 +39,6 @@ success("UnionMigration_SingleVariant") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(1):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object 1: x
-            num(42):4, padding:4,
-        ],
         v2 = [
             // primary object
             num(1):8, // ordinal
@@ -73,14 +54,6 @@ success("UnionMigration_Uint8Union_1") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(1):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object 1: uint8_value
-            num(42):1, padding:7,
-        ],
         v2 = [
             // primary object
             num(1):8, // ordinal
@@ -96,14 +69,6 @@ success("UnionMigration_Uint8Union_2") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(2):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object 1: uint8_value
-            num(0):1, padding:7,
-        ],
         v2 = [
             // primary object
             num(2):8, // ordinal
@@ -119,14 +84,6 @@ success("ReverseOrdinalUnion") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(4):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object 1: x
-            num(42):8,
-        ],
         v2 = [
             // primary object
             num(4):8, // ordinal
@@ -136,23 +93,6 @@ success("ReverseOrdinalUnion") {
             num(42):8,
         ],
     },
-}
-
-// Regression test for fxbug.dev/72895.
-decode_failure("UnionWithInvalidPresenceIndicator") {
-    type = XUnionWithStructStruct,
-    bytes = {
-        v1 = [
-            0xd2, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // ordinal
-            0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 0x18 bytes, 0 handles
-            0xd8, 0x09, 0x00, 0x0d, 0xc4, 0x00, 0x00, 0x00, // invalid pointer
-            0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
-            0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab, 0xab,
-            0xab, 0xab, 0xab, 0xab, 0x00, 0x00, 0x00, 0x00,
-        ],
-        // No test for v2 because there no longer is presence indicator.
-    },
-    err = INVALID_PRESENCE_INDICATOR,
 }
 
 // ======================== UNKNOWN VARIANT TESTS ==========================
@@ -170,11 +110,6 @@ success("FlexibleUnionUnknownValueStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(0):2, num(0):2, // envelope
@@ -192,11 +127,6 @@ decode_success("FlexibleUnionUnknownValue") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(0):2, num(0):2, // envelope
@@ -236,11 +166,6 @@ success("FlexibleResourceUnionUnknownValueStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(0):2, num(0):2, // envelope
@@ -258,11 +183,6 @@ decode_success("FlexibleResourceUnionUnknownValue") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(0):2, num(0):2, // envelope
@@ -310,11 +230,6 @@ success("FlexibleResourceUnionUnknownValueWithHandlesStored") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(4):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(4):2, num(0):2, // envelope
@@ -322,7 +237,7 @@ success("FlexibleResourceUnionUnknownValueWithHandlesStored") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -343,11 +258,6 @@ decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(4):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(4):2, num(0):2, // envelope
@@ -355,7 +265,7 @@ decode_success("FlexibleResourceUnionUnknownValueWithHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -393,11 +303,6 @@ encode_failure("FlexibleResourceUnionUnknownValueWithHandles") {
 decode_failure("StrictUnionUnknownValue") {
     type = TestStrictXUnionInStruct,
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(0):2, num(0):2, // envelope
@@ -416,11 +321,6 @@ decode_failure("StrictUnionUnknownValueWithHandles") {
     },
     type = TestStrictXUnionInStruct,
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(4):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(4):2, num(0):2, // envelope
@@ -428,7 +328,7 @@ decode_failure("StrictUnionUnknownValueWithHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -447,11 +347,6 @@ decode_failure("FlexibleUnionUnknownValueWithHandles") {
     },
     type = TestFlexibleXUnionInStruct,
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(4):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(4):2, num(0):2, // envelope
@@ -459,7 +354,7 @@ decode_failure("FlexibleUnionUnknownValueWithHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -481,11 +376,6 @@ decode_success("FlexibleUnionUnknownValueWithHandlesCloseHandles") {
         },
     },
     bytes = {
-        v1 = [
-            num(1234):8, // unknown ordinal
-            num(24):4, num(4):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(1234):8, // unknown ordinal
             num(24):4, num(4):2, num(0):2, // envelope
@@ -493,7 +383,7 @@ decode_success("FlexibleUnionUnknownValueWithHandlesCloseHandles") {
         ],
     },
     handles = {
-        v1, v2 = [
+        v2 = [
             #0, #1, #2, #3,
         ],
     },
@@ -516,11 +406,6 @@ encode_failure("StrictUnionUnknownValue") {
 decode_failure("FlexibleValueUnionUnknownBytesNonMultipleOf8") {
     type = TestFlexibleXUnionInStruct,
     bytes = {
-        v1 = [
-            num(123):8, // ordinal (unknown)
-            num(20):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(123):8, // ordinal (unknown)
             num(20):4, num(0):2, num(0):2, // envelope
@@ -533,11 +418,6 @@ decode_failure("FlexibleValueUnionUnknownBytesNonMultipleOf8") {
 decode_failure("FlexibleResourceUnionUnknownBytesNonMultipleOf8") {
     type = TestFlexibleResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(123):8, // ordinal (unknown)
-            num(20):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(123):8, // ordinal (unknown)
             num(20):4, num(0):2, num(0):2, // envelope
@@ -554,14 +434,6 @@ success("UnionEnvelopeInlining_SmallValue_Inlined") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(1):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object
-            num(100):4, padding:4,
-        ],
         v2 = [
             // primary object
             num(1):8, // ordinal
@@ -577,14 +449,6 @@ success("UnionEnvelopeInlining_LargeValue_Outlined") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(2):8, // ordinal
-            num(8):4, num(0):4, repeat(0xff):8, // envelope
-
-            // secondary object
-            num(100):8,
-        ],
         v2 = [
             // primary object
             num(2):8, // ordinal
@@ -647,14 +511,6 @@ success("UnionEnvelopeInlining_HandleValue_Inlined") {
         },
     },
     bytes = {
-        v1 = [
-            // primary object
-            num(3):8, // ordinal
-            num(8):4, num(1):4, repeat(0xff):8, // envelope
-
-            // secondary object
-            repeat(0xff):4, padding:4,
-        ],
         v2 = [
             // primary object
             num(3):8, // ordinal
@@ -662,7 +518,7 @@ success("UnionEnvelopeInlining_HandleValue_Inlined") {
         ],
     },
     handles = {
-        v1, v2 = [#0],
+        v2 = [#0],
     },
 }
 
@@ -936,10 +792,6 @@ encode_failure("OptionalFlexibleResourceUnionZeroOrdinalWithPayload") {
 decode_failure("RequiredStrictValueUnionZeroOrdinalNoPayload") {
     type = TestStrictXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -951,11 +803,6 @@ decode_failure("RequiredStrictValueUnionZeroOrdinalNoPayload") {
 decode_failure("RequiredStrictValueUnionZeroOrdinalWithPayload") {
     type = TestStrictXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -968,10 +815,6 @@ decode_failure("RequiredStrictValueUnionZeroOrdinalWithPayload") {
 decode_failure("RequiredStrictResourceUnionZeroOrdinalNoPayload") {
     type = TestStrictResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -983,11 +826,6 @@ decode_failure("RequiredStrictResourceUnionZeroOrdinalNoPayload") {
 decode_failure("RequiredStrictResourceUnionZeroOrdinalWithPayload") {
     type = TestStrictResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1000,10 +838,6 @@ decode_failure("RequiredStrictResourceUnionZeroOrdinalWithPayload") {
 decode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayload") {
     type = TestFlexibleXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1015,11 +849,6 @@ decode_failure("RequiredFlexibleValueUnionZeroOrdinalNoPayload") {
 decode_failure("RequiredFlexibleValueUnionZeroOrdinalWithPayload") {
     type = TestFlexibleXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1032,10 +861,6 @@ decode_failure("RequiredFlexibleValueUnionZeroOrdinalWithPayload") {
 decode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayload") {
     type = TestFlexibleResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1047,11 +872,6 @@ decode_failure("RequiredFlexibleResourceUnionZeroOrdinalNoPayload") {
 decode_failure("RequiredFlexibleResourceUnionZeroOrdinalWithPayload") {
     type = TestFlexibleResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1066,10 +886,6 @@ success("OptionalStrictValueUnionZeroOrdinalNoPayload") {
         xu: null,
     },
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1080,11 +896,6 @@ success("OptionalStrictValueUnionZeroOrdinalNoPayload") {
 decode_failure("OptionalStrictValueUnionZeroOrdinalWithPayload") {
     type = TestOptionalStrictXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1099,10 +910,6 @@ success("OptionalStrictResourceUnionZeroOrdinalNoPayload") {
         xu: null,
     },
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1113,11 +920,6 @@ success("OptionalStrictResourceUnionZeroOrdinalNoPayload") {
 decode_failure("OptionalStrictResourceUnionZeroOrdinalWithPayload") {
     type = TestOptionalStrictResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1132,10 +934,6 @@ success("OptionalFlexibleValueUnionZeroOrdinalNoPayload") {
         xu: null,
     },
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1146,11 +944,6 @@ success("OptionalFlexibleValueUnionZeroOrdinalNoPayload") {
 decode_failure("OptionalFlexibleValueUnionZeroOrdinalWithPayload") {
     type = TestOptionalFlexibleXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope
@@ -1165,10 +958,6 @@ success("OptionalFlexibleResourceUnionZeroOrdinalNoPayload") {
         xu: null,
     },
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(0):4, num(0):4, repeat(0x00):8, // envelope
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(0):4, num(0):2, repeat(0):2, // envelope
@@ -1179,11 +968,6 @@ success("OptionalFlexibleResourceUnionZeroOrdinalNoPayload") {
 decode_failure("OptionalFlexibleResourceUnionZeroOrdinalWithPayload") {
     type = TestOptionalFlexibleResourceXUnionInStruct,
     bytes = {
-        v1 = [
-            num(0):8, // zero ordinal
-            num(24):4, num(0):4, repeat(0xff):8, // envelope
-            repeat(0xab):20, padding:4, // unknown bytes
-        ],
         v2 = [
             num(0):8, // zero ordinal
             num(24):4, num(0):2, repeat(0):2, // envelope

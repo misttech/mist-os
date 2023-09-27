@@ -7,7 +7,7 @@ success("StrictBitsUint8KnownValue") {
         b: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, padding:7,
         ],
     },
@@ -18,7 +18,7 @@ success("StrictBitsUint8CombinedValue") {
         b: 3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, padding:7,
         ],
     },
@@ -29,7 +29,7 @@ success("StrictBitsUint16KnownValue") {
         b: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, padding:6,
         ],
     },
@@ -40,7 +40,7 @@ success("StrictBitsUint16CombinedValue") {
         b: 3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, padding:6,
         ],
     },
@@ -51,7 +51,7 @@ success("StrictBitsUint32KnownValue") {
         b: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, padding:4,
         ],
     },
@@ -62,7 +62,7 @@ success("StrictBitsUint32CombinedValue") {
         b: 3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, padding:4,
         ],
     },
@@ -73,7 +73,7 @@ success("StrictBitsUint64KnownValue") {
         b: 1,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -84,7 +84,7 @@ success("StrictBitsUint64CombinedValue") {
         b: 3,
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },
@@ -121,7 +121,7 @@ encode_failure("StrictBitsUint64UnknownBit") {
 decode_failure("StrictBitsUint8UnknownBit") {
     type = StrictBitsUint8Struct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, padding:7,
         ],
     },
@@ -131,7 +131,7 @@ decode_failure("StrictBitsUint8UnknownBit") {
 decode_failure("StrictBitsUint16UnknownBit") {
     type = StrictBitsUint16Struct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x00, padding:6,
         ],
     },
@@ -141,7 +141,7 @@ decode_failure("StrictBitsUint16UnknownBit") {
 decode_failure("StrictBitsUint32UnknownBit") {
     type = StrictBitsUint32Struct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x00, 0x00, 0x00, padding:4,
         ],
     },
@@ -151,7 +151,7 @@ decode_failure("StrictBitsUint32UnknownBit") {
 decode_failure("StrictBitsUint64UnknownBit") {
     type = StrictBitsUint64Struct,
     bytes = {
-        v1, v2 = [
+        v2 = [
             0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ],
     },

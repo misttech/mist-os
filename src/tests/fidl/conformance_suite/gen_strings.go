@@ -190,7 +190,7 @@ success("StringsValidCase{{ .index }}") {
         str: "{{ .escapedValue }}",
     },
     bytes = {
-        v1, v2 = [
+        v2 = [
             // length, present
             num({{ .lenValue }}):8,
             repeat(0xff):8,
@@ -225,7 +225,7 @@ decode_failure("StringsInvalidCase{{ .index }}") {
     bindings_denylist = [dart],
     type = StringWrapper,
     bytes = {
-        v1, v2 = [
+        v2 = [
             // length, present
             num({{ .lenValue }}):8,
             repeat(0xff):8,

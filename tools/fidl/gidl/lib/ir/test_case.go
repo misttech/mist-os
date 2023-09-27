@@ -172,7 +172,6 @@ type HandleDispositionEncoding struct {
 type WireFormat string
 
 const (
-	V1WireFormat WireFormat = "v1"
 	V2WireFormat WireFormat = "v2"
 )
 
