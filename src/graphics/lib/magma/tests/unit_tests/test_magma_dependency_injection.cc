@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
-#include <fuchsia/memorypressure/cpp/fidl.h>
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/magma_service/sys_driver/dfv1/magma_dependency_injection_device.h>
 #include <lib/sync/completion.h>
 
 #include <gtest/gtest.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -31,18 +32,19 @@ class TestOwner : public magma::MagmaDependencyInjectionDevice::Owner {
   sync_completion_t completion_;
 };
 
-class Provider : public fuchsia::memorypressure::Provider {
+class Provider : public fidl::Server<fuchsia_memorypressure::Provider> {
  public:
-  void RegisterWatcher(
-      ::fidl::InterfaceHandle<::fuchsia::memorypressure::Watcher> watcher) override {
-    fuchsia::memorypressure::WatcherSyncPtr watcher_sync;
-    watcher_sync.Bind(std::move(watcher));
-    watcher_sync->OnLevelChanged(fuchsia::memorypressure::Level::CRITICAL);
+  void RegisterWatcher(RegisterWatcherRequest& request,
+                       RegisterWatcherCompleter::Sync& completer) override {
+    fidl::SyncClient client(std::move(request.watcher()));
+    client->OnLevelChanged(fidl::Request<fuchsia_memorypressure::Watcher::OnLevelChanged>{
+        fuchsia_memorypressure::Level::kCritical});
   }
-  fidl::BindingSet<fuchsia::memorypressure::Provider>& binding_set() { return binding_set_; }
+
+  fidl::ServerBindingGroup<fuchsia_memorypressure::Provider>& binding_set() { return binding_set_; }
 
  private:
-  fidl::BindingSet<fuchsia::memorypressure::Provider> binding_set_;
+  fidl::ServerBindingGroup<fuchsia_memorypressure::Provider> binding_set_;
 };
 
 TEST(DependencyInjection, Load) {
@@ -71,17 +73,16 @@ TEST(DependencyInjection, Load) {
 
   fidl::WireSyncClient client{std::move(endpoints->client)};
 
-  fidl::InterfaceHandle<fuchsia::memorypressure::Provider> provider_handle;
-  auto request = provider_handle.NewRequest();
-  async::PostTask(loop.dispatcher(), [request = std::move(request), &provider]() mutable {
-    provider.binding_set().AddBinding(&provider, std::move(request));
-  });
+  auto provider_endpoints = fidl::CreateEndpoints<fuchsia_memorypressure::Provider>();
+  ASSERT_TRUE(provider_endpoints.is_ok());
+  async::PostTask(loop.dispatcher(),
+                  [&loop, server = std::move(provider_endpoints->server), &provider]() mutable {
+                    provider.binding_set().AddBinding(loop.dispatcher(), std::move(server),
+                                                      &provider, fidl::kIgnoreBindingClosure);
+                  });
 
   EXPECT_EQ(ZX_OK,
-            client
-                ->SetMemoryPressureProvider(fidl::ClientEnd<fuchsia_memorypressure::Provider>(
-                    provider_handle.TakeChannel()))
-                .status());
+            client->SetMemoryPressureProvider(std::move(provider_endpoints->client)).status());
 
   sync_completion_wait(&owner.completion(), ZX_TIME_INFINITE);
   EXPECT_EQ(owner.level(), msd::MAGMA_MEMORY_PRESSURE_LEVEL_CRITICAL);

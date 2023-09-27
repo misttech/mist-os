@@ -28,7 +28,6 @@
 #include "fidl/fuchsia.gpu.magma/cpp/wire.h"
 #include "fidl/fuchsia.logger/cpp/wire.h"
 #include "fidl/fuchsia.tracing.provider/cpp/wire.h"
-#include "fuchsia/sysmem/cpp/fidl.h"
 #endif
 
 #if defined(__linux__)
