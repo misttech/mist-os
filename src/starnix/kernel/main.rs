@@ -33,7 +33,7 @@ mod bpf;
 mod device;
 mod diagnostics;
 mod drop_notifier;
-mod dynamic_thread_pool;
+mod dynamic_thread_spawner;
 mod execution;
 mod fs;
 mod loader;

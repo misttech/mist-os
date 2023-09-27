@@ -69,8 +69,8 @@ pub fn serve_file_at(
 /// - directory::entry::DirectoryEntry
 ///
 /// Each method is delegated back to the starnix vfs, using `task` as the current task. Blocking
-/// methods are run from the kernel dynamic thread pool so that the async dispatched do not block
-/// on these.
+/// methods are run from the kernel dynamic thread spawner so that the async dispatched do not
+/// block on these.
 struct StarnixNodeConnection {
     task: WeakRef<CurrentTask>,
     file: FileHandle,
@@ -524,8 +524,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let kernel = self.task()?.kernel().clone();
         Ok(kernel
             .kthreads
-            .pool
-            .dispatch_and_get_result(move || -> Result<Vec<u8>, Errno> {
+            .spawner
+            .spawn_and_get_result(move || -> Result<Vec<u8>, Errno> {
                 let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
                 let mut data = VecOutputBuffer::new(count as usize);
                 file.read(&task, &mut data)?;
@@ -540,8 +540,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let kernel = self.task()?.kernel().clone();
         Ok(kernel
             .kthreads
-            .pool
-            .dispatch_and_get_result(move || -> Result<Vec<u8>, Errno> {
+            .spawner
+            .spawn_and_get_result(move || -> Result<Vec<u8>, Errno> {
                 let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
                 let mut data = VecOutputBuffer::new(count as usize);
                 file.read_at(&task, offset as usize, &mut data)?;
@@ -557,8 +557,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let mut data = VecInputBuffer::new(content);
         let written = kernel
             .kthreads
-            .pool
-            .dispatch_and_get_result(move || -> Result<usize, Errno> {
+            .spawner
+            .spawn_and_get_result(move || -> Result<usize, Errno> {
                 let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
                 file.write(&task, &mut data)
             })
@@ -573,8 +573,8 @@ impl file::RawFileIoConnection for StarnixNodeConnection {
         let mut data = VecInputBuffer::new(content);
         let written = kernel
             .kthreads
-            .pool
-            .dispatch_and_get_result(move || -> Result<usize, Errno> {
+            .spawner
+            .spawn_and_get_result(move || -> Result<usize, Errno> {
                 let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
                 file.write_at(&task, offset as usize, &mut data)
             })

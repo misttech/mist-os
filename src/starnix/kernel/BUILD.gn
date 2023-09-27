@@ -215,7 +215,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/wayland/vulkan.rs",
     "diagnostics/mod.rs",
     "drop_notifier.rs",
-    "dynamic_thread_pool.rs",
+    "dynamic_thread_spawner.rs",
     "execution/component_runner.rs",
     "execution/container.rs",
     "execution/mod.rs",

@@ -21,24 +21,24 @@ type BoxedClosure = Box<dyn FnOnce() + Send + 'static>;
 /// A thread pool that immediately execute any new work sent to it and keep a maximum number of
 /// idle threads.
 #[derive(Debug)]
-pub struct DynamicThreadPool {
-    state: Arc<Mutex<DynamicThreadPoolState>>,
+pub struct DynamicThreadSpawner {
+    state: Arc<Mutex<DynamicThreadSpawnerState>>,
     /// A persistent thread that is used to create new thread. This ensures that threads are
     /// created from the initial starnix process and are not tied to a specific task.
     persistent_thread: RunningThread,
 }
 
 #[derive(Debug, Default)]
-struct DynamicThreadPoolState {
+struct DynamicThreadSpawnerState {
     threads: Vec<RunningThread>,
     idle_threads: u8,
     max_idle_threads: u8,
 }
 
-impl DynamicThreadPool {
+impl DynamicThreadSpawner {
     pub fn new(max_idle_threads: u8) -> Self {
         Self {
-            state: Arc::new(Mutex::new(DynamicThreadPoolState {
+            state: Arc::new(Mutex::new(DynamicThreadSpawnerState {
                 max_idle_threads,
                 ..Default::default()
             })),
@@ -46,30 +46,30 @@ impl DynamicThreadPool {
         }
     }
 
-    /// Dispatch the given closure to the thread pool and returns a Future that will resolve to the
-    /// return value of the closure.
+    /// Run the given closure on a thread and returns a Future that will resolve to the return
+    /// value of the closure.
     ///
     /// This method will use an idle thread in the pool if one is available, otherwise it will
     /// start a new thread. When this method returns, it is guaranteed that a thread is
     /// responsible to start running the closure.
-    pub fn dispatch_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
+    pub fn spawn_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
     where
         R: Send + 'static,
         F: FnOnce() -> R + Send + 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
-        self.dispatch(move || {
+        self.spawn(move || {
             let _ = sender.send(f());
         });
         receiver.map_err(|_| errno!(EINTR))
     }
 
-    /// Dispatch the given closure to the thread pool.
+    /// Run the given closure on a thread.
     ///
     /// This method will use an idle thread in the pool if one is available, otherwise it will
     /// start a new thread. When this method returns, it is guaranteed that a thread is
     /// responsible to start running the closure.
-    pub fn dispatch<F>(&self, f: F)
+    pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
@@ -126,7 +126,7 @@ struct RunningThread {
 }
 
 impl RunningThread {
-    fn new(state: Arc<Mutex<DynamicThreadPoolState>>, f: BoxedClosure) -> Self {
+    fn new(state: Arc<Mutex<DynamicThreadSpawnerState>>, f: BoxedClosure) -> Self {
         let (sender, receiver) = sync_channel::<BoxedClosure>(0);
         let thread = Some(
             std::thread::Builder::new()
@@ -200,26 +200,26 @@ mod tests {
 
     #[fuchsia::test]
     fn run_simple_task() {
-        let pool = DynamicThreadPool::new(2);
-        pool.dispatch(|| {});
+        let spawner = DynamicThreadSpawner::new(2);
+        spawner.spawn(|| {});
     }
 
     #[fuchsia::test]
     fn run_10_tasks() {
-        let pool = DynamicThreadPool::new(2);
+        let spawner = DynamicThreadSpawner::new(2);
         for _ in 0..10 {
-            pool.dispatch(|| {});
+            spawner.spawn(|| {});
         }
     }
 
     #[fuchsia::test]
     fn blocking_task_do_not_prevent_further_processing() {
-        let pool = DynamicThreadPool::new(1);
+        let spawner = DynamicThreadSpawner::new(1);
 
         let pair = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         for _ in 0..10 {
             let pair2 = Arc::clone(&pair);
-            pool.dispatch(move || {
+            spawner.spawn(move || {
                 let (lock, cvar) = &*pair2;
                 let mut cont = lock.lock().unwrap();
                 while !*cont {
@@ -230,7 +230,7 @@ mod tests {
 
         let executed = Arc::new(Mutex::new(false));
         let executed_clone = executed.clone();
-        pool.dispatch(move || {
+        spawner.spawn(move || {
             {
                 let (lock, cvar) = &*pair;
                 let mut cont = lock.lock().unwrap();
@@ -244,17 +244,17 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         // Post a couple of new tasks. As the maximum number of idle threads is 1, it should
         // ensures that finished threads will be cleaned up from the pool.
-        pool.dispatch(move || {});
-        pool.dispatch(move || {});
+        spawner.spawn(move || {});
+        spawner.spawn(move || {});
 
-        // Drop the pool. This will wait for all thread to finish.
-        std::mem::drop(pool);
+        // Drop the spawner. This will wait for all thread to finish.
+        std::mem::drop(spawner);
         assert!(*executed.lock());
     }
 
     #[fuchsia::test]
-    async fn run_dispatch_and_get_result() {
-        let pool = DynamicThreadPool::new(2);
-        assert_eq!(pool.dispatch_and_get_result(|| 3).await, Ok(3));
+    async fn run_spawn_and_get_result() {
+        let spawner = DynamicThreadSpawner::new(2);
+        assert_eq!(spawner.spawn_and_get_result(|| 3).await, Ok(3));
     }
 }

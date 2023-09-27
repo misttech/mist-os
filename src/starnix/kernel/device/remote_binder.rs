@@ -906,7 +906,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.pool.dispatch(move || {
+        current_task.kernel().kthreads.spawner.spawn(move || {
             let mut executor = fasync::LocalExecutor::new();
             let result = executor.run_singlethreaded({
                 let handle = handle.clone();

@@ -191,7 +191,7 @@ fn forward_to_pty(
     let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
     let kernel = &container.kernel;
     let pty_sink = pty.clone();
-    kernel.kthreads.pool.dispatch({
+    kernel.kthreads.spawner.spawn({
         let read_task = container.kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {
@@ -210,7 +210,7 @@ fn forward_to_pty(
     });
 
     let pty_source = pty;
-    kernel.kthreads.pool.dispatch({
+    kernel.kthreads.spawner.spawn({
         let write_task = container.kernel.kthreads.new_system_thread()?;
         move || {
             let _result = fasync::LocalExecutor::new().run_singlethreaded(async {

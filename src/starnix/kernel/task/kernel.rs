@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use bstr::BString;
-use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
-use fidl::AsHandleRef;
+use fidl::{
+    endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy},
+    AsHandleRef,
+};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -387,7 +389,7 @@ impl Kernel {
     pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
         self.generic_netlink.get_or_init(|| {
             let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
-            self.kthreads.pool.dispatch(move || {
+            self.kthreads.spawner.spawn(move || {
                 fasync::LocalExecutor::new().run_singlethreaded(generic_netlink_fut);
                 log_error!("Generic Netlink future unexpectedly exited");
             });
@@ -405,7 +407,7 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) =
                 Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
-            self.kthreads.dispatch(move || {
+            self.kthreads.spawn(move || {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");
             });

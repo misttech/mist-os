@@ -8,7 +8,7 @@ use once_cell::sync::OnceCell;
 use std::{ffi::CString, sync::Arc};
 
 use crate::{
-    dynamic_thread_pool::DynamicThreadPool,
+    dynamic_thread_spawner::DynamicThreadSpawner,
     fs::FsContext,
     task::{CurrentTask, Kernel, Task},
     types::*,
@@ -25,12 +25,12 @@ pub struct KernelThreads {
     /// A handle to the async executor running in `starnix_process`.
     ///
     /// You can spawn tasks on this executor using `fasync::EHandle::spawn_detached`.
-    /// However, those task must not block. If you need to block, you can dispatch to
-    /// a worker thread using `thread_pool`.
+    /// However, those task must not block. If you need to block, you can spawn a worker thread
+    /// using `spawner`.
     pub ehandle: fasync::EHandle,
 
-    /// The thread pool to dispatch blocking calls to.
-    pub pool: DynamicThreadPool,
+    /// The thread pool to spawn blocking calls to.
+    pub spawner: DynamicThreadSpawner,
 
     /// A task object for the kernel threads.
     system_task: OnceCell<OwnedRef<CurrentTask>>,
@@ -43,7 +43,7 @@ impl Default for KernelThreads {
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("Failed to duplicate process self"),
             ehandle: fasync::EHandle::local(),
-            pool: DynamicThreadPool::new(2),
+            spawner: DynamicThreadSpawner::new(2),
             system_task: OnceCell::new(),
         }
     }
@@ -81,10 +81,10 @@ impl KernelThreads {
         Task::create_kernel_thread(self.system_task(), CString::new("[kthread]").unwrap())
     }
 
-    pub fn dispatch<F>(&self, f: F)
+    pub fn spawn<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
-        self.pool.dispatch(f)
+        self.spawner.spawn(f)
     }
 }
