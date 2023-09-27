@@ -183,7 +183,13 @@ impl Idle {
         let protection_ie = match build_protection_ie(&cmd.protection) {
             Ok(ie) => ie,
             Err(e) => {
-                error!("Failed to build protection IEs: {}", e);
+                let msg = format!("Failed to build protection IEs: {}", e);
+                error!("{}", msg);
+                let _ = state_change_ctx.replace(StateChangeContext::Connect {
+                    msg,
+                    bssid: cmd.bss.bssid,
+                    ssid: cmd.bss.ssid,
+                });
                 return Err(self);
             }
         };
@@ -3384,6 +3390,7 @@ mod tests {
         let (supplicant, _suppl_mock) = mock_psk_supplicant();
 
         let (mut command, _connect_txn_stream) = connect_command_wpa2(supplicant);
+        let bss = command.bss.clone();
         // Take the RSNA and wrap it in LegacyWpa to make it invalid.
         if let Protection::Rsna(rsna) = command.protection {
             command.protection = Protection::LegacyWpa(rsna);
@@ -3396,6 +3403,23 @@ mod tests {
 
         // State did not change to Connecting because command is invalid, thus ignored.
         assert_variant!(state, ClientState::Idle(_));
+
+        assert_data_tree!(h.inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: IDLE_STATE,
+                        to: IDLE_STATE,
+                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid_hash: &*BSSID_HASH_REGEX,
+                        ssid: bss.ssid.to_string(),
+                        ssid_hash: &*SSID_HASH_REGEX,
+                    }
+                },
+            },
+        });
     }
 
     #[test]
@@ -3403,6 +3427,7 @@ mod tests {
         let (supplicant, _suppl_mock) = mock_psk_supplicant();
 
         let (mut command, _connect_txn_stream) = connect_command_wpa1(supplicant);
+        let bss = command.bss.clone();
         // Take the LegacyWpa RSNA and wrap it in Rsna to make it invalid.
         if let Protection::LegacyWpa(rsna) = command.protection {
             command.protection = Protection::Rsna(rsna);
@@ -3416,6 +3441,23 @@ mod tests {
 
         // State did not change to Connecting because command is invalid, thus ignored.
         assert_variant!(state, ClientState::Idle(_));
+
+        assert_data_tree!(h.inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: IDLE_STATE,
+                        to: IDLE_STATE,
+                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid_hash: &*BSSID_HASH_REGEX,
+                        ssid: bss.ssid.to_string(),
+                        ssid_hash: &*SSID_HASH_REGEX,
+                    }
+                },
+            },
+        });
     }
 
     #[test]
