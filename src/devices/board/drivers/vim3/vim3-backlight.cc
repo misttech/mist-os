@@ -10,7 +10,7 @@
 #include <bind/fuchsia/amlogic/platform/a311d/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
-#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -41,15 +41,14 @@ zx_status_t Vim3::BacklightInit() {
 
   const ddk::BindRule pwm_bind_rules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+                              bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
       ddk::MakeAcceptBindRule(bind_fuchsia::PWM_ID,
                               bind_fuchsia_amlogic_platform_a311d::BIND_PWM_ID_PWM_AO_C)};
 
   const device_bind_prop_t pwm_properties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_pwm::BIND_FIDL_PROTOCOL_DEVICE),
-      ddk::MakeProperty(bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION,
-                        bind_fuchsia_hardware_pwm::PWM_ID_FUNCTION_LCD_BRIGHTNESS),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_pwm::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia_pwm::PWM_ID_FUNCTION,
+                        bind_fuchsia_pwm::PWM_ID_FUNCTION_LCD_BRIGHTNESS),
   };
 
   auto status = DdkAddCompositeNodeSpec(

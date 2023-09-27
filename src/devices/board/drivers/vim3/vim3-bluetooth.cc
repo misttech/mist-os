@@ -15,7 +15,7 @@
 #include <unistd.h>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <bind/fuchsia/hardware/pwm/cpp/bind.h>
+#include <bind/fuchsia/pwm/cpp/bind.h>
 #include <sdk/lib/driver/component/cpp/composite_node_spec.h>
 #include <sdk/lib/driver/component/cpp/node_add_args.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -105,12 +105,11 @@ zx_status_t Vim3::BluetoothInit() {
   fuchsia_driver_framework::wire::BindRule kPwmBindRules[] = {
       // TODO(fxbug.dev/129042): Replace this with wire type function.
       fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
-                                                  bind_fuchsia_hardware_pwm::BIND_INIT_STEP_PWM)),
+                                                  bind_fuchsia_pwm::BIND_INIT_STEP_PWM)),
   };
 
   fuchsia_driver_framework::wire::NodeProperty kPwmProperties[] = {
-      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP,
-                        bind_fuchsia_hardware_pwm::BIND_INIT_STEP_PWM),
+      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
   };
 
   auto parents = std::vector{
