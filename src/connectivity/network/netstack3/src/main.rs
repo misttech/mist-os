@@ -10,19 +10,36 @@
 #[cfg(feature = "instrumented")]
 extern crate netstack3_core_instrumented as netstack3_core;
 
-use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-
 mod bindings;
+
+use argh::FromArgs;
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 
 use bindings::{NetstackSeed, Service};
 
+/// Netstack3.
+///
+/// The networking stack for Fuchsia.
+#[derive(FromArgs)]
+struct Options {
+    /// run with debug logging.
+    #[argh(switch)]
+    debug: bool,
+}
+
 /// Runs Netstack3.
-#[fuchsia::main(logging_minimum_severity = "debug")]
 pub fn main() {
     // TOOD(https://fxbug.dev/125388): Support running with multiple threads.
     // This is currently blocked on fixing race conditions when concurrent
     // operations are allowed.
     let mut executor = fuchsia_async::SendExecutor::new(1 /* num_threads */);
+
+    let Options { debug } = argh::from_env();
+    let mut log_options = diagnostics_log::PublishOptions::default();
+    if debug {
+        log_options = log_options.minimum_severity(diagnostics_log::Severity::Debug);
+    }
+    diagnostics_log::initialize(log_options).expect("failed to initialize log");
 
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
