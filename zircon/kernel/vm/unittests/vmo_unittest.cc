@@ -4086,6 +4086,9 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_NONNULL(slice, "slice root vmo");
   slice->set_user_id(45);
 
+  // The oot VMO should have 3 children at this point.
+  ASSERT_EQ(vmo->num_children(), (uint32_t)3);
+
   // Snapshot-modified of root-slice should work.
   fbl::RefPtr<VmObject> slicesnapshot;
   status =
@@ -4095,14 +4098,25 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_NONNULL(slicesnapshot, "snapshot modified root-slice\n");
   slicesnapshot->set_user_id(46);
 
+  // At the VMO level, the slice should see the snapshot as a child.
+  ASSERT_EQ(vmo->num_children(), (uint32_t)3);
+  ASSERT_EQ(slice->num_children(), (uint32_t)1);
+
+  // The cow pages, however, should be hung off the root VMO.
+  auto slicesnapshot_p = static_cast<VmObjectPaged*>(slicesnapshot.get());
+  auto vmo_cow_pages = vmo->DebugGetCowPages();
+  auto slicesnapshot_cow_pages = slicesnapshot_p->DebugGetCowPages();
+
+  ASSERT_EQ(slicesnapshot_cow_pages->DebugGetParent().get(), vmo_cow_pages.get());
+
   // Create a slice of the clone of the root-slice.
-  fbl::RefPtr<VmObject> snapshotslice;
+  fbl::RefPtr<VmObject> slicesnapshot_slice;
   status = slicesnapshot->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0,
                                       kSliceSize, false, AttributionObject::GetKernelAttribution(),
-                                      &snapshotslice);
+                                      &slicesnapshot_slice);
   ASSERT_EQ(ZX_OK, status, "slice snapshot-modified-root-slice\n");
-  ASSERT_NONNULL(snapshotslice, "slice snapshot-modified-root-slice\n");
-  snapshotslice->set_user_id(47);
+  ASSERT_NONNULL(slicesnapshot_slice, "slice snapshot-modified-root-slice\n");
+  slicesnapshot_slice->set_user_id(47);
 
   // Check that snapshot-modified will work again on the snapshot-modified clone of the slice.
   fbl::RefPtr<VmObject> slicesnapshot2;

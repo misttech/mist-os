@@ -860,10 +860,16 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
                                        new_root_parent_offset, child_parent_limit);
     }
     case CloneType::SnapshotModified: {
-      // If at the root of vmo hierarchy, create a unidirectional clone
+      // If at the root of vmo hierarchy or the slice of the root VMO, create a unidirectional clone
       // TODO(fxb/123742): consider extinding this to take unidirectional clones of
       // snapshot-modified leaves if possible.
-      if (!parent_) {
+      if (!parent_ || is_slice_locked()) {
+        if (is_slice_locked()) {
+          // ZX_ERR_NOT_SUPPORTED should have already been returned in the case of a non-root slice
+          // clone.
+          AssertHeld(parent_->lock_ref());
+          DEBUG_ASSERT(!parent_->parent_);
+        }
         return CloneUnidirectionalLocked(offset, size, attribution_object, cow_child,
                                          new_root_parent_offset, child_parent_limit);
         // Else, take a snapshot.
