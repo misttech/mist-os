@@ -13,6 +13,15 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 )
 
+type repeatableBuildKind int
+
+const (
+	builderNameKind repeatableBuildKind = iota
+	buildIdKind
+	fuchsiaBuildDirKind
+	productBundleDirKind
+)
+
 // If the useLatestFfx flag is set to true then use the latest ffx tool,
 // else the ffx tool from the build will be used.
 type BuildConfig struct {
@@ -138,56 +147,141 @@ func (c *BuildConfig) GetBuild(ctx context.Context, deviceClient *device.Client,
 }
 
 type RepeatableBuildConfig struct {
-	archiveConfig *ArchiveConfig
-	deviceConfig  *DeviceConfig
-	builds        []ProductBundleBuild
+	archiveConfig  *ArchiveConfig
+	deviceConfig   *DeviceConfig
+	defaultBuildID string
+	builds         []repeatableBuild
 }
 
 func NewRepeatableBuildConfig(
 	fs *flag.FlagSet,
 	archiveConfig *ArchiveConfig,
 	deviceConfig *DeviceConfig,
+	defaultBuildID string,
+	prefix string,
 ) *RepeatableBuildConfig {
 	c := &RepeatableBuildConfig{
-		archiveConfig: archiveConfig,
-		deviceConfig:  deviceConfig,
+		archiveConfig:  archiveConfig,
+		deviceConfig:   deviceConfig,
+		defaultBuildID: defaultBuildID,
 	}
 
 	fs.Var(
-		c,
-		"product-bundle-dir",
+		repeatableBuildVar{c: c, kind: builderNameKind},
+		fmt.Sprintf("%sbuilder-name", prefix),
+		"Pave to the latest version of this builder",
+	)
+	fs.Var(
+		repeatableBuildVar{c: c, kind: buildIdKind},
+		fmt.Sprintf("%sbuild-id", prefix),
+		"Pave to this specific build id",
+	)
+	fs.Var(
+		repeatableBuildVar{c: c, kind: fuchsiaBuildDirKind},
+		fmt.Sprintf("%sfuchsia-build-dir", prefix),
+		"Pave to the build in this fuchsia build output directory",
+	)
+	fs.Var(
+		repeatableBuildVar{c: c, kind: productBundleDirKind},
+		fmt.Sprintf("%sproduct-bundle-dir", prefix),
 		"Update to the latest version of this builder",
 	)
 
 	return c
 }
 
-func (c *RepeatableBuildConfig) GetBuilds(ctx context.Context, deviceClient *device.Client) ([]artifacts.Build, error) {
+func (c *RepeatableBuildConfig) GetBuilds(
+	ctx context.Context,
+	deviceClient *device.Client,
+	outputDir string,
+) ([]artifacts.Build, error) {
 	sshPrivateKey, err := c.deviceConfig.SSHPrivateKey()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ssh key: %w", err)
 	}
 
 	var builds []artifacts.Build
-	for _, build := range c.builds {
-		builds = append(builds, artifacts.NewProductBundleDirBuild(build.path, sshPrivateKey.PublicKey()))
+	for _, b := range c.builds {
+		switch b.kind {
+		case builderNameKind:
+			builder := c.archiveConfig.BuildArchive().GetBuilder(b.value)
+			buildID, err := builder.GetLatestBuildID(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to lookup build id: %w", err)
+			}
+
+			build, err := c.archiveConfig.BuildArchive().GetBuildByID(
+				ctx,
+				buildID,
+				outputDir,
+				sshPrivateKey.PublicKey(),
+				c.deviceConfig.ffxPath,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			builds = append(builds, build)
+		case buildIdKind:
+			build, err := c.archiveConfig.BuildArchive().GetBuildByID(
+				ctx,
+				b.value,
+				outputDir,
+				sshPrivateKey.PublicKey(),
+				c.deviceConfig.ffxPath,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			builds = append(builds, build)
+		case fuchsiaBuildDirKind:
+			builds = append(builds, artifacts.NewFuchsiaDirBuild(b.value, sshPrivateKey.PublicKey()))
+		case productBundleDirKind:
+			builds = append(builds, artifacts.NewProductBundleDirBuild(b.value, sshPrivateKey.PublicKey()))
+		}
+	}
+
+	// Append the last build id as our final upgrade.
+	if c.defaultBuildID != "" {
+		build, err := c.archiveConfig.BuildArchive().GetBuildByID(
+			ctx,
+			c.defaultBuildID,
+			outputDir,
+			sshPrivateKey.PublicKey(),
+			c.deviceConfig.ffxPath,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		builds = append(builds, build)
 	}
 
 	return builds, nil
 }
 
-type ProductBundleBuild struct {
-	path string
+type repeatableBuild struct {
+	kind  repeatableBuildKind
+	value string
 }
 
-func (c *RepeatableBuildConfig) String() string {
-	return fmt.Sprint(c.builds)
+type repeatableBuildVar struct {
+	c    *RepeatableBuildConfig
+	kind repeatableBuildKind
 }
 
-func (c *RepeatableBuildConfig) Set(s string) error {
-	if s == "" {
-		return fmt.Errorf("Product bundle path cannot be empty")
+func (v repeatableBuildVar) String() string {
+	if v.c != nil {
+		return fmt.Sprintf("%+v", v.c.builds)
 	}
-	c.builds = append(c.builds, ProductBundleBuild{path: s})
+	return ""
+}
+
+func (v repeatableBuildVar) Set(s string) error {
+	if s == "" {
+		return fmt.Errorf("%s value cannot be empty", v.kind)
+	}
+	v.c.builds = append(v.c.builds, repeatableBuild{kind: v.kind, value: s})
 	return nil
 }

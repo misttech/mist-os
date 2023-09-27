@@ -104,6 +104,11 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 		return fmt.Errorf("failed to get upgrade build: %w", err)
 	}
 
+	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, deviceClient, outputDir)
+	if err != nil {
+		return fmt.Errorf("failed to get chained builds: %w", err)
+	}
+
 	// Adapt the builds for the device.
 	if downgradeBuild != nil {
 		downgradeBuild, err = c.installerConfig.ConfigureBuild(ctx, deviceClient, downgradeBuild)
@@ -127,12 +132,6 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 		}
 	}
 
-	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, deviceClient)
-	if err != nil {
-		return fmt.Errorf("failed to get chained builds: %w", err)
-	}
-	logger.Infof(ctx, "Chained build %s", fmt.Sprint(chainedBuilds))
-
 	for i, build := range chainedBuilds {
 		build, err = c.installerConfig.ConfigureBuild(ctx, deviceClient, build)
 		if err != nil {
@@ -147,6 +146,11 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 
 	if downgradeBuild == nil && len(chainedBuilds) > 0 {
 		downgradeBuild = chainedBuilds[0]
+		chainedBuilds = chainedBuilds[1:]
+	}
+
+	if upgradeBuild != nil {
+		chainedBuilds = append(chainedBuilds, upgradeBuild)
 	}
 
 	ch := make(chan *sl4f.Client, 1)
@@ -167,11 +171,7 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 		}
 	}()
 
-	if upgradeBuild != nil {
-		return testOTAs(ctx, deviceClient, []artifacts.Build{upgradeBuild}, &rpcClient)
-	}
-
-	return testOTAs(ctx, deviceClient, chainedBuilds[1:], &rpcClient)
+	return testOTAs(ctx, deviceClient, chainedBuilds, &rpcClient)
 }
 
 func testOTAs(

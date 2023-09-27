@@ -48,7 +48,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 		archiveConfig:        archiveConfig,
 		deviceConfig:         deviceConfig,
 		installerConfig:      installerConfig,
-		chainedBuildConfig:   cli.NewRepeatableBuildConfig(fs, archiveConfig, deviceConfig),
+		chainedBuildConfig:   cli.NewRepeatableBuildConfig(fs, archiveConfig, deviceConfig, "", ""),
 		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-", true),
 		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-", false),
 	}
