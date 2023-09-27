@@ -63,11 +63,11 @@ use {
     futures::{self, future::poll_fn, FutureExt},
     once_cell::sync::OnceCell,
     rand::Rng,
+    rustc_hash::FxHashMap as HashMap,
     serde::{Deserialize, Serialize},
     static_assertions::const_assert,
     std::{
         clone::Clone,
-        collections::HashMap,
         convert::AsRef,
         ops::{Bound, Range},
         sync::{
@@ -737,7 +737,7 @@ impl Journal {
         end_offset: Option<u64>,
     ) -> Result<JournaledTransactions, Error> {
         let mut transactions = Vec::new();
-        let mut marked_for_deletion: HashMap<u64, u64> = HashMap::new();
+        let mut marked_for_deletion = HashMap::default();
         let (mut device_flushed_offset, root_parent_store_object_id) = {
             let super_block = &self.inner.lock().unwrap().super_block_header;
             (super_block.super_block_journal_file_offset, super_block.root_parent_store_object_id)

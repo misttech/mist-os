@@ -8,6 +8,7 @@ use {
     linked_hash_map::{Entry, LinkedHashMap},
     std::{
         boxed::Box,
+        hash::BuildHasherDefault,
         ops::Drop,
         sync::{
             atomic::{AtomicU64, Ordering},
@@ -87,14 +88,17 @@ enum CacheValue {
 
 /// Supports caching for Objects directly for now. Speeds up stat calls.
 pub struct TreeCache {
-    inner: Mutex<LinkedHashMap<ObjectKey, CacheValue>>,
+    inner: Mutex<LinkedHashMap<ObjectKey, CacheValue, BuildHasherDefault<rustc_hash::FxHasher>>>,
     placeholder_counter: AtomicU64,
 }
 
 impl TreeCache {
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(LinkedHashMap::with_capacity(ITEM_LIMIT + 1)),
+            inner: Mutex::new(LinkedHashMap::with_capacity_and_hasher(
+                ITEM_LIMIT + 1,
+                BuildHasherDefault::<rustc_hash::FxHasher>::default(),
+            )),
             placeholder_counter: AtomicU64::new(0),
         }
     }

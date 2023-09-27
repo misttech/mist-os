@@ -35,6 +35,7 @@ fxfs_deps = [
   "//third_party/rust_crates:once_cell",
   "//third_party/rust_crates:pin-project",
   "//third_party/rust_crates:rand",
+  "//third_party/rust_crates:rustc-hash",
   "//third_party/rust_crates:scopeguard",
   "//third_party/rust_crates:serde",
   "//third_party/rust_crates:slab",

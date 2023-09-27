@@ -25,8 +25,9 @@ use {
     anyhow::{anyhow, Context, Error},
     futures::try_join,
     fxfs_crypto::Crypt,
+    rustc_hash::FxHashSet as HashSet,
     std::{
-        collections::{BTreeMap, HashSet},
+        collections::BTreeMap,
         iter::zip,
         ops::Bound,
         sync::{
@@ -106,7 +107,7 @@ pub async fn fsck_with_options(
 
     // Keep track of all things that might exist in journal checkpoints so we can check for
     // unexpected entries.
-    let mut journal_checkpoint_ids: HashSet<u64> = HashSet::new();
+    let mut journal_checkpoint_ids: HashSet<u64> = HashSet::default();
     journal_checkpoint_ids.insert(super_block_header.allocator_object_id);
     journal_checkpoint_ids.insert(super_block_header.root_store_object_id);
 
@@ -178,7 +179,7 @@ pub async fn fsck_with_options(
 
     // Now compare our regenerated allocation map with what we actually have.
     fsck.verbose("Verifying allocations...");
-    let mut store_ids = HashSet::new();
+    let mut store_ids = HashSet::default();
     store_ids.insert(root_store.store_object_id());
     store_ids.insert(object_manager.root_parent_store().store_object_id());
     fsck.verify_allocations(filesystem.as_ref(), &store_ids).await?;
@@ -239,7 +240,7 @@ pub async fn fsck_volume_with_options(
 
     let mut fsck = Fsck::new(options);
     fsck.check_child_store(filesystem, store_id, crypt).await?;
-    let mut store_ids = HashSet::new();
+    let mut store_ids = HashSet::default();
     store_ids.insert(store_id);
     fsck.verify_allocations(filesystem, &store_ids).await?;
 

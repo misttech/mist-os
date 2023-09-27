@@ -56,9 +56,9 @@ use {
     anyhow::{bail, ensure, Context, Error},
     fprint::TypeFingerprint,
     fuchsia_inspect::{Property as _, UintProperty},
+    rustc_hash::FxHashMap as HashMap,
     serde::{Deserialize, Serialize},
     std::{
-        collections::HashMap,
         convert::TryInto,
         fmt,
         io::{Read, Write},

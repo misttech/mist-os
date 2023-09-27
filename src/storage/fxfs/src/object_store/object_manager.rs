@@ -28,8 +28,9 @@ use {
     futures::FutureExt as _,
     fxfs_crypto::Crypt,
     once_cell::sync::OnceCell,
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::{hash_map::Entry, HashMap},
+        collections::hash_map::Entry,
         sync::{Arc, RwLock},
     },
 };
@@ -132,13 +133,13 @@ impl ObjectManager {
     pub fn new(on_new_store: Option<Box<dyn Fn(&ObjectStore) + Send + Sync>>) -> ObjectManager {
         ObjectManager {
             inner: RwLock::new(Inner {
-                stores: HashMap::new(),
+                stores: HashMap::default(),
                 root_parent_store_object_id: INVALID_OBJECT_ID,
                 root_store_object_id: INVALID_OBJECT_ID,
                 allocator_object_id: INVALID_OBJECT_ID,
                 allocator: None,
-                journal_checkpoints: HashMap::new(),
-                reservations: HashMap::new(),
+                journal_checkpoints: HashMap::default(),
+                reservations: HashMap::default(),
                 last_end_offset: 0,
                 borrowed_metadata_space: 0,
                 max_transaction_size: (0, metrics::detail().create_uint("max_transaction_size", 0)),
@@ -570,7 +571,7 @@ impl ObjectManager {
     pub fn journal_file_offsets(&self) -> (HashMap<u64, u64>, Option<JournalCheckpoint>) {
         let inner = self.inner.read().unwrap();
         let mut min_checkpoint = None;
-        let mut offsets = HashMap::new();
+        let mut offsets = HashMap::default();
         for (&object_id, checkpoint) in &inner.journal_checkpoints {
             let checkpoint = checkpoint.earliest();
             match &mut min_checkpoint {

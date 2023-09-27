@@ -20,8 +20,9 @@ use {
         round::{round_down, round_up},
     },
     once_cell::sync::Lazy,
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::{hash_map::Entry, HashMap},
+        collections::hash_map::Entry,
         marker::{Send, Sync},
         mem::MaybeUninit,
         ops::Range,

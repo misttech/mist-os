@@ -23,9 +23,10 @@ use {
     },
     anyhow::Error,
     fxfs_crypto::WrappedKeys,
+    rustc_hash::FxHashSet as HashSet,
     std::{
         cell::UnsafeCell,
-        collections::{btree_map::BTreeMap, hash_set::HashSet},
+        collections::btree_map::BTreeMap,
         convert::TryInto,
         iter::Iterator,
         ops::{Bound, Range},
@@ -169,7 +170,7 @@ impl<'a> ScannedStore<'a> {
                         }
                         self.current_object = Some(CurrentObject {
                             object_id: key.object_id,
-                            key_ids: HashSet::new(),
+                            key_ids: HashSet::default(),
                             lazy_keys: false,
                         });
                         let parents = if self.root_objects.contains(&key.object_id) {
@@ -209,7 +210,7 @@ impl<'a> ScannedStore<'a> {
                         };
                         self.current_object = Some(CurrentObject {
                             object_id: key.object_id,
-                            key_ids: HashSet::new(),
+                            key_ids: HashSet::default(),
                             lazy_keys: true,
                         });
                         // We've verified no duplicate keys, and Object records come first,
@@ -253,7 +254,7 @@ impl<'a> ScannedStore<'a> {
                         }
                         self.current_object = Some(CurrentObject {
                             object_id: key.object_id,
-                            key_ids: HashSet::new(),
+                            key_ids: HashSet::default(),
                             lazy_keys: true,
                         });
                         self.objects.insert(

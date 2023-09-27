@@ -36,8 +36,9 @@ use {
         },
     },
     fxfs_crypto::Crypt,
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::{hash_map::Entry::Occupied, HashMap},
+        collections::hash_map::Entry::Occupied,
         sync::{
             atomic::{AtomicU64, Ordering},
             Arc, Weak,
@@ -217,7 +218,7 @@ impl VolumesDirectory {
         let me = Arc::new(Self {
             root_volume,
             directory_node: vfs::directory::immutable::simple(),
-            mounted_volumes: futures::lock::Mutex::new(HashMap::new()),
+            mounted_volumes: futures::lock::Mutex::new(HashMap::default()),
             inspect_tree,
             mem_monitor,
             pager_dirty_bytes_count: AtomicU64::new(0),

@@ -819,10 +819,8 @@ mod tests {
         },
         fuchsia_async as fasync,
         futures::future::join_all,
-        std::{
-            collections::HashMap,
-            sync::{Arc, Mutex},
-        },
+        rustc_hash::FxHashMap as HashMap,
+        std::sync::{Arc, Mutex},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
 
@@ -923,7 +921,7 @@ mod tests {
         };
 
         let allocator_mutations = Arc::new(Mutations::new());
-        let object_mutations = Arc::new(Mutex::new(HashMap::new()));
+        let object_mutations = Arc::new(Mutex::new(HashMap::default()));
         let fs = open_fs(device, object_mutations.clone(), allocator_mutations.clone()).await;
 
         let root_store = fs.root_store();
@@ -991,7 +989,7 @@ mod tests {
         let device = fs.take_device().await;
         device.reopen(false);
 
-        let replayed_object_mutations = Arc::new(Mutex::new(HashMap::new()));
+        let replayed_object_mutations = Arc::new(Mutex::new(HashMap::default()));
         let replayed_allocator_mutations = Arc::new(Mutations::new());
         let fs = open_fs(
             device,

@@ -8,8 +8,8 @@ use {
     async_trait::async_trait,
     fxfs_crypto::{Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes},
     rand::{rngs::StdRng, RngCore, SeedableRng},
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::HashMap,
         convert::TryInto,
         sync::atomic::{AtomicBool, Ordering},
     },

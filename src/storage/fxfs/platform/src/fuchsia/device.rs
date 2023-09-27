@@ -18,8 +18,9 @@ use {
         round::{round_down, round_up},
     },
     remote_block_device::{BlockFifoRequest, BlockFifoResponse},
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::{BTreeMap, HashMap},
+        collections::BTreeMap,
         hash::{Hash, Hasher},
         option::Option,
         sync::Mutex,
@@ -88,7 +89,7 @@ struct FifoMessageGroups(HashMap<u16, FifoMessageGroup>);
 // Keeps track of all the group requests that are currently being processed
 impl FifoMessageGroups {
     fn new() -> Self {
-        Self(HashMap::new())
+        Self(HashMap::default())
     }
 
     // Returns the current MessageGroup with this group ID
@@ -644,7 +645,7 @@ mod tests {
         fuchsia_zircon as zx,
         futures::join,
         remote_block_device::{BlockClient, RemoteBlockClient, VmoId},
-        std::collections::HashSet,
+        rustc_hash::FxHashSet as HashSet,
     };
 
     #[fuchsia::test(threads = 10)]
@@ -787,7 +788,7 @@ mod tests {
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
-                let mut vmo_set = HashSet::new();
+                let mut vmo_set = HashSet::default();
                 let vmo = zx::Vmo::create(1).expect("Vmo::create failed");
                 for _ in 1..5 {
                     match remote_block_device.attach_vmo(&vmo).await {

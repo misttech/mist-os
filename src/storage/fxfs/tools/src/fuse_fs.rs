@@ -22,8 +22,8 @@ use {
     fxfs_crypto::Crypt,
     libc,
     once_cell::sync::OnceCell,
+    rustc_hash::FxHashMap as HashMap,
     std::{
-        collections::HashMap,
         ffi::OsStr,
         fs::{File, OpenOptions},
         path::PathBuf,
@@ -134,7 +134,7 @@ impl FuseFs {
             fs,
             default_store,
             mount_path,
-            object_handle_cache: Arc::new(RwLock::new(HashMap::new())),
+            object_handle_cache: Arc::new(RwLock::new(HashMap::default())),
         }
     }
 
@@ -155,7 +155,7 @@ impl FuseFs {
             fs,
             default_store,
             mount_path,
-            object_handle_cache: Arc::new(RwLock::new(HashMap::new())),
+            object_handle_cache: Arc::new(RwLock::new(HashMap::default())),
         }
     }
 

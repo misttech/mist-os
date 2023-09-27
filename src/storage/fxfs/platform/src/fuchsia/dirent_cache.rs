@@ -6,7 +6,11 @@ use {
     crate::fuchsia::node::FxNode,
     fxfs::object_handle::INVALID_OBJECT_ID,
     linked_hash_map::LinkedHashMap,
-    std::sync::{Arc, Mutex},
+    rustc_hash::FxHasher,
+    std::{
+        hash::BuildHasherDefault,
+        sync::{Arc, Mutex},
+    },
 };
 
 enum CacheHolder {
@@ -15,7 +19,7 @@ enum CacheHolder {
 }
 
 struct DirentCacheInner {
-    lru: LinkedHashMap<(u64, String), CacheHolder>,
+    lru: LinkedHashMap<(u64, String), CacheHolder, BuildHasherDefault<FxHasher>>,
     limit: usize,
     timer_in_queue: bool,
 }
@@ -53,7 +57,7 @@ impl DirentCache {
     pub fn new(limit: usize) -> Self {
         Self {
             inner: Mutex::new(DirentCacheInner {
-                lru: LinkedHashMap::with_capacity(limit + 1),
+                lru: linked_hash_map_with_capacity(limit + 1),
                 limit,
                 timer_in_queue: false,
             }),
@@ -92,7 +96,7 @@ impl DirentCache {
             let mut this = self.inner.lock().unwrap();
             this.timer_in_queue = false;
             let limit = this.limit;
-            std::mem::replace(&mut this.lru, LinkedHashMap::with_capacity(limit))
+            std::mem::replace(&mut this.lru, linked_hash_map_with_capacity(limit + 1))
         };
     }
 
@@ -138,6 +142,12 @@ impl DirentCache {
             }
         }
     }
+}
+
+fn linked_hash_map_with_capacity(
+    capacity: usize,
+) -> LinkedHashMap<(u64, String), CacheHolder, BuildHasherDefault<FxHasher>> {
+    LinkedHashMap::with_capacity_and_hasher(capacity, BuildHasherDefault::<FxHasher>::default())
 }
 
 #[cfg(test)]

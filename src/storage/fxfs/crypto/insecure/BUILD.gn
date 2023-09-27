@@ -16,6 +16,7 @@ rustc_library("insecure") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:rustc-hash",
   ]
 
   sources = [ "src/lib.rs" ]

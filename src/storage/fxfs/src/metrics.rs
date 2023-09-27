@@ -7,10 +7,8 @@ use {
     fuchsia_inspect::Node,
     futures::FutureExt,
     once_cell::sync::Lazy,
-    std::{
-        collections::hash_map::HashMap,
-        sync::{Mutex, Weak},
-    },
+    rustc_hash::FxHashMap as HashMap,
+    std::sync::{Mutex, Weak},
 };
 
 /// Root node to which the filesystem Inspect tree will be attached.
@@ -70,7 +68,7 @@ pub fn object_stores_tracker() -> &'static ObjectStoresTracker {
             .boxed()
         });
         root.record(node);
-        ObjectStoresTracker { stores: Mutex::new(HashMap::new()) }
+        ObjectStoresTracker { stores: Mutex::new(HashMap::default()) }
     });
 
     &OBJECT_STORES_TRACKER

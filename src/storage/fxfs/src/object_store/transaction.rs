@@ -24,15 +24,13 @@ use {
     fprint::TypeFingerprint,
     futures::{future::poll_fn, pin_mut},
     fxfs_crypto::WrappedKey,
+    rustc_hash::FxHashMap as HashMap,
     scopeguard::ScopeGuard,
     serde::{Deserialize, Serialize},
     std::{
         cell::UnsafeCell,
         cmp::Ordering,
-        collections::{
-            hash_map::{Entry, HashMap},
-            BTreeSet,
-        },
+        collections::{hash_map::Entry, BTreeSet},
         convert::{From, Into},
         fmt,
         marker::PhantomPinned,
@@ -1182,7 +1180,7 @@ enum LockState {
 
 impl LockManager {
     pub fn new() -> Self {
-        LockManager { locks: Mutex::new(Locks { keys: HashMap::new() }) }
+        LockManager { locks: Mutex::new(Locks { keys: HashMap::default() }) }
     }
 
     /// Acquires the locks.  It is the caller's responsibility to ensure that drop_transaction is

@@ -103,7 +103,7 @@ macro_rules! impl_fprint_two_generic {
     };
 }
 
-impl_fprint_two_generic!(BTreeMap, HashMap);
+impl_fprint_two_generic!(BTreeMap);
 
 macro_rules! impl_fprint_tuple {
     (($($type: ident,)*)) => {
@@ -147,6 +147,14 @@ impl<T: TypeFingerprint> TypeFingerprint for [T] {
 impl<T: TypeFingerprint + ?Sized> TypeFingerprint for Box<T> {
     fn fingerprint() -> String {
         "Box<".to_owned() + &T::fingerprint() + ">"
+    }
+}
+
+impl<K: TypeFingerprint, V: TypeFingerprint, S> TypeFingerprint for HashMap<K, V, S> {
+    fn fingerprint() -> String {
+        // Serde doesn't store any information about the hash function and all entries are re-hashed
+        // when deserialized.
+        "HashMap<".to_owned() + &K::fingerprint() + "," + &V::fingerprint() + ">"
     }
 }
 

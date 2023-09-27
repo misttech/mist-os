@@ -454,7 +454,7 @@ mod tests {
         futures::{future::FutureExt, pin_mut, select},
         fxfs::{filesystem::FxFilesystem, object_store::volume::root_volume},
         ramdevice_client::RamdiskClientBuilder,
-        std::{collections::HashSet, pin::Pin},
+        std::pin::Pin,
         storage_device::block_device::BlockDevice,
         storage_device::DeviceHolder,
     };
@@ -667,15 +667,10 @@ mod tests {
                     .expect("fidl failed")
                     .expect("create failed");
 
-                assert_eq!(
-                    readdir(&volumes_dir_proxy)
-                        .await
-                        .expect("readdir failed")
-                        .iter()
-                        .map(|d| d.name.as_str())
-                        .collect::<HashSet<_>>(),
-                    HashSet::from(["default", "test"])
-                );
+                let entries = readdir(&volumes_dir_proxy).await.expect("readdir failed");
+                let mut entry_names = entries.iter().map(|d| d.name.as_str()).collect::<Vec<_>>();
+                entry_names.sort();
+                assert_eq!(entry_names, ["default", "test"]);
 
                 fs_admin_proxy.shutdown().await.expect("shutdown failed");
             }

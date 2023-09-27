@@ -9,10 +9,8 @@ use {
         range::RangeExt,
     },
     anyhow::{ensure, Error},
-    std::{
-        collections::{BTreeMap, HashMap},
-        ops::Range,
-    },
+    rustc_hash::FxHashMap as HashMap,
+    std::{collections::BTreeMap, ops::Range},
     storage_device::Device,
 };
 
@@ -270,7 +268,7 @@ mod tests {
     use {
         super::ChecksumList,
         crate::checksum::fletcher64,
-        std::collections::HashMap,
+        rustc_hash::FxHashMap as HashMap,
         storage_device::{fake_device::FakeDevice, Device},
     };
 
@@ -295,7 +293,7 @@ mod tests {
 
         // All entries should pass.
         assert_eq!(
-            list.clone().verify(&device, HashMap::new(), 10).await.expect("verify failed"),
+            list.clone().verify(&device, HashMap::default(), 10).await.expect("verify failed"),
             10
         );
 
@@ -305,14 +303,14 @@ mod tests {
 
         // Verification should fail now.
         assert_eq!(
-            list.clone().verify(&device, HashMap::new(), 10).await.expect("verify failed"),
+            list.clone().verify(&device, HashMap::default(), 10).await.expect("verify failed"),
             1
         );
 
         // Mark the middle block as deallocated and then it should pass again.
         list.mark_deallocated(2, 1024..1536);
         assert_eq!(
-            list.clone().verify(&device, HashMap::new(), 10).await.expect("verify failed"),
+            list.clone().verify(&device, HashMap::default(), 10).await.expect("verify failed"),
             10
         );
 
@@ -322,7 +320,7 @@ mod tests {
 
         // All entries should validate.
         assert_eq!(
-            list.clone().verify(&device, HashMap::new(), 10).await.expect("verify failed"),
+            list.clone().verify(&device, HashMap::default(), 10).await.expect("verify failed"),
             10
         );
 
@@ -332,7 +330,7 @@ mod tests {
 
         // This should only validate up to journal offset 3.
         assert_eq!(
-            list.clone().verify(&device, HashMap::new(), 10).await.expect("verify failed"),
+            list.clone().verify(&device, HashMap::default(), 10).await.expect("verify failed"),
             3
         );
 
@@ -342,7 +340,7 @@ mod tests {
 
         // The deallocation in #4 should be ignored and so validation should only succeed up
         // to offset 1.
-        assert_eq!(list.verify(&device, HashMap::new(), 10).await.expect("verify failed"), 1);
+        assert_eq!(list.verify(&device, HashMap::default(), 10).await.expect("verify failed"), 1);
     }
 
     #[fuchsia::test]
@@ -361,7 +359,7 @@ mod tests {
 
         list.push(2, 1, 1024..1536, &[fletcher64(&[2; 512], 0)]).unwrap();
 
-        assert_eq!(list.verify(&device, HashMap::new(), 10).await.expect("verify failed"), 10);
+        assert_eq!(list.verify(&device, HashMap::default(), 10).await.expect("verify failed"), 10);
     }
 
     #[fuchsia::test]
@@ -378,7 +376,7 @@ mod tests {
         list.push(4, 1, 2048..3072, &[fletcher64(&[2; 512], 0); 2]).unwrap();
         list.mark_deallocated(5, 1536..2560);
 
-        assert_eq!(list.verify(&device, HashMap::new(), 10).await.expect("verify failed"), 10);
+        assert_eq!(list.verify(&device, HashMap::default(), 10).await.expect("verify failed"), 10);
     }
 
     #[fuchsia::test]
@@ -387,7 +385,7 @@ mod tests {
         let mut buffer = device.allocate_buffer(512);
         let mut list = ChecksumList::new(1);
 
-        let mut marked_for_deletion = HashMap::new();
+        let mut marked_for_deletion = HashMap::default();
 
         buffer.as_mut_slice().copy_from_slice(&[2; 512]);
         device.write(2560, buffer.as_ref()).await.expect("write failed");
@@ -411,7 +409,7 @@ mod tests {
         let mut buffer = device.allocate_buffer(512);
         let mut list = ChecksumList::new(1);
 
-        let mut marked_for_deletion = HashMap::new();
+        let mut marked_for_deletion = HashMap::default();
 
         buffer.as_mut_slice().copy_from_slice(&[2; 512]);
         device.write(2560, buffer.as_ref()).await.expect("write failed");
@@ -463,6 +461,6 @@ mod tests {
         list.push(8, 2, 512..1024, &[c0])
             .expect_err("Expected failure due to different owner object");
 
-        assert_eq!(list.verify(&device, HashMap::new(), 6).await.expect("verify failed"), 6);
+        assert_eq!(list.verify(&device, HashMap::default(), 6).await.expect("verify failed"), 6);
     }
 }

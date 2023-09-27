@@ -35,6 +35,7 @@ if (is_host) {
         "//third_party/rust_crates:futures-util",
         "//third_party/rust_crates:libc",
         "//third_party/rust_crates:once_cell",
+        "//third_party/rust_crates:rustc-hash",
         "//third_party/rust_crates:tokio",
       ]
     }
