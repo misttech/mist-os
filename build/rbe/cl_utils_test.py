@@ -5,6 +5,7 @@
 
 import contextlib
 import filecmp
+import io
 import multiprocessing
 import os
 import shutil
@@ -43,6 +44,19 @@ class AutoEnvPrefixCommandTests(unittest.TestCase):
         self.assertEqual(
             cl_utils.auto_env_prefix_command(['FOO=BAR', 'echo']),
             [cl_utils._ENV, 'FOO=BAR', 'echo'])
+
+
+class TimerCMTests(unittest.TestCase):
+
+    @mock.patch('cl_utils._ENABLE_TIMERS', True)
+    def test_basic(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            with cl_utils.timer_cm('descriptive text'):
+                pass
+        lines = output.getvalue().splitlines()
+        self.assertIn('start: descriptive text', lines[0])
+        self.assertIn('end  : descriptive text', lines[1])
 
 
 class BoolGolangFlagTests(unittest.TestCase):

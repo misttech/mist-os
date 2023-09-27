@@ -231,7 +231,8 @@ class CxxRemoteAction(object):
             preprocessed_source = self.cxx_action.preprocessed_output
             self._cleanup_files.append(preprocessed_source)
             remote_inputs.append(preprocessed_source)
-            cpp_status = self.preprocess_locally()
+            with cl_utils.timer_cm('CxxRemoteAction.preprocess_locally()'):
+                cpp_status = self.preprocess_locally()
             remote_command = self._compile_preprocessed_command
             if cpp_status != 0:
                 return cpp_status
@@ -482,9 +483,10 @@ class CxxRemoteAction(object):
         if self.local_only:
             return self._run_locally()
 
-        prepare_status = self.prepare()
-        if prepare_status != 0:
-            return prepare_status
+        with cl_utils.timer_cm('CxxRemoteAction.prepare()'):
+            prepare_status = self.prepare()
+            if prepare_status != 0:
+                return prepare_status
 
         # Remote compile C++
         try:
@@ -495,18 +497,22 @@ class CxxRemoteAction(object):
                 self._cleanup()
 
     def _cleanup(self):
-        for f in self._cleanup_files:
-            f.unlink()
+        with cl_utils.timer_cm('CxxRemoteAction._cleanup()'):
+            for f in self._cleanup_files:
+                f.unlink()
 
 
 def main(argv: Sequence[str]) -> int:
-    cxx_remote_action = CxxRemoteAction(
-        argv,  # [remote options] -- C-compile-command...
-        exec_root=remote_action.PROJECT_ROOT,
-        working_dir=Path(os.curdir),
-        host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
-    )
-    return cxx_remote_action.run()
+    with cl_utils.timer_cm('cxx_remote_wrapper.main()'):
+        with cl_utils.timer_cm('CxxRemoteAction.__init__()'):
+            cxx_remote_action = CxxRemoteAction(
+                argv,  # [remote options] -- C-compile-command...
+                exec_root=remote_action.PROJECT_ROOT,
+                working_dir=Path(os.curdir),
+                host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
+            )
+        with cl_utils.timer_cm('CxxRemoteAction.run()'):
+            return cxx_remote_action.run()
 
 
 if __name__ == "__main__":

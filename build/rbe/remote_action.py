@@ -1328,12 +1328,14 @@ class RemoteAction(object):
 
     @property
     def local_launch_command(self) -> Sequence[str]:
-        return list(self._generate_local_launch_command())
+        with cl_utils.timer_cm('local_launch_command'):
+            return list(self._generate_local_launch_command())
 
     @property
     def remote_launch_command(self) -> Sequence[str]:
         """Generates the rewrapper command, one token at a time."""
-        return list(self._generate_remote_launch_command())
+        with cl_utils.timer_cm('remote_launch_command'):
+            return list(self._generate_remote_launch_command())
 
     @property
     def launch_command(self) -> Sequence[str]:
@@ -1475,9 +1477,10 @@ class RemoteAction(object):
 
     def _cleanup(self):
         self.vmsg("Cleaning up temporary files.")
-        for f in self._cleanup_files:
-            if f.exists():
-                f.unlink()  # does os.remove for files, rmdir for dirs
+        with cl_utils.timer_cm('RemoteAction._cleanup()'):
+            for f in self._cleanup_files:
+                if f.exists():
+                    f.unlink()  # does os.remove for files, rmdir for dirs
 
     def remote_debug(self) -> cl_utils.SubprocessResult:
         """Perform all remote setup, but run a different diagnostic command.
@@ -1489,10 +1492,12 @@ class RemoteAction(object):
             list(self._generate_remote_debug_command()), cwd=self.working_dir)
 
     def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
-        command = self.launch_command
+        with cl_utils.timer_cm('launch_command'):
+            command = self.launch_command
         quoted = cl_utils.command_quoted_str(command)
         self.vmsg(f"Launching: {quoted}")
-        return cl_utils.subprocess_call(command, cwd=self.working_dir)
+        with cl_utils.timer_cm('subprocess (remote, rewrapper)'):
+            return cl_utils.subprocess_call(command, cwd=self.working_dir)
 
     def _on_success(self) -> int:
         """Work to do after success (local or remote)."""
@@ -1590,11 +1595,12 @@ class RemoteAction(object):
         # being launched does not reference the non-canonical local working
         # dir explicitly.
         if self.canonicalize_working_dir and str(self.build_subdir) != '.':
-            leak_status = output_leak_scanner.preflight_checks(
-                paths=self.output_files_relative_to_working_dir,
-                command=self.local_only_command,
-                pattern=output_leak_scanner.PathPattern(self.build_subdir),
-            )
+            with cl_utils.timer_cm('output_leak_scanner.preflight_checks()'):
+                leak_status = output_leak_scanner.preflight_checks(
+                    paths=self.output_files_relative_to_working_dir,
+                    command=self.local_only_command,
+                    pattern=output_leak_scanner.PathPattern(self.build_subdir),
+                )
             if leak_status != 0:
                 msg(
                     f"Error: Detected local output dir leaks '{self.build_subdir}' in the command.  Aborting remote execution."
@@ -1617,7 +1623,8 @@ class RemoteAction(object):
                 result = self._run_maybe_remotely()
 
             if result.returncode == 0:  # success, nothing to see
-                return self._on_success()
+                with cl_utils.timer_cm('RemoteAction._on_success()'):
+                    return self._on_success()
 
             # From here onward, remote return code was != 0
             return self._on_failure(result)
@@ -1648,7 +1655,8 @@ class RemoteAction(object):
             msg(f"[dry-run only]{label_str}{command_str}")
             return 0
 
-        return self.run()
+        with cl_utils.timer_cm('RemoteAction.run()'):
+            return self.run()
 
     def _relativize_local_deps(self, path: str) -> str:
         p = Path(path)
@@ -2359,7 +2367,8 @@ def main(argv: Sequence[str]) -> int:
         remote_options=other_remote_options,
         command=filtered_command,
     )
-    return remote_action.run_with_main_args(main_args)
+    with cl_utils.timer_cm('RemoteAction.run_with_main_args()'):
+        return remote_action.run_with_main_args(main_args)
 
 
 if __name__ == "__main__":

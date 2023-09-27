@@ -10,6 +10,7 @@ import asyncio
 import collections
 import contextlib
 import dataclasses
+import datetime
 import fcntl
 import filecmp
 import io
@@ -32,6 +33,36 @@ _ENV = '/usr/bin/env'
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
+
+
+def tfmt(t: datetime.datetime) -> str:
+    return f'{t.hour:02.0f}:{t.minute:02.0f}:{t.second:02.0f}.{t.microsecond:06.0f}'
+
+
+def tmsg(dt: datetime.datetime, text: str):
+    print(f'[{tfmt(dt)}] {text}')
+
+
+# Global control switch for time profiling using timer_cm.
+_ENABLE_TIMERS = False
+
+
+@contextlib.contextmanager
+def timer_cm(text: str):
+    """Times execution of a body of code for profiling performance.
+
+    Globally enabled/disabled with _ENABLE_TIMERS.
+    """
+    try:
+        if _ENABLE_TIMERS:
+            start_time = datetime.datetime.now()
+            tmsg(start_time, 'start: ' + text)
+        yield
+    finally:
+        if _ENABLE_TIMERS:
+            end_time = datetime.datetime.now()
+            elapsed = end_time - start_time
+            tmsg(end_time, 'end  : ' + text + f" (elapsed: {elapsed})")
 
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
