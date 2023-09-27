@@ -37,7 +37,7 @@ struct RelocationFuzzer {
       info.set_rel(rel, relcount).set_rela(rela, relacount).set_jmprel(jmprel);
       // These walks never fail for any "bad data" reasons, they should just
       // call the visitor.  It never fails, so the walks should never fail.
-      constexpr auto visitor = [](auto&& reloc) -> bool { return true; };
+      auto visitor = [](auto&& reloc) -> bool { return true; };
       return info.VisitRelative(visitor) && info.VisitSymbolic(visitor);
     };
 
