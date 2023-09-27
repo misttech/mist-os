@@ -28,7 +28,7 @@ pub async fn new_blob_fixture() -> TestFixture {
 
 #[async_trait]
 pub trait BlobFixture {
-    async fn write_blob(&self, data: &[u8]) -> Hash;
+    async fn write_blob(&self, data: &[u8], mode: CompressionMode) -> Hash;
     async fn read_blob(&self, hash: Hash) -> Vec<u8>;
     async fn get_blob_handle(&self, name: &str) -> DataObjectHandle<FxVolume>;
     async fn get_blob_vmo(&self, hash: Hash) -> zx::Vmo;
@@ -41,11 +41,11 @@ pub trait BlobFixture {
 
 #[async_trait]
 impl BlobFixture for TestFixture {
-    async fn write_blob(&self, data: &[u8]) -> Hash {
+    async fn write_blob(&self, data: &[u8], mode: CompressionMode) -> Hash {
         let mut builder = MerkleTreeBuilder::new();
         builder.write(&data);
         let hash = builder.finish().root();
-        let delivery_data: Vec<u8> = Type1Blob::generate(&data, CompressionMode::Never);
+        let delivery_data: Vec<u8> = Type1Blob::generate(&data, mode);
         let writer = self.create_blob(&hash.into(), false).await.expect("failed to create blob");
         let mut blob_writer = BlobWriter::create(writer, delivery_data.len() as u64)
             .await

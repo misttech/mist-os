@@ -301,18 +301,8 @@ mod tests {
         super::*,
         crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
         assert_matches::assert_matches,
+        delivery_blob::CompressionMode,
         fuchsia_async as fasync,
-        fuchsia_merkle::MerkleTreeBuilder,
-        fxfs::{
-            object_handle::WriteBytes as _,
-            object_store::{
-                directory::Directory,
-                transaction::{lock_keys, LockKey, TransactionHandler as _},
-                DirectWriter, BLOB_MERKLE_ATTRIBUTE_ID,
-            },
-            round::round_up,
-            serialized_types::BlobMetadata,
-        },
     };
 
     #[fasync::run(10, test)]
@@ -320,7 +310,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
         assert_eq!(fixture.read_blob(hash).await, data);
 
         fixture.close().await;
@@ -331,7 +321,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![3; 3_000_000];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
 
         assert_eq!(fixture.read_blob(hash).await, data);
 
@@ -343,67 +333,9 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![3; 3_000_000];
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let tree = builder.finish();
-        {
-            // Manually insert the blob with our own metadata.
-            // TODO(fxbug.dev/122056): Refactor to share implementation with blob.rs and make-blob-image.
-            let root_object_id = fixture.volume().volume().store().root_directory_object_id();
-            let root_dir = Directory::open(fixture.volume().volume(), root_object_id)
-                .await
-                .expect("open failed");
+        let hash = fixture.write_blob(&data, CompressionMode::Always).await;
 
-            let handle;
-            let keys = lock_keys![LockKey::object(
-                fixture.volume().volume().store().store_object_id(),
-                root_object_id,
-            )];
-            let mut transaction =
-                fixture.fs().clone().new_transaction(keys, Default::default()).await.unwrap();
-            handle = root_dir
-                .create_child_file(&mut transaction, &format!("{}", tree.root()), None)
-                .await
-                .unwrap();
-            transaction.commit().await.unwrap();
-
-            let mut writer = DirectWriter::new(&handle, Default::default());
-            let mut compressed_offsets = vec![];
-            let mut offset = 0;
-            let chunk_size = round_up(data.len() as u64 / 2, BLOCK_SIZE).unwrap();
-            for chunk in data.chunks(chunk_size as usize) {
-                let mut compressor = zstd::bulk::Compressor::new(1).ok().unwrap();
-                compressor
-                    .set_parameter(zstd::zstd_safe::CParameter::ChecksumFlag(true))
-                    .ok()
-                    .unwrap();
-                let contents = compressor.compress(&chunk).unwrap();
-                compressed_offsets.push(offset);
-                offset += contents.len() as u64;
-                writer.write_bytes(&contents[..]).await.unwrap();
-            }
-            writer.complete().await.unwrap();
-
-            let mut serialized = Vec::new();
-            let len = data.len() as u64;
-            bincode::serialize_into(
-                &mut serialized,
-                &BlobMetadata {
-                    hashes: tree.as_ref()[0]
-                        .clone()
-                        .into_iter()
-                        .map(|h| h.into())
-                        .collect::<Vec<[u8; 32]>>(),
-                    chunk_size,
-                    compressed_offsets,
-                    uncompressed_size: len,
-                },
-            )
-            .unwrap();
-            handle.write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &serialized).await.unwrap();
-        }
-
-        assert_eq!(fixture.read_blob(tree.root()).await, data);
+        assert_eq!(fixture.read_blob(hash).await, data);
 
         fixture.close().await;
     }
@@ -414,7 +346,7 @@ mod tests {
 
         let page_size = zx::system_get_page_size() as usize;
         let data = vec![0xffu8; page_size - 1];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
         assert_eq!(fixture.read_blob(hash).await, data);
 
         {
@@ -434,7 +366,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![0xffu8; (READ_AHEAD_SIZE + BLOCK_SIZE) as usize];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
         let name = format!("{}", hash);
 
         {

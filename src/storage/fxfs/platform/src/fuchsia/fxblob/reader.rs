@@ -33,6 +33,7 @@ mod tests {
     use {
         super::*,
         crate::fuchsia::fxblob::testing::{new_blob_fixture, BlobFixture},
+        delivery_blob::CompressionMode,
         fidl_fuchsia_io::{self as fio},
         fuchsia_async as fasync,
         fuchsia_component::client::connect_to_protocol_at_dir_svc,
@@ -60,13 +61,42 @@ mod tests {
     }
 
     #[fasync::run(10, test)]
-    async fn test_blob_reader() {
+    async fn test_blob_reader_uncompressed() {
+        const NEVER_COMPRESS: CompressionMode = CompressionMode::Never;
         let fixture = new_blob_fixture().await;
-        let empty_blob_hash = fixture.write_blob(&[]).await;
+        let empty_blob_hash = fixture.write_blob(&[], NEVER_COMPRESS).await;
         let short_data = b"This is some data";
-        let short_blob_hash = fixture.write_blob(short_data).await;
+        let short_blob_hash = fixture.write_blob(short_data, NEVER_COMPRESS).await;
         let long_data = &[0x65u8; 30000];
-        let long_blob_hash = fixture.write_blob(long_data).await;
+        let long_blob_hash = fixture.write_blob(long_data, NEVER_COMPRESS).await;
+
+        assert_eq!(
+            &*read_blob(fixture.volume_out_dir(), empty_blob_hash).await.expect("read empty"),
+            &[0u8; 0]
+        );
+        assert_eq!(
+            &*read_blob(fixture.volume_out_dir(), short_blob_hash).await.expect("read short"),
+            short_data
+        );
+        assert_eq!(
+            &*read_blob(fixture.volume_out_dir(), long_blob_hash).await.expect("read long"),
+            long_data
+        );
+        let missing_hash = Hash::from([0x77u8; 32]);
+        assert!(read_blob(fixture.volume_out_dir(), missing_hash).await.is_err());
+
+        fixture.close().await;
+    }
+
+    #[fasync::run(10, test)]
+    async fn test_blob_reader_compressed() {
+        const ALWAYS_COMPRESS: CompressionMode = CompressionMode::Always;
+        let fixture = new_blob_fixture().await;
+        let empty_blob_hash = fixture.write_blob(&[], ALWAYS_COMPRESS).await;
+        let short_data = b"This is some data";
+        let short_blob_hash = fixture.write_blob(short_data, ALWAYS_COMPRESS).await;
+        let long_data = &[0x65u8; 30000];
+        let long_blob_hash = fixture.write_blob(long_data, ALWAYS_COMPRESS).await;
 
         assert_eq!(
             &*read_blob(fixture.volume_out_dir(), empty_blob_hash).await.expect("read empty"),

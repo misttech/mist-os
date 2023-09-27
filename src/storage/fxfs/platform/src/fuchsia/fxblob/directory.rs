@@ -598,7 +598,7 @@ mod tests {
 
         let data = [1; 1000];
 
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
 
         assert_eq!(fixture.read_blob(hash).await, data);
 
@@ -758,7 +758,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
 
         let (status, token) = fixture.root().get_token().await.expect("FIDL failed");
         Status::ok(status).unwrap();
@@ -777,7 +777,7 @@ mod tests {
         let fixture = new_blob_fixture().await;
 
         let data = vec![];
-        let hash = fixture.write_blob(&data).await;
+        let hash = fixture.write_blob(&data, CompressionMode::Never).await;
 
         let (status, token) = fixture.root().get_token().await.expect("FIDL failed");
         Status::ok(status).unwrap();
