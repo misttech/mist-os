@@ -178,10 +178,12 @@ impl Stats {
 }
 
 pub async fn main() -> Result<(), Error> {
+    let inspector = inspect::component::inspector();
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
+
     let mut service_fs = ServiceFs::new();
     service_fs.take_and_serve_directory_handle()?;
-    let inspector = inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut service_fs)?;
     fasync::Task::spawn(async move {
         service_fs.collect::<()>().await;
     })
