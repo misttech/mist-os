@@ -1,0 +1,20 @@
+// Copyright 2023 The Fuchsia Authors.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.sensors;
+
+type SensorId = struct {
+    id int32;
+};
+
+type Sensor = table {
+    1: id SensorId;
+    2: name string:MAX;
+};
+
+@discoverable
+open protocol Manager {
+    flexible GetSensorsInfo() -> (struct {
+        sensors vector<Sensor>:MAX;
+    });
+};

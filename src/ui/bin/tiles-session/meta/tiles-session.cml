@@ -82,6 +82,7 @@
                 "fuchsia.net.stack.Stack",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
+                "fuchsia.sensors.Manager",
                 "fuchsia.update.CommitStatusProvider",
                 "fuchsia.update.installer.Installer",
                 "fuchsia.wlan.wlanix.Wlanix",

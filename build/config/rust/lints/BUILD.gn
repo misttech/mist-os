@@ -91,6 +91,7 @@ config("allow_unused_results") {
     "//src/power/*",
     "//src/recovery/*",
     "//src/security/*",
+    "//src/sensors/*",
     "//src/session/*",
     "//src/settings/service:*",
     "//src/starnix/*",

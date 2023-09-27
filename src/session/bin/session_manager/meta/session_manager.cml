@@ -121,6 +121,7 @@
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.systemmode.ClientConfigurator",
                 "fuchsia.recovery.FactoryReset",
+                "fuchsia.sensors.Manager",
                 "fuchsia.settings.Accessibility",
                 "fuchsia.settings.Audio",
                 "fuchsia.settings.Display",

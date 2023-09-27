@@ -309,5 +309,11 @@
             to: "#session-manager",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.sensors.Manager",
+            from: "#sensors",
+            to: "#session-manager",
+            source_availability: "unknown",
+        },
     ],
 }
