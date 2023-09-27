@@ -51,7 +51,8 @@ pub async fn main() -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     fs.take_and_serve_directory_handle()?;
     let inspector = fuchsia_inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     publish_kcounter_inspect(connect_to_protocol::<CounterMarker>()?, inspector).await?;
 
     info!("Serving");
