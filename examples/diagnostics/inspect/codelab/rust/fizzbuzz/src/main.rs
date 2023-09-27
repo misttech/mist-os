@@ -101,7 +101,10 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc")
         .add_fidl_service(move |stream| FizzBuzzServer::new(metrics.clone()).spawn(stream));
 
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     fs.take_and_serve_directory_handle()?;
     fs.collect::<()>().await;

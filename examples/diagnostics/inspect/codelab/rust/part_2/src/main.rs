@@ -24,7 +24,11 @@ async fn main() -> Result<(), Error> {
     info!("starting up...");
 
     // [START part_1_serve_inspect]
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
+
     // [END part_1_serve_inspect]
 
     // Create a version string. We use record_ rather than create_ to tie the lifecyle of the

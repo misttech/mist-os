@@ -21,8 +21,10 @@ async fn main() -> Result<(), anyhow::Error> {
     // This creates the root of an Inspect tree
     // The Inspector is a singleton that you can access from any scope
     let inspector = fuchsia_inspect::component::inspector();
-    // This serves the Inspect tree to the default path
-    inspect_runtime::serve(inspector, &mut service_fs)?;
+    // This serves the Inspect tree, converting failures into fatal errors
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
+
     // [END initialization]
 
     // [START health_check]

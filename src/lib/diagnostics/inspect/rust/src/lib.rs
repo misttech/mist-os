@@ -62,7 +62,10 @@
 //! use fuchsia_inspect::component;
 //! use inspect_runtime;
 //!
-//! let _inspect_server_task = inspect_runtime::publish(component::inspector());
+//! let _inspect_server_task = inspect_runtime::publish(
+//!     component::inspector(),
+//!     inspect_runtime::PublishOptions::default(),
+//! );
 //!
 //! // Now you can create nodes and properties anywhere!
 //! let child = component::inspector().root().create_child("foo");

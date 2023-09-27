@@ -20,7 +20,10 @@ async fn main() -> Result<(), Error> {
 
     info!("starting up...");
 
-    inspect_runtime::serve(component::inspector(), &mut fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     // ComponentInspector has built-in health checking. Set it to "starting up" so snapshots show
     // we may still be initializing.
