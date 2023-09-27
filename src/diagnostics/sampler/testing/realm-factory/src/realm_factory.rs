@@ -7,6 +7,7 @@ use anyhow::*;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_hardware_power_statecontrol as fpower;
+use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_logger as flogger;
 use fidl_fuchsia_metrics as fmetrics;
 use fidl_fuchsia_metrics_test as fmetrics_test;
@@ -157,6 +158,16 @@ impl SamplerRealmFactory {
                     .capability(Capability::protocol::<flogger::LogSinkMarker>())
                     .from(Ref::parent())
                     .to(&test_case_archivist)
+                    .to(&mock_cobalt)
+                    .to(&sampler)
+                    .to(&single_counter),
+            )
+            .await?;
+        wrapper_realm
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<finspect::InspectSinkMarker>())
+                    .from(&test_case_archivist)
                     .to(&mock_cobalt)
                     .to(&sampler)
                     .to(&single_counter),

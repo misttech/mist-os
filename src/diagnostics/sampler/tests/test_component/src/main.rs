@@ -14,15 +14,18 @@ use std::{
 
 #[fuchsia::main]
 async fn main() {
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
+
     let mut fs = ServiceFs::new();
-    let inspector = component::inspector();
-    inspect_runtime::serve(inspector, &mut fs).unwrap();
     tracing::info!("Started SamplerTestController");
     fs.dir("svc").add_fidl_service(move |stream| serve_sampler_test_controller(stream));
 
     fs.take_and_serve_directory_handle().unwrap();
 
-    fs.collect::<()>().await;
+    fs.collect::<()>().await
 }
 
 struct TestState {
