@@ -16,37 +16,25 @@ def _fuchsia_package_size_check_impl(ctx):
     verbose_output = ctx.actions.declare_file(ctx.label.name + "_verbose_output.json")
     budgets_file = ctx.actions.declare_file(ctx.label.name + "_size_budgets.json")
     size_checker_file = ctx.file.size_checker_file
-    platform_aibs = ctx.attr.product_image[FuchsiaProductImageInfo].platform_aibs
     product_assembly_out = ctx.attr.product_image[FuchsiaProductImageInfo].product_assembly_out
-
-    arguments = [
-        "--platform-aibs",
-        platform_aibs.path,
-        "--size-limits",
-        size_checker_file.path,
-        "--image-assembly-config",
-        product_assembly_out.path + "/image_assembly.json",
-        "--output",
-        budgets_file.path,
-        "--blobfs-capacity",
-        str(ctx.attr.blobfs_capacity),
-        "--max-blob-contents-size",
-        str(ctx.attr.max_blob_contents_size),
-    ]
-
-    if ctx.attr.board_config and FuchsiaBoardConfigDirectoryInfo in ctx.attr.board_config:
-        board_config_dir = ctx.attr.board_config[FuchsiaBoardConfigDirectoryInfo].config_directory
-        arguments.extend([
-            "--board-output-dir",
-            board_config_dir.path,
-        ])
 
     # Convert size_checker.json to size_budgets.json
     ctx.actions.run(
         outputs = [budgets_file],
-        inputs = [size_checker_file, platform_aibs, product_assembly_out],
+        inputs = [size_checker_file, product_assembly_out],
         executable = ctx.executable._convert_size_limits,
-        arguments = arguments,
+        arguments = [
+            "--size-limits",
+            size_checker_file.path,
+            "--image-assembly-config",
+            product_assembly_out.path + "/image_assembly.json",
+            "--output",
+            budgets_file.path,
+            "--blobfs-capacity",
+            str(ctx.attr.blobfs_capacity),
+            "--max-blob-contents-size",
+            str(ctx.attr.max_blob_contents_size),
+        ],
     )
 
     # Size checker execution
@@ -111,10 +99,6 @@ fuchsia_package_size_check = rule(
         "product_image": attr.label(
             doc = "fuchsia_product_image target to check size",
             providers = [FuchsiaProductImageInfo],
-        ),
-        "board_config": attr.label(
-            doc = "A board configuration target.",
-            providers = [FuchsiaBoardConfigDirectoryInfo],
         ),
         "blobfs_capacity": attr.int(
             doc = "Total Capacity of BlobFS",

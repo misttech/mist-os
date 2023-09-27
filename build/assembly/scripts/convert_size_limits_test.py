@@ -30,36 +30,29 @@ class ConvertTest(unittest.TestCase):
                             component="b1_2_comp",
                             creep_limit=12,
                             limit=20,
-                            src=[
-                                "a/b1/c1/package_manifest.json",
-                                "a/b1/c2/package_manifest.json",
-                                "a/b2/c1/package_manifest.json"
-                            ]),
+                            pkgs=["b1_c1", "b1_c2", "b2_c1"]),
                         dict(
                             component="b_comp",
                             creep_limit=16,
                             limit=22,
-                            src=[
-                                "a/b/c2/package_manifest.json",
-                                "a/b/c1/package_manifest.json"
-                            ]),
+                            pkgs=["b_c2", "b_c1"]),
                         dict(
                             component="/system (drivers and early boot)",
                             creep_limit=52,
                             limit=53,
-                            src=[])
+                            pkgs=[])
                     ],
                 ),
                 image_assembly_config=dict(
                     base=[
-                        "obj/a/b1/c1/package_manifest.json",
-                        "obj/a/b/c2/package_manifest.json",
+                        "obj/a/b1_c1/package_manifest.json",
+                        "obj/a/b_c2/package_manifest.json",
                         "obj/is_not_matched_1/package_manifest.json",
                     ],
                     cache=[
-                        "obj/a/b/c1/package_manifest.json",
-                        "obj/a/b2/c1/package_manifest.json",
-                        "obj/a/b1/c2/package_manifest.json",
+                        "obj/a/b_c1/package_manifest.json",
+                        "obj/a/b2_c1/package_manifest.json",
+                        "obj/a/b1_c2_expanded/rebased_package_manifest.json",
                         "obj/is_not_matched_2/package_manifest.json",
                     ],
                     system=["obj/system/package_manifest.json"],
@@ -99,9 +92,9 @@ class ConvertTest(unittest.TestCase):
                             creep_budget_bytes=12,
                             merge=False,
                             packages=[
-                                'obj/a/b1/c1/package_manifest.json',
-                                'obj/a/b1/c2/package_manifest.json',
-                                'obj/a/b2/c1/package_manifest.json',
+                                'obj/a/b1_c1/package_manifest.json',
+                                'obj/a/b1_c2_expanded/rebased_package_manifest.json',
+                                'obj/a/b2_c1/package_manifest.json',
                             ]),
                         dict(
                             name='b_comp',
@@ -109,8 +102,8 @@ class ConvertTest(unittest.TestCase):
                             creep_budget_bytes=16,
                             merge=False,
                             packages=[
-                                'obj/a/b/c1/package_manifest.json',
-                                'obj/a/b/c2/package_manifest.json',
+                                'obj/a/b_c1/package_manifest.json',
+                                'obj/a/b_c2/package_manifest.json',
                             ]),
                     ],
                     total_budget_bytes=999,
@@ -134,16 +127,16 @@ class ConvertTest(unittest.TestCase):
                             component="comp1",
                             creep_limit=12,
                             limit=20,
-                            src=["a/b/c2/package_manifest.json"]),
+                            pkgs=["b_c2"]),
                         dict(
                             component="comp2",
                             creep_limit=16,
                             limit=22,
-                            src=["a/b/c2/package_manifest.json"]),
+                            pkgs=["b_c2"]),
                     ],
                 ),
                 image_assembly_config=dict(
-                    base=["obj/a/b/c2/package_manifest.json"]),
+                    base=["obj/a/b_c2/package_manifest.json"]),
                 expected_output=None,
                 blobfs_capacity=101,
                 max_blob_contents_size=100,
@@ -186,10 +179,6 @@ class ConvertTest(unittest.TestCase):
             # It is unused and left empty.
             sys.argv = [
                 "",
-                "--platform-aibs",
-                platform_aibs_path,
-                "--board-output-dir",
-                os.path.join(tmpdir, "board"),
                 "--size-limits",
                 size_limits_path,
                 "--image-assembly-config",

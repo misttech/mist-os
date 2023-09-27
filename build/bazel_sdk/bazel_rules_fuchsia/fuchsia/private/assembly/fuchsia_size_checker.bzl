@@ -24,7 +24,6 @@ load(
 def fuchsia_size_checker(
         name,
         product_image = None,
-        board_config = None,
         update_package = None,
         size_checker_file = None,
         blobfs_capacity = None,
@@ -53,7 +52,6 @@ def fuchsia_size_checker(
         name = name + "_package_blobfs",
         size_checker_file = size_checker_file,
         product_image = product_image,
-        board_config = board_config,
         blobfs_capacity = blobfs_capacity,
         max_blob_contents_size = max_blob_contents_size,
     )

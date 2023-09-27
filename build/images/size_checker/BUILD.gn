@@ -10,7 +10,6 @@ import("//build/images/filesystem_limits.gni")
 import("//build/images/size_checker/size_checker_input.gni")
 import("//build/python/python_action.gni")
 import("//build/tools/json_merge/json_merge.gni")
-import("//bundles/assembly/platform_aibs.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 assert(!bootfs_only)
@@ -79,7 +78,6 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
   _blobs_config = "${_output_dir}/../fuchsia/fuchsia/gen/blobs.json"
   _image_assembly_config =
       "${_output_dir}/../fuchsia/fuchsia/image_assembly.json"
-  _platform_aibs = "${target_out_dir}/platform_assembly_input_bundles.json"
 
   generated_file("size_checker_json") {
     outputs = [ "$root_build_dir/size_checker.json" ]
@@ -111,39 +109,19 @@ if (blobfs_capacity != false && max_blob_contents_size != false &&
     output_conversion = "json"
   }
 
-  generated_file("platform_assembly_input_bundles") {
-    testonly = true
-    outputs = [ _platform_aibs ]
-    data_keys = [ "assembly_input_archives" ]
-    output_conversion = "json"
-
-    # eng_platform_aib_labels come from //bundles/assembly/platform_aibs.gni.
-    deps = eng_platform_aib_labels
-  }
-
-  _board_output_dir =
-      get_label_info(board_configuration_label, "target_out_dir") + "/" +
-      get_label_info(board_configuration_label, "name")
-
   action("convert_size_limits_to_size_budgets") {
     script = "//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/tools/convert_size_limits.py"
     inputs = [
       "$root_build_dir/size_checker.json",
       _image_assembly_config,
-      _platform_aibs,
     ]
     outputs = [ _size_budgets_blobfs_file ]
     deps = [
-      ":platform_assembly_input_bundles",
       ":size_checker_json",
       "//build/images/fuchsia:fuchsia.product_assembler",
     ]
     testonly = true
     args = [
-      "--platform-aibs",
-      rebase_path(_platform_aibs, root_build_dir),
-      "--board-output-dir",
-      rebase_path(_board_output_dir, root_build_dir),
       "--size-limits",
       rebase_path("$root_build_dir/size_checker.json", root_build_dir),
       "--image-assembly-config",
