@@ -16,7 +16,7 @@ use {
                 },
                 service::{
                     AggregateServiceDirectoryProvider, CollectionServiceDirectory,
-                    CollectionServiceRoute, FilteredServiceProvider,
+                    CollectionServiceRoute,
                 },
                 RouteSource,
             },
@@ -214,27 +214,6 @@ impl<'a> OpenRequest<'a> {
             CapabilitySource::Namespace { capability, .. } => match capability.source_path() {
                 Some(path) => {
                     Ok(Some(Box::new(NamespaceCapabilityProvider { path: path.clone() })))
-                }
-                _ => Ok(None),
-            },
-            CapabilitySource::FilteredService {
-                capability,
-                component,
-                source_instance_filter,
-                instance_name_source_to_target,
-            } => match capability.source_path() {
-                Some(_) => {
-                    let base_capability_source = Arc::new(CapabilitySource::Component {
-                        capability: capability.clone(),
-                        component: component.clone(),
-                    });
-                    let provider = FilteredServiceProvider::new(
-                        base_capability_source,
-                        source_instance_filter.clone(),
-                        instance_name_source_to_target.clone(),
-                    )
-                    .await?;
-                    Ok(Some(Box::new(provider)))
                 }
                 _ => Ok(None),
             },
