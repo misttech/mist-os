@@ -137,7 +137,7 @@ pub struct Mount {
     // Mountpoint or Namespace, maybe called "parent", and then traverse up to the top of the tree
     // if you need to find a Mount's Namespace.
 }
-type MountHandle = Arc<Mount>;
+pub type MountHandle = Arc<Mount>;
 
 #[derive(Default)]
 pub struct MountState {
@@ -900,7 +900,7 @@ pub struct NamespaceNode {
     ///
     /// A given FsNode can be mounted in multiple places in a namespace. This
     /// field distinguishes between them.
-    mount: Option<MountHandle>,
+    pub mount: Option<MountHandle>,
 
     /// The FsNode that corresponds to this namespace entry.
     pub entry: DirEntryHandle,

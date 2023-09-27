@@ -56,6 +56,105 @@ enum UpperCopyMode {
     CopyAll,
 }
 
+/// An `DirEntry` associated with the mount options. This is required because OverlayFs mostly
+/// works at the `DirEntry` level (mounts on the lower, upper and work directories are ignored),
+/// but operation must still depend on mount options.
+#[derive(Clone)]
+struct ActiveEntry {
+    entry: DirEntryHandle,
+    mount: Option<MountHandle>,
+}
+
+impl ActiveEntry {
+    fn mapper<'a>(entry: &'a ActiveEntry) -> impl Fn(DirEntryHandle) -> ActiveEntry + 'a {
+        |dir_entry| ActiveEntry { entry: dir_entry, mount: entry.mount.clone() }
+    }
+
+    fn entry(&self) -> &DirEntryHandle {
+        &self.entry
+    }
+
+    fn component_lookup(&self, current_task: &CurrentTask, name: &FsStr) -> Result<Self, Errno> {
+        self.entry().component_lookup(current_task, name).map(ActiveEntry::mapper(self))
+    }
+
+    fn create_entry(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<Self, Errno> {
+        self.entry().create_entry(current_task, name, create_node_fn).map(ActiveEntry::mapper(self))
+    }
+
+    /// Sets an xattr to mark the directory referenced by `entry` as opaque. Directories that are
+    /// marked as opaque in the upper FS are not merged with the corresponding directories in the
+    /// lower FS.
+    fn set_opaque_xattr(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+        self.entry().node.set_xattr(
+            current_task,
+            OPAQUE_DIR_XATTR,
+            OPAQUE_DIR_XATTR_VALUE,
+            XattrOp::Set,
+        )
+    }
+
+    /// Checks if the `entry` is marked as opaque.
+    fn is_opaque_node(&self, current_task: &CurrentTask) -> bool {
+        match self.entry().node.get_xattr(
+            current_task,
+            OPAQUE_DIR_XATTR,
+            OPAQUE_DIR_XATTR_VALUE.len(),
+        ) {
+            Ok(ValueOrSize::Value(v)) if v == OPAQUE_DIR_XATTR_VALUE => true,
+            _ => false,
+        }
+    }
+
+    /// Creates a "whiteout" entry in the directory called `name`. Whiteouts are created by
+    /// overlayfs to denote files and directories that were removed and should not be listed in the
+    /// directory. This is necessary because we cannot remove entries from the lower FS.
+    fn create_whiteout(
+        &self,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<ActiveEntry, Errno> {
+        self.create_entry(current_task, name, |dir, name| {
+            dir.mknod(current_task, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
+        })
+    }
+
+    /// Returns `true` if this is a "whiteout".
+    fn is_whiteout(&self) -> bool {
+        let info = self.entry().node.info();
+        info.mode.is_chr() && info.rdev == DeviceType::NONE
+    }
+
+    /// Checks whether the child of this entry represented by `info` is a "whiteout".
+    ///
+    /// Only looks up the corresponding `DirEntry` when necessary.
+    fn is_whiteout_child(
+        &self,
+        current_task: &CurrentTask,
+        info: &DirEntryInfo,
+    ) -> Result<bool, Errno> {
+        // We need to lookup the node only if the file is a char device.
+        if info.entry_type != DirectoryEntryType::CHR {
+            return Ok(false);
+        }
+        let entry = self.component_lookup(current_task, &info.name)?;
+        Ok(entry.is_whiteout())
+    }
+
+    fn read_dir_entries(&self, current_task: &CurrentTask) -> Result<Vec<DirEntryInfo>, Errno> {
+        let mut sink = DirentSinkAdapter::default();
+        self.entry()
+            .open_anonymous(current_task, OpenFlags::DIRECTORY)?
+            .readdir(current_task, &mut sink)?;
+        Ok(sink.items)
+    }
+}
+
 struct OverlayNode {
     fs: Arc<OverlayFs>,
 
@@ -63,8 +162,8 @@ struct OverlayNode {
     // set. Note that we don't care about `NamespaceNode`: overlayfs overlays filesystems
     // (i.e. not namespace subtrees). These directories may not be mounted anywhere.
     // `upper` may be created dynamically whenever write access is required.
-    upper: OnceCell<DirEntryHandle>,
-    lower: Option<DirEntryHandle>,
+    upper: OnceCell<ActiveEntry>,
+    lower: Option<ActiveEntry>,
 
     // `prepare_to_unlink()` may mark `upper` as opaque. In that case we want to skip merging
     // with `lower` in `readdir()`.
@@ -76,8 +175,8 @@ struct OverlayNode {
 impl OverlayNode {
     fn new(
         fs: Arc<OverlayFs>,
-        lower: Option<DirEntryHandle>,
-        upper: Option<DirEntryHandle>,
+        lower: Option<ActiveEntry>,
+        upper: Option<ActiveEntry>,
         parent: Option<Arc<OverlayNode>>,
     ) -> Arc<Self> {
         assert!(upper.is_some() || parent.is_some());
@@ -96,18 +195,21 @@ impl OverlayNode {
         node.downcast_ops::<Arc<Self>>().ok_or_else(|| errno!(EIO))
     }
 
-    fn main_entry<'a>(&'a self) -> &'a DirEntryHandle {
-        self.upper.get().or(self.lower.as_ref()).expect("Expected either upper or lower node")
+    fn main_entry(&self) -> &ActiveEntry {
+        self.upper
+            .get()
+            .or_else(|| self.lower.as_ref())
+            .expect("Expected either upper or lower node")
     }
 
     fn init_fs_node_for_child(
         self: &Arc<OverlayNode>,
         node: &FsNode,
-        lower: Option<DirEntryHandle>,
-        upper: Option<DirEntryHandle>,
+        lower: Option<ActiveEntry>,
+        upper: Option<ActiveEntry>,
     ) -> Arc<FsNode> {
         let entry = upper.as_ref().or(lower.as_ref()).expect("expect either lower or upper node");
-        let info = entry.node.info().clone();
+        let info = entry.entry().node.info().clone();
 
         // Parent may be needed to initialize `upper`. We don't need to pass it if we have `upper`.
         let parent = if upper.is_some() { None } else { Some(self.clone()) };
@@ -118,7 +220,7 @@ impl OverlayNode {
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the
     /// file is already in the upper FS.
-    fn ensure_upper(&self, current_task: &CurrentTask) -> Result<&DirEntryHandle, Errno> {
+    fn ensure_upper(&self, current_task: &CurrentTask) -> Result<&ActiveEntry, Errno> {
         self.ensure_upper_maybe_copy(current_task, UpperCopyMode::CopyAll)
     }
 
@@ -127,20 +229,20 @@ impl OverlayNode {
         &self,
         current_task: &CurrentTask,
         copy_mode: UpperCopyMode,
-    ) -> Result<&DirEntryHandle, Errno> {
+    ) -> Result<&ActiveEntry, Errno> {
         self.upper.get_or_try_init(|| {
             let lower = self.lower.as_ref().expect("lower is expected when upper is missing");
             let parent = self.parent.as_ref().expect("Parent is expected when upper is missing");
             let parent_upper = parent.ensure_upper(current_task)?;
-            let name = lower.local_name();
+            let name = lower.entry().local_name();
             let info = {
-                let info = lower.node.info();
+                let info = lower.entry().node.info();
                 info.clone()
             };
             let cred = info.cred();
 
             if info.mode.is_lnk() {
-                let link_target = lower.node.readlink(current_task)?;
+                let link_target = lower.entry().node.readlink(current_task)?;
                 let link_path = match &link_target {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
@@ -176,7 +278,7 @@ impl OverlayNode {
     fn lower_entry_exists(&self, current_task: &CurrentTask, name: &FsStr) -> Result<bool, Errno> {
         match &self.lower {
             Some(lower) => match lower.component_lookup(current_task, name) {
-                Ok(entry) => Ok(!is_whiteout(&*entry)),
+                Ok(entry) => Ok(!entry.is_whiteout()),
                 Err(err) if err.code == ENOENT => Ok(false),
                 Err(err) => Err(err),
             },
@@ -197,16 +299,16 @@ impl OverlayNode {
         current_task: &CurrentTask,
         name: &FsStr,
         do_create: F,
-    ) -> Result<DirEntryHandle, Errno>
+    ) -> Result<ActiveEntry, Errno>
     where
-        F: Fn(&DirEntryHandle, &FsStr) -> Result<DirEntryHandle, Errno>,
+        F: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
     {
         let upper = self.ensure_upper(current_task)?;
 
         match upper.component_lookup(current_task, name) {
             Ok(existing) => {
                 // If there is an entry in the upper dir, then it must be a whiteout.
-                if !is_whiteout(&*existing) {
+                if !existing.is_whiteout() {
                     return error!(EEXIST);
                 }
             }
@@ -229,11 +331,11 @@ impl OverlayNode {
     /// `prepare_to_unlink()` checks that the directory doesn't contain anything other
     /// than whiteouts and if that is the case then it unlinks all of them.
     fn prepare_to_unlink(self: &Arc<OverlayNode>, current_task: &CurrentTask) -> Result<(), Errno> {
-        if self.main_entry().node.is_dir() {
+        if self.main_entry().entry().node.is_dir() {
             let mut lower_entries = BTreeSet::new();
             if let Some(dir) = &self.lower {
-                for item in read_dir_entries(current_task, dir)?.drain(..) {
-                    if !is_whiteout_info(current_task, dir, &item)? {
+                for item in dir.read_dir_entries(current_task)?.drain(..) {
+                    if !dir.is_whiteout_child(current_task, &item)? {
                         lower_entries.insert(item.name);
                     }
                 }
@@ -241,8 +343,8 @@ impl OverlayNode {
 
             if let Some(dir) = self.upper.get() {
                 let mut to_remove = Vec::<FsString>::new();
-                for item in read_dir_entries(current_task, dir)?.drain(..) {
-                    if !is_whiteout_info(current_task, dir, &item)? {
+                for item in dir.read_dir_entries(current_task)?.drain(..) {
+                    if !dir.is_whiteout_child(current_task, &item)? {
                         return error!(ENOTEMPTY);
                     }
                     lower_entries.remove(&item.name);
@@ -254,12 +356,12 @@ impl OverlayNode {
                 }
 
                 // Mark the directory as opaque. Children can be removed after this.
-                set_opaque_xattr(current_task, dir)?;
+                dir.set_opaque_xattr(current_task)?;
                 let _ = self.upper_is_opaque.set(());
 
                 // Finally, remove the children.
                 for name in to_remove.iter() {
-                    dir.unlink(current_task, name, UnlinkKind::NonDirectory, false)?;
+                    dir.entry().unlink(current_task, name, UnlinkKind::NonDirectory, false)?;
                 }
             }
         }
@@ -289,11 +391,11 @@ impl FsNodeOps for Arc<OverlayNode> {
             Box::new(OverlayDirectory { node: self.clone(), dir_entries: Default::default() })
         } else {
             let state = match (self.upper.get(), &self.lower) {
-                (Some(entry), _) => {
-                    OverlayFileState::Upper(entry.open_anonymous(current_task, flags)?)
+                (Some(upper), _) => {
+                    OverlayFileState::Upper(upper.entry().open_anonymous(current_task, flags)?)
                 }
-                (None, Some(entry)) => {
-                    OverlayFileState::Lower(entry.open_anonymous(current_task, flags)?)
+                (None, Some(lower)) => {
+                    OverlayFileState::Lower(lower.entry().open_anonymous(current_task, flags)?)
                 }
                 _ => panic!("Expected either upper or lower node"),
             };
@@ -310,7 +412,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let resolve_child = |dir_opt: Option<&DirEntryHandle>| {
+        let resolve_child = |dir_opt: Option<&ActiveEntry>| {
             // TODO(sergeyu): lookup() checks access, but we don't need that here.
             dir_opt
                 .as_ref()
@@ -323,13 +425,13 @@ impl FsNodeOps for Arc<OverlayNode> {
                 .transpose()
         };
 
-        let upper: Option<DirEntryHandle> = resolve_child(self.upper.get())?;
+        let upper: Option<ActiveEntry> = resolve_child(self.upper.get())?;
 
         let (upper_is_dir, upper_is_opaque) = match &upper {
-            Some(upper) if is_whiteout(upper) => return error!(ENOENT),
+            Some(upper) if upper.is_whiteout() => return error!(ENOENT),
             Some(upper) => {
-                let is_dir = upper.node.is_dir();
-                let is_opaque = !is_dir || is_opaque_node(current_task, upper);
+                let is_dir = upper.entry().node.is_dir();
+                let is_opaque = !is_dir || upper.is_opaque_node(current_task);
                 (is_dir, is_opaque)
             }
             None => (false, false),
@@ -339,11 +441,11 @@ impl FsNodeOps for Arc<OverlayNode> {
 
         // We don't need to resolve the lower node if we have an opaque node in the upper dir.
         let lookup_lower = !parent_upper_is_opaque && !upper_is_opaque;
-        let lower: Option<DirEntryHandle> = if lookup_lower {
+        let lower: Option<ActiveEntry> = if lookup_lower {
             match resolve_child(self.lower.as_ref())? {
                 // If the upper node is a directory and the lower isn't then ignore the lower node.
-                Some(lower) if upper_is_dir && !lower.node.is_dir() => None,
-                Some(lower) if is_whiteout(&*lower) => None,
+                Some(lower) if upper_is_dir && !lower.entry().node.is_dir() => None,
+                Some(lower) if lower.is_whiteout() => None,
                 result => result,
             }
         } else {
@@ -388,7 +490,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             })?;
 
             // Set opaque attribute to ensure the new directory is not merged with lower.
-            set_opaque_xattr(current_task, &entry)?;
+            entry.set_opaque_xattr(current_task)?;
 
             Ok(entry)
         })?;
@@ -413,7 +515,7 @@ impl FsNodeOps for Arc<OverlayNode> {
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.main_entry().node.readlink(current_task)
+        self.main_entry().entry().node.readlink(current_task)
     }
 
     fn link(
@@ -427,7 +529,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         let upper_child = child_overlay.ensure_upper(current_task)?;
         self.create_entry(current_task, name, |dir, temp_name| {
             dir.create_entry(current_task, temp_name, |dir_node, name| {
-                dir_node.link(current_task, name, &upper_child.node)
+                dir_node.link(current_task, name, &upper_child.entry().node)
             })
         })?;
         Ok(())
@@ -450,16 +552,16 @@ impl FsNodeOps for Arc<OverlayNode> {
                 current_task,
                 &upper,
                 &name,
-                |work_dir, name| create_whiteout(current_task, work_dir, name),
+                |work, name| work.create_whiteout(current_task, name),
                 |_entry| Ok(()),
             )?;
         } else if let Some(child_upper) = child_overlay.upper.get() {
-            let kind = if child_upper.node.is_dir() {
+            let kind = if child_upper.entry().node.is_dir() {
                 UnlinkKind::Directory
             } else {
                 UnlinkKind::NonDirectory
             };
-            upper.unlink(current_task, name, kind, false)?
+            upper.entry().unlink(current_task, name, kind, false)?
         }
 
         Ok(())
@@ -472,7 +574,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let mut lock = info.write();
-        *lock = self.main_entry().node.refresh_info(current_task)?.clone();
+        *lock = self.main_entry().entry().node.refresh_info(current_task)?.clone();
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
@@ -482,7 +584,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(current_task)?.node.truncate(current_task, length)
+        self.ensure_upper(current_task)?.entry().node.truncate(current_task, length)
     }
 
     fn allocate(
@@ -493,7 +595,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(current_task)?.node.fallocate(current_task, mode, offset, length)
+        self.ensure_upper(current_task)?.entry().node.fallocate(current_task, mode, offset, length)
     }
 }
 struct OverlayDirectory {
@@ -512,12 +614,12 @@ impl OverlayDirectory {
         // items that are not present in the upper.
         let mut upper_set = BTreeSet::new();
         if let Some(dir) = self.node.upper.get() {
-            for item in read_dir_entries(current_task, dir)?.drain(..) {
+            for item in dir.read_dir_entries(current_task)?.drain(..) {
                 // Fill `upper_set` only if we will need it later.
                 if merge_with_lower {
                     upper_set.insert(item.name.clone());
                 }
-                if !is_whiteout_info(current_task, dir, &item)? {
+                if !dir.is_whiteout_child(current_task, &item)? {
                     entries.push(item);
                 }
             }
@@ -525,9 +627,9 @@ impl OverlayDirectory {
 
         if merge_with_lower {
             if let Some(dir) = &self.node.lower {
-                for item in read_dir_entries(current_task, dir)?.drain(..) {
+                for item in dir.read_dir_entries(current_task)?.drain(..) {
                     if !upper_set.contains(&item.name)
-                        && !is_whiteout_info(current_task, dir, &item)?
+                        && !dir.is_whiteout_child(current_task, &item)?
                     {
                         entries.push(item);
                     }
@@ -613,8 +715,9 @@ impl FileOps for OverlayFile {
 
                 {
                     let mut write_state = self.state.write();
-                    *write_state =
-                        OverlayFileState::Upper(upper.open_anonymous(current_task, self.flags)?);
+                    *write_state = OverlayFileState::Upper(
+                        upper.entry().open_anonymous(current_task, self.flags)?,
+                    );
                 }
                 state = self.state.read();
             }
@@ -660,7 +763,7 @@ pub struct OverlayFs {
     lower_fs: FileSystemHandle,
     upper_fs: FileSystemHandle,
 
-    work_dir: DirEntryHandle,
+    work: ActiveEntry,
 }
 
 impl OverlayFs {
@@ -678,28 +781,27 @@ impl OverlayFs {
             }
         }
 
-        let lower_dir = resolve_dir_param(current_task, &mount_options, b"lowerdir")?;
-        let upper_dir = resolve_dir_param(current_task, &mount_options, b"upperdir")?;
-        let work_dir = resolve_dir_param(current_task, &mount_options, b"workdir")?;
+        let lower = resolve_dir_param(current_task, &mount_options, b"lowerdir")?;
+        let upper = resolve_dir_param(current_task, &mount_options, b"upperdir")?;
+        let work = resolve_dir_param(current_task, &mount_options, b"workdir")?;
 
-        let lower_fs = lower_dir.node.fs().clone();
-        let upper_fs = upper_dir.node.fs().clone();
+        let lower_fs = lower.entry().node.fs().clone();
+        let upper_fs = upper.entry().node.fs().clone();
 
-        if !Arc::ptr_eq(&upper_fs, &work_dir.node.fs()) {
+        if !Arc::ptr_eq(&upper_fs, &work.entry().node.fs()) {
             log_error!("overlayfs: upperdir and workdir must be on the same FS");
             return error!(EINVAL);
         }
 
-        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work_dir });
-        let root_node =
-            OverlayNode::new(overlay_fs.clone(), Some(lower_dir), Some(upper_dir), None);
+        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
+        let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options);
         fs.set_root(root_node);
         Ok(fs)
     }
 
     // Helper used to create new entry called `name` in `target_dir` in the upper FS.
-    // 1. Calls `try_create` to create a new entry in `work_dir`. It is called repeateadly with a
+    // 1. Calls `try_create` to create a new entry in `work`. It is called repeateadly with a
     //    new name until it returns any result other than `EEXIST`.
     // 2. `do_init` is called to initilize the contents and the attributes of the new entry, etc.
     // 3. The new entry is moved to `target_dir`. If there is an existing entry called `name` in
@@ -708,20 +810,20 @@ impl OverlayFs {
     fn create_upper_entry<FCreate, FInit>(
         &self,
         current_task: &CurrentTask,
-        target_dir: &DirEntryHandle,
+        target_dir: &ActiveEntry,
         name: &FsStr,
         try_create: FCreate,
         do_init: FInit,
-    ) -> Result<DirEntryHandle, Errno>
+    ) -> Result<ActiveEntry, Errno>
     where
-        FCreate: Fn(&DirEntryHandle, &FsStr) -> Result<DirEntryHandle, Errno>,
-        FInit: FnOnce(&DirEntryHandle) -> Result<(), Errno>,
+        FCreate: Fn(&ActiveEntry, &FsStr) -> Result<ActiveEntry, Errno>,
+        FInit: FnOnce(&ActiveEntry) -> Result<(), Errno>,
     {
         let mut rng = rand::thread_rng();
         let (temp_name, entry) = loop {
             let x: u64 = rng.gen();
             let temp_name = format!("tmp{:x}", x).into_bytes();
-            match try_create(&self.work_dir, &temp_name) {
+            match try_create(&self.work, &temp_name) {
                 Err(err) if err.code == EEXIST => continue,
                 Err(err) => return Err(err),
                 Ok(entry) => break (temp_name, entry),
@@ -732,16 +834,17 @@ impl OverlayFs {
             .and_then(|()| {
                 DirEntry::rename(
                     current_task,
-                    &self.work_dir,
+                    self.work.entry(),
                     &temp_name,
-                    target_dir,
+                    target_dir.entry(),
                     name,
                     RenameFlags::REPLACE_ANY,
                 )
             })
             .map_err(|e| {
                 // Remove the temp entry in case of a failure.
-                self.work_dir
+                self.work
+                    .entry()
                     .unlink(current_task, &temp_name, UnlinkKind::NonDirectory, false)
                     .unwrap_or_else(|e| {
                         log_error!("Failed to cleanup work dir after an error: {}", e)
@@ -774,7 +877,7 @@ impl FileSystemOps for Arc<OverlayFs> {
         _replaced: Option<&FsNodeHandle>,
     ) -> Result<(), Errno> {
         let renamed = OverlayNode::from_fs_node(renamed)?;
-        if renamed.main_entry().node.is_dir() {
+        if renamed.main_entry().entry().node.is_dir() {
             // Return EXDEV for directory renames. Potentially they may be handled with the
             // `redirect_dir` feature, but it's not implemented here yet.
             // See https://docs.kernel.org/filesystems/overlayfs.html#renaming-directories
@@ -792,16 +895,16 @@ impl FileSystemOps for Arc<OverlayFs> {
 
         DirEntry::rename(
             current_task,
-            &old_parent_upper,
+            old_parent_upper.entry(),
             old_name,
-            &new_parent_upper,
+            new_parent_upper.entry(),
             new_name,
             RenameFlags::REPLACE_ANY,
         )?;
 
         // If the old node existed in lower FS, then override it in the upper FS with a whiteout.
         if need_whiteout {
-            match create_whiteout(current_task, old_parent_upper, old_name) {
+            match old_parent_upper.create_whiteout(current_task, old_name) {
                 Err(e) => {
                     log_warn!(
                         "overlayfs: failed to create whiteout for {}: {}",
@@ -826,7 +929,7 @@ fn resolve_dir_param(
     current_task: &CurrentTask,
     mount_options: &HashMap<&FsStr, &FsStr>,
     name: &FsStr,
-) -> Result<DirEntryHandle, Errno> {
+) -> Result<ActiveEntry, Errno> {
     let path = mount_options.get(name).ok_or_else(|| {
         log_error!("overlayfs: {} was not specified", String::from_utf8_lossy(name));
         errno!(EINVAL)
@@ -834,64 +937,21 @@ fn resolve_dir_param(
 
     current_task
         .open_file(path, OpenFlags::RDONLY | OpenFlags::DIRECTORY)
-        .map(|f| f.name.entry.clone())
+        .map(|f| ActiveEntry { entry: f.name.entry.clone(), mount: f.name.mount.clone() })
         .map_err(|e| {
             log_error!("overlayfs: Failed to lookup {}: {}", String::from_utf8_lossy(path), e);
             e
         })
 }
 
-fn read_dir_entries(
-    current_task: &CurrentTask,
-    dir: &DirEntryHandle,
-) -> Result<Vec<DirEntryInfo>, Errno> {
-    let mut sink = DirentSinkAdapter::default();
-    dir.open_anonymous(current_task, OpenFlags::DIRECTORY)?.readdir(current_task, &mut sink)?;
-    Ok(sink.items)
-}
-
-/// Creates a "whiteout" entry in `parent` called `name`. Whiteouts are created by overlayfs to
-/// denote files and directories that were removed and should not be listed in the directory.
-/// This is necessary because we cannot remove entries from the lower FS.
-fn create_whiteout(
-    current_task: &CurrentTask,
-    parent: &DirEntryHandle,
-    name: &FsStr,
-) -> Result<DirEntryHandle, Errno> {
-    parent.create_entry(current_task, name, |dir, name| {
-        dir.mknod(current_task, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
-    })
-}
-
-/// Returns `true` if the `entry` is a "whiteout.
-fn is_whiteout(entry: &DirEntry) -> bool {
-    let info = entry.node.info();
-    info.mode.is_chr() && info.rdev == DeviceType::NONE
-}
-
-/// Same as `is_whiteout()`, but takes `DirEntryInfo` and looks up the corresponding `DirEntry`
-/// only when necessary.
-fn is_whiteout_info(
-    current_task: &CurrentTask,
-    dir: &DirEntryHandle,
-    info: &DirEntryInfo,
-) -> Result<bool, Errno> {
-    // We need to lookup the node only if the file is a char device.
-    if info.entry_type != DirectoryEntryType::CHR {
-        return Ok(false);
-    }
-    let entry = dir.component_lookup(current_task, &info.name)?;
-    Ok(is_whiteout(&*entry))
-}
-
 /// Copies file content from one file to another.
 fn copy_file_content(
     current_task: &CurrentTask,
-    from: &DirEntryHandle,
-    to: &DirEntryHandle,
+    from: &ActiveEntry,
+    to: &ActiveEntry,
 ) -> Result<(), Errno> {
-    let from_file = from.open_anonymous(current_task, OpenFlags::RDONLY)?;
-    let to_file = to.open_anonymous(current_task, OpenFlags::WRONLY)?;
+    let from_file = from.entry().open_anonymous(current_task, OpenFlags::RDONLY)?;
+    let to_file = to.entry().open_anonymous(current_task, OpenFlags::WRONLY)?;
 
     const BUFFER_SIZE: usize = 4096;
 
@@ -914,19 +974,4 @@ fn copy_file_content(
     to_file.data_sync(current_task)?;
 
     Ok(())
-}
-
-/// Sets an xattr to mark the directory referenced by `entry` as opaque. Directories that are
-/// marked as opaque in the upper FS are not merged with the corresponding directories in the
-/// lower FS.
-fn set_opaque_xattr(current_task: &CurrentTask, entry: &DirEntryHandle) -> Result<(), Errno> {
-    entry.node.set_xattr(current_task, OPAQUE_DIR_XATTR, OPAQUE_DIR_XATTR_VALUE, XattrOp::Set)
-}
-
-/// Checks if the `entry` is marked as opaque.
-fn is_opaque_node(current_task: &CurrentTask, entry: &DirEntryHandle) -> bool {
-    match entry.node.get_xattr(current_task, OPAQUE_DIR_XATTR, OPAQUE_DIR_XATTR_VALUE.len()) {
-        Ok(ValueOrSize::Value(v)) if v == OPAQUE_DIR_XATTR_VALUE => true,
-        _ => false,
-    }
 }
