@@ -2,15 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    argh::FromArgs,
-    fidl::{endpoints::ClientEnd, prelude::*},
-    fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream},
-    fidl_test_placeholders as echo,
-    futures::prelude::*,
-    hoist::{hoist, OvernetInstance},
-};
+use anyhow::{Context as _, Error};
+use argh::FromArgs;
+use fidl::{endpoints::ClientEnd, prelude::*};
+use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
+use fidl_test_placeholders as echo;
+use futures::prelude::*;
+use std::sync::Arc;
 
 #[derive(FromArgs)]
 /// Echo example for Overnet.
@@ -45,10 +43,10 @@ enum Subcommand {
 ////////////////////////////////////////////////////////////////////////////////
 // Client implementation
 
-async fn exec_client(text: Option<String>) -> Result<(), Error> {
-    let svc = hoist().connect_as_service_consumer()?;
+async fn exec_client(node: Arc<overnet_core::Router>, text: Option<String>) -> Result<(), Error> {
+    let list_peers_context = node.new_list_peers_context().await;
     loop {
-        let peers = svc.list_peers().await?;
+        let peers = list_peers_context.list_peers().await?;
         tracing::info!("Got peers: {:?}", peers);
         for peer in peers {
             if peer.description.services.is_none() {
@@ -68,7 +66,9 @@ async fn exec_client(text: Option<String>) -> Result<(), Error> {
             tracing::info!(id = ?peer.id, "Trying peer");
 
             let (s, p) = fidl::Channel::create();
-            if let Err(err) = svc.connect_to_service(&peer.id, echo::EchoMarker::PROTOCOL_NAME, s) {
+            if let Err(err) =
+                node.connect_to_service(peer.id.into(), echo::EchoMarker::PROTOCOL_NAME, s).await
+            {
                 tracing::info!(?err);
                 continue;
             }
@@ -113,10 +113,10 @@ async fn echo_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(), Error>
     Ok(())
 }
 
-async fn exec_server(quiet: bool) -> Result<(), Error> {
+async fn exec_server(node: Arc<overnet_core::Router>, quiet: bool) -> Result<(), Error> {
     let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
-    hoist().publish_service(echo::EchoMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
+    node.register_service(echo::EchoMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p)).await?;
     ServiceProviderRequestStream::from_channel(chan)
         .map_err(Into::into)
         .try_for_each_concurrent(
@@ -144,14 +144,16 @@ async fn exec_server(quiet: bool) -> Result<(), Error> {
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let _t = hoist::init_hoist()?.start_default_link()?;
+    let hoist = hoist::Hoist::new(None)?;
+    let _t = hoist.start_default_link()?;
+    let node = hoist.node();
 
     let app: OvernetEcho = argh::from_env();
 
     match app.subcommand {
-        Subcommand::Server(_) => exec_server(app.quiet).await,
+        Subcommand::Server(_) => exec_server(node, app.quiet).await,
         Subcommand::Client(c) => {
-            let r = exec_client(c.text).await;
+            let r = exec_client(node, c.text).await;
             tracing::trace!("finished client");
             eprintln!("{:?}", r);
             r

@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{Context as _, Error},
-    clap::{App, Arg, SubCommand},
-    fidl::{
-        endpoints::{ClientEnd, ServerEnd},
-        prelude::*,
-    },
-    fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream},
-    fidl_fuchsia_overnet_examples_interfacepassing as interfacepassing,
-    fidl_test_placeholders as echo,
-    futures::prelude::*,
-    hoist::{hoist, OvernetInstance},
-};
+use anyhow::{Context as _, Error};
+use clap::{App, Arg, SubCommand};
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl::prelude::*;
+use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
+use fidl_fuchsia_overnet_examples_interfacepassing as interfacepassing;
+use fidl_test_placeholders as echo;
+use futures::prelude::*;
+use std::sync::Arc;
 
 fn app<'a, 'b>() -> App<'a, 'b> {
     App::new("overnet-interface-passing")
@@ -30,10 +26,10 @@ fn app<'a, 'b>() -> App<'a, 'b> {
 ////////////////////////////////////////////////////////////////////////////////
 // Client implementation
 
-async fn exec_client(text: Option<&str>) -> Result<(), Error> {
-    let svc = hoist().connect_as_service_consumer()?;
+async fn exec_client(node: Arc<overnet_core::Router>, text: Option<&str>) -> Result<(), Error> {
+    let list_peers_context = node.new_list_peers_context().await;
     loop {
-        let peers = svc.list_peers().await?;
+        let peers = list_peers_context.list_peers().await?;
         println!("Got peers: {:?}", peers);
         for peer in peers {
             if peer.description.services.is_none() {
@@ -50,8 +46,13 @@ async fn exec_client(text: Option<&str>) -> Result<(), Error> {
                 continue;
             }
             let (s, p) = fidl::Channel::create();
-            if let Err(e) =
-                svc.connect_to_service(&peer.id, interfacepassing::ExampleMarker::PROTOCOL_NAME, s)
+            if let Err(e) = node
+                .connect_to_service(
+                    peer.id.into(),
+                    interfacepassing::ExampleMarker::PROTOCOL_NAME,
+                    s,
+                )
+                .await
             {
                 println!("{:?}", e);
                 continue;
@@ -112,10 +113,14 @@ async fn example_server(chan: fidl::AsyncChannel, quiet: bool) -> Result<(), Err
         .await
 }
 
-async fn exec_server(quiet: bool) -> Result<(), Error> {
+async fn exec_server(node: Arc<overnet_core::Router>, quiet: bool) -> Result<(), Error> {
     let (s, p) = fidl::Channel::create();
     let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
-    hoist().publish_service(interfacepassing::ExampleMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
+    node.register_service(
+        interfacepassing::ExampleMarker::PROTOCOL_NAME.to_owned(),
+        ClientEnd::new(p),
+    )
+    .await?;
     ServiceProviderRequestStream::from_channel(chan)
         .map_err(Into::into)
         .try_for_each_concurrent(
@@ -143,14 +148,16 @@ async fn exec_server(quiet: bool) -> Result<(), Error> {
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    let _t = hoist::init_hoist()?.start_default_link()?;
+    let hoist = hoist::Hoist::new(None)?;
+    let _t = hoist.start_default_link()?;
 
     let args = app().get_matches();
+    let node = hoist.node();
 
     match args.subcommand() {
-        ("server", Some(_)) => exec_server(args.is_present("quiet")).await,
+        ("server", Some(_)) => exec_server(node, args.is_present("quiet")).await,
         ("client", Some(cmd)) => {
-            let r = exec_client(cmd.value_of("text")).await;
+            let r = exec_client(node, cmd.value_of("text")).await;
             println!("finished client");
             r
         }

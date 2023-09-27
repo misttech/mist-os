@@ -19,6 +19,7 @@ rustc_binary("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
+    "//src/connectivity/overnet/lib/core",
     "//src/connectivity/overnet/lib/hoist",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
