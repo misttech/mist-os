@@ -10,6 +10,7 @@
 
 #include <atomic>
 #include <latch>
+#include <new>
 #include <string>
 #include <thread>
 #include <vector>
@@ -139,6 +140,38 @@ TEST(RobustFutexTest, RobustListLimitIsEnforced) {
     }
     // The last entry was not modified.
     EXPECT_EQ(0, entries[kNumEntries - 1].futex & FUTEX_OWNER_DIED);
+  });
+
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST(RobustFutexTest, DoesNotModifyReadOnlyMapping) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([] {
+    const size_t page_size = sysconf(_SC_PAGESIZE);
+    void *addr =
+        mmap(NULL, sizeof(page_size), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(addr, MAP_FAILED);
+
+    robust_list_head head = {.list = {.next = nullptr},
+                             .futex_offset = offsetof(robust_list_entry, futex),
+                             .list_op_pending = nullptr};
+
+    robust_list_entry *entry = new (addr) robust_list_entry;
+
+    std::thread t([entry, &head, addr, page_size]() {
+      head.list.next = reinterpret_cast<struct robust_list *>(entry);
+      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
+      entry->futex = static_cast<int>(syscall(SYS_gettid));
+      entry->next = reinterpret_cast<struct robust_list *>(&head);
+
+      EXPECT_EQ(0, mprotect(addr, page_size, PROT_READ));
+    });
+    t.join();
+    // Memory allocating futex is not writable, so it should not be modified by the kernel.
+    EXPECT_EQ(0, entry->futex & FUTEX_OWNER_DIED);
+    entry->~robust_list_entry();
+    EXPECT_EQ(0, munmap(addr, page_size));
   });
 
   EXPECT_TRUE(helper.WaitForChildren());
