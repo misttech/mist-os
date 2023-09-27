@@ -251,14 +251,14 @@ func TestProtocolDeps(t *testing.T) {
 	ir := fidlgentest.EndToEndTest{T: t}.Single(`
 		library example;
 
-		protocol A {
+		closed protocol A {
 			compose B;
 		};
 
-		protocol B {
-			Foo() -> (D);
+		closed protocol B {
+			strict Foo() -> (D);
 
-			Bar(C);
+			strict Bar(C);
 		};
 
 		type C = struct {
@@ -269,7 +269,7 @@ func TestProtocolDeps(t *testing.T) {
 			endpoint client_end:E;
 		};
 
-		protocol E {};
+		closed protocol E {};
 	`)
 
 	g := NewDeclDepGraph(ir)
@@ -286,14 +286,14 @@ func TestServiceDeps(t *testing.T) {
 	ir := fidlgentest.EndToEndTest{T: t}.Single(`
 		library example;
 
-		protocol A {};
+		closed protocol A {};
 
 		service B {
 			first client_end:A;
 			second client_end:C;
 		};
 
-		protocol C {};
+		closed protocol C {};
 	`)
 
 	g := NewDeclDepGraph(ir)
@@ -455,7 +455,7 @@ func TestNoEdgesToNullableTypes(t *testing.T) {
 		nullable server_end:<D, optional>;
 	};
 
-	protocol D {};
+	closed protocol D {};
 `)
 
 	g := NewDeclDepGraph(ir)

@@ -69,6 +69,7 @@ void Lint(const fidl::SourceFile& source_file, fidl::Findings* findings,
   fidl::ExperimentalFlags experimental_flags;
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   fidl::Parser parser(&lexer, &reporter, experimental_flags);
   std::unique_ptr<fidl::raw::File> ast = parser.Parse();
   for (auto* diag : reporter.Diagnostics()) {

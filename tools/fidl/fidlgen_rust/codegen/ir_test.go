@@ -43,7 +43,7 @@ func TestDerivesCalculation(t *testing.T) {
 			expected: "#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]",
 		},
 		{
-			fidl:     `type MyStruct = resource struct { field client_end:P; }; protocol P {};`,
+			fidl:     `type MyStruct = resource struct { field client_end:P; }; closed protocol P {};`,
 			expected: "#[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]",
 		},
 		{
@@ -65,7 +65,7 @@ func TestDerivesCalculation(t *testing.T) {
 }
 
 func TestExperiments(t *testing.T) {
-	default_experiments := []string{"unknown_interactions"}
+	default_experiments := []string{"unknown_interactions", "unknown_interactions_mandate"}
 
 	cases := []struct {
 		desc        string

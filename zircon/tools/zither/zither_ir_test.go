@@ -1239,9 +1239,9 @@ library example;
 
 /// This gives the foo syscalls.
 @transport("Syscall")
-protocol Foo {
+closed protocol Foo {
   /// This is the foo_bar syscall.
-  Bar();
+  strict Bar();
 };
 
 /// This
@@ -1250,45 +1250,45 @@ protocol Foo {
 /// fizz syscalls.
 @no_protocol_prefix
 @transport("Syscall")
-protocol Arbitrary {
+closed protocol Arbitrary {
   /// This
   /// is
   /// the
   /// fizz_buzz syscall.
-  FizzBuzz();
+  strict FizzBuzz();
 };
 
 @transport("Syscall")
-protocol Category {
+closed protocol Category {
 	@vdsocall
-	VdsoCall();
+	strict VdsoCall();
 
 	@const
 	@vdsocall
-	ConstVdsoCall();
+	strict ConstVdsoCall();
 
 	@internal
-	Internal();
+	strict Internal();
 
     @next
-    Next();
+    strict Next();
 
 	@blocking
-	Blocking();
+	strict Blocking();
 
 	@noreturn
-	NoReturn();
+	strict NoReturn();
 
     @testonly
-    Test0();
+    strict Test0();
 
     @testonly
     @test_category1
-    Test1();
+    strict Test1();
 
     @testonly
     @test_category2
-    Test2();
+    strict Test2();
 };
 
 type StatusEnum = enum : uint32 {
@@ -1302,18 +1302,18 @@ type StructReturnType = struct {
 
 @no_protocol_prefix
 @transport("Syscall")
-protocol SyscallWithParameters {
-	SyscallWithInputs(struct{
+closed protocol SyscallWithParameters {
+	strict SyscallWithInputs(struct{
 		in1 uint64;
 		in2 bool;
 	});
 
-	SyscallWithOutputs() -> (struct{
+	strict SyscallWithOutputs() -> (struct{
 		out1 int32;
 		out2 uint16;
 	});
 
-	SyscallWithMixedOrientation(struct{
+	strict SyscallWithMixedOrientation(struct{
 		in uint64;
 		@inout
 		inout uint32;
@@ -1323,15 +1323,15 @@ protocol SyscallWithParameters {
 		out2 int8;
 	});
 
-	SyscallWithError(struct {
+	strict SyscallWithError(struct {
 		in bool;
 	}) -> (struct{
 		out bool;
 	}) error StatusEnum;
 
-	SyscallWithStructReturnType() -> (StructReturnType);
+	strict SyscallWithStructReturnType() -> (StructReturnType);
 
-	SyscallWithWrappedReturnType() -> (@wrapped_return struct {
+	strict SyscallWithWrappedReturnType() -> (@wrapped_return struct {
 		value uint32;
 	});
 };
@@ -1611,8 +1611,8 @@ library zx;
 alias status = int32;
 
 @transport("Syscall")
-protocol Foo {
-	WithStatus(struct {
+closed protocol Foo {
+	strict WithStatus(struct {
 		in bool;
 	}) -> (struct{
 		out bool;
@@ -1689,8 +1689,8 @@ library example;
 type EmptyStruct = struct {};
 
 @transport("Syscall")
-protocol Syscall {
-	WithVectors(struct{
+closed protocol Syscall {
+	strict WithVectors(struct{
 		structs vector<EmptyStruct>;
 
 		@size32

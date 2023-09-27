@@ -1914,7 +1914,7 @@ library l;
 `,
 			after: `
 library l;
-protocol T {};
+closed protocol T {};
 `,
 			expected: `
 {
@@ -1937,7 +1937,7 @@ protocol T {};
 			name: "protocol remove",
 			before: `
 library l;
-protocol T {};
+closed protocol T {};
 `,
 			after: `
 library l;
@@ -1996,12 +1996,12 @@ ajar protocol T {};
 			name: "protocol change transport",
 			before: `
 library l;
-protocol T {};
+closed protocol T {};
 `,
 			after: `
 library l;
 @transport("Driver")
-protocol T {};
+closed protocol T {};
 `,
 			expected: `
 {
@@ -2030,13 +2030,13 @@ protocol T {};
 			name: "protocol member add",
 			before: `
 library l;
-protocol T {
+closed protocol T {
 };
 `,
 			after: `
 library l;
-protocol T {
-  Test(struct { t int32; }) -> ();
+closed protocol T {
+  strict Test(struct { t int32; }) -> ();
 };
 `,
 			expected: `
@@ -2080,13 +2080,13 @@ protocol T {
 			name: "protocol member remove",
 			before: `
 library l;
-protocol T {
-  Test(struct { t int32; }) -> ();
+closed protocol T {
+  strict Test(struct { t int32; }) -> ();
 };
 `,
 			after: `
 library l;
-protocol T {
+closed protocol T {
 };
 `,
 			expected: `
@@ -2130,15 +2130,15 @@ protocol T {
 			name: "protocol member ordinal change",
 			before: `
 library l;
-protocol T {
-    Test(struct { t int32; }) -> ();
+closed protocol T {
+    strict Test(struct { t int32; }) -> ();
 };
 `,
 			after: `
 library l;
-protocol T {
+closed protocol T {
     @selector("notl/NotT.NotTest")
-    Test(struct { t int32; }) -> ();
+    strict Test(struct { t int32; }) -> ();
 };
 `,
 			expected: `
@@ -2172,14 +2172,14 @@ protocol T {
 			name: "protocol member direction change",
 			before: `
 library l;
-protocol T {
-  Test();
+closed protocol T {
+  strict Test();
 };
 `,
 			after: `
 library l;
-protocol T {
-  -> Test();
+closed protocol T {
+  strict -> Test();
 };
 `,
 			expected: `
@@ -2292,15 +2292,15 @@ open protocol T {
 			before: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test();
+closed protocol T {
+  strict Test();
 };
 `,
 			after: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test(R);
+closed protocol T {
+  strict Test(R);
 };
 `,
 			expected: `
@@ -2334,15 +2334,15 @@ protocol T {
 			before: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test(R);
+closed protocol T {
+  strict Test(R);
 };
 `,
 			after: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test();
+closed protocol T {
+  strict Test();
 };
 `,
 			expected: `
@@ -2376,15 +2376,15 @@ protocol T {
 			before: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test() -> ();
+closed protocol T {
+  strict Test() -> ();
 };
 `,
 			after: `
 library l;
 type R = struct { t int32; };
-protocol T {
-    Test() -> (R);
+closed protocol T {
+    strict Test() -> (R);
 };
 `,
 			expected: `
@@ -2418,15 +2418,15 @@ protocol T {
 			before: `
 library l;
 type R = struct { t int32; };
-protocol T {
-  Test() -> (R);
+closed protocol T {
+  strict Test() -> (R);
 };
 `,
 			after: `
 library l;
 type R = struct { t int32; };
-protocol T {
-    Test() -> ();
+closed protocol T {
+    strict Test() -> ();
 };
 `,
 			expected: `
@@ -2459,14 +2459,14 @@ protocol T {
 			name: "protocol member error add",
 			before: `
 library l;
-protocol T {
-  Test() -> ();
+closed protocol T {
+  strict Test() -> ();
 };
 `,
 			after: `
 library l;
-protocol T {
-    Test() -> () error uint32;
+closed protocol T {
+    strict Test() -> () error uint32;
 };
 `,
 			expected: `
@@ -2500,14 +2500,14 @@ protocol T {
 			name: "protocol member error remove",
 			before: `
 library l;
-protocol T {
-  Test() -> () error uint32;
+closed protocol T {
+  strict Test() -> () error uint32;
 };
 `,
 			after: `
 library l;
-protocol T {
-    Test() -> ();
+closed protocol T {
+    strict Test() -> ();
 };
 `,
 			expected: `
@@ -2541,14 +2541,14 @@ protocol T {
 			name: "protocol member type change",
 			before: `
 library l;
-protocol T {
-  Test(struct { t int32; }) -> ();
+closed protocol T {
+  strict Test(struct { t int32; }) -> ();
 };
 `,
 			after: `
 library l;
-protocol T {
-  Test(struct { t int32; u int32; }) -> ();
+closed protocol T {
+  strict Test(struct { t int32; u int32; }) -> ();
 };
 `,
 			expected: `

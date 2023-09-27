@@ -34,14 +34,14 @@ type T = struct {};
 type UnaryArg = struct {
     num int32;
 };
-protocol Inverter {
-    Invert(UnaryArg) -> (UnaryArg);
+closed protocol Inverter {
+    strict Invert(UnaryArg) -> (UnaryArg);
 };
-protocol TableResponse {
-    Foo() -> (table {});
+closed protocol TableResponse {
+    strict Foo() -> (table {});
 };
-protocol ErrorSyntax {
-    Foo() -> () error uint32;
+closed protocol ErrorSyntax {
+    strict Foo() -> () error uint32;
 };
 `
 )
@@ -927,8 +927,8 @@ type Either = strict union {
 			name: "protocols 1",
 			fidl: `
 library l;
-protocol Calculator {
-    Add(struct { a int32; b int32; }) -> (struct { sum int32; });
+closed protocol Calculator {
+    strict Add(struct { a int32; b int32; }) -> (struct { sum int32; });
 };
 `,
 			expected: `[
@@ -1046,12 +1046,12 @@ open protocol P {
 			fidl: `
 library l;
 type Bar = struct {};
-protocol P {};
-protocol P2 {
-    M1(resource struct { a client_end:P; });
-    M2(resource struct { a client_end:<P, optional>; });
-    M3(resource struct { a server_end:<P>; });
-    M4(resource struct { a server_end:<P, optional>; });
+closed protocol P {};
+closed protocol P2 {
+    strict M1(resource struct { a client_end:P; });
+    strict M2(resource struct { a client_end:<P, optional>; });
+    strict M3(resource struct { a server_end:<P>; });
+    strict M4(resource struct { a server_end:<P, optional>; });
 };
 `,
 			expected: `[
@@ -1158,11 +1158,11 @@ protocol P2 {
 			name: "protocols 4",
 			fidl: `
 library l;
-protocol P {
-    -> F1(struct { a int32; });
-    F2() -> (struct { a int32; });
-	F3() -> () error int32;
-	F4();
+closed protocol P {
+    strict -> F1(struct { a int32; });
+    strict F2() -> (struct { a int32; });
+	strict F3() -> () error int32;
+	strict F4();
 };
 `,
 			expected: `[
@@ -1238,9 +1238,9 @@ library l;
 type Payload = struct {
     a bool;
 };
-protocol P {
-    -> M1(Payload);
-    M2() -> (Payload) error uint32;
+closed protocol P {
+    strict -> M1(Payload);
+    strict M2() -> (Payload) error uint32;
 };
 `,
 			expected: `[
@@ -1294,9 +1294,9 @@ type U = flexible union {
 type T = table {
     1: b int32;
 };
-protocol P {
-    M1(U)-> (T);
-    M2(table {1: c bool; })-> (strict union {1: d uint32; });
+closed protocol P {
+    strict M1(U)-> (T);
+    strict M2(table {1: c bool; })-> (strict union {1: d uint32; });
 };
 `,
 			expected: `[
@@ -1380,9 +1380,9 @@ library l;
 type T = table {
     1: b string;
 };
-protocol P {
-    M1() -> (flexible union { 1: a bool; }) error uint32;
-    M2() -> (T) error int32;
+closed protocol P {
+    strict M1() -> (flexible union { 1: a bool; }) error uint32;
+    strict M2() -> (T) error int32;
 };
 `,
 			expected: `[
@@ -1514,10 +1514,10 @@ library l;
 using l2;
 type Foo = struct {};
 type Bar = struct {};
-protocol Calculator {
+closed protocol Calculator {
     compose l2.Inverter;
-    Halve(l2.UnaryArg) -> (l2.UnaryArg);
-    Add(struct { a l2.T; b Bar; }) -> (struct { c Foo; });
+    strict Halve(l2.UnaryArg) -> (l2.UnaryArg);
+    strict Add(struct { a l2.T; b Bar; }) -> (struct { c Foo; });
 };
 `,
 			expected: `[
@@ -1601,7 +1601,7 @@ protocol Calculator {
 			fidl: `
 library l;
 using l2;
-protocol P {
+closed protocol P {
     compose l2.TableResponse;
 };
 `,
@@ -1633,7 +1633,7 @@ protocol P {
 			fidl: `
 library l;
 using l2;
-protocol P {
+closed protocol P {
     compose l2.ErrorSyntax;
 };
 `,

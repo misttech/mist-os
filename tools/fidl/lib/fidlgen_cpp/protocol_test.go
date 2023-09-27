@@ -34,10 +34,10 @@ var exampleProtocol = func() func(t *testing.T) *Protocol {
 			root := compile(fidlgentest.EndToEndTest{T: t}.Single(`
 library example;
 
-protocol P {
-	OneWay();
-	TwoWay() -> ();
-	-> Event();
+closed protocol P {
+	strict OneWay();
+	strict TwoWay() -> ();
+	strict -> Event();
 };
 `))
 			p = onlyProtocol(t, root)
@@ -185,7 +185,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 	}{
 		{
 			desc:          "client request inlined",
-			fidl:          "protocol P { Method(struct { a array<uint8, 496>; }); };",
+			fidl:          "closed  protocol P { strict Method(struct { a array<uint8, 496>; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Request.ClientAllocationV1 },
 			expected: allocation{
 				IsStack:    true,
@@ -196,7 +196,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc:          "client request boxed due to message size",
-			fidl:          "protocol P { Method(struct { a array<uint8, 497>; }); };",
+			fidl:          "closed protocol P { strict Method(struct { a array<uint8, 497>; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Request.ClientAllocationV1 },
 			expected: allocation{
 				IsStack:    false,
@@ -208,7 +208,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "client request inlined despite message flexibility",
 			fidl: "type Flexible = flexible union { 1: a int32; };" +
-				"protocol P { Method(struct { a Flexible; }); };",
+				"closed protocol P { strict Method(struct { a Flexible; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Request.ClientAllocationV1 },
 			expected: allocation{
 				IsStack:    true,
@@ -220,7 +220,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "client response boxed due to message flexibility",
 			fidl: "type Flexible = flexible union { 1: a int32; };" +
-				"protocol P { Method() -> (struct { a Flexible; }); };",
+				"closed protocol P { strict Method() -> (struct { a Flexible; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Response.ClientAllocationV1 },
 			expected: allocation{
 				IsStack:    false,
@@ -231,7 +231,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc:          "server response inlined",
-			fidl:          "protocol P { Method() -> (struct { a array<uint8, 496>; }); };",
+			fidl:          "closed protocol P { strict Method() -> (struct { a array<uint8, 496>; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Response.ServerAllocationV1 },
 			expected: allocation{
 				IsStack:    true,
@@ -242,7 +242,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc:          "server response boxed due to message size",
-			fidl:          "protocol P { Method() -> (struct { a array<uint8, 497>; }); };",
+			fidl:          "closed protocol P { strict Method() -> (struct { a array<uint8, 497>; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Response.ServerAllocationV1 },
 			expected: allocation{
 				IsStack:    false,
@@ -254,7 +254,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "server response inlined despite message flexibility",
 			fidl: "type Flexible = flexible union { 1: a int32; };" +
-				"protocol P { Method() -> (struct { a Flexible; }); };",
+				"closed protocol P { strict Method() -> (struct { a Flexible; }); };",
 			actualChooser: func(p *Protocol) allocation { return p.Methods[0].Response.ServerAllocationV1 },
 			expected: allocation{
 				IsStack:    true,
@@ -265,9 +265,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc: "client sync event handling inlined",
-			fidl: "protocol P {" +
-				"    -> Event1(struct { a int32; });" +
-				"    -> Event2(struct { a int32; b int32; });" +
+			fidl: "closed protocol P {" +
+				"    strict -> Event1(struct { a int32; });" +
+				"    strict -> Event2(struct { a int32; b int32; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -279,9 +279,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc: "client sync event handling boxed due to message size",
-			fidl: "protocol P {" +
-				"    -> Event1(struct { a array<uint8, 497>; });" +
-				"    -> Event2(struct { a int32; b int32; });" +
+			fidl: "closed protocol P {" +
+				"    strict -> Event1(struct { a array<uint8, 497>; });" +
+				"    strict -> Event2(struct { a int32; b int32; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -294,9 +294,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "client sync event handling boxed due to message flexibility",
 			fidl: "type Flexible = table {};" +
-				"protocol P {" +
-				"    -> Event1(struct { f Flexible; });" +
-				"    -> Event2(struct { a int32; b int32; });" +
+				"closed protocol P {" +
+				"    strict -> Event1(struct { f Flexible; });" +
+				"    strict -> Event2(struct { a int32; b int32; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -309,9 +309,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "client sync event handling inlined ignoring flexible two-way response",
 			fidl: "type Flexible = table {};" +
-				"protocol P {" +
-				"    Method() -> (struct { f Flexible; });" +
-				"    -> Event2(struct { a int32; b int32; });" +
+				"closed protocol P {" +
+				"    strict Method() -> (struct { f Flexible; });" +
+				"    strict -> Event2(struct { a int32; b int32; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -324,9 +324,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		{
 			desc: "client sync event handling with max of two or three handles",
 			fidl: "type Flexible = table {};" +
-				"protocol P {" +
-				"    -> Event1(resource struct { v vector<client_end:P>:2; });" +
-				"    -> Event2(resource struct { v vector<client_end:P>:3; });" +
+				"closed protocol P {" +
+				"    strict -> Event1(resource struct { v vector<client_end:P>:2; });" +
+				"    strict -> Event2(resource struct { v vector<client_end:P>:3; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -338,9 +338,9 @@ func TestWireBindingsAllocation(t *testing.T) {
 		},
 		{
 			desc: "client sync event handling only counts event sizes",
-			fidl: "protocol P {" +
-				"    -> Event1(struct { a int64; });" +
-				"    Request() -> (resource struct { v vector<client_end:P>; });" +
+			fidl: "closed protocol P {" +
+				"    strict -> Event1(struct { a int64; });" +
+				"    strict Request() -> (resource struct { v vector<client_end:P>; });" +
 				"};",
 			actualChooser: func(p *Protocol) allocation { return p.SyncEventAllocationV1 },
 			expected: allocation{
@@ -381,73 +381,73 @@ func TestRequestAndResponseResourceness(t *testing.T) {
 	}{
 		{
 			desc:          "value struct request",
-			fidl:          "protocol P { Method(struct { a int32; b int32; }); };",
+			fidl:          "closed protocol P { strict Method(struct { a int32; b int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "value table request",
-			fidl:          "protocol P { Method(table { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method(table { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "value union request",
-			fidl:          "protocol P { Method(union { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method(union { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "resource struct request",
-			fidl:          "protocol P { Method(resource struct { a int32; b int32; }); };",
+			fidl:          "closed protocol P { strict Method(resource struct { a int32; b int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      true,
 		},
 		{
 			desc:          "resource table request",
-			fidl:          "protocol P { Method(resource table { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method(resource table { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      true,
 		},
 		{
 			desc:          "resource union request",
-			fidl:          "protocol P { Method(resource union { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method(resource union { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Request.messageInner },
 			expected:      true,
 		},
 		{
 			desc:          "value struct response",
-			fidl:          "protocol P { Method() -> (struct { a int32; b int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (struct { a int32; b int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "value table response",
-			fidl:          "protocol P { Method() -> (table { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (table { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "value union response",
-			fidl:          "protocol P { Method() -> (union { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (union { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      false,
 		},
 		{
 			desc:          "resource struct response",
-			fidl:          "protocol P { Method() -> (resource struct { a int32; b int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (resource struct { a int32; b int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      true,
 		},
 		{
 			desc:          "resource table response",
-			fidl:          "protocol P { Method() -> (resource table { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (resource table { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      true,
 		},
 		{
 			desc:          "resource union response",
-			fidl:          "protocol P { Method() -> (resource union { 1: a int32; }); };",
+			fidl:          "closed protocol P { strict Method() -> (resource union { 1: a int32; }); };",
 			actualChooser: func(p *Protocol) messageInner { return p.Methods[0].Response.messageInner },
 			expected:      true,
 		},
@@ -481,7 +481,7 @@ func TestHlMessagingProtocolAssociatedNames(t *testing.T) {
 library fuchsia.foobar;
 
 // Regular protocol
-protocol P {};
+closed protocol P {};
 `
 	root := compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
 
@@ -504,7 +504,7 @@ func TestWireMessagingProtocolAssociatedNames(t *testing.T) {
 library fuchsia.foobar;
 
 // Regular protocol
-protocol P {};
+closed protocol P {};
 `
 	root := compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
 

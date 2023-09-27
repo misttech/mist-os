@@ -59,6 +59,7 @@ bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::
   // set all the flags which could block parsing if disabled.
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
   auto formatter = fidl::fmt::NewFormatter(100, reporter);

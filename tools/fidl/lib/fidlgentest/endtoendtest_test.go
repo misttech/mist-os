@@ -50,15 +50,15 @@ func TestHandleObjType(t *testing.T) {
 func TestErrorSyntaxOfImportedComposedProtocol(t *testing.T) {
 	root := EndToEndTest{T: t}.WithDependency(`library parent;
 
-	protocol Parent {
-		Method() -> () error uint32;
+	closed protocol Parent {
+		strict Method() -> () error uint32;
 	};
 
 `).Single(`library child;
 
 	using parent;
 
-	protocol Child {
+	closed protocol Child {
 		compose parent.Parent;
 	};
 
@@ -89,8 +89,8 @@ func TestErrorSyntaxOfImportedComposedProtocol(t *testing.T) {
 func TestMultipleFiles(t *testing.T) {
 	root := EndToEndTest{T: t}.WithDependency(`library dependency;
 
-	protocol Foo {
-		Method() -> () error uint32;
+	closed protocol Foo {
+		strict Method() -> () error uint32;
 	};
 
 `).Multiple([]string{
@@ -123,7 +123,7 @@ func TestMultipleFiles(t *testing.T) {
 
 	using dependency;
 
-	protocol F {
+	closed protocol F {
 		compose dependency.Foo;
 	};
 `,

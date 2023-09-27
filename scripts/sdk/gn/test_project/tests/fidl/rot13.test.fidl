@@ -5,20 +5,20 @@ library fuchsia.examples.rot13;
 
 /// Example service that performs rot13 encryption.
 @discoverable
-protocol Rot13 {
+closed protocol Rot13 {
     /// Applies rot13 encryption to the given string
     /// Args:
     ///   value - the string to encrypt.
     /// Returns:
     ///   response - is the encrypted string.
-    Encrypt(struct {
+    strict Encrypt(struct {
         value string:<128, optional>;
     }) -> (struct {
         response string:<128, optional>;
     });
 
     /// Calculates the unsigned 32 bit checksum of the string.
-    Checksum(struct {
+    strict Checksum(struct {
         value string:<128, optional>;
     }) -> (struct {
         response uint32;
