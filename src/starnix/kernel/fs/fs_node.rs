@@ -6,7 +6,7 @@ use crate::{
     arch::uapi::stat_time_t,
     auth::FsCred,
     device::DeviceMode,
-    fs::{pipe::Pipe, socket::*, *},
+    fs::{pipe::Pipe, rw_queue::RwQueue, socket::*, *},
     lock::{Mutex, RwLock, RwLockReadGuard},
     logging::log_error,
     signals::*,
@@ -70,7 +70,7 @@ pub struct FsNode {
     /// FileObjects writing with O_APPEND should grab a write() lock on this
     /// field to ensure they operate sequentially. FileObjects writing without
     /// O_APPEND should grab read() lock so that they can operate in parallel.
-    pub append_lock: InterruptibleRwLock<()>,
+    pub append_lock: RwQueue,
 
     /// Mutable information about this node.
     ///
@@ -914,7 +914,7 @@ impl FsNode {
             };
             #[cfg(any(test, debug_assertions))]
             {
-                let _l1 = result.append_lock.raw_read();
+                let _l1 = result.append_lock.read_for_lock_ordering();
                 let _l2 = result.info.read();
                 let _l3 = result.flock_info.lock();
                 let _l4 = result.write_guard_state.lock();
