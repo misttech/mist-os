@@ -36,7 +36,7 @@ use futures::{
     executor::block_on,
     prelude::*,
 };
-use hoist::{Hoist, OvernetInstance};
+use hoist::Hoist;
 use notify::{RecursiveMode, Watcher};
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
 use rcs::RcsConnection;
@@ -639,16 +639,9 @@ impl Daemon {
             let mut known_peers: HashSet<PeerSetElement> = Default::default();
 
             loop {
-                let svc = match hoist.connect_as_service_consumer() {
-                    Ok(svc) => svc,
-                    Err(err) => {
-                        tracing::info!("Overnet setup failed: {}, will retry in 1s", err);
-                        Timer::new(Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
+                let lpc = hoist.node().new_list_peers_context().await;
                 loop {
-                    match svc.list_peers().await {
+                    match lpc.list_peers().await {
                         Ok(new_peers) => {
                             known_peers =
                                 Self::handle_overnet_peers(&queue, known_peers, new_peers);
@@ -789,7 +782,10 @@ impl Daemon {
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
         tracing::debug!("Starting daemon overnet server");
-        hoist.publish_service(DaemonMarker::PROTOCOL_NAME, ClientEnd::new(p))?;
+        hoist
+            .node()
+            .register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p))
+            .await?;
 
         tracing::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();

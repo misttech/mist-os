@@ -195,7 +195,7 @@ mod tests {
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
     use fidl_fuchsia_io as fio;
     use fuchsia_async::Task;
-    use hoist::{Hoist, OvernetInstance};
+    use hoist::Hoist;
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
     use std::{
@@ -387,21 +387,23 @@ mod tests {
             fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>();
         let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), server);
         hoist2
-            .connect_as_service_publisher()
-            .unwrap()
-            .publish_service(fidl_rcs::RemoteControlMarker::PROTOCOL_NAME, client)
+            .node()
+            .register_service(fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), client)
+            .await
             .unwrap();
         let daemon = FakeDaemonBuilder::new().build();
         let cx = Context::new(daemon);
-        let service_consumer = local_hoist.connect_as_service_consumer().unwrap();
-        while service_consumer.list_peers().await.unwrap().iter().all(|x| x.is_self) {}
+        let lpc = local_hoist.node().new_list_peers_context().await;
+        while lpc.list_peers().await.unwrap().iter().all(|x| x.is_self) {}
         let (client, server) = fidl::Channel::create();
-        service_consumer
+        local_hoist
+            .node()
             .connect_to_service(
-                &hoist2.node().node_id().into(),
+                hoist2.node().node_id(),
                 fidl_rcs::RemoteControlMarker::PROTOCOL_NAME,
                 server,
             )
+            .await
             .unwrap();
         let rcs_proxy =
             fidl_rcs::RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client).unwrap());

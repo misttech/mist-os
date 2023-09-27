@@ -372,7 +372,6 @@ mod test {
     use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, FutureExt, TryStreamExt};
-    use hoist::OvernetInstance;
     use std::time::Duration;
     use std::{path::PathBuf, sync::Arc};
 
@@ -437,7 +436,11 @@ mod test {
         let local_link_task = local_hoist.start_socket_link(sockpath.clone());
 
         let (s, p) = fidl::Channel::create();
-        daemon_hoist.publish_service(DaemonMarker::PROTOCOL_NAME, ClientEnd::new(p)).unwrap();
+        daemon_hoist
+            .node()
+            .register_service(DaemonMarker::PROTOCOL_NAME.into(), ClientEnd::new(p))
+            .await
+            .unwrap();
 
         let link_tasks = Arc::new(Mutex::new(Vec::<Task<()>>::new()));
         let link_tasks1 = link_tasks.clone();

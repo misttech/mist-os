@@ -11,7 +11,7 @@ use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::Timer;
 use futures::prelude::*;
-use hoist::{Hoist, OvernetInstance};
+use hoist::Hoist;
 use nix::sys::signal;
 use std::{
     path::{Path, PathBuf},
@@ -31,9 +31,8 @@ pub use constants::LOG_FILE_PREFIX;
 pub use socket::SocketDetails;
 
 async fn create_daemon_proxy(hoist: &Hoist, id: &mut NodeId) -> Result<DaemonProxy> {
-    let svc = hoist.connect_as_service_consumer()?;
     let (s, p) = fidl::Channel::create();
-    svc.connect_to_service(id, DaemonMarker::PROTOCOL_NAME, s)?;
+    hoist.node().connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
     Ok(DaemonProxy::new(proxy))
 }
@@ -74,9 +73,9 @@ async fn find_next_daemon<'a>(
     hoist: &Hoist,
     exclusions: Option<Vec<NodeId>>,
 ) -> Result<(NodeId, DaemonProxy)> {
-    let svc = hoist.connect_as_service_consumer()?;
+    let lpc = hoist.node().new_list_peers_context().await;
     loop {
-        let peers = svc.list_peers().await?;
+        let peers = lpc.list_peers().await?;
         for peer in peers.iter() {
             if peer
                 .description
