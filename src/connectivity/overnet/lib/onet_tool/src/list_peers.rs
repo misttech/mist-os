@@ -11,7 +11,7 @@ use {
     futures::future::Either,
     futures::lock::Mutex,
     futures::prelude::*,
-    hoist::{hoist, OvernetInstance},
+    hoist::hoist,
     std::collections::HashSet,
     std::sync::Arc,
     std::time::Duration,
@@ -28,7 +28,7 @@ pub const MIN_PEERS: usize = 2;
 pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
     Generator::new(move |mut tx| async move {
         let r: Result<(), Error> = async {
-            let svc = hoist().connect_as_service_consumer()?;
+            let lpc = hoist().node().new_list_peers_context().await;
             let seen_peers = Arc::new(Mutex::new(HashSet::new()));
             let more_to_do = {
                 let seen_peers = seen_peers.clone();
@@ -89,7 +89,7 @@ pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
                 };
                 match futures::future::select(
                     wait_until_no_more_to_do.boxed(),
-                    svc.list_peers().boxed(),
+                    lpc.list_peers().boxed(),
                 )
                 .await
                 {
@@ -118,7 +118,7 @@ pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
 
 /// Get this nodes id
 pub async fn own_id() -> Result<NodeId, Error> {
-    for peer in hoist().connect_as_service_consumer()?.list_peers().await?.into_iter() {
+    for peer in hoist().node().new_list_peers_context().await.list_peers().await?.into_iter() {
         if peer.is_self {
             return Ok(peer.id);
         }

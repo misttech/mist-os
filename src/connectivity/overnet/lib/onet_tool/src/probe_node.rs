@@ -6,18 +6,14 @@ use {
     anyhow::{Context as _, Error},
     fidl::prelude::*,
     fidl_fuchsia_overnet_protocol::{DiagnosticMarker, DiagnosticProxy, NodeId, ProbeResult},
-    hoist::{hoist, OvernetInstance},
+    hoist::hoist,
 };
 
 pub use fidl_fuchsia_overnet_protocol::ProbeSelector as Selector;
 
 pub async fn probe_node(node_id: NodeId, probe_bits: Selector) -> Result<ProbeResult, Error> {
     let (s, p) = fidl::Channel::create();
-    hoist().connect_as_service_consumer()?.connect_to_service(
-        &node_id,
-        DiagnosticMarker::PROTOCOL_NAME,
-        s,
-    )?;
+    hoist().node().connect_to_service(node_id.into(), DiagnosticMarker::PROTOCOL_NAME, s).await?;
     Ok(DiagnosticProxy::new(
         fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?,
     )
