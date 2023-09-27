@@ -12,8 +12,8 @@ enum class A311dPowerDomains : uint32_t {
   kArmCoreLittle = 1,
 };
 
-static constexpr uint32_t kMinVoltageUv = 680'000;
-static constexpr uint32_t kMaxVoltageUv = 1'040'000;
+static constexpr uint32_t kMinVoltageUv = 690'000;
+static constexpr uint32_t kMaxVoltageUv = 1'050'000;
 static_assert(kMaxVoltageUv >= kMinVoltageUv,
               "kMaxVoltageUv must be greater than or equal to kMinVoltageUv\n");
 

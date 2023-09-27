@@ -33,33 +33,31 @@ const std::vector<fpbus::Mmio> cpu_mmios{
     }},
 };
 
+// clang-format off
 constexpr amlogic_cpu::operating_point_t operating_points[] = {
     // Little Cluster DVFS Table
-    {.freq_hz = 500'000'000, .volt_uv = 730'000, .pd_id = kPdArmA53},
-    {.freq_hz = 667'000'000, .volt_uv = 730'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'000'000'000, .volt_uv = 760'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'200'000'000, .volt_uv = 780'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'398'000'000, .volt_uv = 810'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'512'000'000, .volt_uv = 860'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'608'000'000, .volt_uv = 900'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'704'000'000, .volt_uv = 950'000, .pd_id = kPdArmA53},
-    {.freq_hz = 1'800'000'000, .volt_uv = 1'020'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'000'000'000, .volt_uv =   761'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'200'000'000, .volt_uv =   781'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'398'000'000, .volt_uv =   811'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'512'000'000, .volt_uv =   861'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'608'000'000, .volt_uv =   901'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'704'000'000, .volt_uv =   951'000, .pd_id = kPdArmA53},
+    {.freq_hz = 1'800'000'000, .volt_uv = 1'001'000, .pd_id = kPdArmA53},
 
     // Big Cluster DVFS Table
-    {.freq_hz = 500'000'000, .volt_uv = 730'000, .pd_id = kPdArmA73},
-    {.freq_hz = 667'000'000, .volt_uv = 730'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'000'000'000, .volt_uv = 730'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'200'000'000, .volt_uv = 750'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'398'000'000, .volt_uv = 770'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'512'000'000, .volt_uv = 770'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'608'000'000, .volt_uv = 780'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'704'000'000, .volt_uv = 790'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'800'000'000, .volt_uv = 830'000, .pd_id = kPdArmA73},
-    {.freq_hz = 1'908'000'000, .volt_uv = 860'000, .pd_id = kPdArmA73},
-    {.freq_hz = 2'016'000'000, .volt_uv = 910'000, .pd_id = kPdArmA73},
-    {.freq_hz = 2'100'000'000, .volt_uv = 960'000, .pd_id = kPdArmA73},
-    {.freq_hz = 2'208'000'000, .volt_uv = 1'030'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'000'000'000, .volt_uv =   731'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'200'000'000, .volt_uv =   751'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'398'000'000, .volt_uv =   771'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'512'000'000, .volt_uv =   771'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'608'000'000, .volt_uv =   781'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'704'000'000, .volt_uv =   791'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'800'000'000, .volt_uv =   831'000, .pd_id = kPdArmA73},
+    {.freq_hz = 1'908'000'000, .volt_uv =   861'000, .pd_id = kPdArmA73},
+    {.freq_hz = 2'016'000'000, .volt_uv =   911'000, .pd_id = kPdArmA73},
+    {.freq_hz = 2'108'000'000, .volt_uv =   951'000, .pd_id = kPdArmA73},
+    {.freq_hz = 2'208'000'000, .volt_uv = 1'011'000, .pd_id = kPdArmA73},
 };
+// clang-format on
 
 constexpr amlogic_cpu::perf_domain_t performance_domains[] = {
     {.id = kPdArmA73, .core_count = 4, .name = "a311d-arm-a73"},

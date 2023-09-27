@@ -37,9 +37,9 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 namespace {
 
-constexpr voltage_pwm_period_ns_t kA311dPwmPeriodNs = 1500;
+constexpr voltage_pwm_period_ns_t kA311dPwmPeriodNs = 1250;
 
-const uint32_t kVoltageStepUv = 10'000;
+const uint32_t kVoltageStepUv = 1'000;
 static_assert((kMaxVoltageUv - kMinVoltageUv) % kVoltageStepUv == 0,
               "Voltage step must be a factor of (kMaxVoltageUv - kMinVoltageUv)\n");
 const uint32_t kNumSteps = (kMaxVoltageUv - kMinVoltageUv) / kVoltageStepUv + 1;
