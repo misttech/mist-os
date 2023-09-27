@@ -1,5 +1,5 @@
 expected_values:
-  device_type: qemu-x64
+  device_type: x64
   manufacturer: default-manufacturer
   model: default-model
   product_name: default-fuchsia
