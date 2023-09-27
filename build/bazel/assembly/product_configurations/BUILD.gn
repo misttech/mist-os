@@ -20,19 +20,9 @@ verify_product_configuration("verify_default_product_configuration") {
 
 verify_product_configuration("verify_minimal_product_configuration") {
   gn_product_config_target = "//products/minimal"
-
-  if (board_name == "x64") {
-    bazel_product_config_target = "//products/minimal:product_config.x64"
-  } else {
-    bazel_product_config_target = "//products/minimal:product_config.default"
-  }
-
+  bazel_product_config_target = "//products/minimal:product_config"
   bazel_inputs =
       [ "//src/fonts/asset_providers:small-open-fonts-collection-bazel" ]
-
-  if (board_name == "x64") {
-    bazel_inputs += [ "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel" ]
-  }
 }
 
 group("verifications") {

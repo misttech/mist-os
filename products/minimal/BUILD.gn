@@ -85,7 +85,6 @@ if (current_cpu == "x64") {
       "//boards/x64:x64.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
-      "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
     ]
   }
 
@@ -100,10 +99,10 @@ if (current_cpu == "x64") {
       "//boards/qemu-x64:qemu-x64.bazel_input",
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
-      "//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi_for_bazel",
     ]
   }
 }
+
 if (current_cpu == "riscv64") {
   bazel_product_bundle("product_bundle.riscv64") {
     testonly = true
