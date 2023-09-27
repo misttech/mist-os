@@ -691,7 +691,7 @@ group("regex-syntax") {
 }
 
 group("ring") {
-  public_deps = [ ":ring-v0_16_12" ]
+  public_deps = [ ":ring-v0_16_13" ]
 }
 
 import("//build/icu/icu_rust_crates.gni")
@@ -9116,10 +9116,10 @@ rust_library("rfc6979-v0_3_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("ring-v0_16_12") {
+rust_library("ring-v0_16_13") {
   crate_name = "ring"
-  crate_root = "//third_party/rust_crates/vendor/ring-0.16.12/src/lib.rs"
-  output_name = "ring-34f98e503c3d6a69"
+  crate_root = "//third_party/rust_crates/vendor/ring-0.16.13/src/lib.rs"
+  output_name = "ring-8e160d6000e055a8"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -9129,10 +9129,10 @@ rust_library("ring-v0_16_12") {
     deps += [ ":spin-v0_5_2" ]
   }
   if (current_cpu == "wasm32" && false && current_os == "unknown" && false) {
-    deps += [ ":web-sys-v0_3_36" ]
+    deps += [ ":web-sys-v0_3_40" ]
   }
   if (false || false || current_os == "linux" || false || false || false) {
-    deps += [ ":lazy_static-v1_4_0" ]
+    deps += [ ":once_cell-v1_17_1" ]
   }
   if (false || current_os == "linux") {
     deps += [ ":libc-v0_2_142" ]
@@ -9146,12 +9146,12 @@ rust_library("ring-v0_16_12") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=34f98e503c3d6a69",
-    "-Cextra-filename=-34f98e503c3d6a69",
+    "-Cmetadata=8e160d6000e055a8",
+    "-Cextra-filename=-8e160d6000e055a8",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"dev_urandom_fallback\"",
-    "--cfg=feature=\"lazy_static\"",
+    "--cfg=feature=\"once_cell\"",
   ]
 
   visibility = []
@@ -9509,7 +9509,7 @@ rust_library("rustls-v0_19_1") {
   deps = []
   deps += [ ":base64-v0_13_0" ]
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":ring-v0_16_12" ]
+  deps += [ ":ring-v0_16_13" ]
   deps += [ ":sct-v0_6_0" ]
   deps += [ ":webpki-v0_21_0" ]
 
@@ -9868,7 +9868,7 @@ rust_library("sct-v0_6_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_12" ]
+  deps += [ ":ring-v0_16_13" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []
@@ -11910,7 +11910,7 @@ rust_library("tuf-v0_3_0-beta11") {
   deps += [ ":itoa-v0_4_3" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
-  deps += [ ":ring-v0_16_12" ]
+  deps += [ ":ring-v0_16_13" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":serde_derive-v1_0_147($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_87" ]
@@ -12951,10 +12951,10 @@ rust_library("wasm-bindgen-shared-v0_2_63") {
   visibility = [ ":*" ]
 }
 
-rust_library("web-sys-v0_3_36") {
+rust_library("web-sys-v0_3_40") {
   crate_name = "web_sys"
   crate_root = "//third_party/rust_crates/empty/web-sys/src/lib.rs"
-  output_name = "web_sys-41fe16a596d7ee0d"
+  output_name = "web_sys-587629034c2c5b90"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -12964,8 +12964,8 @@ rust_library("web-sys-v0_3_36") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=41fe16a596d7ee0d",
-    "-Cextra-filename=-41fe16a596d7ee0d",
+    "-Cmetadata=587629034c2c5b90",
+    "-Cextra-filename=-587629034c2c5b90",
     "--cfg=feature=\"Crypto\"",
     "--cfg=feature=\"Window\"",
   ]
@@ -12980,7 +12980,7 @@ rust_library("webpki-v0_21_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_12" ]
+  deps += [ ":ring-v0_16_13" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []
