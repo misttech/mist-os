@@ -10,11 +10,9 @@ use {
     fuchsia_url::AbsolutePackageUrl,
     std::{collections::HashMap, path::PathBuf},
     tracing::warn,
-    url::Url,
 };
 
 pub type Protocol = String;
-pub type ServiceMapping = HashMap<Protocol, Url>;
 
 /// Package- and component-related data extracted from a package identified by a
 /// fully-qualified fuchsia package URL.

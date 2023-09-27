@@ -318,7 +318,6 @@ pub struct ManifestData {
 pub struct Manifest {
     pub component_id: i32,
     pub manifest: ManifestData,
-    pub uses: Vec<Capability>,
 }
 
 #[derive(Default, Deserialize, Serialize, Debug, Clone, PartialEq, Eq)]

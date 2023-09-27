@@ -6,8 +6,8 @@ use {
     crate::{
         core::{
             collection::{
-                Capability, Component, ComponentSource, Components, CoreDataDeps, Manifest,
-                ManifestData, Manifests, Package, Packages, ProtocolCapability, Zbi,
+                Component, ComponentSource, Components, CoreDataDeps, Manifest, ManifestData,
+                Manifests, Package, Packages, Zbi,
             },
             package::{
                 is_cf_v2_manifest,
@@ -15,9 +15,7 @@ use {
                     read_partial_package_definition, PackageReader, PackagesFromUpdateReader,
                 },
             },
-            util::types::{
-                ComponentManifest, PackageDefinition, PartialPackageDefinition, ServiceMapping,
-            },
+            util::types::{ComponentManifest, PackageDefinition, PartialPackageDefinition},
         },
         static_pkgs::StaticPkgsCollection,
     },
@@ -327,7 +325,6 @@ impl PackageDataCollector {
     /// Extracts all of the components and manifests from a package.
     fn extract_package_data<'a>(
         component_id: &mut i32,
-        service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         pkg: &PackageDefinition,
@@ -364,7 +361,6 @@ impl PackageDataCollector {
 
             let cf_manifest = {
                 if let ComponentManifest::Version2(decl_bytes) = &cm {
-                    let mut cap_uses = Vec::new();
                     let cm_base64 = base64::encode(&decl_bytes);
                     let mut cvf_bytes = None;
 
@@ -391,37 +387,6 @@ impl PackageDataCollector {
                                     }
                                 }
                             }
-
-                            if let Some(uses) = cm_decl.uses {
-                                for use_ in uses {
-                                    match &use_ {
-                                        fdecl::Use::Protocol(protocol) => {
-                                            if let Some(source_name) = &protocol.source_name {
-                                                cap_uses.push(Capability::Protocol(
-                                                    ProtocolCapability::new(source_name.clone()),
-                                                ));
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                            if let Some(exposes) = cm_decl.exposes {
-                                for expose in exposes {
-                                    match &expose {
-                                        fdecl::Expose::Protocol(protocol) => {
-                                            if let Some(source_name) = &protocol.source_name {
-                                                if let Some(fdecl::Ref::Self_(_)) = &protocol.source
-                                                {
-                                                    service_map
-                                                        .insert(source_name.clone(), url.clone());
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
                         }
                     } else {
                         warn!(%url, "cm failed to be decoded");
@@ -429,13 +394,11 @@ impl PackageDataCollector {
                     Manifest {
                         component_id: *component_id,
                         manifest: ManifestData { cm_base64, cvf_bytes },
-                        uses: cap_uses,
                     }
                 } else {
                     Manifest {
                         component_id: *component_id,
                         manifest: ManifestData { cm_base64: String::from(""), cvf_bytes: None },
-                        uses: Vec::new(),
                     }
                 }
             };
@@ -447,7 +410,6 @@ impl PackageDataCollector {
     /// Extracts all the components and manifests from the ZBI.
     fn extract_zbi_data(
         component_id: &mut i32,
-        service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         zbi: &Zbi,
@@ -466,7 +428,6 @@ impl PackageDataCollector {
                 let bootfs_pkg_index = parse_key_value(bootfs_pkg_index_contents)?;
                 Self::extract_bootfs_packaged_data(
                     component_id,
-                    service_map,
                     components,
                     manifests,
                     zbi,
@@ -475,7 +436,6 @@ impl PackageDataCollector {
             } else if file_name.ends_with(".cm") {
                 Self::extract_bootfs_unpackaged_data(
                     component_id,
-                    service_map,
                     components,
                     manifests,
                     zbi,
@@ -490,7 +450,6 @@ impl PackageDataCollector {
 
     fn extract_bootfs_unpackaged_data(
         component_id: &mut i32,
-        service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         zbi: &Zbi,
@@ -504,7 +463,6 @@ impl PackageDataCollector {
 
         Self::extract_bootfs_data(
             component_id,
-            service_map,
             components,
             manifests,
             &zbi.bootfs,
@@ -516,7 +474,6 @@ impl PackageDataCollector {
 
     fn extract_bootfs_packaged_data(
         component_id: &mut i32,
-        service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         zbi: &Zbi,
@@ -544,7 +501,6 @@ impl PackageDataCollector {
                         })?;
                         Self::extract_bootfs_data(
                             component_id,
-                            service_map,
                             components,
                             manifests,
                             &partial_package_def.cvfs,
@@ -563,7 +519,6 @@ impl PackageDataCollector {
 
     fn extract_bootfs_data(
         component_id: &mut i32,
-        service_map: &mut ServiceMapping,
         components: &mut HashMap<Url, Component>,
         manifests: &mut Vec<Manifest>,
         cvf_source: &HashMap<String, Vec<u8>>,
@@ -595,56 +550,6 @@ impl PackageDataCollector {
                     None
                 };
 
-                let mut cap_uses = Vec::new();
-                if let Some(uses) = cm_decl.uses {
-                    for use_ in uses {
-                        match &use_ {
-                            fdecl::Use::Protocol(protocol) => {
-                                if let Some(source_name) = &protocol.source_name {
-                                    cap_uses.push(Capability::Protocol(ProtocolCapability::new(
-                                        source_name.clone(),
-                                    )));
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                if let Some(exposes) = cm_decl.exposes {
-                    for expose in exposes {
-                        match &expose {
-                            fdecl::Expose::Protocol(protocol) => {
-                                if let Some(source_name) = &protocol.source_name {
-                                    if let Some(fdecl::Ref::Self_(_)) = &protocol.source {
-                                        service_map.insert(source_name.clone(), url.clone());
-                                    }
-                                }
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-
-                // The root manifest is special semantically as it offers from its parent
-                // which is outside of the component model. So in this case offers
-                // should also be captured.
-                if file_name == ROOT_RESOURCE {
-                    if let Some(offers) = cm_decl.offers {
-                        for offer in offers {
-                            match &offer {
-                                fdecl::Offer::Protocol(protocol) => {
-                                    if let Some(source_name) = &protocol.source_name {
-                                        if let Some(fdecl::Ref::Parent(_)) = &protocol.source {
-                                            service_map.insert(source_name.clone(), url.clone());
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
-                        }
-                    }
-                }
-
                 // Add the components directly from the ZBI.
                 *component_id += 1;
                 components.insert(
@@ -658,7 +563,6 @@ impl PackageDataCollector {
                 manifests.push(Manifest {
                     component_id: *component_id,
                     manifest: ManifestData { cm_base64, cvf_bytes },
-                    uses: cap_uses,
                 });
             }
         }
@@ -672,7 +576,6 @@ impl PackageDataCollector {
         update_package: &PartialPackageDefinition,
         mut artifact_reader: &mut Box<dyn ArtifactReader>,
         fuchsia_packages: Vec<PackageDefinition>,
-        mut service_map: ServiceMapping,
         static_pkgs: &'a Option<Vec<StaticPackageDescription<'a>>>,
         recovery: bool,
     ) -> Result<PackageDataResponse> {
@@ -700,7 +603,6 @@ impl PackageDataCollector {
             let source = Self::get_non_bootfs_pkg_source(pkg, static_pkgs)?;
             Self::extract_package_data(
                 &mut component_id,
-                &mut service_map,
                 &mut components,
                 &mut manifests,
                 &pkg,
@@ -715,13 +617,7 @@ impl PackageDataCollector {
             recovery,
         ) {
             Ok(zbi) => {
-                Self::extract_zbi_data(
-                    &mut component_id,
-                    &mut service_map,
-                    &mut components,
-                    &mut manifests,
-                    &zbi,
-                )?;
+                Self::extract_zbi_data(&mut component_id, &mut components, &mut manifests, &zbi)?;
                 Some(zbi)
             }
             Err(err) => {
@@ -754,7 +650,6 @@ impl PackageDataCollector {
             &update_package,
             &mut artifact_reader,
             served_packages,
-            ServiceMapping::new(),
             &static_pkgs,
             config.is_recovery(),
         )?;
@@ -824,8 +719,8 @@ pub mod tests {
         super::{PackageDataCollector, StaticPackageDescription},
         crate::core::{
             collection::{
-                testing::fake_component_src_pkg, Capability, Components, CoreDataDeps,
-                ManifestData, Manifests, Packages, ProtocolCapability,
+                testing::fake_component_src_pkg, Components, CoreDataDeps, ManifestData, Manifests,
+                Packages,
             },
             package::{
                 collector::{Component, ComponentSource},
@@ -977,14 +872,11 @@ pub mod tests {
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let served = vec![pkg];
 
-        let services = HashMap::new();
-
         let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
         let response = PackageDataCollector::extract(
             &empty_update_pkg(),
             &mut artifact_loader,
             served,
-            services,
             &None,
             false,
         )
@@ -1004,14 +896,11 @@ pub mod tests {
         let pkg = create_test_package_with_cms(PackageName::from_str("foo").unwrap(), None, cms);
         let served = vec![pkg];
 
-        let services = HashMap::new();
-
         let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
         let response = PackageDataCollector::extract(
             &empty_update_pkg(),
             &mut artifact_loader,
             served,
-            services,
             &None,
             false,
         )
@@ -1046,14 +935,10 @@ pub mod tests {
             manis.push(crate::core::collection::Manifest {
                 component_id: 1,
                 manifest: make_v2_manifest_data(ComponentDecl { ..ComponentDecl::default() }),
-                uses: vec![Capability::Protocol(ProtocolCapability::new(String::from(
-                    "test.service",
-                )))],
             });
             manis.push(crate::core::collection::Manifest {
                 component_id: 2,
                 manifest: make_v2_manifest_data(ComponentDecl { ..ComponentDecl::default() }),
-                uses: Vec::new(),
             });
             model.set(Manifests { entries: manis }).unwrap();
         }
@@ -1091,14 +976,12 @@ pub mod tests {
             contents,
         );
         let served = vec![pkg];
-        let services = HashMap::new();
 
         let mut artifact_loader: Box<dyn ArtifactReader> = Box::new(MockArtifactReader::new());
         let response = PackageDataCollector::extract(
             &empty_update_pkg(),
             &mut artifact_loader,
             served,
-            services,
             &None,
             false,
         )

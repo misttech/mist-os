@@ -180,7 +180,6 @@ mod tests {
         Manifest {
             component_id: id,
             manifest: ManifestData { cm_base64: manifest.to_string(), cvf_bytes: None },
-            uses: vec![],
         }
     }
 

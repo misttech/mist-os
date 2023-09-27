@@ -339,11 +339,7 @@ mod tests {
     fn make_v2_manifest(component_id: i32, decl: ComponentDecl) -> Result<Manifest> {
         let decl_fidl: fdecl::Component = decl.native_into_fidl();
         let cm_base64 = base64::encode(&persist(&decl_fidl)?);
-        Ok(Manifest {
-            component_id,
-            manifest: ManifestData { cm_base64, cvf_bytes: None },
-            uses: vec![],
-        })
+        Ok(Manifest { component_id, manifest: ManifestData { cm_base64, cvf_bytes: None } })
     }
 
     // Creates a data model with a ZBI containing one component manifest and the provided component
