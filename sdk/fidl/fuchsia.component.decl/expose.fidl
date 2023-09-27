@@ -16,6 +16,8 @@ type Expose = flexible union {
     5: resolver ExposeResolver;
     @available(removed=13)
     6: event_stream ExposeEventStream;
+    @available(added=HEAD)
+    7: dictionary ExposeDictionary;
 };
 
 /// Declares a service exposed to a component's containing realm, such as a
@@ -33,6 +35,13 @@ type ExposeService = table {
     /// (Required) Name identifying the service, by which it was presented to
     /// this component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the service is exposed: either the
     /// component's realm or the framework.
@@ -63,6 +72,17 @@ type ExposeProtocol = table {
     /// this component.
     2: source_name name;
 
+    /// (Optional) Path in a dictionary offered by `ref` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside a
+    /// dictionary. The name of the top-level dictionary is given by the first path
+    /// segment of `source_dictionary`, and `source` is expected to route a
+    /// dictionary capability with this name. The rest of the path (possibly empty)
+    /// represents the path to a dictionary nested in the top-level dictionary which
+    /// is expected to contain `source_name`.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
+
     /// (Required) The destination to which the protocol is exposed: either the
     /// component's realm or the framework.
     3: target Ref;
@@ -88,6 +108,17 @@ type ExposeDirectory = table {
     /// (Required) Name identifying the directory, by which it was presented to
     /// this component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary offered by `ref` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside a
+    /// dictionary. The name of the top-level dictionary is given by the first path
+    /// segment of `source_dictionary`, and `source` is expected to route a
+    /// dictionary capability with this name. The rest of the path (possibly empty)
+    /// represents the path to a dictionary nested in the top-level dictionary which
+    /// is expected to contain `source_name`.
+    @available(added=HEAD)
+    8: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the directory is exposed: either the
     /// component's realm or the framework.
@@ -121,6 +152,17 @@ type ExposeRunner = table {
     /// component.
     2: source_name name;
 
+    /// (Optional) Path in a dictionary offered by `ref` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside a
+    /// dictionary. The name of the top-level dictionary is given by the first path
+    /// segment of `source_dictionary`, and `source` is expected to route a
+    /// dictionary capability with this name. The rest of the path (possibly empty)
+    /// represents the path to a dictionary nested in the top-level dictionary which
+    /// is expected to contain `source_name`.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
+
     /// (Required) The destination to which the runner is exposed: either the
     /// component's realm or the framework.
     3: target Ref;
@@ -144,6 +186,17 @@ type ExposeResolver = table {
     /// (Required) The name of the resolver, by which it was presented to this
     /// component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary offered by `ref` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside a
+    /// dictionary. The name of the top-level dictionary is given by the first path
+    /// segment of `source_dictionary`, and `source` is expected to route a
+    /// dictionary capability with this name. The rest of the path (possibly empty)
+    /// represents the path to a dictionary nested in the top-level dictionary which
+    /// is expected to contain `source_name`.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
 
     /// (Required) The destination to which the resolver is exposed
     3: target Ref;
@@ -183,4 +236,44 @@ type ExposeEventStream = table {
     /// See [`Availability`].
     @available(added=11)
     6: availability Availability;
+};
+
+/// Declares a dictionary exposed to a component's containing realm, such as
+/// a dictionary exposed by the component or one of its children at runtime.
+///
+/// To learn more about dictionarys, see:
+/// https://fuchsia.dev/fuchsia-src/glossary#dictionary
+@available(added=HEAD)
+type ExposeDictionary = table {
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
+    /// target must expose, offer, or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
+    1: source Ref;
+
+    /// (Required) Name identifying the dictionary, by which it was presented to
+    /// this component.
+    2: source_name name;
+
+    /// (Optional) Path in a dictionary offered by `ref` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside a
+    /// dictionary. The name of the top-level dictionary is given by the first path
+    /// segment of `source_dictionary`, and `source` is expected to route a
+    /// dictionary capability with this name. The rest of the path (possibly empty)
+    /// represents the path to a dictionary nested in the top-level dictionary which
+    /// is expected to contain `source_name`.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
+
+    /// (Required) The destination to which the dictionary is exposed: either the
+    /// component's realm or the framework.
+    3: target Ref;
+
+    /// (Required) The name by which the capability is being exposed.
+    4: target_name name;
+
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
+    5: availability Availability;
 };

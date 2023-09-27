@@ -53,6 +53,11 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                         Self::Void => write!(f, "void"),
                     });
                 }
+                if self.variants.contains("Dictionary") {
+                    tokens.append_all(quote! {
+                        Self::Dictionary(d) => write!(f, "{}", d),
+                    });
+                }
                 if self.variants.contains("All") {
                     tokens.append_all(quote! {
                         Self::All => write!(f, "all"),
@@ -89,6 +94,16 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                         return Err(ParseError::TooLong);
                     }
                 });
+                if self.variants.contains("Dictionary") {
+                    tokens.append_all(quote! {
+                        if value.contains("/") {
+                            return value
+                                .parse::<DictionaryRef>()
+                                .map(Self::Dictionary)
+                                .map_err(|_| ParseError::InvalidValue);
+                        }
+                    });
+                }
                 if self.variants.contains("Named") {
                     tokens.append_all(quote! {
                         if value.starts_with("#") {
@@ -188,6 +203,11 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                 if self.variants.contains("Named") {
                     tokens.append_all(quote! {
                         #name::Named(ref n) => Self::Named(n),
+                    });
+                }
+                if self.variants.contains("Dictionary") {
+                    tokens.append_all(quote! {
+                        #name::Dictionary(ref d) => Self::Dictionary(d),
                     });
                 }
                 if self.variants.contains("All") {
@@ -291,6 +311,7 @@ fn parse_reference_attributes(ast: &syn::DeriveInput) -> Result<ReferenceAttribu
         "Debug",
         "Self_",
         "Void",
+        "Dictionary",
         "All",
     };
     for ty in variants.iter() {

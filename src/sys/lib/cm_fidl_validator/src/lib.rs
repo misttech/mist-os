@@ -243,6 +243,7 @@ struct ValidationContext<'a> {
     all_directories: HashSet<&'a str>,
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
+    all_dictionaries: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
     target_ids: IdMap<'a>,
@@ -564,6 +565,12 @@ impl<'a> ValidationContext<'a> {
                     self.validate_event_stream_decl(&event)
                 } else {
                     self.errors.push(Error::CapabilityMustBeBuiltin(DeclType::EventStream))
+                }
+            }
+            fdecl::Capability::Dictionary(dictionary) => {
+                // TODO(fxbug.dev/300500098): Implement validation.
+                if let Some(name) = dictionary.name.as_ref() {
+                    self.all_dictionaries.insert(name);
                 }
             }
             fdecl::CapabilityUnknown!() => self.errors.push(Error::UnknownCapability),
@@ -1625,6 +1632,9 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            fdecl::Expose::Dictionary(_) => {
+                // TODO(fxbug.dev/300500098): Implement validation.
+            }
             _ => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "expose"));
             }
@@ -2028,6 +2038,9 @@ impl<'a> ValidationContext<'a> {
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
+            fdecl::Offer::Dictionary(_) => {
+                // TODO(fxbug.dev/300500098): Implement validation.
+            }
             _ => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "offer"));
             }
@@ -2284,6 +2297,12 @@ impl<'a> ValidationContext<'a> {
             }
             Some(fdecl::Ref::Collection(c)) => {
                 self.validate_target_collection(decl, allowable_names, c, target_name);
+            }
+            Some(fdecl::Ref::Capability(c)) => {
+                // TODO(fxbug.dev/300500098): Implement validation.
+                if !self.all_dictionaries.contains(&c.name.as_str()) {
+                    self.errors.push(Error::invalid_field(decl, "target"));
+                }
             }
             Some(_) => {
                 self.errors.push(Error::invalid_field(decl, "target"));

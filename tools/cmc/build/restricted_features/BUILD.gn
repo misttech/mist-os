@@ -12,6 +12,11 @@ group("hub") {
   # Available to all components in fuchsia.git
 }
 
+# The allowlist of components that can use dictionaries in CML.
+group("dictionaries") {
+  visibility = []
+}
+
 # The allowlist of components that can use the "allow_long_names" feature in CML.
 group("allow_long_names") {
   visibility = [

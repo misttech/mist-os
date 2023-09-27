@@ -394,7 +394,7 @@ impl<'de> de::Deserialize<'de> for Path {
 }
 
 /// A relative filesystem path.
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct RelativePath(FlyStr);
 
 impl RelativePath {
@@ -431,6 +431,27 @@ impl FromStr for RelativePath {
 impl From<RelativePath> for String {
     fn from(path: RelativePath) -> String {
         path.0.into()
+    }
+}
+
+impl fmt::Debug for RelativePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl fmt::Display for RelativePath {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl ser::Serialize for RelativePath {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        self.0.serialize(serializer)
     }
 }
 

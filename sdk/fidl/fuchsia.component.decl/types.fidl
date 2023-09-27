@@ -12,3 +12,12 @@ const MAX_URL_SCHEME_LENGTH uint32 = 100;
 alias name = string:MAX_NAME_LENGTH;
 alias child_name = string:MAX_CHILD_NAME_LENGTH;
 alias url_scheme = string:MAX_URL_SCHEME_LENGTH;
+/// Path in a dictionary. The format is similar to a directory path, except no `.` or `..`.
+/// is allowed and each path segment must conform to the format of the `name` type.
+///
+/// The "dirname" (first to the penultimate segment, or empty if there is one
+/// segment) represents a sequence of nested dictionaries.
+/// The "basename" (last segment) identifies a capability in the last nested
+/// dictionary.
+@available(added=HEAD)
+alias dictionary_path = string:MAX_PATH_LENGTH;

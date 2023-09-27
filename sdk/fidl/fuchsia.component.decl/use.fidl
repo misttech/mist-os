@@ -26,14 +26,20 @@ type Use = flexible union {
 /// To learn more about services, see:
 /// https://fuchsia.dev/fuchsia-src/glossary#service
 type UseService = table {
-    /// (Required) The provider of the service relative to the component itself.
-    /// Must be `parent` or `framework`. If the availability is set to
-    /// `optional`, then this must be set to `parent`.
+    /// (Required) The provider of the protocol relative to the component
+    /// itself. Must be `parent`, `framework`, `self`, or `child`.
     1: source Ref;
 
     /// (Required) Name identifying the service, by which it was presented to
     /// this component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    6: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the
     /// component's namespace.
@@ -63,14 +69,20 @@ type UseService = table {
 /// A protocol is a service with a single instance, provided by a single FIDL
 /// protocol.
 type UseProtocol = table {
-    /// (Required) The provider of the protocol relative to the component itself.
-    /// Must be `parent`, `framework`, `debug`, `capability`, or `child`. If the
-    /// availability is set to `optional`, then this must be set to `parent`.
+    /// (Required) The provider of the protocol relative to the component
+    /// itself. Must be `parent`, `framework`, `debug`, `capability` or `child`.
     1: source Ref;
 
     /// (Required) Name identifying the protocol, by which it was presented to this
     /// component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    6: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the component's
     /// namespace.
@@ -98,13 +110,19 @@ type UseProtocol = table {
 /// Declares a directory used by a component, which was offered to it.
 type UseDirectory = table {
     /// (Required) The provider of the directory relative to the component
-    /// itself. Must be `parent`, `framework`, or `child`. If the availability
-    /// is set to `optional`, then this must be set to `parent`.
+    /// itself. Must be `parent`, `framework`,  or `child`.
     1: source Ref;
 
     /// (Required) Name identifying the directory, by which it was presented to
     /// this component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    8: source_dictionary dictionary_path;
 
     /// (Required) The path where the capability should be installed in the
     /// component's namespace.
@@ -139,8 +157,7 @@ type UseDirectory = table {
 /// Declares storage used by a component, which was offered to it.
 type UseStorage = table {
     /// (Required) Name identifying the storage, by which it was presented to
-    /// this component. If the availability is set to `optional`, then this must
-    /// be set to `parent`.
+    /// this component.
     1: source_name name;
 
     /// (Required) The path where the capability should be installed in the
@@ -214,9 +231,7 @@ type UseEventStream = table {
     /// (Required) The names of the event streams.
     1: source_name name;
 
-    /// (Required) The provider of the event. Must be `parent`, `framework`, or `child`. If
-    /// the availability is set to `optional`, then this must be set to
-    /// `parent`.
+    /// (Required) The provider of the event. Must be `parent`, `framework`, or `child`.
     2: source Ref;
 
     /// (Optional) When an event is used from framework, the scope is required
@@ -253,4 +268,11 @@ type UseRunner = table {
     /// (Required) Name identifying the runner, by which it was presented to this
     /// component.
     2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    3: source_dictionary dictionary_path;
 };

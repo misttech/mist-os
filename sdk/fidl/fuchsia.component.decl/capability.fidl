@@ -17,6 +17,8 @@ type Capability = flexible union {
     7: event Event;
     @available(added=8)
     8: event_stream EventStream;
+    @available(added=HEAD)
+    9: dictionary Dictionary;
 };
 
 /// Declares a service capability backed by this component.
@@ -159,4 +161,24 @@ type EventStream = table {
     ///
     /// Must be unique among built-in capabilities.
     1: name name;
+};
+
+/// Declares a dictionary capability.
+// TODO(fxbug.dev/300503731): Add doc link
+@available(added=HEAD)
+type Dictionary = table {
+    /// (Required) The name of this dictionary.
+    ///
+    /// Must be unique among built-in capabilities.
+    1: name name;
+
+    /// (Required) Source of the contents used to initialize the dictionary.
+    /// Must be `void`, `parent`, `self`, or `child`.
+    2: source Ref;
+
+    /// (Optional) Path in a dictionary provided by `ref` which contains the contents
+    /// that will be used to initialize the dictionary.
+    ///
+    /// This must be set iff `source` is not `void`.
+    3: source_dictionary dictionary_path;
 };

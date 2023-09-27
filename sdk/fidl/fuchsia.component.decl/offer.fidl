@@ -19,6 +19,8 @@ type Offer = flexible union {
     @available(removed=14)
     7: event OfferEvent;
     8: event_stream OfferEventStream;
+    @available(added=HEAD)
+    7: dictionary OfferDictionary;
 };
 
 /// Describes the type of dependency implied by the capability.
@@ -91,15 +93,23 @@ type Availability = strict enum {
 /// https://fuchsia.dev/fuchsia-src/glossary#service
 type OfferService = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `self`, `child`, or `void`. If set to `void`,
-    /// then the target must offer or use the capability with `OPTIONAL` or
-    /// `TRANSITIONAL` availability.
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the service being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target. Must be `child` or `collection`.
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    8: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) The name under which the capability is being offered.
@@ -140,15 +150,23 @@ type OfferService = table {
 /// https://fuchsia.dev/fuchsia-src/glossary#protocol
 type OfferProtocol = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `self`, `child`, `framework`, or `void`. If
-    /// set to `void`, then the target must offer or use the capability with
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
     /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the protocol being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target. Must be `child` or `collection`.
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    7: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) The name by which the capability is being offered.
@@ -173,16 +191,23 @@ type OfferProtocol = table {
 /// itself, or one of its other children.
 type OfferDirectory = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `self`, `child`, `framework`, or `void`. If
-    /// set to `void`, then the target must offer or use the capability with
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
     /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name identifying the directory being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target of the capability. Must be `child` or
-    /// `collection`.
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    9: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) The name by which the capability is being offered.
@@ -218,13 +243,13 @@ type OfferStorage = table {
     1: source_name name;
 
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `storage`, or `void`. If set to `void`, then
-    /// the target must offer or use the capability with `OPTIONAL` or
-    /// `TRANSITIONAL` availability.
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     2: source Ref;
 
-    /// (Required) Reference to the target of the capability. Must be `child` or
-    /// `collection`.
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) The name the storage capability is being offered as
@@ -244,14 +269,23 @@ type OfferStorage = table {
 /// or one of its other children.
 type OfferRunner = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `self`, or `child`.
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name of the runner being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target of the capability. Must be `child` or
-    /// `collection`.
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    5: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) Name under which the capability is being offered.
@@ -263,14 +297,23 @@ type OfferRunner = table {
 /// or one of its other children.
 type OfferResolver = table {
     /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `parent`, `self`, or `child`.
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
     1: source Ref;
 
     /// (Required) Name of the resolver being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target of the capability. Must be `child` or
-    /// `collection`.
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    5: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) Name under which the capability is being offered.
@@ -288,8 +331,8 @@ type OfferEvent = table {
     /// (Required) Name of the event being offered.
     2: source_name name;
 
-    /// (Required) Reference to the target of the event. Must be `child` or
-    /// `collection`.
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
     3: target Ref;
 
     /// (Required) Name under which the event is being offered.
@@ -344,4 +387,49 @@ type OfferEventStream = table {
     /// The `same_as_target` value causes this offer's availability to match the
     /// availability set in the target.
     7: availability Availability;
+};
+
+/// Declares a dictionary offered by a component to one of its children,
+/// which may have been offered by the component's containing realm, the
+/// component itself, or one of its other children.
+///
+/// To learn more about dictionaries, see:
+/// https://fuchsia.dev/fuchsia-src/glossary#dictionary
+@available(added=HEAD)
+type OfferDictionary = table {
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
+    1: source Ref;
+
+    /// (Required) Name identifying the dictionary being offered.
+    2: source_name name;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    7: source_dictionary dictionary_path;
+
+    /// (Required) Reference to the target. Must be `child`, `collection`, or
+    /// a dictionary `capability`.
+    3: target Ref;
+
+    /// (Required) The name by which the capability is being offered.
+    4: target_name name;
+
+    /// (Required) The dependency type this offer represents. A component which
+    /// receives a weak offer must support the offered capability being
+    /// unavailable at any point.
+    5: dependency_type DependencyType;
+
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the target may use or offer the capability with
+    /// either `required` or `optional` availability. If set to `optional`, the
+    /// target must use or offer the capability with `optional` availability.
+    /// The `same_as_target` value causes this offer's availability to match the
+    /// availability set in the target.
+    6: availability Availability;
 };

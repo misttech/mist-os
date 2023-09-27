@@ -429,6 +429,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `runner`: (_optional `string`_) The [name](#name) for this runner capability.
 - `resolver`: (_optional `string`_) The [name](#name) for this resolver capability.
 - `event_stream`: (_optional `string or array of strings`_) The [name](#name) for this event_stream capability.
+- `dictionary`: (_optional `string`_) The [name](#name) for this dictionary capability.
 - `path`: (_optional `string`_) The path within the [outgoing directory][glossary.outgoing directory] of the component's
     program to source the capability.
 
@@ -452,6 +453,14 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     - `self`: This component.
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
+
+    (`dictionary` only) The contents to initialize a dictionary with. One of:
+    - `void`: Create the dictionary empty.
+    - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
+    - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
+    - `self/<relative_path>`: A path to a dictionary defined by this component.
+    `<relative_path>` may be either a name, identifying a dictionary capability), or
+    a path with multiple parts, identifying a nested dictionary.
 - `backing_dir`: (_optional `string`_) (`storage` only) The [name](#name) of the directory capability backing the storage. The
     capability must be available from the component referenced in `from`.
 - `subdir`: (_optional `string`_) (`storage` only) A subdirectory within `backing_dir` where per-component isolated storage
@@ -576,6 +585,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `directory`: (_optional `string or array of strings`_) When routing a directory, the [name](#name) of a [directory capability][doc-directory].
 - `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
+- `dictionary`: (_optional `string or array of strings`_) When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `self`: This component. Requires a corresponding
         [`capability`](#capabilities) declaration.
@@ -659,6 +669,7 @@ instance or a [child collection][doc-collections].
 - `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
 - `storage`: (_optional `string or array of strings`_) When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
+- `dictionary`: (_optional `string or array of strings`_) When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `parent`: The component's parent. This source can be used for all
         capability types.

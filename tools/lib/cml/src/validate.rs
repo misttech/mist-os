@@ -7,10 +7,10 @@ use {
         features::{Feature, FeatureSet},
         offer_to_all_would_duplicate, AnyRef, Availability, Capability, CapabilityClause,
         CapabilityFromRef, CapabilityId, Child, Collection, ConfigKey, ConfigValueType,
-        DependencyType, Disable, Document, Environment, EnvironmentExtends, EnvironmentRef, Error,
-        EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name, Offer, OfferFromRef,
-        OfferToRef, OneOrMany, Program, RegistrationRef, Rights, SourceAvailability, Use,
-        UseFromRef,
+        DependencyType, DictionaryRef, Disable, Document, Environment, EnvironmentExtends,
+        EnvironmentRef, Error, EventScope, Expose, ExposeFromRef, ExposeToRef, FromClause, Name,
+        Offer, OfferFromRef, OfferToRef, OneOrMany, Program, RegistrationRef, Rights,
+        RootDictionaryRef, SourceAvailability, Use, UseFromRef,
     },
     directed_graph::{self, DirectedGraph},
     std::{
@@ -51,12 +51,13 @@ struct ValidationContext<'a> {
     protocol_requirements: &'a ProtocolRequirements<'a>,
     all_children: HashMap<&'a Name, &'a Child>,
     all_collections: HashSet<&'a Name>,
-    all_storage_and_sources: HashMap<&'a Name, &'a CapabilityFromRef>,
+    all_storages: HashMap<&'a Name, &'a CapabilityFromRef>,
     all_services: HashSet<&'a Name>,
     all_protocols: HashSet<&'a Name>,
     all_directories: HashSet<&'a Name>,
     all_runners: HashSet<&'a Name>,
     all_resolvers: HashSet<&'a Name>,
+    all_dictionaries: HashMap<&'a Name, &'a CapabilityFromRef>,
     all_environment_names: HashSet<&'a Name>,
     all_capability_names: HashSet<&'a Name>,
 }
@@ -82,12 +83,13 @@ impl<'a> ValidationContext<'a> {
             protocol_requirements,
             all_children: HashMap::new(),
             all_collections: HashSet::new(),
-            all_storage_and_sources: HashMap::new(),
+            all_storages: HashMap::new(),
             all_services: HashSet::new(),
             all_protocols: HashSet::new(),
             all_directories: HashSet::new(),
             all_runners: HashSet::new(),
             all_resolvers: HashSet::new(),
+            all_dictionaries: HashMap::new(),
             all_environment_names: HashSet::new(),
             all_capability_names: HashSet::new(),
         }
@@ -112,13 +114,16 @@ impl<'a> ValidationContext<'a> {
             self.document.all_resolver_names().into_iter().zip(iter::repeat("resolvers"));
         let all_environment_names =
             self.document.all_environment_names().into_iter().zip(iter::repeat("environments"));
+        let all_dictionary_names =
+            self.document.all_dictionary_names().into_iter().zip(iter::repeat("dictionaries"));
         ensure_no_duplicate_names(
             all_children_names
                 .chain(all_collection_names)
                 .chain(all_storage_names)
                 .chain(all_runner_names)
                 .chain(all_resolver_names)
-                .chain(all_environment_names),
+                .chain(all_environment_names)
+                .chain(all_dictionary_names),
         )?;
 
         // Populate the sets of children and collections.
@@ -126,12 +131,13 @@ impl<'a> ValidationContext<'a> {
             self.all_children = children.iter().map(|c| (&c.name, c)).collect();
         }
         self.all_collections = self.document.all_collection_names().into_iter().collect();
-        self.all_storage_and_sources = self.document.all_storage_and_sources();
+        self.all_storages = self.document.all_storage_with_sources();
         self.all_services = self.document.all_service_names().into_iter().collect();
         self.all_protocols = self.document.all_protocol_names().into_iter().collect();
         self.all_directories = self.document.all_directory_names().into_iter().collect();
         self.all_runners = self.document.all_runner_names().into_iter().collect();
         self.all_resolvers = self.document.all_resolver_names().into_iter().collect();
+        self.all_dictionaries = self.document.all_dictionaries_with_sources().into_iter().collect();
         self.all_environment_names = self.document.all_environment_names().into_iter().collect();
         self.all_capability_names = self.document.all_capability_names();
 
@@ -379,8 +385,16 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             return Err(Error::validate("\"rights\" should be present with \"directory\""));
         }
         if capability.storage.is_some() {
-            if capability.from.is_none() {
-                return Err(Error::validate("\"from\" should be present with \"storage\""));
+            match capability.from {
+                Some(CapabilityFromRef::Named(_))
+                | Some(CapabilityFromRef::Parent)
+                | Some(CapabilityFromRef::Self_) => {}
+                Some(_) => {
+                    return Err(Error::validate("\"from\" in \"storage\" must match \"parent\", \"self\", or \"#<child-name>\""));
+                }
+                None => {
+                    return Err(Error::validate("\"from\" should be present with \"storage\""));
+                }
             }
             if capability.path.is_some() {
                 return Err(Error::validate(
@@ -405,6 +419,22 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         }
         if capability.resolver.is_some() && capability.path.is_none() {
             return Err(Error::validate("\"path\" should be present with \"resolver\""));
+        }
+        if capability.dictionary.is_some() {
+            if !self.features.has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            match capability.from {
+                Some(CapabilityFromRef::Void) | Some(CapabilityFromRef::Dictionary(_)) => {}
+                Some(_) => {
+                    return Err(Error::validate(
+                        "\"from\" in \"dictionary\" must be \"void\" or a dictionary path",
+                    ));
+                }
+                None => {
+                    return Err(Error::validate("\"from\" should be present with \"dictionary\""));
+                }
+            }
         }
         if let Some(from) = capability.from.as_ref() {
             self.validate_component_child_ref("\"capabilities\" source", &AnyRef::from(from))?;
@@ -455,6 +485,18 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             return Err(Error::validate(
                 "\"availability: same_as_target\" cannot be used with use declarations",
             ));
+        }
+        if let Some(UseFromRef::Dictionary(_)) = use_.from.as_ref() {
+            if use_.storage.is_some() {
+                return Err(Error::validate(
+                    "Dictionaries do not support \"storage\" capabilities",
+                ));
+            }
+            if use_.event_stream.is_some() {
+                return Err(Error::validate(
+                    "Dictionaries do not support \"event_stream\" capabilities",
+                ));
+            }
         }
 
         if let Some(source) = DependencyNode::use_from_ref(use_.from.as_ref()) {
@@ -681,6 +723,22 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
+        // Ensure that dictionaries exposed from self are defined in `capabilities`.
+        if let Some(dictionary) = expose.dictionary.as_ref() {
+            if !self.features.has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            for dictionary in dictionary {
+                if expose.from.iter().any(|r| *r == ExposeFromRef::Self_) {
+                    if !self.all_dictionaries.contains_key(dictionary) {
+                        return Err(Error::validate(format!(
+                       "Dictionary \"{}\" is exposed from self, so it must be declared as a \"dictionary\" in \"capabilities\"", dictionary
+                   )));
+                    }
+                }
+            }
+        }
+
         if let Some(event_stream) = &expose.event_stream {
             if event_stream.iter().len() > 1 && expose.r#as.is_some() {
                 return Err(Error::validate(format!(
@@ -705,6 +763,24 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                                 return Err(Error::validate(format!("event_stream scope {} did not match a component or collection in this .cml file.", name.as_str())));
                             }
                         }
+                    }
+                }
+            }
+        }
+
+        for ref_ in expose.from.iter() {
+            if let ExposeFromRef::Dictionary(d) = ref_ {
+                if expose.event_stream.is_some() {
+                    return Err(Error::validate(
+                        "Dictionaries do not support \"event_stream\" capabilities",
+                    ));
+                }
+                match &d.root {
+                    RootDictionaryRef::Self_ | RootDictionaryRef::Named(_) => {}
+                    RootDictionaryRef::Parent => {
+                        return Err(Error::validate(
+                            "`expose` dictionary path must begin with `self` or `#<child-name>`",
+                        ));
                     }
                 }
             }
@@ -823,7 +899,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     "Storage \"{}\" is offered from a child, but storage capabilities cannot be exposed", storage)));
                 }
                 if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
-                    if !self.all_storage_and_sources.contains_key(storage) {
+                    if !self.all_storages.contains_key(storage) {
                         return Err(Error::validate(format!(
                        "Storage \"{}\" is offered from self, so it must be declared as a \"storage\" in \"capabilities\"",
                        storage
@@ -863,6 +939,39 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
+        // Ensure that dictionaries offered from self are defined in `dictionaries`.
+        if let Some(dictionary) = offer.dictionary.as_ref() {
+            if !self.features.has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            for dictionary in dictionary {
+                if offer.from.iter().any(|r| *r == OfferFromRef::Self_) {
+                    if !self.all_dictionaries.contains_key(dictionary) {
+                        return Err(Error::validate(format!(
+                            "Dictionary \"{}\" is offered from self, so it must be declared as a \
+                       \"dictionary\" in \"capabilities\"",
+                            dictionary
+                        )));
+                    }
+                }
+            }
+        }
+
+        for ref_ in offer.from.iter() {
+            if let OfferFromRef::Dictionary(_) = ref_ {
+                if offer.storage.is_some() {
+                    return Err(Error::validate(
+                        "Dictionaries do not support \"storage\" capabilities",
+                    ));
+                }
+                if offer.event_stream.is_some() {
+                    return Err(Error::validate(
+                        "Dictionaries do not support \"event_stream\" capabilities",
+                    ));
+                }
+            }
+        }
+
         // Ensure that dependency can only be provided for directories and protocols
         if offer.dependency.is_some() && offer.directory.is_none() && offer.protocol.is_none() {
             return Err(Error::validate(
@@ -873,7 +982,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         // Validate every target of this offer.
         let target_cap_ids = CapabilityId::from_offer_expose(offer)?;
         for to in &offer.to {
-            // Ensure the "to" value is a child.
+            // Ensure the "to" value is a child, collection, or dictionary capability.
             let to_target = match to {
                 OfferToRef::Named(ref name) => name,
                 OfferToRef::All => continue,
@@ -886,20 +995,23 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
 
             // Check that any referenced child actually exists.
-            if !self.all_children.contains_key(to_target)
-                && !self.all_collections.contains(to_target)
+            if self.all_children.contains_key(to_target)
+                || self.all_collections.contains(to_target)
+                || self.all_dictionaries.contains_key(to_target)
             {
+                // Allowed.
+            } else {
                 if let OneOrMany::One(from) = &offer.from {
                     return Err(Error::validate(format!(
                         "\"{}\" is an \"offer\" target from \"{}\" but it does not appear in \"children\" \
-                         or \"collections\"",
+                         or \"collections\", and is not a dictionary capability",
                         to,
                         from
                     )));
                 } else {
                     return Err(Error::validate(format!(
                         "\"{}\" is an \"offer\" target but it does not appear in \"children\" \
-                         or \"collections\"",
+                         or \"collections\", and is not a dictionary capability",
                         to,
                     )));
                 }
@@ -923,7 +1035,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                     // verified.
                     if let OneOrMany::One(OfferFromRef::Self_) = &offer.from {
                         if let Some(CapabilityFromRef::Named(source)) =
-                            self.all_storage_and_sources.get(storage)
+                            self.all_storages.get(storage)
                         {
                             if to_target == source {
                                 return Err(Error::validate(format!(
@@ -1132,13 +1244,15 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             (DependencyNode::Self_, Some(name)) => name,
             _ => return dep,
         };
-        if let Some(source) = self.all_storage_and_sources.get(&name) {
-            let dep = DependencyNode::Named(name);
-            let other_dep = DependencyNode::capability_from_ref(source);
-            if let Some(other_dep) = other_dep {
-                Self::add_edge(other_dep, dep, strong_dependencies);
+        for m in [&self.all_storages, &self.all_dictionaries] {
+            if let Some(source) = m.get(&name) {
+                let dep = DependencyNode::Named(name);
+                let other_dep = DependencyNode::capability_from_ref(source);
+                if let Some(other_dep) = other_dep {
+                    Self::add_edge(other_dep, dep, strong_dependencies);
+                }
+                return dep;
             }
-            return dep;
         }
         dep
     }
@@ -1552,6 +1666,8 @@ impl<'a> DependencyNode<'a> {
             // We don't care about cycles with the parent, because those will be resolved when the
             // parent manifest is validated.
             CapabilityFromRef::Parent => None,
+            CapabilityFromRef::Void => None,
+            CapabilityFromRef::Dictionary(d) => Self::from_dictionary_ref(d),
         }
     }
 
@@ -1571,6 +1687,8 @@ impl<'a> DependencyNode<'a> {
             // We don't care about cycles with debug, because our environment is controlled by our
             // parent
             Some(UseFromRef::Debug) => None,
+
+            Some(UseFromRef::Dictionary(d)) => Self::from_dictionary_ref(d),
 
             None => None,
         }
@@ -1592,6 +1710,16 @@ impl<'a> DependencyNode<'a> {
             // If the offer source is intentionally omitted, then definitionally this offer does
             // not cause an edge in our dependency graph.
             OfferFromRef::Void => None,
+
+            OfferFromRef::Dictionary(d) => Self::from_dictionary_ref(d),
+        }
+    }
+
+    fn from_dictionary_ref(d: &'a DictionaryRef) -> Option<DependencyNode<'a>> {
+        match &d.root {
+            RootDictionaryRef::Named(name) => Some(DependencyNode::Named(&name)),
+            RootDictionaryRef::Self_ => Some(DependencyNode::Self_),
+            RootDictionaryRef::Parent => None,
         }
     }
 
@@ -2390,7 +2518,7 @@ mod tests {
         assert_matches!(
             result,
             Err(Error::Parse { err, location: Some(l), filename: Some(f) })
-                if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", or none" &&
+                if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none" &&
                 l == Location { line: 5, column: 21 } &&
                 f.ends_with("test.cml")
         );
@@ -2479,7 +2607,7 @@ mod tests {
             json!({
                 "use": [
                   { "protocol": "CoolFonts", "path": "/svc/MyFonts" },
-                  { "protocol": "CoolFonts2", "path": "/svc/MyFonts2", "from": "debug" },
+                  { "protocol": "CoolFonts2", "path": "/svc/MyFonts2", "from": "parent/dict" },
                   { "protocol": "fuchsia.test.hub.HubReport", "from": "framework" },
                   { "protocol": "fuchsia.sys2.StorageAdmin", "from": "#data-storage" },
                   { "protocol": ["fuchsia.ui.scenic.Scenic", "fuchsia.logger.LogSink"] },
@@ -2538,7 +2666,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"parent\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"parent\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
         ),
         test_cml_offer_event_stream_capability_requested_with_filter(
             json!({
@@ -2550,7 +2678,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
         ),
         test_cml_offer_event_stream_directory_ready_with_filter(
             json!({
@@ -2562,7 +2690,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#something\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
         ),
         test_cml_offer_event_stream_multiple_as(
             json!({
@@ -2603,7 +2731,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#self\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#self\" is an \"offer\" target from \"framework\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
         ),
         test_cml_expose_event_stream_to_framework(
             json!({
@@ -2714,7 +2842,15 @@ mod tests {
                   { "protocol": "CoolFonts", "from": "bad" }
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", or none"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+        ),
+        test_cml_use_invalid_from_dictionary(
+            json!({
+                "use": [
+                  { "protocol": "CoolFonts", "from": "bad/dict" }
+                ]
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/dict\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
         ),
         test_cml_use_from_missing_capability(
             json!({
@@ -3158,7 +3294,7 @@ mod tests {
                     "protocol": "fuchsia.logger.Log", "from": "parent"
                 } ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent\", expected one or an array of \"framework\", \"self\", or \"#<child-name>\""
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent\", expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
         ),
         // if "as" is specified, only 1 array item is allowed.
         test_cml_expose_bad_as(
@@ -3341,6 +3477,28 @@ mod tests {
                 ],
             }),
             Err(Error::Validate { err, .. }) if &err == "Resolver \"pkg_resolver\" is exposed from self, so it must be declared as a \"resolver\" in \"capabilities\""
+        ),
+        test_cml_expose_from_dictionary_invalid(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "pkg_protocol",
+                        "from": "bad/a",
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
+        ),
+        test_cml_expose_from_dictionary_parent(
+            json!({
+                "expose": [
+                    {
+                        "protocol": "pkg_protocol",
+                        "from": "parent/a",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "`expose` dictionary path must begin with `self` or `#<child-name>`"
         ),
         test_cml_expose_protocol_from_collection_invalid(
             json!({
@@ -3629,7 +3787,7 @@ mod tests {
                         "to": [ "#echo_server" ],
                     } ]
                 }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"#invalid@\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", or \"#<collection-name>\""
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"#invalid@\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path"
         ),
         test_cml_offer_invalid_multiple_from(
             json!({
@@ -3751,6 +3909,42 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
         ),
+        test_cml_offer_from_dictionary_invalid(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "pkg_protocol",
+                        "from": "bad/a",
+                        "to": "#child",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "child",
+                        "url": "fuchsia-pkg://child",
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path"
+        ),
+        test_cml_offer_to_non_dictionary(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "p",
+                        "from": "parent",
+                        "to": "#dict",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "protocol": "dict",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "\"#dict\" is an \"offer\" target from \"parent\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
+        ),
+
         test_cml_offer_empty_targets(
             json!({
                 "offer": [
@@ -3767,7 +3961,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected one or an array of \"#<child-name>\" or \"#<collection-name>\", with unique elements"
+            Err(Error::Parse { err, .. }) if &err == "invalid length 0, expected one or an array of \"#<child-name>\", \"#<collection-name>\", or a dictionary path, with unique elements"
         ),
         test_cml_offer_duplicate_targets(
             json!({
@@ -3777,7 +3971,7 @@ mod tests {
                     "to": ["#a", "#a"]
                 } ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid value: array with duplicate element, expected one or an array of \"#<child-name>\" or \"#<collection-name>\", with unique elements"
+            Err(Error::Parse { err, .. }) if &err == "invalid value: array with duplicate element, expected one or an array of \"#<child-name>\", \"#<collection-name>\", or a dictionary path, with unique elements"
         ),
         test_cml_offer_target_missing_props(
             json!({
@@ -3801,7 +3995,7 @@ mod tests {
                     "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
                 } ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"#missing\" is an \"offer\" target from \"#logger\" but it does not appear in \"children\" or \"collections\""
+            Err(Error::Validate { err, .. }) if &err == "\"#missing\" is an \"offer\" target from \"#logger\" but it does not appear in \"children\" or \"collections\", and is not a dictionary capability"
         ),
         test_cml_offer_target_bad_to(
             json!({
@@ -4868,7 +5062,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event_stream\", \"dictionary\""
         ),
         test_cml_resolver_missing_path(
             json!({
@@ -4906,6 +5100,17 @@ mod tests {
                 ]
             }),
             Err(Error::Validate { err, .. }) if &err == "identifier \"pkg_resolver\" is defined twice, once in \"resolvers\" and once in \"runners\""
+        ),
+        test_cml_capabilities_dictionary_invalid_from(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "from": "bad",
+                    },
+                ]
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad\", expected \"parent\", \"self\", \"#<child-name>\", \"void\", or a dictionary path"
         ),
 
         // environments
@@ -5378,6 +5583,7 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "This use statement requires a `rights` field. Refer to: https://fuchsia.dev/go/components/directory#consumer."
         ),
+
         test_cml_path(
             json!({
                 "capabilities": [
@@ -5530,7 +5736,65 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "invalid length 102, expected one or an array of \"framework\", \"self\", or \"#<child-name>\""
+            Err(Error::Parse { err, .. }) if &err == "invalid length 102, expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
+        ),
+        test_cml_dictionary_ref(
+            json!({
+                "use": [
+                    {
+                        "protocol": "a",
+                        "from": "parent/a",
+                    },
+                    {
+                        "protocol": "b",
+                        "from": "#child/a/b",
+                    },
+                    {
+                        "protocol": "c",
+                        "from": "self/a/b/c",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "child",
+                        "url": "fuchsia-pkg://child",
+                    },
+                ],
+            }),
+            Ok(())
+        ),
+        test_cml_dictionary_ref_invalid_root(
+            json!({
+                "use": [
+                    {
+                        "protocol": "a",
+                        "from": "bad/a",
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"bad/a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+        ),
+        test_cml_dictionary_ref_invalid_path(
+            json!({
+                "use": [
+                    {
+                        "protocol": "a",
+                        "from": "parent//a",
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent//a\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
+        ),
+        test_cml_dictionary_ref_too_long(
+            json!({
+                "use": [
+                    {
+                        "protocol": "a",
+                        "from": format!("parent/{}", "a".repeat(4089)),
+                    },
+                ],
+            }),
+            Err(Error::Parse { err, .. }) if &err == "invalid length 4096, expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
         ),
         test_cml_capability_name(
             json!({
@@ -6630,6 +6894,214 @@ mod tests {
             }),
             Ok(())
         ),
+    }}
+
+    test_validate_cml_with_feature! { FeatureSet::from(vec![Feature::Dictionaries]), {
+        test_cml_expose_dictionary_from_self(
+            json!({
+                "expose": [
+                    {
+                        "dictionary": "foo_dictionary",
+                        "from": "self",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "foo_dictionary",
+                        "from": "void",
+                    },
+                ]
+            }),
+            Ok(())
+        ),
+        test_cml_offer_to_dictionary_duplicate(
+            json!({
+                "offer": [
+                    {
+                        "protocol": "p",
+                        "from": "parent",
+                        "to": "#dict",
+                    },
+                    {
+                        "protocol": "p",
+                        "from": "#child",
+                        "to": "#dict",
+                    },
+                ],
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "from": "void",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "child",
+                        "url": "fuchsia-pkg://child",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "\"p\" is a duplicate \"offer\" target capability for \"#dict\""
+        ),
+        test_cml_offer_dependency_cycle_from_dictionary(
+            json!({
+                    "offer": [
+                        {
+                            "protocol": "1",
+                            "from": "#a/in/dict",
+                            "to": [ "#b" ],
+                            "dependency": "strong"
+                        },
+                        {
+                            "directory": "2",
+                            "from": "#b/in/dict",
+                            "to": [ "#a" ],
+                        },
+                    ],
+                    "children": [
+                        {
+                            "name": "a",
+                            "url": "fuchsia-pkg://fuchsia.com/a#meta/a.cm"
+                        },
+                        {
+                            "name": "b",
+                            "url": "fuchsia-pkg://fuchsia.com/b#meta/b.cm"
+                        },
+                    ]
+                }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: \
+                {{#a -> #b -> #a}}"
+        ),
+        test_cml_offer_dependency_cycle_with_dictionary_from_void(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "from": "void",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "#meta/a.cm",
+                    },
+                    {
+                        "name": "b",
+                        "url": "#meta/b.cm",
+                    },
+                ],
+                "offer": [
+                    {
+                        "dictionary": "dict",
+                        "from": "self",
+                        "to": "#a",
+                    },
+                    {
+                        "protocol": "1",
+                        "from": "#b",
+                        "to": "#dict",
+                    },
+                    {
+                        "protocol": "2",
+                        "from": "#a",
+                        "to": "#b",
+                    },
+                ],
+            }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: {{#a -> #b -> #dict -> #a}}"
+        ),
+        test_cml_offer_dependency_cycle_with_dictionary_from_dictionary(
+            json!({
+                "capabilities": [
+                    {
+                        "dictionary": "dict",
+                        "from": "#b/foo",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "#meta/a.cm",
+                    },
+                    {
+                        "name": "b",
+                        "url": "#meta/b.cm",
+                    },
+                ],
+                "offer": [
+                    {
+                        "dictionary": "dict",
+                        "from": "self",
+                        "to": "#a",
+                    },
+                    {
+                        "protocol": "1",
+                        "from": "#a",
+                        "to": "#b",
+                    },
+                ],
+            }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: {{#a -> #b -> #dict -> #a}}"
+        ),
+        test_cml_use_dependency_cycle_with_dictionary(
+            json!({
+                "capabilities": [
+                    {
+                        "protocol": "1",
+                    },
+                    {
+                        "dictionary": "dict",
+                        "from": "void",
+                    },
+                ],
+                "children": [
+                    {
+                        "name": "a",
+                        "url": "#meta/a.cm",
+                    },
+                ],
+                "use": [
+                    {
+                        "protocol": "2",
+                        "from": "#a",
+                    },
+                ],
+                "offer": [
+                    {
+                        "dictionary": "dict",
+                        "from": "self",
+                        "to": "#a",
+                    },
+                    {
+                        "protocol": "1",
+                        "from": "self",
+                        "to": "#dict",
+                    },
+                ],
+            }),
+            Err(Error::Validate {
+                err,
+                ..
+            }) if &err ==
+                "Strong dependency cycles were found. Break the cycle by removing a \
+                dependency or marking an offer as weak. Cycles: {{#a -> self -> #dict -> #a}}"
+        ),
+
     }}
 
     // Tests that offering and exposing service capabilities to the same target and target name is

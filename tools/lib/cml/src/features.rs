@@ -43,6 +43,9 @@ pub enum Feature {
     /// Allows `hub` framework capability to be used.
     Hub,
 
+    /// Allows `dictionary` capabilities to be used
+    Dictionaries,
+
     // Allows dynamic child name lengths to exceed the default limit.
     AllowLongNames,
 
@@ -63,6 +66,7 @@ impl FromStr for Feature {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "hub" => Ok(Feature::Hub),
+            "dictionaries" => Ok(Feature::Dictionaries),
             "allow_long_names" => Ok(Feature::AllowLongNames),
             "allow_non_hermetic_packages" => Ok(Feature::AllowNonHermeticPackages),
             "enable_allow_non_hermetic_packages_feature" => {
@@ -78,6 +82,7 @@ impl fmt::Display for Feature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Feature::Hub => "hub",
+            Feature::Dictionaries => "dictionaries",
             Feature::AllowLongNames => "allow_long_names",
             Feature::AllowNonHermeticPackages => "allow_non_hermetic_packages",
             Feature::EnableAllowNonHermeticPackagesFeature => {

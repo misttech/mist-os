@@ -5,7 +5,10 @@
 use {
     argh::FromArgs,
     cm_types::{symmetrical_enums, Url},
-    cml::error::{Error, Location},
+    cml::{
+        error::{Error, Location},
+        translate::CompileOptions,
+    },
     fidl::persist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
     serde::Deserialize,
@@ -244,12 +247,16 @@ impl TryFrom<Config> for component_internal::Config {
             namespace_capabilities: config
                 .namespace_capabilities
                 .as_ref()
-                .map(|c| cml::translate::translate_capabilities(c, false))
+                .map(|c| {
+                    cml::translate::translate_capabilities(&CompileOptions::default(), c, false)
+                })
                 .transpose()?,
             builtin_capabilities: config
                 .builtin_capabilities
                 .as_ref()
-                .map(|c| cml::translate::translate_capabilities(c, true))
+                .map(|c| {
+                    cml::translate::translate_capabilities(&CompileOptions::default(), c, true)
+                })
                 .transpose()?,
             num_threads: config.num_threads,
             root_component_url: match config.root_component_url {

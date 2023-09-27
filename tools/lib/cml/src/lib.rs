@@ -26,7 +26,7 @@ use {
     maplit::{hashmap, hashset},
     paste::paste,
     reference_doc::ReferenceDoc,
-    serde::{de, Deserialize, Serialize},
+    serde::{de, ser, Deserialize, Serialize},
     serde_json::{Map, Value},
     std::{
         cmp,
@@ -109,6 +109,7 @@ pub enum CapabilityId<'a> {
     Runner(&'a Name),
     Resolver(&'a Name),
     EventStream(&'a Name),
+    Dictionary(&'a Name),
 }
 
 /// Generates a `Vec<Name>` -> `Vec<CapabilityId>` conversion function.
@@ -146,6 +147,7 @@ impl<'a> CapabilityId<'a> {
             CapabilityId::Runner(_) => "runner",
             CapabilityId::Resolver(_) => "resolver",
             CapabilityId::EventStream(_) => "event_stream",
+            CapabilityId::Dictionary(_) => "dictionary",
         }
     }
 
@@ -284,6 +286,12 @@ impl<'a> CapabilityId<'a> {
                 None,
                 capability.capability_type(),
             )?));
+        } else if let Some(n) = capability.dictionary() {
+            return Ok(Self::dictionaries_from(Self::get_one_or_many_names(
+                n,
+                None,
+                capability.capability_type(),
+            )?));
         }
 
         // Unsupported capability type.
@@ -356,6 +364,12 @@ impl<'a> CapabilityId<'a> {
                 alias,
                 clause.capability_type(),
             )?));
+        } else if let Some(n) = clause.dictionary() {
+            return Ok(Self::dictionaries_from(Self::get_one_or_many_names(
+                n,
+                alias,
+                clause.capability_type(),
+            )?));
         }
 
         // Unsupported capability type.
@@ -420,6 +434,7 @@ impl<'a> CapabilityId<'a> {
     capability_ids_from_names!(runners_from, CapabilityId::Runner);
     capability_ids_from_names!(resolvers_from, CapabilityId::Resolver);
     capability_ids_from_names!(event_streams_from, CapabilityId::EventStream);
+    capability_ids_from_names!(dictionaries_from, CapabilityId::Dictionary);
     capability_ids_from_paths!(used_services_from, CapabilityId::UsedService);
     capability_ids_from_paths!(used_protocols_from, CapabilityId::UsedProtocol);
 }
@@ -433,7 +448,8 @@ impl fmt::Display for CapabilityId<'_> {
             | CapabilityId::Runner(n)
             | CapabilityId::UsedRunner(n)
             | CapabilityId::Resolver(n)
-            | CapabilityId::EventStream(n) => n.as_str(),
+            | CapabilityId::EventStream(n)
+            | CapabilityId::Dictionary(n) => n.as_str(),
             CapabilityId::UsedService(p)
             | CapabilityId::UsedProtocol(p)
             | CapabilityId::UsedDirectory(p)
@@ -477,7 +493,7 @@ pub struct OneOrManyPaths;
 /// Generates deserializer for `OneOrMany<ExposeFromRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"framework\", \"self\", or \"#<child-name>\"",
+    expected = "one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path",
     inner_type = "ExposeFromRef",
     min_length = 1,
     unique_items = true
@@ -487,7 +503,7 @@ pub struct OneOrManyExposeFromRefs;
 /// Generates deserializer for `OneOrMany<OfferToRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"#<child-name>\" or \"#<collection-name>\", with unique elements",
+    expected = "one or an array of \"#<child-name>\", \"#<collection-name>\", or a dictionary path, with unique elements",
     inner_type = "OfferToRef",
     min_length = 1,
     unique_items = true
@@ -497,7 +513,7 @@ pub struct OneOrManyOfferToRefs;
 /// Generates deserializer for `OneOrMany<OfferFromRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", or \"#<collection-name>\"",
+    expected = "one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path",
     inner_type = "OfferFromRef",
     min_length = 1,
     unique_items = true
@@ -572,13 +588,14 @@ pub enum AnyRef<'a> {
     Parent,
     /// A reference to the framework (component manager). Parsed as `framework`.
     Framework,
-
     /// A reference to the debug. Parsed as `debug`.
     Debug,
     /// A reference to this component. Parsed as `self`.
     Self_,
     /// An intentionally omitted reference.
     Void,
+    /// A reference to a dictionary. Parsed as a dictionary path.
+    Dictionary(&'a DictionaryRef),
 }
 
 /// Format an `AnyRef` as a string.
@@ -591,6 +608,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Debug => write!(f, "debug"),
             Self::Self_ => write!(f, "self"),
             Self::Void => write!(f, "void"),
+            Self::Dictionary(d) => write!(f, "{}", d),
         }
     }
 }
@@ -598,7 +616,7 @@ impl fmt::Display for AnyRef<'_> {
 /// A reference in a `use from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
 #[reference(
-    expected = "\"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", or none"
+    expected = "\"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
 )]
 pub enum UseFromRef {
     /// A reference to the parent.
@@ -609,14 +627,18 @@ pub enum UseFromRef {
     Debug,
     /// A reference to a child or a capability declared on self.
     ///
-    /// A reference to a capability is only valid on use declarations for a protocol that
-    /// references a storage capability declared in the same component, which will cause the
-    /// framework to host a fuchsia.sys2.StorageAdmin protocol for the component.
+    /// A reference to a capability must be one of the following:
+    /// - A dictionary capability.
+    /// - A protocol that references a storage capability declared in the same component,
+    ///   which will cause the framework to host a fuchsia.sys2.StorageAdmin protocol for the
+    ///   component.
     ///
     /// This cannot be used to directly access capabilities that a component itself declares.
     Named(Name),
     /// A reference to this component.
     Self_,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 /// The scope of an event.
@@ -639,6 +661,8 @@ pub enum ExposeFromRef {
     Self_,
     /// An intentionally omitted source.
     Void,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 /// A reference in an `expose to`.
@@ -653,7 +677,9 @@ pub enum ExposeToRef {
 
 /// A reference in an `offer from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"parent\", \"framework\", \"self\", \"void\", or \"#<child-name>\"")]
+#[reference(
+    expected = "\"parent\", \"framework\", \"self\", \"void\", \"#<child-name>\", or a dictionary path"
+)]
 pub enum OfferFromRef {
     /// A reference to a child or collection.
     Named(Name),
@@ -665,6 +691,8 @@ pub enum OfferFromRef {
     Self_,
     /// An intentionally omitted source.
     Void,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 impl OfferFromRef {
@@ -711,8 +739,103 @@ pub enum EnvironmentRef {
 
 /// A reference in a `storage from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"parent\", \"self\", or \"#<child-name>\"")]
+#[reference(expected = "\"parent\", \"self\", \"#<child-name>\", \"void\", or a dictionary path")]
 pub enum CapabilityFromRef {
+    /// (storage) A reference to a child.
+    Named(Name),
+    /// (storage) A reference to the parent.
+    Parent,
+    /// (storage) A reference to this component.
+    Self_,
+    /// (dictionary) Create empty from scratch.
+    Void,
+    /// (dictionary) Initialize with the contents of another dictionary.
+    Dictionary(DictionaryRef),
+}
+
+/// A reference to a (possibly nested) dictionary.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct DictionaryRef {
+    /// Path to the dictionary relative to `root_dictionary`.
+    pub path: RelativePath,
+    pub root: RootDictionaryRef,
+}
+
+impl FromStr for DictionaryRef {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, ParseError> {
+        let path = RelativePath::new(s)?;
+        let path = path.as_str();
+        match path.find('/') {
+            Some(n) => {
+                let root = path[..n].parse().map_err(|_| ParseError::InvalidValue)?;
+                let path = RelativePath::new(&path[n + 1..])?;
+                Ok(Self { root, path })
+            }
+            None => Err(ParseError::InvalidValue),
+        }
+    }
+}
+
+impl fmt::Display for DictionaryRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.root, self.path)
+    }
+}
+
+impl ser::Serialize for DictionaryRef {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        format!("{}", self).serialize(serializer)
+    }
+}
+
+const DICTIONARY_REF_EXPECT_STR: &str = "a path to a dictionary no more \
+    than 4095 characters in length";
+
+impl<'de> de::Deserialize<'de> for DictionaryRef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = DictionaryRef;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(DICTIONARY_REF_EXPECT_STR)
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                s.parse().map_err(|err| match err {
+                    ParseError::InvalidValue => {
+                        E::invalid_value(de::Unexpected::Str(s), &DICTIONARY_REF_EXPECT_STR)
+                    }
+                    ParseError::TooLong | ParseError::Empty => {
+                        E::invalid_length(s.len(), &DICTIONARY_REF_EXPECT_STR)
+                    }
+                    e => {
+                        panic!("unexpected parse error: {:?}", e);
+                    }
+                })
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
+    }
+}
+
+/// A reference to a root dictionary.
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
+#[reference(expected = "\"parent\", \"self\", \"#<child-name>\"")]
+pub enum RootDictionaryRef {
     /// A reference to a child.
     Named(Name),
     /// A reference to the parent.
@@ -1410,6 +1533,7 @@ where
     compute_capability_diff!(ours, theirs, resolver);
     compute_capability_diff!(ours, theirs, runner);
     compute_capability_diff!(ours, theirs, event_stream);
+    compute_capability_diff!(ours, theirs, dictionary);
 }
 
 impl Document {
@@ -1670,7 +1794,7 @@ impl Document {
         }
     }
 
-    pub fn all_storage_and_sources<'a>(&'a self) -> HashMap<&'a Name, &'a CapabilityFromRef> {
+    pub fn all_storage_with_sources<'a>(&'a self) -> HashMap<&'a Name, &'a CapabilityFromRef> {
         if let Some(capabilities) = self.capabilities.as_ref() {
             capabilities
                 .iter()
@@ -1721,6 +1845,28 @@ impl Document {
             .as_ref()
             .map(|c| c.iter().filter_map(|c| c.resolver.as_ref()).collect())
             .unwrap_or_else(|| vec![])
+    }
+
+    pub fn all_dictionary_names(&self) -> Vec<&Name> {
+        if let Some(capabilities) = self.capabilities.as_ref() {
+            capabilities.iter().filter_map(|c| c.dictionary.as_ref()).collect()
+        } else {
+            vec![]
+        }
+    }
+
+    pub fn all_dictionaries_with_sources<'a>(&'a self) -> HashMap<&'a Name, &'a CapabilityFromRef> {
+        if let Some(capabilities) = self.capabilities.as_ref() {
+            capabilities
+                .iter()
+                .filter_map(|c| match (c.dictionary.as_ref(), c.from.as_ref()) {
+                    (Some(s), Some(f)) => Some((s, f)),
+                    _ => None,
+                })
+                .collect()
+        } else {
+            HashMap::new()
+        }
     }
 
     pub fn all_environment_names(&self) -> Vec<&Name> {
@@ -2110,6 +2256,10 @@ pub struct Capability {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream: Option<OneOrMany<Name>>,
 
+    /// The [name](#name) for this dictionary capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dictionary: Option<Name>,
+
     /// The path within the [outgoing directory][glossary.outgoing directory] of the component's
     /// program to source the capability.
     ///
@@ -2140,6 +2290,14 @@ pub struct Capability {
     /// - `self`: This component.
     /// - `#<child-name>`: A [reference](#references) to a child component
     ///     instance.
+    ///
+    /// (`dictionary` only) The contents to initialize a dictionary with. One of:
+    /// - `void`: Create the dictionary empty.
+    /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
+    /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
+    /// - `self/<relative_path>`: A path to a dictionary defined by this component.
+    /// `<relative_path>` may be either a name, identifying a dictionary capability), or
+    /// a path with multiple parts, identifying a nested dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<CapabilityFromRef>,
 
@@ -2439,6 +2597,10 @@ pub struct Expose {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolver: Option<OneOrMany<Name>>,
 
+    /// When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dictionary: Option<OneOrMany<Name>>,
+
     /// `from`: The source of the capability, one of:
     /// - `self`: This component. Requires a corresponding
     ///     [`capability`](#capabilities) declaration.
@@ -2511,6 +2673,7 @@ impl Expose {
             directory: None,
             runner: None,
             resolver: None,
+            dictionary: None,
             r#as: None,
             to: None,
             rights: None,
@@ -2602,6 +2765,10 @@ pub struct Offer {
     /// When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage: Option<OneOrMany<Name>>,
+
+    /// When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dictionary: Option<OneOrMany<Name>>,
 
     /// `from`: The source of the capability, one of:
     /// - `parent`: The component's parent. This source can be used for all
@@ -2827,6 +2994,7 @@ pub trait CapabilityClause: Clone + PartialEq {
     fn runner(&self) -> Option<OneOrMany<&Name>>;
     fn resolver(&self) -> Option<OneOrMany<&Name>>;
     fn event_stream(&self) -> Option<OneOrMany<&Name>>;
+    fn dictionary(&self) -> Option<OneOrMany<&Name>>;
     fn set_service(&mut self, o: Option<OneOrMany<Name>>);
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>);
     fn set_directory(&mut self, o: Option<OneOrMany<Name>>);
@@ -2834,6 +3002,7 @@ pub trait CapabilityClause: Clone + PartialEq {
     fn set_runner(&mut self, o: Option<OneOrMany<Name>>);
     fn set_resolver(&mut self, o: Option<OneOrMany<Name>>);
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>);
 
     fn availability(&self) -> Option<Availability>;
     fn set_availability(&mut self, a: Option<Availability>);
@@ -2861,6 +3030,7 @@ pub trait CapabilityClause: Clone + PartialEq {
             self.runner(),
             self.resolver(),
             self.event_stream(),
+            self.dictionary(),
         ];
         res.into_iter()
             .map(|o| o.map(|o| o.into_iter().collect::<Vec<&Name>>()).unwrap_or(vec![]))
@@ -2890,6 +3060,8 @@ pub trait CapabilityClause: Clone + PartialEq {
             self.set_resolver(Some(names));
         } else if cap_type == "event_stream" {
             self.set_event_stream(Some(names));
+        } else if cap_type == "dictionary" {
+            self.set_dictionary(Some(names));
         } else {
             panic!("Unknown capability type {}", cap_type);
         }
@@ -2962,6 +3134,9 @@ impl CapabilityClause for Capability {
     fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
+    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+        self.dictionary.as_ref().map(|n| OneOrMany::One(n))
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -2984,6 +3159,9 @@ impl CapabilityClause for Capability {
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
         self.event_stream = o;
     }
+    fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
+        self.dictionary = always_one(o);
+    }
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3005,6 +3183,8 @@ impl CapabilityClause for Capability {
             "resolver"
         } else if self.event_stream.is_some() {
             "event_stream"
+        } else if self.dictionary.is_some() {
+            "dictionary"
         } else {
             panic!("Missing capability name")
         }
@@ -3013,7 +3193,16 @@ impl CapabilityClause for Capability {
         "capability"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
+        &[
+            "service",
+            "protocol",
+            "directory",
+            "storage",
+            "runner",
+            "resolver",
+            "event_stream",
+            "dictionary",
+        ]
     }
     fn are_many_names_allowed(&self) -> bool {
         ["service", "protocol", "event_stream"].contains(&self.capability_type())
@@ -3066,6 +3255,9 @@ impl CapabilityClause for DebugRegistration {
     fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         None
     }
+    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+        None
+    }
 
     fn set_service(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3076,6 +3268,7 @@ impl CapabilityClause for DebugRegistration {
     fn set_runner(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_resolver(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_event_stream(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_dictionary(&mut self, _o: Option<OneOrMany<Name>>) {}
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3156,6 +3349,9 @@ impl CapabilityClause for Use {
     fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
+    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+        None
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3174,6 +3370,7 @@ impl CapabilityClause for Use {
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
         self.event_stream = o;
     }
+    fn set_dictionary(&mut self, _o: Option<OneOrMany<Name>>) {}
 
     fn availability(&self) -> Option<Availability> {
         self.availability
@@ -3199,6 +3396,7 @@ impl CapabilityClause for Use {
             panic!("Missing capability name")
         }
     }
+
     fn decl_type(&self) -> &'static str {
         "use"
     }
@@ -3253,6 +3451,7 @@ impl Canonicalize for Expose {
                 scope.canonicalize();
             }
         }
+        // TODO(fxbug.dev/300500098): canonicalize dictionaries
     }
 }
 
@@ -3278,6 +3477,9 @@ impl CapabilityClause for Expose {
     fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
+    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.dictionary)
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3298,6 +3500,9 @@ impl CapabilityClause for Expose {
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
         self.event_stream = o;
     }
+    fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
+        self.dictionary = o;
+    }
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3317,6 +3522,8 @@ impl CapabilityClause for Expose {
             "resolver"
         } else if self.event_stream.is_some() {
             "event_stream"
+        } else if self.dictionary.is_some() {
+            "dictionary"
         } else {
             panic!("Missing capability name")
         }
@@ -3325,10 +3532,10 @@ impl CapabilityClause for Expose {
         "expose"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "runner", "resolver", "event_stream"]
+        &["service", "protocol", "directory", "runner", "resolver", "event_stream", "dictionary"]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["service", "protocol", "directory", "runner", "resolver", "event_stream"]
+        ["service", "protocol", "directory", "runner", "resolver", "event_stream", "dictionary"]
             .contains(&self.capability_type())
     }
 }
@@ -3409,6 +3616,9 @@ impl CapabilityClause for Offer {
     fn event_stream(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.event_stream)
     }
+    fn dictionary(&self) -> Option<OneOrMany<&Name>> {
+        option_one_or_many_as_ref(&self.dictionary)
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3430,6 +3640,9 @@ impl CapabilityClause for Offer {
     }
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>) {
         self.event_stream = o;
+    }
+    fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
+        self.dictionary = o;
     }
 
     fn availability(&self) -> Option<Availability> {
@@ -3454,6 +3667,8 @@ impl CapabilityClause for Offer {
             "resolver"
         } else if self.event_stream.is_some() {
             "event_stream"
+        } else if self.dictionary.is_some() {
+            "dictionary"
         } else {
             panic!("Missing capability name")
         }
@@ -3699,6 +3914,7 @@ impl Offer {
             runner: None,
             resolver: None,
             storage: None,
+            dictionary: None,
             dependency: None,
             rights: None,
             subdir: None,
@@ -3934,6 +4150,7 @@ mod tests {
             storage: None,
             runner: None,
             resolver: None,
+            dictionary: None,
             from: OneOrMany::One(OfferFromRef::Self_),
             to: OneOrMany::Many(vec![]),
             r#as: None,
