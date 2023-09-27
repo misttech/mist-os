@@ -89,6 +89,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "no_update_checker",
     "omaha_client",
     "radar_proxy_without_injector",
+    "sensors_framework",
     "session_manager",
     "setui",
     "setui.icu_default_{}".format(icu_flavors.default_git_commit),

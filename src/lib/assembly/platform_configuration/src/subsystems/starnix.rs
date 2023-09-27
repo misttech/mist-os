@@ -22,8 +22,12 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
 
             let has_fullmac = context.board_info.provides_feature("fuchsia::wlan_fullmac");
             let has_softmac = context.board_info.provides_feature("fuchsia::wlan_softmac");
-            if starnix_config.enable_android_support && (has_fullmac || has_softmac) {
-                builder.platform_bundle("wlan_wlanix");
+            if starnix_config.enable_android_support {
+                if has_fullmac || has_softmac {
+                    builder.platform_bundle("wlan_wlanix");
+                }
+
+                builder.platform_bundle("sensors_framework");
             }
         }
         Ok(())

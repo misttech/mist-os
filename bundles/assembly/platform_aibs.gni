@@ -135,6 +135,9 @@ user_platform_aib_names =
       "wlan_softmac_support",
       "wlan_wlanix",
 
+      # Sensors
+      "sensors_framework",
+
       # Session
       "session_manager",
 
