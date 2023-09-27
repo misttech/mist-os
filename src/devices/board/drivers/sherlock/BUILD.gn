@@ -16,7 +16,7 @@ driver_bind_rules("sherlock-bind") {
   tests = "sherlock-bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

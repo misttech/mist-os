@@ -32,8 +32,8 @@ driver_bind_rules("nelson-bind") {
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.google.platform",
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
     "//src/devices/bind/fuchsia.hardware.power.sensor",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

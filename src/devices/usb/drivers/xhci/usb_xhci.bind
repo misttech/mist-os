@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.hardware.platform.device;
 using fuchsia.pci;
 using fuchsia.pci.serial;
 using fuchsia.pci.serial.usb;
@@ -23,7 +22,7 @@ if fuchsia.BIND_FIDL_PROTOCOL == fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE {
     0x02,  // Only relevant to vim2, needs to be cleaned up.
   }
   if fuchsia.BIND_COMPOSITE != 1 {
-    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.platform.device.BIND_FIDL_PROTOCOL.DEVICE;
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.platform.BIND_FIDL_PROTOCOL.DEVICE;
   } else {
     true;
   }

@@ -10,10 +10,7 @@ driver_bind_rules("qemu-arm64_bind") {
   rules = "qemu-arm64.bind"
   header_output = "qemu-arm64_bind.h"
   tests = "bind_tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
-    "//src/devices/bind/fuchsia.platform",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.platform" ]
 }
 
 group("tests") {

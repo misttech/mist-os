@@ -35,8 +35,8 @@ driver_bind_rules("x64-bind") {
   bind_output = "platform-bus-x64.bindbc"
   tests = "bind-tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
     "//src/devices/bind/fuchsia.intel.platform",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

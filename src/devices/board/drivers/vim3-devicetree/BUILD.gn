@@ -40,8 +40,8 @@ driver_bind_rules("vim3-devicetree-bind") {
   header_output = "vim3-devicetree-bind.h"
   tests = "bind-tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
     "//src/devices/bind/fuchsia.khadas.platform",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

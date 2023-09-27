@@ -29,7 +29,7 @@ test("platform-bus") {
 driver_bind_rules("test-board-bind") {
   rules = "test-board.bind"
   deps = [
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
   ]
 }
@@ -369,7 +369,7 @@ fidl("fuchsia.hardware.btitest") {
 driver_bind_rules("test-bti-board-bind") {
   rules = "test-bti-board.bind"
   deps = [
-    "//src/devices/bind/fuchsia.hardware.platform.bus",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.test.platform",
   ]
 }
