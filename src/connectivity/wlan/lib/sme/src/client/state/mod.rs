@@ -313,6 +313,7 @@ impl Connecting {
             other => {
                 let msg = format!("Connect request failed: {:?}", other);
                 warn!("{}", msg);
+                state_change_ctx.set_msg(msg);
                 send_deauthenticate_request(&self.cmd.bss, &context.mlme_sink);
                 let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
                 return Err(Disconnecting {
@@ -3182,7 +3183,7 @@ mod tests {
         let bss = cmd.bss.clone();
         let state = link_up_state(cmd);
 
-        let deauth_ind = MlmeEvent::DisassociateInd {
+        let disassoc_ind = MlmeEvent::DisassociateInd {
             ind: fidl_mlme::DisassociateIndication {
                 peer_sta_address: [0, 0, 0, 0, 0, 0],
                 reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
@@ -3190,7 +3191,7 @@ mod tests {
             },
         };
 
-        let state = state.on_mlme_event(deauth_ind, &mut h.context);
+        let state = state.on_mlme_event(disassoc_ind, &mut h.context);
         assert_variant!(
             connect_txn_stream.try_next(),
             Ok(Some(ConnectTransactionEvent::OnDisconnect { .. }))
@@ -3206,7 +3207,8 @@ mod tests {
             create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
         let state = state.on_mlme_event(connect_conf, &mut h.context);
 
-        let _state = exchange_deauth(state, &mut h);
+        let state = exchange_deauth(state, &mut h);
+        assert_idle(state);
 
         // User should be notified that reconnection attempt failed
         assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect })) => {
@@ -3215,6 +3217,30 @@ mod tests {
                 code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
             }.into());
             assert!(is_reconnect);
+        });
+
+        assert_data_tree!(h.inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: LINK_UP_STATE,
+                        to: CONNECTING_STATE,
+                    },
+                    "1": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: CONNECTING_STATE,
+                        to: DISCONNECTING_STATE,
+                    },
+                    "2": {
+                        "@time": AnyNumericProperty,
+                        from: DISCONNECTING_STATE,
+                        to: IDLE_STATE,
+                    },
+                },
+            },
         });
     }
 
