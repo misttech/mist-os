@@ -51,6 +51,11 @@
       // The official LSP for Rust, rust-analyzer.
       "rust-lang.rust-analyzer",
 
+      // The Python extensions
+      "ms-python.python",
+      "ms-python.mypy-type-checker",
+      "ms-python.black-formatter",
+
       // The GN language server from Microsoft
       "msedge-dev.gnls",
 
@@ -178,6 +183,17 @@
     "bazel.enableCodeLens": true,
     // See: https://github.com/bazelbuild/vscode-bazel/issues/236
     //"bazel.executable": "${workspaceFolder}/tools/devshell/bazel",
+
+    ////////
+    // Python
+    //
+    "[python]": {
+      "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "black-formatter.args": [
+      "--config",
+      "${workspaceFolder}/pyproject.toml"
+    ],
 
     ////////
     // VSCode file exclusions (marked as hidden in the Workspace Explorer)
