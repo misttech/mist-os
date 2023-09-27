@@ -70,16 +70,13 @@ def _fuchsia_product_configuration_impl(ctx):
 
     base_driver_details = []
     for dep in ctx.attr.base_driver_packages:
-        # iwlwifi is added in vendor repos and this is an unfortunate, but
-        # necessary and temporary step to undo some technical debt.
-        if str(dep.label) != "@//src/connectivity/wlan/drivers/third_party/intel/iwlwifi:iwlwifi":
-            base_driver_details.append(
-                {
-                    "package": dep[FuchsiaPackageInfo].package_manifest.path,
-                    "components": dep[FuchsiaPackageInfo].drivers,
-                },
-            )
-            pkg_files += _collect_file_deps(dep)
+        base_driver_details.append(
+            {
+                "package": dep[FuchsiaPackageInfo].package_manifest.path,
+                "components": dep[FuchsiaPackageInfo].drivers,
+            },
+        )
+        pkg_files += _collect_file_deps(dep)
     product["base_drivers"] = base_driver_details
 
     product_config["product"] = product
