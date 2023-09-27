@@ -5,10 +5,10 @@
 #ifndef SRC_STORAGE_LIB_STORAGE_METRICS_STORAGE_METRICS_H_
 #define SRC_STORAGE_LIB_STORAGE_METRICS_STORAGE_METRICS_H_
 
-#include <fidl/fuchsia.storage.metrics/cpp/wire.h>
-#include <stdio.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 
 #include <atomic>
+#include <cstdio>
 #include <limits>
 #include <optional>
 
@@ -16,8 +16,8 @@
 
 namespace storage_metrics {
 constexpr zx_ticks_t kUninitializedMinimumLatency = std::numeric_limits<zx_ticks_t>::max();
-using CallStatFidl = fuchsia_storage_metrics::wire::CallStat;
-using CallStatRawFidl = fuchsia_storage_metrics::wire::CallStatRaw;
+using CallStatFidl = fuchsia_hardware_block::wire::OperationStats;
+using CallStatRawFidl = fuchsia_hardware_block::wire::RequestStats;
 
 // Compares total_calls and bytes_transferred. Returns false if they don't match.
 bool RawCallStatEqual(const CallStatRawFidl& lhs, const CallStatRawFidl& rhs);

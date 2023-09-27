@@ -9,6 +9,7 @@ fidl("fuchsia.hardware.block") {
     "block.fidl",
     "ftl.fidl",
     "overview.fidl",
+    "stats.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.storage.metrics",
