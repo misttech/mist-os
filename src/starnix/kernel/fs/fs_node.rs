@@ -989,6 +989,7 @@ impl FsNode {
     pub fn open(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         flags: OpenFlags,
         check_access: bool,
     ) -> Result<Box<dyn FileOps>, Errno> {
@@ -999,7 +1000,7 @@ impl FsNode {
         }
 
         if check_access {
-            self.check_access(current_task, Access::from_open_flags(flags))?;
+            self.check_access(current_task, mount, Access::from_open_flags(flags))?;
         }
 
         let (mode, rdev) = {
@@ -1027,21 +1028,27 @@ impl FsNode {
         }
     }
 
-    pub fn lookup(&self, current_task: &CurrentTask, name: &FsStr) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, Access::EXEC)?;
+    pub fn lookup(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        self.check_access(current_task, mount, Access::EXEC)?;
         self.ops().lookup(self, current_task, name)
     }
 
     pub fn mknod(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         mut mode: FileMode,
         dev: DeviceType,
         mut owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         assert!(mode & FileMode::IFMT != FileMode::EMPTY, "mknod called without node type.");
-        self.check_access(current_task, Access::WRITE)?;
+        self.check_access(current_task, mount, Access::WRITE)?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
 
         if mode.is_dir() {
@@ -1069,22 +1076,24 @@ impl FsNode {
     pub fn create_symlink(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, Access::WRITE)?;
+        self.check_access(current_task, mount, Access::WRITE)?;
         self.ops().create_symlink(self, current_task, name, target, owner)
     }
 
     pub fn create_tmpfile(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         mut mode: FileMode,
         mut owner: FsCred,
         link_behavior: FsNodeLinkBehavior,
     ) -> Result<FsNodeHandle, Errno> {
-        self.check_access(current_task, Access::WRITE)?;
+        self.check_access(current_task, mount, Access::WRITE)?;
         self.update_metadata_for_child(current_task, &mut mode, &mut owner);
         let node = self.ops().create_tmpfile(self, current_task, mode, owner)?;
         node.link_behavior.set(link_behavior).unwrap();
@@ -1101,14 +1110,15 @@ impl FsNode {
     pub fn link(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<FsNodeHandle, Errno> {
+        self.check_access(current_task, mount, Access::WRITE)?;
+
         if child.is_dir() {
             return error!(EPERM);
         }
-
-        self.check_access(current_task, Access::WRITE)?;
 
         if matches!(child.link_behavior.get(), Some(FsNodeLinkBehavior::Disallowed)) {
             return error!(ENOENT);
@@ -1131,7 +1141,7 @@ impl FsNode {
         if !creds.has_capability(CAP_FOWNER) && child_uid != creds.fsuid {
             // If current_task is not the user of the existing file, it needs to have read and write
             // access to the existing file.
-            child.check_access(current_task, Access::READ | Access::WRITE).map_err(|e| {
+            child.check_access(current_task, mount, Access::READ | Access::WRITE).map_err(|e| {
                 // `check_access(..)` returns EACCES when the access rights doesn't match - change
                 // it to EPERM to match Linux standards.
                 if e == EACCES {
@@ -1160,23 +1170,29 @@ impl FsNode {
     pub fn unlink(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         // The user must be able to search and write to the directory.
-        self.check_access(current_task, Access::EXEC | Access::WRITE)?;
+        self.check_access(current_task, mount, Access::EXEC | Access::WRITE)?;
         self.check_sticky_bit(current_task, child)?;
         self.ops().unlink(self, current_task, name, child)?;
         self.update_ctime_mtime();
         Ok(())
     }
 
-    pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+    pub fn truncate(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        length: u64,
+    ) -> Result<(), Errno> {
         if self.is_dir() {
             return error!(EISDIR);
         }
 
-        self.check_access(current_task, Access::WRITE)?;
+        self.check_access(current_task, mount, Access::WRITE)?;
 
         self.truncate_common(current_task, length)
     }
@@ -1287,13 +1303,22 @@ impl FsNode {
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
-    pub fn check_access(&self, current_task: &CurrentTask, access: Access) -> Result<(), Errno> {
+    pub fn check_access(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        access: Access,
+    ) -> Result<(), Errno> {
         // HACK: while the access() fuse operation is not wired up, disable all access checks on
         // any fuse filesystem that doesn't opt in to the default access checks.
         if crate::fs::fuse::is_fuse_filesystem_without_default_permissions(&self.fs())
             && current_task.kernel().features.contains("hack_no_fuse_access_checks")
         {
             return Ok(());
+        }
+
+        if access.contains(Access::WRITE) {
+            mount.check_readonly_filesystem()?;
         }
 
         let (node_uid, node_gid, mode) = {
@@ -1389,7 +1414,13 @@ impl FsNode {
     /// Set the permissions on this FsNode to the given values.
     ///
     /// Does not change the IFMT of the node.
-    pub fn chmod(&self, current_task: &CurrentTask, mut mode: FileMode) -> Result<(), Errno> {
+    pub fn chmod(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        mut mode: FileMode,
+    ) -> Result<(), Errno> {
+        mount.check_readonly_filesystem()?;
         self.update_attributes(|info| {
             let creds = current_task.creds();
             if !creds.has_capability(CAP_FOWNER) {
@@ -1409,9 +1440,11 @@ impl FsNode {
     pub fn chown(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         owner: Option<uid_t>,
         group: Option<gid_t>,
     ) -> Result<(), Errno> {
+        mount.check_readonly_filesystem()?;
         self.update_attributes(|info| {
             if !current_task.creds().has_capability(CAP_CHOWN) {
                 let creds = current_task.creds();
@@ -1590,10 +1623,11 @@ impl FsNode {
     pub fn get_xattr(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         max_size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
-        self.check_access(current_task, Access::READ)?;
+        self.check_access(current_task, mount, Access::READ)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
         self.ops().get_xattr(self, current_task, name, max_size)
     }
@@ -1601,17 +1635,23 @@ impl FsNode {
     pub fn set_xattr(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         value: &FsStr,
         op: XattrOp,
     ) -> Result<(), Errno> {
-        self.check_access(current_task, Access::WRITE)?;
+        self.check_access(current_task, mount, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
         self.ops().set_xattr(self, current_task, name, value, op)
     }
 
-    pub fn remove_xattr(&self, current_task: &CurrentTask, name: &FsStr) -> Result<(), Errno> {
-        self.check_access(current_task, Access::WRITE)?;
+    pub fn remove_xattr(
+        &self,
+        current_task: &CurrentTask,
+        mount: &MountInfo,
+        name: &FsStr,
+    ) -> Result<(), Errno> {
+        self.check_access(current_task, mount, Access::WRITE)?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
         self.ops().remove_xattr(self, current_task, name)
     }
@@ -1683,9 +1723,13 @@ impl FsNode {
     pub fn update_atime_mtime(
         &self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         atime: TimeUpdateType,
         mtime: TimeUpdateType,
     ) -> Result<(), Errno> {
+        // If the filesystem is read-only, this always fail.
+        mount.check_readonly_filesystem()?;
+
         // To set the timestamps to the current time the caller must either have write access to
         // the file, be the file owner, or hold the CAP_DAC_OVERRIDE or CAP_FOWNER capability.
         // To set the timestamps to other values the caller must either be the file owner or hold
@@ -1696,7 +1740,7 @@ impl FsNode {
         let set_current_time = matches!((atime, mtime), (TimeUpdateType::Now, TimeUpdateType::Now));
         if !has_owner_priviledge {
             if set_current_time {
-                self.check_access(current_task, Access::WRITE)?
+                self.check_access(current_task, mount, Access::WRITE)?
             } else {
                 return error!(EPERM);
             }
@@ -1868,7 +1912,7 @@ mod tests {
                 info.uid = uid;
                 info.gid = gid;
             });
-            node.check_access(&current_task, access)
+            node.check_access(&current_task, &MountInfo::detached(), access)
         };
 
         assert_eq!(check_access(0, 0, 0o700, Access::EXEC), error!(EACCES));

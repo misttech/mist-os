@@ -32,6 +32,7 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     hash::{Hash, Hasher},
+    ops::{Deref, DerefMut},
     sync::{atomic::Ordering, Arc, Weak},
 };
 
@@ -76,7 +77,7 @@ impl Namespace {
         // Collect the list of mountpoints that leads to this node's mount
         let mut mountpoints = vec![];
         let mut mount = node.mount;
-        while let Some(mountpoint) = mount.and_then(|m| m.mountpoint()) {
+        while let Some(mountpoint) = mount.as_ref().and_then(|m| m.mountpoint()) {
             mountpoints.push(mountpoint.entry);
             mount = mountpoint.mount;
         }
@@ -87,7 +88,7 @@ impl Namespace {
             let next_mount = Arc::clone(mount.read().submounts.get(ArcKey::ref_cast(mountpoint))?);
             mount = next_mount;
         }
-        node.mount = Some(mount);
+        node.mount = Some(mount).into();
         Some(node)
     }
 }
@@ -137,7 +138,65 @@ pub struct Mount {
     // Mountpoint or Namespace, maybe called "parent", and then traverse up to the top of the tree
     // if you need to find a Mount's Namespace.
 }
-pub type MountHandle = Arc<Mount>;
+type MountHandle = Arc<Mount>;
+
+/// Public representation of the mount options.
+#[derive(Clone, Debug)]
+pub struct MountInfo(Option<MountHandle>);
+
+impl MountInfo {
+    /// `MountInfo` for a element that is not tied to a given mount. Mount flags will be considered
+    /// empty.
+    pub fn detached() -> Self {
+        None.into()
+    }
+
+    /// The mount flags of the represented mount.
+    pub fn flags(&self) -> MountFlags {
+        if let Some(mount) = &self.0 {
+            mount.flags()
+        } else {
+            // Consider not mounted node have the NOATIME flags.
+            MountFlags::NOATIME
+        }
+    }
+
+    /// Checks whether this `MountInfo` represents a writable file system mounted.
+    pub fn check_readonly_filesystem(&self) -> Result<(), Errno> {
+        if self.flags().contains(MountFlags::RDONLY) {
+            return error!(EROFS);
+        }
+        Ok(())
+    }
+}
+
+impl Deref for MountInfo {
+    type Target = Option<MountHandle>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for MountInfo {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl std::cmp::PartialEq for MountInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.as_ref().map(Arc::as_ptr) == other.0.as_ref().map(Arc::as_ptr)
+    }
+}
+
+impl std::cmp::Eq for MountInfo {}
+
+impl Into<MountInfo> for Option<MountHandle> {
+    fn into(self) -> MountInfo {
+        MountInfo(self)
+    }
+}
 
 #[derive(Default)]
 pub struct MountState {
@@ -189,7 +248,7 @@ impl Mount {
         match what {
             WhatToMount::Fs(fs) => Self::new_with_root(fs.root().clone(), flags),
             WhatToMount::Bind(node) => {
-                let mount = node.mount.expect("can't bind mount from an anonymous node");
+                let mount = node.mount.as_ref().expect("can't bind mount from an anonymous node");
                 mount.clone_mount(&node.entry, flags)
             }
         }
@@ -215,14 +274,14 @@ impl Mount {
 
     /// A namespace node referring to the root of the mount.
     pub fn root(self: &MountHandle) -> NamespaceNode {
-        NamespaceNode { mount: Some(Arc::clone(self)), entry: Arc::clone(&self.root) }
+        NamespaceNode { mount: Some(Arc::clone(self)).into(), entry: Arc::clone(&self.root) }
     }
 
     /// The NamespaceNode on which this Mount is mounted.
     fn mountpoint(&self) -> Option<NamespaceNode> {
         let state = self.state.read();
         let (ref mount, ref entry) = state.mountpoint.as_ref()?;
-        Some(NamespaceNode { mount: Some(mount.upgrade()?), entry: entry.clone() })
+        Some(NamespaceNode { mount: Some(mount.upgrade()?).into(), entry: entry.clone() })
     }
 
     /// Create the specified mount as a child. Also propagate it to the mount's peer group.
@@ -900,7 +959,7 @@ pub struct NamespaceNode {
     ///
     /// A given FsNode can be mounted in multiple places in a namespace. This
     /// field distinguishes between them.
-    pub mount: Option<MountHandle>,
+    pub mount: MountInfo,
 
     /// The FsNode that corresponds to this namespace entry.
     pub entry: DirEntryHandle,
@@ -909,7 +968,7 @@ pub struct NamespaceNode {
 impl NamespaceNode {
     /// Create a namespace node that is not mounted in a namespace.
     pub fn new_anonymous(dir_entry: DirEntryHandle) -> Self {
-        Self { mount: None, entry: dir_entry }
+        Self { mount: None.into(), entry: dir_entry }
     }
 
     /// Create a namespace node that is not mounted in a namespace and that refers to a node that
@@ -929,24 +988,11 @@ impl NamespaceNode {
         flags: OpenFlags,
         check_access: bool,
     ) -> Result<FileHandle, Errno> {
-        if check_access && Access::from_open_flags(flags).contains(Access::WRITE) {
-            self.check_readonly_filesystem()?;
-        }
         FileObject::new(
-            self.entry.node.open(current_task, flags, check_access)?,
+            self.entry.node.open(current_task, &self.mount, flags, check_access)?,
             self.clone(),
             flags,
         )
-    }
-
-    /// Checks whether this namespace node has a writable file system mounted.
-    pub fn check_readonly_filesystem(&self) -> Result<(), Errno> {
-        if let Some(mount) = &self.mount {
-            if mount.flags().contains(MountFlags::RDONLY) {
-                return error!(EROFS);
-            }
-        }
-        Ok(())
     }
 
     /// Create or open a node in the file system.
@@ -964,14 +1010,13 @@ impl NamespaceNode {
     ) -> Result<NamespaceNode, Errno> {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        let create_fn = |dir: &FsNodeHandle, name: &_| {
-            self.check_readonly_filesystem()?;
-            dir.mknod(current_task, name, mode, dev, owner)
+        let create_fn = |dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
+            dir.mknod(current_task, mount, name, mode, dev, owner)
         };
         let entry = if flags.contains(OpenFlags::EXCL) {
-            self.entry.create_entry(current_task, name, create_fn)
+            self.entry.create_entry(current_task, &self.mount, name, create_fn)
         } else {
-            self.entry.get_or_create_entry(current_task, name, create_fn)
+            self.entry.get_or_create_entry(current_task, &self.mount, name, create_fn)
         }?;
         Ok(self.with_new_entry(entry))
     }
@@ -990,10 +1035,10 @@ impl NamespaceNode {
     ) -> Result<NamespaceNode, Errno> {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        let entry = self.entry.create_entry(current_task, name, |dir, name| {
-            self.check_readonly_filesystem()?;
-            dir.mknod(current_task, name, mode, dev, owner)
-        })?;
+        let entry =
+            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+                dir.mknod(current_task, mount, name, mode, dev, owner)
+            })?;
         Ok(self.with_new_entry(entry))
     }
 
@@ -1007,10 +1052,10 @@ impl NamespaceNode {
         target: &FsStr,
     ) -> Result<NamespaceNode, Errno> {
         let owner = current_task.as_fscred();
-        let entry = self.entry.create_entry(current_task, name, |dir, name| {
-            self.check_readonly_filesystem()?;
-            dir.create_symlink(current_task, name, target, owner)
-        })?;
+        let entry =
+            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+                dir.create_symlink(current_task, mount, name, target, owner)
+            })?;
         Ok(self.with_new_entry(entry))
     }
 
@@ -1025,10 +1070,15 @@ impl NamespaceNode {
         mode: FileMode,
         flags: OpenFlags,
     ) -> Result<NamespaceNode, Errno> {
-        self.check_readonly_filesystem()?;
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        Ok(self.with_new_entry(self.entry.create_tmpfile(current_task, mode, owner, flags)?))
+        Ok(self.with_new_entry(self.entry.create_tmpfile(
+            current_task,
+            &self.mount,
+            mode,
+            owner,
+            flags,
+        )?))
     }
 
     pub fn link(
@@ -1037,10 +1087,10 @@ impl NamespaceNode {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<NamespaceNode, Errno> {
-        let dir_entry = self.entry.create_entry(current_task, name, |dir, name| {
-            self.check_readonly_filesystem()?;
-            dir.link(current_task, name, child)
-        })?;
+        let dir_entry =
+            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+                dir.link(current_task, mount, name, child)
+            })?;
         Ok(self.with_new_entry(dir_entry))
     }
 
@@ -1052,17 +1102,23 @@ impl NamespaceNode {
         socket_address: SocketAddress,
         mode: FileMode,
     ) -> Result<NamespaceNode, Errno> {
-        let dir_entry = self.entry.create_entry(current_task, name, |dir, name| {
-            self.check_readonly_filesystem()?;
-            let node =
-                dir.mknod(current_task, name, mode, DeviceType::NONE, current_task.as_fscred())?;
-            if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
-                unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
-            } else {
-                return error!(ENOTSUP);
-            }
-            Ok(node)
-        })?;
+        let dir_entry =
+            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+                let node = dir.mknod(
+                    current_task,
+                    mount,
+                    name,
+                    mode,
+                    DeviceType::NONE,
+                    current_task.as_fscred(),
+                )?;
+                if let Some(unix_socket) = socket.downcast_socket::<UnixSocket>() {
+                    unix_socket.bind_socket_to_node(&socket, socket_address, &node)?;
+                } else {
+                    return error!(ENOTSUP);
+                }
+                Ok(node)
+            })?;
         Ok(self.with_new_entry(dir_entry))
     }
 
@@ -1073,7 +1129,6 @@ impl NamespaceNode {
         kind: UnlinkKind,
         must_be_directory: bool,
     ) -> Result<(), Errno> {
-        self.check_readonly_filesystem()?;
         if DirEntry::is_reserved_name(name) {
             match kind {
                 UnlinkKind::Directory => {
@@ -1089,7 +1144,7 @@ impl NamespaceNode {
                 UnlinkKind::NonDirectory => error!(ENOTDIR),
             }
         } else {
-            self.entry.unlink(current_task, name, kind, must_be_directory)
+            self.entry.unlink(current_task, &self.mount, name, kind, must_be_directory)
         }
     }
 
@@ -1118,8 +1173,11 @@ impl NamespaceNode {
                 self.parent().unwrap_or_else(|| self.clone())
             }
         } else {
-            let mut child =
-                self.with_new_entry(self.entry.component_lookup(current_task, basename)?);
+            let mut child = self.with_new_entry(self.entry.component_lookup(
+                current_task,
+                &self.mount,
+                basename,
+            )?);
             while child.entry.node.is_lnk() {
                 match context.symlink_mode {
                     SymlinkMode::NoFollow => {
@@ -1195,7 +1253,7 @@ impl NamespaceNode {
     fn enter_mount(&self) -> NamespaceNode {
         // While the child is a mountpoint, replace child with the mount's root.
         fn enter_one_mount(node: &NamespaceNode) -> Option<NamespaceNode> {
-            if let Some(mount) = &node.mount {
+            if let Some(mount) = node.mount.deref() {
                 if let Some(mount) = mount.state.read().submounts.get(ArcKey::ref_cast(&node.entry))
                 {
                     return Some(mount.root());
@@ -1224,7 +1282,7 @@ impl NamespaceNode {
 
     /// If this node is the root of a mount, return it. Otherwise EINVAL.
     pub fn mount_if_root(&self) -> Result<&MountHandle, Errno> {
-        if let Some(mount) = &self.mount {
+        if let Some(mount) = self.mount.deref() {
             if Arc::ptr_eq(&self.entry, &mount.root) {
                 return Ok(mount);
             }
@@ -1308,10 +1366,6 @@ impl NamespaceNode {
         Ok(())
     }
 
-    pub fn mount_eq(a: &NamespaceNode, b: &NamespaceNode) -> bool {
-        a.mount.as_ref().map(Arc::as_ptr) == b.mount.as_ref().map(Arc::as_ptr)
-    }
-
     pub fn rename(
         current_task: &CurrentTask,
         old_parent: &NamespaceNode,
@@ -1320,18 +1374,13 @@ impl NamespaceNode {
         new_name: &FsStr,
         flags: RenameFlags,
     ) -> Result<(), Errno> {
-        if !NamespaceNode::mount_eq(&old_parent, &new_parent) {
-            return error!(EXDEV);
-        }
-
-        old_parent.check_readonly_filesystem()?;
-        new_parent.check_readonly_filesystem()?;
-
         DirEntry::rename(
             current_task,
             &old_parent.entry,
+            &old_parent.mount,
             old_name,
             &new_parent.entry,
+            &new_parent.mount,
             new_name,
             flags,
         )
@@ -1346,15 +1395,12 @@ impl NamespaceNode {
     }
 
     pub fn update_atime(&self) {
-        // Do not update the atime of this node if it is not mounted
-        // or is mounted with the NOATIME flag.
-        if let Some(mount) = &self.mount {
-            if !mount.flags().contains(MountFlags::NOATIME) {
-                self.entry.node.update_info(|info| {
-                    let now = utc::utc_now();
-                    info.time_access = now;
-                });
-            }
+        // Do not update the atime of this node if it is mounted with the NOATIME flag.
+        if !self.mount.flags().contains(MountFlags::NOATIME) {
+            self.entry.node.update_info(|info| {
+                let now = utc::utc_now();
+                info.time_access = now;
+            });
         }
     }
 
@@ -1367,6 +1413,17 @@ impl NamespaceNode {
         if self.mount.is_some() {
             self.entry.notify(event_mask);
         }
+    }
+
+    /// Check whether the node can be accessed in the current context with the specified access
+    /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
+    /// owner or is in the file's group.
+    pub fn check_access(&self, current_task: &CurrentTask, access: Access) -> Result<(), Errno> {
+        self.entry.node.check_access(current_task, &self.mount, access)
+    }
+
+    pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
+        self.entry.node.truncate(current_task, &self.mount, length)
     }
 }
 

@@ -191,7 +191,7 @@ pub fn sys_fcntl(
             if requested_flags.contains(OpenFlags::NOATIME)
                 && !file.flags().contains(OpenFlags::NOATIME)
             {
-                file.name.entry.node.check_access(current_task, Access::NOATIME)?;
+                file.name.check_access(current_task, Access::NOATIME)?;
             }
 
             file.update_file_flags(requested_flags, settable_flags);
@@ -558,10 +558,7 @@ pub fn sys_faccessat2(
     let mode = Access::from_bits(mode).ok_or_else(|| errno!(EINVAL))?;
     let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW | AT_EACCESS)?;
     let name = lookup_at(current_task, dir_fd, user_path, lookup_flags)?;
-    if mode.contains(Access::WRITE) {
-        name.check_readonly_filesystem()?;
-    }
-    name.entry.node.check_access(current_task, mode)
+    name.check_access(current_task, mode)
 }
 
 pub fn sys_getdents64(
@@ -684,8 +681,7 @@ pub fn sys_truncate(
 ) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
     let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
-    name.check_readonly_filesystem()?;
-    name.entry.node.truncate(current_task, length)?;
+    name.truncate(current_task, length)?;
     Ok(())
 }
 
@@ -765,7 +761,7 @@ pub fn sys_linkat(
         if context.must_be_directory {
             return error!(ENOENT);
         }
-        if !NamespaceNode::mount_eq(&target, &parent) {
+        if target.mount != parent.mount {
             return error!(EXDEV);
         }
         parent.link(current_task, basename, &target.entry.node)
@@ -844,8 +840,7 @@ pub fn sys_fchmod(current_task: &CurrentTask, fd: FdNumber, mode: FileMode) -> R
     // Remove the filetype from the mode.
     let mode = mode & FileMode::PERMISSIONS;
     let file = current_task.files.get_unless_opath(fd)?;
-    file.name.check_readonly_filesystem()?;
-    file.name.entry.node.chmod(current_task, mode)?;
+    file.name.entry.node.chmod(current_task, &file.name.mount, mode)?;
     file.notify(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -859,8 +854,7 @@ pub fn sys_fchmodat(
     // Remove the filetype from the mode.
     let mode = mode & FileMode::PERMISSIONS;
     let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::default())?;
-    name.check_readonly_filesystem()?;
-    name.entry.node.chmod(current_task, mode)?;
+    name.entry.node.chmod(current_task, &name.mount, mode)?;
     name.notify(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -880,8 +874,12 @@ pub fn sys_fchown(
     group: u32,
 ) -> Result<(), Errno> {
     let file = current_task.files.get_unless_opath(fd)?;
-    file.name.check_readonly_filesystem()?;
-    file.name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))?;
+    file.name.entry.node.chown(
+        current_task,
+        &file.name.mount,
+        maybe_uid(owner),
+        maybe_uid(group),
+    )?;
     file.notify(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -896,8 +894,7 @@ pub fn sys_fchownat(
 ) -> Result<(), Errno> {
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
     let name = lookup_at(current_task, dir_fd, user_path, flags)?;
-    name.check_readonly_filesystem()?;
-    name.entry.node.chown(current_task, maybe_uid(owner), maybe_uid(group))?;
+    name.entry.node.chown(current_task, &name.mount, maybe_uid(owner), maybe_uid(group))?;
     name.notify(InotifyMask::ATTRIB);
     Ok(())
 }
@@ -929,7 +926,7 @@ fn do_getxattr(
     size: usize,
 ) -> Result<usize, Errno> {
     let name = read_xattr_name(current_task, name_addr)?;
-    let value = match node.entry.node.get_xattr(current_task, &name, size)? {
+    let value = match node.entry.node.get_xattr(current_task, &node.mount, &name, size)? {
         ValueOrSize::Size(s) => return Ok(s),
         ValueOrSize::Value(v) => v,
     };
@@ -986,7 +983,6 @@ fn do_setxattr(
     if size > XATTR_NAME_MAX as usize {
         return error!(E2BIG);
     }
-    node.check_readonly_filesystem()?;
     let mode = node.entry.node.info().mode;
     if mode.is_chr() || mode.is_fifo() {
         return error!(EPERM);
@@ -1000,7 +996,7 @@ fn do_setxattr(
     };
     let name = read_xattr_name(current_task, name_addr)?;
     let value = current_task.read_memory_to_vec(value_addr, size)?;
-    node.entry.node.set_xattr(current_task, &name, &value, op)
+    node.entry.node.set_xattr(current_task, &node.mount, &name, &value, op)
 }
 
 pub fn sys_fsetxattr(
@@ -1044,13 +1040,12 @@ fn do_removexattr(
     node: &NamespaceNode,
     name_addr: UserCString,
 ) -> Result<(), Errno> {
-    node.check_readonly_filesystem()?;
     let mode = node.entry.node.info().mode;
     if mode.is_chr() || mode.is_fifo() {
         return error!(EPERM);
     }
     let name = read_xattr_name(current_task, name_addr)?;
-    node.entry.node.remove_xattr(current_task, &name)
+    node.entry.node.remove_xattr(current_task, &node.mount, &name)
 }
 
 pub fn sys_removexattr(
@@ -2252,8 +2247,7 @@ pub fn sys_utimensat(
         let lookup_flags = LookupFlags::from_bits(flags, AT_SYMLINK_NOFOLLOW)?;
         lookup_at(current_task, dir_fd, user_path, lookup_flags)?
     };
-    name.check_readonly_filesystem()?;
-    name.entry.node.update_atime_mtime(current_task, atime, mtime)
+    name.entry.node.update_atime_mtime(current_task, &name.mount, atime, mtime)
 }
 
 pub fn sys_splice(

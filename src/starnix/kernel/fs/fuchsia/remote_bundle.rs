@@ -374,7 +374,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, b"user.a", usize::MAX)
+                .get_xattr(&current_task, &test_dir.mount, b"user.a", usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             b"apple"
@@ -382,7 +382,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&current_task, b"user.b", usize::MAX)
+                .get_xattr(&current_task, &test_dir.mount, b"user.b", usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             b"ball"

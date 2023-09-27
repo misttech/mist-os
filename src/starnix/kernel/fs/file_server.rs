@@ -431,7 +431,13 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
         must_be_directory: bool,
     ) -> Result<(), zx::Status> {
         let kind = if must_be_directory { UnlinkKind::Directory } else { UnlinkKind::NonDirectory };
-        self.file.name.entry.unlink(self.task()?.as_ref(), name.as_bytes(), kind, false)?;
+        self.file.name.entry.unlink(
+            self.task()?.as_ref(),
+            &self.file.name.mount,
+            name.as_bytes(),
+            kind,
+            false,
+        )?;
         Ok(())
     }
     async fn sync(&self) -> Result<(), zx::Status> {
@@ -470,7 +476,7 @@ impl file::File for StarnixNodeConnection {
         Ok(())
     }
     async fn truncate(&self, length: u64) -> Result<(), zx::Status> {
-        self.file.name.entry.node.truncate(self.task()?.as_ref(), length)?;
+        self.file.name.truncate(self.task()?.as_ref(), length)?;
         Ok(())
     }
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, zx::Status> {

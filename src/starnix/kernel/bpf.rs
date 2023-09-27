@@ -295,13 +295,7 @@ pub fn sys_bpf(
             let bpf_dir =
                 parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
             let selinux_context = get_selinux_context(&pathname);
-            bpf_dir.register_pin(
-                current_task,
-                &parent.entry,
-                basename,
-                object,
-                &selinux_context,
-            )?;
+            bpf_dir.register_pin(current_task, &parent, basename, object, &selinux_context)?;
             Ok(SUCCESS)
         }
 
@@ -434,12 +428,12 @@ impl BpfFsDir {
     fn register_pin(
         &self,
         current_task: &CurrentTask,
-        dir_entry: &DirEntryHandle,
+        node: &NamespaceNode,
         name: &FsStr,
         object: BpfHandle,
         selinux_context: &FsStr,
     ) -> Result<(), Errno> {
-        dir_entry.create_entry(current_task, name, |dir, _name| {
+        node.entry.create_entry(current_task, &node.mount, name, |dir, _mount, _name| {
             Ok(dir.fs().create_node(
                 BpfFsObject::new(object, &selinux_context),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o600), FsCred::root()),

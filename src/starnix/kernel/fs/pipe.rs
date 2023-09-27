@@ -255,7 +255,7 @@ pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), 
 
     let open = |flags: OpenFlags| {
         Ok(FileObject::new_anonymous(
-            node.open(current_task, flags, false)?,
+            node.open(current_task, &MountInfo::detached(), flags, false)?,
             Arc::clone(&node),
             flags,
         ))

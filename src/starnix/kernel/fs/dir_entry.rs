@@ -217,10 +217,12 @@ impl DirEntry {
     pub fn component_lookup(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
-        let (node, _) =
-            self.get_or_create_child(current_task, name, |d, name| d.lookup(current_task, name))?;
+        let (node, _) = self.get_or_create_child(current_task, mount, name, |d, mount, name| {
+            d.lookup(current_task, mount, name)
+        })?;
         Ok(node)
     }
 
@@ -234,10 +236,12 @@ impl DirEntry {
     pub fn create_entry(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<DirEntryHandle, Errno> {
-        let (entry, exists) = self.create_entry_internal(current_task, name, create_node_fn)?;
+        let (entry, exists) =
+            self.create_entry_internal(current_task, mount, name, create_node_fn)?;
         if exists {
             return error!(EEXIST);
         }
@@ -249,18 +253,21 @@ impl DirEntry {
     pub fn get_or_create_entry(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<DirEntryHandle, Errno> {
-        let (entry, _exists) = self.create_entry_internal(current_task, name, create_node_fn)?;
+        let (entry, _exists) =
+            self.create_entry_internal(current_task, mount, name, create_node_fn)?;
         Ok(entry)
     }
 
     fn create_entry_internal(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<(DirEntryHandle, bool), Errno> {
         if DirEntry::is_reserved_name(name) {
             return error!(EEXIST);
@@ -269,7 +276,8 @@ impl DirEntry {
         if name.len() > NAME_MAX as usize {
             return error!(ENAMETOOLONG);
         }
-        let (entry, exists) = self.get_or_create_child(current_task, name, create_node_fn)?;
+        let (entry, exists) =
+            self.get_or_create_child(current_task, mount, name, create_node_fn)?;
         if !exists {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
@@ -287,8 +295,15 @@ impl DirEntry {
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         // TODO: apply_umask
-        self.create_entry(current_task, name, |dir, name| {
-            dir.mknod(current_task, name, mode!(IFDIR, 0o777), DeviceType::NONE, FsCred::root())
+        self.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
+            dir.mknod(
+                current_task,
+                mount,
+                name,
+                mode!(IFDIR, 0o777),
+                DeviceType::NONE,
+                FsCred::root(),
+            )
         })
     }
 
@@ -300,6 +315,7 @@ impl DirEntry {
     pub fn create_tmpfile(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         mode: FileMode,
         owner: FsCred,
         flags: OpenFlags,
@@ -323,13 +339,14 @@ impl DirEntry {
             FsNodeLinkBehavior::Allowed
         };
 
-        let node = self.node.create_tmpfile(current_task, mode, owner, link_behavior)?;
+        let node = self.node.create_tmpfile(current_task, mount, mode, owner, link_behavior)?;
         Ok(DirEntry::new_unrooted(node))
     }
 
     pub fn unlink(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
         kind: UnlinkKind,
         must_be_directory: bool,
@@ -341,7 +358,7 @@ impl DirEntry {
         let child;
 
         let mut self_children = self.lock_children();
-        child = self_children.component_lookup(current_task, name)?;
+        child = self_children.component_lookup(current_task, mount, name)?;
         let child_children = child.children.read();
 
         if child.state.read().mount_count > 0 {
@@ -377,7 +394,7 @@ impl DirEntry {
             }
         }
 
-        self.node.unlink(current_task, name, &child.node)?;
+        self.node.unlink(current_task, mount, name, &child.node)?;
         self_children.children.remove(name);
 
         std::mem::drop(child_children);
@@ -421,11 +438,20 @@ impl DirEntry {
     pub fn rename(
         current_task: &CurrentTask,
         old_parent: &DirEntryHandle,
+        old_mount: &MountInfo,
         old_basename: &FsStr,
         new_parent: &DirEntryHandle,
+        new_mount: &MountInfo,
         new_basename: &FsStr,
         flags: RenameFlags,
     ) -> Result<(), Errno> {
+        // The nodes we are touching must be part of the same mount.
+        if old_mount != new_mount {
+            return error!(EXDEV);
+        }
+        // The mounts are equals, choose one.
+        let mount = old_mount;
+
         // If either the old_basename or the new_basename is a reserved name
         // (e.g., "." or ".."), then we cannot do the rename.
         if DirEntry::is_reserved_name(old_basename) || DirEntry::is_reserved_name(new_basename) {
@@ -442,10 +468,10 @@ impl DirEntry {
         }
 
         // This task must have write access to the old and new parent nodes.
-        old_parent.node.check_access(current_task, Access::WRITE)?;
-        new_parent.node.check_access(current_task, Access::WRITE)?;
+        old_parent.node.check_access(current_task, mount, Access::WRITE)?;
+        new_parent.node.check_access(current_task, mount, Access::WRITE)?;
 
-        // The mount_eq check in sys_renameat ensures that the nodes we're touching are part of the
+        // The mount check ensures that the nodes we're touching are part of the
         // same file system. It doesn't matter where we grab the FileSystem reference from.
         let fs = old_parent.node.fs();
 
@@ -486,7 +512,7 @@ impl DirEntry {
 
             // Now that we know the old_parent child list cannot change, we
             // establish the DirEntry that we are going to try to rename.
-            renamed = state.old_parent().component_lookup(current_task, old_basename)?;
+            renamed = state.old_parent().component_lookup(current_task, mount, old_basename)?;
 
             // Check whether the sticky bit on the old parent prevents us from
             // removing this child.
@@ -509,7 +535,7 @@ impl DirEntry {
             // We need to check if there is already a DirEntry with
             // new_basename in new_parent. If so, there are additional checks
             // we need to perform.
-            match state.new_parent().component_lookup(current_task, new_basename) {
+            match state.new_parent().component_lookup(current_task, mount, new_basename) {
                 Ok(replaced) => {
                     // Set `maybe_replaced` now to ensure it gets dropped in the right order.
                     let replaced = maybe_replaced.insert(replaced);
@@ -654,27 +680,27 @@ impl DirEntry {
     fn get_or_create_child(
         self: &DirEntryHandle,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
-        create_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<(DirEntryHandle, bool), Errno> {
         assert!(!DirEntry::is_reserved_name(name));
         // Only directories can have children.
         if !self.node.is_dir() {
             return error!(ENOTDIR);
         }
+        // The user must be able to search the directory (requires the EXEC permission)
+        self.node.check_access(current_task, mount, Access::EXEC)?;
+
         // Check if the child is already in children. In that case, we can
         // simply return the child and we do not need to call init_fn.
-        //
-        // The user must be able to search the directory (requires the EXEC permission)
-        self.node.check_access(current_task, Access::EXEC)?;
-
         if let Some(child) = self.children.read().get(name).and_then(Weak::upgrade) {
             child.node.fs().did_access_dir_entry(&child);
             return Ok((child, true));
         }
 
         let (child, exists) =
-            self.lock_children().get_or_create_child(current_task, name, create_fn)?;
+            self.lock_children().get_or_create_child(current_task, mount, name, create_fn)?;
         child.node.fs().purge_old_entries();
         Ok((child, exists))
     }
@@ -757,24 +783,27 @@ impl<'a> DirEntryLockedChildren<'a> {
     fn component_lookup(
         &mut self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno> {
         assert!(!DirEntry::is_reserved_name(name));
-        let (node, _) = self.get_or_create_child(current_task, name, |_, _| error!(ENOENT))?;
+        let (node, _) =
+            self.get_or_create_child(current_task, mount, name, |_, _, _| error!(ENOENT))?;
         Ok(node)
     }
 
     fn get_or_create_child(
         &mut self,
         current_task: &CurrentTask,
+        mount: &MountInfo,
         name: &FsStr,
-        create_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<(DirEntryHandle, bool), Errno> {
         let create_child = || {
             // Before creating the child, check for existence.
-            let (node, exists) = match self.entry.node.lookup(current_task, name) {
+            let (node, exists) = match self.entry.node.lookup(current_task, mount, name) {
                 Ok(node) => (node, true),
-                Err(e) if e == ENOENT => (create_fn(&self.entry.node, name)?, false),
+                Err(e) if e == ENOENT => (create_fn(&self.entry.node, mount, name)?, false),
                 Err(e) => return Err(e),
             };
 

@@ -95,7 +95,7 @@ impl FsContext {
 
     /// Change the current working directory.
     pub fn chdir(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
-        name.entry.node.check_access(current_task, Access::EXEC)?;
+        name.check_access(current_task, Access::EXEC)?;
         let mut state = self.state.write();
         state.cwd = name;
         Ok(())
@@ -103,7 +103,7 @@ impl FsContext {
 
     /// Change the root.
     pub fn chroot(&self, current_task: &CurrentTask, name: NamespaceNode) -> Result<(), Errno> {
-        name.entry.node.check_access(current_task, Access::EXEC).map_err(|_| errno!(EACCES))?;
+        name.check_access(current_task, Access::EXEC).map_err(|_| errno!(EACCES))?;
         if !current_task.creds().has_capability(CAP_SYS_CHROOT) {
             return error!(EPERM);
         }

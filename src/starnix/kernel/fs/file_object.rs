@@ -1385,6 +1385,7 @@ mod tests {
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             tmpfs::TmpFs,
+            MountInfo,
         },
         testing::*,
         types::{DeviceType, FileMode, OpenFlags},
@@ -1399,11 +1400,13 @@ mod tests {
     async fn test_append_truncate_race() {
         let (kernel, current_task) = create_kernel_and_task();
         let root_fs = TmpFs::new_fs(&kernel);
+        let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
-            .create_entry(&current_task, b"test", |dir, name| {
+            .create_entry(&current_task, &mount, b"test", |dir, mount, name| {
                 dir.mknod(
                     &current_task,
+                    mount,
                     name,
                     FileMode::IFREG | FileMode::ALLOW_ALL,
                     DeviceType::NONE,

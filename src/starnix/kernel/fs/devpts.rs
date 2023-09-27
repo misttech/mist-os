@@ -712,11 +712,13 @@ mod tests {
         // Initialize pts devices
         dev_pts_fs(&kernel, Default::default());
         let fs = TmpFs::new_fs(&kernel);
+        let mount = MountInfo::detached();
         let pts = fs
             .root()
-            .create_entry(&task, b"custom_pts", |dir, name| {
+            .create_entry(&task, &mount, b"custom_pts", |dir, mount, name| {
                 dir.mknod(
                     &task,
+                    mount,
                     name,
                     mode!(IFCHR, 0o666),
                     DeviceType::new(DEVPTS_FIRST_MAJOR, 0),

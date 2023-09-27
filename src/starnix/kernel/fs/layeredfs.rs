@@ -71,7 +71,7 @@ impl FsNodeOps for Arc<LayeredFs> {
         if let Some(fs) = self.mappings.get(name) {
             Ok(fs.root().node.clone())
         } else {
-            self.base_fs.root().node.lookup(current_task, name)
+            self.base_fs.root().node.lookup(current_task, &MountInfo::detached(), name)
         }
     }
 }

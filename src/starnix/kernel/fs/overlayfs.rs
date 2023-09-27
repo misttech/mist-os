@@ -62,7 +62,7 @@ enum UpperCopyMode {
 #[derive(Clone)]
 struct ActiveEntry {
     entry: DirEntryHandle,
-    mount: Option<MountHandle>,
+    mount: MountInfo,
 }
 
 impl ActiveEntry {
@@ -74,17 +74,25 @@ impl ActiveEntry {
         &self.entry
     }
 
+    fn mount(&self) -> &MountInfo {
+        &self.mount
+    }
+
     fn component_lookup(&self, current_task: &CurrentTask, name: &FsStr) -> Result<Self, Errno> {
-        self.entry().component_lookup(current_task, name).map(ActiveEntry::mapper(self))
+        self.entry()
+            .component_lookup(current_task, self.mount(), name)
+            .map(ActiveEntry::mapper(self))
     }
 
     fn create_entry(
         &self,
         current_task: &CurrentTask,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &FsStr) -> Result<FsNodeHandle, Errno>,
+        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     ) -> Result<Self, Errno> {
-        self.entry().create_entry(current_task, name, create_node_fn).map(ActiveEntry::mapper(self))
+        self.entry()
+            .create_entry(current_task, self.mount(), name, create_node_fn)
+            .map(ActiveEntry::mapper(self))
     }
 
     /// Sets an xattr to mark the directory referenced by `entry` as opaque. Directories that are
@@ -93,6 +101,7 @@ impl ActiveEntry {
     fn set_opaque_xattr(&self, current_task: &CurrentTask) -> Result<(), Errno> {
         self.entry().node.set_xattr(
             current_task,
+            self.mount(),
             OPAQUE_DIR_XATTR,
             OPAQUE_DIR_XATTR_VALUE,
             XattrOp::Set,
@@ -103,6 +112,7 @@ impl ActiveEntry {
     fn is_opaque_node(&self, current_task: &CurrentTask) -> bool {
         match self.entry().node.get_xattr(
             current_task,
+            self.mount(),
             OPAQUE_DIR_XATTR,
             OPAQUE_DIR_XATTR_VALUE.len(),
         ) {
@@ -119,8 +129,8 @@ impl ActiveEntry {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<ActiveEntry, Errno> {
-        self.create_entry(current_task, name, |dir, name| {
-            dir.mknod(current_task, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
+        self.create_entry(current_task, name, |dir, mount, name| {
+            dir.mknod(current_task, mount, name, FileMode::IFCHR, DeviceType::NONE, FsCred::root())
         })
     }
 
@@ -247,8 +257,8 @@ impl OverlayNode {
                     SymlinkTarget::Node(_) => return error!(EIO),
                     SymlinkTarget::Path(path) => path,
                 };
-                parent_upper.create_entry(current_task, &name, |dir, name| {
-                    dir.create_symlink(current_task, name, link_path, info.cred())
+                parent_upper.create_entry(current_task, &name, |dir, mount, name| {
+                    dir.create_symlink(current_task, mount, name, link_path, info.cred())
                 })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
@@ -257,16 +267,23 @@ impl OverlayNode {
                     parent_upper,
                     &name,
                     |dir, name| {
-                        dir.create_entry(current_task, name, |dir_node, name| {
-                            dir_node.mknod(current_task, name, info.mode, DeviceType::NONE, cred)
+                        dir.create_entry(current_task, name, |dir_node, mount, name| {
+                            dir_node.mknod(
+                                current_task,
+                                mount,
+                                name,
+                                info.mode,
+                                DeviceType::NONE,
+                                cred,
+                            )
                         })
                     },
                     |entry| copy_file_content(current_task, lower, &entry),
                 )
             } else {
                 // TODO(sergeyu): create_node() checks access, but we don't need that here.
-                parent_upper.create_entry(current_task, &name, |dir, name| {
-                    dir.mknod(current_task, name, info.mode, info.rdev, cred)
+                parent_upper.create_entry(current_task, &name, |dir, mount, name| {
+                    dir.mknod(current_task, mount, name, info.mode, info.rdev, cred)
                 })
             }
 
@@ -361,7 +378,13 @@ impl OverlayNode {
 
                 // Finally, remove the children.
                 for name in to_remove.iter() {
-                    dir.entry().unlink(current_task, name, UnlinkKind::NonDirectory, false)?;
+                    dir.entry().unlink(
+                        current_task,
+                        dir.mount(),
+                        name,
+                        UnlinkKind::NonDirectory,
+                        false,
+                    )?;
                 }
             }
         }
@@ -469,8 +492,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, name| {
-                dir_node.mknod(current_task, name, mode, dev, owner.clone())
+            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                dir_node.mknod(current_task, mount, name, mode, dev, owner.clone())
             })
         })?;
         Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
@@ -485,8 +508,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            let entry = dir.create_entry(current_task, temp_name, |dir_node, name| {
-                dir_node.mknod(current_task, name, mode, DeviceType::NONE, owner.clone())
+            let entry = dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                dir_node.mknod(current_task, mount, name, mode, DeviceType::NONE, owner.clone())
             })?;
 
             // Set opaque attribute to ensure the new directory is not merged with lower.
@@ -507,8 +530,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node = self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, name| {
-                dir_node.create_symlink(current_task, name, target, owner.clone())
+            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                dir_node.create_symlink(current_task, mount, name, target, owner.clone())
             })
         })?;
         Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
@@ -528,8 +551,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         let child_overlay = OverlayNode::from_fs_node(child)?;
         let upper_child = child_overlay.ensure_upper(current_task)?;
         self.create_entry(current_task, name, |dir, temp_name| {
-            dir.create_entry(current_task, temp_name, |dir_node, name| {
-                dir_node.link(current_task, name, &upper_child.entry().node)
+            dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
+                dir_node.link(current_task, mount, name, &upper_child.entry().node)
             })
         })?;
         Ok(())
@@ -561,7 +584,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             } else {
                 UnlinkKind::NonDirectory
             };
-            upper.entry().unlink(current_task, name, kind, false)?
+            upper.entry().unlink(current_task, upper.mount(), name, kind, false)?
         }
 
         Ok(())
@@ -584,7 +607,8 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(current_task)?.entry().node.truncate(current_task, length)
+        let upper = self.ensure_upper(current_task)?;
+        upper.entry().node.truncate(current_task, upper.mount(), length)
     }
 
     fn allocate(
@@ -835,8 +859,10 @@ impl OverlayFs {
                 DirEntry::rename(
                     current_task,
                     self.work.entry(),
+                    self.work.mount(),
                     &temp_name,
                     target_dir.entry(),
+                    target_dir.mount(),
                     name,
                     RenameFlags::REPLACE_ANY,
                 )
@@ -845,7 +871,13 @@ impl OverlayFs {
                 // Remove the temp entry in case of a failure.
                 self.work
                     .entry()
-                    .unlink(current_task, &temp_name, UnlinkKind::NonDirectory, false)
+                    .unlink(
+                        current_task,
+                        self.work.mount(),
+                        &temp_name,
+                        UnlinkKind::NonDirectory,
+                        false,
+                    )
                     .unwrap_or_else(|e| {
                         log_error!("Failed to cleanup work dir after an error: {}", e)
                     });
@@ -896,8 +928,10 @@ impl FileSystemOps for Arc<OverlayFs> {
         DirEntry::rename(
             current_task,
             old_parent_upper.entry(),
+            old_parent_upper.mount(),
             old_name,
             new_parent_upper.entry(),
+            new_parent_upper.mount(),
             new_name,
             RenameFlags::REPLACE_ANY,
         )?;

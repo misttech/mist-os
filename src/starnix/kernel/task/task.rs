@@ -1594,7 +1594,7 @@ impl CurrentTask {
             if !dir.entry.node.is_dir() {
                 return error!(ENOTDIR);
             }
-            dir.entry.node.check_access(self, Access::EXEC)?;
+            dir.check_access(self, Access::EXEC)?;
         }
         Ok((dir, path))
     }
@@ -1790,8 +1790,7 @@ impl CurrentTask {
                 // are supposed to truncate the file if this task can write
                 // to the underlying node, even if we are opening the file
                 // as read-only. See OpenTest.CanTruncateReadOnly.
-                name.check_readonly_filesystem()?;
-                name.entry.node.truncate(self, 0)?;
+                name.truncate(self, 0)?;
             }
 
             name
@@ -1895,7 +1894,7 @@ impl CurrentTask {
         // File node must have EXEC mode permissions.
         // Note that the ability to execute a file is unrelated to the flags
         // used in the `open` call.
-        executable.node().check_access(self, Access::EXEC)?;
+        executable.name.check_access(self, Access::EXEC)?;
 
         let resolved_elf = resolve_executable(self, executable, path.clone(), argv, environ)?;
 

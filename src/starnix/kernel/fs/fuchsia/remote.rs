@@ -1753,7 +1753,7 @@ mod test {
 
             // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
             // truncate should return EINVAL
-            match fifo_node.entry.node.truncate(&current_task, 0) {
+            match fifo_node.truncate(&current_task, 0) {
                 Ok(_) => {
                     panic!("truncate passed for special node")
                 }
@@ -1772,7 +1772,7 @@ mod test {
                 .expect("lookup_child failed");
 
             // We should be able to perform truncate on regular files
-            reg_node.entry.node.truncate(&current_task, 0).expect("truncate failed");
+            reg_node.truncate(&current_task, 0).expect("truncate failed");
         })
         .await;
 
@@ -1808,7 +1808,7 @@ mod test {
             ns.root()
                 .entry
                 .node
-                .link(&current_task, b"file2", &node.entry.node)
+                .link(&current_task, &ns.root().mount, b"file2", &node.entry.node)
                 .expect("link failed");
         })
         .await;
@@ -1885,7 +1885,10 @@ mod test {
                 .create_node(&current_task, b"file", MODE, DeviceType::NONE)
                 .expect("create_node failed");
             // Change the mode, this change should persist
-            file.entry.node.chmod(&current_task, MODE | FileMode::ALLOW_ALL).expect("chmod failed");
+            file.entry
+                .node
+                .chmod(&current_task, &file.mount, MODE | FileMode::ALLOW_ALL)
+                .expect("chmod failed");
         })
         .await;
 

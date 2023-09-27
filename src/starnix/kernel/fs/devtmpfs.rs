@@ -21,8 +21,17 @@ fn init_devtmpfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
     let current_task = kernel.kthreads.system_task();
 
     let mkdir = |name| {
-        root.create_entry(current_task, name, |dir, name| {
-            dir.mknod(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
+        // This creates content inside the temporary FS. This doesn't depend on the mount
+        // information.
+        root.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
+            dir.mknod(
+                current_task,
+                mount,
+                name,
+                mode!(IFDIR, 0o755),
+                DeviceType::NONE,
+                FsCred::root(),
+            )
         })
         .unwrap();
     };
@@ -41,16 +50,37 @@ pub fn devtmpfs_create_device(
         DeviceMode::Char => mode!(IFCHR, 0o666),
         DeviceMode::Block => mode!(IFBLK, 0o666),
     };
-    dev_tmp_fs(kernel).root().create_entry(current_task, &device.name, |dir, name| {
-        dir.mknod(current_task, name, mode, device.device_type, FsCred::root())
-    })
+    // This creates content inside the temporary FS. This doesn't depend on the mount
+    // information.
+    dev_tmp_fs(kernel).root().create_entry(
+        current_task,
+        &MountInfo::detached(),
+        &device.name,
+        |dir, mount, name| {
+            dir.mknod(current_task, mount, name, mode, device.device_type, FsCred::root())
+        },
+    )
 }
 
 pub fn devtmpfs_mkdir(kernel: &Arc<Kernel>, name: &FsStr) -> Result<DirEntryHandle, Errno> {
     let current_task = kernel.kthreads.system_task();
-    dev_tmp_fs(kernel).root().create_entry(current_task, name, |dir, name| {
-        dir.mknod(current_task, name, mode!(IFDIR, 0o755), DeviceType::NONE, FsCred::root())
-    })
+    // This creates content inside the temporary FS. This doesn't depend on the mount
+    // information.
+    dev_tmp_fs(kernel).root().create_entry(
+        current_task,
+        &MountInfo::detached(),
+        name,
+        |dir, mount, name| {
+            dir.mknod(
+                current_task,
+                mount,
+                name,
+                mode!(IFDIR, 0o755),
+                DeviceType::NONE,
+                FsCred::root(),
+            )
+        },
+    )
 }
 
 pub fn devtmpfs_remove_child(kernel: &Arc<Kernel>, name: &FsStr) {
@@ -72,7 +102,9 @@ fn create_symlink(
     target: &FsStr,
 ) -> Result<DirEntryHandle, Errno> {
     let current_task = kernel.kthreads.system_task();
-    entry.create_entry(current_task, name, |dir, name| {
-        dir.create_symlink(current_task, name, target, FsCred::root())
+    // This creates content inside the temporary FS. This doesn't depend on the mount
+    // information.
+    entry.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
+        dir.create_symlink(current_task, mount, name, target, FsCred::root())
     })
 }
