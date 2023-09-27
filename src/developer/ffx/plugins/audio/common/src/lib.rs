@@ -1,94 +1,44 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use {
     anyhow::Error,
     blocking::Unblock,
-    errors::ffx_bail,
     fidl::{endpoints::Proxy, Socket},
     fidl_fuchsia_audio_controller::{
         PlayerPlayRequest, PlayerPlayResponse, PlayerProxy, PlayerRequest, RecordCancelerMarker,
     },
     futures::{AsyncReadExt, FutureExt},
-    std::borrow::BorrowMut,
-    std::io,
+    serde::{Deserialize, Serialize},
     std::io::BufRead,
-    std::sync::{Arc, Mutex},
 };
 
-lazy_static::lazy_static! {
-    pub static ref STDOUT: Arc<Mutex<std::io::Stdout>> = Arc::new(Mutex::new(std::io::stdout()));
-    pub static ref STDERR: Arc<Mutex<std::io::Stdout>> = Arc::new(Mutex::new(std::io::stdout()));
+#[derive(Debug, Serialize, PartialEq, Deserialize)]
+pub struct PlayResult {
+    pub bytes_processed: Option<u64>,
 }
 
-impl std::io::Write for &'static STDOUT {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        if let Ok(mut x) = self.borrow_mut().lock() {
-            let written = x.write(buf)?;
-            Ok(written)
-        } else {
-            Err(io::Error::new(io::ErrorKind::WouldBlock, "couldn't lock"))
-        }
-    }
-
-    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-        // Do nothing since we are not buffered.
-        Ok(())
-    }
+#[derive(Debug, PartialEq, Serialize)]
+pub enum DeviceResult {
+    Play(PlayResult),
 }
 
-impl std::io::Write for &'static STDERR {
-    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
-        if let Ok(mut x) = self.borrow_mut().lock() {
-            let written = x.write(buf)?;
-            Ok(written)
-        } else {
-            Err(io::Error::new(io::ErrorKind::WouldBlock, "couldn't lock"))
-        }
-    }
-
-    fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-        // Do nothing since we are not buffered.
-        Ok(())
-    }
-}
-
-pub async fn play<R, W, E>(
+pub async fn play(
     request: PlayerPlayRequest,
     controller: PlayerProxy,
-    play_local: Socket,        // Send data from ffx to target.
-    input_reader: R,           // Input generalized to stdin or test buffer. Forward to socket.
-    output_writer: &'static W, // Output generalized to stdout or a test buffer. Forward data
-    // from daemon to this writer.
-    output_error_writer: &'static E, // Likewise, forward error data to a separate writer
-                                     // generalized to stderr or a test buffer.
-) -> Result<(), Error>
+    play_local: Socket, // Send data from ffx to target.
+    input_reader: Box<dyn std::io::Read + std::marker::Send + 'static>,
+    // Input generalized to stdin or test buffer. Forward to socket.
+) -> Result<PlayResult, Error>
 where
-    R: std::io::Read + std::marker::Send + 'static,
-    W: std::marker::Send + 'static + std::marker::Sync,
-    E: std::marker::Send + 'static + std::marker::Sync,
-    &'static W: std::io::Write,
-    &'static E: std::io::Write,
 {
-    let futs = futures::future::try_join(
+    let (play_result, _stdin_reader_result) = futures::future::try_join(
         async {
-            let (stdout_sock, stderr_sock) = match controller.play(request).await? {
-                Ok(value) => (
-                    value.stdout.ok_or(anyhow::anyhow!("No stdout socket"))?,
-                    value.stderr.ok_or(anyhow::anyhow!("No stderr socket."))?,
-                ),
-                Err(err) => ffx_bail!("Play failed with err: {}", err),
-            };
-
-            let mut stdout = Unblock::new(output_writer); // argument must outlive 'static
-            let mut stderr = Unblock::new(output_error_writer);
-
-            futures::future::try_join(
-                futures::io::copy(fidl::AsyncSocket::from_socket(stdout_sock)?, &mut stdout),
-                futures::io::copy(fidl::AsyncSocket::from_socket(stderr_sock)?, &mut stderr),
-            )
-            .await
-            .map_err(|e| anyhow::anyhow!("Error joining stdio futures: {}", e))
+            controller
+                .play(request)
+                .await
+                .map_err(|e| anyhow::anyhow!("future try join failed with error {e}"))
         },
         async move {
             let mut socket_writer = fidl::AsyncSocket::from_socket(play_local)?;
@@ -98,11 +48,11 @@ where
             drop(socket_writer);
             stdin_res.map_err(|e| anyhow::anyhow!("Error stdin: {}", e))
         },
-    );
-
-    futs.await?;
-
-    Ok(())
+    )
+    .await?;
+    play_result
+        .map(|result| PlayResult { bytes_processed: result.bytes_processed })
+        .map_err(|e| anyhow::anyhow!("Play failed with error {:?}", e))
 }
 
 pub async fn wait_for_keypress(
@@ -143,17 +93,20 @@ pub mod tests {
     use fidl_fuchsia_audio_controller::DeviceControlProxy;
 
     use super::*;
-    lazy_static::lazy_static! {
-        pub static ref MOCK_STDOUT: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::<u8>::new()));
-        pub static ref MOCK_STDERR: Arc<Mutex<Vec<u8>>> = Arc::new(Mutex::new(Vec::<u8>::new()));
-    }
 
-    pub const WAV_HEADER_EXT: &'static [u8; 68] = b"RIFF\xFF\xFF\xFF\xFFWAVE\
-    fmt \x28\x00\x00\x00\xfe\xff\x0a\x00\x80\x3e\x00\x00\x00\xe2\x04\x00\
-    \x14\x00\x10\x00\x16\x00\x10\x00\xff\x03\x00\x00\x01\x00\x00\x00\
-    \x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71\
-    data\xFF\xFF\xFF\xFF";
+    // Header for an infinite-length audio stream: 16 kHz, 3-channel, 16-bit signed.
+    // This slice contains a complete WAVE_FORMAT_EXTENSIBLE file header
+    // (everything except the audio data itself), which includes the 'fmt ' chunk
+    // and the first two fields of the 'data' chunk. After this, the next bytes
+    // in this stream would be the audio itself (in 6-byte frames).
+    pub const WAV_HEADER_EXT: &'static [u8; 83] = b"\x52\x49\x46\x46\xff\xff\xff\xff
+    \x57\x41\x56\x45\x66\x6d\x74\x20\x28\x00\x00\x00\xfe\xff\x03\x00\x80\x3e\x00\x00
+    \x00\x77\x01\x00\x06\x00\x10\x00\x16\x00\x10\x00\x07\x00\x00\x00\x01\x00\x00\x00
+    \x00\x00\x10\x00\x80\x00\x00\xaa\x00\x38\x9b\x71\x64\x61\x74\x61\xff\xff\xff\xff";
 
+    // Complete WAV file (140 bytes in all) for a 48 kHz, 1-channel, unsigned 8-bit
+    // audio stream. The file is the old-style PCMWAVEFORMAT and contains 96 frames
+    // of a sinusoid of approx. 439 Hz.
     pub const SINE_WAV: &'static [u8; 140] = b"\
     \x52\x49\x46\x46\x84\x00\x00\x00\x57\x41\x56\x45\x66\x6d\x74\x20\
     \x10\x00\x00\x00\x01\x00\x01\x00\x80\xbb\x00\x00\x80\xbb\x00\x00\
@@ -165,38 +118,6 @@ pub mod tests {
     \x26\x21\x1d\x18\x14\x10\x0d\x0a\x07\x05\x03\x02\x01\x00\x00\x00\
     \x01\x02\x04\x06\x08\x0b\x0e\x11\x15\x1a\x1e\x23";
 
-    impl std::io::Write for &'static MOCK_STDOUT {
-        fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
-            if let Ok(mut x) = self.borrow_mut().lock() {
-                let written = x.write(buf)?;
-                Ok(written)
-            } else {
-                Err(io::Error::new(io::ErrorKind::WouldBlock, "couldn't lock"))
-            }
-        }
-
-        fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-            // Do nothing since we are not buffered.
-            Ok(())
-        }
-    }
-
-    impl std::io::Write for &'static MOCK_STDERR {
-        fn write(&mut self, buf: &[u8]) -> std::result::Result<usize, std::io::Error> {
-            if let Ok(mut x) = self.borrow_mut().lock() {
-                let written = x.write(buf)?;
-                Ok(written)
-            } else {
-                Err(io::Error::new(io::ErrorKind::WouldBlock, "couldn't lock"))
-            }
-        }
-
-        fn flush(&mut self) -> std::result::Result<(), std::io::Error> {
-            // Do nothing since we are not buffered.
-            Ok(())
-        }
-    }
-
     pub fn fake_audio_daemon() -> DeviceControlProxy {
         let callback = |req| match req {
             _ => {}
@@ -205,33 +126,23 @@ pub mod tests {
     }
 
     pub fn fake_audio_player() -> PlayerProxy {
-        use futures::AsyncWriteExt;
-
         let callback = |req| match req {
             PlayerRequest::Play { payload, responder } => {
-                let (stdout_remote, stdout_local) = fidl::Socket::create_datagram();
-                let (stderr_remote, _stderr_local) = fidl::Socket::create_datagram();
-                let response = PlayerPlayResponse {
-                    stdout: Some(stdout_remote),
-                    stderr: Some(stderr_remote),
-                    ..Default::default()
-                };
-
                 let data_socket =
-                    payload.wav_socket.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
+                    payload.wav_source.ok_or(anyhow::anyhow!("Socket argument missing.")).unwrap();
 
                 let mut socket = fidl::AsyncSocket::from_socket(data_socket).unwrap();
                 let mut wav_file = vec![0u8; 11];
                 fuchsia_async::Task::local(async move {
                     let _ = socket.read_exact(&mut wav_file).await.unwrap();
-                })
-                .detach();
+                    // Pass back a fake value for total bytes processed.
+                    // ffx tests are focused on the interaction between ffx and the user,
+                    // so controller specific functionality can be covered by tests targeting
+                    // it specifically.
+                    let response =
+                        PlayerPlayResponse { bytes_processed: Some(1), ..Default::default() };
 
-                responder.send(Ok(response)).unwrap();
-                fuchsia_async::Task::local(async move {
-                    let mut socket = fidl::AsyncSocket::from_socket(stdout_local).unwrap();
-                    let bytes = "Successfully processed all audio data.".as_bytes();
-                    socket.write_all(bytes).await.unwrap();
+                    responder.send(Ok(response)).unwrap();
                 })
                 .detach();
             }

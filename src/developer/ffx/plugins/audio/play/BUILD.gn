@@ -33,7 +33,6 @@ ffx_plugin("ffx_audio_play") {
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:tempfile",
-    "//third_party/rust_crates:zerocopy",
   ]
 
   sources = [ "src/lib.rs" ]

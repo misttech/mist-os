@@ -53,12 +53,12 @@ type UltrasoundRendererConfig = table {
 @discoverable
 open protocol Player {
     /// Plays audio data from socket on either an `AudioRenderer` or on device ring buffer.
-    /// Returns sockets for transmitting info back to stdout and stderr on host.
+    /// Return when all bytes have been read from the socket.
     flexible Play(resource table {
-        /// Socket for audio data. Should transmit entire file in WAV format.
+        /// Socket for the client to send audio data. Should transmit entire file in WAV format.
         ///
         /// Required.
-        1: wav_socket zx.Handle:SOCKET;
+        1: wav_source zx.Handle:<SOCKET, zx.Rights.READ | zx.Rights.WAIT | zx.Rights.DUPLICATE>;
 
         /// Play on device ring buffer or AudioRenderer.
         ///
@@ -67,17 +67,11 @@ open protocol Player {
 
         /// Play settings.
         ///
-        /// Required.
+        /// Optional. If not specified, use unity gain unmuted, and no other gain
+        /// processing enabled.
         3: gain_settings GainSettings;
     }) -> (resource table {
-        /// Information from daemon component for ffx plugin to display.
-        ///
-        /// Required.
-        1: stdout zx.Handle:SOCKET;
-
-        /// Errors from daemon component for ffx plugin to display.
-        ///
-        /// Required.
-        2: stderr zx.Handle:SOCKET;
-    }) error zx.Status;
+        /// Total number of bytes sent to destination.
+        1: bytes_processed uint64;
+    }) error Error;
 };

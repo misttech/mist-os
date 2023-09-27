@@ -2,19 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::HandleBased;
-
 use {
     anyhow::Result,
     async_trait::async_trait,
+    ffx_audio_common::PlayResult,
     ffx_audio_play_args::{
         AudioRenderUsageExtended::{
             Background, Communication, Interruption, Media, SystemAgent, Ultrasound,
         },
         PlayCommand,
     },
-    fho::{moniker, FfxMain, FfxTool, SimpleWriter},
+    fho::{moniker, FfxMain, FfxTool, MachineWriter},
+    fidl::HandleBased,
     fidl_fuchsia_audio_controller::{PlayerPlayRequest, PlayerProxy},
+    std::io::Read,
+    std::marker::Send,
 };
 
 #[derive(FfxTool)]
@@ -29,59 +31,33 @@ pub struct PlayTool {
 fho::embedded_plugin!(PlayTool);
 #[async_trait(?Send)]
 impl FfxMain for PlayTool {
-    type Writer = SimpleWriter;
-    async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
+    type Writer = MachineWriter<PlayResult>;
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let (play_remote, play_local) = fidl::Socket::create_datagram();
-        match &self.cmd.file {
+        let reader: Box<dyn Read + Send + 'static> = match &self.cmd.file {
             Some(input_file_path) => {
-                let file_reader = std::fs::File::open(&input_file_path).map_err(|e| {
+                let file = std::fs::File::open(&input_file_path).map_err(|e| {
                     anyhow::anyhow!("Error trying to open file \"{input_file_path}\": {e}")
                 })?;
-                play_impl(
-                    self.controller,
-                    play_local,
-                    play_remote,
-                    self.cmd,
-                    file_reader,
-                    &ffx_audio_common::STDOUT,
-                    &ffx_audio_common::STDERR,
-                )
-                .await
-                .map_err(Into::into)
+                Box::new(file)
             }
-            None => play_impl(
-                self.controller,
-                play_local,
-                play_remote,
-                self.cmd,
-                std::io::stdin(),
-                &ffx_audio_common::STDOUT,
-                &ffx_audio_common::STDERR,
-            )
+            None => Box::new(std::io::stdin()),
+        };
+
+        play_impl(self.controller, play_local, play_remote, self.cmd, reader, writer)
             .await
-            .map_err(Into::into),
-        }
+            .map_err(Into::into)
     }
 }
 
-async fn play_impl<R, W, E>(
+async fn play_impl(
     controller: PlayerProxy,
-    play_local: fidl::Socket,
-    play_remote: fidl::Socket,
+    wav_local: fidl::Socket,
+    wav_remote: fidl::Socket,
     command: PlayCommand,
-    input_reader: R, // Input generalized to stdin or test buffer. Forward to socket.
-    output_writer: &'static W, // Output generalized to stdout or a test buffer. Forward data
-    // from daemon to this writer.
-    output_error_writer: &'static E, // Likewise, forward error data to a separate writer
-                                     // generalized to stderr or a test buffer.
-) -> Result<(), anyhow::Error>
-where
-    R: std::io::Read + std::marker::Send + 'static,
-    W: std::marker::Send + 'static + std::marker::Sync,
-    E: std::marker::Send + 'static + std::marker::Sync,
-    &'static W: std::io::Write,
-    &'static E: std::io::Write,
-{
+    input_reader: Box<dyn Read + Send + 'static>, // Input generalized to stdin, file, or test buffer.
+    mut writer: MachineWriter<PlayResult>,
+) -> Result<(), anyhow::Error> {
     let renderer = match command.usage {
         Ultrasound => fidl_fuchsia_audio_controller::RendererConfig::UltrasoundRenderer(
             fidl_fuchsia_audio_controller::UltrasoundRendererConfig {
@@ -101,12 +77,12 @@ where
     };
 
     // Duplicate socket handle so that connection stays alive in real + testing scenarios.
-    let daemon_request_socket = play_remote
+    let remote_socket = wav_remote
         .duplicate_handle(fidl::Rights::SAME_RIGHTS)
         .map_err(|e| anyhow::anyhow!("Error duplicating socket: {e}"))?;
 
     let request = PlayerPlayRequest {
-        wav_socket: Some(daemon_request_socket),
+        wav_source: Some(remote_socket),
         destination: Some(fidl_fuchsia_audio_controller::PlayDestination::Renderer(renderer)),
         gain_settings: Some(fidl_fuchsia_audio_controller::GainSettings {
             mute: Some(command.mute),
@@ -116,15 +92,17 @@ where
         ..Default::default()
     };
 
-    ffx_audio_common::play(
-        request,
-        controller,
-        play_local,
-        input_reader,
-        output_writer,
-        output_error_writer,
-    )
-    .await
+    let result = ffx_audio_common::play(request, controller, wav_local, input_reader).await?;
+    writer
+        .machine_or_else(&result, || {
+            format!("Successfully processed all audio data. Bytes processed: {:?}", {
+                result
+                    .bytes_processed
+                    .map(|bytes| bytes.to_string())
+                    .unwrap_or_else(|| format!("Unavailable"))
+            })
+        })
+        .map_err(Into::<anyhow::Error>::into)
 }
 
 #[cfg(test)]
@@ -132,17 +110,19 @@ mod tests {
     use super::*;
     use ffx_audio_play_args::AudioRenderUsageExtended;
     use ffx_core::macro_deps::futures::AsyncWriteExt;
-    use ffx_writer as _;
+    use ffx_writer::TestBuffers;
+    use fidl::HandleBased;
     use fidl_fuchsia_media::AudioRenderUsage;
     use std::fs;
     use std::io::Write;
     use std::os::unix::fs::PermissionsExt;
     use tempfile::TempDir;
-    use zerocopy::AsBytes;
 
     #[fuchsia_async::run_singlethreaded(test)]
     pub async fn test_play() -> Result<(), fho::Error> {
         let controller = ffx_audio_common::tests::fake_audio_player();
+        let test_buffers = TestBuffers::default();
+        let writer: MachineWriter<PlayResult> = MachineWriter::new_test(None, &test_buffers);
 
         let stdin_command = PlayCommand {
             usage: AudioRenderUsageExtended::Media(AudioRenderUsage::Media),
@@ -168,21 +148,18 @@ mod tests {
             play_local,
             play_remote,
             stdin_command,
-            &ffx_audio_common::tests::WAV_HEADER_EXT[..],
-            &ffx_audio_common::tests::MOCK_STDOUT,
-            &ffx_audio_common::tests::MOCK_STDERR,
+            Box::new(&ffx_audio_common::tests::WAV_HEADER_EXT[..]),
+            writer,
         )
         .await;
 
         result.unwrap();
-        let expected_output = "Successfully processed all audio data.".as_bytes();
-
-        {
-            let mut lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
-            let output: &[u8] = lock.as_bytes();
-            assert_eq!(output, expected_output);
-            lock.clear();
-        }
+        // TODO(b/300279107): Calculate total bytes sent to an AudioRenderer.
+        // The test audio controller always returns 1 for bytes processed value.
+        let expected_output =
+            format!("Successfully processed all audio data. Bytes processed: \"1\"\n");
+        let stdout = test_buffers.into_stdout_str();
+        assert_eq!(stdout, expected_output);
 
         // Test reading from a file.
         let test_dir = TempDir::new().unwrap();
@@ -215,23 +192,27 @@ mod tests {
                 fidl_fuchsia_audio_controller::Flexible,
             ),
         };
+
+        let test_buffers = TestBuffers::default();
+        let writer: MachineWriter<PlayResult> = MachineWriter::new_test(None, &test_buffers);
+
         let (play_remote, play_local) = fidl::Socket::create_datagram();
         let result = play_impl(
             controller,
             play_local,
             play_remote,
             file_command,
-            file_reader,
-            &ffx_audio_common::tests::MOCK_STDOUT,
-            &ffx_audio_common::tests::MOCK_STDERR,
+            Box::new(file_reader),
+            writer,
         )
         .await;
         result.unwrap();
-        let expected_output = "Successfully processed all audio data.".as_bytes();
-        let lock = ffx_audio_common::tests::MOCK_STDOUT.lock().unwrap();
-        let output: &[u8] = lock.as_bytes();
-
-        assert_eq!(output, expected_output);
+        // TODO(b/300279107): Calculate total bytes sent to an AudioRenderer.
+        // The test audio controller always returns 1 for bytes processed value.
+        let expected_output =
+            format!("Successfully processed all audio data. Bytes processed: \"1\"\n");
+        let stdout = test_buffers.into_stdout_str();
+        assert_eq!(stdout, expected_output);
 
         Ok(())
     }

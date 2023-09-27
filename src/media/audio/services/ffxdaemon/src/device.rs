@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_audio_controller::PlayerPlayResponse;
+
 use {
     crate::{socket, stop_listener, RingBuffer, SECONDS_PER_NANOSECOND},
     anyhow::{self, Context, Error},
@@ -69,7 +71,7 @@ impl Device {
             .map_err(|e| anyhow::anyhow!("Error setting device gain state: {e}"))
     }
 
-    pub async fn play(self, mut data_socket: fasync::Socket) -> Result<String, Error> {
+    pub async fn play(self, mut data_socket: fasync::Socket) -> Result<PlayerPlayResponse, Error> {
         let mut socket = socket::Socket { socket: &mut data_socket };
         let spec = socket.read_wav_header().await?;
         let format = format_utils::Format::from(&spec);
@@ -227,12 +229,12 @@ impl Device {
 
         ring_buffer_wrapper.stop().await?;
 
-        let output_message = format!(
+        println!(
             "Successfully processed all audio data. \n Woke up late {} times.\n ",
             late_wakeups
         );
 
-        Ok(output_message)
+        Ok(PlayerPlayResponse { bytes_processed: None, ..Default::default() })
     }
 
     pub async fn record(

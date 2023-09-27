@@ -438,9 +438,8 @@ impl AudioDaemon {
     async fn play_renderer(
         &self,
         request: PlayerPlayRequest,
-        stdout_local: zx::Socket,
-    ) -> Result<(), anyhow::Error> {
-        let data_socket = request.wav_socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
+    ) -> Result<PlayerPlayResponse, anyhow::Error> {
+        let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
         let mut socket = socket::Socket {
             socket: &mut fasync::Socket::from_socket(
@@ -498,6 +497,7 @@ impl AudioDaemon {
         let offsets: Vec<usize> = (0..packet_count).map(|x| x * bytes_per_packet).collect();
 
         let futs = offsets.iter().map(|offset| async {
+            // TODO(b/300279107): Calculate total bytes sent to an AudioRenderer.
             Self::send_next_packet(
                 offset.to_owned() as u64,
                 fasync::Socket::from_socket(
@@ -512,20 +512,13 @@ impl AudioDaemon {
         });
 
         futures::future::try_join_all(futs).await?;
-
-        let mut async_stdout = fasync::Socket::from_socket(stdout_local)
-            .map_err(|e| anyhow::anyhow!("Async socket create failed: {}", e))?;
-        async_stdout
-            .write_all("Succesfully processed all audio data. \n".as_bytes())
-            .await
-            .map_err(|e| anyhow::anyhow!("Write to socket failed: {}", e))
+        Ok(PlayerPlayResponse { bytes_processed: None, ..Default::default() })
     }
 
     async fn play_device(
         &self,
         request: PlayerPlayRequest,
-        stdout_local: zx::Socket,
-    ) -> Result<(), anyhow::Error> {
+    ) -> Result<PlayerPlayResponse, anyhow::Error> {
         let device_id = request
             .destination
             .ok_or(anyhow::anyhow!("Device id argument missing."))
@@ -536,18 +529,12 @@ impl AudioDaemon {
             _ => Err(anyhow::anyhow!("Expected Ring Buffer play location")),
         })?;
 
-        let data_socket = request.wav_socket.ok_or(anyhow::anyhow!("Socket argument missing."))?;
+        let data_socket = request.wav_source.ok_or(anyhow::anyhow!("Socket argument missing."))?;
 
         let device = device::Device::connect(format!("/dev/class/audio-output/{}", device_id))?;
 
-        let output_message = device.play(fasync::Socket::from_socket(data_socket)?).await?;
-        let mut async_stdout = fasync::Socket::from_socket(stdout_local)
-            .map_err(|e| anyhow::anyhow!("Async socket create failed: {}", e))?;
-
-        async_stdout
-            .write_all(output_message.as_bytes())
-            .await
-            .map_err(|e| anyhow::anyhow!("Write to socket failed: {}", e))
+        let async_socket = fasync::Socket::from_socket(data_socket)?;
+        device.play(async_socket).await
     }
 
     async fn record_device(
@@ -604,42 +591,44 @@ impl AudioDaemon {
 
     async fn serve_player(&mut self, mut stream: PlayerRequestStream) -> Result<(), Error> {
         while let Ok(Some(request)) = stream.try_next().await {
-            let (stdout_remote, stdout_local) = zx::Socket::create_stream();
-            let (stderr_remote, stderr_local) = zx::Socket::create_stream();
-
             let request_name = request.method_name();
-            let request_result = match request {
+            let result = match request {
                 PlayerRequest::Play { payload, responder } => {
-                    let response = PlayerPlayResponse {
-                        stdout: Some(stdout_remote),
-                        stderr: Some(stderr_remote),
-                        ..Default::default()
+                    let response = match payload.destination {
+                        Some(PlayDestination::Renderer(..)) => {
+                            self.play_renderer(payload).await.map_err(|e| {
+                                println!("Error trying to play to AudioRenderer {e}");
+                                fidl_fuchsia_audio_controller::Error::UnknownFatal
+                            })
+                        }
+                        Some(PlayDestination::DeviceRingBuffer(..)) => {
+                            self.play_device(payload).await.map_err(|e| {
+                                println!("Error trying to play to device ring buffer {e}");
+                                fidl_fuchsia_audio_controller::Error::UnknownFatal
+                            })
+                        }
+                        Some(..) => {
+                            println!("No PlayDestination variant specified.");
+                            Err(fidl_fuchsia_audio_controller::Error::NotSupported)
+                        }
+                        None => {
+                            println!("Missing destination argument.");
+                            Err(fidl_fuchsia_audio_controller::Error::NotSupported)
+                        }
                     };
 
                     responder
-                        .send(Ok(response))
-                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))?;
-
-                    match payload.destination {
-                        Some(PlayDestination::Renderer(..)) => {
-                            self.play_renderer(payload, stdout_local).await
-                        }
-                        Some(PlayDestination::DeviceRingBuffer(..)) => {
-                            self.play_device(payload, stdout_local).await
-                        }
-                        Some(..) => Err(anyhow::anyhow!("No PlayDestination variant specified.")),
-                        None => Err(anyhow::anyhow!("PlayDestination argument missing. ")),
-                    }
+                        .send(response)
+                        .map_err(|e| anyhow::anyhow!("Could not send reponse: {}", e))
                 }
                 _ => Err(anyhow::anyhow!("Request {request_name} not supported.")),
             };
-            match request_result {
+
+            match result {
                 Ok(_) => println!("Request succeeded."),
                 Err(e) => {
                     let error_msg = format!("Request {request_name} failed with error {e} \n");
                     println!("{}", &error_msg);
-                    let mut async_stderr_writer = fidl::AsyncSocket::from_socket(stderr_local)?;
-                    let _ = async_stderr_writer.write_all(error_msg.as_bytes()).await;
                 }
             }
         }

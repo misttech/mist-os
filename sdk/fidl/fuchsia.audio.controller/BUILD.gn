@@ -10,6 +10,7 @@ fidl("fuchsia.audio.controller") {
     "play.fidl",
     "record.fidl",
     "settings.fidl",
+    "types.fidl",
   ]
   sdk_category = "partner_internal"
 

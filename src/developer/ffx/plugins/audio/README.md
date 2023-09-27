@@ -67,14 +67,16 @@ on target device to execute the audio commands on behalf of the ffx client. Daem
 be found at `/src/media/audio/services/ffxdaemon`.
 
 The ffx host communicates with AudioDaemon through FIDL messages and sockets (passed via FIDL
-messages), which are in `/sdk/fidl/fuchsia.audio.ffxdaemon/audio_proxy.fidl`. To add a new command,
-one can add a high level subcommand on ffx audio or extend the existing subcommands like
-play, record, etc. If the command needs to interact with the target device, one can add a new FIDL
-method to `audio_proxy.fidl` or add fields to existing messages.
+messages), which are in `/sdk/fidl/fuchsia.audio.controller/audio_proxy.fidl`,
+`/sdk/fidl/fuchsia.audio.controller/play.fidl` and `/sdk/fidl/fuchsia.audio.controller/record.fidl`.
+To add a new command, one can add a high level subcommand on ffx audio or extend the existing
+subcommands like play, record, etc. If the command needs to interact with the target device,
+one can add a new FIDL method to the appropriate protocol or add fields to existing messages.
 
-Audio data is transferred between host and target via `fidl::Socket` as bytestreams. Additionally,
-any logging information from the ffxdaemon is sent back to the client via socket, which ffx then
-copies it to the host device stderr.
+Audio data is transferred between host and target via `fidl::Socket` as bytestreams. Summary
+information and results of commands are returned when the daemon component completed the request.
+The ffx plugin then writes this information to the plugin writer in either machine or human
+readable format.
 
 Except for the gen subtool, all audio subtools interact with the ffxdaemon. The `audio_dev_support`
 assembly input bundle contains the daemon and is enabled only for `eng` build types.
