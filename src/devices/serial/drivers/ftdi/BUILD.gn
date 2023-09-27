@@ -65,10 +65,7 @@ fuchsia_driver_package("package") {
 driver_bind_rules("ftdi_function_bind") {
   rules = "ftdi_function.bind"
   tests = "ftdi_function_tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.usb",
-    "//src/devices/bind/fuchsia.usb.vendorspecific",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.usb" ]
 }
 
 fuchsia_driver("ftdi-fake-usb-driver") {

@@ -67,3 +67,11 @@ extend uint fuchsia.BIND_USB_CLASS {
   APPLICATION_SPECIFIC = 0xfe,
   VENDOR_SPECIFIC = 0xff,
 };
+
+extend uint fuchsia.BIND_USB_SUBCLASS {
+  VENDOR_SPECIFIC = 0xff,
+};
+
+extend uint fuchsia.BIND_USB_PROTOCOL {
+  TEST_FTDI = 0x01,
+};
