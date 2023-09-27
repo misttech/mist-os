@@ -672,6 +672,83 @@ async fn dynamic_offer_from_parent() {
     .await;
 }
 
+// TODO(fxbug.dev/298698003): If we fix the bug we don't need this test.
+#[fuchsia::test]
+async fn dynamic_offer_from_parent_with_collision() {
+    let components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source: UseSource::Framework,
+                    target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .protocol(ProtocolDeclBuilder::new("foo_svc").path("/svc/foo").build())
+                .offer(OfferDecl::Protocol(OfferProtocolDecl {
+                    source_name: "foo_svc".parse().unwrap(),
+                    source: OfferSource::Self_,
+                    target_name: "foo_svc".parse().unwrap(),
+                    target: OfferTarget::Collection("coll".parse().unwrap()),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .add_collection(
+                    CollectionDeclBuilder::new_transient_collection("coll")
+                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic)
+                        .build(),
+                )
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Protocol(UseProtocolDecl {
+                    source_name: "foo_svc".parse().unwrap(),
+                    source: UseSource::Parent,
+                    target_path: "/svc/hippo".parse().unwrap(),
+                    dependency_type: DependencyType::Strong,
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+    let test = RoutingTest::new("a", components).await;
+    test.create_dynamic_child_with_args(
+        &vec![].try_into().unwrap(),
+        "coll",
+        ChildDecl {
+            name: "b".to_string(),
+            url: "test:///b".to_string(),
+            startup: fdecl::StartupMode::Lazy,
+            environment: None,
+            on_terminate: None,
+            config_overrides: None,
+        },
+        fcomponent::CreateChildArgs {
+            dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
+                source_name: Some("foo_svc".to_string()),
+                source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                target_name: Some("foo_svc".to_string()),
+                dependency_type: Some(fdecl::DependencyType::Strong),
+                ..Default::default()
+            })]),
+            ..Default::default()
+        },
+    )
+    .await;
+    test.check_use(
+        vec!["coll:b"].try_into().unwrap(),
+        CheckUse::Protocol {
+            path: default_service_capability(),
+            expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+        },
+    )
+    .await;
+}
+
 ///    a
 ///   / \
 /// [b] [c]
@@ -2589,7 +2666,7 @@ async fn verify_service_route(
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
-            source: CapabilitySource::CollectionAggregate { collections, capability, component, .. },
+            source: CapabilitySource::AnonymizedAggregate { collections, capability, component, .. },
             relative_path: _,
         } => {
             let unique_colls: HashSet<_> =
@@ -3209,7 +3286,7 @@ async fn list_service_instances_from_collections() {
         .expect("failed to route service");
     let aggregate_capability_provider = match source {
         RouteSource {
-            source: CapabilitySource::CollectionAggregate { aggregate_capability_provider, .. },
+            source: CapabilitySource::AnonymizedAggregate { aggregate_capability_provider, .. },
             relative_path: _,
         } => aggregate_capability_provider,
         _ => panic!("bad capability source"),
@@ -3571,7 +3648,7 @@ async fn use_filtered_service_from_sibling() {
 }
 
 #[fuchsia::test]
-async fn use_aggregate_service_from_sibling() {
+async fn use_filtered_aggregate_service_from_sibling() {
     let components = vec![
         (
             "a",
@@ -3690,6 +3767,99 @@ async fn use_aggregate_service_from_sibling() {
         CheckUse::Service {
             path: "/svc/my.service.Service".parse().unwrap(),
             instance: ServiceInstance::Named("renamed_default".to_string()),
+            member: "echo".to_string(),
+            expected_res: ExpectedResult::Ok,
+        },
+    )
+    .await;
+}
+
+#[fuchsia::test]
+async fn use_anonymized_aggregate_service_from_sibling() {
+    let expose_service_decl = ComponentDeclBuilder::new()
+        .expose(ExposeDecl::Service(ExposeServiceDecl {
+            source: ExposeSource::Self_,
+            source_name: "my.service.Service".parse().unwrap(),
+            target_name: "my.service.Service".parse().unwrap(),
+            target: ExposeTarget::Parent,
+            availability: cm_rust::Availability::Required,
+        }))
+        .service(ServiceDecl {
+            name: "my.service.Service".parse().unwrap(),
+            source_path: Some("/svc/my.service.Service".parse().unwrap()),
+        })
+        .build();
+    let components = vec![
+        (
+            "a",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::static_child("b".to_string()),
+                    source_name: "my.service.Service".parse().unwrap(),
+                    target: OfferTarget::static_child("d".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                }))
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::static_child("c".to_string()),
+                    source_name: "my.service.Service".parse().unwrap(),
+                    target: OfferTarget::static_child("d".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                }))
+                .add_child(ChildDeclBuilder::new_lazy_child("b"))
+                .add_child(ChildDeclBuilder::new_lazy_child("c"))
+                .add_child(ChildDeclBuilder::new_lazy_child("d"))
+                .build(),
+        ),
+        ("b", expose_service_decl.clone()),
+        ("c", expose_service_decl),
+        (
+            "d",
+            ComponentDeclBuilder::new()
+                .use_(UseDecl::Service(UseServiceDecl {
+                    dependency_type: DependencyType::Strong,
+                    source: UseSource::Parent,
+                    source_name: "my.service.Service".parse().unwrap(),
+                    target_path: "/svc/my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                }))
+                .build(),
+        ),
+    ];
+
+    let (directory_entry, mut receiver) = create_service_directory_entry::<echo::EchoMarker>();
+    let instance_dir = pseudo_directory! {
+        "echo" => directory_entry,
+    };
+    let test = RoutingTestBuilder::new("a", components)
+        .add_outgoing_path(
+            "b",
+            "/svc/my.service.Service/default".parse().unwrap(),
+            instance_dir.clone(),
+        )
+        .add_outgoing_path(
+            "c",
+            "/svc/my.service.Service/variantinstance".parse().unwrap(),
+            instance_dir,
+        )
+        .build()
+        .await;
+    let _server_handle = fasync::Task::spawn(async move {
+        while let Some(echo::EchoRequest::EchoString { value, responder }) = receiver.next().await {
+            responder.send(value.as_ref().map(|v| v.as_str())).expect("failed to send reply");
+        }
+    });
+
+    test.check_use(
+        vec!["d"].try_into().unwrap(),
+        CheckUse::Service {
+            path: "/svc/my.service.Service".parse().unwrap(),
+            instance: ServiceInstance::Aggregated(2),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },

@@ -10,7 +10,7 @@ use {
             error::{CapabilityProviderError, ModelError},
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
-            routing::{self, service::CollectionServiceRoute, Route, RouteRequest, RoutingError},
+            routing::{self, service::AnonymizedServiceRoute, Route, RouteRequest, RoutingError},
         },
     },
     async_trait::async_trait,
@@ -306,18 +306,23 @@ impl RouteValidator {
         let source = request.route(target).await?;
         let source = &source.source;
         let service_dir = match source {
-            CapabilitySource::CollectionAggregate {
-                capability, component, collections, ..
+            CapabilitySource::AnonymizedAggregate {
+                capability,
+                component,
+                collections,
+                children,
+                ..
             } => {
                 let component = component.upgrade()?;
-                let route = CollectionServiceRoute {
+                let route = AnonymizedServiceRoute {
                     source_moniker: component.moniker.clone(),
                     collections: collections.clone(),
+                    children: children.clone(),
                     service_name: capability.source_name().clone(),
                 };
                 let state = component.lock_state().await;
                 match &*state {
-                    InstanceState::Resolved(r) => r.collection_services.get(&route).cloned(),
+                    InstanceState::Resolved(r) => r.anonymized_services.get(&route).cloned(),
                     _ => None,
                 }
             }

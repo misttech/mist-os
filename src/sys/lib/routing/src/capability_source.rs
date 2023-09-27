@@ -72,16 +72,20 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         source_capability: ComponentCapability,
         component: WeakComponentInstanceInterface<C>,
     },
-    /// This capability is an aggregate of capabilities provided by components in a collection.
-    CollectionAggregate {
+    /// This capability is an aggregate of capabilities over a set of collections and static
+    /// children. The instance names in the aggregate service will be anonymized.
+    AnonymizedAggregate {
         capability: AggregateCapability,
         component: WeakComponentInstanceInterface<C>,
-        aggregate_capability_provider: Box<dyn CollectionAggregateCapabilityProvider<C>>,
+        aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
         collections: Vec<Name>,
+        children: Vec<ChildName>,
     },
-    OfferAggregate {
+    /// This capability is an aggregate of capabilities over a set of children with filters
+    /// The instances in the aggregate service are the union of these filters.
+    FilteredAggregate {
         capability: AggregateCapability,
-        capability_provider: Box<dyn OfferAggregateCapabilityProvider<C>>,
+        capability_provider: Box<dyn FilteredAggregateCapabilityProvider<C>>,
         component: WeakComponentInstanceInterface<C>,
     },
     // This capability originates from "environment". It's implemented by a component instance.
@@ -101,8 +105,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Builtin { capability, .. } => capability.can_be_in_namespace(),
             Self::Namespace { capability, .. } => capability.can_be_in_namespace(),
             Self::Capability { .. } => true,
-            Self::CollectionAggregate { capability, .. } => capability.can_be_in_namespace(),
-            Self::OfferAggregate { capability, .. } => capability.can_be_in_namespace(),
+            Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
+            Self::FilteredAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::Environment { capability, .. } => capability.can_be_in_namespace(),
         }
     }
@@ -114,8 +118,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Builtin { capability, .. } => Some(capability.source_name()),
             Self::Namespace { capability, .. } => capability.source_name(),
             Self::Capability { .. } => None,
-            Self::CollectionAggregate { capability, .. } => Some(capability.source_name()),
-            Self::OfferAggregate { capability, .. } => Some(capability.source_name()),
+            Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
+            Self::FilteredAggregate { capability, .. } => Some(capability.source_name()),
             Self::Environment { capability, .. } => capability.source_name(),
         }
     }
@@ -127,8 +131,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Builtin { capability, .. } => capability.type_name(),
             Self::Namespace { capability, .. } => capability.type_name(),
             Self::Capability { source_capability, .. } => source_capability.type_name(),
-            Self::CollectionAggregate { capability, .. } => capability.type_name(),
-            Self::OfferAggregate { capability, .. } => capability.type_name(),
+            Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
+            Self::FilteredAggregate { capability, .. } => capability.type_name(),
             Self::Environment { capability, .. } => capability.type_name(),
         }
     }
@@ -138,8 +142,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::Component { component, .. }
             | Self::Framework { component, .. }
             | Self::Capability { component, .. }
-            | Self::CollectionAggregate { component, .. }
-            | Self::OfferAggregate { component, .. }
+            | Self::AnonymizedAggregate { component, .. }
+            | Self::FilteredAggregate { component, .. }
             | Self::Environment { component, .. } => {
                 WeakExtendedInstanceInterface::Component(component.clone())
             }
@@ -162,9 +166,9 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::Framework { capability, .. } => capability.to_string(),
                 Self::Builtin { capability, .. } => capability.to_string(),
                 Self::Namespace { capability, .. } => capability.to_string(),
-                Self::OfferAggregate { capability, .. } => capability.to_string(),
+                Self::FilteredAggregate { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::CollectionAggregate { capability, collections, component, .. } => {
+                Self::AnonymizedAggregate { capability, collections, component, .. } => {
                     format!(
                         "{} from collections '{}' of component '{}'",
                         capability,
@@ -178,11 +182,12 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
     }
 }
 
-/// A provider of a capability from an aggregation of one or more collections.
+/// A provider of a capability from an aggregation of one or more collections and static children.
+/// The instance names in the aggregate will be anonymized.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
 #[async_trait]
-pub trait CollectionAggregateCapabilityProvider<C: ComponentInstanceInterface>:
+pub trait AnonymizedAggregateCapabilityProvider<C: ComponentInstanceInterface>:
     Send + Sync
 {
     /// Lists the instances of the capability.
@@ -198,26 +203,26 @@ pub trait CollectionAggregateCapabilityProvider<C: ComponentInstanceInterface>:
     ) -> Result<CapabilitySource<C>, RoutingError>;
 
     /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn CollectionAggregateCapabilityProvider<C>>;
+    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>>;
 }
 
-impl<C: ComponentInstanceInterface> Clone for Box<dyn CollectionAggregateCapabilityProvider<C>> {
+impl<C: ComponentInstanceInterface> Clone for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
     fn clone(&self) -> Self {
         self.clone_boxed()
     }
 }
 
-impl<C> fmt::Debug for Box<dyn CollectionAggregateCapabilityProvider<C>> {
+impl<C> fmt::Debug for Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Box<dyn CollectionAggregateCapabilityProvider>").finish()
+        f.debug_struct("Box<dyn AnonymizedAggregateCapabilityProvider>").finish()
     }
 }
 
 /// The return value of the routing future returned by
-/// `OfferAggregateCapabilityProvider::route_instances`, which contains information about the
+/// `FilteredAggregateCapabilityProvider::route_instances`, which contains information about the
 /// source of the route.
 #[derive(Debug)]
-pub struct OfferAggregateCapabilityRouteData<C>
+pub struct FilteredAggregateCapabilityRouteData<C>
 where
     C: ComponentInstanceInterface,
 {
@@ -228,29 +233,30 @@ where
     pub instance_filter: Vec<NameMapping>,
 }
 
-/// A provider of a capability from an aggregation of zero or more offered instances of a capability.
+/// A provider of a capability from an aggregation of zero or more offered instances of a
+/// capability, with filters.
 ///
 /// This trait type-erases the capability type, so it can be handled and hosted generically.
-pub trait OfferAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
+pub trait FilteredAggregateCapabilityProvider<C: ComponentInstanceInterface>: Send + Sync {
     /// Return a list of futures to route every instance in the aggregate to its source. Each
     /// result is paired with the list of instances to include in the source.
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>>;
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>>;
 
     /// Trait-object compatible clone.
-    fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>>;
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>>;
 }
 
-impl<C: ComponentInstanceInterface> Clone for Box<dyn OfferAggregateCapabilityProvider<C>> {
+impl<C: ComponentInstanceInterface> Clone for Box<dyn FilteredAggregateCapabilityProvider<C>> {
     fn clone(&self) -> Self {
         self.clone_boxed()
     }
 }
 
-impl<C> fmt::Debug for Box<dyn OfferAggregateCapabilityProvider<C>> {
+impl<C> fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider<C>> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Box<dyn OfferAggregateCapabilityProvider>").finish()
+        f.debug_struct("Box<dyn FilteredAggregateCapabilityProvider>").finish()
     }
 }
 

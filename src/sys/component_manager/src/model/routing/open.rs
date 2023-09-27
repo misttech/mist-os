@@ -15,8 +15,8 @@ use {
                     NamespaceCapabilityProvider,
                 },
                 service::{
-                    AggregateServiceDirectoryProvider, CollectionServiceDirectory,
-                    CollectionServiceRoute,
+                    AnonymizedAggregateServiceDir, AnonymizedServiceRoute,
+                    FilteredAggregateServiceProvider,
                 },
                 RouteSource,
             },
@@ -217,10 +217,10 @@ impl<'a> OpenRequest<'a> {
                 }
                 _ => Ok(None),
             },
-            CapabilitySource::OfferAggregate { capability_provider, component, .. } => {
+            CapabilitySource::FilteredAggregate { capability_provider, component, .. } => {
                 // TODO(fxbug.dev/4776): This should cache the directory
                 Ok(Some(Box::new(
-                    AggregateServiceDirectoryProvider::new(
+                    FilteredAggregateServiceProvider::new(
                         component.clone(),
                         target,
                         capability_provider.clone(),
@@ -228,17 +228,19 @@ impl<'a> OpenRequest<'a> {
                     .await?,
                 )))
             }
-            CapabilitySource::CollectionAggregate {
+            CapabilitySource::AnonymizedAggregate {
                 capability,
                 component,
                 aggregate_capability_provider,
                 collections,
+                children,
             } => {
                 let source_component_instance = component.upgrade()?;
 
-                let route = CollectionServiceRoute {
+                let route = AnonymizedServiceRoute {
                     source_moniker: source_component_instance.moniker.clone(),
                     collections: collections.clone(),
+                    children: children.clone(),
                     service_name: capability.source_name().clone(),
                 };
 
@@ -257,7 +259,7 @@ impl<'a> OpenRequest<'a> {
                 // If there is an existing collection service directory, provide it.
                 {
                     let state = source_component_instance.lock_resolved_state().await?;
-                    if let Some(service_dir) = state.collection_services.get(&route) {
+                    if let Some(service_dir) = state.anonymized_services.get(&route) {
                         let provider = DirectoryEntryCapabilityProvider {
                             execution_scope: state.execution_scope().clone(),
                             entry: service_dir.dir_entry().await,
@@ -268,7 +270,7 @@ impl<'a> OpenRequest<'a> {
 
                 // Otherwise, create one. This must be done while the component ResolvedInstanceState
                 // is unlocked because the AggregateCapabilityProvider uses locked state.
-                let service_dir = Arc::new(CollectionServiceDirectory::new(
+                let service_dir = Arc::new(AnonymizedAggregateServiceDir::new(
                     component.clone(),
                     route.clone(),
                     aggregate_capability_provider.clone_boxed(),
@@ -281,7 +283,7 @@ impl<'a> OpenRequest<'a> {
                     let execution_scope = state.execution_scope().clone();
                     let entry = service_dir.dir_entry().await;
 
-                    state.collection_services.insert(route, service_dir.clone());
+                    state.anonymized_services.insert(route, service_dir.clone());
 
                     DirectoryEntryCapabilityProvider { execution_scope, entry }
                 };

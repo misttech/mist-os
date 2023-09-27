@@ -24,7 +24,7 @@ use {
         ns_dir::NamespaceDir,
         routing::{
             self, route_and_open_capability,
-            service::{CollectionServiceDirectory, CollectionServiceRoute},
+            service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
             OpenOptions, RouteRequest,
         },
     },
@@ -1318,8 +1318,8 @@ pub struct ResolvedInstanceState {
     /// relative to this component (for example, a component in a subpackage).
     /// If `None`, the resolver cannot resolve relative path component URLs.
     context_to_resolve_children: Option<ComponentResolutionContext>,
-    /// Service directories aggregated from children in this component's collection.
-    pub collection_services: HashMap<CollectionServiceRoute, Arc<CollectionServiceDirectory>>,
+    /// Anonymized service directories aggregated from collections and children.
+    pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
     /// The sandbox containing all capabilities that the parent wished to provide to us.
     pub sandbox_from_parent: Sandbox,
@@ -1364,7 +1364,7 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             context_to_resolve_children,
-            collection_services: HashMap::new(),
+            anonymized_services: HashMap::new(),
             decl,
             sandbox_from_parent: component_sandboxes.sandbox_from_parent,
             program_sandbox: component_sandboxes.program_sandbox.clone(),

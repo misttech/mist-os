@@ -273,14 +273,6 @@ pub enum RoutingError {
     )]
     UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
-    #[error(
-        "`{}` was queried in an aggregate for `{}` at `{}` but it does not contain that child.",
-        child_moniker,
-        capability,
-        moniker
-    )]
-    UnexpectedChildInAggregate { child_moniker: ChildName, moniker: Moniker, capability: Name },
-
     #[error("Routing a capability from an unsupported source type: {}.", source_type)]
     UnsupportedRouteSource { source_type: String },
 

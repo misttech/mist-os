@@ -24,7 +24,7 @@ use {
             AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
         },
         collection::{
-            CollectionAggregateServiceProvider, OfferAggregateServiceProvider,
+            AnonymizedAggregateServiceProvider, OfferAggregateServiceProvider,
             OfferFilteredServiceProvider,
         },
         component_instance::{
@@ -226,7 +226,7 @@ where
                             component.clone(),
                             capability,
                         ));
-                        return Ok(CapabilitySource::<C>::OfferAggregate {
+                        return Ok(CapabilitySource::<C>::FilteredAggregate {
                             capability: AggregateCapability::Service(source_name),
                             component,
                             capability_provider,
@@ -236,31 +236,46 @@ where
             }
             Ok(capability_source)
         }
-        OfferResult::OfferFromCollectionAggregate(offers, aggregation_component) => {
-            let collections: Vec<_> = offers
-                .iter()
-                .map(|e| match e.source() {
-                    OfferSource::Collection(n) => n.clone(),
-                    _ => unreachable!("this was checked before"),
-                })
-                .collect();
+        OfferResult::OfferFromAnonymizedAggregate(offers, aggregation_component) => {
+            let mut collections = vec![];
+            let mut children = vec![];
+            for o in offers.iter() {
+                match o.source() {
+                    OfferSource::Collection(n) => {
+                        collections.push(n.clone());
+                    }
+                    OfferSource::Child(c) => {
+                        assert!(
+                            c.collection.is_none(),
+                            "Anonymized offer source contained a dynamic child"
+                        );
+                        children.push(
+                            ChildName::try_new(c.name.clone(), None)
+                                .expect("child source should be convertible to ChildName"),
+                        );
+                    }
+                    _ => unreachable!("impossible source"),
+                }
+            }
             let first_offer = offers.iter().next().unwrap();
-            Ok(CapabilitySource::<C>::CollectionAggregate {
+            Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
                 component: aggregation_component.as_weak(),
-                aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
+                aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
                     collections: collections.clone(),
+                    children: children.clone(),
                     phantom_expose: std::marker::PhantomData::<E> {},
-                    collection_component: aggregation_component.as_weak(),
+                    containing_component: aggregation_component.as_weak(),
                     capability_name: first_offer.source_name().clone(),
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                     mapper: mapper.clone(),
                 }),
-                collections: collections.clone(),
+                collections,
+                children,
             })
         }
-        OfferResult::OfferFromChildAggregate(offers, aggregation_component) => {
+        OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
             // Check that all of the service offers contain non-conflicting filter instances.
             let mut seen_instances: HashSet<String> = HashSet::new();
             for o in offers.iter() {
@@ -303,7 +318,7 @@ where
             );
             // TODO(fxbug.dev/71881) Make the Collection CapabilitySource type generic
             // for other types of aggregations.
-            Ok(CapabilitySource::<C>::OfferAggregate {
+            Ok(CapabilitySource::<C>::FilteredAggregate {
                 capability: AggregateCapability::Service(source_name),
                 component: aggregation_component.as_weak(),
                 capability_provider: Box::new(OfferAggregateServiceProvider::new(
@@ -348,21 +363,31 @@ where
 {
     match Expose::route(expose, expose_target, &sources, visitor, mapper, route).await? {
         ExposeResult::Source(source) => Ok(source),
-        ExposeResult::ExposeFromAggregate(expose, aggregation_component) => {
-            let collections: Vec<_> = expose
-                .iter()
-                .map(|e| match e.source() {
-                    ExposeSource::Collection(n) => n.clone(),
+        ExposeResult::ExposeFromAnonymizedAggregate(expose, aggregation_component) => {
+            let mut collections = vec![];
+            let mut children = vec![];
+            for e in expose.iter() {
+                match e.source() {
+                    ExposeSource::Collection(n) => {
+                        collections.push(n.clone());
+                    }
+                    ExposeSource::Child(n) => {
+                        children.push(
+                            ChildName::try_new(n.clone(), None)
+                                .expect("child source should be convertible to ChildName"),
+                        );
+                    }
                     _ => unreachable!("this was checked before"),
-                })
-                .collect();
+                }
+            }
             let first_expose = expose.iter().next().expect("empty bundle");
-            Ok(CapabilitySource::<C>::CollectionAggregate {
+            Ok(CapabilitySource::<C>::AnonymizedAggregate {
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
                 component: aggregation_component.as_weak(),
-                aggregate_capability_provider: Box::new(CollectionAggregateServiceProvider {
+                aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
                     collections: collections.clone(),
-                    collection_component: aggregation_component.as_weak(),
+                    children: children.clone(),
+                    containing_component: aggregation_component.as_weak(),
                     phantom_expose: std::marker::PhantomData::<E>,
                     capability_name: first_expose.source_name().clone(),
                     sources: sources.clone(),
@@ -370,6 +395,7 @@ where
                     mapper: mapper.clone(),
                 }),
                 collections,
+                children,
             })
         }
     }
@@ -476,12 +502,12 @@ where
             // that this kind of declaration cannot exist.
             unreachable!("found offer from child but capability cannot be exposed")
         }
-        OfferResult::OfferFromCollectionAggregate(_, _) => {
+        OfferResult::OfferFromAnonymizedAggregate(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
             // that this kind of declaration cannot exist.
             unreachable!("found offer from collections but capability cannot be exposed")
         }
-        OfferResult::OfferFromChildAggregate(_, _) => {
+        OfferResult::OfferFromFilteredAggregate(_, _) => {
             // This condition should not happen since cm_fidl_validator ensures
             // that this kind of declaration cannot exist.
             unreachable!("found offer from aggregate but capability cannot be exposed")
@@ -1048,10 +1074,10 @@ enum OfferResult<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
     /// The Offer led to an Offer-from-child declaration.
     /// Not all capabilities can be exposed, so let the caller decide how to handle this.
     OfferFromChild(O, Arc<C>),
-    /// Offer from multiple static children.
-    OfferFromChildAggregate(RouteBundle<O>, Arc<C>),
-    /// Offer from one or more collections.
-    OfferFromCollectionAggregate(RouteBundle<O>, Arc<C>),
+    /// Offer from multiple static children, with filters.
+    OfferFromFilteredAggregate(RouteBundle<O>, Arc<C>),
+    /// Offer from one or more collections and/or static children.
+    OfferFromAnonymizedAggregate(RouteBundle<O>, Arc<C>),
 }
 
 enum OfferSegment<C: ComponentInstanceInterface, O: Clone + fmt::Debug> {
@@ -1102,6 +1128,25 @@ where
                 });
             }
 
+            fn is_filtered_offer<O>(o: &O) -> bool
+            where
+                O: Clone + Into<OfferDecl>,
+            {
+                if let OfferDecl::Service(offer_service) = o.clone().into() {
+                    if let Some(f) = offer_service.source_instance_filter.as_ref() {
+                        if !f.is_empty() {
+                            return true;
+                        }
+                    }
+                    if let Some(f) = offer_service.renamed_instances.as_ref() {
+                        if !f.is_empty() {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+
             match offer_bundle {
                 RouteBundle::Single(offer) => {
                     match Self::route_segment(offer, target, sources, visitor, mapper).await? {
@@ -1113,19 +1158,18 @@ where
                     }
                 }
                 RouteBundle::Aggregate(_) => {
-                    if offer_bundle.iter().all(|e| matches!(e.source(), OfferSource::Collection(_)))
-                    {
-                        return Ok(OfferResult::OfferFromCollectionAggregate(offer_bundle, target));
-                    } else if offer_bundle
-                        .iter()
-                        .all(|e| !matches!(e.source(), OfferSource::Collection(_)))
-                    {
-                        return Ok(OfferResult::OfferFromChildAggregate(offer_bundle, target));
-                    } else {
-                        // TODO(fxbug.dev/4776): Support aggregation over collections and children.
+                    let decl_target = offer_bundle.iter().next().unwrap().target();
+                    if offer_bundle.iter().any(|o| o.target() != decl_target) {
+                        // TODO(fxbug.dev/298698003): This situation should be caught by the
+                        // validator, but due to this bug it is not. Fail the route.
                         return Err(RoutingError::UnsupportedRouteSource {
-                            source_type: "mix of collections and child routes".into(),
+                            source_type: "disallowed aggregate".into(),
                         });
+                    }
+                    if offer_bundle.iter().all(|o| !is_filtered_offer(o)) {
+                        return Ok(OfferResult::OfferFromAnonymizedAggregate(offer_bundle, target));
+                    } else {
+                        return Ok(OfferResult::OfferFromFilteredAggregate(offer_bundle, target));
                     }
                 }
             }
@@ -1172,7 +1216,7 @@ where
                                 component.clone(),
                                 capability,
                             ));
-                            OfferResult::Source(CapabilitySource::<C>::OfferAggregate {
+                            OfferResult::Source(CapabilitySource::<C>::FilteredAggregate {
                                 capability: AggregateCapability::Service(source_name),
                                 component,
                                 capability_provider,
@@ -1255,7 +1299,7 @@ where
             }
             OfferSource::Child(_) => OfferSegment::Done(OfferResult::OfferFromChild(offer, target)),
             OfferSource::Collection(_) => OfferSegment::Done(
-                OfferResult::OfferFromCollectionAggregate(RouteBundle::from_offer(offer), target),
+                OfferResult::OfferFromAnonymizedAggregate(RouteBundle::from_offer(offer), target),
             ),
         };
         Ok(res)
@@ -1313,8 +1357,8 @@ pub struct Expose<E>(PhantomData<E>);
 enum ExposeResult<C: ComponentInstanceInterface, E: Clone + fmt::Debug> {
     /// The source of the Expose was found (Framework, Component, etc.).
     Source(CapabilitySource<C>),
-    /// The source of the Expose comes from an aggregation of collections
-    ExposeFromAggregate(RouteBundle<E>, Arc<C>),
+    /// The source of the Expose comes from an aggregation of collections and/or static children
+    ExposeFromAnonymizedAggregate(RouteBundle<E>, Arc<C>),
 }
 
 /// A bundle of one or more routing declarations to route together, that share the same target_name
@@ -1533,7 +1577,7 @@ where
                             source_type: "mix of collections and child routes".into(),
                         });
                     }
-                    return Ok(ExposeResult::ExposeFromAggregate(expose_bundle, target));
+                    return Ok(ExposeResult::ExposeFromAnonymizedAggregate(expose_bundle, target));
                 }
             }
         }
@@ -1607,10 +1651,12 @@ where
                     })?;
                 ExposeSegment::Next(child_exposes, child_component)
             }
-            ExposeSource::Collection(_) => ExposeSegment::Done(ExposeResult::ExposeFromAggregate(
-                RouteBundle::from_expose(expose),
-                target,
-            )),
+            ExposeSource::Collection(_) => {
+                ExposeSegment::Done(ExposeResult::ExposeFromAnonymizedAggregate(
+                    RouteBundle::from_expose(expose),
+                    target,
+                ))
+            }
         };
         Ok(res)
     }

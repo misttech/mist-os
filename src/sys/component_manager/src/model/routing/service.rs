@@ -28,7 +28,7 @@ use {
     futures::FutureExt,
     moniker::{ChildName, ExtendedMoniker, Moniker, MonikerBase},
     routing::capability_source::{
-        CollectionAggregateCapabilityProvider, OfferAggregateCapabilityProvider,
+        AnonymizedAggregateCapabilityProvider, FilteredAggregateCapabilityProvider,
     },
     std::{
         collections::HashMap,
@@ -52,7 +52,7 @@ const OPEN_SERVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
 /// Serves a Service directory that allows clients to list instances resulting from an aggregation of service offers
 /// and to open instances.
 ///
-pub struct AggregateServiceDirectoryProvider {
+pub struct FilteredAggregateServiceProvider {
     /// Execution scope for requests to `dir`. This is the same scope
     /// as the one in `collection_component`'s resolved state.
     execution_scope: ExecutionScope,
@@ -62,21 +62,21 @@ pub struct AggregateServiceDirectoryProvider {
     dir: Arc<SimpleImmutableDir>,
 }
 
-impl AggregateServiceDirectoryProvider {
+impl FilteredAggregateServiceProvider {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn OfferAggregateCapabilityProvider<ComponentInstance>>,
-    ) -> Result<AggregateServiceDirectoryProvider, ModelError> {
+        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
+    ) -> Result<FilteredAggregateServiceProvider, ModelError> {
         let execution_scope =
             parent.upgrade()?.lock_resolved_state().await?.execution_scope().clone();
-        let dir = AggregateServiceDirectory::new(parent, target, provider).await?;
-        Ok(AggregateServiceDirectoryProvider { execution_scope, dir })
+        let dir = FilteredAggregateServiceDir::new(parent, target, provider).await?;
+        Ok(FilteredAggregateServiceProvider { execution_scope, dir })
     }
 }
 
 #[async_trait]
-impl CapabilityProvider for AggregateServiceDirectoryProvider {
+impl CapabilityProvider for FilteredAggregateServiceProvider {
     async fn open(
         self: Box<Self>,
         _task_group: TaskGroup,
@@ -108,13 +108,13 @@ impl CapabilityProvider for AggregateServiceDirectoryProvider {
 /// This directory can be accessed by components by opening `/svc/my.service/` in their
 /// incoming namespace when they have a `use my.service` declaration in their manifest, and the
 /// source of `my.service` is multiple services.
-struct AggregateServiceDirectory {}
+struct FilteredAggregateServiceDir {}
 
-impl AggregateServiceDirectory {
+impl FilteredAggregateServiceDir {
     pub async fn new(
         parent: WeakComponentInstance,
         target: WeakComponentInstance,
-        provider: Box<dyn OfferAggregateCapabilityProvider<ComponentInstance>>,
+        provider: Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>>,
     ) -> Result<Arc<SimpleImmutableDir>, ModelError> {
         let futs: Vec<_> = provider
             .route_instances()
@@ -162,43 +162,51 @@ impl AggregateServiceDirectory {
     }
 }
 
-/// Represents a routed service capability from a collection in the source component.
+/// Represents a routed service capability from an anonymized aggregate defined in a component.
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
-pub struct CollectionServiceRoute {
-    /// Moniker of the component that contains the collection.
+pub struct AnonymizedServiceRoute {
+    /// Moniker of the component that defines the anonymized aggregate.
     pub source_moniker: Moniker,
 
-    /// All collections over which the aggregated service is exposed.
+    /// All collections over which the service is aggregated.
     pub collections: Vec<Name>,
+
+    /// All static children over which the service is aggregated.
+    pub children: Vec<ChildName>,
 
     /// Name of the service exposed from the collection.
     pub service_name: Name,
 }
 
-impl CollectionServiceRoute {
-    /// Returns true if the component with `moniker` is a child of the collection in this route.
+impl AnonymizedServiceRoute {
+    /// Returns true if the component with `moniker` is a member of a collection or static child in
+    /// this route.
     fn matches_child_component(&self, moniker: &Moniker) -> bool {
         let component_parent_moniker = match moniker.parent() {
             Some(moniker) => moniker,
             None => {
-                // Component is the root component, and so cannot be in a collection.
+                // Component is the root component, and so cannot be in an aggregate.
                 return false;
             }
         };
 
-        let component_leaf_moniker = match moniker.leaf() {
-            Some(moniker) => moniker,
+        let component_leaf_name = match moniker.leaf() {
+            Some(n) => n,
             None => {
-                // Component is the root component, and so cannot be in a collection.
+                // Component is the root component, and so cannot be in an aggregate.
                 return false;
             }
         };
 
-        self.source_moniker == component_parent_moniker
-            && component_leaf_moniker
-                .collection
-                .as_ref()
-                .map_or(false, |collection| self.collections.contains(collection.into()))
+        if self.source_moniker != component_parent_moniker {
+            return false;
+        }
+
+        if let Some(collection) = component_leaf_name.collection.as_ref() {
+            self.collections.contains(collection)
+        } else {
+            self.children.contains(component_leaf_name)
+        }
     }
 
     /// Returns true if the component exposes the same services aggregated in this route.
@@ -209,7 +217,7 @@ impl CollectionServiceRoute {
     }
 }
 
-struct CollectionServiceDirectoryInner {
+struct AnonymizedAggregateServiceDirInner {
     /// Directory that contains all aggregated service instances.
     pub dir: Arc<SimpleImmutableDir>,
 
@@ -223,36 +231,36 @@ struct CollectionServiceDirectoryInner {
     >,
 }
 
-pub struct CollectionServiceDirectory {
+pub struct AnonymizedAggregateServiceDir {
     /// The parent component of the collection and aggregated service.
     parent: WeakComponentInstance,
 
     /// The route for the service capability backed by this directory.
-    route: CollectionServiceRoute,
+    route: AnonymizedServiceRoute,
 
     /// The provider of service capabilities for the collection being aggregated.
     ///
     /// This returns routed `CapabilitySourceInterface`s to a service capability for a
     /// component instance in the collection.
     aggregate_capability_provider:
-        Box<dyn CollectionAggregateCapabilityProvider<ComponentInstance>>,
+        Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>>,
 
-    inner: Mutex<CollectionServiceDirectoryInner>,
+    inner: Mutex<AnonymizedAggregateServiceDirInner>,
 }
 
-impl CollectionServiceDirectory {
+impl AnonymizedAggregateServiceDir {
     pub fn new(
         parent: WeakComponentInstance,
-        route: CollectionServiceRoute,
+        route: AnonymizedServiceRoute,
         aggregate_capability_provider: Box<
-            dyn CollectionAggregateCapabilityProvider<ComponentInstance>,
+            dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>,
         >,
     ) -> Self {
-        CollectionServiceDirectory {
+        AnonymizedAggregateServiceDir {
             parent,
             route,
             aggregate_capability_provider,
-            inner: Mutex::new(CollectionServiceDirectoryInner {
+            inner: Mutex::new(AnonymizedAggregateServiceDirInner {
                 dir: simple_immutable_dir(),
                 entries: HashMap::new(),
             }),
@@ -261,7 +269,7 @@ impl CollectionServiceDirectory {
 
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
         vec![HooksRegistration::new(
-            "CollectionServiceDirectory",
+            "AnonymizedAggregateServiceDir",
             vec![EventType::CapabilityRouted, EventType::Started, EventType::Stopped],
             Arc::downgrade(self) as Weak<dyn Hook>,
         )]
@@ -480,7 +488,7 @@ impl CollectionServiceDirectory {
 }
 
 #[async_trait]
-impl Hook for CollectionServiceDirectory {
+impl Hook for AnonymizedAggregateServiceDir {
     async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
         match &event.payload {
             EventPayload::Started { component_decl, .. } => {
@@ -515,9 +523,10 @@ pub struct ServiceInstanceDirectoryEntry<T: Send + Sync + 'static + fmt::Display
     /// This is a generic type because it varies between aggregated directory types. For example,
     /// for aggregated offers this an instance in the source instance filter,
     /// while for aggregated collections it is the moniker of the source child.
-    // TODO(fxbug.dev/4776): CollectionServiceDirectory needs this, but AggregateServiceDirectory
-    // only uses this for debug info. We could probably have CollectionServiceDirectory use
-    // ServiceInstanceDirectoryKey.source_id instead, and either delete this or make it debug-only.
+    // TODO(fxbug.dev/294909269): AnonymizedAggregateServiceDir needs this, but
+    // FilteredAggregateServiceDir only uses this for debug info. We could probably have
+    // AnonymizedAggregateServiceDir use ServiceInstanceDirectoryKey.source_id instead, and either
+    // delete this or make it debug-only.
     pub source_id: T,
 
     /// The name of the service instance directory to open at the source.
@@ -608,8 +617,8 @@ mod tests {
         },
         ::routing::{
             capability_source::{
-                CollectionAggregateCapabilityProvider, ComponentCapability,
-                OfferAggregateCapabilityProvider, OfferAggregateCapabilityRouteData,
+                AnonymizedAggregateCapabilityProvider, ComponentCapability,
+                FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
             },
             component_instance::ComponentInstanceInterface,
             error::RoutingError,
@@ -617,6 +626,7 @@ mod tests {
         cm_rust::*,
         cm_rust_testing::{ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder},
         fuchsia_async as fasync,
+        maplit::hashmap,
         moniker::{ChildName, Moniker, MonikerBase},
         proptest::prelude::*,
         rand::SeedableRng,
@@ -628,12 +638,12 @@ mod tests {
     };
 
     #[derive(Clone)]
-    struct MockCollectionCapabilityProvider {
+    struct MockAnonymizedCapabilityProvider {
         instances: HashMap<ChildName, WeakComponentInstance>,
     }
 
     #[async_trait]
-    impl CollectionAggregateCapabilityProvider<ComponentInstance> for MockCollectionCapabilityProvider {
+    impl AnonymizedAggregateCapabilityProvider<ComponentInstance> for MockAnonymizedCapabilityProvider {
         async fn route_instance(
             &self,
             instance: &ChildName,
@@ -659,7 +669,7 @@ mod tests {
             Ok(self.instances.keys().cloned().collect())
         }
 
-        fn clone_boxed(&self) -> Box<dyn CollectionAggregateCapabilityProvider<ComponentInstance>> {
+        fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<ComponentInstance>> {
             Box::new(self.clone())
         }
     }
@@ -671,13 +681,13 @@ mod tests {
     }
 
     #[async_trait]
-    impl OfferAggregateCapabilityProvider<ComponentInstance> for MockOfferCapabilityProvider {
+    impl FilteredAggregateCapabilityProvider<ComponentInstance> for MockOfferCapabilityProvider {
         fn route_instances(
             &self,
         ) -> Vec<
             BoxFuture<
                 '_,
-                Result<OfferAggregateCapabilityRouteData<ComponentInstance>, RoutingError>,
+                Result<FilteredAggregateCapabilityRouteData<ComponentInstance>, RoutingError>,
             >,
         > {
             let capability_source = CapabilitySource::Component {
@@ -687,7 +697,7 @@ mod tests {
                 }),
                 component: self.component.clone(),
             };
-            let data = OfferAggregateCapabilityRouteData::<ComponentInstance> {
+            let data = FilteredAggregateCapabilityRouteData::<ComponentInstance> {
                 capability_source,
                 instance_filter: self.instance_filter.clone(),
             };
@@ -695,7 +705,7 @@ mod tests {
             vec![Box::pin(fut)]
         }
 
-        fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<ComponentInstance>> {
+        fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<ComponentInstance>> {
             Box::new(self.clone())
         }
     }
@@ -718,6 +728,19 @@ mod tests {
     }
 
     fn create_test_component_decls() -> Vec<(&'static str, ComponentDecl)> {
+        let leaf_component_decl = ComponentDeclBuilder::new()
+            .expose(ExposeDecl::Service(ExposeServiceDecl {
+                source: ExposeSource::Self_,
+                source_name: "my.service.Service".parse().unwrap(),
+                target_name: "my.service.Service".parse().unwrap(),
+                target: ExposeTarget::Parent,
+                availability: cm_rust::Availability::Required,
+            }))
+            .service(ServiceDecl {
+                name: "my.service.Service".parse().unwrap(),
+                source_path: Some("/svc/my.service.Service".parse().unwrap()),
+            })
+            .build();
         vec![
             (
                 "root",
@@ -743,58 +766,34 @@ mod tests {
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
                     }))
+                    .expose(ExposeDecl::Service(ExposeServiceDecl {
+                        source: ExposeSource::Child("static_a".into()),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
+                        target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
+                    }))
+                    .expose(ExposeDecl::Service(ExposeServiceDecl {
+                        source: ExposeSource::Child("static_b".into()),
+                        source_name: "my.service.Service".parse().unwrap(),
+                        target_name: "my.service.Service".parse().unwrap(),
+                        target: ExposeTarget::Parent,
+                        availability: cm_rust::Availability::Required,
+                    }))
                     .add_collection(CollectionDeclBuilder::new_transient_collection("coll1"))
                     .add_collection(CollectionDeclBuilder::new_transient_collection("coll2"))
+                    .add_lazy_child("static_a")
+                    .add_lazy_child("static_b")
+                    // This child is not included in the aggregate.
+                    .add_lazy_child("static_c")
                     .build(),
             ),
-            (
-                "foo",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .service(ServiceDecl {
-                        name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                    })
-                    .build(),
-            ),
-            (
-                "bar",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .service(ServiceDecl {
-                        name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                    })
-                    .build(),
-            ),
-            (
-                "baz",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "my.service.Service".parse().unwrap(),
-                        target_name: "my.service.Service".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .service(ServiceDecl {
-                        name: "my.service.Service".parse().unwrap(),
-                        source_path: Some("/svc/my.service.Service".parse().unwrap()),
-                    })
-                    .build(),
-            ),
+            ("foo", leaf_component_decl.clone()),
+            ("bar", leaf_component_decl.clone()),
+            ("baz", leaf_component_decl.clone()),
+            ("static_a", leaf_component_decl.clone()),
+            ("static_b", leaf_component_decl.clone()),
+            ("static_c", leaf_component_decl.clone()),
         ]
     }
 
@@ -803,7 +802,7 @@ mod tests {
         original_entries: Vec<fuchsia_fs::directory::DirEntry>,
     ) -> Vec<fuchsia_fs::directory::DirEntry> {
         loop {
-            // TODO(fxbug.dev/4776): Once component manager supports watching for
+            // TODO(fxbug.dev/294909269): Now that component manager supports watching for
             // service instances, this loop should be replaced by a watcher.
             let updated_entries = fuchsia_fs::directory::readdir(dir_proxy)
                 .await
@@ -815,9 +814,9 @@ mod tests {
         }
     }
 
-    async fn create_collection_service_test_realm(
+    async fn create_anonymized_service_test_realm(
         init_service_dir: bool,
-    ) -> (RoutingTest, Arc<CollectionServiceDirectory>) {
+    ) -> (RoutingTest, Arc<AnonymizedAggregateServiceDir>) {
         let components = create_test_component_decls();
 
         let mock_single_instance = pseudo_directory! {
@@ -843,12 +842,27 @@ mod tests {
             .add_outgoing_path(
                 "bar",
                 "/svc/my.service.Service".parse().unwrap(),
-                mock_single_instance,
+                mock_single_instance.clone(),
             )
             .add_outgoing_path(
                 "baz",
                 "/svc/my.service.Service".parse().unwrap(),
                 mock_dual_instance,
+            )
+            .add_outgoing_path(
+                "static_a",
+                "/svc/my.service.Service".parse().unwrap(),
+                mock_single_instance.clone(),
+            )
+            .add_outgoing_path(
+                "static_b",
+                "/svc/my.service.Service".parse().unwrap(),
+                mock_single_instance.clone(),
+            )
+            .add_outgoing_path(
+                "static_c",
+                "/svc/my.service.Service".parse().unwrap(),
+                mock_single_instance,
             )
             .build()
             .await;
@@ -871,40 +885,34 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("baz"),
         )
         .await;
-        let foo_component = test
-            .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .expect("failed to find foo instance");
-        let bar_component = test
-            .model
-            .look_up(&vec!["coll1:bar"].try_into().unwrap())
-            .await
-            .expect("failed to find bar instance");
-        let baz_component = test
-            .model
-            .look_up(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .expect("failed to find baz instance");
+        let foo_component = test.model.look_up(&"coll1:foo".parse().unwrap()).await.unwrap();
+        let bar_component = test.model.look_up(&"coll1:bar".parse().unwrap()).await.unwrap();
+        let baz_component = test.model.look_up(&"coll2:baz".parse().unwrap()).await.unwrap();
+        let static_a_component = test.model.look_up(&"static_a".parse().unwrap()).await.unwrap();
+        let static_b_component = test.model.look_up(&"static_b".parse().unwrap()).await.unwrap();
 
-        let provider = MockCollectionCapabilityProvider {
-            instances: {
-                let mut instances = HashMap::new();
-                instances.insert("coll1:foo".try_into().unwrap(), foo_component.as_weak());
-                instances.insert("coll1:bar".try_into().unwrap(), bar_component.as_weak());
-                instances.insert("coll2:baz".try_into().unwrap(), baz_component.as_weak());
-                instances
+        let provider = MockAnonymizedCapabilityProvider {
+            instances: hashmap! {
+                "coll1:foo".try_into().unwrap() => foo_component.as_weak(),
+                "coll1:bar".try_into().unwrap() => bar_component.as_weak(),
+                "coll2:baz".try_into().unwrap() => baz_component.as_weak(),
+                "static_a".try_into().unwrap() => static_a_component.as_weak(),
+                "static_b".try_into().unwrap() => static_b_component.as_weak(),
             },
         };
 
-        let route = CollectionServiceRoute {
+        let route = AnonymizedServiceRoute {
             source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
+            children: vec!["static_a".try_into().unwrap(), "static_b".try_into().unwrap()],
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir =
-            CollectionServiceDirectory::new(test.model.root().as_weak(), route, Box::new(provider));
+        let dir = AnonymizedAggregateServiceDir::new(
+            test.model.root().as_weak(),
+            route,
+            Box::new(provider),
+        );
 
         if init_service_dir {
             dir.add_entries_from_children().await.expect("failed to add entries");
@@ -916,8 +924,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_collection_service_directory() {
-        let (test, dir_arc) = create_collection_service_test_realm(true).await;
+    async fn test_anonymized_service_directory() {
+        let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
 
@@ -930,7 +938,7 @@ mod tests {
                 .await
                 .expect("failed to read directory entries");
             let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
-            assert_eq!(instance_names.len(), 4);
+            assert_eq!(instance_names.len(), 6);
             assert_eq!(dir_instance_names, instance_names);
             instance_names
         };
@@ -952,11 +960,10 @@ mod tests {
             assert!(instance_dir_contents.iter().find(|d| d.name == "member").is_some());
         }
 
-        let baz_component = test
-            .model
-            .look_up(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .expect("failed to find baz instance");
+        let baz_component =
+            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+        let static_a_component =
+            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
         // Add entries from the children again. This should be a no-op since all of them are
         // already there and we prevent duplicates.
@@ -984,40 +991,40 @@ mod tests {
             dir_contents
         };
 
-        // Test that removal of instances works.
+        // Test that removal of instances works (both dynamic and static).
         {
-            baz_component.stop().await.expect("failed to shutdown component");
-            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-            assert_eq!(dir_contents.len(), 2);
-
-            test.start_instance_and_wait_start(baz_component.moniker())
-                .await
-                .expect("component should start");
-
+            baz_component.stop().await.unwrap();
             let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
             assert_eq!(dir_contents.len(), 4);
+
+            static_a_component.stop().await.unwrap();
+            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+            assert_eq!(dir_contents.len(), 3);
+
+            test.start_instance_and_wait_start(static_a_component.moniker()).await.unwrap();
+            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+            assert_eq!(dir_contents.len(), 4);
+
+            test.start_instance_and_wait_start(baz_component.moniker()).await.unwrap();
+            let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
+            assert_eq!(dir_contents.len(), 6);
         }
     }
 
     #[fuchsia::test]
-    async fn test_collection_service_directory_component_started() {
-        let (test, dir_arc) = create_collection_service_test_realm(false).await;
+    async fn test_anonymized_service_directory_component_started() {
+        let (test, dir_arc) = create_anonymized_service_test_realm(false).await;
 
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
 
-        let entries = fuchsia_fs::directory::readdir(&dir_proxy)
-            .await
-            .expect("failed to read directory entries");
+        let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
         // should be no entries in a non initialized collection service dir.
         assert_eq!(instance_names.len(), 0);
 
-        let foo_component = test
-            .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .expect("failed to find foo instance");
+        let foo_component =
+            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that starting an instance results in the collection service directory adding the
         // relevant instances.
@@ -1025,57 +1032,62 @@ mod tests {
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 1);
 
-        let baz_component = test
-            .model
-            .look_up(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .expect("failed to find baz instance");
+        let baz_component =
+            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
 
         // Test with second collection
         baz_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 3);
+
+        let static_a_component =
+            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
+
+        // Test with static child
+        static_a_component.start(&StartReason::Eager, None, vec![], vec![]).await.unwrap();
+        let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
+        assert_eq!(entries.len(), 4);
     }
 
     #[fuchsia::test]
-    async fn test_collection_service_directory_component_stopped() {
-        let (test, dir_arc) = create_collection_service_test_realm(true).await;
+    async fn test_anonymized_service_directory_component_stopped() {
+        let (test, dir_arc) = create_anonymized_service_test_realm(true).await;
 
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir_arc.dir_entry().await);
 
         // List the entries of the directory served by `open`.
-        let entries = fuchsia_fs::directory::readdir(&dir_proxy)
-            .await
-            .expect("failed to read directory entries");
+        let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         let instance_names: HashSet<String> = entries.iter().map(|d| d.name.clone()).collect();
-        assert_eq!(instance_names.len(), 4);
+        assert_eq!(instance_names.len(), 6);
 
-        let foo_component = test
-            .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .expect("failed to find baz instance");
+        let foo_component =
+            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
         // Test that removal of instances works
-        foo_component.stop().await.expect("failed to shutdown component");
+        foo_component.stop().await.unwrap();
+        let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
+        assert_eq!(entries.len(), 5);
+
+        let baz_component =
+            test.model.look_up(&vec!["coll2:baz"].try_into().unwrap()).await.unwrap();
+
+        // Test with second collection
+        baz_component.stop().await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
         assert_eq!(entries.len(), 3);
 
-        let baz_component = test
-            .model
-            .look_up(&vec!["coll2:baz"].try_into().unwrap())
-            .await
-            .expect("failed to find baz instance");
+        let static_a_component =
+            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
-        // Test with second collection
-        baz_component.stop().await.expect("failed to shutdown component");
+        // Test with static child
+        static_a_component.stop().await.unwrap();
         let entries = wait_for_dir_content_change(&dir_proxy, entries).await;
-        assert_eq!(entries.len(), 1);
+        assert_eq!(entries.len(), 2);
     }
 
     #[fuchsia::test]
-    async fn test_collection_service_directory_failed_to_route_child() {
+    async fn test_anonymized_service_directory_failed_to_route_child() {
         let components = create_test_component_decls();
 
         let mock_single_instance = pseudo_directory! {
@@ -1110,39 +1122,36 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component = test
-            .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .expect("failed to find foo instance");
+        let foo_component =
+            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
 
-        let provider = MockCollectionCapabilityProvider {
-            instances: {
-                let mut instances = HashMap::new();
-                instances.insert("coll1:foo".try_into().unwrap(), foo_component.as_weak());
+        let provider = MockAnonymizedCapabilityProvider {
+            instances: hashmap! {
+                "coll1:foo".try_into().unwrap() => foo_component.as_weak(),
                 // "bar" not added to induce a routing failure on route_instance
-                instances
             },
         };
 
-        let route = CollectionServiceRoute {
+        let route = AnonymizedServiceRoute {
             source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap()],
+            children: vec![],
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir =
-            CollectionServiceDirectory::new(test.model.root().as_weak(), route, Box::new(provider));
+        let dir = AnonymizedAggregateServiceDir::new(
+            test.model.root().as_weak(),
+            route,
+            Box::new(provider),
+        );
 
-        dir.add_entries_from_children().await.expect("failed to add entries");
+        dir.add_entries_from_children().await.unwrap();
         // Entries from foo should be available even though we can't route to bar
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
 
         // List the entries of the directory served by `open`.
-        let entries = fuchsia_fs::directory::readdir(&dir_proxy)
-            .await
-            .expect("failed to read directory entries");
+        let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
         assert_eq!(instance_names.len(), 1);
         for instance in instance_names {
@@ -1151,7 +1160,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_collection_readdir() {
+    async fn test_anonymized_service_directory_readdir() {
         let components = create_test_component_decls();
 
         let mock_instance_foo = pseudo_directory! {
@@ -1163,9 +1172,18 @@ mod tests {
             "one" => pseudo_directory! {},
         };
 
+        let mock_instance_static_a = pseudo_directory! {
+            "default" => pseudo_directory! {}
+        };
+
         let test = RoutingTestBuilder::new("root", components)
             .add_outgoing_path("foo", "/svc/my.service.Service".parse().unwrap(), mock_instance_foo)
             .add_outgoing_path("bar", "/svc/my.service.Service".parse().unwrap(), mock_instance_bar)
+            .add_outgoing_path(
+                "static_a",
+                "/svc/my.service.Service".parse().unwrap(),
+                mock_instance_static_a,
+            )
             .build()
             .await;
 
@@ -1181,46 +1199,43 @@ mod tests {
             ChildDeclBuilder::new_lazy_child("bar"),
         )
         .await;
-        let foo_component = test
-            .model
-            .look_up(&vec!["coll1:foo"].try_into().unwrap())
-            .await
-            .expect("failed to find foo instance");
-        let bar_component = test
-            .model
-            .look_up(&vec!["coll2:bar"].try_into().unwrap())
-            .await
-            .expect("failed to find bar instance");
+        let foo_component =
+            test.model.look_up(&vec!["coll1:foo"].try_into().unwrap()).await.unwrap();
+        let bar_component =
+            test.model.look_up(&vec!["coll2:bar"].try_into().unwrap()).await.unwrap();
+        let static_a_component =
+            test.model.look_up(&vec!["static_a"].try_into().unwrap()).await.unwrap();
 
-        let provider = MockCollectionCapabilityProvider {
-            instances: {
-                let mut instances = HashMap::new();
-                instances.insert("coll1:foo".try_into().unwrap(), foo_component.as_weak());
-                instances.insert("coll2:bar".try_into().unwrap(), bar_component.as_weak());
-                instances
+        let provider = MockAnonymizedCapabilityProvider {
+            instances: hashmap! {
+                "coll1:foo".try_into().unwrap() => foo_component.as_weak(),
+                "coll2:bar".try_into().unwrap() => bar_component.as_weak(),
+                "static_a".try_into().unwrap() => static_a_component.as_weak(),
             },
         };
 
-        let route = CollectionServiceRoute {
+        let route = AnonymizedServiceRoute {
             source_moniker: Moniker::root(),
             collections: vec!["coll1".parse().unwrap(), "coll2".parse().unwrap()],
+            children: vec![],
             service_name: "my.service.Service".parse().unwrap(),
         };
 
-        let dir =
-            CollectionServiceDirectory::new(test.model.root().as_weak(), route, Box::new(provider));
+        let dir = AnonymizedAggregateServiceDir::new(
+            test.model.root().as_weak(),
+            route,
+            Box::new(provider),
+        );
 
-        dir.add_entries_from_children().await.expect("failed to add entries");
+        dir.add_entries_from_children().await.unwrap();
 
         let execution_scope = ExecutionScope::new();
         let dir_proxy = open_dir(execution_scope.clone(), dir.dir_entry().await);
 
-        let entries = fuchsia_fs::directory::readdir(&dir_proxy)
-            .await
-            .expect("failed to read directory entries");
+        let entries = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
 
         let instance_names: HashSet<String> = entries.into_iter().map(|d| d.name).collect();
-        assert_eq!(instance_names.len(), 3);
+        assert_eq!(instance_names.len(), 4);
         for instance in instance_names {
             assert!(is_instance_id(&instance), "{}", instance);
         }
@@ -1230,11 +1245,11 @@ mod tests {
         #[test]
         fn service_instance_id(seed in 0..u64::MAX) {
             let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-            let instance = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            let instance = AnonymizedAggregateServiceDir::generate_instance_id(&mut rng);
             assert!(is_instance_id(&instance), "{}", instance);
 
             // Verify it's random
-            let instance2 = CollectionServiceDirectory::generate_instance_id(&mut rng);
+            let instance2 = AnonymizedAggregateServiceDir::generate_instance_id(&mut rng);
             assert!(is_instance_id(&instance2), "{}", instance2);
             assert_ne!(instance, instance2);
         }
@@ -1283,7 +1298,7 @@ mod tests {
             ],
         };
 
-        let dir = AggregateServiceDirectory::new(
+        let dir = FilteredAggregateServiceDir::new(
             test.model.root().as_weak(),
             foo_component.as_weak(),
             Box::new(provider),

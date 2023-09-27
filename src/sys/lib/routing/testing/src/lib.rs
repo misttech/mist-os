@@ -37,8 +37,8 @@ use {
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::{
         capability_source::{
-            AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
-            OfferAggregateCapabilityRouteData,
+            AggregateCapability, CapabilitySource, ComponentCapability,
+            FilteredAggregateCapabilityRouteData, InternalCapability,
         },
         component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
@@ -320,10 +320,9 @@ macro_rules! instantiate_common_routing_tests {
             test_route_protocol_from_expose,
             test_use_from_expose_to_framework,
             test_offer_from_non_executable,
-            test_route_aggregate_protocol_fails,
-            test_route_aggregate_service,
-            test_route_aggregate_service_without_filter_fails,
-            test_route_aggregate_service_with_conflicting_filter_fails,
+            test_route_filtered_aggregate_service,
+            test_route_filtered_aggregate_service_with_conflicting_filter_fails,
+            test_route_anonymized_aggregate_service,
             test_use_directory_with_subdir_from_grandparent,
             test_use_directory_with_subdir_from_sibling,
             test_expose_directory_with_subdir,
@@ -2054,107 +2053,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// b: exposes "foo" to parent from self
     /// c: exposes "foo" to parent from self
     /// d: uses "foo" from parent
-    /// routing an aggregate protocol should fail
-    pub async fn test_route_aggregate_protocol_fails(&self) {
-        let expected_protocol_decl = ProtocolDecl {
-            name: "foo".parse().unwrap(),
-            source_path: Some("/svc/foo".parse().unwrap()),
-        };
-        let components = vec![
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("b".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .offer(OfferDecl::Protocol(OfferProtocolDecl {
-                        source: OfferSource::static_child("c".parse().unwrap()),
-                        source_name: "foo".parse().unwrap(),
-                        target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
-                    .build(),
-            ),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .protocol(expected_protocol_decl.clone())
-                    .build(),
-            ),
-            (
-                "c",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
-                        source: ExposeSource::Self_,
-                        source_name: "foo".parse().unwrap(),
-                        target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
-                    }))
-                    .protocol(expected_protocol_decl.clone())
-                    .build(),
-            ),
-            (
-                "d",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::Protocol(UseProtocolDecl {
-                        source: UseSource::Parent,
-                        source_name: "foo".parse().unwrap(),
-                        target_path: "/svc/foo".parse().unwrap(),
-                        dependency_type: DependencyType::Strong,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
-            ),
-        ];
-        let model = T::new("a", components).build().await;
-
-        let d_component =
-            model.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
-        assert_matches!(
-            route_capability(
-                RouteRequest::UseProtocol(UseProtocolDecl {
-                    source: UseSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    target_path: "/svc/foo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                &d_component,
-                &mut NoopRouteMapper
-            )
-            .await,
-            Err(RoutingError::UnsupportedRouteSource { source_type: _ })
-        );
-    }
-
-    ///   a
-    /// / | \
-    /// b c d
-    ///
-    /// a: offers "foo" from both b and c to d
-    /// b: exposes "foo" to parent from self
-    /// c: exposes "foo" to parent from self
-    /// d: uses "foo" from parent
     /// routing an aggregate service with non-conflicting filters should succeed.
-    pub async fn test_route_aggregate_service(&self) {
+    pub async fn test_route_filtered_aggregate_service(&self) {
         let expected_service_decl = ServiceDecl {
             name: "foo".parse().unwrap(),
             source_path: Some("/svc/foo".parse().unwrap()),
@@ -2254,7 +2154,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::OfferAggregate {
+                    >::FilteredAggregate {
                         capability: AggregateCapability::Service(name),
                         ..
                     },
@@ -2275,7 +2175,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: exposes "foo" to parent from self
     /// d: uses "foo" from parent
     /// routing an aggregate service without specifying a source_instance_filter should fail.
-    pub async fn test_route_aggregate_service_without_filter_fails(&self) {
+    pub async fn test_route_anonymized_aggregate_service(&self) {
         let expected_service_decl = ServiceDecl {
             name: "foo".parse().unwrap(),
             source_path: Some("/svc/foo".parse().unwrap()),
@@ -2346,25 +2246,38 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .build(),
             ),
         ];
-        let model = T::new("a", components).build().await;
+        let test = T::new("a", components).build().await;
 
         let d_component =
-            model.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
-        assert_matches!(
-            route_capability(
-                RouteRequest::UseService(UseServiceDecl {
-                    source: UseSource::Parent,
-                    source_name: "foo".parse().unwrap(),
-                    target_path: "/svc/foo".parse().unwrap(),
-                    dependency_type: DependencyType::Strong,
-                    availability: Availability::Required,
-                }),
-                &d_component,
-                &mut NoopRouteMapper
-            )
-            .await,
-            Err(RoutingError::UnsupportedRouteSource { source_type: _ })
-        );
+            test.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
+        let source = route_capability(
+            RouteRequest::UseService(UseServiceDecl {
+                source: UseSource::Parent,
+                source_name: "foo".parse().unwrap(),
+                target_path: "/svc/foo".parse().unwrap(),
+                dependency_type: DependencyType::Strong,
+                availability: Availability::Required,
+            }),
+            &d_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .unwrap();
+        match source {
+            RouteSource {
+                source:
+                    CapabilitySource::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::AnonymizedAggregate {
+                        capability: AggregateCapability::Service(name),
+                        ..
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
+                assert_eq!(name, "foo");
+            }
+            _ => panic!("bad capability source"),
+        }
     }
 
     ///   a
@@ -2376,7 +2289,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c: exposes "foo" to parent from self
     /// d: uses "foo" from parent
     /// routing an aggregate service with conflicting source_instance_filters should fail.
-    pub async fn test_route_aggregate_service_with_conflicting_filter_fails(&self) {
+    pub async fn test_route_filtered_aggregate_service_with_conflicting_filter_fails(&self) {
         let expected_service_decl = ServiceDecl {
             name: "foo".parse().unwrap(),
             source_path: Some("/svc/foo".parse().unwrap()),
@@ -4748,7 +4661,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::OfferAggregate {
+                    >::FilteredAggregate {
                         capability: AggregateCapability::Service(name),
                         component,
                         capability_provider,
@@ -4762,7 +4675,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 let data = data.remove(0).await.unwrap();
                 assert_matches!(
                     data,
-                    OfferAggregateCapabilityRouteData {
+                    FilteredAggregateCapabilityRouteData {
                         capability_source: CapabilitySource::Component {
                             component,
                             capability,
@@ -4859,7 +4772,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source:
                     CapabilitySource::<
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-                    >::OfferAggregate {
+                    >::FilteredAggregate {
                         capability: AggregateCapability::Service(name),
                         component,
                         capability_provider,
@@ -4873,7 +4786,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 let data = data.remove(0).await.unwrap();
                 assert_matches!(
                     data,
-                    OfferAggregateCapabilityRouteData {
+                    FilteredAggregateCapabilityRouteData {
                         capability_source: CapabilitySource::Component {
                             component,
                             capability,

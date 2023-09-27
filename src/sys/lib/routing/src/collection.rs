@@ -5,8 +5,8 @@
 use {
     crate::{
         capability_source::{
-            CapabilitySource, CollectionAggregateCapabilityProvider, ComponentCapability,
-            OfferAggregateCapabilityProvider, OfferAggregateCapabilityRouteData,
+            AnonymizedAggregateCapabilityProvider, CapabilitySource, ComponentCapability,
+            FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
         },
         component_instance::{
             ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
@@ -27,28 +27,30 @@ use {
     derivative::Derivative,
     from_enum::FromEnum,
     futures::future::BoxFuture,
-    moniker::{ChildName, ChildNameBase},
-    std::{collections::HashSet, sync::Arc},
+    moniker::ChildName,
+    std::collections::HashSet,
 };
 
-/// Provides capabilities exposed by children in a collection.
+/// Provides capabilities exposed by an anonymized aggregates.
 ///
-/// Given a collection and the name of a capability, this provider returns a list of children
-/// within the collection that expose the capability, and routes to a particular child's exposed
-/// capability with that name.
+/// Given a set of collections and static children and the name of a capability, this provider
+/// returns a list of children within them that expose the capability, and routes to a particular
+/// child's exposed capability with that name.
 ///
-/// This is used during collection routing to aggregate service instances across
-/// all children within the collection.
+/// This is used during collection routing from anonymized aggregate service instances.
 #[derive(Derivative)]
 #[derivative(Clone(bound = "E: Clone, S: Clone, V: Clone, M: Clone"))]
-pub(super) struct CollectionAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V, M> {
-    /// Component that contains the collection.
-    pub collection_component: WeakComponentInstanceInterface<C>,
+pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterface, E, S, V, M> {
+    /// Component that defines the aggregate.
+    pub containing_component: WeakComponentInstanceInterface<C>,
 
     pub phantom_expose: std::marker::PhantomData<E>,
 
-    /// Names of the collections within `collection_component` that are being aggregated.
+    /// Names of the collections within `containing_component` that are in the aggregate.
     pub collections: Vec<Name>,
+
+    /// Names of the static children within `containing_component` that are in the aggregate.
+    pub children: Vec<ChildName>,
 
     /// Name of the capability as exposed by children in the collection.
     pub capability_name: Name,
@@ -59,8 +61,8 @@ pub(super) struct CollectionAggregateServiceProvider<C: ComponentInstanceInterfa
 }
 
 #[async_trait]
-impl<C, E, S, V, M> CollectionAggregateCapabilityProvider<C>
-    for CollectionAggregateServiceProvider<C, E, S, V, M>
+impl<C, E, S, V, M> AnonymizedAggregateCapabilityProvider<C>
+    for AnonymizedAggregateServiceProvider<C, E, S, V, M>
 where
     C: ComponentInstanceInterface + 'static,
     E: ExposeDeclCommon
@@ -84,20 +86,27 @@ where
     /// rather service capabilities with the same name that are exposed by different children.
     async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError> {
         let mut instances = Vec::new();
-        let component = self.collection_component.upgrade()?;
+        let component = self.containing_component.upgrade()?;
         let mut child_components = vec![];
-        for collection in &self.collections {
-            child_components
-                .extend(component.lock_resolved_state().await?.children_in_collection(collection));
+        {
+            let resolved_state = component.lock_resolved_state().await?;
+            for child_name in &self.children {
+                if let Some(child) = resolved_state.get_child(child_name) {
+                    child_components.push((child_name.clone(), child.clone()));
+                }
+            }
+            for collection in &self.collections {
+                child_components.extend(resolved_state.children_in_collection(collection));
+            }
         }
-        for (moniker, child_component) in child_components {
+        for (child_name, child_component) in child_components {
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
             match child_exposes {
                 Ok(child_exposes) => {
                     if let Some(_) =
                         router::find_matching_exposes::<E>(&self.capability_name, &child_exposes)
                     {
-                        instances.push(moniker.clone());
+                        instances.push(child_name.clone());
                     }
                 }
                 // Ignore errors. One misbehaving component should not affect the entire collection.
@@ -115,37 +124,22 @@ where
         &self,
         instance: &ChildName,
     ) -> Result<CapabilitySource<C>, RoutingError> {
-        if instance.collection().is_none()
-            || !self.collections.contains(instance.collection().unwrap())
-        {
-            return Err(RoutingError::UnexpectedChildInAggregate {
-                child_moniker: instance.clone(),
-                moniker: self.collection_component.moniker.clone(),
-                capability: self.capability_name.clone(),
-            });
-        }
-
-        let collection_component = self.collection_component.upgrade()?;
-        let (child_moniker, child_component): (ChildName, Arc<C>) = {
-            collection_component
-                .lock_resolved_state()
-                .await?
-                .children_in_collection(instance.collection().unwrap())
-                .into_iter()
-                .find(|child| child.0.name() == instance.name())
-                .ok_or_else(|| RoutingError::OfferFromChildInstanceNotFound {
+        let containing_component = self.containing_component.upgrade()?;
+        let child_component =
+            containing_component.lock_resolved_state().await?.get_child(instance).ok_or_else(
+                || RoutingError::OfferFromChildInstanceNotFound {
                     child_moniker: instance.clone(),
-                    moniker: collection_component.moniker().clone(),
+                    moniker: containing_component.moniker().clone(),
                     capability_id: self.capability_name.clone().into(),
-                })?
-        };
+                },
+            )?;
 
         let child_exposes = child_component.lock_resolved_state().await?.exposes();
         let child_exposes = router::find_matching_exposes(&self.capability_name, &child_exposes)
             .ok_or_else(|| {
                 E::error_not_found_in_child(
-                    collection_component.moniker().clone(),
-                    child_moniker,
+                    containing_component.moniker().clone(),
+                    instance.clone(),
                     self.capability_name.clone(),
                 )
             })?;
@@ -160,7 +154,7 @@ where
         .await
     }
 
-    fn clone_boxed(&self) -> Box<dyn CollectionAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
         Box::new(self.clone())
     }
 }
@@ -189,30 +183,30 @@ where
     }
 }
 
-impl<C> OfferAggregateCapabilityProvider<C> for OfferFilteredServiceProvider<C>
+impl<C> FilteredAggregateCapabilityProvider<C> for OfferFilteredServiceProvider<C>
 where
     C: ComponentInstanceInterface + 'static,
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
         let capability_source = CapabilitySource::Component {
             capability: self.capability.clone(),
             component: self.component.clone(),
         };
         let instance_filter = get_instance_filter(&self.offer_decl);
         let fut = async move {
-            Ok(OfferAggregateCapabilityRouteData { capability_source, instance_filter })
+            Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })
         };
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
         > = vec![];
         out.push(Box::pin(fut));
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
         Box::new(self.clone())
     }
 }
@@ -316,7 +310,7 @@ where
     }
 }
 
-impl<C, O, E, S, M, V> OfferAggregateCapabilityProvider<C>
+impl<C, O, E, S, M, V> FilteredAggregateCapabilityProvider<C>
     for OfferAggregateServiceProvider<C, O, E, S, M, V>
 where
     C: ComponentInstanceInterface + 'static,
@@ -342,10 +336,10 @@ where
 {
     fn route_instances(
         &self,
-    ) -> Vec<BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>> {
+    ) -> Vec<BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>> {
         // Without the explicit type, this does not compile
         let mut out: Vec<
-            BoxFuture<'_, Result<OfferAggregateCapabilityRouteData<C>, RoutingError>>,
+            BoxFuture<'_, Result<FilteredAggregateCapabilityRouteData<C>, RoutingError>>,
         > = vec![];
         for offer_decl in &self.offer_decls {
             let instance_filter = get_instance_filter(offer_decl);
@@ -376,14 +370,14 @@ where
                     &mut vec![],
                 )
                 .await?;
-                Ok(OfferAggregateCapabilityRouteData { capability_source, instance_filter })
+                Ok(FilteredAggregateCapabilityRouteData { capability_source, instance_filter })
             };
             out.push(Box::pin(fut));
         }
         out
     }
 
-    fn clone_boxed(&self) -> Box<dyn OfferAggregateCapabilityProvider<C>> {
+    fn clone_boxed(&self) -> Box<dyn FilteredAggregateCapabilityProvider<C>> {
         Box::new(self.clone())
     }
 }
