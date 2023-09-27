@@ -222,7 +222,10 @@ impl LinkState {
             Self::EstablishingRsna(state) => {
                 let (transition, mut state) = state.release_data();
                 match process_eapol_event(context, &mut state.rsna, &eapol_event) {
-                    RsnaStatus::Failed(failure_reason) => Err(failure_reason),
+                    RsnaStatus::Failed(failure_reason) => {
+                        state_change_msg.set_msg(format!("{:?}", failure_reason));
+                        Err(failure_reason)
+                    }
                     RsnaStatus::Progressed {
                         ap_responsive,
                         new_retransmission_timeout,

@@ -2101,20 +2101,45 @@ mod tests {
         let mut h = TestHelper::new();
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
-        let bssid = command.bss.bssid.clone();
+        let bss = command.bss.clone();
         let state = establishing_rsna_state(command);
 
         // (mlme->sme) Send an EapolInd, mock supplicant with wrong password status
         let update = SecAssocUpdate::Status(SecAssocStatus::WrongPassword);
-        let _state = on_eapol_ind(state, &mut h, bssid, &suppl_mock, vec![update]);
+        let state = on_eapol_ind(state, &mut h, bss.bssid, &suppl_mock, vec![update]);
 
-        expect_deauth_req(&mut h.mlme_stream, bssid, fidl_ieee80211::ReasonCode::StaLeaving);
+        expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
         assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
             assert_eq!(result, EstablishRsnaFailure {
                 auth_method: Some(auth::MethodName::Psk),
                 reason: EstablishRsnaFailureReason::InternalError,
             }
             .into());
+        });
+
+        // (mlme->sme) Send a DeauthenticateConf as a response
+        let deauth_conf = MlmeEvent::DeauthenticateConf {
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.0 },
+        };
+        let state = state.on_mlme_event(deauth_conf, &mut h.context);
+        assert_idle(state);
+
+        assert_data_tree!(h.inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: RSNA_STATE,
+                        to: DISCONNECTING_STATE,
+                    },
+                    "1": {
+                        "@time": AnyNumericProperty,
+                        from: DISCONNECTING_STATE,
+                        to: IDLE_STATE,
+                    },
+                },
+            },
         });
     }
 
