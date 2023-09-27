@@ -21,6 +21,8 @@
 #include <queue>
 #include <unordered_map>
 
+#include <pw_async_fuchsia/dispatcher.h>
+
 #include "src/connectivity/bluetooth/core/bt-host/testing/fake_controller.h"
 #include "src/connectivity/bluetooth/hci/virtual/emulated_peer.h"
 #include "src/connectivity/bluetooth/lib/fidl/hanging_getter.h"
