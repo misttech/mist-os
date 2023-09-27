@@ -2130,16 +2130,14 @@ impl CurrentTask {
                 return;
             };
 
-            let futex_addr = if let Some(fb) = curr_ptr.addr.addr.checked_add_signed(offset) {
-                UserAddress::from(fb)
+            let futex_base: u64;
+            if let Some(fb) = curr_ptr.addr.addr.checked_add_signed(offset) {
+                futex_base = fb;
             } else {
-                return;
-            };
-            if !futex_addr.is_aligned(4) {
                 return;
             }
 
-            let futex_ref = UserRef::<u32>::new(futex_addr);
+            let futex_ref = UserRef::<u32>::new(UserAddress::from(futex_base));
 
             // TODO(b/299096230): Futex modification should be atomic.
             let futex = if let Ok(futex) = self.mm.read_object(futex_ref) {

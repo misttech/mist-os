@@ -85,38 +85,6 @@ TEST(RobustFutexTest, OtherTidsAreIgnored) {
   });
 }
 
-// Tests that a list with an offset that is unaligned is not processed.
-TEST(RobustFutexTest, UnalignedOffsetIsNotProcessed) {
-  struct unaligned_entry {
-    struct unaligned_entry *next;
-    uint8_t unaligner;
-    uint32_t futex;
-  } __attribute__((packed));
-
-  static_assert(offsetof(unaligned_entry, futex) % 4 != 0, "futex lock must be unaligned");
-
-  test_helper::ForkHelper helper;
-  helper.RunInForkedProcess([] {
-    unaligned_entry entry = {.next = nullptr, .futex = 0};
-    robust_list_head head = {.list = {.next = nullptr},
-                             .futex_offset = offsetof(unaligned_entry, futex),
-                             .list_op_pending = nullptr};
-
-    head.list.next = reinterpret_cast<struct robust_list *>(&entry);
-    entry.next = reinterpret_cast<struct unaligned_entry *>(&head);
-
-    std::thread t([&entry, &head]() {
-      entry.futex = static_cast<uint32_t>(syscall(SYS_gettid));
-      EXPECT_EQ(0, syscall(SYS_set_robust_list, &head, sizeof(robust_list_head)));
-    });
-
-    t.join();
-
-    // Given that the offset is unaligned, the entry should not be modified.
-    EXPECT_EQ(0u, entry.futex & FUTEX_OWNER_DIED);
-  });
-}
-
 // Tests that an entry with next = NULL doesn't cause issues.
 TEST(RobustFutexTest, NullEntryStopsProcessing) {
   test_helper::ForkHelper helper;
