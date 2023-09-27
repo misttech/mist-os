@@ -52,7 +52,6 @@ To manually exclude a directory from VS Code’s watcher:
             "**/.jiri_manifest": true,
             "**/.jiri_root": true,
             "**/.ssh": true,
-            "**/.style.yapf": true,
             "**/.svn": true,
             "**/AUTHORS": true,
             "**/CMakeLists.txt": true,

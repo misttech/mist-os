@@ -16,7 +16,7 @@
     "mypy-type-checker.args": [
         "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pyproject.toml"
     ],
-    "python.formatting.provider": "yapf",
+    "python.formatting.provider": "black",
     "editor.rulers": [
         80
     ],

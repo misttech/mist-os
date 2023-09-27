@@ -37,7 +37,7 @@ autoflake \
 echo "Formatting the code..."
 # Sort the imports
 isort $HONEYDEW_SRC
-# Format the code (using YAPF)
+# Format the code (using black)
 fx format-code
 
 

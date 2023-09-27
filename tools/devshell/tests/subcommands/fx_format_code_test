@@ -27,13 +27,14 @@ BT_FILE_DEPS=(
 MOCK_CLANG_DIR="prebuilt/third_party/clang/test"
 MOCK_SHAC="prebuilt/third_party/shac/shac"
 MOCK_PYTHON3_DIR="prebuilt/third_party/python3/test"
+MOCK_BLACK_DIR="prebuilt/third_party/black/test"
 BT_MOCKED_TOOLS=(
   "scripts/fuchsia-vendored-python"
   "tools/devshell/list-build-artifacts"
   "tools/devshell/lib/platform.sh"
-  "prebuilt/third_party/vpython/vpython3"
   "${MOCK_CLANG_DIR}/bin/clang-format"
   "${MOCK_PYTHON3_DIR}/bin/python3"
+  "${MOCK_BLACK_DIR}/black"
   "${MOCK_SHAC}"
   "${FUCHSIA_BUILD_DIR}/host_x64/cmc"
   "${FUCHSIA_BUILD_DIR}/host_x64/fidl-format"
@@ -55,6 +56,7 @@ BT_SET_UP() {
     readonly PREBUILT_CLANG_DIR=${BT_TEMP_DIR}/${MOCK_CLANG_DIR}
     readonly PREBUILT_SHAC=${BT_TEMP_DIR}/${MOCK_SHAC}
     readonly PREBUILT_PYTHON3_DIR=${BT_TEMP_DIR}/${MOCK_PYTHON3_DIR}
+    readonly PREBUILT_BLACK_DIR=${BT_TEMP_DIR}/${MOCK_BLACK_DIR}
 EOF
 }
 
@@ -78,7 +80,7 @@ TEST_fx-format-code-commands() {
   BT_EXPECT "${fx}" format-code --verbose --files="${csfiles:1}" > "${out}"
   BT_EXPECT grep -q -E '"clang-format.*cplusplus.cc"' "${out}"
   BT_EXPECT grep -q -E '"shac fmt .*/rust.rs .*/gn.gn .*/gn.gni"' "${out}"
-  BT_EXPECT grep -q -E '"yapf.*python3.py"' "${out}"
+  BT_EXPECT grep -q -E '"black.*python3.py"' "${out}"
 }
 
 # Ensure that buildable format commands are built when needed

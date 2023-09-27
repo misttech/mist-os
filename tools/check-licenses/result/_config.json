@@ -100,7 +100,6 @@
           "prebuilt/third_party/sysroot/linux/usr/share/pkgconfig": true,
           "prebuilt/third_party/vulkan_runtime/linux-x64": true,
           "prebuilt/third_party/vulkansdk/linux/source/DirectXShaderCompiler/external/effcee/third_party": true,
-          "prebuilt/third_party/yapf": true,
           "prebuilt/tools/artifacts": true,
           "prebuilt/tools/buildbucket": true,
           "prebuilt/tools/buildidtool/linux-x64": true,

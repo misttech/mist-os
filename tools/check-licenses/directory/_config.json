@@ -296,7 +296,6 @@
                     ".ignore",
                     ".jiri_root",
                     ".jiri_manifest",
-                    ".style.yapf",
                     ".ssh"
                 ],
                 "notes": [

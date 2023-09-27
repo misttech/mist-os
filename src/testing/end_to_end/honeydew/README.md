@@ -301,8 +301,8 @@ follow the below instructions every time HoneyDew code is changed.
     ```shell
     (fuchsia_python_venv)~/fuchsia$ isort $FUCHSIA_DIR/src/testing/end_to_end/honeydew/
     ```
-* Ensure code is formatted using [yapf]
-    * `fx format-code` underneath uses [yapf] for formatting the python code.
+* Ensure code is formatted using [black]
+    * `fx format-code` underneath uses [black] for formatting the python code.
     * Run below command to format the code
     ```shell
     (fuchsia_python_venv)~/fuchsia$ fx format-code
@@ -496,7 +496,7 @@ CL author/contributor (or) CL reviewer/approver:
 
 [mypy]: https://mypy.readthedocs.io/en/stable/
 
-[yapf]: https://github.com/google/yapf
+[black]: https://github.com/psf/black
 
 [vscode IDE]: https://code.visualstudio.com/docs/python/python-tutorial
 

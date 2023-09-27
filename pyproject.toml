@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+[tool.black]
+# Following the Google Python style guide, we set the maximum line length
+# to 80 characters. See: https://google.github.io/styleguide/pyguide.html#32-line-length
+line-length = 80
+target-version = ['py311']
+include = '\.pyi?$'
+exclude = '''
+# Start regex with a forward slash so that black will only ignore these files
+# if they're in the root of the repo.
+^/(
+  (
+      \.jiri_root
+    | out
+    | third_party
+    | prebuilt
+    | __pycache__
+  )
+)
+'''

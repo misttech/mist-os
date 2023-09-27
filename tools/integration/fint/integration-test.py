@@ -87,7 +87,7 @@ changed_files {{
             args.cmd,
             '-static', args.fint_params_path,
             '-context', context_path,
-        ])  # yapf: disable
+        ])  # fmt: skip
     if proc.returncode != 0:
         print("Failed to run fint. Make sure you have run `fx setup-go`.")
         sys.exit(1)
