@@ -326,11 +326,6 @@ impl<'a> ValidationContext<'a> {
             self.collect_environment_names(&envs);
         }
 
-        // Validate "program".
-        if let Some(program) = decl.program.as_ref() {
-            self.validate_program(program);
-        }
-
         // Validate "children" and build the set of all children.
         if let Some(children) = decl.children.as_ref() {
             for child in children {
@@ -353,8 +348,14 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "uses".
+        let mut uses_runner = None;
         if let Some(uses) = decl.uses.as_ref() {
-            self.validate_use_decls(uses);
+            uses_runner = self.validate_use_decls(uses);
+        }
+
+        // Validate "program".
+        if let Some(program) = decl.program.as_ref() {
+            self.validate_program(program, uses_runner);
         }
 
         // Validate "exposes".
@@ -569,13 +570,24 @@ impl<'a> ValidationContext<'a> {
         }
     }
 
-    fn validate_use_decls(&mut self, uses: &'a [fdecl::Use]) {
+    fn validate_use_decls(&mut self, uses: &'a [fdecl::Use]) -> Option<fdecl::UseRunner> {
+        let mut uses_runner = None;
+
         // Validate individual fields.
         for use_ in uses.iter() {
             self.validate_use_decl(&use_);
+            if let fdecl::Use::Runner(use_runner) = use_ {
+                if uses_runner.is_some() {
+                    self.errors.push(Error::MultipleRunnersUsed);
+                }
+
+                uses_runner = Some(use_runner.clone());
+            }
         }
 
         self.validate_use_paths(&uses);
+
+        uses_runner
     }
 
     fn validate_use_decl(&mut self, use_: &'a fdecl::Use) {
@@ -688,6 +700,21 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            fdecl::Use::Runner(u) => {
+                const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
+                    Some(fdecl::DependencyType::Strong);
+                const AVAILABILITY: Option<fdecl::Availability> =
+                    Some(fdecl::Availability::Required);
+                let decl = DeclType::UseRunner;
+                self.validate_use_fields(
+                    decl,
+                    u.source.as_ref(),
+                    u.source_name.as_ref(),
+                    None,
+                    DEPENDENCY_TYPE.as_ref(),
+                    AVAILABILITY.as_ref(),
+                );
+            }
             fdecl::UseUnknown!() => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "use"));
             }
@@ -696,9 +723,26 @@ impl<'a> ValidationContext<'a> {
 
     /// Validates the "program" declaration. This does not check runner-specific properties
     /// since those are checked by the runner.
-    fn validate_program(&mut self, program: &fdecl::Program) {
-        if program.runner.is_none() {
-            self.errors.push(Error::missing_field(DeclType::Program, "runner"));
+    fn validate_program(
+        &mut self,
+        program: &fdecl::Program,
+        uses_runner: Option<fdecl::UseRunner>,
+    ) {
+        match &program.runner {
+            Some(_) => {
+                if let Some(use_runner) = uses_runner {
+                    if &use_runner.source_name != &program.runner
+                        || use_runner.source != Some(fdecl::Ref::Environment(fdecl::EnvironmentRef))
+                    {
+                        self.errors.push(Error::ConflictingRunners);
+                    }
+                }
+            }
+            None => {
+                if uses_runner.is_none() {
+                    self.errors.push(Error::MissingRunner);
+                }
+            }
         }
 
         if program.info.is_none() {
@@ -819,6 +863,7 @@ impl<'a> ValidationContext<'a> {
             Some(fdecl::Ref::Framework(_)) => {}
             Some(fdecl::Ref::Debug(_)) => {}
             Some(fdecl::Ref::Self_(_)) => {}
+            Some(fdecl::Ref::Environment(_)) => {}
             Some(fdecl::Ref::Child(child)) => {
                 if self.validate_child_ref(decl, "source", &child, OfferType::Static)
                     && dependency_type == Some(&fdecl::DependencyType::Strong)
@@ -849,7 +894,9 @@ impl<'a> ValidationContext<'a> {
             }
         };
         check_name(source_name, decl, "source_name", &mut self.errors);
-        check_path(target_path, decl, "target_path", &mut self.errors);
+        if decl != DeclType::UseRunner {
+            check_path(target_path, decl, "target_path", &mut self.errors);
+        }
         check_use_availability(decl, availability, &mut self.errors);
 
         // Only allow `weak` dependency with `use from child`.
@@ -2912,6 +2959,11 @@ mod tests {
                         target_path: None,
                         ..Default::default()
                     }),
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source_name: None,
+                        source: None,
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -2934,6 +2986,9 @@ mod tests {
                 Error::missing_field(DeclType::UseEventStream, "source"),
                 Error::missing_field(DeclType::UseEventStream, "source_name"),
                 Error::missing_field(DeclType::UseEventStream, "target_path"),
+                Error::missing_field(DeclType::UseRunner, "source"),
+                Error::missing_field(DeclType::UseRunner, "source_name"),
+                Error::ConflictingRunners,
             ])),
         },
         test_validate_missing_program_info => {
@@ -2999,6 +3054,14 @@ mod tests {
                         target_path: Some("e".to_string()),
                         ..Default::default()
                     }),
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                            name: "^bad".to_string(),
+                            collection: None,
+                        })),
+                        source_name: Some("foo/".to_string()),
+                        ..Default::default()
+                    }),
                 ]);
                 decl
             },
@@ -3018,6 +3081,8 @@ mod tests {
                 Error::invalid_field(DeclType::UseEventStream, "source.child.name"),
                 Error::invalid_field(DeclType::UseEventStream, "source_name"),
                 Error::invalid_field(DeclType::UseEventStream, "target_path"),
+                Error::invalid_field(DeclType::UseRunner, "source.child.name"),
+                Error::invalid_field(DeclType::UseRunner, "source_name"),
             ])),
         },
         test_validate_uses_missing_source => {
@@ -3068,6 +3133,11 @@ mod tests {
                             subdir: None,
                             ..Default::default()
                         }),
+                        fdecl::Use::Runner(fdecl::UseRunner {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef{ name: "no-such-child".to_string(), collection: None})),
+                            source_name: Some("RunnerName".to_string()),
+                            ..Default::default()
+                        }),
                     ]),
                     ..new_component_decl()
                 }
@@ -3076,6 +3146,7 @@ mod tests {
                 Error::invalid_child(DeclType::UseProtocol, "source", "no-such-child"),
                 Error::invalid_child(DeclType::UseService, "source", "no-such-child"),
                 Error::invalid_child(DeclType::UseDirectory, "source", "no-such-child"),
+                Error::invalid_child(DeclType::UseRunner, "source", "no-such-child"),
             ])),
         },
         test_validate_use_from_child_offer_to_child_strong_cycle => {
@@ -4200,7 +4271,7 @@ mod tests {
                 Error::MissingField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
             ])),
         },
-        test_validate_uses_no_runner => {
+        test_validate_no_runner => {
             input = {
                 let mut decl = new_component_decl();
                 decl.program = Some(fdecl::Program {
@@ -4214,7 +4285,99 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field(DeclType::Program, "runner"),
+                Error::MissingRunner,
+            ])),
+        },
+        test_validate_uses_runner => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.program = Some(fdecl::Program {
+                    runner: None,
+                    info: Some(fdata::Dictionary {
+                        entries: None,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+                decl.uses = Some(vec![
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("runner".to_string()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Ok(()),
+        },
+        test_validate_program_and_uses_runner_match => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.program = Some(fdecl::Program {
+                    runner: Some("runner".to_string()),
+                    info: Some(fdata::Dictionary {
+                        entries: None,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+                decl.uses = Some(vec![
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Environment(fdecl::EnvironmentRef {})),
+                        source_name: Some("runner".to_string()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Ok(()),
+        },
+        test_validate_runner_names_conflict => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.program = Some(fdecl::Program {
+                    runner: Some("runner".to_string()),
+                    info: Some(fdata::Dictionary {
+                        entries: None,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+                decl.uses = Some(vec![
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Environment(fdecl::EnvironmentRef {})),
+                        source_name: Some("other.runner".to_string()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::ConflictingRunners,
+            ])),
+        },
+        test_validate_uses_runner_not_environement => {
+            input = {
+                let mut decl = new_component_decl();
+                decl.program = Some(fdecl::Program {
+                    runner: Some("runner".to_string()),
+                    info: Some(fdata::Dictionary {
+                        entries: None,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                });
+                decl.uses = Some(vec![
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        source_name: Some("runner".to_string()),
+                        ..Default::default()
+                    }),
+                ]);
+                decl
+            },
+            result = Err(ErrorList::new(vec![
+                Error::ConflictingRunners,
             ])),
         },
         test_validate_uses_long_identifiers => {

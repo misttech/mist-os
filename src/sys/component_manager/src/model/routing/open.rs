@@ -315,8 +315,9 @@ impl<'a> OpenRequest<'a> {
             }
             CapabilitySource::Framework { .. }
             | CapabilitySource::Capability { .. }
-            | CapabilitySource::Builtin { .. } => {
-                // There is no default provider for a framework or builtin capability
+            | CapabilitySource::Builtin { .. }
+            | CapabilitySource::Environment { .. } => {
+                // There is no default provider for a framework, builtin or environment capability
                 Ok(None)
             }
         }

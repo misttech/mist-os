@@ -159,10 +159,14 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Validate "use".
+        let mut uses_runner = false;
         if let Some(uses) = self.document.r#use.as_ref() {
             let mut used_ids = HashMap::new();
             for use_ in uses.iter() {
                 self.validate_use(&use_, &mut used_ids, &mut strong_dependencies)?;
+                if use_.runner.is_some() {
+                    uses_runner = true;
+                }
             }
         }
 
@@ -215,8 +219,15 @@ impl<'a> ValidationContext<'a> {
             }
         }
 
-        // Ensure we don't have a component with a "program" block which fails to specify a runner.
-        self.validate_runner_specified(self.document.program.as_ref())?;
+        if uses_runner {
+            // Component "use"s a runner. Ensure we don't also have a runner specified in "program",
+            // which would necessarily conflict.
+            self.validate_runner_not_specified(self.document.program.as_ref())?;
+        } else {
+            // Component doesn't "use" a runner. Ensure we don't have a component with a "program"
+            // block which fails to specify a runner.
+            self.validate_runner_specified(self.document.program.as_ref())?;
+        }
 
         // Validate "environments".
         if let Some(environments) = &self.document.environments {
@@ -431,8 +442,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if use_.storage.is_some() && use_.from.is_some() {
             return Err(Error::validate("\"from\" cannot be used with \"storage\""));
         }
+        if use_.runner.is_some() && use_.availability.is_some() {
+            return Err(Error::validate("\"availability\" cannot be used with \"runner\""));
+        }
         if use_.from == Some(UseFromRef::Self_) && use_.event_stream.is_some() {
             return Err(Error::validate("\"from: self\" cannot be used with \"event_stream\""));
+        }
+        if use_.from == Some(UseFromRef::Self_) && use_.runner.is_some() {
+            return Err(Error::validate("\"from: self\" cannot be used with \"runner\""));
         }
         if use_.availability == Some(Availability::SameAsTarget) {
             return Err(Error::validate(
@@ -1338,14 +1355,35 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     }
 
     /// Ensure we don't have a component with a "program" block which fails to specify a runner.
+    /// This should only be called if the manifest doesn't "use" a runner.
     fn validate_runner_specified(&self, program: Option<&Program>) -> Result<(), Error> {
         match program {
             Some(program) => match program.runner {
                 Some(_) => Ok(()),
-                None => Err(Error::validate(
-                    "Component has a `program` block defined, but doesn't specify a `runner`. \
-                    Components need to use a runner to actually execute code.",
-                )),
+                None => {
+                    return Err(Error::validate(
+                        "Component has a `program` block defined, but doesn't specify a `runner`. \
+                        Components need to use a runner to actually execute code.",
+                    ));
+                }
+            },
+            None => Ok(()),
+        }
+    }
+
+    /// Ensure we don't have a component with a "program" block which fails to specify a runner.
+    /// This should only be called if the manifest "use"s a runner.
+    fn validate_runner_not_specified(&self, program: Option<&Program>) -> Result<(), Error> {
+        match program {
+            Some(program) => match program.runner {
+                Some(_) => {
+                    // Use/runner always conflicts with program/runner, because use/runner
+                    // can't be from environment in CML.
+                    return Err(Error::validate(
+                        "Component has conflicting runners in `program` block and `use` block.",
+                    ));
+                }
+                None => Ok(()),
             },
             None => Ok(()),
         }
@@ -2401,6 +2439,34 @@ mod tests {
             ),
             Ok(())
         ),
+        test_cml_program_use_runner(
+            json!(
+                {
+                    "program": {
+                        "binary": "bin/app",
+                    },
+                    "use": [
+                        { "runner": "elf", "from": "parent" }
+                    ]
+                }
+            ),
+            Ok(())
+        ),
+        test_cml_program_use_runner_conflict(
+            json!(
+                {
+                    "program": {
+                        "runner": "elf",
+                        "binary": "bin/app",
+                    },
+                    "use": [
+                        { "runner": "elf", "from": "parent" }
+                    ]
+                }
+            ),
+            Err(Error::Validate { err, .. }) if &err ==
+                "Component has conflicting runners in `program` block and `use` block."
+        ),
         test_cml_program_no_runner(
             json!({"program": { "binary": "bin/app" }}),
             Err(Error::Validate { err, .. }) if &err ==
@@ -2437,6 +2503,7 @@ mod tests {
                    "path":"/svc/testpath",
                    "from":"parent",
                   },
+                  { "runner": "usain", "from": "parent" }
                 ],
                 "capabilities": [
                     {
@@ -2586,7 +2653,6 @@ mod tests {
         test_cml_use_event_stream_invalid_path(
             json!({
                 "use": [
-
                     {
                         "event_stream": ["started"],
                         "path": "my_stream",
@@ -2599,7 +2665,6 @@ mod tests {
         test_cml_use_event_stream_self_ref(
             json!({
                 "use": [
-
                     {
                         "event_stream": ["started"],
                         "path": "/svc/my_stream",
@@ -2609,11 +2674,33 @@ mod tests {
             }),
             Err(Error::Validate { err, .. }) if &err == "\"from: self\" cannot be used with \"event_stream\""
         ),
+        test_cml_use_runner_debug_ref(
+            json!({
+                "use": [
+                    {
+                        "runner": "elf",
+                        "from": "debug",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
+        ),
+        test_cml_use_runner_self_ref(
+            json!({
+                "use": [
+                    {
+                        "runner": "elf",
+                        "from": "self",
+                    },
+                ],
+            }),
+            Err(Error::Validate { err, .. }) if &err == "\"from: self\" cannot be used with \"runner\""
+        ),
         test_cml_use_missing_props(
             json!({
                 "use": [ { "path": "/svc/fuchsia.logger.Log" } ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\", \"runner\""
         ),
         test_cml_use_from_with_storage(
             json!({
@@ -2689,7 +2776,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`"
+            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `runner`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`"
         ),
 
         test_cml_use_disallows_nested_dirs_directory(

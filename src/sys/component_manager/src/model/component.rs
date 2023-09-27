@@ -520,7 +520,7 @@ impl ComponentInstance {
         let runner = {
             let state = self.lock_state().await;
             match *state {
-                InstanceState::Resolved(ref s) => s.decl.get_runner().cloned(),
+                InstanceState::Resolved(ref s) => s.decl.get_runner(),
                 InstanceState::Destroyed => {
                     return Err(StartActionError::InstanceDestroyed {
                         moniker: self.moniker.clone(),
@@ -545,12 +545,12 @@ impl ComponentInstance {
             relative_path: "".into(),
             server_chan: &mut server_channel,
         };
-        route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
+        route_and_open_capability(RouteRequest::UseRunner(runner.clone()), self, options)
             .await
             .map_err(|err| StartActionError::ResolveRunnerError {
                 err: Box::new(err),
                 moniker: self.moniker.clone(),
-                runner,
+                runner: runner.source_name,
             })?;
 
         return Ok(Some(RemoteRunner::new(client)));

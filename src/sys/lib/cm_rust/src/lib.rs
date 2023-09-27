@@ -154,8 +154,19 @@ pub struct ComponentDecl {
 
 impl ComponentDecl {
     /// Returns the runner used by this component, or `None` if this is a non-executable component.
-    pub fn get_runner(&self) -> Option<&Name> {
-        self.program.as_ref().and_then(|p| p.runner.as_ref())
+    pub fn get_runner(&self) -> Option<UseRunnerDecl> {
+        self.program
+            .as_ref()
+            .and_then(|p| p.runner.as_ref())
+            .and_then(|r| {
+                Some(UseRunnerDecl { source: UseSource::Environment, source_name: r.clone() })
+            })
+            .or_else(|| {
+                self.uses.iter().find_map(|u| match u {
+                    UseDecl::Runner(r) => Some(r.clone()),
+                    _ => None,
+                })
+            })
     }
 
     /// Returns the `StorageDecl` corresponding to `storage_name`.
@@ -262,6 +273,7 @@ pub enum UseDecl {
     Directory(UseDirectoryDecl),
     Storage(UseStorageDecl),
     EventStream(UseEventStreamDecl),
+    Runner(UseRunnerDecl),
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -355,6 +367,30 @@ pub struct UseEventStreamDecl {
     pub filter: Option<BTreeMap<String, DictionaryValue>>,
     #[fidl_decl(default)]
     pub availability: Availability,
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::UseRunner")]
+pub struct UseRunnerDecl {
+    pub source: UseSource,
+    pub source_name: Name,
+}
+
+impl SourceName for UseRunnerDecl {
+    fn source_name(&self) -> &Name {
+        &self.source_name
+    }
+}
+
+impl UseDeclCommon for UseRunnerDecl {
+    fn source(&self) -> &UseSource {
+        &self.source
+    }
+
+    fn availability(&self) -> &Availability {
+        &Availability::Required
+    }
 }
 
 #[cfg_attr(
@@ -486,7 +522,7 @@ pub struct OfferStorageDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, OfferDeclCommonNoAvailability, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::OfferRunner")]
 pub struct OfferRunnerDecl {
     pub source: OfferSource,
@@ -527,6 +563,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Directory(u) => u.source(),
             UseDecl::Storage(u) => u.source(),
             UseDecl::EventStream(u) => u.source(),
+            UseDecl::Runner(u) => u.source(),
         }
     }
 
@@ -537,6 +574,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Directory(u) => u.availability(),
             UseDecl::Storage(u) => u.availability(),
             UseDecl::EventStream(u) => u.availability(),
+            UseDecl::Runner(u) => u.availability(),
         }
     }
 }
@@ -588,6 +626,30 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Resolver(o) => o.availability(),
             OfferDecl::EventStream(o) => o.availability(),
         }
+    }
+}
+
+impl SourceName for OfferRunnerDecl {
+    fn source_name(&self) -> &Name {
+        &self.source_name
+    }
+}
+
+impl OfferDeclCommon for OfferRunnerDecl {
+    fn target_name(&self) -> &Name {
+        &self.target_name
+    }
+
+    fn target(&self) -> &OfferTarget {
+        &self.target
+    }
+
+    fn source(&self) -> &OfferSource {
+        &self.source
+    }
+
+    fn availability(&self) -> Option<&Availability> {
+        Some(&Availability::Required)
     }
 }
 
@@ -1481,6 +1543,7 @@ impl UseDecl {
             UseDecl::Directory(d) => Some(&d.target_path),
             UseDecl::Storage(d) => Some(&d.target_path),
             UseDecl::EventStream(d) => Some(&d.target_path),
+            UseDecl::Runner(_) => None,
         }
     }
 
@@ -1488,7 +1551,10 @@ impl UseDecl {
         match self {
             UseDecl::Storage(storage_decl) => Some(&storage_decl.source_name),
             UseDecl::EventStream(_) => None,
-            UseDecl::Service(_) | UseDecl::Protocol(_) | UseDecl::Directory(_) => None,
+            UseDecl::Service(_)
+            | UseDecl::Protocol(_)
+            | UseDecl::Directory(_)
+            | UseDecl::Runner(_) => None,
         }
     }
 }
@@ -1501,6 +1567,7 @@ impl SourceName for UseDecl {
             UseDecl::Protocol(protocol_decl) => &protocol_decl.source_name,
             UseDecl::Directory(directory_decl) => &directory_decl.source_name,
             UseDecl::EventStream(event_stream_decl) => &event_stream_decl.source_name,
+            UseDecl::Runner(runner_decl) => &runner_decl.source_name,
         }
     }
 }
@@ -1582,6 +1649,7 @@ impl From<&UseDecl> for CapabilityTypeName {
             UseDecl::Directory(_) => Self::Directory,
             UseDecl::Storage(_) => Self::Storage,
             UseDecl::EventStream(_) => Self::EventStream,
+            UseDecl::Runner(_) => Self::Runner,
         }
     }
 }
@@ -1728,6 +1796,7 @@ pub enum UseSource {
     Self_,
     Capability(Name),
     Child(String),
+    Environment,
 }
 
 impl std::fmt::Display for UseSource {
@@ -1739,6 +1808,7 @@ impl std::fmt::Display for UseSource {
             Self::Self_ => write!(f, "self"),
             Self::Capability(c) => write!(f, "capability `{}`", c),
             Self::Child(c) => write!(f, "child `#{}`", c),
+            Self::Environment => write!(f, "environment"),
         }
     }
 }
@@ -1753,6 +1823,7 @@ impl FidlIntoNative<UseSource> for fdecl::Ref {
             // cm_fidl_validator should have already validated this
             fdecl::Ref::Capability(c) => UseSource::Capability(c.name.parse().unwrap()),
             fdecl::Ref::Child(c) => UseSource::Child(c.name),
+            fdecl::Ref::Environment(_) => UseSource::Environment,
             _ => panic!("invalid UseSource variant"),
         }
     }
@@ -1769,6 +1840,7 @@ impl NativeIntoFidl<fdecl::Ref> for UseSource {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.to_string() })
             }
             UseSource::Child(name) => fdecl::Ref::Child(fdecl::ChildRef { name, collection: None }),
+            UseSource::Environment => fdecl::Ref::Environment(fdecl::EnvironmentRef {}),
         }
     }
 }
@@ -2313,6 +2385,11 @@ mod tests {
                         availability: Some(fdecl::Availability::Optional),
                         ..Default::default()
                     }),
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source: Some(fdecl::Ref::Environment(fdecl::EnvironmentRef {})),
+                        source_name: Some("elf".to_string()),
+                        ..Default::default()
+                    }),
                 ]),
                 exposes: Some(vec![
                     fdecl::Expose::Protocol(fdecl::ExposeProtocol {
@@ -2718,6 +2795,10 @@ mod tests {
                             filter: None,
                             availability: Availability::Optional,
                         }),
+                        UseDecl::Runner(UseRunnerDecl {
+                            source: UseSource::Environment,
+                            source_name: "elf".parse().unwrap(),
+                        }),
                     ],
                     exposes: vec![
                         ExposeDecl::Protocol(ExposeProtocolDecl {
@@ -2981,6 +3062,7 @@ mod tests {
                     name: "foo".into(),
                     collection: None,
                 }),
+                fdecl::Ref::Environment(fdecl::EnvironmentRef{}),
             ],
             input_type = fdecl::Ref,
             result = vec![
@@ -2989,6 +3071,7 @@ mod tests {
                 UseSource::Debug,
                 UseSource::Capability("capability".parse().unwrap()),
                 UseSource::Child("foo".to_string()),
+                UseSource::Environment,
             ],
             result_type = UseSource,
         },

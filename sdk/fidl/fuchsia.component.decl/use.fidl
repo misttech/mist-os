@@ -17,6 +17,8 @@ type Use = flexible union {
     @available(removed=14)
     6: event_stream_deprecated UseEventStreamDeprecated;
     7: event_stream UseEventStream;
+    @available(added=HEAD)
+    8: runner UseRunner;
 };
 
 /// Declares a service used by a component, which was offered to it.
@@ -239,4 +241,16 @@ type UseEventStream = table {
     /// `DirectoryReady` and `CapabilityRequested` event types.
     @available(added=9)
     6: filter fuchsia.data.Dictionary;
+};
+
+/// Declares runner used by a component.
+@available(added=HEAD)
+type UseRunner = table {
+    /// (Required) The provider of the runner relative to the component.
+    /// Must be `parent`, `child`, `framework`, or `environment`.
+    1: source Ref;
+
+    /// (Required) Name identifying the runner, by which it was presented to this
+    /// component.
+    2: source_name name;
 };

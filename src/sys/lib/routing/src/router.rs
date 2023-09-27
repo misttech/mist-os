@@ -890,6 +890,11 @@ where
             UseSource::Self_ => {
                 return Err(RoutingError::unsupported_route_source("self"));
             }
+            UseSource::Environment => {
+                // This is not supported today. It might be worthwhile to support this if
+                // capabilities other than runner can be used from environment.
+                return Err(RoutingError::unsupported_route_source("environment"));
+            }
         }
     }
 }

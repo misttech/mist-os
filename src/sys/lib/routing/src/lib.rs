@@ -22,8 +22,8 @@ use {
     crate::{
         availability::{
             AvailabilityDirectoryVisitor, AvailabilityEventStreamVisitor,
-            AvailabilityProtocolVisitor, AvailabilityServiceVisitor, AvailabilityState,
-            AvailabilityStorageVisitor,
+            AvailabilityProtocolVisitor, AvailabilityRunnerVisitor, AvailabilityServiceVisitor,
+            AvailabilityState, AvailabilityStorageVisitor,
         },
         capability_source::{CapabilitySource, ComponentCapability, InternalCapability},
         component_instance::{
@@ -47,7 +47,7 @@ use {
         OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
         RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
         SourceName, StorageDecl, StorageDirectorySource, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -70,7 +70,6 @@ pub enum RouteRequest {
 
     // Route a capability from a realm's environment.
     Resolver(ResolverRegistration),
-    Runner(Name),
 
     // Route the directory capability that backs a storage capability.
     StorageBackingDirectory(StorageDecl),
@@ -81,6 +80,7 @@ pub enum RouteRequest {
     UseProtocol(UseProtocolDecl),
     UseService(UseServiceDecl),
     UseStorage(UseStorageDecl),
+    UseRunner(UseRunnerDecl),
 
     // Route a capability from an OfferDecl.
     OfferDirectory(OfferDirectoryDecl),
@@ -113,8 +113,8 @@ impl RouteRequest {
             | ExposeProtocol(_)
             | ExposeService(_)
             | Resolver(_)
-            | Runner(_)
-            | StorageBackingDirectory(_) => false,
+            | StorageBackingDirectory(_)
+            | UseRunner(_) => false,
 
             OfferDirectory(OfferDirectoryDecl { availability, .. })
             | OfferEventStream(OfferEventStreamDecl { availability, .. })
@@ -143,9 +143,6 @@ impl std::fmt::Display for RouteRequest {
             Self::Resolver(r) => {
                 write!(f, "resolver `{}`", r.resolver)
             }
-            Self::Runner(r) => {
-                write!(f, "runner `{}`", r)
-            }
             Self::UseDirectory(u) => {
                 write!(f, "directory `{}`", u.source_name)
             }
@@ -160,6 +157,9 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::UseEventStream(u) => {
                 write!(f, "event stream `{}`", u.source_name)
+            }
+            Self::UseRunner(u) => {
+                write!(f, "runner `{}`", u.source_name)
             }
             Self::StorageBackingDirectory(u) => {
                 write!(f, "storage backing directory `{}`", u.backing_dir)
@@ -238,7 +238,6 @@ where
         RouteRequest::Resolver(resolver_registration) => {
             route_resolver(resolver_registration, target, mapper).await
         }
-        RouteRequest::Runner(runner_name) => route_runner(&runner_name, target, mapper).await,
         // Route the backing directory for a storage capability
         RouteRequest::StorageBackingDirectory(storage_decl) => {
             route_storage_backing_directory(storage_decl, target, mapper).await
@@ -259,6 +258,9 @@ where
         }
         RouteRequest::UseStorage(use_storage_decl) => {
             route_storage(use_storage_decl, target, mapper).await
+        }
+        RouteRequest::UseRunner(use_runner_decl) => {
+            route_runner(use_runner_decl, target, mapper).await
         }
 
         // Route from a OfferDecl
@@ -978,7 +980,7 @@ make_noop_visitor!(RunnerVisitor, {
 
 /// Finds a Runner capability that matches `runner` in the `target`'s environment, and then
 /// routes the Runner capability from the environment's component instance to its source.
-async fn route_runner<C, M>(
+async fn route_runner_from_environment<C, M>(
     runner: &Name,
     target: &Arc<C>,
     mapper: &mut M,
@@ -1027,6 +1029,43 @@ where
 
     target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
+}
+
+/// Finds a Runner capability that matches the use of `runner`.
+async fn route_runner<C, M>(
+    use_decl: UseRunnerDecl,
+    target: &Arc<C>,
+    mapper: &mut M,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+    M: DebugRouteMapper + 'static,
+{
+    match use_decl.source {
+        UseSource::Environment => {
+            route_runner_from_environment(use_decl.source_name(), target, mapper).await
+        }
+        _ => {
+            let allowed_sources = AllowedSourcesBuilder::new()
+                .framework(InternalCapability::Runner)
+                .builtin()
+                .capability()
+                .component();
+            let mut availability_visitor = AvailabilityRunnerVisitor::new(&use_decl);
+            let source = router::route_from_use(
+                use_decl,
+                target.clone(),
+                allowed_sources,
+                &mut availability_visitor,
+                mapper,
+                &mut vec![],
+            )
+            .await?;
+
+            target.policy_checker().can_route_capability(&source, target.moniker())?;
+            Ok(RouteSource::new(source))
+        }
+    }
 }
 
 make_noop_visitor!(ResolverVisitor, {
@@ -1144,6 +1183,12 @@ impl ErrorNotFoundFromParent for UseProtocolDecl {
     }
 }
 
+impl ErrorNotFoundFromParent for UseRunnerDecl {
+    fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
+        RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
+    }
+}
+
 impl ErrorNotFoundFromParent for DebugRegistration {
     fn error_not_found_from_parent(moniker: Moniker, capability_name: Name) -> RoutingError {
         RoutingError::EnvironmentFromParentNotFound {
@@ -1176,6 +1221,20 @@ impl ErrorNotFoundFromParent for OfferProtocolDecl {
 }
 
 impl ErrorNotFoundInChild for UseProtocolDecl {
+    fn error_not_found_in_child(
+        moniker: Moniker,
+        child_moniker: ChildName,
+        capability_name: Name,
+    ) -> RoutingError {
+        RoutingError::UseFromChildExposeNotFound {
+            child_moniker,
+            moniker,
+            capability_id: capability_name.into(),
+        }
+    }
+}
+
+impl ErrorNotFoundInChild for UseRunnerDecl {
     fn error_not_found_in_child(
         moniker: Moniker,
         child_moniker: ChildName,

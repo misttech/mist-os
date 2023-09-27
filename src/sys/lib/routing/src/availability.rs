@@ -7,9 +7,10 @@ use {
     crate::RouteBundle,
     cm_rust::{
         Availability, DirectoryDecl, EventStreamDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeProtocolDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon, OfferDirectoryDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        ProtocolDecl, ServiceDecl, StorageDecl, UseDeclCommon,
+        ExposeProtocolDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, OfferDeclCommon,
+        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferRunnerDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, ProtocolDecl, RunnerDecl, ServiceDecl,
+        StorageDecl, UseDeclCommon,
     },
     std::convert::From,
 };
@@ -198,6 +199,12 @@ make_availability_visitor!(AvailabilityStorageVisitor, {
 make_availability_visitor!(AvailabilityEventStreamVisitor, {
     OfferDecl => OfferEventStreamDecl,
     CapabilityDecl => EventStreamDecl,
+});
+
+make_availability_visitor!(AvailabilityRunnerVisitor, {
+    OfferDecl => OfferRunnerDecl,
+    ExposeDecl => ExposeRunnerDecl,
+    CapabilityDecl => RunnerDecl,
 });
 
 #[cfg(test)]

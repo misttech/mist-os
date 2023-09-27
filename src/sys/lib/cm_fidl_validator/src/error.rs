@@ -85,6 +85,18 @@ pub enum Error {
 
     #[error("All sources that feed into an aggregation operation should have the same availability. Got {0}.")]
     DifferentAvailabilityInAggregation(AvailabilityList),
+
+    #[error("Multiple runners used.")]
+    MultipleRunnersUsed,
+
+    #[error("Used runner conflicts with program runner.")]
+    ConflictingRunners,
+
+    #[error(
+        "Runner is missing for executable component. A runner must be specified in the \
+            `program` section or in the `use` section."
+    )]
+    MissingRunner,
 }
 
 /// [AvailabilityList] is a newtype to provide a human friendly [Display] impl for a vector
@@ -350,6 +362,7 @@ pub enum DeclType {
     UseDirectory,
     UseEventStream,
     UseProtocol,
+    UseRunner,
     UseService,
     UseStorage,
     VoidRef,
@@ -442,6 +455,7 @@ impl fmt::Display for DeclType {
             DeclType::UseDirectory => "UseDirectory",
             DeclType::UseEventStream => "UseEventStream",
             DeclType::UseProtocol => "UseProtocol",
+            DeclType::UseRunner => "UseRunner",
             DeclType::UseService => "UseService",
             DeclType::UseStorage => "UseStorage",
             DeclType::VoidRef => "VoidRef",

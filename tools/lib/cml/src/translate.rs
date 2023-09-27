@@ -88,7 +88,7 @@ pub fn compile(
     let all_children = document.all_children_names().into_iter().collect();
     let all_collections = document.all_collection_names().into_iter().collect();
     let component = fdecl::Component {
-        program: document.program.as_ref().map(|p| translate_program(p)).transpose()?,
+        program: document.program.as_ref().map(translate_program).transpose()?,
         uses: document
             .r#use
             .as_ref()
@@ -377,6 +377,12 @@ fn translate_use(
                     ..Default::default()
                 }));
             }
+        } else if let Some(n) = &use_.runner {
+            out_uses.push(fdecl::Use::Runner(fdecl::UseRunner {
+                source_name: Some(n.clone().into()),
+                source: Some(extract_use_source(use_, all_capability_names, all_children)?),
+                ..Default::default()
+            }));
         } else {
             return Err(Error::internal(format!("no capability in use declaration")));
         };
@@ -2349,6 +2355,40 @@ mod tests {
             },
         },
 
+        test_compile_program_with_use_runner => {
+            input = json!({
+                "program": {
+                    "binary": "bin/app",
+                },
+                "use": [
+                    { "runner": "elf", "from": "parent", },
+                ],
+            }),
+            output = fdecl::Component {
+                program: Some(fdecl::Program {
+                    runner: None,
+                    info: Some(fdata::Dictionary {
+                        entries: Some(vec![fdata::DictionaryEntry {
+                            key: "binary".to_string(),
+                            value: Some(Box::new(fdata::DictionaryValue::Str("bin/app".to_string()))),
+                        }]),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                uses: Some(vec![
+                    fdecl::Use::Runner (
+                        fdecl::UseRunner {
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            source_name: Some("elf".to_string()),
+                            ..Default::default()
+                        }
+                    ),
+                ]),
+                ..default_component_decl()
+            },
+        },
+
         test_compile_program_with_nested_objects => {
             input = json!({
                 "program": {
@@ -2499,7 +2539,8 @@ mod tests {
                         "event_stream": ["foobar", "stream"],
                         "scope": ["#logger", "#modular"],
                         "path": "/event_stream/another",
-                    }
+                    },
+                    { "runner": "usain", "from": "parent", }
                 ],
                 "capabilities": [
                     {
@@ -2642,6 +2683,11 @@ mod tests {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_path: Some("/event_stream/another".to_string()),
                         availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::Runner(fdecl::UseRunner {
+                        source_name: Some("usain".to_string()),
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         ..Default::default()
                     })
                 ]),

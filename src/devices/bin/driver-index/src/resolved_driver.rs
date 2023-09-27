@@ -199,7 +199,11 @@ pub async fn load_boot_driver(
         Some(r) => r,
         None => return Ok(None),
     };
-    if runner.as_str() != "driver" {
+    if runner.source != cm_rust::UseSource::Environment {
+        // TODO(b/301458801): support use/runner for drivers.
+        return Ok(None);
+    }
+    if runner.source_name.as_str() != "driver" {
         return Ok(None);
     }
     load_driver(

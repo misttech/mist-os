@@ -145,12 +145,26 @@ fn get_program_binary(component_manifest: &ComponentManifest) -> Option<String> 
 
 fn get_component_runner(component_manifest: &ComponentManifest) -> Option<String> {
     match component_manifest {
-        ComponentManifest::Cml(document) => {
-            document.program.as_ref().and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))
-        }
-        ComponentManifest::Cm(decl) => {
-            decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))
-        }
+        ComponentManifest::Cml(document) => document
+            .r#use
+            .as_ref()
+            .and_then(|u| {
+                u.iter()
+                    .find(|&r| r.runner.is_some())
+                    .and_then(|ru| ru.runner.as_ref().map(|s| s.as_str().to_owned()))
+            })
+            .or(document
+                .program
+                .as_ref()
+                .and_then(|p| p.runner.as_ref().map(|s| s.as_str().to_owned()))),
+        ComponentManifest::Cm(decl) => decl
+            .uses
+            .iter()
+            .find_map(|u| match u {
+                cm_rust::UseDecl::Runner(r) => Some(r.source_name.to_string()),
+                _ => None,
+            })
+            .or(decl.program.as_ref().and_then(|p| p.runner.as_ref().map(|n| n.to_string()))),
     }
 }
 
@@ -288,6 +302,29 @@ mod tests {
                     runner: "elf",
                     binary: "bin/hello_world",
                 },
+            }"#,
+        );
+        let package_manifest = tmp_file(
+            &tmp_dir,
+            "test.fini",
+            fini_file!("bin/hello_world=hello_world", "lib/foo=foo"),
+        );
+
+        assert_matches!(validate(&component_manifest, &package_manifest, None), Ok(()));
+    }
+
+    #[test]
+    fn validate_returns_ok_for_proper_cml_with_use_runner() {
+        let tmp_dir = TempDir::new().unwrap();
+        let component_manifest = tmp_file(
+            &tmp_dir,
+            "test.cml",
+            r#"{
+                // JSON5, which .cml uses, allows for comments.
+                program: {
+                    binary: "bin/hello_world",
+                },
+                use: [{  runner: "elf", }],
             }"#,
         );
         let package_manifest = tmp_file(

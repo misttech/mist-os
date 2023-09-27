@@ -14,7 +14,7 @@ use {
         OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
         OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon,
         RegistrationSource, StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseServiceDecl, UseSource,
+        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
     },
     cm_types::Name,
     futures::future::select_all,
@@ -438,14 +438,14 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
             UseDecl::Service(UseServiceDecl { source: UseSource::Child(name), .. })
             | UseDecl::Protocol(UseProtocolDecl { source: UseSource::Child(name), .. })
             | UseDecl::Directory(UseDirectoryDecl { source: UseSource::Child(name), .. })
-            | UseDecl::EventStream(UseEventStreamDecl { source: UseSource::Child(name), .. }) => {
-                name
-            }
+            | UseDecl::EventStream(UseEventStreamDecl { source: UseSource::Child(name), .. })
+            | UseDecl::Runner(UseRunnerDecl { source: UseSource::Child(name), .. }) => name,
             UseDecl::Service(_)
             | UseDecl::Protocol(_)
             | UseDecl::Directory(_)
             | UseDecl::Storage(_)
-            | UseDecl::EventStream(_) => {
+            | UseDecl::EventStream(_)
+            | UseDecl::Runner(_) => {
                 // capabilities which cannot or are not used from a child can be ignored.
                 continue;
             }
@@ -459,7 +459,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
                     continue;
                 }
             }
-            UseDecl::Storage(_) | UseDecl::EventStream(_) => {
+            UseDecl::Storage(_) | UseDecl::EventStream(_) | UseDecl::Runner(_) => {
                 // Any other capability type cannot be marked as weak, so we can proceed
             }
         }
@@ -804,9 +804,9 @@ mod tests {
         },
         cm_rust::{
             Availability, ChildDecl, ComponentDecl, DependencyType, ExposeDecl, ExposeProtocolDecl,
-            ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl, OfferResolverDecl,
-            OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl, StorageDecl,
-            StorageDirectorySource, UseDecl, UseSource,
+            ExposeRunnerDecl, ExposeSource, ExposeTarget, OfferDecl, OfferProtocolDecl,
+            OfferResolverDecl, OfferSource, OfferStorageDecl, OfferTarget, ProtocolDecl,
+            StorageDecl, StorageDirectorySource, UseDecl, UseSource,
         },
         cm_rust_testing::{
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
@@ -2415,7 +2415,34 @@ mod tests {
                 child("childA") => hashset![ComponentRef::Self_],
             },
             process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_use_runner_from_child() {
+        let decl = ComponentDecl {
+            children: vec![ChildDecl {
+                name: "childA".to_string(),
+                url: "ignored:///child".to_string(),
+                startup: fdecl::StartupMode::Lazy,
+                environment: None,
+                on_terminate: None,
+                config_overrides: None,
+            }],
+            uses: vec![UseDecl::Runner(UseRunnerDecl {
+                source: UseSource::Child("childA".to_string()),
+                source_name: "test.runner".parse().unwrap(),
+            })],
+            ..default_component_decl()
+        };
+
+        pretty_assertions::assert_eq!(
+            hashmap! {
+                ComponentRef::Self_ => hashset![],
+                child("childA") => hashset![ComponentRef::Self_],
+            },
+            process_component_dependencies(&FakeComponent::from_decl(decl))
+        );
     }
 
     #[fuchsia::test]
@@ -3875,6 +3902,82 @@ mod tests {
                         target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
+                    }))
+                    .build(),
+            ),
+            ("c", ComponentDeclBuilder::new().build()),
+        ];
+        let test = ActionsTest::new("root", components, None).await;
+        let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
+        let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;
+        let component_c = test.look_up(vec!["a", "c"].try_into().unwrap()).await;
+
+        // Component startup was eager, so they should all have an `Execution`.
+        test.model
+            .start_instance(&component_a.moniker, &StartReason::Eager)
+            .await
+            .expect("could not start a");
+
+        let component_a_info = ComponentInfo::new(component_a).await;
+        let component_b_info = ComponentInfo::new(component_b).await;
+        let component_c_info = ComponentInfo::new(component_c).await;
+
+        // Register shutdown action on "a", and wait for it. This should cause all components
+        // to shut down.
+        ActionSet::register(component_a_info.component.clone(), ShutdownAction::new())
+            .await
+            .expect("shutdown failed");
+        component_a_info.check_is_shut_down(&test.runner).await;
+        component_b_info.check_is_shut_down(&test.runner).await;
+        component_c_info.check_is_shut_down(&test.runner).await;
+
+        {
+            let events: Vec<_> = test
+                .test_hook
+                .lifecycle()
+                .into_iter()
+                .filter(|e| match e {
+                    Lifecycle::Stop(_) => true,
+                    _ => false,
+                })
+                .collect();
+            let expected: Vec<_> = vec![
+                Lifecycle::Stop(vec!["a", "c"].try_into().unwrap()),
+                Lifecycle::Stop(vec!["a"].try_into().unwrap()),
+                Lifecycle::Stop(vec!["a", "b"].try_into().unwrap()),
+            ];
+            assert_eq!(events, expected);
+        }
+    }
+
+    /// Shut down `a`:
+    ///   a     (a uses runner from b)
+    ///  / \
+    /// b    c
+    /// In this case, c shuts down first, then a, then b.
+    #[fuchsia::test]
+    async fn test_shutdown_use_runner_from_child() {
+        let components = vec![
+            ("root", ComponentDeclBuilder::new().add_lazy_child("a").build()),
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .add_eager_child("b")
+                    .add_eager_child("c")
+                    .use_(UseDecl::Runner(UseRunnerDecl {
+                        source: UseSource::Child("b".to_string()),
+                        source_name: "test.runner".parse().unwrap(),
+                    }))
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .expose(ExposeDecl::Runner(ExposeRunnerDecl {
+                        source: ExposeSource::Self_,
+                        source_name: "test.runner".parse().unwrap(),
+                        target_name: "test.runner".parse().unwrap(),
+                        target: ExposeTarget::Parent,
                     }))
                     .build(),
             ),

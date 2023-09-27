@@ -106,39 +106,34 @@ async fn do_start(
 
     let result = async move {
         // Resolve the component.
-        let component_info = component.resolve().await.map_err(|err|
+        let component_info = component.resolve().await.map_err(|err| {
             StartActionError::ResolveActionError { moniker: component.moniker.clone(), err }
-        )?;
+        })?;
 
         // Find the runner to use.
         let runner = component.resolve_runner().await.map_err(|err| {
-            warn!(moniker = %component.moniker, %err, "Failed to resolve runner. A runner must be registered in a component's environment before being referenced. https://fuchsia.dev/go/components/runners#register");
+            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
             err
         })?;
 
         // Generate the Runtime which will be set in the Execution.
         let checker = component.policy_checker();
-        let (pending_runtime, start_info, break_on_start) =
-            make_execution_runtime(
-                &component,
-                &checker,
-                component_info.resolved_url.clone(),
-                component_info.package.as_ref(),
-                &component_info.decl,
-                component_info.config,
-                start_reason.clone(),
-                execution_controller_task,
-                numbered_handles,
-                additional_namespace_entries,
-            )
-            .await?;
+        let (pending_runtime, start_info, break_on_start) = make_execution_runtime(
+            &component,
+            &checker,
+            component_info.resolved_url.clone(),
+            component_info.package.as_ref(),
+            &component_info.decl,
+            component_info.config,
+            start_reason.clone(),
+            execution_controller_task,
+            numbered_handles,
+            additional_namespace_entries,
+        )
+        .await?;
 
         Ok((
-            StartContext {
-                runner,
-                start_info,
-                diagnostics_sender,
-            },
+            StartContext { runner, start_info, diagnostics_sender },
             component_info.decl,
             pending_runtime,
             break_on_start,

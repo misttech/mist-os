@@ -131,6 +131,15 @@ impl GlobalPolicyChecker {
                     capability: capability.type_name(),
                 }
             }
+            CapabilitySource::Environment { capability, .. } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentManager,
+                source_name: capability
+                    .source_name()
+                    .ok_or(PolicyError::InvalidCapabilitySource)?
+                    .clone(),
+                source: CapabilityAllowlistSource::Environment,
+                capability: capability.type_name(),
+            },
         })
     }
 

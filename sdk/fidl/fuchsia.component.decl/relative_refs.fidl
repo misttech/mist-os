@@ -14,6 +14,8 @@ type Ref = flexible union {
     6: capability CapabilityRef;
     7: debug DebugRef;
     8: void_type VoidRef;
+    @available(added=HEAD)
+    9: environment EnvironmentRef;
 };
 
 /// A reference to a component's parent instance.
@@ -51,3 +53,7 @@ type CapabilityRef = struct {
 
 /// A reference to an intentionally missing offer source.
 type VoidRef = struct {};
+
+/// A reference to the environment.
+@available(added=HEAD)
+type EnvironmentRef = struct {};

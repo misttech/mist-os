@@ -43,18 +43,30 @@ pub enum Error {
 pub enum CapabilitySource<C: ComponentInstanceInterface> {
     /// This capability originates from the component instance for the given Realm.
     /// point.
-    Component { capability: ComponentCapability, component: WeakComponentInstanceInterface<C> },
+    Component {
+        capability: ComponentCapability,
+        component: WeakComponentInstanceInterface<C>,
+    },
     /// This capability originates from "framework". It's implemented by component manager and is
     /// scoped to the realm of the source.
-    Framework { capability: InternalCapability, component: WeakComponentInstanceInterface<C> },
+    Framework {
+        capability: InternalCapability,
+        component: WeakComponentInstanceInterface<C>,
+    },
     /// This capability originates from the parent of the root component, and is built in to
     /// component manager. `top_instance` is the instance at the top of the tree, i.e.  the
     /// instance representing component manager.
-    Builtin { capability: InternalCapability, top_instance: Weak<C::TopInstance> },
+    Builtin {
+        capability: InternalCapability,
+        top_instance: Weak<C::TopInstance>,
+    },
     /// This capability originates from the parent of the root component, and is offered from
     /// component manager's namespace. `top_instance` is the instance at the top of the tree, i.e.
     /// the instance representing component manager.
-    Namespace { capability: ComponentCapability, top_instance: Weak<C::TopInstance> },
+    Namespace {
+        capability: ComponentCapability,
+        top_instance: Weak<C::TopInstance>,
+    },
     /// This capability is provided by the framework based on some other capability.
     Capability {
         source_capability: ComponentCapability,
@@ -78,6 +90,11 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         source_instance_filter: Vec<String>,
         instance_name_source_to_target: HashMap<String, Vec<String>>,
     },
+    // This capability originates from "environment". It's implemented by a component instance.
+    Environment {
+        capability: ComponentCapability,
+        component: WeakComponentInstanceInterface<C>,
+    },
 }
 
 impl<C: ComponentInstanceInterface> CapabilitySource<C> {
@@ -93,6 +110,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::CollectionAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::OfferAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::FilteredService { capability, .. } => capability.can_be_in_namespace(),
+            Self::Environment { capability, .. } => capability.can_be_in_namespace(),
         }
     }
 
@@ -106,6 +124,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::CollectionAggregate { capability, .. } => Some(capability.source_name()),
             Self::OfferAggregate { capability, .. } => Some(capability.source_name()),
             Self::FilteredService { capability, .. } => capability.source_name(),
+            Self::Environment { capability, .. } => capability.source_name(),
         }
     }
 
@@ -119,6 +138,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::CollectionAggregate { capability, .. } => capability.type_name(),
             Self::OfferAggregate { capability, .. } => capability.type_name(),
             Self::FilteredService { capability, .. } => capability.type_name(),
+            Self::Environment { capability, .. } => capability.type_name(),
         }
     }
 
@@ -129,7 +149,8 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             | Self::Capability { component, .. }
             | Self::FilteredService { component, .. }
             | Self::CollectionAggregate { component, .. }
-            | Self::OfferAggregate { component, .. } => {
+            | Self::OfferAggregate { component, .. }
+            | Self::Environment { component, .. } => {
                 WeakExtendedInstanceInterface::Component(component.clone())
             }
             Self::Builtin { top_instance, .. } | Self::Namespace { top_instance, .. } => {
@@ -170,6 +191,7 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::FilteredService { capability, component, .. } => {
                     format!("{} '{}'", capability, component.moniker)
                 }
+                CapabilitySource::Environment { capability, .. } => capability.to_string(),
             }
         )
     }
@@ -391,6 +413,7 @@ impl ComponentCapability {
                 UseDecl::Service(_) => CapabilityTypeName::Service,
                 UseDecl::Storage(_) => CapabilityTypeName::Storage,
                 UseDecl::EventStream(_) => CapabilityTypeName::EventStream,
+                UseDecl::Runner(_) => CapabilityTypeName::Runner,
             },
             ComponentCapability::Environment(env) => match env {
                 EnvironmentCapability::Runner { .. } => CapabilityTypeName::Runner,

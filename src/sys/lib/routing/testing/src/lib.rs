@@ -24,7 +24,7 @@ use {
         OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferRunnerDecl,
         OfferServiceDecl, OfferSource, OfferTarget, ProgramDecl, ProtocolDecl, RegistrationSource,
         RunnerDecl, RunnerRegistration, ServiceDecl, UseDecl, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseServiceDecl, UseSource,
+        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
@@ -359,6 +359,9 @@ macro_rules! instantiate_common_routing_tests {
             test_route_builtin_runner_from_root_env,
             test_route_builtin_runner_not_found,
             test_route_builtin_runner_from_root_env_registration_not_found,
+            test_use_runner_from_child,
+            test_use_runner_from_parent,
+            test_use_runner_from_parent_environment,
         }
     };
     ($builder_impl:path, $test:ident, $($remaining:ident),+ $(,)?) => {
@@ -4908,7 +4911,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -4944,7 +4950,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     ///      \
     ///       c
     ///
-    /// a: declares runner "elf" as service "/svc/runner" from self.
+    /// a: declares runner "elf" at path "/svc/runner" from self.
     /// a: offers runner "elf" from self to "b" as "dwarf".
     /// b: registers runner "dwarf" from realm in environment as "hobbit".
     /// c: uses runner "hobbit".
@@ -4991,7 +4997,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5026,7 +5035,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// b   c
     ///
     /// a: registers runner "dwarf" from "b" in environment as "hobbit".
-    /// b: exposes runner "elf" as service "/svc/runner" from self as "dwarf".
+    /// b: exposes runner "elf" at path "/svc/runner" from self as "dwarf".
     /// c: uses runner "hobbit".
     pub async fn test_route_runner_from_sibling_environment(&self) {
         let components = vec![
@@ -5072,7 +5081,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5108,7 +5120,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     ///      \
     ///       c
     ///
-    /// a: declares runner "elf" as service "/svc/runner" from self.
+    /// a: declares runner "elf" at path "/svc/runner" from self.
     /// a: registers runner "elf" from realm in environment as "hobbit".
     /// b: creates environment extending from realm.
     /// c: uses runner "hobbit".
@@ -5155,7 +5167,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let c_component =
             model.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &c_component,
             &mut NoopRouteMapper,
         )
@@ -5222,7 +5237,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5281,7 +5299,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let source = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5322,7 +5343,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let source = route_capability(
-            RouteRequest::Runner("elf".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "elf".parse().unwrap(),
+            }),
             &a_component,
             &mut NoopRouteMapper,
         )
@@ -5383,7 +5407,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let b_component =
             model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &b_component,
             &mut NoopRouteMapper,
         )
@@ -5416,7 +5443,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let route_result = route_capability(
-            RouteRequest::Runner("hobbit".parse().unwrap()),
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
             &a_component,
             &mut NoopRouteMapper,
         )
@@ -5434,5 +5464,230 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 && capability_type == "runner".to_string()
                 && capability_name == "hobbit"
         );
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// a: uses runner "elf" from "#b" as "dwarf".
+    /// b: exposes runner "elf" at path "/svc/runner" from self as "dwarf".
+    pub async fn test_use_runner_from_child(&self) {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .use_(UseDecl::Runner(UseRunnerDecl {
+                        source: UseSource::Child("b".to_string()),
+                        source_name: "dwarf".parse().unwrap(),
+                    }))
+                    .add_lazy_child("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .expose(ExposeDecl::Runner(ExposeRunnerDecl {
+                        source: ExposeSource::Self_,
+                        source_name: "elf".parse().unwrap(),
+                        target: ExposeTarget::Parent,
+                        target_name: "dwarf".parse().unwrap(),
+                    }))
+                    .runner(RunnerDecl {
+                        name: "elf".parse().unwrap(),
+                        source_path: Some("/svc/runner".parse().unwrap()),
+                    })
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
+        let b_component =
+            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let source = route_capability(
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Child("b".parse().unwrap()),
+                source_name: "dwarf".parse().unwrap(),
+            }),
+            &a_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
+
+        // Verify this source comes from `b`.
+        match source {
+            RouteSource {
+                source:
+                    CapabilitySource::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
+                assert_eq!(name, "elf");
+                assert_eq!(
+                    source_path.expect("missing source path"),
+                    "/svc/runner".parse::<cm_types::Path>().unwrap()
+                );
+                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &b_component));
+            }
+            _ => panic!("bad capability source"),
+        };
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// a: offers runner "elf" at path "/svc/runner" from self as "dwarf".
+    /// b: uses runner "elf" from "parent" as "dwarf".
+    pub async fn test_use_runner_from_parent(&self) {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .offer(OfferDecl::Runner(OfferRunnerDecl {
+                        source: OfferSource::Self_,
+                        source_name: "elf".parse().unwrap(),
+                        target: OfferTarget::static_child("b".to_string()),
+                        target_name: "dwarf".parse().unwrap(),
+                    }))
+                    .runner(RunnerDecl {
+                        name: "elf".parse().unwrap(),
+                        source_path: Some("/svc/runner".parse().unwrap()),
+                    })
+                    .add_lazy_child("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(UseDecl::Runner(UseRunnerDecl {
+                        source: UseSource::Parent,
+                        source_name: "dwarf".parse().unwrap(),
+                    }))
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
+        let b_component =
+            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let source = route_capability(
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Parent,
+                source_name: "dwarf".parse().unwrap(),
+            }),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
+
+        // Verify this source comes from `a`.
+        match source {
+            RouteSource {
+                source:
+                    CapabilitySource::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
+                assert_eq!(name, "elf");
+                assert_eq!(
+                    source_path.expect("missing source path"),
+                    "/svc/runner".parse::<cm_types::Path>().unwrap()
+                );
+                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+            }
+            _ => panic!("bad capability source"),
+        };
+    }
+
+    ///  a
+    ///   \
+    ///    b
+    ///
+    /// a: declares runner "elf" with service "/svc/runner" from "self".
+    /// a: registers runner "elf" from self in environment as "hobbit".
+    /// b: uses runner "hobbit" from environment.
+    pub async fn test_use_runner_from_parent_environment(&self) {
+        let components = vec![
+            (
+                "a",
+                ComponentDeclBuilder::new()
+                    .add_child(ChildDeclBuilder::new_lazy_child("b").environment("env").build())
+                    .add_environment(
+                        EnvironmentDeclBuilder::new()
+                            .name("env")
+                            .extends(fdecl::EnvironmentExtends::Realm)
+                            .add_runner(RunnerRegistration {
+                                source_name: "elf".parse().unwrap(),
+                                source: RegistrationSource::Self_,
+                                target_name: "hobbit".parse().unwrap(),
+                            })
+                            .build(),
+                    )
+                    .runner(RunnerDecl {
+                        name: "elf".parse().unwrap(),
+                        source_path: Some("/svc/runner".parse().unwrap()),
+                    })
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
+                    .use_(UseDecl::Runner(UseRunnerDecl {
+                        source: UseSource::Environment,
+                        source_name: "hobbit".parse().unwrap(),
+                    }))
+                    .build(),
+            ),
+        ];
+
+        let model = T::new("a", components).build().await;
+        let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
+        let b_component =
+            model.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
+        let source = route_capability(
+            RouteRequest::UseRunner(UseRunnerDecl {
+                source: UseSource::Environment,
+                source_name: "hobbit".parse().unwrap(),
+            }),
+            &b_component,
+            &mut NoopRouteMapper,
+        )
+        .await
+        .expect("failed to route runner");
+
+        // Verify this source comes from `a`.
+        match source {
+            RouteSource {
+                source:
+                    CapabilitySource::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
+                assert_eq!(name, "elf");
+                assert_eq!(
+                    source_path.expect("missing source path"),
+                    "/svc/runner".parse::<cm_types::Path>().unwrap()
+                );
+                assert!(Arc::ptr_eq(&component.upgrade().unwrap(), &a_component));
+            }
+            _ => panic!("bad capability source"),
+        };
     }
 }

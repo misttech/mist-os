@@ -104,6 +104,7 @@ pub enum CapabilityId<'a> {
     UsedStorage(Path),
     // An event stream in a `use` declaration has a target path in the component's namespace.
     UsedEventStream(Path),
+    UsedRunner(&'a Name),
     Storage(&'a Name),
     Runner(&'a Name),
     Resolver(&'a Name),
@@ -140,6 +141,7 @@ impl<'a> CapabilityId<'a> {
             CapabilityId::UsedDirectory(_) => "directory",
             CapabilityId::UsedStorage(_) => "storage",
             CapabilityId::UsedEventStream(_) => "event_stream",
+            CapabilityId::UsedRunner(_) => "runner",
             CapabilityId::Storage(_) => "storage",
             CapabilityId::Runner(_) => "runner",
             CapabilityId::Resolver(_) => "resolver",
@@ -199,6 +201,15 @@ impl<'a> CapabilityId<'a> {
             return Ok(vec![CapabilityId::UsedEventStream(Path::new(
                 "/svc/fuchsia.component.EventStream".to_string(),
             )?)]);
+        } else if let Some(n) = use_.runner() {
+            match n {
+                OneOrMany::One(name) => {
+                    return Ok(vec![CapabilityId::UsedRunner(name)]);
+                }
+                OneOrMany::Many(_) => {
+                    return Err(Error::validate("`use runner` should occur at most once."));
+                }
+            }
         }
         // Unsupported capability type.
         let supported_keywords = use_
@@ -420,6 +431,7 @@ impl fmt::Display for CapabilityId<'_> {
             CapabilityId::Service(n)
             | CapabilityId::Storage(n)
             | CapabilityId::Runner(n)
+            | CapabilityId::UsedRunner(n)
             | CapabilityId::Resolver(n)
             | CapabilityId::EventStream(n) => n.as_str(),
             CapabilityId::UsedService(p)
@@ -2271,6 +2283,10 @@ impl<'de> de::Deserialize<'de> for Program {
 ///         ],
 ///         from: "framework",
 ///     },
+///     {
+///         runner: "own_test_runner".
+///         from: "#test_runner",
+///     },
 /// ],
 /// ```
 #[derive(Deserialize, Debug, Default, PartialEq, Clone, ReferenceDoc, Serialize)]
@@ -2297,6 +2313,10 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream: Option<OneOrMany<Name>>,
 
+    /// When using a runner capability, the [name](#name) of a [runner capability][doc-runners].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub runner: Option<Name>,
+
     /// The source of the capability. Defaults to `parent`.  One of:
     /// - `parent`: The component's parent.
     /// - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
@@ -2312,7 +2332,7 @@ pub struct Use {
 
     /// The path at which to install the capability in the component's namespace. For protocols,
     /// defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
-    /// disallowed for declarations with arrays of capability names.
+    /// disallowed for declarations with arrays of capability names and for runner capabilities.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<Path>,
 
@@ -2346,6 +2366,7 @@ pub struct Use {
     /// - `weak`: a weak dependency, which is ignored during shutdown. When component manager
     ///     stops the parent realm, the source may stop before the clients. Clients of weak
     ///     dependencies must be able to handle these dependencies becoming unavailable.
+    /// This property is disallowed for runner capabilities, which are always a `strong` dependency.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dependency: Option<DependencyType>,
 
@@ -2358,6 +2379,7 @@ pub struct Use {
     ///     disabled).
     /// - `transitional`: the source may omit the route completely without even having to route
     ///     from `void`. Used for soft transitions that introduce new capabilities.
+    /// This property is disallowed for runner capabilities, which are always `required`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
 }
@@ -3126,7 +3148,7 @@ impl CapabilityClause for Use {
         self.storage.as_ref().map(|n| OneOrMany::One(n))
     }
     fn runner(&self) -> Option<OneOrMany<&Name>> {
-        None
+        self.runner.as_ref().map(|n| OneOrMany::One(n))
     }
     fn resolver(&self) -> Option<OneOrMany<&Name>> {
         None
@@ -3171,6 +3193,8 @@ impl CapabilityClause for Use {
             "storage"
         } else if self.event_stream.is_some() {
             "event_stream"
+        } else if self.runner.is_some() {
+            "runner"
         } else {
             panic!("Missing capability name")
         }
@@ -3179,7 +3203,7 @@ impl CapabilityClause for Use {
         "use"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "storage", "event_stream"]
+        &["service", "protocol", "directory", "storage", "event_stream", "runner"]
     }
     fn are_many_names_allowed(&self) -> bool {
         ["service", "protocol", "event_stream"].contains(&self.capability_type())
@@ -3935,6 +3959,7 @@ mod tests {
             rights: None,
             subdir: None,
             event_stream: None,
+            runner: None,
             filter: None,
             dependency: None,
             availability: None,
@@ -4090,6 +4115,12 @@ mod tests {
                 ..empty_use()
             },)?,
             vec![CapabilityId::UsedStorage("/b".parse().unwrap())]
+        );
+
+        // runner
+        assert_eq!(
+            CapabilityId::from_use(&Use { runner: Some("elf".parse().unwrap()), ..empty_use() },)?,
+            vec![CapabilityId::UsedRunner(&"elf".parse().unwrap())]
         );
 
         // "as" aliasing.

@@ -14,7 +14,8 @@ use {
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon, OfferDecl,
         OfferDeclCommon, OfferEventStreamDecl, OfferTarget, ProgramDecl, ResolverRegistration,
-        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseStorageDecl,
+        SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl, UseRunnerDecl, UseSource,
+        UseStorageDecl,
     },
     config_encoder::ConfigFields,
     fidl::prelude::*,
@@ -829,6 +830,14 @@ impl ComponentModelForAnalyzer {
                     (Err(err), route) => (Err(err.into()), vec![route], capability),
                 }
             }
+            UseDecl::Runner(use_runner_decl) => {
+                let capability = use_runner_decl.source_name.clone();
+                match Self::route_capability_sync(RouteRequest::UseRunner(use_runner_decl), target)
+                {
+                    (Ok(source), route) => (Ok(source), vec![route], capability),
+                    (Err(err), route) => (Err(err.into()), vec![route], capability),
+                }
+            }
         };
         match route_result {
             (Ok(source), routes, capability) => match self.check_use_source(&source) {
@@ -912,8 +921,13 @@ impl ComponentModelForAnalyzer {
     ) -> Option<VerifyRouteResult> {
         match program_decl.runner {
             Some(ref runner) => {
-                let (result, route) =
-                    Self::route_capability_sync(RouteRequest::Runner(runner.clone()), target);
+                let (result, route) = Self::route_capability_sync(
+                    RouteRequest::UseRunner(UseRunnerDecl {
+                        source: UseSource::Environment,
+                        source_name: runner.clone(),
+                    }),
+                    target,
+                );
                 match result {
                     Ok(_source) => Some(VerifyRouteResult {
                         using_node: target.moniker().clone(),

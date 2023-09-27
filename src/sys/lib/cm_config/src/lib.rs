@@ -342,6 +342,7 @@ pub enum CapabilityAllowlistSource {
     Self_,
     Framework,
     Capability,
+    Environment,
 }
 
 /// The enforcement and validation policy to apply to component target ABI revisions.
@@ -668,6 +669,7 @@ fn parse_capability_policy(
                     Some(fdecl::Ref::Self_(_)) => Ok(CapabilityAllowlistSource::Self_),
                     Some(fdecl::Ref::Framework(_)) => Ok(CapabilityAllowlistSource::Framework),
                     Some(fdecl::Ref::Capability(_)) => Ok(CapabilityAllowlistSource::Capability),
+                    Some(fdecl::Ref::Environment(_)) => Ok(CapabilityAllowlistSource::Environment),
                     _ => Err(Error::new(PolicyConfigError::InvalidSourceCapability)),
                 }?;
 

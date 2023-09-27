@@ -102,6 +102,11 @@ async fn add_use_decls(
     uses: impl Iterator<Item = &UseDecl>,
 ) -> Result<(), CreateNamespaceError> {
     for use_ in uses {
+        if let cm_rust::UseDecl::Runner(_) = use_ {
+            // The runner is not available in the namespace.
+            continue;
+        }
+
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
         let capability = match use_ {
@@ -116,6 +121,9 @@ async fn add_use_decls(
             cm_rust::UseDecl::EventStream(s) => {
                 service_or_protocol_use(UseDecl::EventStream(s.clone()), component.as_weak())
             }
+            cm_rust::UseDecl::Runner(_) => {
+                std::process::abort();
+            }
         };
         match use_ {
             cm_rust::UseDecl::Directory(_) | cm_rust::UseDecl::Storage(_) => {
@@ -125,6 +133,9 @@ async fn add_use_decls(
             | cm_rust::UseDecl::Service(_)
             | cm_rust::UseDecl::EventStream(_) => {
                 namespace.add_object(capability, target_path.as_ref())
+            }
+            cm_rust::UseDecl::Runner(_) => {
+                std::process::abort();
             }
         }?
     }

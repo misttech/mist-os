@@ -484,6 +484,7 @@ this component and the capability's source.
 - `directory`: (_optional `string`_) When using a directory capability, the [name](#name) of a [directory capability][doc-directory].
 - `storage`: (_optional `string`_) When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
 - `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
+- `runner`: (_optional `string`_) When using a runner capability, the [name](#name) of a [runner capability][doc-runners].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
     - `parent`: The component's parent.
     - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
@@ -496,7 +497,7 @@ this component and the capability's source.
         instance.
 - `path`: (_optional `string`_) The path at which to install the capability in the component's namespace. For protocols,
     defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
-    disallowed for declarations with arrays of capability names.
+    disallowed for declarations with arrays of capability names and for runner capabilities.
 - `rights`: (_optional `array of string`_) (`directory` only) the maximum [directory rights][doc-directory-rights] to apply to
     the directory in the component's namespace.
 - `subdir`: (_optional `string`_) (`directory` only) A subdirectory within the directory capability to provide in the
@@ -514,6 +515,7 @@ this component and the capability's source.
     - `weak`: a weak dependency, which is ignored during shutdown. When component manager
         stops the parent realm, the source may stop before the clients. Clients of weak
         dependencies must be able to handle these dependencies becoming unavailable.
+    This property is disallowed for runner capabilities, which are always a `strong` dependency.
 - `availability`: (_optional `string`_) `availability` _(optional)_: The expectations around this capability's availability. One
     of:
     - `required` (default): a required dependency, the component is unable to perform its
@@ -523,6 +525,7 @@ this component and the capability's source.
         disabled).
     - `transitional`: the source may omit the route completely without even having to route
         from `void`. Used for soft transitions that introduce new capabilities.
+    This property is disallowed for runner capabilities, which are always `required`.
 
 Example:
 
@@ -549,6 +552,10 @@ use: [
             "stopped",
         ],
         from: "framework",
+    },
+    {
+        runner: "own_test_runner".
+        from: "#test_runner",
     },
 ],
 ```
