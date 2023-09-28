@@ -8,6 +8,8 @@
 #include <lib/sys/cpp/component_context.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
+#include <optional>
+
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/media/audio/audio_core/shared/audio_admin.h"
@@ -18,6 +20,7 @@ namespace {
 using ::inspect::testing::BoolIs;
 using ::inspect::testing::ChildrenMatch;
 using ::inspect::testing::DoubleIs;
+using ::inspect::testing::IntIs;
 using ::inspect::testing::NameMatches;
 using ::inspect::testing::NodeMatches;
 using ::inspect::testing::PropertyList;
@@ -220,41 +223,66 @@ TEST_F(ReporterTest, DeviceMetrics) {
   EXPECT_THAT(
       GetHierarchy(),
       ChildrenMatch(UnorderedElementsAre(
-          AllOf(
-              NodeMatches(NameMatches("output devices")),
-              ChildrenMatch(UnorderedElementsAre(AllOf(
-                  NodeMatches(AllOf(
-                      NameMatches("output_device"),
-                      PropertyList(UnorderedElementsAre(
-                          DoubleIs("gain db", 0.0), BoolIs("muted", false),
-                          BoolIs("agc supported", false), BoolIs("agc enabled", false),
-                          StringIs("mixer thread name", "output_thread"))))),
-                  ChildrenMatch(UnorderedElementsAre(
-                      NodeMatches(AllOf(
-                          NameMatches("driver"),
-                          PropertyList(UnorderedElementsAre(
-                              UintIs("internal delay (ns)", 0), UintIs("external delay (ns)", 0),
-                              UintIs("driver transfer (bytes)", 0), StringIs("name", "unknown"))))),
-                      NodeMatches(AllOf(
-                          NameMatches("format"),
-                          PropertyList(UnorderedElementsAre(StringIs("sample format", "unknown"),
-                                                            UintIs("channels", 0),
-                                                            UintIs("frames per second", 0))))),
-                      NodeMatches(AllOf(NameMatches("device underflows"),
-                                        PropertyList(UnorderedElementsAre(
-                                            UintIs("count", 0), UintIs("duration (ns)", 0),
-                                            UintIs("session count", 0))))),
-                      NodeMatches(AllOf(NameMatches("pipeline underflows"),
-                                        PropertyList(UnorderedElementsAre(
-                                            UintIs("count", 0), UintIs("duration (ns)", 0),
-                                            UintIs("session count", 0))))))))))),
+          AllOf(NodeMatches(NameMatches("output devices")),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(AllOf(NameMatches("output_device"),
+                                      PropertyList(UnorderedElementsAre(
+                                          StringIs("mixer thread name", "output_thread"))))),
+                    ChildrenMatch(UnorderedElementsAre(
+                        NodeMatches(AllOf(NameMatches("driver"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("initial internal delay (ns)", 0),
+                                              UintIs("current internal delay (ns)", 0),
+                                              IntIs("time of latest internal delay change", 0),
+                                              UintIs("initial external delay (ns)", 0),
+                                              UintIs("current external delay (ns)", 0),
+                                              IntIs("time of latest external delay change", 0),
+                                              UintIs("driver transfer (bytes)", 0),
+                                              StringIs("name", "unknown"))))),
+                        NodeMatches(AllOf(
+                            NameMatches("format"),
+                            PropertyList(UnorderedElementsAre(StringIs("sample format", "unknown"),
+                                                              UintIs("channels", 0),
+                                                              UintIs("frames per second", 0))))),
+                        NodeMatches(AllOf(
+                            NameMatches("device gain"),
+                            PropertyList(UnorderedElementsAre(
+                                DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                                BoolIs("agc supported", false), BoolIs("agc enabled", false))))),
+                        NodeMatches(AllOf(NameMatches("device underflows"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("count", 0), UintIs("duration (ns)", 0),
+                                              UintIs("session count", 0))))),
+                        NodeMatches(AllOf(NameMatches("pipeline underflows"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("count", 0), UintIs("duration (ns)", 0),
+                                              UintIs("session count", 0))))))))))),
           AllOf(NodeMatches(NameMatches("input devices")),
-                ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                    AllOf(NameMatches("input_device"),
-                          PropertyList(UnorderedElementsAre(
-                              DoubleIs("gain db", 0.0), BoolIs("muted", false),
-                              BoolIs("agc supported", false), BoolIs("agc enabled", false),
-                              StringIs("mixer thread name", "input_thread")))))))),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(AllOf(NameMatches("input_device"),
+                                      PropertyList(UnorderedElementsAre(
+                                          StringIs("mixer thread name", "input_thread"))))),
+                    ChildrenMatch(UnorderedElementsAre(
+                        NodeMatches(AllOf(NameMatches("driver"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("initial internal delay (ns)", 0),
+                                              UintIs("current internal delay (ns)", 0),
+                                              IntIs("time of latest internal delay change", 0),
+                                              UintIs("initial external delay (ns)", 0),
+                                              UintIs("current external delay (ns)", 0),
+                                              IntIs("time of latest external delay change", 0),
+                                              UintIs("driver transfer (bytes)", 0),
+                                              StringIs("name", "unknown"))))),
+                        NodeMatches(AllOf(
+                            NameMatches("format"),
+                            PropertyList(UnorderedElementsAre(StringIs("sample format", "unknown"),
+                                                              UintIs("channels", 0),
+                                                              UintIs("frames per second", 0))))),
+                        NodeMatches(AllOf(NameMatches("device gain"),
+                                          PropertyList(UnorderedElementsAre(
+                                              DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                                              BoolIs("agc supported", false),
+                                              BoolIs("agc enabled", false))))))))))),
           AllOf(NodeMatches(NameMatches("renderers")), ChildrenMatch(IsEmpty())),
           AllOf(NodeMatches(NameMatches("capturers")), ChildrenMatch(IsEmpty())),
           AllOf(NodeMatches(
@@ -313,13 +341,15 @@ TEST_F(ReporterTest, DeviceSetGainInfo) {
       GetHierarchy(),
       ChildrenMatch(UnorderedElementsAre(
           AllOf(NodeMatches(NameMatches("output devices")),
-                ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                    AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                            DoubleIs("gain db", 0.0),
-                                                            BoolIs("muted", false),
-                                                            BoolIs("agc supported", false),
-                                                            BoolIs("agc enabled", false),
-                                                        }))))))),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(AllOf(NameMatches("output_device"),
+                                      PropertyList(UnorderedElementsAre(
+                                          StringIs("mixer thread name", "output_thread"))))),
+                    ChildrenMatch(Contains(NodeMatches(AllOf(
+                        NameMatches("device gain"),
+                        PropertyList(UnorderedElementsAre(
+                            DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                            BoolIs("agc supported", false), BoolIs("agc enabled", false))))))))))),
           AllOf(NodeMatches(NameMatches("input devices")), ChildrenMatch(IsEmpty())),
           AllOf(NodeMatches(NameMatches("renderers")), ChildrenMatch(IsEmpty())),
           AllOf(NodeMatches(NameMatches("capturers")), ChildrenMatch(IsEmpty())),
@@ -353,76 +383,220 @@ TEST_F(ReporterTest, DeviceSetGainInfo) {
 
   output_device->SetGainInfo(gain_info_a, {});
 
-  // Expect initial device metric values.
-  EXPECT_THAT(GetHierarchy(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("output devices")),
-                        ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                            AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                                    DoubleIs("gain db", 0.0),
-                                                                    BoolIs("muted", false),
-                                                                    BoolIs("agc supported", false),
-                                                                    BoolIs("agc enabled", false),
-                                                                }))))))))));
+  // Expect initial device metric values to remain, since no AudioGainValidFlags were set.
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(AllOf(
+          NodeMatches(NameMatches("output devices")),
+          ChildrenMatch(UnorderedElementsAre(AllOf(
+              NodeMatches(NameMatches("output_device")),
+              ChildrenMatch(Contains(NodeMatches(AllOf(
+                  NameMatches("device gain"),
+                  PropertyList(UnorderedElementsAre(
+                      DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                      BoolIs("agc supported", false), BoolIs("agc enabled", false))))))))))))));
 
   output_device->SetGainInfo(gain_info_a, fuchsia::media::AudioGainValidFlags::GAIN_VALID);
 
   // Expect a gain change.
-  EXPECT_THAT(GetHierarchy(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("output devices")),
-                        ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                            AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                                    DoubleIs("gain db", -1.0),
-                                                                    BoolIs("muted", false),
-                                                                    BoolIs("agc supported", false),
-                                                                    BoolIs("agc enabled", false),
-                                                                }))))))))));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(AllOf(
+          NodeMatches(NameMatches("output devices")),
+          ChildrenMatch(UnorderedElementsAre(AllOf(
+              NodeMatches(NameMatches("output_device")),
+              ChildrenMatch(Contains(NodeMatches(AllOf(
+                  NameMatches("device gain"),
+                  PropertyList(UnorderedElementsAre(
+                      DoubleIs("gain db", -1.0), BoolIs("muted", false),
+                      BoolIs("agc supported", false), BoolIs("agc enabled", false))))))))))))));
 
   output_device->SetGainInfo(gain_info_a, fuchsia::media::AudioGainValidFlags::MUTE_VALID);
 
   // Expect a mute change.
-  EXPECT_THAT(GetHierarchy(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("output devices")),
-                        ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                            AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                                    DoubleIs("gain db", -1.0),
-                                                                    BoolIs("muted", true),
-                                                                    BoolIs("agc supported", false),
-                                                                    BoolIs("agc enabled", false),
-                                                                }))))))))));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(AllOf(
+          NodeMatches(NameMatches("output devices")),
+          ChildrenMatch(UnorderedElementsAre(AllOf(
+              NodeMatches(NameMatches("output_device")),
+              ChildrenMatch(Contains(NodeMatches(AllOf(
+                  NameMatches("device gain"),
+                  PropertyList(UnorderedElementsAre(
+                      DoubleIs("gain db", -1.0), BoolIs("muted", true),
+                      BoolIs("agc supported", false), BoolIs("agc enabled", false))))))))))))));
 
   output_device->SetGainInfo(gain_info_a, fuchsia::media::AudioGainValidFlags::AGC_VALID);
 
-  // Expect an agc change.
-  EXPECT_THAT(GetHierarchy(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("output devices")),
-                        ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                            AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                                    DoubleIs("gain db", -1.0),
-                                                                    BoolIs("muted", true),
-                                                                    BoolIs("agc supported", true),
-                                                                    BoolIs("agc enabled", true),
-                                                                }))))))))));
+  // Expect an AGC change.
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(
+          AllOf(NodeMatches(NameMatches("output devices")),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(NameMatches("output_device")),
+                    ChildrenMatch(Contains(NodeMatches(AllOf(
+                        NameMatches("device gain"),
+                        PropertyList(UnorderedElementsAre(
+                            DoubleIs("gain db", -1.0), BoolIs("muted", true),
+                            BoolIs("agc supported", true), BoolIs("agc enabled", true))))))))))))));
 
-  fuchsia::media::AudioGainInfo gain_info_b{.gain_db = -2.0f, .flags = {}};
+  fuchsia::media::AudioGainInfo gain_info_b{
+      .gain_db = -2.0f, .flags = fuchsia::media::AudioGainInfoFlags::AGC_SUPPORTED};
   output_device->SetGainInfo(gain_info_b, fuchsia::media::AudioGainValidFlags::GAIN_VALID |
                                               fuchsia::media::AudioGainValidFlags::MUTE_VALID |
                                               fuchsia::media::AudioGainValidFlags::AGC_VALID);
 
   // Expect all changes.
-  EXPECT_THAT(GetHierarchy(),
-              ChildrenMatch(Contains(
-                  AllOf(NodeMatches(NameMatches("output devices")),
-                        ChildrenMatch(UnorderedElementsAre(NodeMatches(
-                            AllOf(NameMatches("output_device"), PropertyList(IsSupersetOf({
-                                                                    DoubleIs("gain db", -2.0),
-                                                                    BoolIs("muted", false),
-                                                                    BoolIs("agc supported", false),
-                                                                    BoolIs("agc enabled", false),
-                                                                }))))))))));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(AllOf(
+          NodeMatches(NameMatches("output devices")),
+          ChildrenMatch(UnorderedElementsAre(AllOf(
+              NodeMatches(NameMatches("output_device")),
+              ChildrenMatch(Contains(NodeMatches(AllOf(
+                  NameMatches("device gain"),
+                  PropertyList(UnorderedElementsAre(
+                      DoubleIs("gain db", -2.0), BoolIs("muted", false),
+                      BoolIs("agc supported", true), BoolIs("agc enabled", false))))))))))))));
+}
+
+// Test the method that updates the delays reported by the device.
+TEST_F(ReporterTest, DeviceDelays) {
+  auto output_device = under_test_.CreateOutputDevice("output_device", "output_thread");
+  auto input_device = under_test_.CreateInputDevice("input_device", "input_thread");
+
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(IsSupersetOf({
+          AllOf(NodeMatches(NameMatches("output devices")),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(NameMatches("output_device")),
+                    ChildrenMatch(IsSupersetOf({
+                        NodeMatches(AllOf(NameMatches("driver"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("initial internal delay (ns)", 0),
+                                              UintIs("current internal delay (ns)", 0),
+                                              IntIs("time of latest internal delay change", 0),
+                                              UintIs("initial external delay (ns)", 0),
+                                              UintIs("current external delay (ns)", 0),
+                                              IntIs("time of latest external delay change", 0),
+                                              UintIs("driver transfer (bytes)", 0),
+                                              StringIs("name", "unknown"))))),
+                    })))))),
+          AllOf(NodeMatches(NameMatches("input devices")),
+                ChildrenMatch(UnorderedElementsAre(AllOf(
+                    NodeMatches(NameMatches("input_device")),
+                    ChildrenMatch(IsSupersetOf({
+                        NodeMatches(AllOf(NameMatches("driver"),
+                                          PropertyList(UnorderedElementsAre(
+                                              UintIs("initial internal delay (ns)", 0),
+                                              UintIs("current internal delay (ns)", 0),
+                                              IntIs("time of latest internal delay change", 0),
+                                              UintIs("initial external delay (ns)", 0),
+                                              UintIs("current external delay (ns)", 0),
+                                              IntIs("time of latest external delay change", 0),
+                                              UintIs("driver transfer (bytes)", 0),
+                                              StringIs("name", "unknown"))))),
+                    })))))),
+      })));
+
+  // For output device, update internal delay; external delay is unknown (and thus not updated).
+  const auto kChangeTime1 = 7654321ull;
+  const auto kIntDelay1 = 4321ull;
+  // For input device, update internal and external delays.
+  const auto kChangeTime2 = 1234ull;
+  const auto kIntDelay2 = 1234567ull;
+  const auto kExtDelay2 = 654321ull;
+
+  output_device->UpdateDelays(zx::time(kChangeTime1), zx::nsec(kIntDelay1), std::nullopt);
+  input_device->UpdateDelays(zx::time(kChangeTime2), zx::nsec(kIntDelay2), zx::nsec(kExtDelay2));
+
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(IsSupersetOf({
+          AllOf(
+              NodeMatches(NameMatches("output devices")),
+              ChildrenMatch(UnorderedElementsAre(AllOf(
+                  NodeMatches(NameMatches("output_device")),
+                  ChildrenMatch(IsSupersetOf({
+                      NodeMatches(AllOf(
+                          NameMatches("driver"),
+                          PropertyList(UnorderedElementsAre(
+                              UintIs("initial internal delay (ns)", 0),
+                              UintIs("current internal delay (ns)", kIntDelay1),
+                              IntIs("time of latest internal delay change", kChangeTime1),
+                              UintIs("initial external delay (ns)", 0),
+                              UintIs("current external delay (ns)", 0),
+                              IntIs("time of latest external delay change", 0),
+                              UintIs("driver transfer (bytes)", 0), StringIs("name", "unknown"))))),
+                  })))))),
+          AllOf(
+              NodeMatches(NameMatches("input devices")),
+              ChildrenMatch(UnorderedElementsAre(AllOf(
+                  NodeMatches(NameMatches("input_device")),
+                  ChildrenMatch(IsSupersetOf({
+                      NodeMatches(AllOf(
+                          NameMatches("driver"),
+                          PropertyList(UnorderedElementsAre(
+                              UintIs("initial internal delay (ns)", 0),
+                              UintIs("current internal delay (ns)", kIntDelay2),
+                              IntIs("time of latest internal delay change", kChangeTime2),
+                              UintIs("initial external delay (ns)", 0),
+                              UintIs("current external delay (ns)", kExtDelay2),
+                              IntIs("time of latest external delay change", kChangeTime2),
+                              UintIs("driver transfer (bytes)", 0), StringIs("name", "unknown"))))),
+                  })))))),
+      })));
+
+  // For output, update both delays at a time less than previous change. Internal delay should not
+  // change, but external delay should (its most recent value is the initial value at time 0).
+  const auto kChangeTime3 = 654321ull;  // < kChangeTime1
+  const auto kIntDelay3 = 54321ull;
+  const auto kExtDelay3 = 12345ull;
+  // For input, update internal delay only.
+  const auto kChangeTime4 = 12345678ull;
+  const auto kIntDelay4 = 123456ull;
+
+  output_device->UpdateDelays(zx::time(kChangeTime3), zx::nsec(kIntDelay3), zx::nsec(kExtDelay3));
+  input_device->UpdateDelays(zx::time(kChangeTime4), zx::nsec(kIntDelay4), std::nullopt);
+
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(IsSupersetOf({
+          AllOf(
+              NodeMatches(NameMatches("output devices")),
+              ChildrenMatch(UnorderedElementsAre(AllOf(
+                  NodeMatches(NameMatches("output_device")),
+                  ChildrenMatch(IsSupersetOf({
+                      NodeMatches(AllOf(
+                          NameMatches("driver"),
+                          PropertyList(UnorderedElementsAre(
+                              UintIs("initial internal delay (ns)", 0),
+                              UintIs("current internal delay (ns)", kIntDelay1),
+                              IntIs("time of latest internal delay change", kChangeTime1),
+                              UintIs("initial external delay (ns)", 0),
+                              UintIs("current external delay (ns)", kExtDelay3),
+                              IntIs("time of latest external delay change", kChangeTime3),
+                              UintIs("driver transfer (bytes)", 0), StringIs("name", "unknown"))))),
+                  })))))),
+          AllOf(
+              NodeMatches(NameMatches("input devices")),
+              ChildrenMatch(UnorderedElementsAre(AllOf(
+                  NodeMatches(NameMatches("input_device")),
+                  ChildrenMatch(IsSupersetOf({
+                      NodeMatches(AllOf(
+                          NameMatches("driver"),
+                          PropertyList(UnorderedElementsAre(
+                              UintIs("initial internal delay (ns)", 0),
+                              UintIs("current internal delay (ns)", kIntDelay4),
+                              IntIs("time of latest internal delay change", kChangeTime4),
+                              UintIs("initial external delay (ns)", 0),
+                              UintIs("current external delay (ns)", kExtDelay2),
+                              IntIs("time of latest external delay change", kChangeTime2),
+                              UintIs("driver transfer (bytes)", 0), StringIs("name", "unknown"))))),
+                  })))))),
+      })));
 }
 
 // Test methods that add and remove client ports.

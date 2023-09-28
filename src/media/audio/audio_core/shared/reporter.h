@@ -8,9 +8,11 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/sys/inspect/cpp/component.h>
+#include <lib/zx/time.h>
 
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <queue>
 #include <set>
 #include <unordered_map>
@@ -80,6 +82,8 @@ class Reporter {
     virtual void SetDriverInfo(const AudioDriverInfo& driver) = 0;
     virtual void SetGainInfo(const fuchsia::media::AudioGainInfo& gain_info,
                              fuchsia::media::AudioGainValidFlags set_flags) = 0;
+    virtual void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                              std::optional<zx::duration> external_delay) = 0;
   };
 
   class OutputDevice : public Device {

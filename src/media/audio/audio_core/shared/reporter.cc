@@ -79,6 +79,8 @@ class OutputDeviceNop : public Reporter::OutputDevice {
   void SetDriverInfo(const AudioDriverInfo& driver) override {}
   void SetGainInfo(const fuchsia::media::AudioGainInfo& gain_info,
                    fuchsia::media::AudioGainValidFlags set_flags) override {}
+  void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                    std::optional<zx::duration> external_delay) override {}
   void DeviceUnderflow(zx::time start_time, zx::time end_time) override {}
   void PipelineUnderflow(zx::time start_time, zx::time end_time) override {}
 };
@@ -93,6 +95,8 @@ class InputDeviceNop : public Reporter::InputDevice {
   void SetDriverInfo(const AudioDriverInfo& driver) override {}
   void SetGainInfo(const fuchsia::media::AudioGainInfo& gain_info,
                    fuchsia::media::AudioGainValidFlags set_flags) override {}
+  void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                    std::optional<zx::duration> external_delay) override {}
 };
 
 class RendererNop : public Reporter::Renderer {
@@ -350,16 +354,26 @@ class Reporter::DeviceDriverInfo {
   DeviceDriverInfo(inspect::Node& parent_node, ObjectTracker&& object_tracker)
       : node_(parent_node.CreateChild("driver")),
         name_(node_.CreateString("name", "unknown")),
-        internal_delay_(node_.CreateUint("internal delay (ns)", 0)),
-        external_delay_(node_.CreateUint("external delay (ns)", 0)),
+        initial_internal_delay_(node_.CreateUint("initial internal delay (ns)", 0)),
+        current_internal_delay_(node_.CreateUint("current internal delay (ns)", 0)),
+        internal_delay_change_time_(zx::time(0)),
+        internal_delay_change_time_ns_(node_.CreateInt("time of latest internal delay change",
+                                                       internal_delay_change_time_.get())),
+        initial_external_delay_(node_.CreateUint("initial external delay (ns)", 0)),
+        current_external_delay_(node_.CreateUint("current external delay (ns)", 0)),
+        external_delay_change_time_(zx::time(0)),
+        external_delay_change_time_ns_(node_.CreateInt("time of latest external delay change",
+                                                       external_delay_change_time_.get())),
         driver_transfer_bytes_(node_.CreateUint("driver transfer (bytes)", 0)),
         format_(parent_node, "format"),
         object_tracker_(std::move(object_tracker)) {}
 
   void Set(const AudioDriverInfo& d) {
     name_.Set(d.manufacturer_name + ' ' + d.product_name);
-    internal_delay_.Set(d.internal_delay.get());
-    external_delay_.Set(d.external_delay.get());
+    initial_internal_delay_.Set(d.internal_delay.get());
+    current_internal_delay_.Set(d.internal_delay.get());
+    initial_external_delay_.Set(d.external_delay.get());
+    current_external_delay_.Set(d.external_delay.get());
     driver_transfer_bytes_.Set(d.driver_transfer_bytes);
     if (d.format.has_value()) {
       format_.Set(*d.format);
@@ -368,11 +382,39 @@ class Reporter::DeviceDriverInfo {
     }
   }
 
+  void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                    std::optional<zx::duration> external_delay) {
+    if (time_of_update > internal_delay_change_time_) {
+      current_internal_delay_.Set(internal_delay.get());
+      SetInternalDelayChangeTime(time_of_update);
+    }
+    if (external_delay.has_value() && time_of_update > external_delay_change_time_) {
+      current_external_delay_.Set(external_delay->get());
+      SetExternalDelayChangeTime(time_of_update);
+    }
+  }
+
  private:
+  // Use separate methods to update these members, to ensure they stay in sync.
+  void SetInternalDelayChangeTime(zx::time internal_delay_change_time) {
+    internal_delay_change_time_ = internal_delay_change_time;
+    internal_delay_change_time_ns_.Set(internal_delay_change_time_.get());
+  }
+  void SetExternalDelayChangeTime(zx::time external_delay_change_time) {
+    external_delay_change_time_ = external_delay_change_time;
+    external_delay_change_time_ns_.Set(external_delay_change_time_.get());
+  }
+
   inspect::Node node_;
   inspect::StringProperty name_;
-  inspect::UintProperty internal_delay_;
-  inspect::UintProperty external_delay_;
+  inspect::UintProperty initial_internal_delay_;
+  inspect::UintProperty current_internal_delay_;
+  zx::time internal_delay_change_time_;  // Needed because we cannot compare based on the prop.
+  inspect::IntProperty internal_delay_change_time_ns_;
+  inspect::UintProperty initial_external_delay_;
+  inspect::UintProperty current_external_delay_;
+  zx::time external_delay_change_time_;  // Needed because we cannot compare based on the prop.
+  inspect::IntProperty external_delay_change_time_ns_;
   inspect::UintProperty driver_transfer_bytes_;
   FormatInfo format_;
   ObjectTracker object_tracker_;
@@ -381,10 +423,11 @@ class Reporter::DeviceDriverInfo {
 class DeviceGainInfo {
  public:
   explicit DeviceGainInfo(inspect::Node& parent)
-      : gain_db_(parent.CreateDouble("gain db", 0.0)),
-        muted_(parent.CreateBool("muted", false)),
-        agc_supported_(parent.CreateBool("agc supported", false)),
-        agc_enabled_(parent.CreateBool("agc enabled", false)) {}
+      : node_(parent.CreateChild("device gain")),
+        gain_db_(node_.CreateDouble("gain db", 0.0)),
+        muted_(node_.CreateBool("muted", false)),
+        agc_supported_(node_.CreateBool("agc supported", false)),
+        agc_enabled_(node_.CreateBool("agc enabled", false)) {}
 
   void Set(const fuchsia::media::AudioGainInfo& gain_info,
            fuchsia::media::AudioGainValidFlags set_flags) {
@@ -409,6 +452,7 @@ class DeviceGainInfo {
   }
 
  private:
+  inspect::Node node_;
   inspect::DoubleProperty gain_db_;
   inspect::BoolProperty muted_;
   inspect::BoolProperty agc_supported_;
@@ -710,6 +754,11 @@ class Reporter::OutputDeviceImpl : public Reporter::OutputDevice {
     gain_info_.Set(gain_info, set_flags);
   }
 
+  void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                    std::optional<zx::duration> external_delay) override {
+    driver_info_.UpdateDelays(time_of_update, internal_delay, external_delay);
+  }
+
   void DeviceUnderflow(zx::time start_time, zx::time end_time) override {
     device_underflows_->Report(start_time, end_time);
   }
@@ -757,6 +806,11 @@ class Reporter::InputDeviceImpl : public Reporter::InputDevice {
   void SetGainInfo(const fuchsia::media::AudioGainInfo& gain_info,
                    fuchsia::media::AudioGainValidFlags set_flags) override {
     gain_info_.Set(gain_info, set_flags);
+  }
+
+  void UpdateDelays(zx::time time_of_update, zx::duration internal_delay,
+                    std::optional<zx::duration> external_delay) override {
+    driver_info_.UpdateDelays(time_of_update, internal_delay, external_delay);
   }
 
  private:
