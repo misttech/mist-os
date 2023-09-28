@@ -1,0 +1,107 @@
+[
+  {
+    "data_source": "Inspect",
+    "metadata": {
+      "filename": "fuchsia.inspect.Tree",
+      "component_url": "#meta/puppet_to_profile.cm",
+      "timestamp": 82727465429583
+    },
+    "moniker": "puppet",
+    "payload": {
+      "root": {
+        "this_name_doesnt_matter": {
+          "__profile_durations_root": true,
+          "count": 0,
+          "lock_contention_time": 0,
+          "cpu_time": 0,
+          "page_fault_time": 0,
+          "wall_time": 0,
+          "queue_time": 0,
+          "location": "../../src/lib/diagnostics/inspect/contrib/rust/src/self_profile.rs:192:23",
+          "RootDuration": {
+            "page_fault_time": 0,
+            "wall_time": 575060997,
+            "lock_contention_time": 0,
+            "count": 100,
+            "queue_time": 16874,
+            "cpu_time": 574974794,
+            "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:38:21",
+            "FourthNestedDuration": {
+              "queue_time": 0,
+              "count": 100,
+              "cpu_time": 35862287,
+              "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:54:31",
+              "page_fault_time": 0,
+              "wall_time": 35901459,
+              "lock_contention_time": 0,
+              "LeafDuration": {
+                "count": 100,
+                "lock_contention_time": 0,
+                "cpu_time": 35749752,
+                "wall_time": 35793249,
+                "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
+                "queue_time": 0,
+                "page_fault_time": 0
+              }
+            },
+            "FirstNestedDuration": {
+              "count": 1000,
+              "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:41:25",
+              "cpu_time": 358744535,
+              "page_fault_time": 0,
+              "lock_contention_time": 0,
+              "wall_time": 359149337,
+              "queue_time": 8749,
+              "LeafDuration": {
+                "queue_time": 8749,
+                "page_fault_time": 0,
+                "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
+                "cpu_time": 357659615,
+                "lock_contention_time": 0,
+                "count": 1000,
+                "wall_time": 358109338
+              }
+            },
+            "ThirdNestedDuration": {
+              "count": 100,
+              "queue_time": 0,
+              "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:51:41",
+              "page_fault_time": 0,
+              "cpu_time": 71685041,
+              "lock_contention_time": 0,
+              "wall_time": 71725336,
+              "LeafDuration": {
+                "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
+                "count": 200,
+                "queue_time": 0,
+                "wall_time": 71587124,
+                "cpu_time": 71498322,
+                "page_fault_time": 0,
+                "lock_contention_time": 0
+              }
+            },
+            "SecondNestedDuration": {
+              "count": 100,
+              "wall_time": 107569582,
+              "page_fault_time": 0,
+              "queue_time": 8125,
+              "lock_contention_time": 0,
+              "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:45:25",
+              "cpu_time": 107521250,
+              "LeafDuration": {
+                "count": 300,
+                "wall_time": 107405957,
+                "queue_time": 8125,
+                "page_fault_time": 0,
+                "location": "../../src/lib/diagnostics/inspect/contrib/self_profiles_report/tests/src/puppet.rs:65:5",
+                "cpu_time": 107266796,
+                "lock_contention_time": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "version": 1
+  }
+]

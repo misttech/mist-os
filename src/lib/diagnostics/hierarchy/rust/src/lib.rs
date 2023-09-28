@@ -475,6 +475,26 @@ impl<K> Property<K> {
             Property::StringList(_, _) => "StringList",
         }
     }
+
+    /// Return a a numeric property as a signed integer. Useful for having a single function to call
+    /// when a property has been passed through JSON, potentially losing its original signedness.
+    ///
+    /// Note: unsigned integers larger than `isize::MAX` will be returned as `None`. If you expect
+    /// values that high, consider calling `Property::int()` and `Property::uint()` directly.
+    pub fn number_as_int(&self) -> Option<i64> {
+        match self {
+            Property::Int(_, i) => Some(*i),
+            Property::Uint(_, u) => i64::try_from(*u).ok(),
+            Property::String(..)
+            | Property::Bytes(..)
+            | Property::Double(..)
+            | Property::Bool(..)
+            | Property::DoubleArray(..)
+            | Property::IntArray(..)
+            | Property::UintArray(..)
+            | Property::StringList(..) => None,
+        }
+    }
 }
 
 impl<K> Display for Property<K>

@@ -1,0 +1,107 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/fidl/fidl.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/testing/environments.gni")
+import("//build/testing/golden_files.gni")
+
+group("tests") {
+  testonly = true
+  deps = [ ":inspect_self_profile_integration_tests" ]
+}
+
+fidl("inspect.selfprofile.test") {
+  sources = [ "fidl/inspect.selfprofile.test.fidl" ]
+}
+
+rustc_binary("self_profile_integration_test") {
+  testonly = true
+  edition = "2021"
+  sources = [ "src/main.rs" ]
+  deps = [
+    ":inspect.selfprofile.test_rust",
+    "//src/lib/diagnostics/inspect/contrib/self_profiles_report",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:once_cell",
+  ]
+}
+
+rustc_binary("profile_duration_puppet") {
+  testonly = true
+  edition = "2021"
+  source_root = "src/puppet.rs"
+  sources = [ source_root ]
+  deps = [
+    ":inspect.selfprofile.test_rust",
+    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/runtime/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//third_party/rust_crates:futures",
+  ]
+
+  # Instrumentation affects the relative runtimes of durations and this test relies on
+  # predictable timing on hardware.
+  exclude_toolchain_tags = [ "instrumented" ]
+}
+
+fuchsia_component("puppet_to_profile") {
+  testonly = true
+  manifest = "meta/puppet_to_profile.cml"
+  deps = [ ":profile_duration_puppet" ]
+}
+
+fuchsia_test_component("self_profile_test") {
+  manifest = "meta/self_profile_test.cml"
+  deps = [
+    ":puppet_to_profile",
+    ":self_profile_integration_test",
+  ]
+}
+
+fuchsia_test_package("inspect_self_profile_integration_tests") {
+  test_components = [ ":self_profile_test" ]
+  test_specs = {
+    # This test asserts on the relative timing of operations which are more predictable on hardware.
+    environments = [
+      nuc_env,
+      vim3_env,
+    ]
+  }
+
+  # Add the golden as a dependency so it will be rebuilt when iterating on integration tests.
+  deps = [ ":self_profile_report_goldens" ]
+}
+
+_json_snapshot = "goldens/basic_snapshot.json"
+_text_report_output = "${target_out_dir}/basic_snapshot.txt"
+
+compiled_action("generate_self_report_text") {
+  testonly = true
+  tool = "//src/lib/diagnostics/inspect/contrib/self_profiles_report:self_profiles_report_bin"
+  inputs = [ _json_snapshot ]
+  outputs = [ _text_report_output ]
+
+  args = [
+    rebase_path(_json_snapshot, root_build_dir),
+    "--output",
+    rebase_path(_text_report_output, root_build_dir),
+  ]
+}
+
+golden_files("self_profile_report_goldens") {
+  testonly = true
+  comparisons = [
+    {
+      candidate = _text_report_output
+      golden = "goldens/basic_snapshot.txt.golden"
+    },
+  ]
+  deps = [ ":generate_self_report_text" ]
+}
