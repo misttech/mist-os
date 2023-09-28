@@ -503,7 +503,7 @@ async fn test_unimplemented_error() {
             Audience::Messenger(signature),
         );
 
-        while let Ok((payload, _)) = reply_receptor.next_of::<Payload>().await {
+        if let Ok((payload, _)) = reply_receptor.next_of::<Payload>().await {
             if let Payload::Result(Err(ControllerError::UnimplementedRequest(incoming_type, _))) =
                 payload
             {

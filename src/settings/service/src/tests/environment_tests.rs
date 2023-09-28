@@ -231,7 +231,7 @@ async fn migration_error_does_not_cause_early_exit() {
                 fidl_fuchsia_stash::StoreRequest::CreateAccessor { accessor_request, .. } => {
                     let mut stream = accessor_request.into_stream().unwrap();
                     fasync::Task::spawn(async move {
-                        while let Some(r) = stream.next().await {
+                        if let Some(r) = stream.next().await {
                             panic!("unexpected call to store before migration id checked: {r:?}");
                         }
                     })
