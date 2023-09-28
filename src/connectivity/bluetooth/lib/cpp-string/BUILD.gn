@@ -3,8 +3,10 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build_overrides/pigweed.gni")
+import("$dir_pw_unit_test/test.gni")
 
-source_set("cpp-string") {
+pw_source_set("cpp-string") {
   sources = [
     "string_printf.cc",
     "string_printf.h",
@@ -15,30 +17,14 @@ source_set("cpp-string") {
   deps = [ "//src/connectivity/bluetooth/lib/third_party/icu" ]
 }
 
-source_set("tests_source_set") {
-  testonly = true
-
+pw_test("string_printf_test") {
   sources = [ "string_printf_unittest.cc" ]
 
-  deps = [
-    ":cpp-string",
-    "//third_party/googletest:gtest",
-  ]
-}
-
-executable("tests_executable") {
-  testonly = true
-
-  output_name = "bt-lib-cpp-string-tests"
-
-  deps = [
-    ":tests_source_set",
-    "//src/lib/fxl/test:gtest_main",
-  ]
+  deps = [ ":cpp-string" ]
 }
 
 fuchsia_unittest_package("bt-lib-cpp-string-tests") {
-  deps = [ ":tests_executable" ]
+  deps = [ ":string_printf_test" ]
 }
 
 group("tests") {

@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("icu") {
+import("//build_overrides/pigweed.gni")
+import("$dir_pw_build/target_types.gni")
+
+pw_source_set("icu") {
   sources = [
     "icu_utf.cc",
     "icu_utf.h",

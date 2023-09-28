@@ -50,7 +50,7 @@ TEST(TypeTest, MemberPointerTraits) {
 
   // offsetof can be used with non-anonymous nested members because it refers to member identifiers,
   // not types.
-  EXPECT_GT(0U, offsetof(Foo, struct_member.nested_scalar_int_member));
+  EXPECT_LT(0U, offsetof(Foo, struct_member.nested_scalar_int_member));
 
   // |Foo::InnerStruct| is the qualified name of a type so |nested_scalar_int_member|'s offset
   // within it is 0.
