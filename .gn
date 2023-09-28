@@ -117,4 +117,10 @@ default_args = {
   pw_unit_test_MAIN = "//src/lib/fxl/test:gtest_main"
   pw_unit_test_GOOGLETEST_BACKEND = "//third_party/googletest:gmock"
   pw_unit_test_TESTONLY = true
+
+  # This is a Pigweed build configuration argument that removes default configs
+  # from pw_* targets. Due to linker errors ("undefined symbol: typeinfo") when
+  # using source_set with pw_source_set, we need to remove the reduced_size
+  # config that adds the "-fno-rtti" flag.
+  remove_default_configs = [ "//third_party/pigweed/src/pw_build:reduced_size" ]
 }
