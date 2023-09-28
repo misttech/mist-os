@@ -20,11 +20,6 @@ rustc_library("onet_tool") {
     "//third_party/rust_crates:tracing",
   ]
 
-  non_rust_deps = []
-  if (!is_fuchsia) {
-    non_rust_deps += [ "//third_party/boringssl" ]
-  }
-
   sources = [
     "src/generator.rs",
     "src/lib.rs",

@@ -23,7 +23,6 @@ rustc_library("hoist") {
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tracing",
   ]
-  non_rust_deps = [ "//third_party/boringssl" ]
 
   sources = [
     "src/lib.rs",

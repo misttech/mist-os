@@ -19,7 +19,5 @@ rustc_binary("bin") {
     "//third_party/rust_crates:argh",
   ]
 
-  non_rust_deps = [ "//third_party/boringssl" ]
-
   sources = [ "src/main.rs" ]
 }
