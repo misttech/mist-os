@@ -18,6 +18,7 @@ use crate::{
     types::*,
 };
 use anyhow::{format_err, Error};
+use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use std::{os::unix::thread::JoinHandleExt, sync::Arc};
 
@@ -172,16 +173,12 @@ const RESTRICTED_ENTER_OPTIONS: u32 = 0;
 /// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
 /// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
 fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
+    let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
+
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
     set_current_task_info(current_task);
 
     trace_duration!(trace_category_starnix!(), trace_name_run_task!());
-
-    // We want to measure the task runtime in restricted mode ("user mode") separately from
-    // normal mode ("kernel mode"), so we'll measure it once on each transition to/from user code
-    // and record that delta.
-    let mut task_info_scope =
-        trace_duration_begin_with_task_info!(trace_category_starnix!(), trace_name_normal_mode!());
 
     // This is the pointer that is passed to `restricted_enter`.
     let restricted_return_ptr = restricted_return as *const ();
@@ -218,13 +215,8 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         // Copy the register state into the mapped VMO.
         restricted_state.write_state(&state);
 
-        // We're about to hand control back to userspace, and traces should transition directly from
-        // the task loop. Compute the task runtime delta here if enabled.
-        trace_duration_end_with_task_info!(task_info_scope);
-        task_info_scope = trace_duration_begin_with_task_info!(
-            trace_category_starnix!(),
-            trace_name_restricted_mode!()
-        );
+        // We're about to hand control back to userspace, start measuring time in user code.
+        profiling_guard.pivot("RestrictedMode");
 
         let mut reason_code: zx::sys::zx_restricted_reason_t = u64::MAX;
         let status = zx::Status::from_raw(unsafe {
@@ -248,19 +240,15 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             _ => return Err(format_err!("failed to restricted_enter: {:?} {:?}", state, status)),
         }
 
-        // We just received control back from userspace and traces should transition directly to
-        // the task loop. Compute the task runtime delta here if enabled.
-        trace_duration_end_with_task_info!(task_info_scope);
-        task_info_scope = trace_duration_begin_with_task_info!(
-            trace_category_starnix!(),
-            trace_name_normal_mode!()
-        );
+        // We just received control back from r-space, start measuring time in normal mode.
+        profiling_guard.pivot("NormalMode");
 
         // Copy the register state out of the VMO.
         restricted_state.read_state(&mut state);
 
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
+                profile_duration!("ExecuteSyscall");
                 trace_duration_begin!(trace_category_starnix!(), trace_name_execute_syscall!());
 
                 // Store the new register state in the current task before dispatching the system call.
@@ -288,6 +276,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             }
             zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
                 trace_duration!(trace_category_starnix!(), trace_name_handle_exception!());
+                profile_duration!("HandleException");
                 let restricted_exception = restricted_state.read_exception();
 
                 current_task.registers =
@@ -303,6 +292,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
                     trace_name_restricted_kick!(),
                     fuchsia_trace::Scope::Thread
                 );
+                profile_duration!("RestrictedKick");
 
                 // Update the task's register state.
                 current_task.registers =
@@ -320,6 +310,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         }
 
         trace_duration!(trace_category_starnix!(), trace_name_check_task_exit!());
+        profile_duration!("CheckTaskExit");
         if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {
             let dump_on_exit = current_task.read().dump_on_exit;

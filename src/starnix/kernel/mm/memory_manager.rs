@@ -4,6 +4,7 @@
 
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
+use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
 use range_map::*;
@@ -173,6 +174,7 @@ impl Mapping {
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
     fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        profile_duration!("MappingReadMemory");
         if !self.prot_flags.contains(ProtectionFlags::READ) {
             return error!(EFAULT);
         }
@@ -188,6 +190,7 @@ impl Mapping {
     /// - `addr`: The address to write to.
     /// - `bytes`: The bytes to write to the VMO.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<(), Errno> {
+        profile_duration!("MappingWriteMemory");
         if !self.prot_flags.contains(ProtectionFlags::WRITE) {
             return error!(EFAULT);
         }
@@ -195,6 +198,7 @@ impl Mapping {
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        profile_duration!("MappingZeroMemory");
         if !self.prot_flags.contains(ProtectionFlags::WRITE) {
             return error!(EFAULT);
         }
@@ -279,7 +283,9 @@ fn map_in_vmar(
     prot_flags: ProtectionFlags,
     options: MappingOptions,
 ) -> Result<UserAddress, Errno> {
-    trace_duration!(trace_category_starnix_mm!(), "MapInVmar");
+    profile_duration!("MapInVmar");
+    let mut profile = ProfileDuration::enter("MapInVmarArgs");
+
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
         DesiredAddress::Any if options.contains(MappingOptions::LOWER_32BIT) => {
@@ -301,15 +307,13 @@ fn map_in_vmar(
 
     let vmar_flags = prot_flags.to_vmar_flags() | zx::VmarFlags::ALLOW_FAULTS | vmar_extra_flags;
 
-    let mut map_result = {
-        trace_duration!(trace_category_starnix_mm!(), "VmarMapSyscall");
-        vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags)
-    };
+    profile.pivot("VmarMapSyscall");
+    let mut map_result = vmar.map(vmar_offset, vmo, vmo_offset, length, vmar_flags);
 
     // Retry mapping if the target address was a Hint.
+    profile.pivot("MapInVmarResults");
     if map_result.is_err() {
         if let DesiredAddress::Hint(_) = addr {
-            trace_duration!(trace_category_starnix_mm!(), "VmarMapSyscallRetry");
             let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
             map_result = vmar.map(0, vmo, vmo_offset, length, vmar_flags);
         }
@@ -365,6 +369,7 @@ impl MemoryManagerState {
             }
         }
 
+        profile_duration!("FinishMapping");
         let end = (mapped_addr + length).round_up(*PAGE_SIZE)?;
 
         if let DesiredAddress::FixedOverwrite(addr) = addr {
@@ -692,6 +697,7 @@ impl MemoryManagerState {
         length: usize,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<(), Errno> {
+        profile_duration!("UpdateAfterUnmap");
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
 
         // Find the private, anonymous mapping that will get its tail cut off by this unmap call.
@@ -773,6 +779,7 @@ impl MemoryManagerState {
         length: usize,
         prot_flags: ProtectionFlags,
     ) -> Result<(), Errno> {
+        profile_duration!("Protect");
         // TODO(https://fxbug.dev/97514): If the mprotect flags include PROT_GROWSDOWN then the specified protection may
         // extend below the provided address if the lowest mapping is a MAP_GROWSDOWN mapping. This function has to
         // compute the potentially extended range before modifying the Zircon protections or metadata.
@@ -812,6 +819,7 @@ impl MemoryManagerState {
         length: usize,
         advice: u32,
     ) -> Result<(), Errno> {
+        profile_duration!("Madvise");
         if !addr.is_aligned(*PAGE_SIZE) {
             return error!(EINVAL);
         }
@@ -937,6 +945,7 @@ impl MemoryManagerState {
         addr: UserAddress,
         length: usize,
     ) -> Result<impl Iterator<Item = (&Mapping, usize)>, Errno> {
+        profile_duration!("GetContiguousMappings");
         let end_addr = addr.checked_add(length).ok_or_else(|| errno!(EFAULT))?;
         if end_addr > self.max_address() {
             return error!(EFAULT);
@@ -947,6 +956,7 @@ impl MemoryManagerState {
         let mut prev_range_end = None;
         let mut offset = 0;
         let result = std::iter::from_fn(move || {
+            profile_duration!("NextContiguousMapping");
             if offset != length {
                 if let Some((range, mapping)) = mappings.next() {
                     return match prev_range_end {
@@ -981,6 +991,7 @@ impl MemoryManagerState {
         addr: UserAddress,
         is_write: bool,
     ) -> Result<bool, Error> {
+        profile_duration!("ExtendGrowsDown");
         let (mapping_to_grow, mapping_low_addr) = match self.mappings.iter_starting_at(&addr).next()
         {
             Some((range, mapping)) => {
@@ -1098,6 +1109,7 @@ impl MemoryManagerState {
     /// - `addr`: The address to write to.
     /// - `bytes`: The bytes to write.
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        profile_duration!("WriteMemory");
         let mut bytes_written = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_written + len;
@@ -1119,6 +1131,7 @@ impl MemoryManagerState {
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to write from.
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        profile_duration!("WriteMemoryPartial");
         let mut bytes_written = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_written + len;
@@ -1139,6 +1152,7 @@ impl MemoryManagerState {
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        profile_duration!("Zero");
         let mut bytes_written = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, length)? {
             let next_offset = bytes_written + len;
@@ -1822,6 +1836,7 @@ impl MemoryManager {
 
         // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
         // in `DirEntry`'s `drop`.
+        profile_duration!("DropReleasedMappings");
         std::mem::drop(state);
         std::mem::drop(released_mappings);
 
@@ -2373,6 +2388,7 @@ impl SequenceFileSource for ProcSmapsFile {
 /// Creates a VMO that can be used in an anonymous mapping for the `mmap`
 /// syscall.
 pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
+    let mut profile = ProfileDuration::enter("CreatAnonVmo");
     // mremap can grow memory regions, so make sure the VMO is resizable.
     let mut vmo =
         zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, size).map_err(|s| match s {
@@ -2380,7 +2396,11 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             _ => impossible_error(s),
         })?;
+
+    profile.pivot("SetAnonVmoName");
     set_zx_name(&vmo, b"starnix-anon");
+
+    profile.pivot("ReplaceAnonVmoAsExecutable");
     // TODO(fxbug.dev/105639): Audit replace_as_executable usage
     vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
     Ok(Arc::new(vmo))

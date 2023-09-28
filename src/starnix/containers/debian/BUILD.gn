@@ -32,7 +32,10 @@ ext4_to_pkg("system_image") {
 
 fuchsia_component("debian_container") {
   manifest = "meta/debian_container.cml"
-  component_name = "debian_container"
+}
+
+fuchsia_component("debian_container_profiled") {
+  manifest = "meta/debian_container_profiled.cml"
 }
 
 fuchsia_package("debian_package") {
@@ -40,5 +43,6 @@ fuchsia_package("debian_package") {
   deps = [
     ":container_resources",
     ":debian_container",
+    ":debian_container_profiled",
   ]
 }

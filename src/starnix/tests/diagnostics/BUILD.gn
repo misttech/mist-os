@@ -4,5 +4,8 @@
 
 group("tests") {
   testonly = true
-  deps = [ "coredumps" ]
+  deps = [
+    "coredumps",
+    "self_profile",
+  ]
 }

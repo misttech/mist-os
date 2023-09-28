@@ -119,7 +119,9 @@ pub fn do_mmap(
 
     let MappedVmo { vmo, user_address } = if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(trace_category_starnix_mm!(), "AnonymousMmap");
+        profile_duration!("AnonymousMmap");
         let vmo = create_anonymous_mapping_vmo(length as u64)?;
+        profile_duration!("MapAnonVmo");
         let user_address = current_task.mm.map(
             addr,
             vmo.clone(),
@@ -133,12 +135,14 @@ pub fn do_mmap(
         MappedVmo::new(vmo, user_address)
     } else {
         trace_duration!(trace_category_starnix_mm!(), "FileBackedMmap");
+        profile_duration!("FileBackedMmap");
         // TODO(tbodt): maximize protection flags so that mprotect works
         let file = current_task.files.get(fd)?;
         file.mmap(current_task, addr, vmo_offset, length, prot_flags, options, file.name.clone())?
     };
 
     if flags & MAP_POPULATE != 0 {
+        profile_duration!("MmapPopulate");
         let op = if prot & PROT_WRITE != 0 {
             // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
             zx::VmoOp::COMMIT
