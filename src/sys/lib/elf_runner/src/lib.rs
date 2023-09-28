@@ -519,24 +519,31 @@ async fn start(
         .ok();
 
     // Spawn a future that watches for the process to exit
-    fasync::Task::spawn(async move {
-        fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
-            .await
-            .map(|_: fidl::Signals| ()) // Discard.
-            .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
-        // Process exit code '0' is considered a clean return.
-        // TODO (fxbug.dev/57024) If we create an epitaph that indicates
-        // intentional, non-zero exit, use that for all non-0 exit
-        // codes.
-        let exit_status: ChannelEpitaph = match proc_copy.info() {
-            Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
-            Ok(_) => fcomp::Error::InstanceDied.into(),
-            Err(error) => {
-                warn!(%error, "Unable to query process info");
-                fcomp::Error::Internal.into()
-            }
-        };
-        epitaph_tx.send(exit_status).unwrap_or_else(|_| warn!("error sending epitaph"));
+    fasync::Task::spawn({
+        let resolved_url = resolved_url.clone();
+        async move {
+            fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
+                .await
+                .map(|_: fidl::Signals| ()) // Discard.
+                .unwrap_or_else(|error| warn!(%error, "error creating signal handler"));
+            // Process exit code '0' is considered a clean return.
+            // TODO (fxbug.dev/57024) If we create an epitaph that indicates
+            // intentional, non-zero exit, use that for all non-0 exit
+            // codes.
+            let exit_status: ChannelEpitaph = match proc_copy.info() {
+                Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
+                Ok(zx::ProcessInfo { return_code, .. }) => {
+                    warn!(url=%resolved_url, %return_code,
+                        "process terminated with non-zero return code");
+                    fcomp::Error::InstanceDied.into()
+                }
+                Err(error) => {
+                    warn!(%error, "Unable to query process info");
+                    fcomp::Error::Internal.into()
+                }
+            };
+            epitaph_tx.send(exit_status).unwrap_or_else(|_| warn!("error sending epitaph"));
+        }
     })
     .detach();
 
