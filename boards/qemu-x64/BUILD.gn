@@ -4,11 +4,18 @@
 
 import("//build/assembly/board_configuration.gni")
 
+assert(current_toolchain == default_toolchain,
+       "The x64 board can only be defined in the default toolchain.")
+assert(current_cpu == "x64",
+       "The x64 board can only be defined in an x64 toolchain.")
+
 board_configuration("qemu-x64") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::wlan_softmac",
   ]
+
+  main_bundle = "//boards/x64:main_bundle"
 
   filesystems = {
     vbmeta = {
