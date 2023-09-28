@@ -658,8 +658,11 @@ static void riscv64_resource_dispatcher_init_hook(unsigned int rl) {
     printf("Resources: Failed to initialize MMIO allocator: %d\n", status);
   }
   // Set up IRQs based on values from the PLIC
+  const auto max_vector = interrupt_get_max_vector();
+  // Normally there would be at least one interrupt vector.
+  DEBUG_ASSERT(max_vector > 0);
   status = ResourceDispatcher::InitializeAllocator(ZX_RSRC_KIND_IRQ, interrupt_get_base_vector(),
-                                                   interrupt_get_max_vector());
+                                                   max_vector);
   if (status != ZX_OK) {
     printf("Resources: Failed to initialize IRQ allocator: %d\n", status);
   }
