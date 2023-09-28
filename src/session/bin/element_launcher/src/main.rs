@@ -25,7 +25,7 @@ async fn main() {
                 component_url: Some(config.main_element_url),
                 annotations: Some(vec![element::Annotation {
                     key: element::AnnotationKey {
-                        namespace: "element_launcher".to_string(),
+                        namespace: "element_manager".to_string(),
                         value: "name".to_string(),
                     },
                     value: element::AnnotationValue::Text("main".to_string()),
