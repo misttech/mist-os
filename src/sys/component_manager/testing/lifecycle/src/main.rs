@@ -26,7 +26,7 @@ async fn main() {
             );
             let mut req_stream = LifecycleRequestStream::from_channel(async_x);
             info!("Awaiting request to close");
-            while let Some(request) =
+            if let Some(request) =
                 req_stream.try_next().await.expect("Failure receiving lifecycle FIDL message")
             {
                 match request {

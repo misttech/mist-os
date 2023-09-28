@@ -25,7 +25,7 @@ async fn main() {
 }
 
 async fn run_service(mut stream: ExitControllerRequestStream) -> Result<(), Error> {
-    while let Some(request) = stream.try_next().await? {
+    if let Some(request) = stream.try_next().await? {
         match request {
             ExitControllerRequest::Exit { code, control_handle: _ } => {
                 process::exit(code);
