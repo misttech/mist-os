@@ -448,13 +448,20 @@ impl<B: ByteSlice> TcpSegment<B> {
 ///
 /// A `TcpFlowHeader` may be the result of a partially parsed TCP segment in
 /// [`TcpSegmentRaw`].
-#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq)]
+#[derive(Debug, Default, FromZeroes, FromBytes, AsBytes, Unaligned, PartialEq, Copy, Clone)]
 #[repr(C)]
 pub struct TcpFlowHeader {
     /// Source port.
     src_port: U16,
     /// Destination port.
     dst_port: U16,
+}
+
+impl TcpFlowHeader {
+    /// Gets the (src, dst) port tuple.
+    pub fn src_dst(&self) -> (u16, u16) {
+        (self.src_port.get(), self.dst_port.get())
+    }
 }
 
 #[derive(Debug)]
@@ -572,6 +579,17 @@ where
 }
 
 impl<B: ByteSlice> TcpSegmentRaw<B> {
+    /// Gets the flow header from this packet.
+    pub fn flow_header(&self) -> TcpFlowHeader {
+        match &self.hdr_prefix {
+            MaybeParsed::Complete(c) => {
+                let HeaderPrefix { src_port, dst_port, .. } = &**c;
+                TcpFlowHeader { src_port: *src_port, dst_port: *dst_port }
+            }
+            MaybeParsed::Incomplete(i) => *i.flow,
+        }
+    }
+
     /// Constructs a builder with the same contents as this packet.
     ///
     /// Returns `None` if an entire TCP header was not successfully parsed.

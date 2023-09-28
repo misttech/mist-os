@@ -122,9 +122,10 @@ impl NetdeviceWorker {
 
             trace_duration!("netdevice::recv");
 
+            let frame_length = rx.len();
             // TODO(https://fxbug.dev/100873): pass strongly owned buffers down
             // to the stack instead of copying it out.
-            rx.read_at(0, &mut buff[..rx.len()]).map_err(|e| {
+            rx.read_at(0, &mut buff[..frame_length]).map_err(|e| {
                 tracing::error!("failed to read from buffer {:?}", e);
                 Error::Client(e)
             })?;
@@ -143,12 +144,106 @@ impl NetdeviceWorker {
                 continue;
             };
 
+            match workaround_drop_ssh_over_wlan(
+                &id.external_state().handler.device_class,
+                &buff[..frame_length],
+            ) {
+                FilterResult::Drop => continue,
+                FilterResult::Accept => (),
+            }
+
             netstack3_core::device::receive_frame(
                 sync_ctx,
                 non_sync_ctx,
                 &id,
-                packet::Buf::new(&mut buff[..rx.len()], ..),
+                packet::Buf::new(&mut buff[..frame_length], ..),
             )
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+enum FilterResult {
+    Accept,
+    Drop,
+}
+
+const SSH_PORT: u16 = 22;
+
+/// Implements a hardcoded filter to drop all incoming TCP frames with
+/// destination port 22 on WiFi interfaces because we don't have a filtering
+/// engine yet. This allows us to test Netstack3 on some devices without
+/// incurring the security risk of remote access before we have the filtering
+/// engine in place.
+///
+/// TODO(https://fxbug.dev/134298): Remove this and replace with real filtering.
+fn workaround_drop_ssh_over_wlan(
+    device_class: &fhardware_network::DeviceClass,
+    buffer: &[u8],
+) -> FilterResult {
+    use packet::ParsablePacket;
+    use packet_formats::{
+        error::{IpParseError, ParseError, ParseResult},
+        ethernet::{EtherType, EthernetFrame, EthernetFrameLengthCheck},
+        ip::{IpProto, Ipv4Proto, Ipv6Proto},
+        ipv4::{Ipv4Header as _, Ipv4PacketRaw},
+        ipv6::{ExtHdrParseError, Ipv6PacketRaw},
+        tcp::TcpSegmentRaw,
+    };
+
+    match device_class {
+        fhardware_network::DeviceClass::Wlan | fhardware_network::DeviceClass::WlanAp => {}
+        fhardware_network::DeviceClass::Ppp
+        | fhardware_network::DeviceClass::Bridge
+        | fhardware_network::DeviceClass::Virtual
+        | fhardware_network::DeviceClass::Ethernet => return FilterResult::Accept,
+    }
+    // Attempt to parse the buffer as loosely as we can, that means we're as
+    // strict as possible here in dropping SSH. We just need to parse deep
+    // enough to get to the TCP header.
+    fn extract_tcp_ports(data: &[u8]) -> ParseResult<Option<(u16, u16)>> {
+        let mut bv = &data[..];
+        let ethernet = EthernetFrame::parse(&mut bv, EthernetFrameLengthCheck::NoCheck)?;
+        let tcp_hdr = match ethernet.ethertype().ok_or(ParseError::Format)? {
+            EtherType::Ipv4 => {
+                let ipv4 = Ipv4PacketRaw::parse(&mut bv, ())
+                    .map_err(|_: IpParseError<_>| ParseError::Format)?;
+
+                match ipv4.proto() {
+                    Ipv4Proto::Proto(IpProto::Tcp) => (),
+                    _ => return Ok(None),
+                };
+                TcpSegmentRaw::parse(&mut ipv4.body().into_inner(), ())?.flow_header()
+            }
+            EtherType::Ipv6 => {
+                let ipv6 = Ipv6PacketRaw::parse(&mut bv, ())
+                    .map_err(|_: IpParseError<_>| ParseError::Format)?;
+                let (body, proto) =
+                    ipv6.body_proto().map_err(|_: ExtHdrParseError| ParseError::Format)?;
+
+                match proto {
+                    Ipv6Proto::Proto(IpProto::Tcp) => (),
+                    _ => return Ok(None),
+                };
+                TcpSegmentRaw::parse(&mut body.into_inner(), ())?.flow_header()
+            }
+            EtherType::Arp | EtherType::Other(_) => return Ok(None),
+        };
+        Ok(Some(tcp_hdr.src_dst()))
+    }
+
+    match extract_tcp_ports(buffer) {
+        Ok(Some((_src, dst))) => {
+            if dst == SSH_PORT {
+                FilterResult::Drop
+            } else {
+                FilterResult::Accept
+            }
+        }
+        Ok(None) => FilterResult::Accept,
+        Result::<_, ParseError>::Err(_) => {
+            // Just pass packets that are not parsable in.
+            FilterResult::Accept
         }
     }
 }
@@ -296,6 +391,7 @@ impl DeviceHandler {
                         port_id: port,
                         inner: self.inner.clone(),
                         _mac_proxy: mac_proxy,
+                        device_class: device_class.clone(),
                     },
                     mac: mac_addr,
                     dynamic: devices::DynamicNetdeviceInfo {
@@ -450,6 +546,7 @@ pub(crate) struct PortHandler {
     // We must keep the mac proxy alive to maintain our multicast filtering mode
     // selection set.
     _mac_proxy: fhardware_network::MacAddressingProxy,
+    device_class: fhardware_network::DeviceClass,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -462,22 +559,37 @@ pub(crate) enum SendError {
 
 impl PortHandler {
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
-            self;
+        let Self {
+            id: _,
+            port_id,
+            inner: Inner { device: _, session, state: _ },
+            _mac_proxy: _,
+            device_class: _,
+        } = self;
         session.attach(*port_id, &[fhardware_network::FrameType::Ethernet]).await
     }
 
     pub(crate) async fn detach(&self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
-            self;
+        let Self {
+            id: _,
+            port_id,
+            inner: Inner { device: _, session, state: _ },
+            _mac_proxy: _,
+            device_class: _,
+        } = self;
         session.detach(*port_id).await
     }
 
     pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
         trace_duration!("netdevice::send");
 
-        let Self { id: _, port_id, inner: Inner { device: _, session, state: _ }, _mac_proxy: _ } =
-            self;
+        let Self {
+            id: _,
+            port_id,
+            inner: Inner { device: _, session, state: _ },
+            _mac_proxy: _,
+            device_class: _,
+        } = self;
         // NB: We currently send on a dispatcher, so we can't wait for new
         // buffers to become available. If that ends up being the long term way
         // of enqueuing outgoing buffers we might want to fix this impedance
@@ -492,8 +604,13 @@ impl PortHandler {
     }
 
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
-            self;
+        let Self {
+            id: _,
+            port_id,
+            inner: Inner { device: _, session, state },
+            _mac_proxy: _,
+            device_class: _,
+        } = self;
         let _: EthernetWeakDeviceId<_> = assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
@@ -505,15 +622,102 @@ impl PortHandler {
         &self,
         port: fidl::endpoints::ServerEnd<fhardware_network::PortMarker>,
     ) -> Result<(), netdevice_client::Error> {
-        let Self { id: _, port_id, inner: Inner { device, session: _, state: _ }, _mac_proxy: _ } =
-            self;
+        let Self {
+            id: _,
+            port_id,
+            inner: Inner { device, session: _, state: _ },
+            _mac_proxy: _,
+            device_class: _,
+        } = self;
         device.connect_port_server_end(*port_id, port)
     }
 }
 
 impl std::fmt::Debug for PortHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { id, port_id, inner: _, _mac_proxy: _ } = self;
-        f.debug_struct("PortHandler").field("id", id).field("port_id", port_id).finish()
+        let Self { id, port_id, inner: _, _mac_proxy: _, device_class } = self;
+        f.debug_struct("PortHandler")
+            .field("id", id)
+            .field("port_id", port_id)
+            .field("device_class", device_class)
+            .finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ip_test_macro::ip_test;
+    use net_declare::net_mac;
+    use net_types::{
+        ip::{Ip, Ipv4, Ipv6},
+        Witness as _,
+    };
+    use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
+    use packet_formats::{
+        ethernet::EthernetFrameBuilder,
+        ip::{IpExt, IpPacketBuilder as _, IpProto},
+        tcp::TcpSegmentBuilder,
+    };
+    use std::num::NonZeroU16;
+
+    #[ip_test]
+    fn wlan_ssh_workaround<I: Ip + IpExt>() {
+        fn make_packet<I: IpExt>(ip_proto: IpProto, dst: u16) -> Buf<Vec<u8>> {
+            let addr = I::LOOPBACK_ADDRESS.get();
+            (&[1u8, 2, 3, 4])
+                .into_serializer()
+                .encapsulate(TcpSegmentBuilder::new(
+                    addr,
+                    addr,
+                    NonZeroU16::new(1234).unwrap(),
+                    NonZeroU16::new(dst).unwrap(),
+                    1,
+                    None,
+                    1024,
+                ))
+                .encapsulate(I::PacketBuilder::new(addr, addr, 1, ip_proto.into()))
+                .encapsulate(EthernetFrameBuilder::new(
+                    net_mac!("02:00:00:00:00:01"),
+                    net_mac!("02:00:00:00:00:02"),
+                    I::ETHER_TYPE,
+                    0,
+                ))
+                .serialize_vec_outer()
+                .unwrap()
+                .unwrap_b()
+        }
+
+        // Check that we're only dropping for WLAN.
+        for device_class in [
+            fhardware_network::DeviceClass::Virtual,
+            fhardware_network::DeviceClass::Ethernet,
+            fhardware_network::DeviceClass::Ppp,
+            fhardware_network::DeviceClass::Bridge,
+        ] {
+            assert_matches!(
+                workaround_drop_ssh_over_wlan(
+                    &device_class,
+                    make_packet::<I>(IpProto::Tcp, SSH_PORT).as_ref(),
+                ),
+                FilterResult::Accept
+            );
+        }
+
+        for (proto, dst, expect) in [
+            (IpProto::Udp, 1234, FilterResult::Accept),
+            (IpProto::Udp, SSH_PORT, FilterResult::Accept),
+            (IpProto::Tcp, 1234, FilterResult::Accept),
+            (IpProto::Tcp, SSH_PORT, FilterResult::Drop),
+        ] {
+            assert_eq!(
+                workaround_drop_ssh_over_wlan(
+                    &fhardware_network::DeviceClass::Wlan,
+                    make_packet::<I>(proto, dst).as_ref()
+                ),
+                expect,
+                "proto={proto:?}, dst={dst}"
+            );
+        }
     }
 }
