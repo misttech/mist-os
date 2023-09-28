@@ -517,6 +517,8 @@ async fn tmp_is_available() {
     let fixture = builder.build().await;
 
     fixture.check_fs_type("tmp", VFS_TYPE_MEMFS).await;
+
+    fixture.tear_down().await;
 }
 
 #[fuchsia::test]
@@ -727,6 +729,8 @@ async fn shred_data_volume_when_mounted() {
         .expect_err("open_file failed"),
         fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
     );
+
+    fixture.tear_down().await;
 }
 
 // TODO(https://fxbug.dev/122940) shred_data_volume in recovery is not supported for fxblob.
@@ -785,6 +789,8 @@ async fn shred_data_volume_from_recovery() {
         .expect_err("open_file failed"),
         fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)
     );
+
+    fixture.tear_down().await;
 }
 
 #[fuchsia::test]
@@ -882,6 +888,8 @@ async fn reset_fvm_partitions() {
             DEFAULT_DATA_VOLUME_SIZE + slice_size
         );
     }
+
+    fixture.tear_down().await;
 }
 
 #[fuchsia::test]
@@ -927,6 +935,8 @@ async fn reset_fvm_partitions_no_existing_data_partition() {
     }
     assert_eq!(count, 4);
     assert_ne!(&data_name, "");
+
+    fixture.tear_down().await;
 }
 
 // Toggle migration mode
@@ -1181,4 +1191,6 @@ async fn data_persists() {
         .await
         .unwrap();
     assert_eq!(&fuchsia_fs::file::read(&file).await.unwrap()[..], b"file contents!");
+
+    fixture.tear_down().await;
 }

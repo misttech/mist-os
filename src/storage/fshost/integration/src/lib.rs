@@ -155,6 +155,7 @@ impl TestFixtureBuilder {
             ramdisks: Vec::new(),
             ramdisk_vmo: None,
             crash_reports,
+            torn_down: TornDown(false),
         };
 
         tracing::info!(
@@ -175,17 +176,31 @@ impl TestFixtureBuilder {
     }
 }
 
+/// Create a separate struct that does the drop-assert because fixture.tear_down can't call
+/// realm.destroy if it has the drop impl itself.
+struct TornDown(bool);
+
+impl Drop for TornDown {
+    fn drop(&mut self) {
+        // Because tear_down is async, it needs to be called by the test in an async context. It
+        // checks some properties so for correctness it must be called.
+        assert!(self.0, "fixture.tear_down() must be called");
+    }
+}
+
 pub struct TestFixture {
     pub realm: RealmInstance,
     pub ramdisks: Vec<RamdiskClient>,
     pub ramdisk_vmo: Option<zx::Vmo>,
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
+    torn_down: TornDown,
 }
 
 impl TestFixture {
     pub async fn tear_down(mut self) {
         self.realm.destroy().await.unwrap();
         assert_eq!(self.crash_reports.next().await, None);
+        self.torn_down.0 = true;
     }
 
     pub async fn into_vmo(mut self) -> Option<zx::Vmo> {

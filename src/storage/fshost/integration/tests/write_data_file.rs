@@ -155,6 +155,7 @@ async fn unformatted_small_disk() {
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     if data_fs_name() == "f2fs" {
         call_write_data_file(&admin).await.expect_err("write_data_file succeeded");
+        fixture.tear_down().await;
         return;
     }
     call_write_data_file(&admin).await.expect("write_data_file failed");

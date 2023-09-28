@@ -1001,19 +1001,29 @@ impl FilesystemLauncher {
             match format {
                 DiskFormat::Fxfs => {
                     let mut serving_multi_vol_fs = fs.serve_multi_volume().await?;
-                    let (crypt_service, volume_name, _) =
-                        fxfs::unlock_data_volume(&mut serving_multi_vol_fs, &self.config).await?;
-                    Ok(Filesystem::ServingMultiVolume(
-                        crypt_service,
-                        serving_multi_vol_fs,
-                        volume_name,
-                    ))
+                    match fxfs::unlock_data_volume(&mut serving_multi_vol_fs, &self.config).await? {
+                        Some((crypt_service, volume_name, _)) => {
+                            Ok(ServeFilesystemStatus::Serving(Filesystem::ServingMultiVolume(
+                                crypt_service,
+                                serving_multi_vol_fs,
+                                volume_name,
+                            )))
+                        }
+                        // If unlocking returns none, the keybag got deleted by something.
+                        None => {
+                            tracing::warn!(
+                                "keybag not found. Perhaps the keys were shredded? \
+                                Reformatting the data volume."
+                            );
+                            Ok(ServeFilesystemStatus::FormatRequired)
+                        }
+                    }
                 }
-                _ => Ok(Filesystem::Serving(fs.serve().await?)),
+                _ => Ok(ServeFilesystemStatus::Serving(Filesystem::Serving(fs.serve().await?))),
             }
         };
         match serve_fut.await {
-            Ok(fs) => Ok(ServeFilesystemStatus::Serving(fs)),
+            Ok(fs) => Ok(fs),
             Err(error) => {
                 self.report_corruption(format, &error);
                 if self.config.format_data_on_corruption {
@@ -1130,8 +1140,15 @@ impl FilesystemLauncher {
             Ok(self.format_data_in_fxblob(serving_multi_vol_fs).await?)
         } else {
             match fxfs::unlock_data_volume(serving_multi_vol_fs, &self.config).await {
-                Ok((crypt_service, volume_name, _)) => {
+                Ok(Some((crypt_service, volume_name, _))) => {
                     Ok(Filesystem::ServingVolumeInFxblob(Some(crypt_service), volume_name))
+                }
+                Ok(None) => {
+                    tracing::warn!(
+                        "could not find keybag. Perhaps the keys were shredded? \
+                        Reformatting the data and unencrypted volumes."
+                    );
+                    self.format_data_in_fxblob(serving_multi_vol_fs).await
                 }
                 Err(error) => {
                     self.report_corruption(DiskFormat::Fxfs, &error);
@@ -1170,10 +1187,9 @@ impl FilesystemLauncher {
             }
         }
 
-        let (crypt_service, volume_name, _) =
-            fxfs::init_data_volume(serving_multi_vol_fs, &self.config)
-                .await
-                .context("initializing data volume encryption")?;
+        let (crypt_service, volume_name, _) = fxfs::init_data_volume(serving_multi_vol_fs)
+            .await
+            .context("initializing data volume encryption")?;
         let filesystem = Filesystem::ServingVolumeInFxblob(Some(crypt_service), volume_name);
 
         Ok(filesystem)
@@ -1237,10 +1253,9 @@ impl FilesystemLauncher {
         let filesystem = if let DiskFormat::Fxfs = format {
             let mut serving_multi_vol_fs =
                 fs.serve_multi_volume().await.context("serving multi volume data partition")?;
-            let (crypt_service, volume_name, _) =
-                fxfs::init_data_volume(&mut serving_multi_vol_fs, &self.config)
-                    .await
-                    .context("initializing data volume encryption")?;
+            let (crypt_service, volume_name, _) = fxfs::init_data_volume(&mut serving_multi_vol_fs)
+                .await
+                .context("initializing data volume encryption")?;
             Filesystem::ServingMultiVolume(crypt_service, serving_multi_vol_fs, volume_name)
         } else {
             Filesystem::Serving(fs.serve().await.context("serving single volume data partition")?)

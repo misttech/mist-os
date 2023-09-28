@@ -5,7 +5,7 @@
 use {
     super::{format_sources, get_policy, unseal_sources, KeyConsumer},
     anyhow::{anyhow, Context, Error},
-    fidl::endpoints::Proxy,
+    fidl::endpoints::{ClientEnd, Proxy},
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
@@ -72,102 +72,90 @@ async fn unwrap_or_create_keys(
     Err(last_err)
 }
 
-// Unwraps the data volume in `fs`.  Any failures should be treated as fatal and the filesystem
-// should be reformatted and re-initialized.
-// Returns the name of the data volume as well as a reference to it.
+/// Unwraps the data volume in `fs`.  Any failures should be treated as fatal and the filesystem
+/// should be reformatted and re-initialized.  If Ok(None) is returned, it means the keybag was
+/// shredded, so a reformat is required.
+/// Returns the name of the data volume as well as a reference to it.
 pub async fn unlock_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
-    unlock_or_init_data_volume(fs, config, false).await
-}
-
-// Initializes the data volume in `fs`, which should be freshly reformatted.
-// Returns the name of the data volume as well as a reference to it.
-pub async fn init_data_volume<'a>(
-    fs: &'a mut ServingMultiVolumeFilesystem,
-    config: &'a fshost_config::Config,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
-    unlock_or_init_data_volume(fs, config, true).await
-}
-
-async fn unlock_or_init_data_volume<'a>(
-    fs: &'a mut ServingMultiVolumeFilesystem,
-    config: &'a fshost_config::Config,
-    create: bool,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+) -> Result<Option<(CryptService, String, &'a mut ServingVolume)>, Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
-    let root_vol = if create {
-        fs.create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
-            .await
-            .context("Failed to create unencrypted")?
-    } else {
-        if config.check_filesystems {
-            fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
-        }
-        fs.open_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
-            .await
-            .context("Failed to open unencrypted")?
-    };
-    let keybag_dir = if create {
-        fuchsia_fs::directory::create_directory(
-            root_vol.root(),
-            "keys",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
+    if config.check_filesystems {
+        fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
+    }
+    let root_vol = fs
+        .open_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
         .await
-        .context("Failed to create keys dir")?
-    } else {
-        fuchsia_fs::directory::open_directory(
-            root_vol.root(),
-            "keys",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .context("Failed to open keys dir")?
-    };
+        .context("Failed to open unencrypted")?;
+    let keybag_dir = fuchsia_fs::directory::open_directory(
+        root_vol.root(),
+        "keys",
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    )
+    .await
+    .context("Failed to open keys dir")?;
     let keybag_dir_fd = fdio::create_fd::<std::os::fd::OwnedFd>(
         keybag_dir.into_channel().unwrap().into_zx_channel().into(),
     )?;
-    let keybag =
-        KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data")).map_err(|e| anyhow!(e))?;
+    let keybag = match KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data"))? {
+        Some(keybag) => keybag,
+        None => return Ok(None),
+    };
 
-    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, create).await?;
+    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, false).await?;
 
     let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
         .await
         .context("init_crypt_service")?;
-    let crypt = Some(
-        connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
-            .expect("Unable to connect to Crypt service")
-            .into_channel()
-            .unwrap()
-            .into_zx_channel()
-            .into(),
-    );
+    if config.check_filesystems {
+        fs.check_volume("data", Some(crypt_service.connect()))
+            .await
+            .context("Failed to verify data")?;
+    }
+    let crypt = Some(crypt_service.connect());
 
-    let volume = if create {
-        fs.create_volume("data", MountOptions { crypt, as_blob: false })
-            .await
-            .context("Failed to create data")?
-    } else {
-        let crypt = if config.check_filesystems {
-            fs.check_volume("data", crypt).await.context("Failed to verify data")?;
-            Some(
-                connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
-                    .expect("Unable to connect to Crypt service")
-                    .into_channel()
-                    .unwrap()
-                    .into_zx_channel()
-                    .into(),
-            )
-        } else {
-            crypt
-        };
-        fs.open_volume("data", MountOptions { crypt, as_blob: false })
-            .await
-            .context("Failed to open data")?
-    };
+    let volume = fs
+        .open_volume("data", MountOptions { crypt, as_blob: false })
+        .await
+        .context("Failed to open data")?;
+
+    Ok(Some((crypt_service, "data".to_string(), volume)))
+}
+
+/// Initializes the data volume in `fs`, which should be freshly reformatted.
+/// Returns the name of the data volume as well as a reference to it.
+pub async fn init_data_volume<'a>(
+    fs: &'a mut ServingMultiVolumeFilesystem,
+) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+    // Open up the unencrypted volume so that we can access the key-bag for data.
+    let root_vol = fs
+        .create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+        .await
+        .context("Failed to create unencrypted")?;
+    let keybag_dir = fuchsia_fs::directory::create_directory(
+        root_vol.root(),
+        "keys",
+        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+    )
+    .await
+    .context("Failed to create keys dir")?;
+    let keybag_dir_fd = fdio::create_fd::<std::os::fd::OwnedFd>(
+        keybag_dir.into_channel().unwrap().into_zx_channel().into(),
+    )?;
+    let keybag = KeyBagManager::create(keybag_dir_fd, Path::new("fxfs-data"))?;
+
+    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, true).await?;
+
+    let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
+        .await
+        .context("init_crypt_service")?;
+    let crypt = Some(crypt_service.connect());
+
+    let volume = fs
+        .create_volume("data", MountOptions { crypt, as_blob: false })
+        .await
+        .context("Failed to create data")?;
 
     Ok((crypt_service, "data".to_string(), volume))
 }
@@ -227,6 +215,17 @@ impl CryptService {
             .map_err(zx::Status::from_raw)?;
 
         Ok(CryptService { component_name, exposed_dir })
+    }
+
+    fn connect(&self) -> ClientEnd<CryptMarker> {
+        // The assumption is if the crypt service child exists at all, the exposed directory will
+        // have the crypt protocol, so we `expect` it.
+        connect_to_protocol_at_dir_root::<CryptMarker>(&self.exposed_dir)
+            .expect("Unable to connect to Crypt service")
+            .into_channel()
+            .unwrap()
+            .into_zx_channel()
+            .into()
     }
 }
 

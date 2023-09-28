@@ -25,12 +25,12 @@ pub struct KeyBag {
     keys: HashMap<KeySlot, WrappedKey>,
 }
 
-#[derive(Error, Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum OpenError {
     #[error("Path to keybag was invalid")]
     InvalidPath,
-    #[error("Path to keybag not found")]
-    KeyBagNotFound,
+    #[error("Failed to open the keybag: {0:?}")]
+    FailedToOpen(#[from] std::io::Error),
     #[error("Keybag failed to parse due to {0}")]
     KeyBagInvalid(String),
     #[error("Keybag was of wrong version (have {0} want {1})")]
@@ -43,7 +43,7 @@ impl From<OpenError> for zx::Status {
     fn from(error: OpenError) -> zx::Status {
         match error {
             OpenError::InvalidPath => zx::Status::INVALID_ARGS,
-            OpenError::KeyBagNotFound => zx::Status::NOT_FOUND,
+            OpenError::FailedToOpen(..) => zx::Status::IO,
             OpenError::KeyBagInvalid(..) => zx::Status::IO_DATA_INTEGRITY,
             OpenError::KeyBagVersionMismatch(..) => zx::Status::NOT_SUPPORTED,
             OpenError::FailedToPersist => zx::Status::IO,
@@ -265,8 +265,37 @@ fn generate_nonce() -> Nonce {
 }
 
 impl KeyBagManager {
-    /// Opens a key-bag file.  If the keybag doesn't exist, creates it.
+    /// Opens a key-bag file. If it doesn't exist, or is an empty file, returns Ok(None).
     pub fn open(
+        directory: std::os::fd::OwnedFd,
+        path: &std::path::Path,
+    ) -> Result<Option<Self>, OpenError> {
+        // Safety:  We're temporarily making |directory| unowned, but then it becomes owned again by
+        // |dir|.
+        let dir = unsafe { openat::Dir::from_raw_fd(directory.into_raw_fd()) };
+        let path_str = path.to_str().map(str::to_string).ok_or(OpenError::InvalidPath)?;
+        match dir.metadata(path) {
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    return Ok(None);
+                } else {
+                    return Err(e.into());
+                }
+            }
+            Ok(m) if m.len() == 0 => return Ok(None),
+            _ => (),
+        };
+        let reader = std::io::BufReader::new(dir.open_file(path)?);
+        let key_bag: KeyBag =
+            serde_json::from_reader(reader).map_err(|e| OpenError::KeyBagInvalid(e.to_string()))?;
+        if key_bag.version != CURRENT_VERSION {
+            return Err(OpenError::KeyBagVersionMismatch(key_bag.version, CURRENT_VERSION));
+        }
+        Ok(Some(Self { key_bag, dir, path: path_str }))
+    }
+
+    /// Creates a new, empty key-bag file, writing it to disk.
+    pub fn create(
         directory: std::os::fd::OwnedFd,
         path: &std::path::Path,
     ) -> Result<Self, OpenError> {
@@ -274,24 +303,11 @@ impl KeyBagManager {
         // |dir|.
         let dir = unsafe { openat::Dir::from_raw_fd(directory.into_raw_fd()) };
         let path_str = path.to_str().map(str::to_string).ok_or(OpenError::InvalidPath)?;
-        let is_empty = match dir.metadata(path) {
-            Ok(m) if m.len() > 0 => false,
-            _ => true,
-        };
-        if is_empty {
-            let mut this = Self { key_bag: KeyBag::default(), dir, path: path_str };
-            this.commit().map_err(|_| OpenError::FailedToPersist)?;
-            return Ok(this);
-        }
-        let reader =
-            std::io::BufReader::new(dir.open_file(path).map_err(|_| OpenError::KeyBagNotFound)?);
-        let key_bag: KeyBag =
-            serde_json::from_reader(reader).map_err(|e| OpenError::KeyBagInvalid(e.to_string()))?;
-        if key_bag.version != CURRENT_VERSION {
-            return Err(OpenError::KeyBagVersionMismatch(key_bag.version, CURRENT_VERSION));
-        }
-        Ok(Self { key_bag, dir, path: path_str })
+        let mut this = Self { key_bag: KeyBag::default(), dir, path: path_str };
+        this.commit().map_err(|_| OpenError::FailedToPersist)?;
+        return Ok(this);
     }
+
     /// Generates and stores a new key in the key-bag, based on |wrapping_key|.  Returns the
     /// unwrapped key contents.
     pub fn new_key(
@@ -330,6 +346,7 @@ impl KeyBagManager {
 
         self.commit().map(|_| key)
     }
+
     /// Removes a key from the key bag.
     pub fn remove_key(&mut self, slot: KeySlot) -> Result<(), Error> {
         if let None = self.key_bag.keys.remove(&slot) {
@@ -337,6 +354,7 @@ impl KeyBagManager {
         }
         self.commit()
     }
+
     /// Attempts to unwrap a key at |slot| with |wrapping_key|.
     pub fn unwrap_key(
         &self,
@@ -369,6 +387,7 @@ impl KeyBagManager {
             Err(_) => Err(UnwrapError::AccessDenied),
         }
     }
+
     fn commit(&mut self) -> Result<(), Error> {
         let path = std::path::Path::new(&self.path);
         let tmp_path = path.with_extension("tmp");
@@ -404,7 +423,7 @@ mod tests {
         let path: &std::path::Path = owned_path.as_ref();
         std::fs::remove_file(path).expect("unlink failed");
         let dir = open_dir(path.parent().unwrap());
-        let keybag = KeyBagManager::open(dir, path).expect("Open nonexistent keybag failed");
+        let keybag = KeyBagManager::create(dir, path).expect("Open nonexistent keybag failed");
         assert!(keybag.key_bag.keys.is_empty());
     }
 
@@ -413,7 +432,7 @@ mod tests {
         let owned_path = NamedTempFile::new().unwrap().into_temp_path();
         let path: &std::path::Path = owned_path.as_ref();
         let dir = open_dir(path.parent().unwrap());
-        let keybag = KeyBagManager::open(dir, path).expect("Open empty keybag failed");
+        let keybag = KeyBagManager::create(dir, path).expect("Open empty keybag failed");
         assert!(keybag.key_bag.keys.is_empty());
     }
 
@@ -423,7 +442,7 @@ mod tests {
         let path: &std::path::Path = owned_path.as_ref();
         {
             let dir = open_dir(path.parent().unwrap());
-            let mut keybag = KeyBagManager::open(dir, path).expect("Open empty keybag failed");
+            let mut keybag = KeyBagManager::create(dir, path).expect("Open empty keybag failed");
             let key = WrappingKey::Aes256([0u8; 32]);
             keybag.new_key(0, &key).expect("new key failed");
             assert_eq!(
@@ -433,7 +452,9 @@ mod tests {
         }
         {
             let dir = open_dir(path.parent().unwrap());
-            let mut keybag = KeyBagManager::open(dir, path).expect("Open keybag failed");
+            let mut keybag = KeyBagManager::open(dir, path)
+                .expect("Open keybag failed")
+                .expect("keybag not found");
             keybag.remove_key(0).expect("remove_key failed");
             assert_eq!(
                 Error::SlotNotFound,
@@ -441,7 +462,8 @@ mod tests {
             );
         }
         let dir = open_dir(path.parent().unwrap());
-        let keybag = KeyBagManager::open(dir, path).expect("Open keybag failed");
+        let keybag =
+            KeyBagManager::open(dir, path).expect("Open keybag failed").expect("keybag not found");
         assert!(keybag.key_bag.keys.is_empty());
     }
 
@@ -450,7 +472,7 @@ mod tests {
         let owned_path = NamedTempFile::new().unwrap().into_temp_path();
         let path: &std::path::Path = owned_path.as_ref();
         let dir = open_dir(path.parent().unwrap());
-        let mut keybag = KeyBagManager::open(dir, path).expect("Open empty keybag failed");
+        let mut keybag = KeyBagManager::create(dir, path).expect("Open empty keybag failed");
 
         let key = WrappingKey::Aes256([3u8; 32]);
         let key2 = WrappingKey::Aes128([0xffu8; 16]);
@@ -477,7 +499,8 @@ mod tests {
         // Slots 0,2 are encrypted with a null AES256 key, and 1 is encrypted with something else.
         let path = std::path::Path::new("/pkg/data/key_bag.json");
         let dir = open_dir(path.parent().unwrap());
-        let keybag = KeyBagManager::open(dir, path).expect("Open keybag failed");
+        let keybag =
+            KeyBagManager::open(dir, path).expect("Open keybag failed").expect("keybag not found");
 
         let mut expected = Aes256Key::default();
         expected.0[..6].copy_from_slice(b"secret");
