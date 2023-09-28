@@ -52,6 +52,6 @@ static int iter(struct dl_phdr_info *info, size_t sz, void *vctx) {
   return 0;
 }
 
-int get_build_id(char out[32]) { return dl_iterate_phdr(iter, out); }
+int get_build_id(char out[33]) { return dl_iterate_phdr(iter, out); }
 
 #endif

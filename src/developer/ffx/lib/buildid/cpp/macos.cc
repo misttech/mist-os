@@ -39,7 +39,7 @@ const struct uuid_command *ExecutableUUID() {
   return nullptr;
 }
 
-int get_build_id(char out[32]) {
+int get_build_id(char out[33]) {
   auto cmd = ExecutableUUID();
 
   if (!cmd) {
@@ -52,7 +52,7 @@ int get_build_id(char out[32]) {
       return -1;
     }
 
-    sprintf(&out[outi], "%02x", b);
+    snprintf(&out[outi], 33 - outi, "%02x", b);
     outi += 2;
   }
 

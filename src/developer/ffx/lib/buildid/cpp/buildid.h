@@ -11,7 +11,7 @@ extern "C" {
 // copies it into out. On success, the return value specifies the length of the
 // buildid returned, on failure a value less than one is returned, and the value
 // of out is undefined.
-int get_build_id(char out[32]);
+int get_build_id(char out[33]);
 }
 
 #endif
