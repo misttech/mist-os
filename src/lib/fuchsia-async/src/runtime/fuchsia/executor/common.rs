@@ -16,10 +16,10 @@ use futures::{
     task::{waker_ref, ArcWake},
 };
 use parking_lot::Mutex;
+use rustc_hash::FxHashMap as HashMap;
 use std::{
     any::Any,
     cell::RefCell,
-    collections::HashMap,
     fmt,
     future::Future,
     panic::Location,
@@ -114,7 +114,7 @@ impl Inner {
             is_local,
             receivers: Mutex::new(PacketReceiverMap::new()),
             task_count: AtomicUsize::new(MAIN_TASK_ID + 1),
-            active_tasks: Mutex::new(HashMap::new()),
+            active_tasks: Mutex::new(HashMap::default()),
             ready_tasks: SegQueue::new(),
             time,
             collector,

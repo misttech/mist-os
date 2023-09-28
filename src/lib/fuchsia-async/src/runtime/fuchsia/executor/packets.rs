@@ -4,8 +4,8 @@
 
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::task::AtomicWaker;
+use rustc_hash::FxHashMap as HashMap;
 use std::{
-    collections::HashMap,
     ops::Deref,
     sync::{
         atomic::{AtomicU32, Ordering},
@@ -72,7 +72,7 @@ pub(crate) struct PacketReceiverMap<T> {
 
 impl<T> PacketReceiverMap<T> {
     pub fn new() -> Self {
-        Self { next_key: 0, mapping: HashMap::new() }
+        Self { next_key: 0, mapping: HashMap::default() }
     }
 
     pub fn get(&self, key: usize) -> Option<&T> {
