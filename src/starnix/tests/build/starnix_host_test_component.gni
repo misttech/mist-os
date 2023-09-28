@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//src/starnix/kernel/starnix.gni")
 import("starnix_toolchain_test_component.gni")
 
 # Defines a Fuchsia component that contains a host test.
@@ -25,7 +26,7 @@ import("starnix_toolchain_test_component.gni")
 #                         using the explicit linux toolchain
 template("starnix_host_test_component") {
   assert(host_os == "linux")
-  test_toolchain = host_toolchain
+  test_toolchain = host_toolchain_for_target_arch
   starnix_toolchain_test_component(target_name) {
     forward_variables_from(invoker, "*")
   }

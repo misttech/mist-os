@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
+import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//zircon/vdso/vdso.gni")
@@ -220,7 +221,7 @@ if (is_linux) {
   }
 }
 
-if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
+if (host_os == "linux" && !is_asan) {
   resource("no_op_executable_in_test_dir") {
     testonly = true
     out_dir = get_label_info(":no_op_executable", "root_out_dir")
@@ -243,17 +244,15 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     manifest = "meta/starnix_microbenchmarks.cml"
     component_name = "starnix_microbenchmarks"
 
-    deps = [ ":no_op_executable_in_test_dir($host_toolchain)" ]
+    deps = [ ":no_op_executable_in_test_dir($host_toolchain_for_target_arch)" ]
     test_type = "starnix"
   }
 
   fuchsia_test_package("starnix_microbenchmarks_unittestmode") {
     test_components = [ ":starnix_microbenchmarks_component" ]
 
-    if (target_cpu == "x64") {
-      subpackages = starnix_test_subpackages +
-                    [ "//src/starnix/containers/debian:debian_package" ]
-    }
+    subpackages = starnix_test_subpackages +
+                  [ "//src/starnix/containers/debian:debian_package" ]
 
     deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
   }
@@ -261,10 +260,8 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
   fuchsia_shell_package("starnix_microbenchmarks_perftestmode") {
     testonly = true
 
-    if (target_cpu == "x64") {
-      subpackages = starnix_test_subpackages +
-                    [ "//src/starnix/containers/debian:debian_package" ]
-    }
+    subpackages = starnix_test_subpackages +
+                  [ "//src/starnix/containers/debian:debian_package" ]
 
     deps = [ ":starnix_microbenchmarks_component" ]
 
@@ -282,9 +279,7 @@ group("tests") {
   deps = [ ":fuchsia_microbenchmarks" ]
   if (host_os == "linux") {
     deps += [ ":fuchsia_microbenchmarks_host($host_toolchain)" ]
-  }
-  if (target_cpu == "x64" && !is_asan) {
-    if (host_os == "linux") {
+    if (!is_asan) {
       deps += [
         ":starnix_microbenchmarks_perftestmode",
         ":starnix_microbenchmarks_unittestmode",

@@ -13,7 +13,7 @@ import("//src/starnix/tests/starnix_test_subpackages.gni")
 group("tests") {
   testonly = true
   deps = [ ":starnix_syscalls_cpp_tests" ]
-  if (host_os == "linux" && has_board) {
+  if (host_os == "linux" && host_cpu == "x64" && has_board) {
     deps += [
       # These are Linux tests, so we can run them as host tests on our host Linux bot.
       ":syscalls_cpp_host_tests($host_toolchain)",

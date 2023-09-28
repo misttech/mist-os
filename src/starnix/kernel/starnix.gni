@@ -15,3 +15,5 @@ if (target_cpu == "x64") {
 } else {
   assert(false, "Need definition for target linux toolchain for $target_cpu")
 }
+
+host_toolchain_for_target_arch = "//build/toolchain:host_$target_cpu"

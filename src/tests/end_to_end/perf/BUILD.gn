@@ -43,13 +43,15 @@ if (target_cpu != "arm64") {
   test_list += [ "diagnostics_log_rust_benchmarks_test" ]
 }
 
-if (target_cpu == "x64" && !is_asan) {
-  if (host_os == "linux") {
-    test_list += [
-      "netstack_starnix_benchmarks_test",
-      "starnix_benchmarks_test",
-      "storage_starnix_benchmarks_test",
-    ]
+if (!is_asan && host_os == "linux") {
+  test_list += [
+    "starnix_benchmarks_test",
+    "storage_starnix_benchmarks_test",
+  ]
+
+  # TODO(b/298565565): Enable these on vim3.
+  if (target_cpu == "x64") {
+    test_list += [ "netstack_starnix_benchmarks_test" ]
   }
 }
 
@@ -139,10 +141,8 @@ shard_test_list = [
   "netstack_iperf_test",
 ]
 
-if (target_cpu == "x64" && !is_asan) {
-  if (host_os == "linux") {
-    shard_test_list += [ "starnix_gvisor_benchmarks_test" ]
-  }
+if (!is_asan && host_os == "linux") {
+  shard_test_list += [ "starnix_gvisor_benchmarks_test" ]
 }
 foreach(test, shard_test_list) {
   foreach(shard, shards) {
@@ -336,7 +336,7 @@ group("package_deps") {
     "//src/starnix/lib/extended_pstate",
   ]
 
-  if (target_cpu == "x64" && !is_asan) {
+  if (!is_asan) {
     public_deps += [
       # This is used by starnix benchmarks.
       "//src/starnix/tests/gvisor:starnix_gvisor_benchmarks",

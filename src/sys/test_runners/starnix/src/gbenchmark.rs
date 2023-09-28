@@ -13,7 +13,7 @@ use {
 };
 
 /// The results returned by gBenchmark.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BenchmarkOutput {
     pub context: BenchmarkContextData,
     pub benchmarks: Vec<BenchmarkRunData>,
@@ -22,7 +22,7 @@ pub struct BenchmarkOutput {
 /// The context returned by gBenchmark.
 ///
 /// This struct is empty because its fields are not used in Fuchsiaperf results.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct BenchmarkContextData {}
 
 /// The benchmark results returned by gBenchmark.
@@ -73,8 +73,11 @@ fn gbenchmark_to_fuchsiaperf(
     results: &str,
     test_suite: &str,
 ) -> Result<Vec<FuchsiaPerfBenchmarkResult>, Error> {
-    let benchmark_output: BenchmarkOutput =
-        serde_json::from_str(results).context("Failed to parse benchmark results.")?;
+    let benchmark_output: BenchmarkOutput = if results.is_empty() {
+        BenchmarkOutput::default()
+    } else {
+        serde_json::from_str(results).context("Failed to parse benchmark results.")?
+    };
 
     let mut perfs = vec![];
     let mut benchmark_count = 0;
