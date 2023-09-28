@@ -89,3 +89,7 @@ extend uint fuchsia.BIND_REGISTER_ID {
   SPICC1_RESET = 5,
   USB_PHY_FACTORY = 6,
 };
+
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  CANVAS_SERVICE = 0x14, // fuchsia.hardware.amlogiccanvas.Service
+};

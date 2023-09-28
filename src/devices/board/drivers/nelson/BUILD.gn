@@ -252,9 +252,9 @@ driver_bind_rules("nelson_aml_video_bind") {
   tests = "bind-tests/nelson_aml_video-test.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.amlogic.platform.meson",
     "//src/devices/bind/fuchsia.clock",
-    "//src/devices/bind/fuchsia.hardware.amlogiccanvas",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.sysmem",
     "//src/devices/bind/fuchsia.tee",
