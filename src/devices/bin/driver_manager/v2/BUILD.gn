@@ -107,17 +107,15 @@ executable("driver_runner_test") {
 
   deps = [
     ":driver_runner",
-    "//sdk/fidl/fuchsia.component:fuchsia.component_hlcpp",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_hlcpp",
-    "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_hlcpp",
-    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
+    "//sdk/fidl/fuchsia.driver.host:fuchsia.driver.host_cpp",
     "//sdk/lib/inspect/testing/cpp",
-    "//sdk/lib/sys/cpp/testing:unit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/zircon-internal",
   ]
 }
 
