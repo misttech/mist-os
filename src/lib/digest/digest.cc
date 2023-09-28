@@ -111,8 +111,9 @@ zx_status_t Digest::Parse(const char* hex, size_t len) {
 fbl::String Digest::ToString() const {
   char hex[kSha256HexLength + 1];
   char* p = hex;
+  static_assert(sizeof(bytes_) * 2 < sizeof(hex));
   for (size_t i = 0; i < sizeof(bytes_); ++i) {
-    sprintf(p, "%02x", bytes_[i]);
+    snprintf(p, sizeof(hex) - i * 2, "%02x", bytes_[i]);
     p += 2;
   }
   return fbl::String(hex);
