@@ -10,3 +10,5 @@ toc:
   path: /docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md
 - title: "Starnix container"
   path: /docs/concepts/starnix/starnix-container.md
+- title: "Architecture of the Starnix VFS"
+  path: /docs/concepts/starnix/architecture-of-the-starnix-vfs.md
