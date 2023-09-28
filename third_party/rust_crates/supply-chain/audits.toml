@@ -180,6 +180,12 @@ criteria = ["safe-to-deploy", "ub-risk-2"]
 version = "0.2.2"
 notes = "Reviewed on https://fxrev.dev/883543"
 
+[[audits.thread_local]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "1.0.1 -> 1.1.7"
+notes = "Reviewed on https://fxrev.dev/906819"
+
 [[audits.tokio-stream]]
 who = "David Koloski <dkoloski@google.com>"
 criteria = ["ub-risk-1", "safe-to-deploy"]
