@@ -232,11 +232,15 @@ class ElementMeta(object):
                             variant_files[arch].update(collection)
         elif type == "fidl_library":
             common_files.update(self._meta["sources"])
-        elif type in ["host_tool", "companion_host_tool", "package"]:
+        elif type in ["host_tool", "companion_host_tool"]:
             if "files" in self._meta:
                 common_files.update(self._meta["files"])
             if "target_files" in self._meta:
                 variant_files.update(self._meta["target_files"])
+        elif type == "package":
+            for variant in self._meta.get("variants", []):
+                constraint = variant["arch"] + "-" + str(variant["api_level"])
+                variant_files[constraint] = variant["files"]
         elif type == "loadable_module":
             common_files.update(self._meta["resources"])
             variant_files.update(self._meta["binaries"])
@@ -303,20 +307,9 @@ class ElementMeta(object):
             meta["binaries"].update(meta_two.get("binaries", {}))
         elif type == "package":
             meta = meta_one
-            meta["package_manifests"] += meta_two["package_manifests"]
-            # Remove duplicate items, and sort final result.
-            meta["package_manifests"] = sorted(
-                [
-                    dict(t)
-                    for t in {
-                        tuple(d.items()) for d in meta["package_manifests"]
-                    }
-                ],
-                key=itemgetter(
-                    "api_level", "target_architecture", "manifest_file"
-                ),
+            meta["variants"] = meta_one.get("variants", []) + meta_two.get(
+                "variants", []
             )
-            meta["target_files"].update(meta_two["target_files"])
         elif type == "sysroot":
             meta = meta_one
             meta["versions"].update(meta_two.get("versions", {}))

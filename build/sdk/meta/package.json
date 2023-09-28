@@ -14,51 +14,36 @@
                     "description": "Name of a Fuchsia package.",
                     "type": "string"
                 },
-                "package_manifests": {
-                    "description": "List of package manifests for flavors of this Fuchsia package.",
+                "variants": {
+                    "description": "List of package manifests and other files for flavors of this Fuchsia package.",
                     "items": {
                         "properties": {
                             "manifest_file": {
                                 "$ref": "common.json#/definitions/file",
                                 "description": "The manifest file for this package."
                             },
-                            "target_architecture": {
+                            "arch": {
                                 "$ref": "common.json#/definitions/target_arch",
                                 "description": "The target architecture for this package."
                             },
                             "api_level": {
                                 "description": "The API level this package is built against.",
                                 "type": "integer"
+                            },
+                            "files": {
+                                "$ref": "#/definitions/fileGroup",
+                                "description": "Files for Fuchsia package targeting this architecture and API level."
                             }
                         },
                         "required": [
                             "manifest_file",
-                            "target_architecture",
+                            "arch",
                             "api_level"
                         ],
                         "type": "object"
                     },
                     "minItems": 1,
                     "type": "array"
-                },
-                "target_files": {
-                    "additionalProperties": false,
-                    "description": "The target-specific files, per architecture.",
-                    "properties": {
-                        "arm64": {
-                            "$ref": "#/definitions/fileGroup",
-                            "description": "Files for Fuchsia package targeting arm64."
-                        },
-                        "x64": {
-                            "$ref": "#/definitions/fileGroup",
-                            "description": "Files for Fuchsia package targeting x64."
-                        },
-                        "riscv64": {
-                            "$ref": "#/definitions/fileGroup",
-                            "description": "Files for Fuchsia package targeting riscv64."
-                        }
-                    },
-                    "type": "object"
                 },
                 "type": {
                     "allOf": [
@@ -75,8 +60,7 @@
             },
             "required": [
                 "name",
-                "package_manifests",
-                "target_files",
+                "variants",
                 "type"
             ]
         }
