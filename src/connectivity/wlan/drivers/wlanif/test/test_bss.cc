@@ -6,7 +6,9 @@
 
 #include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
+#include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 
@@ -22,17 +24,17 @@ namespace wlan_ieee80211 = ::fuchsia::wlan::ieee80211;
 namespace wlan_internal = ::fuchsia::wlan::internal;
 namespace wlan_mlme = ::fuchsia::wlan::mlme;
 
-wlan_internal::BssDescription CreateBssDescription(wlan_channel_t channel) {
+bss_description_t CreateBssDescription(wlan_channel_t channel) {
   wlan::common::MacAddr bssid(kBssid1);
 
-  wlan_internal::BssDescription bss_desc;
-  std::memcpy(bss_desc.bssid.data(), bssid.byte, wlan::common::kMacAddrLen);
-  std::vector<uint8_t> ssid(kSsid, kSsid + sizeof(kSsid));
-  bss_desc.bss_type = wlan_common::BssType::INFRASTRUCTURE;
+  bss_description_t bss_desc = {};
+  std::memcpy((void*)bss_desc.bssid, bssid.byte, ETH_MAC_SIZE);
+  bss_desc.bss_type = BSS_TYPE_INFRASTRUCTURE;
   bss_desc.beacon_period = kBeaconPeriodTu;
   bss_desc.capability_info = 1 | 1 << 5;  // ESS and short preamble bits
-  bss_desc.ies = std::vector<uint8_t>(kIes, kIes + sizeof(kIes));
-  bss_desc.channel.cbw = static_cast<wlan_common::ChannelBandwidth>(channel.cbw);
+  bss_desc.ies_list = (uint8_t*)kIes;
+  bss_desc.ies_count = sizeof(kIes);
+  bss_desc.channel.cbw = CHANNEL_BANDWIDTH_CBW20;
   bss_desc.channel.primary = channel.primary;
 
   bss_desc.rssi_dbm = -35;
@@ -61,12 +63,14 @@ wlan_mlme::StopRequest CreateStopReq() {
   return req;
 }
 
-wlan_mlme::ConnectRequest CreateConnectReq() {
-  wlan_mlme::ConnectRequest req;
+wlan_fullmac_impl_connect_request CreateConnectReq() {
+  wlan_fullmac_impl_connect_request req = {};
+
   req.selected_bss = CreateBssDescription(kBssChannel);
   req.connect_failure_timeout = kConnectFailureTimeout;
-  req.auth_type = wlan_mlme::AuthenticationTypes::OPEN_SYSTEM;
-  req.security_ie = std::vector<uint8_t>(kRsne, kRsne + sizeof(kRsne));
+  req.auth_type = WLAN_AUTH_TYPE_OPEN_SYSTEM;
+  req.security_ie_list = (uint8_t*)kRsne;
+  req.security_ie_count = sizeof(kRsne);
   return req;
 }
 

@@ -6,7 +6,9 @@
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_WLANIF_TEST_TEST_BSS_H_
 
 #include <fuchsia/wlan/common/c/banjo.h>
+#include <fuchsia/wlan/fullmac/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
+#include <fuchsia/wlan/internal/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 
 #include <wlan/common/macaddr.h>
@@ -78,11 +80,10 @@ static constexpr uint8_t kRsne[] = {
 static constexpr uint8_t kRates[] = {0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12,
                                      0x18, 0x24, 0x30, 0x48, 0x60, 0x6c};
 
-::fuchsia::wlan::internal::BssDescription CreateBssDescription(
-    wlan_channel_t channel = kBssChannel);
+bss_description_t CreateBssDescription(wlan_channel_t channel);
 ::fuchsia::wlan::mlme::StartRequest CreateStartReq();
 ::fuchsia::wlan::mlme::StopRequest CreateStopReq();
-::fuchsia::wlan::mlme::ConnectRequest CreateConnectReq();
+wlan_fullmac_impl_connect_request CreateConnectReq();
 ::fuchsia::wlan::mlme::DeauthenticateRequest CreateDeauthenticateReq();
 ::fuchsia::wlan::mlme::DisassociateRequest CreateDisassociateReq();
 

@@ -288,21 +288,22 @@ void Device::Reconnect(const wlan_fullmac_impl_reconnect_request_t* req) {
 }
 
 void Device::AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp) {
-  fuchsia_wlan_fullmac::wire::WlanFullmacImplAuthRespRequest auth_resp;
-
-  // peer_sta_address
-  std::memcpy(auth_resp.peer_sta_address().data(), resp->peer_sta_address, ETH_ALEN);
-
-  // result_code
-  auth_resp.result_code() = ConvertAuthResult(resp->result_code);
-
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
 
-  auto result = client_.buffer(*arena)->AuthResp(auth_resp);
+  auto builder = fuchsia_wlan_fullmac::wire::WlanFullmacImplAuthRespRequest::Builder(*arena);
+  // peer_sta_address
+  ::fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
+  std::memcpy(peer_sta_address.data(), resp->peer_sta_address, ETH_ALEN);
+  builder.peer_sta_address(peer_sta_address);
+
+  // result_code
+  builder.result_code(ConvertAuthResult(resp->result_code));
+
+  auto result = client_.buffer(*arena)->AuthResp(builder.Build());
 
   if (!result.ok()) {
     lerror("AuthResp failed FIDL error: %s", result.status_string());

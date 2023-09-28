@@ -29,9 +29,12 @@
 
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "fuchsia/wlan/fullmac/c/banjo.h"
+#include "src/connectivity/wlan/drivers/wlanif/test/test_bss.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
+
+constexpr uint8_t kPeerStaAddress[6] = {0xba, 0xbe, 0xfa, 0xce, 0x00, 0x00};
 
 std::pair<zx::channel, zx::channel> make_channel() {
   zx::channel local;
@@ -80,13 +83,32 @@ struct WlanifDeviceTest : public ::zxtest::Test,
   void QuerySpectrumManagementSupport(
       fdf::Arena& arena, QuerySpectrumManagementSupportCompleter::Sync& completer) override {}
   void StartScan(StartScanRequestView request, fdf::Arena& arena,
-                 StartScanCompleter::Sync& completer) override {}
+                 StartScanCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_scan_type(), true);
+    EXPECT_EQ(request->has_channels(), true);
+    EXPECT_EQ(request->has_min_channel_time(), true);
+    EXPECT_EQ(request->has_max_channel_time(), true);
+    completer.buffer(arena).Reply();
+  }
   void Connect(ConnectRequestView request, fdf::Arena& arena,
-               ConnectCompleter::Sync& completer) override {}
+               ConnectCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_selected_bss(), true);
+    EXPECT_EQ(request->has_auth_type(), true);
+    EXPECT_EQ(request->has_connect_failure_timeout(), true);
+    EXPECT_EQ(request->has_security_ie(), true);
+    completer.buffer(arena).Reply();
+  }
   void Reconnect(ReconnectRequestView request, fdf::Arena& arena,
-                 ReconnectCompleter::Sync& completer) override {}
+                 ReconnectCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_peer_sta_address(), true);
+    completer.buffer(arena).Reply();
+  }
   void AuthResp(AuthRespRequestView request, fdf::Arena& arena,
-                AuthRespCompleter::Sync& completer) override {}
+                AuthRespCompleter::Sync& completer) override {
+    EXPECT_EQ(request->has_peer_sta_address(), true);
+    EXPECT_EQ(request->has_result_code(), true);
+    completer.buffer(arena).Reply();
+  }
   void DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
                  DeauthReqCompleter::Sync& completer) override {}
   void AssocResp(AssocRespRequestView request, fdf::Arena& arena,
@@ -175,5 +197,40 @@ TEST_F(WlanifDeviceTest, OnLinkStateChangedOnlyCalledWhenStateChanges) {
   EXPECT_TRUE(link_state_changed_called_);
 }
 
+TEST_F(WlanifDeviceTest, CheckScanReq) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  const uint8_t chan_list[1] = {0x9};
+  const wlan_fullmac_impl_start_scan_request_t req = {.scan_type = WLAN_SCAN_TYPE_ACTIVE,
+                                                      .channels_list = chan_list,
+                                                      .channels_count = 1,
+                                                      .ssids_count = 0,
+                                                      .min_channel_time = 10,
+                                                      .max_channel_time = 100};
+  device_->StartScan(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckConnReq) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  const wlan_fullmac_impl_connect_request_t req = wlan_fullmac_test::CreateConnectReq();
+  device_->Connect(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckReconnReq) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_reconnect_request_t req;
+  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->Reconnect(&req);
+}
+
+TEST_F(WlanifDeviceTest, CheckAuthResp) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+  wlan_fullmac_impl_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
+  memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
+  device_->AuthenticateResp(&resp);
+}
 // TODO(fxb/121450) Add unit tests for other functions in wlanif::Device
 }  // namespace
