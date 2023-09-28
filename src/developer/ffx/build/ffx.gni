@@ -69,10 +69,7 @@ template("ffx") {
     }
 
     deps = ffx_deps
-    non_rust_deps = [
-      "//src/lib/chunked-compression",
-      "//third_party/boringssl",
-    ]
+    non_rust_deps = [ "//src/lib/chunked-compression" ]
     forward_variables_from(invoker,
                            "*",
                            [

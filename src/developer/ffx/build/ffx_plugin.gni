@@ -303,7 +303,6 @@ template("ffx_plugin") {
           configs += invoker.configs
         }
 
-        non_rust_deps = [ "//third_party/boringssl" ]
         disable_rustdoc = true
         forward_variables_from(invoker,
                                "*",
@@ -343,7 +342,6 @@ template("ffx_plugin") {
       sources = [ "$target_gen_dir/plugins.rs" ]
       deps = suite_deps
 
-      non_rust_deps = [ "//third_party/boringssl" ]
       forward_variables_from(invoker,
                              "*",
                              [
