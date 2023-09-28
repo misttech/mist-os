@@ -20,7 +20,6 @@ macro_rules! syscall_match {
                 $(
                     $(#[$match])?
                     crate::types::[<__NR_ $call>] => {
-                        profile_duration!(stringify!($call));
                         match syscall_match!(@call $current_task; $args; [<sys_ $call>][$num_args]) {
                             Ok(x) => Ok(SyscallResult::from(x)),
                             Err(err) => Err(err),

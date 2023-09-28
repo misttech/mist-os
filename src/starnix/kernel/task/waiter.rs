@@ -168,7 +168,6 @@ struct PortWaiter {
 impl PortWaiter {
     /// Internal constructor.
     fn new(ignore_signals: bool) -> Arc<Self> {
-        profile_duration!("NewPortWaiter");
         Arc::new(PortWaiter {
             port: zx::Port::create(),
             callbacks: Default::default(),
@@ -246,7 +245,6 @@ impl PortWaiter {
         current_task: &CurrentTask,
         deadline: zx::Time,
     ) -> Result<(), Errno> {
-        profile_duration!("WaiterWaitUntil");
         let is_waiting = deadline.into_nanos() > 0;
 
         let callback = || {
@@ -579,7 +577,6 @@ impl WaitQueue {
     ///
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     fn wait_async_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
-        profile_duration!("WaitAsyncEntry");
         let key = entry.key;
         self.0.waiters.lock().push(entry);
         let weak_self = Arc::downgrade(&self.0);
@@ -646,7 +643,6 @@ impl WaitQueue {
     }
 
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
-        profile_duration!("NotifyEventsCount");
         let mut woken = 0;
         Self::filter_waiters(&mut self.0.waiters.lock(), |entry| {
             if limit > 0 && entry.filter.intercept(&events) {

@@ -25,7 +25,6 @@ use fidl_fuchsia_ui_views as fuiviews;
 /// make the container. When we start the component, we run the run_component_features
 /// function.
 pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), Errno> {
-    let mut enabled_profiling = false;
     for entry in entries {
         let entry_type = entry.split_once(':').map(|(ty, _)| ty).unwrap_or(entry);
         match entry_type {
@@ -47,21 +46,10 @@ pub fn run_features(entries: &Vec<String>, kernel: &Arc<Kernel>) -> Result<(), E
                 start_perfetto_consumer_thread(kernel, socket_path.as_bytes())?;
             }
             "android_serialno" => {}
-            "self_profile" => {
-                enabled_profiling = true;
-                fuchsia_inspect::component::inspector().root().record_lazy_child(
-                    "self_profile",
-                    fuchsia_inspect_contrib::ProfileDuration::lazy_node_callback,
-                );
-                fuchsia_inspect_contrib::start_self_profiling();
-            }
             feature => {
                 log_warn!("Unsupported feature: {:?}", feature);
             }
         }
-    }
-    if !enabled_profiling {
-        fuchsia_inspect_contrib::stop_self_profiling();
     }
     Ok(())
 }

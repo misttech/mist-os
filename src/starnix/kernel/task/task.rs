@@ -2071,7 +2071,6 @@ impl CurrentTask {
         &mut self,
         syscall: &Syscall,
     ) -> Option<Result<SyscallResult, Errno>> {
-        profile_duration!("RunSeccompFilters");
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
         if self.seccomp_filter_state.get() == SeccompStateValue::Strict {

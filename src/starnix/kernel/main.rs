@@ -8,8 +8,6 @@
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 
 #[macro_use]
-extern crate fuchsia_inspect_contrib;
-#[macro_use]
 extern crate macro_rules_attribute;
 
 use crate::{
@@ -122,7 +120,7 @@ async fn main() -> Result<(), Error> {
     kill_job_on_panic::install_hook("\n\n\n\nSTARNIX KERNEL PANIC\n\n\n\n");
 
     let _inspect_server_task = inspect_runtime::publish(
-        fuchsia_inspect::component::init_inspector_with_size(1_000_000),
+        fuchsia_inspect::component::inspector(),
         inspect_runtime::PublishOptions::default(),
     );
     let mut health = fuchsia_inspect::component::health();

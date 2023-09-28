@@ -180,17 +180,14 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         options: MappingOptions,
         filename: NamespaceNode,
     ) -> Result<MappedVmo, Errno> {
-        profile_duration!("FileOpsDefaultMmap");
         trace_duration!(trace_category_starnix_mm!(), "FileOpsDefaultMmap");
         let min_vmo_size = (vmo_offset as usize)
             .checked_add(round_up_to_system_page_size(length)?)
             .ok_or(errno!(EINVAL))?;
         let mut vmo = if options.contains(MappingOptions::SHARED) {
-            profile_duration!("GetSharedVmo");
             trace_duration!(trace_category_starnix_mm!(), "GetSharedVmo");
             self.get_vmo(file, current_task, Some(min_vmo_size), prot_flags)?
         } else {
-            profile_duration!("GetPrivateVmo");
             trace_duration!(trace_category_starnix_mm!(), "GetPrivateVmo");
             // TODO(tbodt): Use PRIVATE_CLONE to have the filesystem server do the clone for us.
             let base_prot_flags = (prot_flags | ProtectionFlags::READ) - ProtectionFlags::WRITE;
@@ -209,7 +206,6 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         // Write guard is necessary only for shared mappings. Note that this doesn't depend on
         // `prot_flags` since these can be changed later with `mprotect()`.
         let file_write_guard = if options.contains(MappingOptions::SHARED) && file.can_write() {
-            profile_duration!("AcquireFileWriteGuard");
             let node = &file.name.entry.node;
             let mut state = node.write_guard_state.lock();
 

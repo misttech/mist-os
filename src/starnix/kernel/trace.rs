@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::ffi::CStr;
+
+#[cfg(not(feature = "disable_tracing"))]
+use fuchsia_trace::{category_enabled, cstr};
+#[cfg(not(feature = "disable_tracing"))]
+use fuchsia_zircon::{self as zx, Task as _};
+
 // The trace category used for starnix-related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
 
@@ -110,6 +117,80 @@ macro_rules! trace_duration_end {
         fuchsia_trace::duration_end!($category, $name $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
+    };
+}
+
+/// Zircon scheduler stats don't understand restricted vs. normal modes, so to compute the relative
+/// time between them we need to measure ourselves when switching into and out of restricted mode.
+pub(crate) struct TaskInfoDurationScope {
+    category: &'static CStr,
+    name: &'static CStr,
+    start_ticks: i64,
+    start_runtime: Option<zx::TaskRuntimeInfo>,
+}
+
+impl TaskInfoDurationScope {
+    pub fn start(category: &'static CStr, name: &'static CStr) -> Self {
+        let start_ticks = zx::ticks_get();
+        let start_runtime = if category_enabled(cstr!(trace_category_starnix_task_runtime!())) {
+            let start_runtime = fuchsia_runtime::thread_self().get_runtime_info().unwrap();
+            Some(start_runtime)
+        } else {
+            None
+        };
+
+        Self { category, name, start_runtime, start_ticks }
+    }
+
+    pub fn finish(self) {
+        if let Some(start_runtime) = self.start_runtime {
+            let zx::TaskRuntimeInfo { cpu_time, queue_time, page_fault_time, lock_contention_time } =
+                fuchsia_runtime::thread_self().get_runtime_info().unwrap() - start_runtime;
+            fuchsia_trace::complete_duration(
+                self.category,
+                self.name,
+                self.start_ticks,
+                &[
+                    fuchsia_trace::ArgValue::of(trace_arg_cpu_time!(), cpu_time),
+                    fuchsia_trace::ArgValue::of(trace_arg_queue_time!(), queue_time),
+                    fuchsia_trace::ArgValue::of(trace_arg_page_fault_time!(), page_fault_time),
+                    fuchsia_trace::ArgValue::of(
+                        trace_arg_lock_contention_time!(),
+                        lock_contention_time,
+                    ),
+                ],
+            );
+        } else {
+            fuchsia_trace::complete_duration(self.category, self.name, self.start_ticks, &[]);
+        }
+    }
+}
+
+macro_rules! trace_duration_begin_with_task_info {
+    ($category:expr, $name:expr) => {
+        if cfg!(not(feature = "disable_tracing")) {
+            let category = fuchsia_trace::cstr!($category);
+            if fuchsia_trace::category_enabled(category) {
+                Some(crate::trace::TaskInfoDurationScope::start(
+                    category,
+                    fuchsia_trace::cstr!($name),
+                ))
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    };
+}
+
+macro_rules! trace_duration_end_with_task_info {
+    ($start_info:expr) => {
+        if cfg!(not(feature = "disable_tracing")) {
+            if let Some(start_info) = $start_info {
+                crate::trace::TaskInfoDurationScope::finish(start_info);
+            }
+        }
     };
 }
 

@@ -204,7 +204,6 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<(), Errno> {
-        profile_duration!("InsertFd");
         let removed_entry;
         {
             let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
@@ -224,7 +223,6 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
-        profile_duration!("AddFd");
         let fd;
         let removed_entry;
         {
@@ -249,7 +247,6 @@ impl FdTable {
         target: TargetFdNumber,
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
-        profile_duration!("DuplicateFd");
         // Drop the removed entry only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
         let _removed_entry;
@@ -293,7 +290,6 @@ impl FdTable {
     }
 
     pub fn get_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-        profile_duration!("GetFdWithFlags");
         let inner = self.table.lock();
         let state = inner.map_handle.lock();
         state
@@ -312,7 +308,6 @@ impl FdTable {
     }
 
     pub fn close(&self, fd: FdNumber) -> Result<(), Errno> {
-        profile_duration!("CloseFile");
         // Drop the file object only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
         let removed = {
@@ -332,7 +327,6 @@ impl FdTable {
     }
 
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
-        profile_duration!("SetFdFlags");
         self.table
             .lock()
             .map_handle
@@ -349,7 +343,6 @@ impl FdTable {
     where
         F: Fn(FdNumber, &mut FdFlags) -> bool,
     {
-        profile_duration!("RetainFds");
         let mut doomed = vec![];
         self.table.lock().map_handle.lock().retain(|fd, entry| {
             if f(*fd, &mut entry.flags) {
