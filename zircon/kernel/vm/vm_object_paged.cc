@@ -1645,8 +1645,7 @@ zx_status_t VmObjectPaged::ReadUser(user_out_ptr<char> ptr, uint64_t offset, siz
     if (copy_result.fault_info.has_value()) {
       zx_status_t result;
       guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
-        VmAspace* current_aspace = Thread::Current::Get()->aspace();
-        result = current_aspace->SoftFault(info.pf_va, info.pf_flags);
+        result = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
       });
       // If we handled the fault, tell the upper level to try again.
       return result == ZX_OK ? ZX_ERR_SHOULD_WAIT : result;
@@ -1696,8 +1695,7 @@ zx_status_t VmObjectPaged::WriteUser(user_in_ptr<const char> ptr, uint64_t offse
     if (copy_result.fault_info.has_value()) {
       zx_status_t result;
       guard->CallUnlocked([&info = *copy_result.fault_info, &result] {
-        VmAspace* current_aspace = Thread::Current::Get()->aspace();
-        result = current_aspace->SoftFault(info.pf_va, info.pf_flags);
+        result = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
       });
       // If we handled the fault, tell the upper level to try again.
       return result == ZX_OK ? ZX_ERR_SHOULD_WAIT : result;

@@ -159,6 +159,9 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // SoftFault that will only resolve a potential missing access flag and nothing else.
   zx_status_t AccessedFault(vaddr_t va);
 
+  // Page fault routine. Should only be called by the hypervisor or by Thread::Current::Fault.
+  zx_status_t PageFault(vaddr_t va, uint flags);
+
   // Convenience method for traversing the tree of VMARs to find the deepest
   // VMAR in the tree that includes *va*.
   // Returns nullptr if the aspace has been destroyed or is not yet initialized.
@@ -196,11 +199,12 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   bool IsHighMemoryPriority() const;
 
  protected:
-  // Share the aspace lock with VmAddressRegion/VmMapping so they can serialize
+  // Share the aspace lock with VmAddressRegion/VmMapping/GuestPhysicalAspace so they can serialize
   // changes to the aspace.
   friend class VmAddressRegionOrMapping;
   friend class VmAddressRegion;
   friend class VmMapping;
+  friend class hypervisor::GuestPhysicalAspace;
   Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
   Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
@@ -264,11 +268,6 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   }
 
   fbl::RefPtr<VmAddressRegion> RootVmarLocked() TA_REQ(lock_);
-
-  // internal page fault routine, friended to be only called by vmm_page_fault_handler
-  zx_status_t PageFault(vaddr_t va, uint flags);
-  friend zx_status_t vmm_page_fault_handler(vaddr_t va, uint flags);
-  friend class hypervisor::GuestPhysicalAspace;
 
   // magic
   fbl::Canary<fbl::magic("VMAS")> canary_;

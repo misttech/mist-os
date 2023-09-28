@@ -531,7 +531,7 @@ void VmAspace::AttachToThread(Thread* t) {
   Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
 
   // not prepared to handle setting a new address space or one on a running thread
-  DEBUG_ASSERT(!t->aspace());
+  DEBUG_ASSERT(!t->active_aspace());
   DEBUG_ASSERT(t->state() != THREAD_RUNNING);
 
   t->switch_aspace(this);
@@ -754,7 +754,7 @@ void VmAspace::MarkAsLatencySensitive() {
     // TODO(fxb/101641): Need a better mechanism than checking for the process name here. See
     // fxbug.dev/85056 for more context.
     char name[ZX_MAX_NAME_LEN];
-    if (Thread::Current::Get()->aspace() != this) {
+    if (Thread::Current::Get()->active_aspace() != this) {
       return;
     }
     ProcessDispatcher* up = ProcessDispatcher::GetCurrent();

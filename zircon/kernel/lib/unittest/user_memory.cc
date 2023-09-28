@@ -8,6 +8,8 @@
 #include <lib/unittest/unittest.h>
 #include <lib/unittest/user_memory.h>
 
+#include <object/process_dispatcher.h>
+
 namespace testing {
 
 UserMemory::~UserMemory() {
@@ -17,7 +19,7 @@ UserMemory::~UserMemory() {
 
 // static
 ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo,
-                                                       fbl::RefPtr<VmAspace> &aspace, uint8_t tag) {
+                                                       fbl::RefPtr<VmAspace>& aspace, uint8_t tag) {
   size_t size = vmo->size();
 
   DEBUG_ASSERT(aspace);
@@ -55,7 +57,11 @@ ktl::unique_ptr<UserMemory> UserMemory::CreateInAspace(fbl::RefPtr<VmObject> vmo
 
 // static
 ktl::unique_ptr<UserMemory> UserMemory::Create(fbl::RefPtr<VmObject> vmo, uint8_t tag) {
-  fbl::RefPtr<VmAspace> aspace(Thread::Current::Get()->aspace());
+  // active_aspace should always return the normal aspace as this is only run in the unittests,
+  // which do not run threads in restricted mode. We assert this to be true by checking that the
+  // restricted state is not set on this thread.
+  DEBUG_ASSERT(!Thread::Current::restricted_state());
+  fbl::RefPtr<VmAspace> aspace(Thread::Current::Get()->active_aspace());
   DEBUG_ASSERT(aspace);
 
   return CreateInAspace(ktl::move(vmo), aspace, tag);

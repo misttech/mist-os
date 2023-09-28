@@ -284,7 +284,6 @@ void FutexContext::ShrinkFutexStatePool() {
   }
 }
 
-
 // NullableDispatcherGuard is a mutex guard type.  Its purpose is to allow the use of clang
 // thread-safety static analysis in situations where we have a (possibly null) pointer to a
 // ThreadDispatcher that we want to lock, but only when the pointer is non-null.  When the pointer
@@ -388,7 +387,7 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
         guard.Release();
         preempt_disabler.Enable();
         if (auto fault = copy_result.fault_info) {
-          result = Thread::Current::Get()->aspace()->SoftFault(fault->pf_va, fault->pf_flags);
+          result = Thread::Current::SoftFault(fault->pf_va, fault->pf_flags);
           if (result != ZX_OK) {
             return result;
           }
@@ -687,7 +686,7 @@ zx_status_t FutexContext::FutexRequeue(user_in_ptr<const zx_futex_t> wake_ptr, u
       futex_guards.Release();
       eager_resched_disabler.Enable();
       if (auto fault = copy_result.fault_info) {
-        result = Thread::Current::Get()->aspace()->SoftFault(fault->pf_va, fault->pf_flags);
+        result = Thread::Current::SoftFault(fault->pf_va, fault->pf_flags);
         if (result != ZX_OK) {
           return result;
         }

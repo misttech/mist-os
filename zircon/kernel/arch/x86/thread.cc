@@ -103,7 +103,7 @@ static void x86_context_switch_spec_mitigations(Thread* oldthread, Thread* newth
   // Only overwrite/fill if the prior thread was a user thread or if we're on CPUs vulnerable to
   // RSB underflow attacks.
   if (x86_cpu_should_ras_fill_on_ctxt_switch() &&
-      (oldthread->aspace() || x86_cpu_vulnerable_to_rsb_underflow())) {
+      (oldthread->active_aspace() || x86_cpu_vulnerable_to_rsb_underflow())) {
     x86_ras_fill();
   }
   auto* const percpu = x86_get_percpu();
@@ -114,14 +114,14 @@ static void x86_context_switch_spec_mitigations(Thread* oldthread, Thread* newth
   //    on this core.
   // TODO(fxbug.dev/39621): Handle aspace* reuse.
   if (x86_cpu_should_ibpb_on_ctxt_switch() &&
-      (((oldthread->aspace() && newthread->aspace()) &&
-        (oldthread->aspace() != newthread->aspace())) ||
-       ((!oldthread->aspace() && newthread->aspace()) &&
-        (percpu->last_user_aspace != newthread->aspace())))) {
+      (((oldthread->active_aspace() && newthread->active_aspace()) &&
+        (oldthread->active_aspace() != newthread->active_aspace())) ||
+       ((!oldthread->active_aspace() && newthread->active_aspace()) &&
+        (percpu->last_user_aspace != newthread->active_aspace())))) {
     arch::IssueIbpb(arch::BootCpuidIo{}, hwreg::X86MsrIo{});
   }
-  if (oldthread->aspace() && !newthread->aspace()) {
-    percpu->last_user_aspace = oldthread->aspace();
+  if (oldthread->active_aspace() && !newthread->active_aspace()) {
+    percpu->last_user_aspace = oldthread->active_aspace();
   }
 }
 

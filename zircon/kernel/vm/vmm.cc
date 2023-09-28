@@ -55,7 +55,7 @@ zx_status_t vmm_accessed_fault_handler(vaddr_t addr) {
     return ZX_ERR_NOT_FOUND;
   }
 
-  const zx_status_t status = current_thread->aspace()->AccessedFault(addr);
+  const zx_status_t status = Thread::Current::AccessedFault(addr);
 
   KTRACE_COMPLETE("kernel:vm", "access_fault", start_time, ("vaddr", ktrace::Pointer{addr}));
 
@@ -85,7 +85,7 @@ zx_status_t vmm_page_fault_handler(vaddr_t addr, uint flags) {
   }
 
   // page fault it
-  zx_status_t status = current_thread->aspace()->PageFault(addr, flags);
+  zx_status_t status = Thread::Current::PageFault(addr, flags);
 
   // If we get this, then all checks passed but we were interrupted or killed while waiting for the
   // request to be fulfilled. Pretend the fault was successful and let the thread re-fault after it
@@ -107,7 +107,7 @@ static void vmm_set_active_aspace_internal(VmAspace* aspace, Lock lock) {
   Thread* t = Thread::Current::Get();
   DEBUG_ASSERT(t);
 
-  if (aspace == t->aspace()) {
+  if (aspace == t->active_aspace()) {
     return;
   }
 
@@ -115,7 +115,7 @@ static void vmm_set_active_aspace_internal(VmAspace* aspace, Lock lock) {
   GuardType lock_guard{lock, SOURCE_TAG};
 
   VmAspace* old = t->switch_aspace(aspace);
-  vmm_context_switch(old, t->aspace());
+  vmm_context_switch(old, t->active_aspace());
 }
 
 void vmm_set_active_aspace(VmAspace* aspace) {
@@ -214,7 +214,7 @@ static int cmd_vmm(int argc, const cmd_args* argv, uint32_t flags) {
       test_aspace = nullptr;
     }
 
-    if (Thread::Current::Get()->aspace() == aspace.get()) {
+    if (Thread::Current::Get()->active_aspace() == aspace.get()) {
       Thread::Current::Get()->switch_aspace(nullptr);
       Thread::Current::Sleep(1);  // hack
     }

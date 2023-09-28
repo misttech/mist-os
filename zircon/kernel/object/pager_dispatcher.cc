@@ -233,8 +233,6 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(fbl::RefPtr<VmObject> vmo, uint64_
         return ZX_ERR_NEXT;
       };
 
-  VmAspace* current_aspace = Thread::Current::Get()->aspace();
-
   // Enumerate dirty ranges with |copy_to_buffer|. If page faults are captured, resolve them and
   // retry enumeration.
   zx_status_t status = ZX_OK;
@@ -244,7 +242,7 @@ zx_status_t PagerDispatcher::QueryDirtyRanges(fbl::RefPtr<VmObject> vmo, uint64_
     // captured. Resolve the fault and then attempt the enumeration again.
     if (status == ZX_ERR_SHOULD_WAIT) {
       DEBUG_ASSERT(info.captured_fault_info);
-      zx_status_t fault_status = current_aspace->SoftFault(info.pf_va, info.pf_flags);
+      zx_status_t fault_status = Thread::Current::SoftFault(info.pf_va, info.pf_flags);
       if (fault_status != ZX_OK) {
         return ZX_ERR_INVALID_ARGS;
       }
@@ -292,8 +290,6 @@ zx_status_t PagerDispatcher::QueryPagerVmoStats(fbl::RefPtr<VmObject> vmo, uint3
     return status;
   }
 
-  VmAspace* current_aspace = Thread::Current::Get()->aspace();
-
   do {
     UserCopyCaptureFaultsResult copy_result =
         buffer.reinterpret<zx_pager_vmo_stats_t>().copy_to_user_capture_faults(stats);
@@ -302,7 +298,7 @@ zx_status_t PagerDispatcher::QueryPagerVmoStats(fbl::RefPtr<VmObject> vmo, uint3
     }
     DEBUG_ASSERT(copy_result.fault_info.has_value());
     zx_status_t fault_status =
-        current_aspace->SoftFault(copy_result.fault_info->pf_va, copy_result.fault_info->pf_flags);
+        Thread::Current::SoftFault(copy_result.fault_info->pf_va, copy_result.fault_info->pf_flags);
     if (fault_status != ZX_OK) {
       return ZX_ERR_INVALID_ARGS;
     }

@@ -1228,8 +1228,8 @@ void Scheduler::RescheduleCommon(SchedTime now, EndTraceCallback end_outer_trace
     current_thread->CallContextSwitchFnLocked();
     next_thread->CallContextSwitchFnLocked();
 
-    if (current_thread->aspace() != next_thread->aspace()) {
-      vmm_context_switch(current_thread->aspace(), next_thread->aspace());
+    if (current_thread->active_aspace() != next_thread->active_aspace()) {
+      vmm_context_switch(current_thread->active_aspace(), next_thread->active_aspace());
     }
 
     CPU_STATS_INC(context_switches);

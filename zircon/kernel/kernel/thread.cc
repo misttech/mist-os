@@ -213,6 +213,43 @@ static void free_thread_resources(Thread* t) {
   }
 }
 
+zx_status_t Thread::Current::Fault(Thread::Current::FaultType type, vaddr_t va, uint flags) {
+  if (is_kernel_address(va)) {
+    // Kernel addresses should never fault.
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  // If this thread is a kernel thread, then it must be running a unit test that set `aspace_`
+  // explicitly, so use `aspace_` to resolve the fault.
+  //
+  // If this is a user thread in restricted mode, then `aspace_` is set to the restricted address
+  // space and should be used to resolve the fault.
+  //
+  // Otherwise, this is a user thread running in normal mode. Therefore, we must consult the
+  // process' aspace_at function to resolve the fault.
+  Thread* t = Thread::Current::Get();
+  VmAspace* containing_aspace;
+  bool in_restricted = t->restricted_state_ && t->restricted_state_->in_restricted();
+  if (!t->user_thread_ || in_restricted) {
+    containing_aspace = t->aspace_;
+  } else {
+    containing_aspace = t->user_thread_->process()->aspace_at(va);
+  }
+
+  // Call the appropriate fault function on the containing address space.
+  switch (type) {
+    case Thread::Current::FaultType::PageFault:
+      return containing_aspace->PageFault(va, flags);
+    case Thread::Current::FaultType::SoftFault:
+      return containing_aspace->SoftFault(va, flags);
+    case Thread::Current::FaultType::AccessedFault:
+      DEBUG_ASSERT(flags == 0);
+      return containing_aspace->AccessedFault(va);
+  }
+  // This should be unreachable, and is here mainly to satisfy GCC.
+  return ZX_ERR_NOT_FOUND;
+}
+
 void Thread::Trampoline() {
   // Release the incoming lock held across reschedule.
   Scheduler::LockHandoff();

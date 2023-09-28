@@ -906,7 +906,7 @@ static bool vmo_demand_paged_map_test() {
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
   ASSERT_NONNULL(aspace, "VmAspace::Create pointer");
 
-  VmAspace* old_aspace = Thread::Current::Get()->aspace();
+  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
   auto cleanup_aspace = fit::defer([&]() {
     vmm_set_active_aspace(old_aspace);
     ASSERT(aspace->Destroy() == ZX_OK);
@@ -2975,7 +2975,7 @@ static bool vmo_discard_failure_test() {
   fbl::RefPtr<VmAspace> aspace = VmAspace::Create(VmAspace::Type::User, "test aspace");
   ASSERT_NONNULL(aspace);
 
-  VmAspace* old_aspace = Thread::Current::Get()->aspace();
+  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
   auto cleanup_aspace = fit::defer([&]() {
     vmm_set_active_aspace(old_aspace);
     ASSERT(aspace->Destroy() == ZX_OK);

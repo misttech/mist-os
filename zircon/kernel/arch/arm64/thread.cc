@@ -107,7 +107,7 @@ static void arm64_context_switch_spec_mitigations(Thread* oldthread, Thread* new
   // 2b)    the old address space is not nullptr (not a kernel thread).
   //        If the old thread is a kernel thread, it can be trusted not to attack userspace
   if (arm64_read_percpu_ptr()->should_invalidate_bp_on_context_switch &&
-      ((oldthread->aspace() != newthread->aspace()) && oldthread->aspace())) {
+      ((oldthread->active_aspace() != newthread->active_aspace()) && oldthread->active_aspace())) {
     arm64_uarch_do_spectre_v2_mitigation();
   }
 }

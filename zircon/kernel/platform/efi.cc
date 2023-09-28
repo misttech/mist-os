@@ -248,7 +248,7 @@ EfiServicesActivation TryActivateEfiServices() {
   ZX_DEBUG_ASSERT(gEfiSystemTable);
 
   // Switch into the address space where EFI services have been mapped.
-  VmAspace* old_aspace = Thread::Current::Get()->aspace();
+  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
   PanicFriendlySwitchAspace(efi_aspace.get());
 
   // Return the services.
