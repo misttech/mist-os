@@ -5,17 +5,17 @@
 library fuchsia.serial;
 
 extend uint fuchsia.BIND_PROTOCOL {
-  DEVICE = 87,
-  IMPL = 88,
-  IMPL_ASYNC = 125,
+  DEVICE = 0x57,
+  IMPL = 0x58,
+  IMPL_ASYNC = 0x7D,
 };
 
 extend uint fuchsia.BIND_SERIAL_CLASS {
-  GENERIC = 1,
+  GENERIC = 0x01,
   // A Bluetooth host controller
-  BLUETOOTH_HCI = 2,
+  BLUETOOTH_HCI = 0x02,
   // An interactive console
-  CONSOLE = 3,
+  CONSOLE = 0x03,
   // Kernel debug serial
-  KERNEL_DEBUG = 4,
+  KERNEL_DEBUG = 0x04,
 };
