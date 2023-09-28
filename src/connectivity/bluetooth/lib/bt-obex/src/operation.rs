@@ -395,7 +395,6 @@ decodable_enum! {
 pub type ResponsePacket = Packet<ResponseCode>;
 
 impl ResponsePacket {
-    #[cfg(test)]
     pub fn new_no_data(code: ResponseCode, headers: HeaderSet) -> Self {
         Self::new(code, vec![], headers)
     }

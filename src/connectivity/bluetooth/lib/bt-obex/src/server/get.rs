@@ -4,11 +4,13 @@
 
 use packet_encoding::Encodable;
 use std::collections::VecDeque;
-use tracing::warn;
+use tracing::{trace, warn};
 
 use crate::error::Error;
 use crate::header::{Header, HeaderSet};
 use crate::operation::{OpCode, RequestPacket, ResponseCode, ResponsePacket};
+use crate::server::handler::ObexOperationError;
+use crate::server::{ApplicationResponse, OperationRequest, ServerOperation};
 
 /// All Body & EndOfBody headers have 3 bytes (1 byte HI, 2 bytes Length) preceding the payload.
 const BODY_HEADER_PREFIX_LENGTH_BYTES: usize = 3;
@@ -29,6 +31,10 @@ struct StagedData {
 impl StagedData {
     fn new(first: Option<Vec<u8>>, rest: VecDeque<Vec<u8>>) -> Self {
         Self { first: Some(first), rest }
+    }
+
+    fn empty() -> Self {
+        Self { first: None, rest: VecDeque::new() }
     }
 
     /// Builds and stages the `data` into chunks of Headers (Body/EndOfBody) that conform to the
@@ -160,16 +166,6 @@ enum State {
     Complete,
 }
 
-/// Represents an action to be taken in the operation.
-#[derive(Debug)]
-pub enum Action {
-    /// Send a response packet to the remote peer (OBEX client).
-    SendPacket(ResponsePacket),
-    /// Ask the application to accept or reject the request for the payload.
-    /// The `HeaderSet` describes the object to be retrieved.
-    GetApplicationData(HeaderSet),
-}
-
 /// Represents an in-progress GET operation.
 pub struct GetOperation {
     /// The maximum number of bytes that can be allocated to headers in the GetOperation. This
@@ -191,11 +187,6 @@ impl GetOperation {
         Self { max_headers_size, state }
     }
 
-    /// Returns true if the operation is complete (e.g. all response packets have been sent).
-    pub fn is_complete(&self) -> bool {
-        matches!(self.state, State::Complete)
-    }
-
     fn check_complete_and_update_state(&mut self) {
         let State::Response { ref staged_data } = &self.state else {
             return
@@ -205,17 +196,20 @@ impl GetOperation {
             self.state = State::Complete;
         }
     }
+}
 
-    /// Handles a request packet received from the remote OBEX client.
-    /// On success, returns an `Action` to be taken by the local OBEX server.
-    /// Returns Error if the `request` couldn't be handled or was invalid.
-    pub fn handle_request(&mut self, request: RequestPacket) -> Result<Action, Error> {
+impl ServerOperation for GetOperation {
+    fn is_complete(&self) -> bool {
+        matches!(self.state, State::Complete)
+    }
+
+    fn handle_peer_request(&mut self, request: RequestPacket) -> Result<OperationRequest, Error> {
         let code = *request.code();
         match &mut self.state {
             State::Request { ref mut headers } if code == OpCode::Get => {
                 headers.try_append(HeaderSet::from(request))?;
                 let response = ResponsePacket::new_get(ResponseCode::Continue, HeaderSet::new());
-                Ok(Action::SendPacket(response))
+                Ok(OperationRequest::SendPacket(response))
             }
             State::Request { ref mut headers } if code == OpCode::GetFinal => {
                 headers.try_append(HeaderSet::from(request))?;
@@ -223,44 +217,59 @@ impl GetOperation {
                 // Received the final request packet. The set of request headers is considered
                 // complete and we are ready to ask the application for the payload.
                 self.state = State::RequestPhaseComplete;
-                Ok(Action::GetApplicationData(request_headers))
+                Ok(OperationRequest::GetApplicationData(request_headers))
             }
             State::Response { ref mut staged_data } if code == OpCode::GetFinal => {
                 let (code, body_header) = staged_data.next_response()?;
                 let response = ResponsePacket::new_get(code, HeaderSet::from_header(body_header)?);
                 self.check_complete_and_update_state();
-                Ok(Action::SendPacket(response))
+                Ok(OperationRequest::SendPacket(response))
             }
             _ => Err(Error::operation(OpCode::Get, "received invalid request")),
         }
     }
 
-    /// Starts the response phase of the GET operation.
-    /// Returns the first response packet to be sent to the remote peer. There may be
-    /// more response packets which will be processed in subsequent `handle_request` calls.
-    /// Returns Error if the `data` couldn't be processed or the response could not be built.
-    pub fn start_response_phase(
+    fn handle_application_response(
         &mut self,
-        data: Vec<u8>,
-        mut response_headers: HeaderSet,
+        response: Result<ApplicationResponse, ObexOperationError>,
     ) -> Result<ResponsePacket, Error> {
         if !matches!(self.state, State::RequestPhaseComplete) {
             return Err(Error::operation(OpCode::Get, "invalid state"));
         }
 
-        // Potentially split the user data payload into chunks to be sent over multiple response
-        // packets. Grab the first packet and stage the rest.
-        let mut staged_data =
-            StagedData::from_data(data, self.max_headers_size, response_headers.encoded_len())?;
-        let (code, body_header) = staged_data.first_response()?;
-        self.state = State::Response { staged_data };
-        self.check_complete_and_update_state();
+        let response = match response {
+            Ok(ApplicationResponse::Get((data, mut response_headers))) => {
+                // Potentially split the user data payload into chunks to be sent over multiple response
+                // packets. Grab the first packet and stage the rest.
+                let mut staged_data = StagedData::from_data(
+                    data,
+                    self.max_headers_size,
+                    response_headers.encoded_len(),
+                )?;
+                let (code, body_header) = staged_data.first_response()?;
+                self.state = State::Response { staged_data };
 
-        // Update the header set and build the response packet.
-        if let Some(header) = body_header {
-            response_headers.add(header)?;
-        }
-        Ok(ResponsePacket::new_get(code, response_headers))
+                // Update the header set and build the response packet.
+                if let Some(header) = body_header {
+                    response_headers.add(header)?;
+                }
+                ResponsePacket::new_get(code, response_headers)
+            }
+            Ok(ApplicationResponse::Put) => {
+                return Err(Error::operation(
+                    OpCode::Get,
+                    "invalid application response to GET request",
+                ));
+            }
+            Err((code, response_headers)) => {
+                trace!("Application rejected GET request: {code:?}");
+                self.state = State::Response { staged_data: StagedData::empty() };
+                ResponsePacket::new_get(code, response_headers)
+            }
+        };
+
+        self.check_complete_and_update_state();
+        Ok(response)
     }
 }
 
@@ -282,17 +291,17 @@ mod tests {
 
     #[track_caller]
     fn expect_packet_with_body(
-        action: Action,
+        operation_request: OperationRequest,
         final_: bool,
         expected_code: ResponseCode,
         expected_body: Vec<u8>,
     ) {
-        let body = if let Action::SendPacket(packet) = action {
+        let body = if let OperationRequest::SendPacket(packet) = operation_request {
             assert_eq!(*packet.code(), expected_code);
             let mut h = HeaderSet::from(packet);
             h.remove_body(final_).expect("contains body")
         } else {
-            panic!("Expected send packet, got: {:?}", action);
+            panic!("Expected send packet, got: {:?}", operation_request);
         };
         assert_eq!(body, expected_body);
     }
@@ -306,17 +315,18 @@ mod tests {
         // First (and final) request with informational headers.
         let headers = HeaderSet::from_header(Header::name("default")).unwrap();
         let request = RequestPacket::new_get_final(headers);
-        let response1 = operation.handle_request(request).expect("valid request");
+        let response1 = operation.handle_peer_request(request).expect("valid request");
         assert_matches!(response1,
-            Action::GetApplicationData(headers)
+            OperationRequest::GetApplicationData(headers)
             if headers.contains_header(&HeaderIdentifier::Name)
         );
 
         // Application provides the payload. Since the entire payload can fit in a single packet,
         // we expect the operation to be complete after it is returned.
         let payload = bytes(0, 25);
-        let response2 =
-            operation.start_response_phase(payload, HeaderSet::new()).expect("valid request");
+        let response2 = operation
+            .handle_application_response(ApplicationResponse::accept_get(payload, HeaderSet::new()))
+            .expect("valid request");
         assert_eq!(*response2.code(), ResponseCode::Ok);
         let mut received_headers = HeaderSet::from(response2);
         let received_body = received_headers.remove_body(/*final_=*/ true).expect("contains body");
@@ -333,17 +343,17 @@ mod tests {
         // First request provides informational headers. Expect a positive ack to the request.
         let headers1 = HeaderSet::from_header(Header::name("foo".into())).unwrap();
         let request1 = RequestPacket::new_get(headers1);
-        let response1 = operation.handle_request(request1).expect("valid request");
-        assert_matches!(response1, Action::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
+        let response1 = operation.handle_peer_request(request1).expect("valid request");
+        assert_matches!(response1, OperationRequest::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
 
         // Second and final request provides informational headers. Expect to ask the profile
         // application for the user data payload. The received informational headers should be
         // relayed.
         let headers2 = HeaderSet::from_header(Header::Type("text/x-vCard".into())).unwrap();
         let request2 = RequestPacket::new_get_final(headers2);
-        let response2 = operation.handle_request(request2).expect("valid request");
+        let response2 = operation.handle_peer_request(request2).expect("valid request");
         assert_matches!(response2,
-            Action::GetApplicationData(headers)
+            OperationRequest::GetApplicationData(headers)
             if headers.contains_header(&HeaderIdentifier::Name)
             && headers.contains_header(&HeaderIdentifier::Type)
         );
@@ -356,8 +366,9 @@ mod tests {
         let payload = bytes(0, 200);
         let response_headers =
             HeaderSet::from_header(Header::Description("random payload".into())).unwrap();
-        let response_packet3 =
-            operation.start_response_phase(payload, response_headers).expect("valid request");
+        let response_packet3 = operation
+            .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
+            .expect("valid request");
         assert_eq!(*response_packet3.code(), ResponseCode::Continue);
         let mut received_headers = HeaderSet::from(response_packet3);
         assert!(received_headers.contains_header(&HeaderIdentifier::Description));
@@ -370,7 +381,7 @@ mod tests {
         let expected_bytes = vec![bytes(11, 55), bytes(55, 99), bytes(99, 143), bytes(143, 187)];
         for expected in expected_bytes {
             let request = RequestPacket::new_get_final(HeaderSet::new());
-            let response = operation.handle_request(request).expect("valid request");
+            let response = operation.handle_peer_request(request).expect("valid request");
             expect_packet_with_body(
                 response,
                 /*final_=*/ false,
@@ -381,19 +392,35 @@ mod tests {
 
         // Final packet and the operation is complete.
         let request4 = RequestPacket::new_get_final(HeaderSet::new());
-        let response4 = operation.handle_request(request4).expect("valid request");
+        let response4 = operation.handle_peer_request(request4).expect("valid request");
         expect_packet_with_body(response4, /*final=*/ true, ResponseCode::Ok, bytes(187, 200));
         assert!(operation.is_complete());
     }
 
     #[fuchsia::test]
-    fn application_response_error() {
+    fn application_rejects_request_success() {
+        let mut operation = GetOperation::new_at_state(10, State::RequestPhaseComplete);
+        let headers =
+            HeaderSet::from_header(Header::Description("not allowed today".into())).unwrap();
+        let response_packet = operation
+            .handle_application_response(Err((ResponseCode::Forbidden, headers)))
+            .expect("rejection is ok");
+        assert_eq!(*response_packet.code(), ResponseCode::Forbidden);
+        assert!(response_packet.headers().contains_header(&HeaderIdentifier::Description));
+        assert!(operation.is_complete());
+    }
+
+    #[fuchsia::test]
+    fn handle_application_response_error() {
         let max_packet_size = 15;
         // Receiving the application response before the request phase is complete is an Error.
         let mut operation = GetOperation::new(max_packet_size);
         let data = vec![1, 2, 3];
         assert_matches!(
-            operation.start_response_phase(data, HeaderSet::new()),
+            operation.handle_application_response(ApplicationResponse::accept_get(
+                data,
+                HeaderSet::new()
+            )),
             Err(Error::OperationError { .. })
         );
     }
@@ -403,13 +430,13 @@ mod tests {
         let mut operation = GetOperation::new(50);
         let random_request1 = RequestPacket::new_put(HeaderSet::new());
         assert_matches!(
-            operation.handle_request(random_request1),
+            operation.handle_peer_request(random_request1),
             Err(Error::OperationError { .. })
         );
 
         let random_request2 = RequestPacket::new_disconnect(HeaderSet::new());
         assert_matches!(
-            operation.handle_request(random_request2),
+            operation.handle_peer_request(random_request2),
             Err(Error::OperationError { .. })
         );
     }
@@ -422,20 +449,20 @@ mod tests {
         // Error.
         let mut operation1 = GetOperation::new_at_state(10, State::RequestPhaseComplete);
         let request1 = RequestPacket::new_get(random_headers.clone());
-        let response1 = operation1.handle_request(request1);
+        let response1 = operation1.handle_peer_request(request1);
         assert_matches!(response1, Err(Error::OperationError { .. }));
 
         // Receiving a GET request when the operation is complete is an Error.
         let mut operation2 = GetOperation::new_at_state(10, State::Complete);
         let request2 = RequestPacket::new_get(random_headers.clone());
-        let response2 = operation2.handle_request(request2);
+        let response2 = operation2.handle_peer_request(request2);
         assert_matches!(response2, Err(Error::OperationError { .. }));
 
         // Receiving a non-GETFINAL request in the response phase is an Error.
         let staged_data = StagedData { first: None, rest: VecDeque::from(vec![vec![1, 2, 3]]) };
         let mut operation3 = GetOperation::new_at_state(10, State::Response { staged_data });
         let request3 = RequestPacket::new_get(random_headers);
-        let response3 = operation3.handle_request(request3);
+        let response3 = operation3.handle_peer_request(request3);
         assert_matches!(response3, Err(Error::OperationError { .. }));
     }
 

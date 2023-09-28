@@ -50,6 +50,14 @@ pub trait ObexServerHandler {
     /// Returns `Err` with a rejection code and optional headers if rejected.
     async fn get(&mut self, headers: HeaderSet) -> ObexResult<(Vec<u8>, HeaderSet)>;
 
+    /// A request to put data in the local OBEX server.
+    /// `data` is the payload to be written.
+    /// `headers` are the informational headers provided by the remote OBEX client that describe
+    /// the payload.
+    /// Returns `Ok` if accepted.
+    /// Returns `Err` with a rejection code and optional headers if rejected.
+    async fn put(&mut self, data: Vec<u8>, headers: HeaderSet) -> ObexResult<()>;
+
     // TODO(fxbug.dev/125307): Add other operation types.
 }
 
@@ -64,6 +72,8 @@ pub(crate) mod test_utils {
     struct TestApplicationProfileInner {
         generic_response: Option<ObexResult<HeaderSet>>,
         get_response: Option<Result<(Vec<u8>, HeaderSet), ObexOperationError>>,
+        put_response: Option<Result<(), ObexOperationError>>,
+        received_put_data: Option<(Vec<u8>, HeaderSet)>,
     }
 
     #[derive(Clone)]
@@ -82,6 +92,14 @@ pub(crate) mod test_utils {
 
         pub fn set_get_response(&self, response: (Vec<u8>, HeaderSet)) {
             (*self.inner.lock()).get_response = Some(Ok(response));
+        }
+
+        pub fn set_put_response(&self, response: ObexResult<()>) {
+            (*self.inner.lock()).put_response = Some(response);
+        }
+
+        pub fn put_data(&self) -> (Vec<u8>, HeaderSet) {
+            (*self.inner.lock()).received_put_data.take().expect("expect data")
         }
     }
 
@@ -123,6 +141,15 @@ pub(crate) mod test_utils {
             self.inner
                 .lock()
                 .get_response
+                .take()
+                .unwrap_or(Err((ResponseCode::NotImplemented, HeaderSet::new())))
+        }
+
+        async fn put(&mut self, data: Vec<u8>, headers: HeaderSet) -> ObexResult<()> {
+            let mut inner = self.inner.lock();
+            inner.received_put_data = Some((data, headers));
+            inner
+                .put_response
                 .take()
                 .unwrap_or(Err((ResponseCode::NotImplemented, HeaderSet::new())))
         }

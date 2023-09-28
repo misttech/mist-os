@@ -47,6 +47,7 @@ rustc_library("bt-obex") {
     "src/server/get.rs",
     "src/server/handler.rs",
     "src/server/mod.rs",
+    "src/server/put.rs",
     "src/transport.rs",
   ]
 

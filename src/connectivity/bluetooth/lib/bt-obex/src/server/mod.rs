@@ -17,11 +17,72 @@ pub use crate::transport::TransportType;
 /// Defines an interface for handling OBEX requests. All profiles & services should implement this
 /// interface.
 mod handler;
-pub use handler::ObexServerHandler;
+pub use handler::{ObexOperationError, ObexServerHandler};
 
 /// Implements the OBEX GET operation.
 mod get;
-use get::{Action, GetOperation};
+use get::GetOperation;
+
+/// Implements the OBEX PUT operation.
+mod put;
+use put::PutOperation;
+
+/// Represents a request to be handled by the OBEX Server during a multi-step operation.
+#[derive(Debug)]
+pub enum OperationRequest {
+    /// Request to send a response packet to the remote peer.
+    SendPacket(ResponsePacket),
+    /// Request to get the payload from the upper layer application -- occurs in a GET operation.
+    GetApplicationData(HeaderSet),
+    /// Request to give the payload to the upper layer application -- occurs in a PUT operation.
+    PutApplicationData(Vec<u8>, HeaderSet),
+}
+
+/// Represents a response from the upper layer application during a multi-step operation.
+#[derive(Debug)]
+pub enum ApplicationResponse {
+    /// The application responded successfully to the GET request by providing the data payload
+    /// and informational headers.
+    Get((Vec<u8>, HeaderSet)),
+    /// The application responded successfully to the PUT request.
+    Put,
+}
+
+impl ApplicationResponse {
+    #[cfg(test)]
+    fn accept_get(data: Vec<u8>, headers: HeaderSet) -> Result<Self, ObexOperationError> {
+        Ok(ApplicationResponse::Get((data, headers)))
+    }
+
+    #[cfg(test)]
+    fn accept_put() -> Result<Self, ObexOperationError> {
+        Ok(ApplicationResponse::Put)
+    }
+}
+
+/// An interface for implementing a multi-step OBEX operation. Currently, the only two such
+/// operations are GET and PUT.
+/// See OBEX 1.5 Sections 3.4.3 & 3.4.4.
+pub trait ServerOperation {
+    /// Returns true if the operation is complete (e.g. all response packets have been sent).
+    fn is_complete(&self) -> bool;
+
+    /// Handle a `request` packet received from the OBEX client.
+    /// Returns an `OperationRequest` to be handled by the OBEX server on success, Error if the
+    /// request was invalid or couldn't be handled.
+    fn handle_peer_request(&mut self, request: RequestPacket) -> Result<OperationRequest, Error>;
+
+    /// Handle a response received from the upper layer application profile.
+    /// `response` is Ok<T> if the application accepted the GET or PUT request.
+    /// `response` is Err<E> if the application rejected the GET or PUT request.
+    /// Returns a response packet to be sent to the remote peer if the application `response` was
+    /// successfully handled.
+    /// Returns Error if there was an internal operation error.
+    fn handle_application_response(
+        &mut self,
+        response: Result<ApplicationResponse, ObexOperationError>,
+    ) -> Result<ResponsePacket, Error>;
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum ConnectionStatus {
@@ -42,14 +103,13 @@ pub struct ObexServer {
     connected: ConnectionStatus,
     /// The maximum OBEX packet length for this OBEX session.
     max_packet_size: u16,
-    /// The active OBEX operation. Currently, the only two potential multi-step operations are
-    /// GET and PUT. This is Some<T> when an operation is in progress, and None otherwise. There
-    /// can only be one active multi-step operation. An operation is considered complete when
-    /// Operation::is_complete returns true. The active operation is cleaned up lazily -- when a
-    /// request to start a new operation is received, the previously finished operation is
-    /// removed.
-    // TODO(fxbug.dev/125307): Refactor into common operation trait when PUT is also supported.
-    active_operation: Option<GetOperation>,
+    /// The active OBEX operation. The only two supported multi-step operations are GET and PUT.
+    /// This is Some<T> when an operation is in progress, and None otherwise. There can only be one
+    /// active multi-step operation. An operation is considered complete when
+    /// `ServerOperation::is_complete` returns true.
+    /// The active operation is cleaned up lazily -- when a request to start a new operation is
+    /// received, the previously finished operation is removed.
+    active_operation: Option<Box<dyn ServerOperation>>,
     /// The data channel that is used to read & write OBEX packets.
     channel: Channel,
     /// The handler provided by the application profile. This handler should implement the
@@ -164,40 +224,49 @@ impl ObexServer {
         Ok(response_packet)
     }
 
-    /// Potentially initializes a new operation.
+    /// Potentially initializes a new multi-step operation.
     /// Returns true if a new operation was initialized, false otherwise.
-    fn maybe_start_new_operation(&mut self) -> bool {
-        // TODO(fxbug.dev/125307): Generalize for PUT & GET when both are supported.
+    fn maybe_start_new_operation(&mut self, code: &OpCode) -> bool {
         if self.active_operation.as_ref().map_or(false, |o| !o.is_complete()) {
             return false;
         }
 
-        trace!("Started new operation ({:?})", OpCode::Get);
-        self.active_operation = Some(GetOperation::new(self.max_packet_size));
+        let op: Box<dyn ServerOperation> = match code {
+            OpCode::Get | OpCode::GetFinal => Box::new(GetOperation::new(self.max_packet_size)),
+            OpCode::Put | OpCode::PutFinal => Box::new(PutOperation::new()),
+            _ => unreachable!("only called from `Self::multistep_request`"),
+        };
+        trace!("Started new operation ({code:?})");
+        self.active_operation = Some(op);
         return true;
     }
 
-    /// Handles a GET request made by the remote OBEX client.
+    /// Handles a request made by the remote OBEX client for a potentially multi-step
+    /// operation (PUT or GET).
     /// Returns a response packet to be sent to the peer on success, Error if the request can't
     /// be handled or is invalid.
-    async fn get_request(&mut self, request: RequestPacket) -> Result<ResponsePacket, Error> {
-        let _ = self.maybe_start_new_operation();
+    async fn multistep_request(&mut self, request: RequestPacket) -> Result<ResponsePacket, Error> {
+        let _ = self.maybe_start_new_operation(request.code());
         let operation = self.active_operation.as_mut().expect("just initialized");
 
-        let request_headers = match operation.handle_request(request)? {
-            Action::SendPacket(response) => return Ok(response),
-            Action::GetApplicationData(request_headers) => request_headers,
+        let application_response = match operation.handle_peer_request(request) {
+            Ok(OperationRequest::SendPacket(response)) => return Ok(response),
+            Ok(OperationRequest::GetApplicationData(request_headers)) => {
+                self.handler.get(request_headers).await.map(|x| ApplicationResponse::Get(x))
+            }
+            Ok(OperationRequest::PutApplicationData(data, request_headers)) => {
+                self.handler.put(data, request_headers).await.map(|_| ApplicationResponse::Put)
+            }
+            Err(e) => {
+                warn!("Internal error in operation: {e:?}");
+                return Ok(ResponsePacket::new_no_data(
+                    ResponseCode::InternalServerError,
+                    HeaderSet::new(),
+                ));
+            }
         };
 
-        // Otherwise, get the response payload from the profile application and begin the
-        // potentially multi-packet response phase.
-        match self.handler.get(request_headers).await {
-            Ok((data, response_headers)) => operation.start_response_phase(data, response_headers),
-            Err((code, response_headers)) => {
-                info!("Application rejected GET request: {code:?}");
-                Ok(ResponsePacket::new_get(code, response_headers))
-            }
-        }
+        operation.handle_application_response(application_response)
     }
 
     /// Processes a raw data `packet` received from the remote peer acting as an OBEX client.
@@ -209,7 +278,9 @@ impl ObexServer {
             OpCode::Connect => self.connect_request(decoded).await,
             OpCode::Disconnect => self.disconnect_request(decoded).await,
             OpCode::SetPath => self.setpath_request(decoded).await,
-            OpCode::Get | OpCode::GetFinal => self.get_request(decoded).await,
+            OpCode::Put | OpCode::PutFinal | OpCode::Get | OpCode::GetFinal => {
+                self.multistep_request(decoded).await
+            }
             _code => todo!("Support other OBEX requests"),
         }
     }
@@ -499,5 +570,38 @@ mod tests {
             assert!(response.headers().is_empty());
         };
         expect_response(&mut exec, &mut remote, expectation, OpCode::GetFinal);
+    }
+
+    #[fuchsia::test]
+    fn put_request_accepted_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, test_app, mut remote) = new_obex_server();
+        // Set to the Connected state to bypass CONNECT operation.
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let headers = HeaderSet::from_headers(vec![
+            Header::name("random object"),
+            Header::EndOfBody(vec![1, 2, 3, 4, 5]),
+        ])
+        .unwrap();
+        let put_request = RequestPacket::new_put_final(headers);
+        send_packet(&mut remote, put_request);
+
+        // The ObexServer should receive the request and hand it to the profile. Profile accepts.
+        test_app.set_put_response(Ok(()));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+        // Verify profile received correct data.
+        let (rec_data, rec_headers) = test_app.put_data();
+        assert_eq!(rec_data, vec![1, 2, 3, 4, 5]);
+        assert!(rec_headers.contains_header(&HeaderIdentifier::Name));
+
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            assert!(response.headers().is_empty());
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::PutFinal);
     }
 }
