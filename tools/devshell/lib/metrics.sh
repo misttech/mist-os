@@ -20,7 +20,6 @@
 # depends on FUCHSIA_DIR being defined correctly.
 
 _METRICS_GA_PROPERTY_ID="UA-127897021-6"
-_METRICS_TRACK_RESULTS=( "set" "build" )
 _METRICS_ALLOWS_CUSTOM_REPORTING=( "test" )
 # If args match the below, then track capture group 1
 _METRICS_TRACK_REGEX=(
@@ -177,7 +176,7 @@ _METRICS_TRACK_UNKNOWN_OPS=( "shell" )
 # old versions of Bash, particularly in the one in MacOS. The alternative is to
 # make them global first via the assignments above and marking they readonly
 # later.
-readonly _METRICS_GA_PROPERTY_ID _METRICS_TRACK_RESULTS _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
+readonly _METRICS_GA_PROPERTY_ID _METRICS_ALLOWS_CUSTOM_REPORTING _METRICS_TRACK_REGEX _METRICS_TRACK_COMMAND_OPS _METRICS_TRACK_UNKNOWN_OPS
 
 # To properly enable unit testing, METRICS_CONFIG is not read-only
 METRICS_CONFIG="${FUCHSIA_DIR}/.fx-metrics-config"
@@ -461,7 +460,7 @@ function track-command-finished {
   args="$*"
 
   metrics-read-config
-  if [[ $METRICS_ENABLED == 0 ]] || ! __is_in "$subcommand" "${_METRICS_TRACK_RESULTS[@]}"; then
+  if [[ $METRICS_ENABLED == 0 ]]; then
     return 0
   fi
 
