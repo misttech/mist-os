@@ -101,6 +101,12 @@ criteria = ["ub-risk-2", "safe-to-deploy"]
 version = "0.3.4"
 notes = "Reviewed on https://fxrev.dev/761470"
 
+[[audits.async-stream]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-0"]
+delta = "0.3.4 -> 0.3.5"
+notes = "Reviewed on https://fxrev.dev/906795"
+
 [[audits.async-stream-impl]]
 who = "Tyler Mandry <tmandry@google.com>"
 criteria = ["ub-risk-2", "safe-to-deploy"]
