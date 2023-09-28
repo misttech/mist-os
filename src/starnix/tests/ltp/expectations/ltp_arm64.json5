@@ -4,7 +4,7 @@
 {
     actions: [
         {
-            type: "expect_failure",
+            type: "skip",
             matchers: [
                 // Seems to need vDSO clock to not flake.
                 "clock_gettime04",
