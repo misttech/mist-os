@@ -91,9 +91,12 @@ type adminAddressStateProviderImpl struct {
 		// result in the address not being removed when the client closes its end of
 		// the channel.
 		detached bool
-		// removed is set to true if the address has already been removed, and
-		// therefore no longer needs to be removed when this protocol terminates.
-		removed bool
+		// removedReason is set to the reason why the address was removed. When this
+		// is set, the address does not need to be removed when this protocol
+		// terminates.
+		removedReason stack.AddressRemovalReason
+		// Indicates if the OnAddressAdded event was sent.
+		sentAddedEvent bool
 	}
 	// The RouteSetId used to associate this address to any subnet route added
 	// as a result of the add_subnet_route AddressParameters field.
@@ -297,11 +300,12 @@ func (pi *adminAddressStateProviderImpl) Remove(fidl.Context) error {
 	_ = syslog.DebugTf(addressStateProviderName, "NICID=%d removing address %s from NIC %d due to explicit removal request", pi.nicid, pi.protocolAddr.AddressWithPrefix, pi.nicid)
 
 	pi.mu.Lock()
-	prevRemoved := pi.mu.removed
-	pi.mu.removed = true
+	prevRemovedReason := pi.mu.removedReason
+	// If not already set, removedReason will be set when the address is removed
+	// below by the synchronous callback to pi.OnRemoved.
 	pi.mu.Unlock()
 
-	if prevRemoved {
+	if prevRemovedReason != 0 {
 		return nil
 	}
 
@@ -327,21 +331,33 @@ func (pi *adminAddressStateProviderImpl) Remove(fidl.Context) error {
 	return nil
 }
 
+func (pi *adminAddressStateProviderImpl) sendOnAddressRemovedEventAndCancelServeLocked() {
+	if err := pi.mu.eventProxy.OnAddressRemoved(fidlconv.ToAddressRemovalReason(pi.mu.removedReason)); err != nil {
+		var zxError *zx.Error
+		if !errors.As(err, &zxError) || (zxError.Status != zx.ErrPeerClosed && zxError.Status != zx.ErrBadHandle) {
+			_ = syslog.ErrorTf(addressStateProviderName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", pi.nicid, pi.mu.removedReason, pi.protocolAddr.AddressWithPrefix.Address, err)
+		}
+	}
+	pi.cancelServe()
+}
+
 func (pi *adminAddressStateProviderImpl) OnRemoved(reason stack.AddressRemovalReason) {
 	_ = syslog.DebugTf(addressStateProviderName, "NIC=%d addr=%s removed reason=%s", pi.nicid, pi.protocolAddr.AddressWithPrefix, reason)
 
 	pi.mu.Lock()
 	defer pi.mu.Unlock()
 
-	pi.mu.removed = true
+	pi.mu.removedReason = reason
 
-	if err := pi.mu.eventProxy.OnAddressRemoved(fidlconv.ToAddressRemovalReason(reason)); err != nil {
-		var zxError *zx.Error
-		if !errors.As(err, &zxError) || (zxError.Status != zx.ErrPeerClosed && zxError.Status != zx.ErrBadHandle) {
-			_ = syslog.ErrorTf(addressStateProviderName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", pi.nicid, reason, pi.protocolAddr.AddressWithPrefix.Address, err)
-		}
+	// If the OnAddressAdded event has not been sent yet, then that means the
+	// address was removed while fuchsia.net.interfaces.admin/Control.AddAddress
+	// operation is in-progress. This can happen when immediately after adding the
+	// address to the core (gVisor) netstack but before the OnAddressAdded event
+	// was sent (when no locks are held), DAD fails which triggers address
+	// removal.
+	if pi.mu.sentAddedEvent {
+		pi.sendOnAddressRemovedEventAndCancelServeLocked()
 	}
-	pi.cancelServe()
 }
 
 func (pi *adminAddressStateProviderImpl) cleanUpSubnetRoute() {
@@ -425,8 +441,16 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 
 	impl.mu.Lock()
 	defer impl.mu.Unlock()
+	impl.mu.sentAddedEvent = true
 	if err := impl.mu.eventProxy.OnAddressAdded(); err != nil {
 		_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/131322): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
+	}
+
+	// If the address was removed before we sent the OnAddressAdded event, then
+	// that means we need to send the (pending) OnAddressRemoved event. See
+	// pi.OnRemoved for details.
+	if impl.mu.removedReason != 0 {
+		impl.sendOnAddressRemovedEventAndCancelServeLocked()
 	}
 
 	go func() {
@@ -439,7 +463,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		})
 
 		impl.mu.Lock()
-		detached, removed := impl.mu.detached, impl.mu.removed
+		detached, removedReason := impl.mu.detached, impl.mu.removedReason
 		impl.mu.Unlock()
 
 		addrDisp.mu.Lock()
@@ -448,7 +472,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 		}
 		addrDisp.mu.Unlock()
 
-		if !detached && !removed {
+		if !detached && removedReason == 0 {
 			_ = syslog.DebugTf(addressStateProviderName, "NICID=%d removing address %s from NIC %d due to protocol closure", impl.nicid, addr, ci.nicid)
 			switch status := ifs.removeAddress(impl.protocolAddr); status {
 			case zx.ErrOk, zx.ErrNotFound:
