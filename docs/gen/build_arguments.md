@@ -6186,7 +6186,7 @@ The build target that overrides the default configuration options for this
 module. This should point to a source set that provides defines through a
 public config (which may -include a file or add defines directly).
 
-**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
+**Current value for `target_cpu = "arm64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
 From //.gn:78
 
@@ -6194,7 +6194,7 @@ From //.gn:78
 
 From //third_party/pigweed/src/pw_function/BUILD.gn:27
 
-**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/backends/pw_function:define_overrides"`
+**Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
 From //.gn:78
 
@@ -7359,7 +7359,19 @@ From //build/security.gni:39
 
 ### remove_default_configs
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
+
+From //.gn:125
+
+**Overridden from the default:** `[]`
+
+From //third_party/pigweed/src/pw_build/defaults.gni:27
+
+**Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
+
+From //.gn:125
+
+**Overridden from the default:** `[]`
 
 From //third_party/pigweed/src/pw_build/defaults.gni:27
 
