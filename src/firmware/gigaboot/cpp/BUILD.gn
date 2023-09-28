@@ -13,6 +13,7 @@ config("board_name") {
 
 source_set("lib") {
   sources = [
+    "acpi.cc",
     "acpi.h",
     "boot_zbi_items.cc",
     "boot_zbi_items.h",
@@ -56,6 +57,7 @@ source_set("lib") {
     "//zircon/kernel/lib/efi/variable",
     "//zircon/kernel/phys/efi:main",
     "//zircon/kernel/phys/efi:protocol",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/pretty",
     "//zircon/third_party/ulib/cksum",

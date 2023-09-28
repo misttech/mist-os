@@ -203,14 +203,14 @@ class EfiConfigTable {
   explicit EfiConfigTable(SmbiosRev smbios_revision) : EfiConfigTable(2, smbios_revision) {}
   void CorruptChecksum() { rsdp_.checksum++; }
   void CorruptV2Checksum() { rsdp_.extended_checksum++; }
-  void CorruptSignature() { rsdp_.signature++; }
+  void CorruptSignature() { rsdp_.signature[0]++; }
 
   efi_configuration_table const* Table() const { return table_.data(); }
   size_t TableSize() const { return table_.size(); }
-  acpi_rsdp_t& rsdp() { return rsdp_; }
+  AcpiRsdp& rsdp() { return rsdp_; }
 
  private:
-  acpi_rsdp_t rsdp_;
+  AcpiRsdp rsdp_;
   std::vector<efi_configuration_table> table_;
 };
 

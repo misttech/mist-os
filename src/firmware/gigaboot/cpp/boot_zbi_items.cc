@@ -4,33 +4,37 @@
 
 #include "boot_zbi_items.h"
 
+#include <lib/ddk/platform-defs.h>
 #include <lib/stdcompat/span.h>
+#include <lib/zbi-format/board.h>
+#include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbi-format/memory.h>
+#include <lib/zbi-format/zbi.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/zbi_utils.h>
+#include <lib/zx/result.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <zircon/errors.h>
 #include <zircon/limits.h>
 
 #include <algorithm>
-#include <numeric>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 
 #include <efi/boot-services.h>
 #include <efi/protocol/graphics-output.h>
 #include <efi/system-table.h>
 #include <efi/types.h>
 #include <fbl/vector.h>
+#include <phys/efi/main.h>
 
 #include "acpi.h"
-#include "phys/efi/main.h"
 #include "utils.h"
 
 namespace gigaboot {
-
-const efi_guid kAcpiTableGuid = ACPI_TABLE_GUID;
-const efi_guid kAcpi20TableGuid = ACPI_20_TABLE_GUID;
-const uint8_t kAcpiRsdpSignature[8] = {'R', 'S', 'D', ' ', 'P', 'T', 'R', ' '};
 
 const efi_guid kSmbiosTableGUID = SMBIOS_TABLE_GUID;
 const efi_guid kSmbios3TableGUID = SMBIOS3_TABLE_GUID;
@@ -43,7 +47,58 @@ extern "C" efi_status generate_efi_memory_attributes_table_item(
 
 namespace {
 
-uint8_t scratch_buffer[32 * 1024];
+constexpr size_t kBufferSize = (static_cast<size_t>(32) * 1024) / 2;
+
+template <typename T>
+using MemArray = std::array<T, kBufferSize / sizeof(T)>;
+
+template <typename T>
+class MemDynamicViewer {
+ public:
+  class Iterator {
+   public:
+    const T& operator*() const { return *item_; }
+    const T* operator->() const { return item_; }
+    Iterator operator++() {
+      item_ = reinterpret_cast<const T*>(reinterpret_cast<const uint8_t*>(item_) + item_size_);
+      return *this;
+    }
+
+    friend bool operator==(const Iterator& a, const Iterator& b) { return a.item_ == b.item_; }
+    friend bool operator!=(const Iterator& a, const Iterator& b) { return !(a == b); }
+
+   private:
+    friend MemDynamicViewer<T>;
+    Iterator(const T* item, size_t item_size) : item_(item), item_size_(item_size) {}
+
+    const T* item_;
+    size_t item_size_;
+  };
+
+  MemDynamicViewer(const MemArray<T>& base, size_t num_items, size_t item_size)
+      : base_(base.data()), num_items_(num_items), item_size_(item_size) {
+    // Verify that iteration won't overrun the end of the backing array.
+    ZX_ASSERT(num_items * item_size <= base.size() * sizeof(T));
+
+    // Verify that we aren't violating alignment requirements.
+    ZX_ASSERT(item_size % std::alignment_of_v<T> == 0);
+  }
+
+  Iterator begin() const { return Iterator(base_, item_size_); }
+  Iterator end() const {
+    // The casting and pointer arithmetic on uint8_t* is necessary
+    // because item_size_ may not equal sizeof(T).
+    // That is the whole point of this custom iterator.
+    return Iterator(reinterpret_cast<const T*>(reinterpret_cast<const uint8_t*>(base_) +
+                                               num_items_ * item_size_),
+                    item_size_);
+  }
+
+ private:
+  const T* base_;
+  size_t num_items_;
+  size_t item_size_;
+};
 
 bool AppendSmbiosPtr(zbi_header_t* image, size_t capacity) {
   uint64_t smbios = 0;
@@ -68,47 +123,10 @@ bool AppendSmbiosPtr(zbi_header_t* image, size_t capacity) {
                                        sizeof(smbios)) == ZBI_RESULT_OK;
 }
 
-bool AppendAcpiRsdp(zbi_header_t* image, size_t capacity) {
-  acpi_rsdp_t const* rsdp = nullptr;
-  cpp20::span<const efi_configuration_table> entries(gEfiSystemTable->ConfigurationTable,
-                                                     gEfiSystemTable->NumberOfTableEntries);
-
-  for (const efi_configuration_table& entry : entries) {
-    // Check if this entry is an ACPI RSD PTR.
-    if ((entry.VendorGuid == kAcpiTableGuid || entry.VendorGuid == kAcpi20TableGuid) &&
-        // Verify the signature of the ACPI RSD PTR.
-        !memcmp(entry.VendorTable, kAcpiRsdpSignature, sizeof(kAcpiRsdpSignature))) {
-      rsdp = reinterpret_cast<const acpi_rsdp_t*>(entry.VendorTable);
-      break;
-    }
-  }
-
-  // Verify an ACPI table was found.
-  if (rsdp == nullptr) {
-    printf("RSDP was not found\n");
-    return false;
-  }
-
-  // Verify the checksum of this table. Both V1 and V2 RSDPs should pass the
-  // V1 checksum, which only covers the first 20 bytes of the table.
-  // The checksum adds all the bytes and passes if the result is 0.
-  cpp20::span<const uint8_t> acpi_bytes(reinterpret_cast<const uint8_t*>(rsdp), kAcpiRsdpV1Size);
-  if (std::accumulate(acpi_bytes.begin(), acpi_bytes.end(), uint8_t{0})) {
-    printf("RSDP V1 checksum failed\n");
-    return false;
-  }
-
-  // V2 RSDPs should additionally pass a checksum of the entire table.
-  if (rsdp->revision > 0) {
-    acpi_bytes = {acpi_bytes.begin(), rsdp->length};
-    if (std::accumulate(acpi_bytes.begin(), acpi_bytes.end(), uint8_t{0})) {
-      printf("RSDP V2 checksum failed\n");
-      return false;
-    }
-  }
-
+bool AppendAcpiRsdp(zbi_header_t* image, size_t capacity, const AcpiRsdp& rsdp) {
+  const auto* ptr = &rsdp;
   if (zbi_result_t result = zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_ACPI_RSDP, 0, 0,
-                                                          &rsdp, sizeof(rsdp));
+                                                          &ptr, sizeof(&ptr));
       result != ZBI_RESULT_OK) {
     printf("Failed to create ACPI rsdp entry, %d\n", result);
     return false;
@@ -199,6 +217,113 @@ bool AddSystemTable(zbi_header_t* image, size_t capacity) {
                                        &gEfiSystemTable, sizeof(gEfiSystemTable)) == ZBI_RESULT_OK;
 }
 
+bool AddUartDriver(zbi_header_t* image, size_t capacity, const AcpiRsdp& rsdp,
+                   ZbiContext* context) {
+  const auto* spcr = rsdp.LoadTable<AcpiSpcr>();
+  if (spcr == nullptr) {
+    printf("%s: no spcr\n", __func__);
+    return true;
+  }
+
+  uint32_t serial_driver_type = spcr->GetKdrv();
+  if (serial_driver_type == 0) {
+    printf("%s: no serial driver\n", __func__);
+    return true;
+  }
+
+  zbi_dcfg_simple_t uart_driver = spcr->DeriveUartDriver();
+  if (context) {
+    context->uart_mmio_phys = uart_driver.mmio_phys;
+  }
+
+  return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_KERNEL_DRIVER, serial_driver_type,
+                                       0, &uart_driver, sizeof(uart_driver)) == ZBI_RESULT_OK;
+}
+
+bool AddMadtItems(zbi_header_t* image, size_t capacity, const AcpiRsdp& rsdp, ZbiContext* context) {
+  const auto* madt = rsdp.LoadTable<AcpiMadt>();
+  if (madt == nullptr) {
+    printf("%s: no madt\n", __func__);
+    return true;
+  }
+
+  std::array<zbi_topology_node_t, 1> nodes;
+  auto node_span = madt->GetTopology(nodes);
+  if (!node_span.empty() && zbi_create_entry_with_payload(
+                                image, capacity, ZBI_TYPE_CPU_TOPOLOGY, sizeof(node_span.front()),
+                                0, node_span.data(), node_span.size_bytes()) != ZBI_RESULT_OK) {
+    return false;
+  }
+  if (context) {
+    context->num_cpu_nodes = static_cast<uint8_t>(node_span.size());
+  }
+
+  std::optional<AcpiMadt::GicDescriptor> gic_cfg = madt->GetGicDriver();
+  if (!gic_cfg) {
+    printf("%s: no gic cfg\n", __func__);
+    return true;
+  }
+
+  if (context) {
+    context->gic_driver = gic_cfg->driver;
+  }
+
+  return std::visit(
+             [image, capacity, zbi_type = gic_cfg->zbi_type](const auto& driver) {
+               return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_KERNEL_DRIVER,
+                                                    zbi_type, 0, &driver, sizeof(driver));
+             },
+             gic_cfg->driver) == ZBI_RESULT_OK;
+}
+
+bool AddPsciDriver(zbi_header_t* image, size_t capacity, const AcpiRsdp& rsdp) {
+  const auto* fadt = rsdp.LoadTable<AcpiFadt>();
+  if (!fadt) {
+    printf("%s: no fadt\n", __func__);
+    return true;
+  }
+
+  std::optional<zbi_dcfg_arm_psci_driver_t> psci_driver = fadt->GetPsciDriver();
+  if (!psci_driver) {
+    printf("%s: no psci\n", __func__);
+    return true;
+  }
+
+  return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_KERNEL_DRIVER,
+                                       ZBI_KERNEL_DRIVER_ARM_PSCI, 0, &(psci_driver.value()),
+                                       sizeof(*psci_driver)) == ZBI_RESULT_OK;
+}
+
+bool AddArmTimerDriver(zbi_header_t* image, size_t capacity, const AcpiRsdp& rsdp) {
+  const auto* gtdt = rsdp.LoadTable<AcpiGtdt>();
+  if (!gtdt) {
+    printf("%s: no gtdt\n", __func__);
+    return true;
+  }
+
+  zbi_dcfg_arm_generic_timer_driver_t timer = gtdt->GetTimer();
+  return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_KERNEL_DRIVER,
+                                       ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER, 0, &timer,
+                                       sizeof(timer)) == ZBI_RESULT_OK;
+}
+
+bool AddPlatformId(zbi_header_t* image, size_t capacity) {
+  zbi_platform_id_t platform_id = {
+#ifdef __x86_64__
+      .vid = PDEV_VID_INTEL,
+      .pid = PDEV_PID_X86,
+#elif __aarch64__
+      .vid = PDEV_VID_ARM,
+      .pid = PDEV_PID_ACPI_BOARD,
+#else
+#error "Uknown platform architecture."
+#endif
+  };
+
+  return zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_PLATFORM_ID, 0, 0, &platform_id,
+                                       sizeof(platform_id)) == ZBI_RESULT_OK;
+}
+
 // Bootloader file item for ssh key provisioning
 // TODO(b/239088231): Consider using dynamic allocation.
 constexpr size_t kZbiFileLength = 4096;
@@ -227,15 +352,18 @@ cpp20::span<uint8_t> GetZbiFiles() { return zbi_files; }
 // Add memory related zbi items.
 //
 // Returns memory map key on success, which will be used for ExitBootService.
-zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity) {
+zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity, const ZbiContext* context) {
+  static MemArray<zbi_mem_range_t> zbi_mem = {};
+  static MemArray<efi_memory_descriptor> efi_mem = {};
+
   uint32_t dversion = 0;
   size_t mkey = 0;
   size_t dsize = 0;
-  size_t msize = sizeof(scratch_buffer);
+  size_t msize = sizeof(efi_mem);
   // Note: Once memory map is grabbed, do not do anything that can change it, i.e. anything that
   // involves memory allocation/de-allocation, including printf if it is printing to graphics.
-  efi_status status = gEfiSystemTable->BootServices->GetMemoryMap(
-      &msize, reinterpret_cast<efi_memory_descriptor*>(scratch_buffer), &mkey, &dsize, &dversion);
+  efi_status status =
+      gEfiSystemTable->BootServices->GetMemoryMap(&msize, efi_mem.data(), &mkey, &dsize, &dversion);
   if (status != EFI_SUCCESS) {
     printf("boot: cannot GetMemoryMap(). %s\n", EfiStatusToString(status));
     return zx::error(ZX_ERR_INTERNAL);
@@ -243,39 +371,114 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity) {
 
   // Look for an EFI memory attributes table we can pass to the kernel.
   efi_status mem_attr_res = generate_efi_memory_attributes_table_item(
-      zbi, capacity, gEfiSystemTable, scratch_buffer, msize, dsize);
+      zbi, capacity, gEfiSystemTable, efi_mem.data(), msize, dsize);
   if (mem_attr_res != EFI_SUCCESS) {
     printf("failed to generate EFI memory attributes table: %s", EfiStatusToString(mem_attr_res));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  // Convert the memory map in place to a range of zbi_mem_range_t, the
-  // preferred ZBI memory format. In-place conversion can safely be done
-  // one-by-one, given that zbi_mem_range_t is smaller than a descriptor.
-  static_assert(sizeof(zbi_mem_range_t) <= sizeof(efi_memory_descriptor),
-                "Cannot assume that sizeof(zbi_mem_range_t) <= dsize");
-  size_t num_ranges = msize / dsize;
-  zbi_mem_range_t* ranges = reinterpret_cast<zbi_mem_range_t*>(scratch_buffer);
-  for (size_t i = 0; i < num_ranges; ++i) {
-    const efi_memory_descriptor* desc =
-        reinterpret_cast<efi_memory_descriptor*>(scratch_buffer + i * dsize);
-    const zbi_mem_range_t range = {
-        .paddr = desc->PhysicalStart,
-        .length = desc->NumberOfPages * kUefiPageSize,
-        .type = EfiToZbiMemRangeType(desc->Type),
+  // The structures populated by GetMemoryMap may be larger than sizeof(efi_memory_descriptor),
+  // and we need to handle that potential difference in a dynamic manner.
+  MemDynamicViewer<efi_memory_descriptor> efi_mem_range(efi_mem, msize / dsize, dsize);
+  zbi_mem_range_t* current_zbi = zbi_mem.begin();
+  for (const efi_memory_descriptor& efi_desc : efi_mem_range) {
+    if (current_zbi == zbi_mem.end()) {
+      break;
+    }
+
+    *current_zbi++ = {
+        .paddr = efi_desc.PhysicalStart,
+        .length = efi_desc.NumberOfPages * kUefiPageSize,
+        .type = EfiToZbiMemRangeType(efi_desc.Type),
     };
-    memcpy(&ranges[i], &range, sizeof(range));
   }
 
-  // TODO(b/236039205): Add memory ranges for uart peripheral. Refer to
-  // https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/gigaboot/src/zircon.c;line=449;drc=de7e29bf0d7189a61b691ef0cdd0fd5ae1dfd605
-  // `src/firmware/gigaboot/src/zircon.c` at line 477.
+  if (context) {
+    if (context->uart_mmio_phys) {
+      if (current_zbi == zbi_mem.end()) {
+        printf("Insufficient memory to add memory items\n");
+        return zx::error(ZX_ERR_NO_MEMORY);
+      }
+      *current_zbi++ = {
+          .paddr = context->uart_mmio_phys.value(),
+          .length = ZX_PAGE_SIZE,
+          .type = ZBI_MEM_TYPE_PERIPHERAL,
+      };
+    }
 
-  // TODO(b/236039205): Add memory ranges for GIC. Rfer to
-  // `https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/gigaboot/src/zircon.c;line=480;drc=de7e29bf0d7189a61b691ef0cdd0fd5ae1dfd605`
+    if (context->gic_driver) {
+      if (const auto* v2_driver =
+              std::get_if<zbi_dcfg_arm_gic_v2_driver_t>(&context->gic_driver.value())) {
+        // This memory range must encompass the GICC and GICD register ranges.
+        // Each of these generally encompass a page, but some systems like QEMU
+        // allocate 64K to make it easier when working with 64kb pages. Since we
+        // use 4K pages, we allocate 16 pages here just to be safe.
+        constexpr uint64_t entry_length = 16 * ZX_PAGE_SIZE;
+        if (current_zbi == zbi_mem.end()) {
+          printf("Insufficient memory to add memory items\n");
+          return zx::error(ZX_ERR_NO_MEMORY);
+        }
 
+        *current_zbi++ = {
+            .paddr = v2_driver->mmio_phys,
+            .length = entry_length,
+            .type = ZBI_MEM_TYPE_PERIPHERAL,
+        };
+
+        if (current_zbi == zbi_mem.end()) {
+          printf("Insufficient memory to add memory items\n");
+          return zx::error(ZX_ERR_NO_MEMORY);
+        }
+
+        *current_zbi++ = {
+            .paddr = v2_driver->mmio_phys + v2_driver->gicd_offset + v2_driver->gicc_offset,
+            .length = entry_length,
+            .type = ZBI_MEM_TYPE_PERIPHERAL,
+        };
+
+        if (v2_driver->use_msi) {
+          if (current_zbi == zbi_mem.end()) {
+            printf("Insufficient memory to add memory items\n");
+            return zx::error(ZX_ERR_NO_MEMORY);
+          }
+
+          *current_zbi++ = {
+              .paddr = v2_driver->msi_frame_phys,
+              .length = entry_length,
+              .type = ZBI_MEM_TYPE_PERIPHERAL,
+          };
+        }
+      } else if (const auto* v3_driver =
+                     std::get_if<zbi_dcfg_arm_gic_v3_driver_t>(&context->gic_driver.value())) {
+        // We should never have a GICv3 system with less than one core.
+        if (context->num_cpu_nodes < 1) {
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+
+        if (current_zbi == zbi_mem.end()) {
+          printf("Insufficient memory to add memory items\n");
+          return zx::error(ZX_ERR_NO_MEMORY);
+        }
+
+        // This memory range must encompass the GICD and GICR register ranges.
+        uint64_t gic_mem_size = 0x10000;  // GICD size.
+        gic_mem_size += v3_driver->gicr_offset + v3_driver->gicd_offset;
+        // Add the GICR size. Each GICR in GICv3 consists of 2 adjacent 64 KiB frames.
+        gic_mem_size += static_cast<uint64_t>(context->num_cpu_nodes) * 0x20000;
+        // Add any padding between GICRs on multi-core systems.
+        gic_mem_size += (context->num_cpu_nodes - 1) * v3_driver->gicr_stride;
+        *current_zbi++ = {
+            .paddr = v3_driver->mmio_phys,
+            .length = gic_mem_size,
+            .type = ZBI_MEM_TYPE_PERIPHERAL,
+        };
+      }
+    }
+  }
+
+  size_t payload_size = (current_zbi - zbi_mem.begin()) * sizeof(*current_zbi);
   zbi_result_t result = zbi_create_entry_with_payload(zbi, capacity, ZBI_TYPE_MEM_CONFIG, 0, 0,
-                                                      ranges, num_ranges * sizeof(zbi_mem_range_t));
+                                                      zbi_mem.data(), payload_size);
   if (result != ZBI_RESULT_OK) {
     printf("Failed to create memory range entry, %d\n", result);
     return zx::error(ZX_ERR_INTERNAL);
@@ -284,12 +487,34 @@ zx::result<size_t> AddMemoryItems(void* zbi, size_t capacity) {
   return zx::ok(mkey);
 }
 
-bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
+bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot,
+                         ZbiContext* context) {
   if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
     return false;
   }
 
-  if (!AppendAcpiRsdp(image, capacity)) {
+  const AcpiRsdp* rsdp = FindAcpiRsdp();
+  if (rsdp == nullptr) {
+    return false;
+  }
+
+  if (!AppendAcpiRsdp(image, capacity, *rsdp)) {
+    return false;
+  }
+
+  if (!AddUartDriver(image, capacity, *rsdp, context)) {
+    return false;
+  }
+
+  if (!AddMadtItems(image, capacity, *rsdp, context)) {
+    return false;
+  }
+
+  if (!AddPsciDriver(image, capacity, *rsdp)) {
+    return false;
+  }
+
+  if (!AddArmTimerDriver(image, capacity, *rsdp)) {
     return false;
   }
 
@@ -302,6 +527,10 @@ bool AddGigabootZbiItems(zbi_header_t* image, size_t capacity, const AbrSlotInde
   }
 
   if (!AppendSmbiosPtr(image, capacity)) {
+    return false;
+  }
+
+  if (!AddPlatformId(image, capacity)) {
     return false;
   }
 

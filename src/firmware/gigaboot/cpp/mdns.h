@@ -106,7 +106,7 @@ struct DnsRecord {
   DnsNameSegment* name;
   uint16_t record_class;
   // Note: any additional DNS record types added MUST define a kType constant
-  //       and MUST be added to the the types in the `data` variant.
+  //       and MUST be added to the the types in the `data_` variant.
   std::variant<DnsPtrRecord, DnsAAAARecord, DnsSrvRecord> data;
 };
 
@@ -271,7 +271,7 @@ class MdnsAgent {
 
  private:
   // Lazily create the transmission callback.
-  // The transmission callback is responsible for resetting the poll timer
+  // The transmission callback is responsible for resetting the poll timer after
   // transmission has completed.
   // Returns an error if the callback event initialization failed.
   fit::result<efi_status, efi_event> LazySetup();

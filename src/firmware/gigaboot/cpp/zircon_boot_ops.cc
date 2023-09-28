@@ -80,7 +80,8 @@ void Boot(ZirconBootOps* ops, zbi_header_t* zbi, size_t capacity) {
 
   void* data_zbi = reinterpret_cast<void*>(boot.DataLoadAddress());
   size_t data_zbi_capacity = boot.DataZbi().storage().size();
-  auto memory_attr = AddMemoryItems(data_zbi, data_zbi_capacity);
+  auto memory_attr =
+      AddMemoryItems(data_zbi, data_zbi_capacity, reinterpret_cast<ZbiContext*>(ops->context));
   if (memory_attr.is_error()) {
     printf("Failed to add additional memory ranges\n");
     abort();
@@ -106,7 +107,7 @@ bool AddZbiItems(ZirconBootOps* ops, zbi_header_t* image, size_t capacity,
   // TODO(b/235489025): To implement. Append necessary ZBI items for booting the ZBI image. Refers
   // to the C Gigaboot implementation in function boot_zircon() in
   // `src/firmware/gigaboot/src/zircon.c` for what items are needed.
-  return AddGigabootZbiItems(image, capacity, slot);
+  return AddGigabootZbiItems(image, capacity, slot, reinterpret_cast<ZbiContext*>(ops->context));
 }
 
 bool ReadPermanentAttributes(ZirconBootOps* ops, AvbAtxPermanentAttributes* attribute) {
@@ -178,8 +179,10 @@ bool VerifiedBootReadRollbackIndex(ZirconBootOps* ops, size_t rollback_index_loc
 
 // TODO(b/269178761): write unit tests for "default" implementation of zircon boot ops code.
 ZirconBootOps GetZirconBootOps() {
+  static ZbiContext zbi_context = {};
+
   ZirconBootOps zircon_boot_ops;
-  zircon_boot_ops.context = nullptr;
+  zircon_boot_ops.context = &zbi_context;
   zircon_boot_ops.read_from_partition = ReadFromPartition;
   zircon_boot_ops.write_to_partition = WriteToPartition;
   zircon_boot_ops.boot = Boot;

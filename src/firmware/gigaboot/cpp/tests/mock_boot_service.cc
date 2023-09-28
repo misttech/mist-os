@@ -308,21 +308,20 @@ void SetGptEntryName(const char* name, gpt_entry_t& entry) {
 
 EfiConfigTable::EfiConfigTable(uint8_t acpi_revision, SmbiosRev smbios_revision) {
   rsdp_ = {
+      .signature = kAcpiRsdpSignature,
       .checksum = 0,
       .revision = acpi_revision,
       .length = sizeof(rsdp_),
       .extended_checksum = 0,
   };
 
-  // The signature, in bytes, spells "RSD PTR "
-  memcpy(&rsdp_.signature, kAcpiRsdpSignature, sizeof(rsdp_.signature));
-
   // The checksum sums all the bytes in the rsdp struct.
   // It is valid if the sum is zero.
   cpp20::span<const uint8_t> bytes(reinterpret_cast<const uint8_t*>(&rsdp_), kAcpiRsdpV1Size);
-  rsdp_.checksum = std::accumulate(bytes.begin(), bytes.end(), uint8_t{0}, std::minus());
+  rsdp_.checksum = static_cast<uint8_t>(0x100 - std::reduce(bytes.begin(), bytes.end(), 0));
   bytes = {bytes.begin(), rsdp_.length};
-  rsdp_.extended_checksum = std::accumulate(bytes.begin(), bytes.end(), uint8_t{0}, std::minus());
+  rsdp_.extended_checksum =
+      static_cast<uint8_t>(0x100 - std::reduce(bytes.begin(), bytes.end(), 0));
 
   efi_guid guid = ACPI_TABLE_GUID;
   if (acpi_revision >= 2) {
@@ -330,7 +329,7 @@ EfiConfigTable::EfiConfigTable(uint8_t acpi_revision, SmbiosRev smbios_revision)
   }
 
   // Make the table lookups iterate at least once.
-  table_.push_back(efi_configuration_table{});
+  table_.push_back(efi_configuration_table{.VendorGuid = {}});
 
   table_.push_back(efi_configuration_table{
       .VendorGuid = guid,
