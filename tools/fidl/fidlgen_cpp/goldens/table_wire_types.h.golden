@@ -6968,6 +6968,8 @@ struct TypeTraits<::test_table::wire::EmptyTable> {
 template <>
 struct IsFidlType<::test_table::wire::EmptyTable> : public std::true_type {};
 template <>
+struct IsWire<::test_table::wire::EmptyTable> : public std::true_type {};
+template <>
 struct IsTable<::test_table::wire::EmptyTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::EmptyTable>);
 
@@ -7046,6 +7048,8 @@ struct TypeTraits<::test_table::wire::SimpleTable> {
 
 template <>
 struct IsFidlType<::test_table::wire::SimpleTable> : public std::true_type {};
+template <>
+struct IsWire<::test_table::wire::SimpleTable> : public std::true_type {};
 template <>
 struct IsTable<::test_table::wire::SimpleTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::SimpleTable>);
@@ -7150,6 +7154,8 @@ struct TypeTraits<::test_table::wire::OlderSimpleTable> {
 template <>
 struct IsFidlType<::test_table::wire::OlderSimpleTable> : public std::true_type {};
 template <>
+struct IsWire<::test_table::wire::OlderSimpleTable> : public std::true_type {};
+template <>
 struct IsTable<::test_table::wire::OlderSimpleTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::OlderSimpleTable>);
 
@@ -7240,6 +7246,8 @@ struct TypeTraits<::test_table::wire::NewerSimpleTable> {
 
 template <>
 struct IsFidlType<::test_table::wire::NewerSimpleTable> : public std::true_type {};
+template <>
+struct IsWire<::test_table::wire::NewerSimpleTable> : public std::true_type {};
 template <>
 struct IsTable<::test_table::wire::NewerSimpleTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::NewerSimpleTable>);
@@ -7356,6 +7364,8 @@ struct TypeTraits<::test_table::wire::ReverseOrdinalTable> {
 template <>
 struct IsFidlType<::test_table::wire::ReverseOrdinalTable> : public std::true_type {};
 template <>
+struct IsWire<::test_table::wire::ReverseOrdinalTable> : public std::true_type {};
+template <>
 struct IsTable<::test_table::wire::ReverseOrdinalTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::ReverseOrdinalTable>);
 
@@ -7471,6 +7481,8 @@ struct TypeTraits<::test_table::wire::TableWithAttributes> {
 template <>
 struct IsFidlType<::test_table::wire::TableWithAttributes> : public std::true_type {};
 template <>
+struct IsWire<::test_table::wire::TableWithAttributes> : public std::true_type {};
+template <>
 struct IsTable<::test_table::wire::TableWithAttributes> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::TableWithAttributes>);
 
@@ -7562,6 +7574,8 @@ struct TypeTraits<::test_table::wire::ExtensionTable> {
 template <>
 struct IsFidlType<::test_table::wire::ExtensionTable> : public std::true_type {};
 template <>
+struct IsWire<::test_table::wire::ExtensionTable> : public std::true_type {};
+template <>
 struct IsTable<::test_table::wire::ExtensionTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::ExtensionTable>);
 
@@ -7640,6 +7654,8 @@ struct TypeTraits<::test_table::wire::SixtyFourOrdinalTable> {
 
 template <>
 struct IsFidlType<::test_table::wire::SixtyFourOrdinalTable> : public std::true_type {};
+template <>
+struct IsWire<::test_table::wire::SixtyFourOrdinalTable> : public std::true_type {};
 template <>
 struct IsTable<::test_table::wire::SixtyFourOrdinalTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_table::wire::SixtyFourOrdinalTable>);

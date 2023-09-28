@@ -63,6 +63,8 @@ struct TypeTraits<::test_structdefaultvalueenumlibraryreference::wire::Foo> {
 template <>
 struct IsFidlType<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
 template <>
+struct IsWire<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
+template <>
 struct IsStruct<::test_structdefaultvalueenumlibraryreference::wire::Foo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_structdefaultvalueenumlibraryreference::wire::Foo>);
 static_assert(offsetof(::test_structdefaultvalueenumlibraryreference::wire::Foo, field) == 0);

@@ -1163,6 +1163,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseNoRequest
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse>);
 static_assert(offsetof(::test_protocols::wire::WithAndWithoutRequestResponseNoRequestWithResponseResponse, ret) == 0);
@@ -1210,6 +1212,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseWithReque
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestNoResponseRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestNoResponseRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestNoResponseRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestNoResponseRequest>);
@@ -1259,6 +1263,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseWithReque
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>);
 static_assert(offsetof(::test_protocols::wire::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest, arg) == 0);
@@ -1306,6 +1312,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseWithReque
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseRequest>);
@@ -1355,6 +1363,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseWithReque
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseResponse>);
 static_assert(offsetof(::test_protocols::wire::WithAndWithoutRequestResponseWithRequestWithResponseResponse, ret) == 0);
@@ -1403,6 +1413,8 @@ struct TypeTraits<::test_protocols::wire::WithAndWithoutRequestResponseOnWithRes
 template <>
 struct IsFidlType<::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest>);
 static_assert(offsetof(::test_protocols::wire::WithAndWithoutRequestResponseOnWithResponseRequest, ret) == 0);
@@ -1450,6 +1462,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructRespons
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxResponseAsStructResponse>);
@@ -1507,6 +1521,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveRespons
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse>);
 static_assert(offsetof(::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResponse, __reserved) == 0);
@@ -1557,6 +1573,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResponse>);
@@ -1612,6 +1630,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse>
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxHandleInResultResponse>);
 static_assert(offsetof(::test_protocols::wire::WithErrorSyntaxHandleInResultResponse, h) == 0);
@@ -1662,6 +1682,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolMethodARequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolMethodARequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolMethodARequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolMethodARequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolMethodARequest>);
@@ -1715,6 +1737,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolEventARequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolEventARequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolEventARequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolEventARequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolEventARequest>);
 static_assert(offsetof(::test_protocols::wire::ChannelProtocolEventARequest, a) == 0);
@@ -1766,6 +1790,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolMethodBRequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolMethodBRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolMethodBRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolMethodBRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolMethodBRequest>);
@@ -1819,6 +1845,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolMethodBResponse> {
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolMethodBResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolMethodBResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolMethodBResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolMethodBResponse>);
 static_assert(offsetof(::test_protocols::wire::ChannelProtocolMethodBResponse, result) == 0);
@@ -1869,6 +1897,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolTakeHandleRequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolTakeHandleRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolTakeHandleRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolTakeHandleRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolTakeHandleRequest>);
@@ -1924,6 +1954,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolMutateSocketRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolMutateSocketRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolMutateSocketRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolMutateSocketRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolMutateSocketRequest>);
 static_assert(offsetof(::test_protocols::wire::ChannelProtocolMutateSocketRequest, a) == 0);
@@ -1978,6 +2010,8 @@ struct TypeTraits<::test_protocols::wire::ChannelProtocolMutateSocketResponse> {
 template <>
 struct IsFidlType<::test_protocols::wire::ChannelProtocolMutateSocketResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::ChannelProtocolMutateSocketResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::ChannelProtocolMutateSocketResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ChannelProtocolMutateSocketResponse>);
 static_assert(offsetof(::test_protocols::wire::ChannelProtocolMutateSocketResponse, b) == 0);
@@ -2028,6 +2062,8 @@ struct TypeTraits<::test_protocols::wire::SyscallProtocolMethodCRequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::SyscallProtocolMethodCRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::SyscallProtocolMethodCRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::SyscallProtocolMethodCRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::SyscallProtocolMethodCRequest>);
@@ -2081,6 +2117,8 @@ struct TypeTraits<::test_protocols::wire::TransitionalRequestRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::TransitionalRequestRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::TransitionalRequestRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::TransitionalRequestRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::TransitionalRequestRequest>);
 static_assert(offsetof(::test_protocols::wire::TransitionalRequestRequest, x) == 0);
@@ -2128,6 +2166,8 @@ struct TypeTraits<::test_protocols::wire::TransitionalRequestResponse> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::TransitionalRequestResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::TransitionalRequestResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::TransitionalRequestResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::TransitionalRequestResponse>);
@@ -2177,6 +2217,8 @@ struct TypeTraits<::test_protocols::wire::TransitionalOneWayRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::TransitionalOneWayRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::TransitionalOneWayRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::TransitionalOneWayRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::TransitionalOneWayRequest>);
 static_assert(offsetof(::test_protocols::wire::TransitionalOneWayRequest, x) == 0);
@@ -2224,6 +2266,8 @@ struct TypeTraits<::test_protocols::wire::TransitionalEventRequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::TransitionalEventRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::TransitionalEventRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::TransitionalEventRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::TransitionalEventRequest>);
@@ -2275,6 +2319,8 @@ struct TypeTraits<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRe
 
 template <>
 struct IsFidlType<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::HandleRightsProtocolNoResponseMethodRequest>);
@@ -2330,6 +2376,8 @@ struct TypeTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodRequ
 template <>
 struct IsFidlType<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::HandleRightsProtocolResponseMethodRequest>);
 static_assert(offsetof(::test_protocols::wire::HandleRightsProtocolResponseMethodRequest, h) == 0);
@@ -2383,6 +2431,8 @@ struct TypeTraits<::test_protocols::wire::HandleRightsProtocolResponseMethodResp
 
 template <>
 struct IsFidlType<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::HandleRightsProtocolResponseMethodResponse>);
@@ -2438,6 +2488,8 @@ struct TypeTraits<::test_protocols::wire::HandleRightsProtocolAnEventRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::HandleRightsProtocolAnEventRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::HandleRightsProtocolAnEventRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::HandleRightsProtocolAnEventRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::HandleRightsProtocolAnEventRequest>);
 static_assert(offsetof(::test_protocols::wire::HandleRightsProtocolAnEventRequest, h) == 0);
@@ -2491,6 +2543,8 @@ struct TypeTraits<::test_protocols::wire::ProtocolEnds> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::ProtocolEnds> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::ProtocolEnds> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::ProtocolEnds> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ProtocolEnds>);
@@ -2558,6 +2612,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsClientEndsRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsClientEndsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsClientEndsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsClientEndsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsClientEndsRequest>);
 static_assert(offsetof(::test_protocols::wire::WithProtocolEndsClientEndsRequest, in) == 0);
@@ -2611,6 +2667,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsClientEndsResponse> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsClientEndsResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsClientEndsResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsClientEndsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsClientEndsResponse>);
@@ -2666,6 +2724,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsServerEndsRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsServerEndsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsServerEndsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsServerEndsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsServerEndsRequest>);
 static_assert(offsetof(::test_protocols::wire::WithProtocolEndsServerEndsRequest, in) == 0);
@@ -2719,6 +2779,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsServerEndsResponse> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsServerEndsResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsServerEndsResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsServerEndsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsServerEndsResponse>);
@@ -2774,6 +2836,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsRe
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest>);
 static_assert(offsetof(::test_protocols::wire::WithProtocolEndsStructContainingEndsRequest, in) == 0);
@@ -2828,6 +2892,8 @@ struct TypeTraits<::test_protocols::wire::WithProtocolEndsStructContainingEndsRe
 template <>
 struct IsFidlType<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse>);
 static_assert(offsetof(::test_protocols::wire::WithProtocolEndsStructContainingEndsResponse, out) == 0);
@@ -2878,6 +2944,8 @@ struct TypeTraits<::test_protocols::wire::ManyParametersFifteenRequest> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::ManyParametersFifteenRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::ManyParametersFifteenRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::ManyParametersFifteenRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::ManyParametersFifteenRequest>);
@@ -2983,6 +3051,8 @@ struct TypeTraits<::test_protocols::wire::MethodWithUnionUnionMethodRequest> {
 template <>
 struct IsFidlType<::test_protocols::wire::MethodWithUnionUnionMethodRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::MethodWithUnionUnionMethodRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocols::wire::MethodWithUnionUnionMethodRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::MethodWithUnionUnionMethodRequest>);
 static_assert(offsetof(::test_protocols::wire::MethodWithUnionUnionMethodRequest, u) == 0);
@@ -3030,6 +3100,8 @@ struct TypeTraits<::test_protocols::wire::MethodWithUnionUnionMethodResponse> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::MethodWithUnionUnionMethodResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::MethodWithUnionUnionMethodResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocols::wire::MethodWithUnionUnionMethodResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::MethodWithUnionUnionMethodResponse>);
@@ -3080,6 +3152,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult>
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxResponseAsStructResult>);
@@ -3207,6 +3281,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult>
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxErrorAsPrimitiveResult>);
 
@@ -3332,6 +3408,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxErrorAsEnumResult>);
@@ -3462,6 +3540,8 @@ struct TypeTraits<::test_protocols::wire::WithErrorSyntaxHandleInResultResult> {
 template <>
 struct IsFidlType<::test_protocols::wire::WithErrorSyntaxHandleInResultResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocols::wire::WithErrorSyntaxHandleInResultResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocols::wire::WithErrorSyntaxHandleInResultResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::WithErrorSyntaxHandleInResultResult>);
 
@@ -3590,6 +3670,8 @@ struct TypeTraits<::test_protocols::wire::TheUnion> {
 
 template <>
 struct IsFidlType<::test_protocols::wire::TheUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_protocols::wire::TheUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocols::wire::TheUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocols::wire::TheUnion>);

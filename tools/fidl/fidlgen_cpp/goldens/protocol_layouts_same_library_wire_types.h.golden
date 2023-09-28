@@ -3048,6 +3048,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload> {
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::TablePayload> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::TablePayload> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::TablePayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::TablePayload>);
 
@@ -3138,6 +3140,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWa
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest>);
@@ -3230,6 +3234,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse>);
 
@@ -3320,6 +3326,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorRequest>);
@@ -3412,6 +3420,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResponse>);
 
@@ -3502,6 +3512,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAno
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest>);
@@ -3594,6 +3606,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse>);
 
@@ -3684,6 +3698,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorRequest>);
@@ -3776,6 +3792,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResponse>);
 
@@ -3867,6 +3885,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::UnionPayload> {
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::UnionPayload> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::UnionPayload> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::UnionPayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::UnionPayload>);
@@ -3982,6 +4002,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedRequest>);
 
@@ -4096,6 +4118,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResponse>);
 
@@ -4209,6 +4233,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult>);
@@ -4336,6 +4362,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest>);
 
@@ -4449,6 +4477,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedWithErrorResult>);
@@ -4576,6 +4606,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult>);
 
@@ -4701,6 +4733,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNam
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNamedComposedWithErrorResult>);
@@ -4828,6 +4862,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLoc
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult>);
 
@@ -4953,6 +4989,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWi
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWithErrorResult>);
@@ -5080,6 +5118,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonRequest>);
 
@@ -5194,6 +5234,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResponse>);
 
@@ -5307,6 +5349,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult>);
@@ -5434,6 +5478,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonReq
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest>);
 
@@ -5547,6 +5593,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorResult>);

@@ -229,6 +229,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableString> {
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableString> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::StructWithNullableString> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableString> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableString>);
 static_assert(offsetof(::test_nullable::wire::StructWithNullableString, val) == 0);
@@ -274,6 +276,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableVector> {
 
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableVector> : public std::true_type {};
+template <>
+struct IsWire<::test_nullable::wire::StructWithNullableVector> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableVector> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableVector>);
@@ -325,6 +329,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableHandle> {
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableHandle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableHandle>);
 static_assert(offsetof(::test_nullable::wire::StructWithNullableHandle, val) == 0);
@@ -372,6 +378,8 @@ struct TypeTraits<::test_nullable::wire::SimpleProtocolAddRequest> {
 
 template <>
 struct IsFidlType<::test_nullable::wire::SimpleProtocolAddRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_nullable::wire::SimpleProtocolAddRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::SimpleProtocolAddRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleProtocolAddRequest>);
@@ -423,6 +431,8 @@ struct TypeTraits<::test_nullable::wire::SimpleProtocolAddResponse> {
 template <>
 struct IsFidlType<::test_nullable::wire::SimpleProtocolAddResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::SimpleProtocolAddResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::SimpleProtocolAddResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleProtocolAddResponse>);
 static_assert(offsetof(::test_nullable::wire::SimpleProtocolAddResponse, sum) == 0);
@@ -472,6 +482,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableProtocol> {
 
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
+template <>
+struct IsWire<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableProtocol> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableProtocol>);
@@ -525,6 +537,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableRequest> {
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableRequest>);
 static_assert(offsetof(::test_nullable::wire::StructWithNullableRequest, val) == 0);
@@ -573,6 +587,8 @@ struct TypeTraits<::test_nullable::wire::Int32Wrapper> {
 template <>
 struct IsFidlType<::test_nullable::wire::Int32Wrapper> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::Int32Wrapper> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::Int32Wrapper> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::Int32Wrapper>);
 static_assert(offsetof(::test_nullable::wire::Int32Wrapper, val) == 0);
@@ -618,6 +634,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableStruct> {
 
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableStruct> : public std::true_type {};
+template <>
+struct IsWire<::test_nullable::wire::StructWithNullableStruct> : public std::true_type {};
 template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableStruct>);
@@ -665,6 +683,8 @@ struct TypeTraits<::test_nullable::wire::StructWithNullableUnion> {
 template <>
 struct IsFidlType<::test_nullable::wire::StructWithNullableUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_nullable::wire::StructWithNullableUnion> : public std::true_type {};
+template <>
 struct IsStruct<::test_nullable::wire::StructWithNullableUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::StructWithNullableUnion>);
 static_assert(offsetof(::test_nullable::wire::StructWithNullableUnion, val) == 0);
@@ -710,6 +730,8 @@ struct TypeTraits<::test_nullable::wire::SimpleUnion> {
 
 template <>
 struct IsFidlType<::test_nullable::wire::SimpleUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_nullable::wire::SimpleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_nullable::wire::SimpleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_nullable::wire::SimpleUnion>);

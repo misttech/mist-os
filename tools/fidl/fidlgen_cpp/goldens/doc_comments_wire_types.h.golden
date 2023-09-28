@@ -504,6 +504,8 @@ struct TypeTraits<::test_doccomments::wire::Struct> {
 template <>
 struct IsFidlType<::test_doccomments::wire::Struct> : public std::true_type {};
 template <>
+struct IsWire<::test_doccomments::wire::Struct> : public std::true_type {};
+template <>
 struct IsStruct<::test_doccomments::wire::Struct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::wire::Struct>);
 static_assert(offsetof(::test_doccomments::wire::Struct, field) == 0);
@@ -549,6 +551,8 @@ struct TypeTraits<::test_doccomments::wire::Table> {
 
 template <>
 struct IsFidlType<::test_doccomments::wire::Table> : public std::true_type {};
+template <>
+struct IsWire<::test_doccomments::wire::Table> : public std::true_type {};
 template <>
 struct IsTable<::test_doccomments::wire::Table> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::wire::Table>);
@@ -636,6 +640,8 @@ struct TypeTraits<::test_doccomments::wire::StrictUnion> {
 
 template <>
 struct IsFidlType<::test_doccomments::wire::StrictUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_doccomments::wire::StrictUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_doccomments::wire::StrictUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::wire::StrictUnion>);
@@ -746,6 +752,8 @@ struct TypeTraits<::test_doccomments::wire::FlexibleUnion> {
 
 template <>
 struct IsFidlType<::test_doccomments::wire::FlexibleUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_doccomments::wire::FlexibleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_doccomments::wire::FlexibleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_doccomments::wire::FlexibleUnion>);

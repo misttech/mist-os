@@ -238,6 +238,8 @@ struct TypeTraits<{{ . }}> {
 template <>
 struct IsFidlType<{{ . }}> : public std::true_type {};
 template <>
+struct IsWire<{{ . }}> : public std::true_type {};
+template <>
 struct IsUnion<{{ . }}> : public std::true_type {};
 static_assert(std::is_standard_layout_v<{{ . }}>);
 

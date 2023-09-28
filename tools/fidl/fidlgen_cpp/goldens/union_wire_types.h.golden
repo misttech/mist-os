@@ -2144,6 +2144,8 @@ struct TypeTraits<::test_union::wire::Pizza> {
 template <>
 struct IsFidlType<::test_union::wire::Pizza> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::Pizza> : public std::true_type {};
+template <>
 struct IsStruct<::test_union::wire::Pizza> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::Pizza>);
 static_assert(offsetof(::test_union::wire::Pizza, toppings) == 0);
@@ -2191,6 +2193,8 @@ struct TypeTraits<::test_union::wire::Pasta> {
 
 template <>
 struct IsFidlType<::test_union::wire::Pasta> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::Pasta> : public std::true_type {};
 template <>
 struct IsStruct<::test_union::wire::Pasta> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::Pasta>);
@@ -2240,6 +2244,8 @@ struct TypeTraits<::test_union::wire::NullableUnionStruct> {
 template <>
 struct IsFidlType<::test_union::wire::NullableUnionStruct> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::NullableUnionStruct> : public std::true_type {};
+template <>
 struct IsStruct<::test_union::wire::NullableUnionStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::NullableUnionStruct>);
 static_assert(offsetof(::test_union::wire::NullableUnionStruct, the_union) == 0);
@@ -2287,6 +2293,8 @@ struct TypeTraits<::test_union::wire::Empty> {
 
 template <>
 struct IsFidlType<::test_union::wire::Empty> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::Empty> : public std::true_type {};
 template <>
 struct IsStruct<::test_union::wire::Empty> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::Empty>);
@@ -2339,6 +2347,8 @@ struct TypeTraits<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeS
 template <>
 struct IsFidlType<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse>);
 static_assert(offsetof(::test_union::wire::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse, xu) == 0);
@@ -2386,6 +2396,8 @@ struct TypeTraits<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMust
 
 template <>
 struct IsFidlType<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse>);
@@ -2435,6 +2447,8 @@ struct TypeTraits<::test_union::wire::StructWithNullableUnion> {
 template <>
 struct IsFidlType<::test_union::wire::StructWithNullableUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::StructWithNullableUnion> : public std::true_type {};
+template <>
 struct IsStruct<::test_union::wire::StructWithNullableUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StructWithNullableUnion>);
 static_assert(offsetof(::test_union::wire::StructWithNullableUnion, x1) == 0);
@@ -2482,6 +2496,8 @@ struct TypeTraits<::test_union::wire::UnionSandwich> {
 
 template <>
 struct IsFidlType<::test_union::wire::UnionSandwich> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::UnionSandwich> : public std::true_type {};
 template <>
 struct IsStruct<::test_union::wire::UnionSandwich> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::UnionSandwich>);
@@ -2544,6 +2560,8 @@ struct TypeTraits<::test_union::wire::PizzaOrPasta> {
 
 template <>
 struct IsFidlType<::test_union::wire::PizzaOrPasta> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::PizzaOrPasta> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::PizzaOrPasta> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::PizzaOrPasta>);
@@ -2671,6 +2689,8 @@ struct TypeTraits<::test_union::wire::ExplicitPizzaOrPasta> {
 template <>
 struct IsFidlType<::test_union::wire::ExplicitPizzaOrPasta> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::ExplicitPizzaOrPasta> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::ExplicitPizzaOrPasta> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitPizzaOrPasta>);
 
@@ -2796,6 +2816,8 @@ struct TypeTraits<::test_union::wire::FlexiblePizzaOrPasta> {
 
 template <>
 struct IsFidlType<::test_union::wire::FlexiblePizzaOrPasta> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::FlexiblePizzaOrPasta> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::FlexiblePizzaOrPasta> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::FlexiblePizzaOrPasta>);
@@ -2923,6 +2945,8 @@ struct TypeTraits<::test_union::wire::StrictPizzaOrPasta> {
 template <>
 struct IsFidlType<::test_union::wire::StrictPizzaOrPasta> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::StrictPizzaOrPasta> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::StrictPizzaOrPasta> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StrictPizzaOrPasta>);
 
@@ -3048,6 +3072,8 @@ struct TypeTraits<::test_union::wire::Union> {
 
 template <>
 struct IsFidlType<::test_union::wire::Union> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::Union> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::Union> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::Union>);
@@ -3187,6 +3213,8 @@ struct TypeTraits<::test_union::wire::FlexibleUnion> {
 template <>
 struct IsFidlType<::test_union::wire::FlexibleUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::FlexibleUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::FlexibleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::FlexibleUnion>);
 
@@ -3324,6 +3352,8 @@ struct TypeTraits<::test_union::wire::StrictUnion> {
 
 template <>
 struct IsFidlType<::test_union::wire::StrictUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::StrictUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::StrictUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StrictUnion>);
@@ -3463,6 +3493,8 @@ struct TypeTraits<::test_union::wire::FieldCollision> {
 template <>
 struct IsFidlType<::test_union::wire::FieldCollision> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::FieldCollision> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::FieldCollision> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::FieldCollision>);
 
@@ -3576,6 +3608,8 @@ struct TypeTraits<::test_union::wire::ExplicitUnion> {
 
 template <>
 struct IsFidlType<::test_union::wire::ExplicitUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::ExplicitUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::ExplicitUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitUnion>);
@@ -3703,6 +3737,8 @@ struct TypeTraits<::test_union::wire::ReverseOrdinalUnion> {
 template <>
 struct IsFidlType<::test_union::wire::ReverseOrdinalUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::ReverseOrdinalUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::ReverseOrdinalUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ReverseOrdinalUnion>);
 
@@ -3828,6 +3864,8 @@ struct TypeTraits<::test_union::wire::FlexibleFoo> {
 
 template <>
 struct IsFidlType<::test_union::wire::FlexibleFoo> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::FlexibleFoo> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::FlexibleFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::FlexibleFoo>);
@@ -3955,6 +3993,8 @@ struct TypeTraits<::test_union::wire::StrictFoo> {
 template <>
 struct IsFidlType<::test_union::wire::StrictFoo> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::StrictFoo> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::StrictFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StrictFoo>);
 
@@ -4080,6 +4120,8 @@ struct TypeTraits<::test_union::wire::ExplicitFoo> {
 
 template <>
 struct IsFidlType<::test_union::wire::ExplicitFoo> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::ExplicitFoo> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::ExplicitFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitFoo>);
@@ -4207,6 +4249,8 @@ struct TypeTraits<::test_union::wire::ExplicitStrictFoo> {
 template <>
 struct IsFidlType<::test_union::wire::ExplicitStrictFoo> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::ExplicitStrictFoo> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::ExplicitStrictFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitStrictFoo>);
 
@@ -4333,6 +4377,8 @@ struct TypeTraits<::test_union::wire::OlderSimpleUnion> {
 template <>
 struct IsFidlType<::test_union::wire::OlderSimpleUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::OlderSimpleUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::OlderSimpleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::OlderSimpleUnion>);
 
@@ -4458,6 +4504,8 @@ struct TypeTraits<::test_union::wire::NewerSimpleUnion> {
 
 template <>
 struct IsFidlType<::test_union::wire::NewerSimpleUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::NewerSimpleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::NewerSimpleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::NewerSimpleUnion>);
@@ -4597,6 +4645,8 @@ struct TypeTraits<::test_union::wire::StrictSimpleUnion> {
 template <>
 struct IsFidlType<::test_union::wire::StrictSimpleUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::StrictSimpleUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::StrictSimpleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StrictSimpleUnion>);
 
@@ -4735,6 +4785,8 @@ struct TypeTraits<::test_union::wire::UnionContainingEmptyStruct> {
 template <>
 struct IsFidlType<::test_union::wire::UnionContainingEmptyStruct> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::UnionContainingEmptyStruct> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::UnionContainingEmptyStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::UnionContainingEmptyStruct>);
 
@@ -4849,6 +4901,8 @@ struct TypeTraits<::test_union::wire::StrictBoundedUnion> {
 template <>
 struct IsFidlType<::test_union::wire::StrictBoundedUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::StrictBoundedUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::StrictBoundedUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::StrictBoundedUnion>);
 
@@ -4962,6 +5016,8 @@ struct TypeTraits<::test_union::wire::ExplicitFlexibleUnion> {
 
 template <>
 struct IsFidlType<::test_union::wire::ExplicitFlexibleUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::ExplicitFlexibleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::ExplicitFlexibleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::ExplicitFlexibleUnion>);
@@ -5089,6 +5145,8 @@ struct TypeTraits<::test_union::wire::UnionWithAttributes> {
 template <>
 struct IsFidlType<::test_union::wire::UnionWithAttributes> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::UnionWithAttributes> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::UnionWithAttributes> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::UnionWithAttributes>);
 
@@ -5203,6 +5261,8 @@ struct TypeTraits<::test_union::wire::EmptyFlexibleUnion> {
 template <>
 struct IsFidlType<::test_union::wire::EmptyFlexibleUnion> : public std::true_type {};
 template <>
+struct IsWire<::test_union::wire::EmptyFlexibleUnion> : public std::true_type {};
+template <>
 struct IsUnion<::test_union::wire::EmptyFlexibleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::EmptyFlexibleUnion>);
 
@@ -5304,6 +5364,8 @@ struct TypeTraits<::test_union::wire::OnlyReservedFlexibleUnion> {
 
 template <>
 struct IsFidlType<::test_union::wire::OnlyReservedFlexibleUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_union::wire::OnlyReservedFlexibleUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_union::wire::OnlyReservedFlexibleUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_union::wire::OnlyReservedFlexibleUnion>);

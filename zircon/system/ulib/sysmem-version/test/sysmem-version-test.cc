@@ -26,20 +26,6 @@ namespace {
 
 constexpr uint32_t kRunCount = 300;
 
-// HasWireTypeTraits - detect if a type has typetraits that seems to look like a FIDL wire type.
-//
-// This isn't entirely unambiguous, but probably good enough for the intended purpose in this test
-// context.
-template <typename FidlType, typename enable = void>
-class HasWireTypeTraits : public std::false_type {};
-constexpr uint32_t kConstexprUint32 = 0;
-template <typename FidlType>
-class HasWireTypeTraits<
-    FidlType,
-    std::enable_if_t<std::is_same_v<decltype((kConstexprUint32)),
-                                    decltype((fidl::TypeTraits<FidlType>::kPrimarySizeV1))>>>
-    : public std::true_type {};
-
 // IsNaturalFidlType<> - This is an ad-hoc detection of whether a given FidlType is a natural fidl
 // type.  Types which are the same type regardless of natural vs. wire will have value true, as the
 // type is valid for use as a natural FIDL type - such types are essentially both natural and wire.
@@ -58,7 +44,7 @@ class IsNaturalFidlType : public std::false_type {};
 template <typename FidlType>
 class IsNaturalFidlType<FidlType, std::enable_if_t<fidl::IsFidlType<FidlType>::value &&
                                                    fidl::IsFidlObject<FidlType>::value &&
-                                                   !HasWireTypeTraits<FidlType>::value>>
+                                                   !fidl::IsWire<FidlType>::value>>
     : public std::true_type {};
 // Non-aggregate FIDL types are shared between natural and wire, so IsNaturalFidlType<> is true for
 // non-aggregate types.

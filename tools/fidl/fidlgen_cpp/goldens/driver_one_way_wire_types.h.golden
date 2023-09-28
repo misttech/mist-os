@@ -71,6 +71,8 @@ struct TypeTraits<::test_driveroneway::wire::Payload> {
 template <>
 struct IsFidlType<::test_driveroneway::wire::Payload> : public std::true_type {};
 template <>
+struct IsWire<::test_driveroneway::wire::Payload> : public std::true_type {};
+template <>
 struct IsStruct<::test_driveroneway::wire::Payload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driveroneway::wire::Payload>);
 static_assert(offsetof(::test_driveroneway::wire::Payload, value) == 0);
@@ -116,6 +118,8 @@ struct TypeTraits<::test_driveroneway::wire::OneWaySendRequest> {
 
 template <>
 struct IsFidlType<::test_driveroneway::wire::OneWaySendRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_driveroneway::wire::OneWaySendRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_driveroneway::wire::OneWaySendRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_driveroneway::wire::OneWaySendRequest>);

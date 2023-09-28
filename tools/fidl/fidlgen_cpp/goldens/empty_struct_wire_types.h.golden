@@ -95,6 +95,8 @@ struct TypeTraits<::test_emptystruct::wire::Empty> {
 template <>
 struct IsFidlType<::test_emptystruct::wire::Empty> : public std::true_type {};
 template <>
+struct IsWire<::test_emptystruct::wire::Empty> : public std::true_type {};
+template <>
 struct IsStruct<::test_emptystruct::wire::Empty> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_emptystruct::wire::Empty>);
 static_assert(offsetof(::test_emptystruct::wire::Empty, __reserved) == 0);
@@ -144,6 +146,8 @@ struct TypeTraits<::test_emptystruct::wire::EmptyProtocolSendRequest> {
 template <>
 struct IsFidlType<::test_emptystruct::wire::EmptyProtocolSendRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_emptystruct::wire::EmptyProtocolSendRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_emptystruct::wire::EmptyProtocolSendRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_emptystruct::wire::EmptyProtocolSendRequest>);
 static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendRequest, e) == 0);
@@ -189,6 +193,8 @@ struct TypeTraits<::test_emptystruct::wire::EmptyProtocolReceiveRequest> {
 
 template <>
 struct IsFidlType<::test_emptystruct::wire::EmptyProtocolReceiveRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_emptystruct::wire::EmptyProtocolReceiveRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_emptystruct::wire::EmptyProtocolReceiveRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_emptystruct::wire::EmptyProtocolReceiveRequest>);
@@ -236,6 +242,8 @@ struct TypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> 
 template <>
 struct IsFidlType<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest>);
 static_assert(offsetof(::test_emptystruct::wire::EmptyProtocolSendAndReceiveRequest, e) == 0);
@@ -281,6 +289,8 @@ struct TypeTraits<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse>
 
 template <>
 struct IsFidlType<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_emptystruct::wire::EmptyProtocolSendAndReceiveResponse>);

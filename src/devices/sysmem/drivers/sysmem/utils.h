@@ -98,28 +98,11 @@ constexpr TypeOut debug_safe_cast(TypeIn in) {
 // Ensure we get/permit a constexpr cast when possible.
 static_assert(4u == safe_cast<uint32_t>(4ull));
 
-// As of this comment, fidl natural types don't admit fidl::IsTable<>, but probably should.  Also
-// fidl::ToWire() is the only way short of ::fidl::internal to find the wire type corresponding to
-// a natural type, but can't be used in a SFINAE context because it triggers a static_assert().
-//
-// Once the issues in the previosu paragraph are addressed in FIDL generated code, we can simplify
-// or eliminate the FIDL-related workaround templates below.
-
-template <typename FidlType, typename enable = void>
-class HasWireTypeTraits : public std::false_type {};
-constexpr uint32_t kConstexprUint32 = 0;
-template <typename FidlType>
-class HasWireTypeTraits<
-    FidlType,
-    std::enable_if_t<std::is_same_v<decltype((kConstexprUint32)),
-                                    decltype((fidl::TypeTraits<FidlType>::kPrimarySizeV1))>>>
-    : public std::true_type {};
-
 template <typename FidlType, typename enable = void>
 class IsNaturalFidlTable : public std::false_type {};
 template <typename FidlType>
-class IsNaturalFidlTable<FidlType, std::enable_if_t<fidl::IsTable<FidlType>::value &&
-                                                    !HasWireTypeTraits<FidlType>::value>>
+class IsNaturalFidlTable<
+    FidlType, std::enable_if_t<fidl::IsTable<FidlType>::value && !fidl::IsWire<FidlType>::value>>
     : public std::true_type {};
 
 static_assert(IsNaturalFidlTable<fuchsia_sysmem2::BufferUsage>::value);

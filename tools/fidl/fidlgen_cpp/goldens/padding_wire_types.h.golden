@@ -224,6 +224,8 @@ struct TypeTraits<::test_padding::wire::Padding1ByteEnd> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding1ByteEnd> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding1ByteEnd> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding1ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding1ByteEnd>);
 static_assert(offsetof(::test_padding::wire::Padding1ByteEnd, a) == 0);
@@ -275,6 +277,8 @@ struct TypeTraits<::test_padding::wire::Padding2ByteEnd> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding2ByteEnd> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding2ByteEnd> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding2ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding2ByteEnd>);
@@ -328,6 +332,8 @@ struct TypeTraits<::test_padding::wire::Padding3ByteEnd> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding3ByteEnd> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding3ByteEnd> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding3ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding3ByteEnd>);
 static_assert(offsetof(::test_padding::wire::Padding3ByteEnd, a) == 0);
@@ -380,6 +386,8 @@ struct TypeTraits<::test_padding::wire::Padding4ByteEnd> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding4ByteEnd> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding4ByteEnd> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding4ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding4ByteEnd>);
 static_assert(offsetof(::test_padding::wire::Padding4ByteEnd, a) == 0);
@@ -431,6 +439,8 @@ struct TypeTraits<::test_padding::wire::Padding5ByteEnd> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding5ByteEnd> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding5ByteEnd> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding5ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding5ByteEnd>);
@@ -488,6 +498,8 @@ struct TypeTraits<::test_padding::wire::Padding6ByteEnd> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding6ByteEnd> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding6ByteEnd> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding6ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding6ByteEnd>);
 static_assert(offsetof(::test_padding::wire::Padding6ByteEnd, a) == 0);
@@ -539,6 +551,8 @@ struct TypeTraits<::test_padding::wire::Padding7ByteEnd> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding7ByteEnd> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding7ByteEnd> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding7ByteEnd> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding7ByteEnd>);
@@ -592,6 +606,8 @@ struct TypeTraits<::test_padding::wire::Padding1ByteMiddle> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding1ByteMiddle> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding1ByteMiddle> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding1ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding1ByteMiddle>);
 static_assert(offsetof(::test_padding::wire::Padding1ByteMiddle, a) == 0);
@@ -643,6 +659,8 @@ struct TypeTraits<::test_padding::wire::Padding2ByteMiddle> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding2ByteMiddle> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding2ByteMiddle> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding2ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding2ByteMiddle>);
@@ -696,6 +714,8 @@ struct TypeTraits<::test_padding::wire::Padding3ByteMiddle> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding3ByteMiddle> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding3ByteMiddle> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding3ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding3ByteMiddle>);
 static_assert(offsetof(::test_padding::wire::Padding3ByteMiddle, a) == 0);
@@ -748,6 +768,8 @@ struct TypeTraits<::test_padding::wire::Padding4ByteMiddle> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding4ByteMiddle> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding4ByteMiddle> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding4ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding4ByteMiddle>);
 static_assert(offsetof(::test_padding::wire::Padding4ByteMiddle, a) == 0);
@@ -799,6 +821,8 @@ struct TypeTraits<::test_padding::wire::Padding5ByteMiddle> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding5ByteMiddle> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding5ByteMiddle> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding5ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding5ByteMiddle>);
@@ -856,6 +880,8 @@ struct TypeTraits<::test_padding::wire::Padding6ByteMiddle> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding6ByteMiddle> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding6ByteMiddle> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding6ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding6ByteMiddle>);
 static_assert(offsetof(::test_padding::wire::Padding6ByteMiddle, a) == 0);
@@ -908,6 +934,8 @@ struct TypeTraits<::test_padding::wire::Padding7ByteMiddle> {
 template <>
 struct IsFidlType<::test_padding::wire::Padding7ByteMiddle> : public std::true_type {};
 template <>
+struct IsWire<::test_padding::wire::Padding7ByteMiddle> : public std::true_type {};
+template <>
 struct IsStruct<::test_padding::wire::Padding7ByteMiddle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding7ByteMiddle>);
 static_assert(offsetof(::test_padding::wire::Padding7ByteMiddle, a) == 0);
@@ -959,6 +987,8 @@ struct TypeTraits<::test_padding::wire::Padding4ByteAlignmentLength12> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding4ByteAlignmentLength12> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding4ByteAlignmentLength12> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding4ByteAlignmentLength12> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding4ByteAlignmentLength12>);
@@ -1021,6 +1051,8 @@ struct TypeTraits<::test_padding::wire::Padding2ByteAlignmentLength6> {
 
 template <>
 struct IsFidlType<::test_padding::wire::Padding2ByteAlignmentLength6> : public std::true_type {};
+template <>
+struct IsWire<::test_padding::wire::Padding2ByteAlignmentLength6> : public std::true_type {};
 template <>
 struct IsStruct<::test_padding::wire::Padding2ByteAlignmentLength6> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_padding::wire::Padding2ByteAlignmentLength6>);

@@ -584,6 +584,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequ
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest>);
 static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartRequest, a) == 0);
@@ -629,6 +631,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResp
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResponse>);
@@ -676,6 +680,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoReques
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest>);
 static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRequest, a) == 0);
@@ -721,6 +727,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoRespon
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse>);
@@ -768,6 +776,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzze
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest>);
 static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerRequest, a) == 0);
@@ -813,6 +823,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzze
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResponse>);
@@ -860,6 +872,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequ
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest>);
 static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustRequest, a) == 0);
@@ -905,6 +919,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResp
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse>);
@@ -952,6 +968,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkalle
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest>);
 static_assert(offsetof(::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerRequest, a) == 0);
@@ -997,6 +1015,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkalle
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResponse>);
@@ -1044,6 +1064,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLib
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary>);
 static_assert(offsetof(::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary, a) == 0);
@@ -1090,6 +1112,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary> 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary> : public std::true_type {};
+template <>
 struct IsStruct<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary>);
 static_assert(offsetof(::test_bindingsdenylist::wire::OnlyAppearsInImportingLibrary, member_only_appears_in_importing_library) == 0);
@@ -1135,6 +1159,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::OnlyLlcpp> {
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::OnlyLlcpp> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::OnlyLlcpp> : public std::true_type {};
 template <>
 struct IsUnion<::test_bindingsdenylist::wire::OnlyLlcpp> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::OnlyLlcpp>);
@@ -1245,6 +1271,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResu
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyDartResult>);
@@ -1368,6 +1396,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResult>);
 
@@ -1489,6 +1519,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzze
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyLibfuzzerResult>);
@@ -1612,6 +1644,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResu
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
 template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResult>);
 
@@ -1733,6 +1767,8 @@ struct TypeTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkalle
 
 template <>
 struct IsFidlType<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
+template <>
+struct IsWire<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult>);

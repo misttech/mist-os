@@ -115,6 +115,8 @@ struct TypeTraits<::test_protocolrequest::wire::ParentGetChildResponse> {
 template <>
 struct IsFidlType<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocolrequest::wire::ParentGetChildResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentGetChildResponse>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentGetChildResponse, c) == 0);
@@ -166,6 +168,8 @@ struct TypeTraits<::test_protocolrequest::wire::ParentGetChildRequestResponse> {
 
 template <>
 struct IsFidlType<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocolrequest::wire::ParentGetChildRequestResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentGetChildRequestResponse>);
@@ -219,6 +223,8 @@ struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequest> {
 template <>
 struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentTakeChildRequest>);
 static_assert(offsetof(::test_protocolrequest::wire::ParentTakeChildRequest, c) == 0);
@@ -270,6 +276,8 @@ struct TypeTraits<::test_protocolrequest::wire::ParentTakeChildRequestRequest> {
 
 template <>
 struct IsFidlType<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_protocolrequest::wire::ParentTakeChildRequestRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocolrequest::wire::ParentTakeChildRequestRequest>);

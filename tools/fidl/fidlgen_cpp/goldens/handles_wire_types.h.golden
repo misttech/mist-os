@@ -186,6 +186,8 @@ struct TypeTraits<::test_handles::wire::Handles> {
 template <>
 struct IsFidlType<::test_handles::wire::Handles> : public std::true_type {};
 template <>
+struct IsWire<::test_handles::wire::Handles> : public std::true_type {};
+template <>
 struct IsStruct<::test_handles::wire::Handles> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handles::wire::Handles>);
 static_assert(offsetof(::test_handles::wire::Handles, plain_handle) == 0);
@@ -369,6 +371,8 @@ struct TypeTraits<::test_handles::wire::FdfHandles> {
 
 template <>
 struct IsFidlType<::test_handles::wire::FdfHandles> : public std::true_type {};
+template <>
+struct IsWire<::test_handles::wire::FdfHandles> : public std::true_type {};
 template <>
 struct IsStruct<::test_handles::wire::FdfHandles> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handles::wire::FdfHandles>);

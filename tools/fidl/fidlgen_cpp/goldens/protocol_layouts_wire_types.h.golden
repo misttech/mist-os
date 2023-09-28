@@ -1870,6 +1870,8 @@ struct TypeTraits<::test_protocollayouts::wire::LocalTablePayload> {
 template <>
 struct IsFidlType<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayouts::wire::LocalTablePayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalTablePayload>);
 
@@ -1960,6 +1962,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> {
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOneWayAnonRequest>);
@@ -2052,6 +2056,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonResponse>);
 
@@ -2142,6 +2148,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorRequest>);
@@ -2234,6 +2242,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorRespo
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResponse>);
 
@@ -2325,6 +2335,8 @@ struct TypeTraits<::test_protocollayouts::wire::LocalUnionPayload> {
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::LocalUnionPayload> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::LocalUnionPayload>);
@@ -2439,6 +2451,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErro
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult>);
@@ -2566,6 +2580,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnImportWithErrorRes
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult>);
 
@@ -2691,6 +2707,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithError
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult>);
@@ -2818,6 +2836,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResu
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult>);
 
@@ -2944,6 +2964,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> {
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest>);
 
@@ -3058,6 +3080,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse>);
 
@@ -3171,6 +3195,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorR
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult>);
@@ -3298,6 +3324,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonRequest> {
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolOnAnonRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnAnonRequest>);
 
@@ -3411,6 +3439,8 @@ struct TypeTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResul
 
 template <>
 struct IsFidlType<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
+template <>
+struct IsWire<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult>);

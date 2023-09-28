@@ -246,6 +246,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictRes
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest>);
 static_assert(offsetof(::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleRequest, s) == 0);
@@ -291,6 +293,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestStrictRes
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::ProtocolRequestStrictResponseFlexibleResponse>);
@@ -338,6 +342,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleR
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest>);
 static_assert(offsetof(::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictRequest, s) == 0);
@@ -384,6 +390,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleR
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse>);
 static_assert(offsetof(::test_requestflexibleenvelope::wire::ProtocolRequestFlexibleResponseStrictResponse, f) == 0);
@@ -429,6 +437,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::FlexibleFoo> {
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::FlexibleFoo> : public std::true_type {};
+template <>
+struct IsWire<::test_requestflexibleenvelope::wire::FlexibleFoo> : public std::true_type {};
 template <>
 struct IsUnion<::test_requestflexibleenvelope::wire::FlexibleFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::FlexibleFoo>);
@@ -551,6 +561,8 @@ struct TypeTraits<::test_requestflexibleenvelope::wire::StrictFoo> {
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::wire::StrictFoo> : public std::true_type {};
+template <>
+struct IsWire<::test_requestflexibleenvelope::wire::StrictFoo> : public std::true_type {};
 template <>
 struct IsUnion<::test_requestflexibleenvelope::wire::StrictFoo> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_requestflexibleenvelope::wire::StrictFoo>);

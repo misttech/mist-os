@@ -614,6 +614,8 @@ struct TypeTraits<::test_handlesintypes::wire::HandlesInTypes> {
 template <>
 struct IsFidlType<::test_handlesintypes::wire::HandlesInTypes> : public std::true_type {};
 template <>
+struct IsWire<::test_handlesintypes::wire::HandlesInTypes> : public std::true_type {};
+template <>
 struct IsStruct<::test_handlesintypes::wire::HandlesInTypes> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::HandlesInTypes>);
 static_assert(offsetof(::test_handlesintypes::wire::HandlesInTypes, normal_handle) == 0);
@@ -690,6 +692,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceStruct> {
 template <>
 struct IsFidlType<::test_handlesintypes::wire::EmptyResourceStruct> : public std::true_type {};
 template <>
+struct IsWire<::test_handlesintypes::wire::EmptyResourceStruct> : public std::true_type {};
+template <>
 struct IsStruct<::test_handlesintypes::wire::EmptyResourceStruct> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::EmptyResourceStruct>);
 static_assert(offsetof(::test_handlesintypes::wire::EmptyResourceStruct, __reserved) == 0);
@@ -744,6 +748,8 @@ struct TypeTraits<::test_handlesintypes::wire::TableWithHandle> {
 
 template <>
 struct IsFidlType<::test_handlesintypes::wire::TableWithHandle> : public std::true_type {};
+template <>
+struct IsWire<::test_handlesintypes::wire::TableWithHandle> : public std::true_type {};
 template <>
 struct IsTable<::test_handlesintypes::wire::TableWithHandle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::TableWithHandle>);
@@ -838,6 +844,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceTable> {
 template <>
 struct IsFidlType<::test_handlesintypes::wire::EmptyResourceTable> : public std::true_type {};
 template <>
+struct IsWire<::test_handlesintypes::wire::EmptyResourceTable> : public std::true_type {};
+template <>
 struct IsTable<::test_handlesintypes::wire::EmptyResourceTable> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::EmptyResourceTable>);
 
@@ -918,6 +926,8 @@ struct TypeTraits<::test_handlesintypes::wire::UnionWithHandle> {
 
 template <>
 struct IsFidlType<::test_handlesintypes::wire::UnionWithHandle> : public std::true_type {};
+template <>
+struct IsWire<::test_handlesintypes::wire::UnionWithHandle> : public std::true_type {};
 template <>
 struct IsUnion<::test_handlesintypes::wire::UnionWithHandle> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::UnionWithHandle>);
@@ -1034,6 +1044,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceUnion> {
 
 template <>
 struct IsFidlType<::test_handlesintypes::wire::EmptyResourceUnion> : public std::true_type {};
+template <>
+struct IsWire<::test_handlesintypes::wire::EmptyResourceUnion> : public std::true_type {};
 template <>
 struct IsUnion<::test_handlesintypes::wire::EmptyResourceUnion> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_handlesintypes::wire::EmptyResourceUnion>);

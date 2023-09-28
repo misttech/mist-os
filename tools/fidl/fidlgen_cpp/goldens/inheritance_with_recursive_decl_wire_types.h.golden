@@ -87,6 +87,8 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>
 template <>
 struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ParentFirstRequest>);
 static_assert(offsetof(::test_inheritancewithrecursivedecl::wire::ParentFirstRequest, request) == 0);
@@ -138,6 +140,8 @@ struct TypeTraits<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>
 
 template <>
 struct IsFidlType<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 template <>
 struct IsStruct<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_inheritancewithrecursivedecl::wire::ChildSecondRequest>);

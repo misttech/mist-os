@@ -12769,6 +12769,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -12816,6 +12818,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResponse>);
@@ -12868,6 +12872,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -12915,6 +12921,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResponse>);
@@ -12967,6 +12975,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse, some_field) == 0);
@@ -13014,6 +13024,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResponse>);
@@ -13066,6 +13078,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse, some_field) == 0);
@@ -13114,6 +13128,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsRequest, some_field) == 0);
@@ -13161,6 +13177,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResponse>);
@@ -13213,6 +13231,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResponse, some_field) == 0);
@@ -13261,6 +13281,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsRequest, some_field) == 0);
@@ -13308,6 +13330,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResponse>);
@@ -13360,6 +13384,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResponse, some_field) == 0);
@@ -13408,6 +13434,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -13455,6 +13483,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResponse>);
@@ -13507,6 +13537,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -13555,6 +13587,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsRequest, some_field) == 0);
@@ -13602,6 +13636,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResponse>);
@@ -13654,6 +13690,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse, some_field) == 0);
@@ -13702,6 +13740,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest, some_field) == 0);
@@ -13749,6 +13789,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResponse>);
@@ -13801,6 +13843,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse, some_field) == 0);
@@ -13849,6 +13893,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -13896,6 +13942,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResponse>);
@@ -13948,6 +13996,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -13996,6 +14046,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsRequest, some_field) == 0);
@@ -14043,6 +14095,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResponse>);
@@ -14095,6 +14149,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse, some_field) == 0);
@@ -14143,6 +14199,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -14190,6 +14248,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResponse>);
@@ -14242,6 +14302,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -14289,6 +14351,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResponse>);
@@ -14341,6 +14405,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse, some_field) == 0);
@@ -14388,6 +14454,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse>);
@@ -14440,6 +14508,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse, some_field) == 0);
@@ -14488,6 +14558,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -14535,6 +14607,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse>);
@@ -14587,6 +14661,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -14635,6 +14711,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse, some_field) == 0);
@@ -14682,6 +14760,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse>);
@@ -14734,6 +14814,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
+template <>
 struct IsStruct<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse>);
 static_assert(offsetof(::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse, some_field) == 0);
@@ -14782,6 +14864,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse>);
@@ -14874,6 +14958,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResponse>);
 
@@ -14964,6 +15050,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResponse>);
@@ -15056,6 +15144,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse>);
 
@@ -15146,6 +15236,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableRequest>);
@@ -15238,6 +15330,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResponse>);
 
@@ -15328,6 +15422,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableRequest>);
@@ -15420,6 +15516,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResponse>);
 
@@ -15510,6 +15608,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>);
@@ -15602,6 +15702,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse>);
 
@@ -15692,6 +15794,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableRequest>);
@@ -15784,6 +15888,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResponse>);
 
@@ -15874,6 +15980,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableRequest>);
@@ -15966,6 +16074,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse>);
 
@@ -16056,6 +16166,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>);
@@ -16148,6 +16260,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse>);
 
@@ -16238,6 +16352,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableRequest>);
@@ -16330,6 +16446,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResponse>);
 
@@ -16420,6 +16538,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableResponse>);
@@ -16512,6 +16632,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse>);
 
@@ -16602,6 +16724,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse>);
@@ -16694,6 +16818,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse>);
 
@@ -16784,6 +16910,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse>);
@@ -16876,6 +17004,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse>);
 
@@ -16966,6 +17096,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse>);
@@ -17058,6 +17190,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
+template <>
 struct IsTable<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse>);
 
@@ -17149,6 +17283,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse>);
@@ -17263,6 +17399,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult>);
@@ -17390,6 +17528,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>);
 
@@ -17516,6 +17656,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse>);
 
@@ -17629,6 +17771,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult>);
@@ -17756,6 +17900,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult>);
 
@@ -17881,6 +18027,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult>);
@@ -18008,6 +18156,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult>);
 
@@ -18134,6 +18284,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>);
 
@@ -18247,6 +18399,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult>);
@@ -18374,6 +18528,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult>);
 
@@ -18499,6 +18655,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult>);
@@ -18638,6 +18796,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>);
 
@@ -18776,6 +18936,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse>);
 
@@ -18889,6 +19051,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>);
@@ -19028,6 +19192,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>);
 
@@ -19166,6 +19332,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest>);
 
@@ -19279,6 +19447,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult>);
@@ -19406,6 +19576,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult>);
 
@@ -19532,6 +19704,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse>);
 
@@ -19645,6 +19819,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult>);
@@ -19772,6 +19948,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolS
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult>);
 
@@ -19898,6 +20076,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest>);
 
@@ -20011,6 +20191,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult>);
@@ -20138,6 +20320,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult>);
 
@@ -20264,6 +20448,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse>);
 
@@ -20377,6 +20563,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult>);
@@ -20504,6 +20692,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsProtocolF
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult>);
 
@@ -20630,6 +20820,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>);
 
@@ -20743,6 +20935,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult>);
@@ -20870,6 +21064,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>);
 
@@ -20996,6 +21192,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse>);
 
@@ -21109,6 +21307,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>);
@@ -21236,6 +21436,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>);
 
@@ -21362,6 +21564,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest>);
 
@@ -21475,6 +21679,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult>);
@@ -21602,6 +21808,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult>);
 
@@ -21728,6 +21936,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse>);
 
@@ -21841,6 +22051,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult>);
@@ -21968,6 +22180,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult>);
 
@@ -22094,6 +22308,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>);
 
@@ -22207,6 +22423,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult>);
@@ -22334,6 +22552,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult>);
 
@@ -22460,6 +22680,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse>);
 
@@ -22573,6 +22795,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult>);
@@ -22700,6 +22924,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarProto
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult>);
 
@@ -22826,6 +23052,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>);
 
@@ -22939,6 +23167,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult>);
@@ -23066,6 +23296,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>);
 
@@ -23192,6 +23424,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>);
 
@@ -23305,6 +23539,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>);
@@ -23432,6 +23668,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>);
 
@@ -23558,6 +23796,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest>);
 
@@ -23671,6 +23911,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult>);
@@ -23798,6 +24040,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult>);
 
@@ -23924,6 +24168,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse>);
 
@@ -24037,6 +24283,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult>);
@@ -24164,6 +24412,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult>);
 
@@ -24290,6 +24540,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>);
 
@@ -24403,6 +24655,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult>);
@@ -24530,6 +24784,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult>);
 
@@ -24656,6 +24912,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse>);
 
@@ -24769,6 +25027,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult>);
@@ -24896,6 +25156,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult>);
 
@@ -25021,6 +25283,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult>);
@@ -25148,6 +25412,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult>);
 
@@ -25274,6 +25540,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse>);
 
@@ -25387,6 +25655,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult>);
@@ -25514,6 +25784,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult>);
 
@@ -25639,6 +25911,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult>);
@@ -25778,6 +26052,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult>);
 
@@ -25916,6 +26192,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse>);
 
@@ -26029,6 +26307,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult>);
@@ -26168,6 +26448,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsDriverPro
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult>);
 
@@ -26306,6 +26588,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>);
 
@@ -26419,6 +26703,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult>);
@@ -26546,6 +26832,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult>);
 
@@ -26672,6 +26960,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse>);
 
@@ -26785,6 +27075,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult>);
@@ -26912,6 +27204,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsAjarDrive
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult>);
 
@@ -27038,6 +27332,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>);
 
@@ -27151,6 +27447,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult>);
@@ -27278,6 +27576,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult>);
 
@@ -27404,6 +27704,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
+template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse>);
 
@@ -27517,6 +27819,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult>);
@@ -27643,6 +27947,8 @@ struct TypeTraits<::test_unknowninteractions::wire::UnknownInteractionsClosedDri
 
 template <>
 struct IsFidlType<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
+template <>
+struct IsWire<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 template <>
 struct IsUnion<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult> : public std::true_type {};
 static_assert(std::is_standard_layout_v<::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult>);
