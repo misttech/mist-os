@@ -11,7 +11,6 @@ use {
     futures::future::Either,
     futures::lock::Mutex,
     futures::prelude::*,
-    hoist::hoist,
     std::collections::HashSet,
     std::sync::Arc,
     std::time::Duration,
@@ -25,10 +24,10 @@ pub const MIN_PEERS: usize = 1;
 pub const MIN_PEERS: usize = 2;
 
 // List peers, but wait for things to settle out first
-pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
+pub fn list_peers(node: Arc<overnet_core::Router>) -> impl Stream<Item = Result<NodeId, Error>> {
     Generator::new(move |mut tx| async move {
         let r: Result<(), Error> = async {
-            let lpc = hoist().node().new_list_peers_context().await;
+            let lpc = node.new_list_peers_context().await;
             let seen_peers = Arc::new(Mutex::new(HashSet::new()));
             let more_to_do = {
                 let seen_peers = seen_peers.clone();
@@ -40,11 +39,12 @@ pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
                     }
                     futures::future::select_ok(seen_peers.iter().map(|&id| {
                         let seen_peers = seen_peers.clone();
+                        let node = Arc::clone(&node);
                         async move {
                             // This async block returns Ok(()) if there is more work to do, and Err(()) if no new work is detected.
                             // The outer select_ok will return Ok(()) if *any* child returns Ok(()), and Err(()) if *all* children return Err(()).
                             tracing::trace!("check for new peers with {}", id);
-                            match probe_node(NodeId { id }, Selector::LINKS)
+                            match probe_node(NodeId { id }, Selector::LINKS, &node)
                                 .on_timeout(Duration::from_secs(5), || {
                                     Err(format_err!("timeout waiting for diagnostic probe"))
                                 })
@@ -117,8 +117,10 @@ pub fn list_peers() -> impl Stream<Item = Result<NodeId, Error>> {
 }
 
 /// Get this nodes id
-pub async fn own_id() -> Result<NodeId, Error> {
-    for peer in hoist().node().new_list_peers_context().await.list_peers().await?.into_iter() {
+pub async fn own_id(node: &Arc<overnet_core::Router>) -> Result<NodeId, Error> {
+    // There's easier ways to do this, but we use this tool in tests so for
+    // legacy reasons we keep this implementation.
+    for peer in node.new_list_peers_context().await.list_peers().await?.into_iter() {
         if peer.is_self {
             return Ok(peer.id);
         }
@@ -130,9 +132,10 @@ pub async fn own_id() -> Result<NodeId, Error> {
 /// String could be a comma separated list of node-ids, or the keyword 'all' to retrieve all peers
 pub fn list_peers_from_argument(
     argument: &str,
+    node: Arc<overnet_core::Router>,
 ) -> Result<impl Stream<Item = Result<NodeId, Error>>, Error> {
     let filter = parse_peers_argument(argument)?;
-    Ok(list_peers().try_filter(move |n| {
+    Ok(list_peers(node).try_filter(move |n| {
         futures::future::ready(match &filter {
             PeerList::All => true,
             PeerList::Exactly(peers) => peers.contains(&n.id),

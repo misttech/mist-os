@@ -15,6 +15,7 @@ use {
     std::{
         collections::{HashMap, HashSet},
         fmt::Write,
+        sync::Arc,
         time::Duration,
     },
 };
@@ -25,6 +26,7 @@ async fn probe(
     descriptions: Option<&mut HashMap<NodeId, NodeDescription>>,
     peer_connections: Option<&mut Vec<PeerConnectionDiagnosticInfo>>,
     links: Option<&mut Vec<LinkDiagnosticInfo>>,
+    node: Arc<overnet_core::Router>,
 ) -> Result<(), Error> {
     let probe_bits = ProbeSelector::empty()
         | descriptions.as_ref().map_or(ProbeSelector::empty(), |_| ProbeSelector::NODE_DESCRIPTION)
@@ -38,69 +40,78 @@ async fn probe(
     let peer_connections = &Mutex::new(peer_connections);
     let links = &Mutex::new(links);
 
-    list_peers()
-        .try_for_each_concurrent(None, move |node_id| async move {
-            let result = match probe_node(node_id, probe_bits).await {
-                Ok(x) => x,
-                Err(e) => {
-                    tracing::warn!("Error probing node: {:?}", e);
-                    return Ok(());
+    list_peers(Arc::clone(&node))
+        .try_for_each_concurrent(None, move |node_id| {
+            let node = Arc::clone(&node);
+            async move {
+                let result = match probe_node(node_id, probe_bits, &node).await {
+                    Ok(x) => x,
+                    Err(e) => {
+                        tracing::warn!("Error probing node: {:?}", e);
+                        return Ok(());
+                    }
+                };
+                if let Some(node_description) = result.node_description {
+                    if let Some(ref mut descriptions) = &mut *descriptions.lock().await {
+                        descriptions.insert(node_id, node_description);
+                    }
                 }
-            };
-            if let Some(node_description) = result.node_description {
-                if let Some(ref mut descriptions) = &mut *descriptions.lock().await {
-                    descriptions.insert(node_id, node_description);
-                }
-            }
-            if let Some(node_peer_connections) = result.peer_connections {
-                for peer_connection in node_peer_connections.iter() {
-                    if let Some(source) = peer_connection.source {
-                        if node_id != source {
+                if let Some(node_peer_connections) = result.peer_connections {
+                    for peer_connection in node_peer_connections.iter() {
+                        if let Some(source) = peer_connection.source {
+                            if node_id != source {
+                                return Err(anyhow::format_err!(
+                                    "Invalid source node id {:?} from {:?}",
+                                    source,
+                                    node_id
+                                ));
+                            }
+                        } else {
                             return Err(anyhow::format_err!(
-                                "Invalid source node id {:?} from {:?}",
-                                source,
+                                "No source node id from {:?}",
                                 node_id
                             ));
                         }
-                    } else {
-                        return Err(anyhow::format_err!("No source node id from {:?}", node_id));
-                    }
-                    if peer_connection.destination.is_none() {
-                        return Err(anyhow::format_err!(
-                            "No destination node id from {:?}",
-                            node_id
-                        ));
-                    }
-                }
-                if let Some(ref mut peer_connections) = &mut *peer_connections.lock().await {
-                    peer_connections.extend(node_peer_connections.into_iter());
-                }
-            }
-            if let Some(node_links) = result.links {
-                for link in node_links.iter() {
-                    if let Some(source) = link.source {
-                        if node_id != source {
+                        if peer_connection.destination.is_none() {
                             return Err(anyhow::format_err!(
-                                "Invalid source node id {:?} from {:?}",
-                                source,
+                                "No destination node id from {:?}",
                                 node_id
                             ));
                         }
-                    } else {
-                        return Err(anyhow::format_err!("No source node id from {:?}", node_id));
                     }
-                    if link.destination.is_none() {
-                        return Err(anyhow::format_err!(
-                            "No destination node id from {:?}",
-                            node_id
-                        ));
+                    if let Some(ref mut peer_connections) = &mut *peer_connections.lock().await {
+                        peer_connections.extend(node_peer_connections.into_iter());
                     }
                 }
-                if let Some(ref mut links) = &mut *links.lock().await {
-                    links.extend(node_links.into_iter());
+                if let Some(node_links) = result.links {
+                    for link in node_links.iter() {
+                        if let Some(source) = link.source {
+                            if node_id != source {
+                                return Err(anyhow::format_err!(
+                                    "Invalid source node id {:?} from {:?}",
+                                    source,
+                                    node_id
+                                ));
+                            }
+                        } else {
+                            return Err(anyhow::format_err!(
+                                "No source node id from {:?}",
+                                node_id
+                            ));
+                        }
+                        if link.destination.is_none() {
+                            return Err(anyhow::format_err!(
+                                "No destination node id from {:?}",
+                                node_id
+                            ));
+                        }
+                    }
+                    if let Some(ref mut links) = &mut *links.lock().await {
+                        links.extend(node_links.into_iter());
+                    }
                 }
+                Ok(())
             }
-            Ok(())
         })
         .on_timeout(TIMEOUT, || Ok(()))
         .await?;
@@ -196,14 +207,20 @@ pub struct FullMapArgs {
     exclude_self: bool,
 }
 
-pub async fn full_map(args: FullMapArgs) -> Result<String, Error> {
+pub async fn full_map(args: FullMapArgs, node: Arc<overnet_core::Router>) -> Result<String, Error> {
     let mut descriptions = HashMap::new();
     let mut peer_connections = Vec::new();
     let mut links = Vec::new();
-    probe(Some(&mut descriptions), Some(&mut peer_connections), Some(&mut links)).await?;
+    probe(
+        Some(&mut descriptions),
+        Some(&mut peer_connections),
+        Some(&mut links),
+        Arc::clone(&node),
+    )
+    .await?;
     let mut exclude_nodes = HashSet::new();
     if args.exclude_self {
-        exclude_nodes.insert(own_id().await?);
+        exclude_nodes.insert(own_id(&node).await?);
     }
     let mut out = String::new();
     out += "digraph G {\n";

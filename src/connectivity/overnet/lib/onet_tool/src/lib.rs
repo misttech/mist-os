@@ -8,6 +8,7 @@ use {
     fidl_fuchsia_overnet_protocol::LinkConfig,
     fuchsia_async::Timer,
     futures::prelude::*,
+    std::sync::Arc,
     std::{fmt::Write, time::Duration},
 };
 
@@ -36,28 +37,33 @@ pub enum Command {
 /// List known peer nodes
 pub struct ListPeers {}
 
-async fn list_peers() -> Result<(), Error> {
-    list_peers::list_peers()
-        .try_for_each_concurrent(None, |peer| async move {
-            let desc = probe_node::probe_node(peer, probe_node::Selector::NODE_DESCRIPTION).await?;
-            let mut out = String::new();
-            write!(&mut out, "{}", peer.id)?;
-            if let Some(desc) = desc.node_description {
-                if let Some(operating_system) = desc.operating_system {
-                    write!(&mut out, " os:{:?}", operating_system)?;
+async fn list_peers(node: Arc<overnet_core::Router>) -> Result<(), Error> {
+    list_peers::list_peers(Arc::clone(&node))
+        .try_for_each_concurrent(None, |peer| {
+            let node = Arc::clone(&node);
+            async move {
+                let desc =
+                    probe_node::probe_node(peer, probe_node::Selector::NODE_DESCRIPTION, &node)
+                        .await?;
+                let mut out = String::new();
+                write!(&mut out, "{}", peer.id)?;
+                if let Some(desc) = desc.node_description {
+                    if let Some(operating_system) = desc.operating_system {
+                        write!(&mut out, " os:{:?}", operating_system)?;
+                    }
+                    if let Some(implementation) = desc.implementation {
+                        write!(&mut out, " impl:{:?}", implementation)?;
+                    }
+                    if let Some(binary) = desc.binary {
+                        write!(&mut out, " bin:{}", binary)?;
+                    }
+                    if let Some(hostname) = desc.hostname {
+                        write!(&mut out, " hostname:{}", hostname)?;
+                    }
                 }
-                if let Some(implementation) = desc.implementation {
-                    write!(&mut out, " impl:{:?}", implementation)?;
-                }
-                if let Some(binary) = desc.binary {
-                    write!(&mut out, " bin:{}", binary)?;
-                }
-                if let Some(hostname) = desc.hostname {
-                    write!(&mut out, " hostname:{}", hostname)?;
-                }
+                println!("{}", out);
+                Ok(())
             }
-            println!("{}", out);
-            Ok(())
         })
         .await
 }
@@ -79,111 +85,117 @@ fn fmtq<T: std::fmt::Display>(a: Option<T>) -> String {
     }
 }
 
-async fn list_links(args: ListLinks) -> Result<(), Error> {
-    list_peers::list_peers_from_argument(&args.nodes)?
-        .try_for_each_concurrent(None, |node| async move {
-            let mut links = loop {
-                let probe = probe_node::probe_node(
-                    node,
-                    probe_node::Selector::LINKS | probe_node::Selector::CONNECTING_LINK_COUNT,
-                )
-                .await?;
-                let connecting_link_count = probe
-                    .connecting_link_count
-                    .ok_or_else(|| format_err!("No connecting link count in probe result"))?;
-                let links = probe.links.ok_or_else(|| format_err!("No links in probe result"))?;
-                if connecting_link_count > 0
-                    || (crate::list_peers::MIN_PEERS > 1 && links.is_empty())
-                {
-                    Timer::new(Duration::from_millis(100)).await;
-                    continue;
-                }
-                break links;
-            };
-            links.sort_by(|a, b| a.source_local_id.cmp(&b.source_local_id));
-            for link in links {
-                println!(
-                    "{}#{} -> {}",
-                    fmtq(link.source.map(|n| n.id)),
-                    fmtq(link.source_local_id),
-                    fmtq(link.destination.map(|n| n.id))
-                );
-                match link.config {
-                    None => (),
-                    Some(LinkConfig::Socket(fidl_fuchsia_overnet_protocol::Empty {})) => {
-                        println!("  external");
-                    }
-                    Some(LinkConfig::Usb(path)) => {
-                        println!("  usb {path}");
-                    }
-                    Some(LinkConfig::Udp(addr)) => {
-                        let addr = std::net::SocketAddrV6::new(
-                            addr.address.addr.into(),
-                            addr.port,
-                            0,
-                            addr.zone_index as u32,
-                        );
-                        println!("  udp {}", addr);
-                    }
-                    Some(LinkConfig::SerialServer(desc)) => {
-                        println!("  serial server descriptor={}", desc);
-                    }
-                    Some(LinkConfig::SerialClient(desc)) => {
-                        println!("  serial client descriptor={}", desc);
-                    }
-                    Some(LinkConfig::AscenddClient(config)) => {
-                        print!("  ascendd client");
-                        if let Some(connection_label) = config.connection_label {
-                            print!(" label={:?}", connection_label);
-                        }
-                        if let Some(path) = config.path {
-                            print!(" @ {}", path);
-                        }
-                        println!("");
-                    }
-                    Some(LinkConfig::AscenddServer(config)) => {
-                        print!("  ascendd server");
-                        if let Some(connection_label) = config.connection_label {
-                            print!(" label={:?}", connection_label);
-                        }
-                        if let Some(path) = config.path {
-                            print!(" @ {}", path);
-                        }
-                        println!("");
-                    }
-                }
-                println!(
-                    "  packets/bytes recv: {}/{} sent: {}/{}",
-                    fmtq(link.received_packets),
-                    fmtq(link.received_bytes),
-                    fmtq(link.sent_packets),
-                    fmtq(link.sent_bytes),
-                );
-                println!(
-                    "  rtt: {}",
-                    fmtq(
-                        link.round_trip_time_microseconds
-                            .map(|us| format!("{:?}", Duration::from_micros(us)))
+async fn list_links(args: ListLinks, node: Arc<overnet_core::Router>) -> Result<(), Error> {
+    list_peers::list_peers_from_argument(&args.nodes, Arc::clone(&node))?
+        .try_for_each_concurrent(None, |node_id| {
+            let node = Arc::clone(&node);
+            async move {
+                let mut links = loop {
+                    let probe = probe_node::probe_node(
+                        node_id,
+                        probe_node::Selector::LINKS | probe_node::Selector::CONNECTING_LINK_COUNT,
+                        &node,
                     )
-                );
-                println!(
-                    "  pings sent: {} packets forwarded: {}",
-                    fmtq(link.pings_sent),
-                    fmtq(link.packets_forwarded)
-                );
+                    .await?;
+                    let connecting_link_count = probe
+                        .connecting_link_count
+                        .ok_or_else(|| format_err!("No connecting link count in probe result"))?;
+                    let links =
+                        probe.links.ok_or_else(|| format_err!("No links in probe result"))?;
+                    if connecting_link_count > 0
+                        || (crate::list_peers::MIN_PEERS > 1 && links.is_empty())
+                    {
+                        Timer::new(Duration::from_millis(100)).await;
+                        continue;
+                    }
+                    break links;
+                };
+                links.sort_by(|a, b| a.source_local_id.cmp(&b.source_local_id));
+                for link in links {
+                    println!(
+                        "{}#{} -> {}",
+                        fmtq(link.source.map(|n| n.id)),
+                        fmtq(link.source_local_id),
+                        fmtq(link.destination.map(|n| n.id))
+                    );
+                    match link.config {
+                        None => (),
+                        Some(LinkConfig::Socket(fidl_fuchsia_overnet_protocol::Empty {})) => {
+                            println!("  external");
+                        }
+                        Some(LinkConfig::Usb(path)) => {
+                            println!("  usb {path}");
+                        }
+                        Some(LinkConfig::Udp(addr)) => {
+                            let addr = std::net::SocketAddrV6::new(
+                                addr.address.addr.into(),
+                                addr.port,
+                                0,
+                                addr.zone_index as u32,
+                            );
+                            println!("  udp {}", addr);
+                        }
+                        Some(LinkConfig::SerialServer(desc)) => {
+                            println!("  serial server descriptor={}", desc);
+                        }
+                        Some(LinkConfig::SerialClient(desc)) => {
+                            println!("  serial client descriptor={}", desc);
+                        }
+                        Some(LinkConfig::AscenddClient(config)) => {
+                            print!("  ascendd client");
+                            if let Some(connection_label) = config.connection_label {
+                                print!(" label={:?}", connection_label);
+                            }
+                            if let Some(path) = config.path {
+                                print!(" @ {}", path);
+                            }
+                            println!("");
+                        }
+                        Some(LinkConfig::AscenddServer(config)) => {
+                            print!("  ascendd server");
+                            if let Some(connection_label) = config.connection_label {
+                                print!(" label={:?}", connection_label);
+                            }
+                            if let Some(path) = config.path {
+                                print!(" @ {}", path);
+                            }
+                            println!("");
+                        }
+                    }
+                    println!(
+                        "  packets/bytes recv: {}/{} sent: {}/{}",
+                        fmtq(link.received_packets),
+                        fmtq(link.received_bytes),
+                        fmtq(link.sent_packets),
+                        fmtq(link.sent_bytes),
+                    );
+                    println!(
+                        "  rtt: {}",
+                        fmtq(
+                            link.round_trip_time_microseconds
+                                .map(|us| format!("{:?}", Duration::from_micros(us)))
+                        )
+                    );
+                    println!(
+                        "  pings sent: {} packets forwarded: {}",
+                        fmtq(link.pings_sent),
+                        fmtq(link.packets_forwarded)
+                    );
+                }
+                Ok(())
             }
-            Ok(())
         })
         .await
 }
 
 pub async fn run_onet(hoist: &hoist::Hoist, opts: Opts) -> Result<(), Error> {
     let _t = hoist.start_default_link()?;
+    let node = hoist.node();
     match opts.command {
-        Command::ListPeers(_) => list_peers().await,
-        Command::ListLinks(args) => list_links(args).await,
+        Command::ListPeers(_) => list_peers(node).await,
+        Command::ListLinks(args) => list_links(args, node).await,
         Command::FullMap(args) => {
-            println!("{}", probe_reports::full_map(args).await?);
+            println!("{}", probe_reports::full_map(args, node).await?);
             Ok(())
         }
     }

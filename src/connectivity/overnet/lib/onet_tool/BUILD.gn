@@ -11,6 +11,7 @@ rustc_library("onet_tool") {
 
   deps = [
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
+    "//src/connectivity/overnet/lib/core",
     "//src/connectivity/overnet/lib/hoist",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
