@@ -75,7 +75,7 @@ default_args = {
 
   # Pigweed configs for Fuchsia.
   pw_function_CONFIG =
-      "//third_party/pigweed/backends/pw_function:define_overrides"
+      "//third_party/pigweed/src/pw_function:enable_dynamic_allocation"
 
   # Some Pigweed module implementations need to be link dependencies to avoid circular dependencies.
   pw_build_LINK_DEPS = [
