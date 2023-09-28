@@ -19,6 +19,13 @@
             ],
             "bug": "",
             "notes": []
+          },
+          {
+            "projects": [
+              "prebuilt/third_party/lldb/linux-x64"
+            ],
+            "bug": "",
+            "notes": []
           }
         ]
       }

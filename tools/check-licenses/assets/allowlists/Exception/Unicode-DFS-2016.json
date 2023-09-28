@@ -33,7 +33,8 @@
           },
           {
             "projects": [
-              "prebuilt/third_party/clang/linux-x64"
+              "prebuilt/third_party/clang/linux-x64",
+              "prebuilt/third_party/lldb/linux-x64"
             ],
             "bug": "",
             "notes": []

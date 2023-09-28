@@ -15,7 +15,8 @@
           {
             "projects": [
               "prebuilt/third_party/vpython",
-              "prebuilt/third_party/python3/linux-x64"
+              "prebuilt/third_party/python3/linux-x64",
+              "prebuilt/third_party/lldb/linux-x64"
             ],
             "bug": "",
             "notes": ["Python is not shipped."]
