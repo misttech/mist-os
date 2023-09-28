@@ -32,7 +32,7 @@ namespace debug_ipc {
 //   - More complex logic could be implemented by checking the protocol version before sending.
 //
 // NOTE: Before you want to bump the kCurrentProtocolVersion, please make sure that
-// CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in platform_version.json.
+// CURRENT_SUPPORTED_API_LEVEL is equal to FUCHSIA_API_LEVEL specified in version_history.json.
 // If not, continue reading the comments below.
 
 constexpr uint32_t kCurrentProtocolVersion = 57;
