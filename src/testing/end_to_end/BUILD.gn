@@ -6,23 +6,6 @@
 
 assert(is_host, "Python E2E tests are host-only")
 
-group("pye2e") {
-  testonly = true
-  public_deps = [
-    "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
-    "//src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "//src/tests/end_to_end/snapshot:snapshot_test($host_toolchain)",
-  ]
-}
-
-group("pye2e_fyi") {
-  testonly = true
-  public_deps = [
-    ":pye2e",
-    "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
-  ]
-}
-
 # Stable infra test groups.
 group("stable_sl4f_emulator_tests") {
   testonly = true
