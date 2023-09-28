@@ -21,6 +21,28 @@ _environment_service_account =
 #
 # Parameters
 #
+#   builds
+#   - Required: An array of build scopes to download and install onto the
+#     device in sequence, in order to simulate multi-step upgrade flows. The
+#     first will be flashed or paved onto the device, then the rest will be
+#     OTAed.
+#
+#     Each scope in $builds contains one of:
+#
+#       release_builder
+#       - Optional: Builder from which the build artifacts will be downloaded and
+#         upgraded to on the device, rather than from the current build. This
+#         has the form of `project/bucket/builder id`, like
+#         `fuchsia/ci/fuchsia-x64-release`.
+#         Conflicts with `release_build_id`.
+#       - Type: string
+#
+#       release_build_id
+#       - Optional: Build ID from which the build artifacts will be downloaded
+#         and upgraded to on the device, rather than from the current
+#         build. This has the form of `1234...`. Conflicts with `release_builder`.
+#       - Type: string
+#
 #   downgrade_release_builder
 #   - Required: Builder from which the downgrade build artifacts will be
 #     downloaded and installed on the device. This has the form of
@@ -125,8 +147,60 @@ template("system_test_upgrade_suite") {
             defined(invoker.upgrade_release_build_id)),
       "upgrade_release_builder and upgrade_release_build_id are mutually exclusive for $target_name")
 
+  assert(
+      !(defined(invoker.builds) && defined(invoker.downgrade_release_builder)),
+      "builds is mutually exlusive with downgrade_release_builder for $target_name")
+
+  assert(
+      !(defined(invoker.builds) && defined(invoker.downgrade_release_build_id)),
+      "builds is mutually exlusive with downgrade_release_build_id for $target_name")
+
+  assert(
+      !(defined(invoker.builds) && defined(invoker.upgrade_release_builder)),
+      "builds is mutually exlusive with upgrade_release_builder for $target_name")
+
+  assert(
+      !(defined(invoker.builds) && defined(invoker.upgrade_release_build_id)),
+      "builds is mutually exlusive with upgrade_release_build_id for $target_name")
+
   assert(defined(invoker.environments),
          "environments must be defined for $target_name")
+
+  _builds = []
+  if (defined(invoker.builds)) {
+    foreach(build, invoker.builds) {
+      assert(
+          defined(build.release_builder) || defined(build.release_build_id),
+          "release_builder or release_build_id must be defined for $target_name")
+      assert(
+          !(defined(invoker.release_builder) &&
+                defined(invoker.release_build_id)),
+          "release_builder and release_build_id are mutually exclusive for $target_name")
+
+      _builds += [ build ]
+    }
+  } else {
+    _build = {
+    }
+
+    if (defined(invoker.downgrade_release_builder)) {
+      _build.release_builder = invoker.downgrade_release_builder
+    }
+
+    if (defined(invoker.downgrade_release_build_id)) {
+      _build.release_build_id = invoker.downgrade_release_build_id
+    }
+
+    if (defined(invoker.upgrade_release_builder)) {
+      _build.release_builder = invoker.upgrade_release_builder
+    }
+
+    if (defined(invoker.upgrade_release_build_id)) {
+      _build.release_build_id = invoker.upgrade_release_build_id
+    }
+
+    _builds += [ _build ]
+  }
 
   _tests =
       [ "//src/sys/pkg/tests/system-tests/upgrade_test:system_tests_upgrade" ]
@@ -142,38 +216,26 @@ template("system_test_upgrade_suite") {
 
     _args = [ "-test.v" ]  # Print test detailed case status
 
-    if (defined(invoker.downgrade_release_builder)) {
-      _args += [
-        "-downgrade-builder-name",
-        invoker.downgrade_release_builder,
-      ]
-    }
+    foreach(build, _builds) {
+      if (defined(build.release_build_id)) {
+        _args += [
+          "--build-id",
+          build.release_build_id,
+        ]
+      }
 
-    if (defined(invoker.downgrade_release_build_id)) {
-      _args += [
-        "-downgrade-build-id",
-        invoker.downgrade_release_build_id,
-      ]
+      if (defined(build.release_builder)) {
+        _args += [
+          "--builder-name",
+          build.release_builder,
+        ]
+      }
     }
 
     if (defined(invoker.downgrade_ota_attempts)) {
       _args += [
         "-downgrade-ota-attempts",
         invoker.downgrade_ota_attempts,
-      ]
-    }
-
-    if (defined(invoker.upgrade_release_builder)) {
-      _args += [
-        "-upgrade-builder-name",
-        invoker.upgrade_release_builder,
-      ]
-    }
-
-    if (defined(invoker.upgrade_release_build_id)) {
-      _args += [
-        "-upgrade-build-id",
-        invoker.upgrade_release_build_id,
       ]
     }
 
