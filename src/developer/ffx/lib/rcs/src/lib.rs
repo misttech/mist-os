@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{Context as _, Result};
 use errors;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
@@ -12,7 +12,7 @@ use fidl_fuchsia_developer_remotecontrol::{
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
 use futures::{StreamExt, TryFutureExt};
-use hoist::{Hoist, OvernetInstance};
+use hoist::Hoist;
 use std::{
     hash::{Hash, Hasher},
     time::Duration,
@@ -66,9 +66,22 @@ impl RcsConnection {
         overnet_id: &mut NodeId,
         channel: fidl::Channel,
     ) -> Result<()> {
-        let svc = hoist.connect_as_service_consumer()?;
-        svc.connect_to_service(overnet_id, RemoteControlMarker::PROTOCOL_NAME, channel)
-            .map_err(|e| anyhow!("Error connecting to Rcs: {}", e))
+        let node = hoist.node();
+        let overnet_id = (*overnet_id).into();
+        // TODO(b/302394849): If this method were async we could return the
+        // error instead of just logging it. This task used to be managed by
+        // Hoist where we couldn't get to it, but now we have it right here
+        // where it would be easy to factor out.
+        fuchsia_async::Task::spawn(async move {
+            if let Err(e) = node
+                .connect_to_service(overnet_id, RemoteControlMarker::PROTOCOL_NAME, channel)
+                .await
+            {
+                tracing::warn!("Error connecting to Rcs: {}", e)
+            }
+        })
+        .detach();
+        Ok(())
     }
 
     // Primarily For testing.
