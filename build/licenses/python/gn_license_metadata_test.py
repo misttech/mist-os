@@ -1,0 +1,78 @@
+#!/usr/bin/env fuchsia-vendored-python
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""Tests for GnLicenseMetadataDB and friends."""
+
+from gn_license_metadata import GnLicenseMetadataDB, GnLabel, GnLicenseMetadata
+import unittest
+
+
+class GnLicenseMetadataDBTest(unittest.TestCase):
+
+    def test_load_from_list(self):
+        input = [
+            {   # l1
+                "target_label": "//foo:license(//toolchain)",
+                "public_package_name": "l1",
+                "license_files": [ "//license1", "//license2"] ,
+            },
+            {
+                # l2
+                "target_label": "//bar:lic(//toolchain)",
+                "public_package_name": "l2",
+                "license_files": [ "license3" ] , # Relative
+            },
+            {
+                # al1
+                "target_label": "//foo:target(//toolchain)",
+                "license_labels": [ "//foo:license(//toolchain)" ] ,
+            },
+            {
+                # al2
+                "target_label": "//bar(//toolchain)",
+                "license_labels": [ "//bar:lic(//toolchain)" ],
+            }
+        ]
+
+        db = GnLicenseMetadataDB.from_json_list(input)
+
+        l1 = db.licenses_by_label[GnLabel.from_str(
+            "//foo:license(//toolchain)")]
+        self.assertEqual(
+            l1,
+            GnLicenseMetadata(
+                target_label=GnLabel.from_str("//foo:license(//toolchain)"),
+                public_package_name="l1",
+                license_files=(
+                    GnLabel.from_str("//license1"),
+                    GnLabel.from_str("//license2")),
+            ))
+
+        l2 = db.licenses_by_label[GnLabel.from_str("//bar:lic(//toolchain)")]
+        self.assertEqual(
+            l2,
+            GnLicenseMetadata(
+                target_label=GnLabel.from_str("//bar:lic(//toolchain)"),
+                public_package_name="l2",
+                license_files=(GnLabel.from_str("//bar/license3"),),
+            ))
+
+        al1 = db.applicable_licenses_by_target[GnLabel.from_str(
+            "//foo:target(//toolchain)")]
+        self.assertEqual(
+            al1.target_label, GnLabel.from_str("//foo:target(//toolchain)"))
+        self.assertEqual(
+            al1.license_labels,
+            (GnLabel.from_str("//foo:license(//toolchain)"),))
+
+        al2 = db.applicable_licenses_by_target[GnLabel.from_str(
+            "//bar(//toolchain)")]
+        self.assertEqual(
+            al2.target_label, GnLabel.from_str("//bar(//toolchain)"))
+        self.assertEqual(
+            al2.license_labels, (GnLabel.from_str("//bar:lic(//toolchain)"),))
+
+
+if __name__ == '__main__':
+    unittest.main()

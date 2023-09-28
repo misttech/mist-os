@@ -1,0 +1,49 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_host_test.gni")
+import("//build/python/python_library.gni")
+
+if (is_host) {
+  # Attempting to put these in a shared `python_library`
+  # breaks IDE and python3 command line usage.
+  common_sources = [
+    "gn_label.py",
+    "gn_license_metadata.py",
+    "spdx_writer.py",
+  ]
+
+  # These tests can be run conveniently also via:
+  # `python3 -m unittest discover -s build/licenses/python  -p '*_test.py'`
+  # or individually:
+  # `python3 build/licenses/python/[name].py`
+  #
+  # Alternatively, run via:
+  # `fx test --host [name]`
+  # but may need to do `fx set ... --with-host //build/licenses:tests`
+  # on user/userdebug builds.
+  python_host_test("gn_label_test") {
+    main_source = "gn_label_test.py"
+    sources = common_sources
+  }
+
+  python_host_test("gn_license_metadata_test") {
+    main_source = "gn_license_metadata_test.py"
+    sources = common_sources
+  }
+
+  python_host_test("spdx_writer_test") {
+    main_source = "spdx_writer_test.py"
+    sources = common_sources
+  }
+
+  group("host_tests") {
+    testonly = true
+    deps = [
+      ":gn_label_test",
+      ":gn_license_metadata_test",
+      ":spdx_writer_test",
+    ]
+  }
+}
