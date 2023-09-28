@@ -559,37 +559,19 @@ pub(crate) enum SendError {
 
 impl PortHandler {
     pub(crate) async fn attach(&self) -> Result<(), netdevice_client::Error> {
-        let Self {
-            id: _,
-            port_id,
-            inner: Inner { device: _, session, state: _ },
-            _mac_proxy: _,
-            device_class: _,
-        } = self;
+        let Self { port_id, inner: Inner { session, .. }, .. } = self;
         session.attach(*port_id, &[fhardware_network::FrameType::Ethernet]).await
     }
 
     pub(crate) async fn detach(&self) -> Result<(), netdevice_client::Error> {
-        let Self {
-            id: _,
-            port_id,
-            inner: Inner { device: _, session, state: _ },
-            _mac_proxy: _,
-            device_class: _,
-        } = self;
+        let Self { port_id, inner: Inner { session, .. }, .. } = self;
         session.detach(*port_id).await
     }
 
     pub(crate) fn send(&self, frame: &[u8]) -> Result<(), SendError> {
         trace_duration!("netdevice::send");
 
-        let Self {
-            id: _,
-            port_id,
-            inner: Inner { device: _, session, state: _ },
-            _mac_proxy: _,
-            device_class: _,
-        } = self;
+        let Self { port_id, inner: Inner { session, .. }, .. } = self;
         // NB: We currently send on a dispatcher, so we can't wait for new
         // buffers to become available. If that ends up being the long term way
         // of enqueuing outgoing buffers we might want to fix this impedance
@@ -604,13 +586,7 @@ impl PortHandler {
     }
 
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
-        let Self {
-            id: _,
-            port_id,
-            inner: Inner { device: _, session, state },
-            _mac_proxy: _,
-            device_class: _,
-        } = self;
+        let Self { port_id, inner: Inner { session, state, .. }, .. } = self;
         let _: EthernetWeakDeviceId<_> = assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
@@ -622,13 +598,7 @@ impl PortHandler {
         &self,
         port: fidl::endpoints::ServerEnd<fhardware_network::PortMarker>,
     ) -> Result<(), netdevice_client::Error> {
-        let Self {
-            id: _,
-            port_id,
-            inner: Inner { device, session: _, state: _ },
-            _mac_proxy: _,
-            device_class: _,
-        } = self;
+        let Self { port_id, inner: Inner { device, .. }, .. } = self;
         device.connect_port_server_end(*port_id, port)
     }
 }
