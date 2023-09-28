@@ -5,7 +5,6 @@
 package readme
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"path/filepath"
@@ -20,6 +19,8 @@ const (
 	rustCrateEmptyRootDir     = "third_party/rust_crates/empty"
 	rustCrateEmptyLicenseFile = "../../../../LICENSE"
 	rustCrateEmptyLicenseURL  = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/LICENSE"
+
+	rustCrateCustomReadme = "tools/check-licenses/assets/readmes/"
 )
 
 type (
@@ -42,13 +43,9 @@ func NewRustCrateReadme(path string) (*Readme, error) {
 	var b builder
 	var err error
 
-	hash, err := git.GetCommitHash(context.Background(), path)
-	if err != nil {
-		return nil, err
-	}
 	name := filepath.Base(path)
 	parentName := filepath.Base(filepath.Dir(path))
-	url := fmt.Sprintf("%s/+/%s/third_party/rust_crates/%s/%s", rustCrateURLPrefix, hash, parentName, name)
+	url := fmt.Sprintf("%s/+/%s/third_party/rust_crates/%s/%s", rustCrateURLPrefix, GitRevision, parentName, name)
 
 	b.setPath(path)
 	b.setName(name)
@@ -84,7 +81,8 @@ func NewRustCrateReadme(path string) (*Readme, error) {
 	if strings.HasSuffix(parentPath, rustCrateEmptyRootDir) {
 		b.addLicense(rustCrateEmptyLicenseFile, rustCrateEmptyLicenseURL, singleLicenseFile)
 	}
-	return NewReadme(strings.NewReader(b.build()), path)
+	customReadmePath := filepath.Join(rustCrateCustomReadme, path, "README.fuchsia")
+	return NewReadme(strings.NewReader(b.build()), path, customReadmePath)
 }
 
 func loadRustCrateTomlFields(b builder, path string) error {

@@ -6,7 +6,7 @@
   "description": "multi line directive\n\nwith empty spaces\n\n",
   "licenseInfo": [
     {
-      "licenseFilePath": "license",
+      "licenseFile": "license",
       "licenseFileFormat": "Single License File",
       "licenseFileURL": "test.com/license"
     }

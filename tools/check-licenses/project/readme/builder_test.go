@@ -16,7 +16,7 @@ func TestBuilder(t *testing.T) {
 		"URL: www.foo.bar\n" +
 		"License File: license\n" +
 		"License File URL: www.foo.bar/license\n" +
-		"License File Format: Single License File\n"
+		"License File Format: Single License\n"
 
 	var b builder
 	b.setName("foo")

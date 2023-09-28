@@ -41,6 +41,7 @@ func init() {
 		RegularFiles:           make([]*file.File, 0),
 		SearchableRegularFiles: make([]*file.File, 0),
 		Children:               make(map[string]*Project, 0),
+		ReadmeFile:             &readme.Readme{Licenses: make([]*readme.ReadmeLicense, 0)},
 	}
 }
 
@@ -90,7 +91,7 @@ func initializeCustomReadmes() error {
 						return err
 					}
 
-					r, err := readme.NewReadmeFromFileCustomLocation(currentPath, filepath.Join(projectRoot, info.Name()))
+					r, err := readme.NewReadmeFromFileCustomLocation(projectRoot, currentPath)
 					if err != nil {
 						// Don't error out with these custom README.fuchsia files, so we don't break rollers.
 						log.Printf("Found issue with custom README.fuchsia file: %v: %v\n", currentPath, err)

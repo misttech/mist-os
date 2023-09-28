@@ -4,13 +4,13 @@
   "malformedLines": [],
   "licenseInfo": [
     {
-      "licenseFilePath": "license.txt",
-      "licenseFileFormat": "Single License File",
+      "licenseFile": "license.txt",
+      "licenseFileFormat": "Single License",
       "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
     },
     {
-      "licenseFilePath": "COPYING",
-      "licenseFileFormat": "Single License File",
+      "licenseFile": "COPYING",
+      "licenseFileFormat": "Single License",
       "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
     }
   ]

@@ -188,10 +188,6 @@ func (fd *FileData) Search() {
 	}
 }
 
-// Setters
-// TODO(fxbug.dev/125736): Remove all setters.
-func (fd *FileData) SetLicenseType(lt string) { fd.licenseType = lt }
-
 // Getters
 func (fd *FileData) File() *File                           { return fd.file }
 func (fd *FileData) LibraryName() string                   { return fd.libraryName }

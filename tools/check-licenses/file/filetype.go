@@ -17,7 +17,7 @@ type FileType string
 
 const (
 	RegularFile          FileType = "Regular File"
-	SingleLicense                 = "Single License File"
+	SingleLicense                 = "Single License"
 	MultiLicense                  = "Multi License"
 	MultiLicenseChromium          = "Multi License Chromium"
 	MultiLicenseFlutter           = "Multi License Flutter"
@@ -31,6 +31,7 @@ func init() {
 	FileTypes = map[string]FileType{
 		"Regular File":           RegularFile,
 		"Single License":         SingleLicense,
+		"Single License File":    SingleLicense,
 		"Multi License":          MultiLicense,
 		"Multi License Chromium": MultiLicenseChromium,
 		"Multi License Flutter":  MultiLicenseFlutter,
@@ -46,4 +47,8 @@ func init() {
 		"multi_license_android":  MultiLicenseAndroid,
 		"multi_license_google":   MultiLicenseGoogle,
 	}
+}
+
+func (ft FileType) String() string {
+	return string(ft)
 }
