@@ -345,6 +345,8 @@ void UITestRealm::ConfigureScenic() {
   // Load default config for Scenic.
   realm_builder_.InitMutableConfigFromPackage(kScenicName);
   realm_builder_.SetConfigValue(kScenicName, "display_composition", ConfigValue::Bool(false));
+  realm_builder_.SetConfigValue(kScenicName, "display_rotation",
+                                ConfigValue::Uint64(config_.display_rotation));
 }
 
 void UITestRealm::ConfigureSceneOwner() {

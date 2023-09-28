@@ -19,7 +19,7 @@
         "identity": {
             "password_pinweaver": "required"
         },
-        "input": {
+        "ui": {
             "supported_input_devices": [
                 "button",
                 "keyboard"

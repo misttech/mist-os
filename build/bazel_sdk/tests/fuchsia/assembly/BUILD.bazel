@@ -69,7 +69,7 @@ fuchsia_product_configuration(
                 ],
             },
             "identity": {"password_pinweaver": "required"},
-            "input": {"supported_input_devices": [
+            "ui": {"supported_input_devices": [
                 "button",
                 "keyboard",
             ]},
