@@ -117,30 +117,91 @@ These categories form an ordered list with a monotonically increasing audience.
 For example, an SDK Atom in the `public` category is necessarily available to
 select partners because `public` comes after `partner` in this list.
 
-The `experimental` category does not make much sense because we have better
-mechanisms (e.g., GN `visibility`) to control use of code within the Fuchsia
-platform source tree. Perhaps this category will be removed soon.
+## Commitments
 
-Each [`sdk_collection`][gn-sdk] GN target also has a `category` parameter that
-defines the set of consumers to whom that SDK ships. The build system enforces
-that everything included in an SDK target has an SDK category that is
-acceptable for that audience. For example, an SDK for `partner` can include SDK
-Atoms authorized for `public` (because `public` comes after `partner` in this
-list above) but cannot include SDK Atoms authorized only for `internal` use
-(because `internal` comes before `partner` in this list).
+Adding an API to the `partner` or `partner_internal` category amounts to a
+commitment to our partners that we will not break their code or impose undue
+[churn][churn-policy] on them. Each team that owns an API in one of these
+categories has a responsibility to uphold these commitments.
 
-The `partner_internal` SDK category is used to give some APIs the same
-compatibility constraints as `partner` APIs without exposing them to the SDK
-users.
+[churn-policy]: /docs/contribute/governance/policy/churn.md
 
-The `excluded` SDK category is used as a double-check to prevent certain
-targets from ever being included in an SDK. Effectively, `excluded` is
-documentation about that intent and is a hook for code reviewers to consider
-changes to that value carefully.
+### `internal`
 
-[gn-sdk-atom]: /build/sdk/sdk_atom.gni
-[gn-sdk]: /build/sdk/sdk_collection.gni
+APIs in the `internal` category have minimal commitments beyond those that
+apply to [all code in the Fuchsia project][contributor-guide].
 
+If your API is only ever called by *in-tree* code, with both sides of the
+communication always having been built from the _same revision_ of the Fuchsia
+source (as is the case for two platform components talking to each other), then
+it should be `internal`.
+
+Note that even if all of your API's clients are in-tree, that's not sufficient
+to say it belongs in `internal`. For instance, the source for `ffx` is in the
+Fuchsia tree, but it doesn't meet the second requirement: `ffx` subtools built
+at one Fuchsia revision will frequently talk to a device built at another. As
+such, `ffx` subtools, and any other artifacts shipped in the SDK, must not
+depend on `internal` APIs.
+
+[contributor-guide]: /CONTRIBUTING.md
+
+### `partner_internal`
+
+Partners don't write their own code using `partner_internal` APIs, but they
+still depend on these APIs _indirectly_ via tools, libraries, or packages
+written by the Fuchsia team. Since the Fuchsia team owns the code that uses
+these APIs, we can change these APIs without churning our partners. However,
+the tools, libraries, and packages that use `partner_internal` APIs will, in
+general, be built from a different revision than the platform components that
+they talk to. Thus, we must follow our ABI compatibility policies whenever we
+change `partner_internal` APIs.
+
+Namely, the owners of an API in the `partner_internal` category agree to:
+
+* Use [FIDL Versioning][fidl-versioning] annotations on their APIs.
+* Only ever modify their API at the `in-development` API level (see
+  [version_history.json]).
+* Keep the platform components that implement those APIs compatible with all
+  Fuchsia-supported API levels (see [version_history.json]).
+
+See the [API evolution guidelines][evolution-guidelines] for more details on
+API compatibility.
+
+[version_history.json]:  /sdk/version_history.json
+[evolution-guidelines]: /docs/development/api/evolution.md
+
+### `partner`
+
+Partners use `partner` APIs directly. These APIs are the foundation on which
+our partners build their applications, and it is our responsibility to keep
+that foundation reliable and stable.
+
+Owners of an API in the `partner` category agree to:
+
+* Make all the versioning commitments from the `partner_internal` section
+  above.
+* Own our partners' developer experience when it comes to this API, including:
+  * Providing good documentation.
+  * Following consistent style.
+  * Anything else you'd like to see in an SDK you were using.
+
+  See the [API Development Guide][api-dev] for relevant rules and suggestions.
+* Acknowledge that backwards-incompatible changes to new API levels impose a
+  cost on our partners, even when we follow our [API evolution
+  guidelines][evolution-guidelines]. If and when a partner chooses to update
+  their target API level, they will need to make modifications within their
+  codebase to adapt to your change. As such, these changes should not be made
+  lightly.
+
+  If you _do_ decide a backwards-incompatible change is worth making, you agree
+  to pay most of the downstream costs of that change, in accordance with the
+  [churn policy][churn-policy].
+
+  Changes are _much_ easier to make to `internal` APIs than `partner` APIs, so
+  any planned API refactoring should be done just _before_ adding an API to the
+  `partner` category, rather than after.
+
+[api-dev]: /docs/development/api/README.md
 
 ## Change history
 
