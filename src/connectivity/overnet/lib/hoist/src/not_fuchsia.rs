@@ -5,25 +5,15 @@
 #![cfg(not(target_os = "fuchsia"))]
 
 use anyhow::{bail, format_err, Context, Error};
-use fidl::endpoints::{create_proxy, create_proxy_and_stream};
-use fidl_fuchsia_overnet::{
-    HostOvernetMarker, HostOvernetProxy, HostOvernetRequest, HostOvernetRequestStream,
-    ServiceConsumerMarker, ServiceConsumerProxy, ServiceConsumerRequest, ServicePublisherMarker,
-    ServicePublisherProxy, ServicePublisherRequest,
-};
 use fuchsia_async::TimeoutExt;
 use fuchsia_async::{Task, Timer};
 use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
-use overnet_core::{log_errors, ListPeersContext, Router, RouterOptions};
+use overnet_core::{Router, RouterOptions};
 use std::io::ErrorKind::{self, TimedOut};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
-use std::{
-    sync::atomic::{AtomicU64, Ordering},
-    sync::Arc,
-    time::Duration,
-};
+use std::{sync::Arc, time::Duration};
 
 pub static CIRCUIT_ID: [u8; 8] = *b"CIRCUIT\0";
 
@@ -36,39 +26,8 @@ pub fn default_ascendd_path() -> PathBuf {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Overnet <-> API bindings
 
-#[derive(Debug)]
-pub struct HostOvernet {
-    proxy: HostOvernetProxy,
-    _task: Task<()>,
-}
-
-impl super::OvernetInstance for HostOvernet {
-    fn connect_as_service_consumer(&self) -> Result<ServiceConsumerProxy, Error> {
-        let (c, s) = create_proxy::<ServiceConsumerMarker>()?;
-        self.proxy.connect_service_consumer(s)?;
-        Ok(c)
-    }
-
-    fn connect_as_service_publisher(&self) -> Result<ServicePublisherProxy, Error> {
-        let (c, s) = create_proxy::<ServicePublisherMarker>()?;
-        self.proxy.connect_service_publisher(s)?;
-        Ok(c)
-    }
-}
-
-impl HostOvernet {
-    pub fn new(node: Arc<Router>) -> Result<Self, Error> {
-        let (c, s) = create_proxy_and_stream::<HostOvernetMarker>()?;
-        Ok(Self {
-            proxy: c,
-            _task: Task::spawn(log_errors(run_overnet(node, s), "overnet main loop failed")),
-        })
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Hoist {
-    host_overnet: Arc<HostOvernet>,
     node: Arc<Router>,
 }
 
@@ -85,9 +44,8 @@ impl Hoist {
             router_options
         };
         let node = Router::new(router_options)?;
-        let host_overnet = Arc::new(HostOvernet::new(node.clone())?);
 
-        Ok(Self { host_overnet, node })
+        Ok(Self { node })
     }
 
     /// Runs a circuit link over the given socket. Assumes it is connected as a client.
@@ -222,16 +180,6 @@ impl Hoist {
     }
 }
 
-impl super::OvernetInstance for Hoist {
-    fn connect_as_service_consumer(&self) -> Result<ServiceConsumerProxy, Error> {
-        self.host_overnet.connect_as_service_consumer()
-    }
-
-    fn connect_as_service_publisher(&self) -> Result<ServicePublisherProxy, Error> {
-        self.host_overnet.connect_as_service_publisher()
-    }
-}
-
 async fn run_ascendd_connection<'a>(
     hoist: &Hoist,
     rx: &'a mut (dyn AsyncRead + Unpin + Send),
@@ -283,105 +231,6 @@ async fn retry_with_backoff<E, F>(
             }
         }
     }
-}
-
-#[tracing::instrument(level = "info")]
-async fn handle_consumer_request(
-    node: Arc<Router>,
-    list_peers_context: Arc<ListPeersContext>,
-    r: ServiceConsumerRequest,
-) -> Result<(), Error> {
-    match r {
-        ServiceConsumerRequest::ListPeers { responder } => {
-            let peers = list_peers_context.list_peers().await?;
-            responder.send(&peers)?
-        }
-        ServiceConsumerRequest::ConnectToService {
-            node: node_id,
-            service_name,
-            chan,
-            control_handle: _,
-        } => node.connect_to_service(node_id.id.into(), &service_name, chan).await?,
-    }
-    Ok(())
-}
-
-#[tracing::instrument(level = "info")]
-async fn handle_publisher_request(
-    node: Arc<Router>,
-    r: ServicePublisherRequest,
-) -> Result<(), Error> {
-    let ServicePublisherRequest::PublishService { service_name, provider, control_handle: _ } = r;
-    node.register_service(service_name, provider).await
-}
-
-static NEXT_LOG_ID: AtomicU64 = AtomicU64::new(0);
-
-fn log_request<
-    R: 'static + Send + std::fmt::Debug,
-    Fut: Send + Future<Output = Result<(), Error>>,
->(
-    f: impl 'static + Send + Clone + Fn(R) -> Fut,
-) -> impl Fn(R) -> std::pin::Pin<Box<dyn Send + Future<Output = Result<(), Error>>>> {
-    move |r| {
-        let f = f.clone();
-        async move {
-            let log_id = NEXT_LOG_ID.fetch_add(1, Ordering::SeqCst);
-            tracing::trace!(request = log_id, begin = ?r);
-            let f = f(r);
-            let r = f.await;
-            tracing::trace!(request = log_id, end = ?r);
-            r
-        }
-        .boxed()
-    }
-}
-
-#[tracing::instrument(level = "info")]
-async fn handle_request(node: Arc<Router>, req: HostOvernetRequest) -> Result<(), Error> {
-    match req {
-        HostOvernetRequest::ConnectServiceConsumer { svc, control_handle: _ } => {
-            let list_peers_context = Arc::new(node.new_list_peers_context().await);
-            svc.into_stream()?
-                .map_err(Into::<Error>::into)
-                .try_for_each_concurrent(
-                    None,
-                    log_request(move |r| {
-                        handle_consumer_request(node.clone(), list_peers_context.clone(), r)
-                    }),
-                )
-                .await?
-        }
-        HostOvernetRequest::ConnectServicePublisher { svc, control_handle: _ } => {
-            svc.into_stream()?
-                .map_err(Into::<Error>::into)
-                .try_for_each_concurrent(
-                    None,
-                    log_request(move |r| handle_publisher_request(node.clone(), r)),
-                )
-                .await?
-        }
-        HostOvernetRequest::ConnectMeshController { .. } => {
-            unreachable!()
-        }
-    }
-    Ok(())
-}
-
-#[tracing::instrument(level = "info", skip(rx))]
-async fn run_overnet(node: Arc<Router>, rx: HostOvernetRequestStream) -> Result<(), Error> {
-    // Run application loop
-    rx.map_err(Into::into)
-        .try_for_each_concurrent(None, move |req| {
-            let node = node.clone();
-            async move {
-                if let Err(e) = handle_request(node, req).await {
-                    tracing::warn!("Service handler failed: {:?}", e);
-                }
-                Ok(())
-            }
-        })
-        .await
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
