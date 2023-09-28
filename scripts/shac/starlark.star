@@ -58,14 +58,8 @@ def _buildifier(ctx):
             replacements = [str(formatted)],
         )
 
-def _validate_finding_messages(ctx):
-    """Validates that `message` is set for all shac ctx.emit.finding() calls.
-
-    shac requires `message` except for findings emitted by formatters, in which
-    case it provides a default message saying to run `shac fmt`. However, `shac
-    fmt` isn't exposed to fuchsia developers directly, instead they should use
-    `fx format-code`, so we should never fall back to the default message.
-    """
+def _fuchsia_shac_style_guide(ctx):
+    """Enforces shac conventions that are specific to the fuchsia project."""
     starlark_files = [
         f
         for f in ctx.scm.affected_files()
@@ -76,7 +70,7 @@ def _validate_finding_messages(ctx):
         procs.append(
             (f, ctx.os.exec([
                 "prebuilt/third_party/python3/%s/bin/python3" % cipd_platform_name(ctx),
-                "scripts/shac/validate_finding_messages.py",
+                "scripts/shac/fuchsia_shac_style_guide.py",
                 f,
             ])),
         )
@@ -96,4 +90,4 @@ def _validate_finding_messages(ctx):
 
 def register_starlark_checks():
     shac.register_check(shac.check(_buildifier, formatter = True))
-    shac.register_check(shac.check(_validate_finding_messages))
+    shac.register_check(shac.check(_fuchsia_shac_style_guide))
