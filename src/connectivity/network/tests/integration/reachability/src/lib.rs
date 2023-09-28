@@ -756,22 +756,20 @@ impl<'a> ReachabilityTestHelper<'a> {
         let snapshot_fut = self.monitor.watch();
         futures::pin_mut!(snapshot_fut);
 
-        loop {
-            futures::select! {
-                _ = self.echo_reply_streams.as_mut() => {
-                    panic!("interface echo reply stream ended unexpectedly");
+        futures::select! {
+            _ = self.echo_reply_streams.as_mut() => {
+                panic!("interface echo reply stream ended unexpectedly");
+            }
+            r = snapshot_fut => {
+                match r {
+                   Ok(snapshot) => {
+                        return snapshot;
+                   },
+                   Err(e) => panic!("failed to fetch updated snapshot {}", e),
                 }
-                r = snapshot_fut => {
-                    match r {
-                       Ok(snapshot) => {
-                            return snapshot;
-                       },
-                       Err(e) => panic!("failed to fetch updated snapshot {}", e),
-                    }
-                }
-                event = reachability_monitor_wait_fut => {
-                    panic!("reachability monitor terminated unexpectedly with event: {:?}", event);
-                }
+            }
+            event = reachability_monitor_wait_fut => {
+                panic!("reachability monitor terminated unexpectedly with event: {:?}", event);
             }
         }
     }

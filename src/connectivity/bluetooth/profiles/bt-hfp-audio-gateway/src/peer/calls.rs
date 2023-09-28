@@ -1052,14 +1052,13 @@ mod tests {
 
     /// Poll the calls  driving async execution, until there are no more updates and and we receive
     /// Pending.  Returns the most recent indicators if any were sent.
+    // TODO(fxbug.dev/129297): fix this to do what it actually says is does or rework tests.
     #[track_caller]
     fn poll_calls_until_pending(exec: &mut fasync::TestExecutor, calls: &mut Calls) {
-        loop {
-            match exec.run_until_stalled(&mut calls.next()) {
-                Poll::Ready(Some(_ind)) => return,
-                Poll::Pending => return,
-                Poll::Ready(None) => panic!("Calls terminated before expected!"),
-            }
+        match exec.run_until_stalled(&mut calls.next()) {
+            Poll::Ready(Some(_ind)) => return,
+            Poll::Pending => return,
+            Poll::Ready(None) => panic!("Calls terminated before expected!"),
         }
     }
 

@@ -47,18 +47,15 @@ async fn set_pairing_delegate() {
         .set_pairing_delegate(input, output, delegate_client2)
         .expect("FIDL request is OK");
 
-    loop {
-        select! {
-            _pairing_result = run_pairing.fuse() => {
-                panic!("`sys.Pairing` server unexpectedly terminated");
-            }
-            result = delegate_server1.next() => {
-                panic!("First delegate should be stay open: {:?}", result);
-            }
-            result = delegate_server2.next() => {
-                assert_matches!(result, None);
-                break;
-            }
+    select! {
+        _pairing_result = run_pairing.fuse() => {
+            panic!("`sys.Pairing` server unexpectedly terminated");
+        }
+        result = delegate_server1.next() => {
+            panic!("First delegate should be stay open: {:?}", result);
+        }
+        result = delegate_server2.next() => {
+            assert_matches!(result, None);
         }
     }
 }
