@@ -733,9 +733,8 @@ async fn shred_data_volume_when_mounted() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/122940) shred_data_volume in recovery is not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(any(not(feature = "fxfs"), feature = "fxblob"), ignore)]
+#[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());

@@ -171,7 +171,7 @@ impl Filesystem {
         Ok(root)
     }
 
-    fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
+    pub fn volume(&mut self, volume_name: &str) -> Option<&mut ServingVolume> {
         match self {
             Filesystem::ServingMultiVolume(_, fs, _) => fs.volume_mut(&volume_name),
             Filesystem::ServingVolumeInFxblob(..) => unreachable!(),

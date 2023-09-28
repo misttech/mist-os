@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
-    fidl_fuchsia_io::{DirectoryMarker, OpenFlags},
+    fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags},
     fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream},
     fs_management::{
         filesystem,
@@ -39,7 +39,6 @@ use {
     fuchsia_runtime::HandleType,
     fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef, Duration},
     futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
-    remote_block_device::{BlockClient, BufferSlice, RemoteBlockClient},
     std::{collections::HashSet, sync::Arc},
     uuid::Uuid,
     vfs::service,
@@ -394,6 +393,7 @@ async fn shred_data_volume(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
+    launcher: &FilesystemLauncher,
 ) -> Result<(), zx::Status> {
     if config.data_filesystem_format != "fxfs" {
         return Err(zx::Status::NOT_SUPPORTED);
@@ -406,30 +406,77 @@ async fn shred_data_volume(
         })?;
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
-        // TODO(https://fxbug.dev/122940) Add support for fxblob.
-        let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
-            tracing::error!("shred_data_volume: unable to find partition: {e:?}");
+        let partition_controller = if config.fxfs_blob {
+            let fxfs_matcher = PartitionMatcher {
+                detected_disk_formats: Some(vec![DiskFormat::Fxfs]),
+                ignore_prefix: ramdisk_prefix,
+                ..Default::default()
+            };
+            find_partition(fxfs_matcher, FIND_PARTITION_DURATION).await.map_err(|e| {
+                tracing::error!("Failed to find fxfs: {e:?}");
+                zx::Status::NOT_FOUND
+            })?
+        } else {
+            find_data_partition(ramdisk_prefix).await.map_err(|e| {
+                tracing::error!("shred_data_volume: unable to find partition: {e:?}");
+                zx::Status::NOT_FOUND
+            })?
+        };
+        let partition_path = partition_controller
+            .get_topological_path()
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to get topo path (fidl error): {e:?}");
+                zx::Status::INTERNAL
+            })?
+            .map_err(|e| {
+                let status = zx::Status::from_raw(e);
+                tracing::error!("Failed to get topo path: {}", status.to_string());
+                status
+            })?;
+        let mut device = Box::new(
+            BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(|e| {
+                tracing::error!("failed to make new device: {e:?}");
+                zx::Status::NOT_FOUND
+            })?,
+        );
+        let filesystem =
+            launcher.serve_data(device.as_mut(), Fxfs::dynamic_child()).await.map_err(|e| {
+                tracing::error!("serving fxfs: {e:?}");
+                zx::Status::INTERNAL
+            })?;
+        let mut filesystem = match filesystem {
+            // If we already need to format for some reason, we don't need to worry about shredding
+            // the data volume.
+            ServeFilesystemStatus::FormatRequired => return Ok(()),
+            ServeFilesystemStatus::Serving(fs) => fs,
+        };
+        let unencrypted = filesystem.volume("unencrypted").ok_or_else(|| {
+            tracing::error!("Failed to find unencrypted volume");
             zx::Status::NOT_FOUND
         })?;
-        let (block_proxy, block_server_end) =
-            fidl::endpoints::create_proxy::<BlockMarker>().map_err(|_| zx::Status::INTERNAL)?;
-        partition_controller
-            .connect_to_device_fidl(block_server_end.into_channel())
-            .map_err(|_| zx::Status::INTERNAL)?;
-
-        let block_client =
-            RemoteBlockClient::new(block_proxy).await.map_err(|_| zx::Status::INTERNAL)?;
-
-        // Overwrite both super blocks.  Deliberately use a non-zero value so that we can tell this
-        // has happened if we're debugging.
-        let buf = vec![0x93; std::cmp::min(block_client.block_size() as usize, 4096)];
-        futures::try_join!(
-            block_client.write_at(BufferSlice::Memory(&buf), 0),
-            block_client.write_at(BufferSlice::Memory(&buf), 524_288)
+        let dir = fuchsia_fs::directory::open_directory(
+            unencrypted.root(),
+            "keys",
+            fio::OpenFlags::RIGHT_WRITABLE,
         )
-        .map_err(|_| zx::Status::IO)?;
-
-        debug_log("Wiped Fxfs super blocks");
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to open keys dir: {e:?}");
+            zx::Status::INTERNAL
+        })?;
+        dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to remove keybag (fidl error): {e:?}");
+                zx::Status::INTERNAL
+            })?
+            .map_err(|e| {
+                let status = zx::Status::from_raw(e);
+                tracing::error!("Failed to remove keybag: {}", status.to_string());
+                status
+            })?;
+        debug_log("Deleted fxfs-data keybag");
     }
     Ok(())
 }
@@ -534,17 +581,23 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         tracing::info!("admin shred data volume called");
-                        let res =
-                            match shred_data_volume(&env, &config, ramdisk_prefix.clone()).await {
-                                Ok(()) => Ok(()),
-                                Err(e) => {
-                                    debug_log(&format!(
-                                        "admin service: shred_data_volume failed: {:?}",
-                                        e
-                                    ));
-                                    Err(e.into_raw())
-                                }
-                            };
+                        let res = match shred_data_volume(
+                            &env,
+                            &config,
+                            ramdisk_prefix.clone(),
+                            &launcher,
+                        )
+                        .await
+                        {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                debug_log(&format!(
+                                    "admin service: shred_data_volume failed: {:?}",
+                                    e
+                                ));
+                                Err(e.into_raw())
+                            }
+                        };
                         responder.send(res).unwrap_or_else(|e| {
                             tracing::error!(
                                 "failed to send ShredDataVolume response. error: {:?}",

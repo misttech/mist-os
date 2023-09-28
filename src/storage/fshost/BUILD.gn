@@ -58,7 +58,6 @@ rustc_binary("fshost") {
     "//src/security/lib/kms-stateless/rust",
     "//src/storage/fshost:fshost_config_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
-    "//src/storage/lib/block_client/rust:remote-block-device",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/key-bag",
     "//src/storage/lib/ramdevice_client/rust",
