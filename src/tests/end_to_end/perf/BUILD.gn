@@ -84,13 +84,17 @@ foreach(target_name, test_list) {
       environments += [
         astro_env,
         sherlock_env,
+        nelson_env,
       ]
     }
 
     # We don't enable this test on Astro because of the potential for
     # it to cause extra flash wear on that device type.
     if (target_name == "storage_benchmarks_test") {
-      environments += [ sherlock_env ]
+      environments += [
+        sherlock_env,
+        nelson_env,
+      ]
     }
   }
 }
