@@ -31,7 +31,7 @@ impl Puppet {
         let reader = ArchiveReader::new();
         let (logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
         let task = Task::spawn(async move {
-            while let Some(e) = errors.next().await {
+            if let Some(e) = errors.next().await {
                 panic!("error in subscription: {}", e);
             }
         });

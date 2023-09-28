@@ -35,7 +35,7 @@ async fn logs_from_crashing_component() {
     reader.with_archive(accessor);
     let (mut logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _errors = Task::spawn(async move {
-        while let Some(e) = errors.next().await {
+        if let Some(e) = errors.next().await {
             panic!("error in subscription: {e}");
         }
     });

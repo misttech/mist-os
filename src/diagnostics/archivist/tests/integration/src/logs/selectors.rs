@@ -43,7 +43,7 @@ async fn component_selectors_filter_logs() {
     let (mut stream, mut errors) =
         reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
     let _errors = fasync::Task::spawn(async move {
-        while let Some(e) = errors.next().await {
+        if let Some(e) = errors.next().await {
             panic!("error in subscription: {e}");
         }
     });
