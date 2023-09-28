@@ -4,7 +4,7 @@
 
 use {
     crate::fuchsia::{
-        pager::Pager,
+        pager::{Pager, PagerPacketReceiverRegistration},
         pager::{PagerVmoStatsOptions, VmoDirtyRange},
         volume::FxVolume,
     },
@@ -53,6 +53,7 @@ pub struct PagedObjectHandle {
     inner: Mutex<Inner>,
     vmo: TempClonable<zx::Vmo>,
     handle: DataObjectHandle<FxVolume>,
+    pager_packet_receiver_registration: PagerPacketReceiverRegistration,
 }
 
 struct Inner {
@@ -224,10 +225,11 @@ impl Inner {
 impl PagedObjectHandle {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Self {
         let size = handle.get_size();
+
+        let (vmo, pager_packet_receiver_registration) =
+            handle.owner().pager().create_vmo(size).unwrap();
         Self {
-            vmo: TempClonable::new(
-                handle.owner().pager().create_vmo(handle.object_id(), size).unwrap(),
-            ),
+            vmo: TempClonable::new(vmo),
             handle,
             inner: Mutex::new(Inner {
                 dirty_crtime: DirtyTimestamp::None,
@@ -236,6 +238,7 @@ impl PagedObjectHandle {
                 spare: 0,
                 pending_shrink: PendingShrink::None,
             }),
+            pager_packet_receiver_registration,
         }
     }
 
@@ -253,6 +256,10 @@ impl PagedObjectHandle {
 
     pub fn pager(&self) -> &Pager {
         self.owner().pager()
+    }
+
+    pub fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+        &self.pager_packet_receiver_registration
     }
 
     pub fn get_size(&self) -> u64 {

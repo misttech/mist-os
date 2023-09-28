@@ -10,7 +10,7 @@ use {
         directory::FxDirectory,
         errors::map_to_status,
         node::FxNode,
-        pager::{default_page_in, PagerBacked},
+        pager::{default_page_in, PagerBacked, PagerPacketReceiverRegistration},
         volume::FxVolume,
     },
     anyhow::{anyhow, ensure, Context, Error},
@@ -53,6 +53,7 @@ pub struct FxBlob {
     compressed_chunk_size: u64,   // zero if blob is not compressed.
     compressed_offsets: Vec<u64>, // unused if blob is not compressed.
     uncompressed_size: u64,       // always set.
+    pager_packet_receiver_registration: PagerPacketReceiverRegistration,
 }
 
 impl FxBlob {
@@ -63,7 +64,8 @@ impl FxBlob {
         compressed_offsets: Vec<u64>,
         uncompressed_size: u64,
     ) -> Arc<Self> {
-        let vmo = handle.owner().pager().create_vmo(handle.object_id(), uncompressed_size).unwrap();
+        let (vmo, pager_packet_receiver_registration) =
+            handle.owner().pager().create_vmo(uncompressed_size).unwrap();
         let trimmed_merkle = &merkle_tree.root().to_string()[0..8];
         let name = format!("blob-{}", trimmed_merkle);
         let cstr_name = std::ffi::CString::new(name).unwrap();
@@ -76,6 +78,7 @@ impl FxBlob {
             compressed_chunk_size,
             compressed_offsets,
             uncompressed_size,
+            pager_packet_receiver_registration,
         });
         file.handle.owner().pager().register_file(&file);
         file
@@ -113,7 +116,6 @@ impl Drop for FxBlob {
     fn drop(&mut self) {
         let volume = self.handle.owner();
         volume.cache().remove(self);
-        volume.pager().unregister_file(self);
     }
 }
 
@@ -156,6 +158,10 @@ impl FxNode for FxBlob {
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::File
     }
+
+    fn terminate(&self) {
+        self.pager_packet_receiver_registration.stop_watching_for_zero_children();
+    }
 }
 
 #[async_trait]
@@ -164,8 +170,8 @@ impl PagerBacked for FxBlob {
         self.handle.owner().pager()
     }
 
-    fn pager_key(&self) -> u64 {
-        self.handle.object_id()
+    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+        &self.pager_packet_receiver_registration
     }
 
     fn vmo(&self) -> &zx::Vmo {

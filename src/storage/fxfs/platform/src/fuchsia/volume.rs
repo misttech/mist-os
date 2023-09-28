@@ -172,18 +172,24 @@ impl FxVolume {
     }
 
     pub async fn terminate(&self) {
-        self.cache.clear();
         self.dirent_cache.clear();
+
+        // `NodeCache::terminate` will break any strong reference cycles contained within nodes
+        // (pager registration). The only remaining nodes should be those with open FIDL
+        // connections. `ExecutionScope::shutdown` + `ExecutionScope::wait` will close the open FIDL
+        // connections which should result in all nodes flushing and then dropping. Any async tasks
+        // required to flush a node should take an active guard on the `ExecutionScope` which will
+        // prevent `ExecutionScope::wait` from completing until all nodes are flushed.
         self.scope.shutdown();
-        self.pager.terminate();
+        self.cache.terminate();
         self.scope.wait().await;
+
         self.store.filesystem().graveyard().flush().await;
         let task = std::mem::replace(&mut *self.flush_task.lock().unwrap(), None);
         if let Some((task, terminate)) = task {
             let _ = terminate.send(());
             task.await;
         }
-        self.flush_all_files().await;
         if self.store.crypt().is_some() {
             if let Err(e) = self.store.lock().await {
                 // The store will be left in a safe state and there won't be data-loss unless
@@ -988,6 +994,7 @@ mod tests {
                 wait *= 2;
             }
 
+            std::mem::drop(file);
             vol.volume().terminate().await;
         }
 
@@ -1098,6 +1105,7 @@ mod tests {
             assert!(data_has_persisted().await);
             assert_eq!(vol.volume().dirent_cache().limit(), 100);
 
+            std::mem::drop(file);
             vol.volume().terminate().await;
         }
 
@@ -1207,6 +1215,7 @@ mod tests {
             assert!(data_has_persisted().await);
             assert_eq!(vol.volume().dirent_cache().limit(), 50);
 
+            std::mem::drop(file);
             vol.volume().terminate().await;
         }
 

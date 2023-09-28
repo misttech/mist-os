@@ -29,6 +29,10 @@ pub trait FxNode: IntoAny + Send + Sync + 'static {
     fn open_count_sub_one(self: Arc<Self>);
     async fn get_properties(&self) -> Result<ObjectProperties, Error>;
     fn object_descriptor(&self) -> ObjectDescriptor;
+
+    /// Called when the filesystem is shutting down. Implementations should break any strong
+    /// reference cycles that would prevent the node from being dropped.
+    fn terminate(&self) {}
 }
 
 struct PlaceholderInner {
@@ -219,8 +223,14 @@ impl NodeCache {
         FileIter { cache: self, object_id: None }
     }
 
-    /// Does nothing anymore, but may again in the future.
-    pub fn clear(&self) {}
+    pub fn terminate(&self) {
+        let nodes = std::mem::take(&mut self.0.lock().unwrap().map);
+        for (_, node) in nodes {
+            if let Some(node) = node.upgrade() {
+                node.terminate();
+            }
+        }
+    }
 
     fn commit(&self, node: Arc<dyn FxNode>) {
         let mut this = self.0.lock().unwrap();

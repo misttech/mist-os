@@ -8,7 +8,7 @@ use {
         errors::map_to_status,
         node::{FxNode, OpenedNode},
         paged_object_handle::PagedObjectHandle,
-        pager::{default_page_in, PagerBacked},
+        pager::{default_page_in, PagerBacked, PagerPacketReceiverRegistration},
         volume::{info_to_filesystem_info, FxVolume},
     },
     anyhow::Error,
@@ -204,7 +204,6 @@ impl Drop for FxFile {
     fn drop(&mut self) {
         let volume = self.handle.owner();
         volume.cache().remove(self);
-        volume.pager().unregister_file(self);
     }
 }
 
@@ -237,6 +236,10 @@ impl FxNode for FxFile {
 
     fn object_descriptor(&self) -> ObjectDescriptor {
         ObjectDescriptor::File
+    }
+
+    fn terminate(&self) {
+        self.handle.pager_packet_receiver_registration().stop_watching_for_zero_children();
     }
 }
 
@@ -488,8 +491,8 @@ impl PagerBacked for FxFile {
         self.handle.owner().pager()
     }
 
-    fn pager_key(&self) -> u64 {
-        self.object_id()
+    fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+        &self.handle.pager_packet_receiver_registration()
     }
 
     fn vmo(&self) -> &zx::Vmo {
