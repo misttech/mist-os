@@ -89,11 +89,8 @@ fn listen_to_logs(
     let (new_logs, mut errors) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
 
     let _check_errors = Task::spawn(async move {
-        loop {
-            match errors.next().await {
-                Some(error) => panic!("log testing client encountered an error: {}", error),
-                None => break,
-            }
+        if let Some(error) = errors.next().await {
+            panic!("log testing client encountered an error: {}", error);
         }
     });
 
