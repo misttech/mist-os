@@ -221,6 +221,14 @@ impl BrowseableItem {
             Self::MediaElement(_) => ItemType::MediaElement,
         }
     }
+
+    /// Tries to downcast `BrowseableItem` to underlying `MediaPlayerItem` type.
+    pub fn try_into_media_player(self) -> Result<MediaPlayerItem, Error> {
+        match self {
+            Self::MediaPlayer(p) => Ok(p),
+            _ => Err(Error::InvalidMessage),
+        }
+    }
 }
 
 impl Encodable for BrowseableItem {
@@ -337,20 +345,7 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::MediaPlayerItem {
 
     fn try_from(src: BrowseableItem) -> Result<Self, Self::Error> {
         match src {
-            BrowseableItem::MediaPlayer(p) => Ok(fidl_avrcp::MediaPlayerItem {
-                player_id: Some(p.player_id),
-                major_type: fidl_avrcp::MajorPlayerType::from_bits(p.major_player_type),
-                sub_type: fidl_avrcp::PlayerSubType::from_bits(p.player_sub_type),
-                playback_status: Some(p.play_status.into()),
-                displayable_name: Some(p.name),
-                feature_bits: Some(fidl_avrcp::PlayerFeatureBits::from_bits_truncate(
-                    p.feature_bit_mask[0],
-                )),
-                feature_bits_ext: Some(fidl_avrcp::PlayerFeatureBitsExt::from_bits_truncate(
-                    p.feature_bit_mask[1],
-                )),
-                ..Default::default()
-            }),
+            BrowseableItem::MediaPlayer(p) => Ok(p.into()),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
         }
     }
@@ -361,23 +356,32 @@ impl TryFrom<BrowseableItem> for fidl_avrcp::FileSystemItem {
 
     fn try_from(src: BrowseableItem) -> Result<Self, Self::Error> {
         match src {
-            BrowseableItem::MediaElement(e) => {
-                Ok(Self::MediaElement(fidl_avrcp::MediaElementItem {
-                    media_element_uid: Some(e.element_uid),
-                    media_type: Some(e.media_type.into()),
-                    displayable_name: Some(e.name.clone()),
-                    attributes: Some(e.attributes.into()),
-                    ..Default::default()
-                }))
-            }
-            BrowseableItem::Folder(f) => Ok(Self::Folder(fidl_avrcp::FolderItem {
-                folder_uid: Some(f.folder_uid),
-                folder_type: Some(f.folder_type.into()),
-                is_playable: Some(f.is_playable),
-                displayable_name: Some(f.name),
-                ..Default::default()
-            })),
+            BrowseableItem::MediaElement(e) => Ok(e.into()),
+            BrowseableItem::Folder(f) => Ok(f.into()),
             _ => Err(fidl_avrcp::BrowseControllerError::PacketEncoding),
+        }
+    }
+}
+
+// Enum to express the level of browsing supported from a peer's available
+// players.
+#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
+pub enum BrowseLevel {
+    NotBrowsable = 1,
+    OnlyBrowsableWhenAddressed = 2,
+    // Player that supports browsing without `OnlyBrowsableWhenAddressed`.
+    Browsable = 3,
+}
+
+impl From<&fidl_avrcp::PlayerFeatureBits> for BrowseLevel {
+    fn from(feature_bits: &fidl_avrcp::PlayerFeatureBits) -> Self {
+        if !feature_bits.contains(fidl_avrcp::PlayerFeatureBits::BROWSING) {
+            return Self::NotBrowsable;
+        }
+        if feature_bits.contains(fidl_avrcp::PlayerFeatureBits::ONLY_BROWSABLE_WHEN_ADDRESSED) {
+            Self::OnlyBrowsableWhenAddressed
+        } else {
+            Self::Browsable
         }
     }
 }
@@ -405,6 +409,45 @@ impl MediaPlayerItem {
     /// Displayable Name Length (2 bytes).
     /// Defined in AVRCP 1.6.2, Section 6.10.2.1.
     const MIN_PACKET_SIZE: usize = 28;
+
+    #[cfg(test)]
+    pub fn new(
+        player_id: u16,
+        major_player_type: u8,
+        player_sub_type: u32,
+        play_status: PlaybackStatus,
+        feature_bit_mask: [u64; 2],
+        name: String,
+    ) -> Self {
+        Self { player_id, major_player_type, player_sub_type, play_status, feature_bit_mask, name }
+    }
+
+    pub fn player_id(&self) -> u16 {
+        self.player_id
+    }
+
+    pub fn browse_level(&self) -> BrowseLevel {
+        (&fidl_avrcp::PlayerFeatureBits::from_bits_truncate(self.feature_bit_mask[0])).into()
+    }
+}
+
+impl From<MediaPlayerItem> for fidl_avrcp::MediaPlayerItem {
+    fn from(src: MediaPlayerItem) -> Self {
+        fidl_avrcp::MediaPlayerItem {
+            player_id: Some(src.player_id),
+            major_type: fidl_avrcp::MajorPlayerType::from_bits(src.major_player_type),
+            sub_type: fidl_avrcp::PlayerSubType::from_bits(src.player_sub_type),
+            playback_status: Some(src.play_status.into()),
+            displayable_name: Some(src.name),
+            feature_bits: Some(fidl_avrcp::PlayerFeatureBits::from_bits_truncate(
+                src.feature_bit_mask[0],
+            )),
+            feature_bits_ext: Some(fidl_avrcp::PlayerFeatureBitsExt::from_bits_truncate(
+                src.feature_bit_mask[1],
+            )),
+            ..Default::default()
+        }
+    }
 }
 
 impl Encodable for MediaPlayerItem {
@@ -521,6 +564,18 @@ impl FolderItem {
     const MIN_PACKET_SIZE: usize = 14;
 }
 
+impl From<FolderItem> for fidl_avrcp::FileSystemItem {
+    fn from(src: FolderItem) -> Self {
+        Self::Folder(fidl_avrcp::FolderItem {
+            folder_uid: Some(src.folder_uid),
+            folder_type: Some(src.folder_type.into()),
+            is_playable: Some(src.is_playable),
+            displayable_name: Some(src.name),
+            ..Default::default()
+        })
+    }
+}
+
 impl Encodable for FolderItem {
     type Error = Error;
 
@@ -611,6 +666,18 @@ impl MediaElementItem {
     /// Displayable Name Length (2 bytes), Number of Attributes (1 byte).
     /// Defined in AVRCP 1.6.2, Section 6.10.2.3.
     const MIN_PACKET_SIZE: usize = 14;
+}
+
+impl From<MediaElementItem> for fidl_avrcp::FileSystemItem {
+    fn from(src: MediaElementItem) -> Self {
+        Self::MediaElement(fidl_avrcp::MediaElementItem {
+            media_element_uid: Some(src.element_uid),
+            media_type: Some(src.media_type.into()),
+            displayable_name: Some(src.name),
+            attributes: Some(src.attributes.into()),
+            ..Default::default()
+        })
+    }
 }
 
 impl Encodable for MediaElementItem {

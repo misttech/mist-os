@@ -2,25 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    bt_avctp::{AvcCommandResponse, AvcCommandType, AvcPeer, AvcResponseType, AvctpPeer},
-    derivative::Derivative,
-    fidl_fuchsia_bluetooth, fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync,
-    fuchsia_bluetooth::{profile::Psm, types::Channel, types::PeerId},
-    fuchsia_inspect::Property,
-    fuchsia_inspect_derive::{AttachError, Inspect},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, stream::StreamExt, Future},
-    packet_encoding::{Decodable, Encodable},
-    parking_lot::RwLock,
-    std::{
-        collections::{HashMap, HashSet},
-        convert::TryFrom,
-        mem::{discriminant, Discriminant},
-        sync::Arc,
-    },
-    tracing::{info, trace, warn},
+use bt_avctp::{AvcCommandResponse, AvcCommandType, AvcPeer, AvcResponseType, AvctpPeer};
+use derivative::Derivative;
+use fidl_fuchsia_bluetooth;
+use fidl_fuchsia_bluetooth_bredr as bredr;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::{profile::Psm, types::Channel, types::PeerId};
+use fuchsia_inspect::Property;
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_zircon as zx;
+use futures::{channel::mpsc, stream::StreamExt, Future};
+use packet_encoding::{Decodable, Encodable};
+use parking_lot::RwLock;
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    mem::{discriminant, Discriminant},
+    num::NonZeroU16,
+    sync::Arc,
 };
+use tracing::{info, trace, warn};
 
 mod controller;
 mod handlers;
@@ -176,6 +177,33 @@ impl AVCTPConnectionType {
     }
 }
 
+/// Represents a browsable player where browse channel commands are routed to.
+#[allow(unused)]
+#[derive(Clone, Debug)]
+pub struct BrowsablePlayer {
+    player_id: u16,
+    // If the browsable player is not database aware, uid_counter will be none.
+    uid_counter: Option<NonZeroU16>,
+    // Number of items in the current folder.
+    num_items: u32,
+    sub_folders: Vec<String>,
+}
+
+impl BrowsablePlayer {
+    fn new(player_id: u16, params: SetBrowsedPlayerResponseParams) -> Self {
+        BrowsablePlayer {
+            player_id,
+            uid_counter: params.uid_counter().try_into().ok(),
+            num_items: params.num_items(),
+            sub_folders: params.folder_names(),
+        }
+    }
+
+    fn uid_counter(&self) -> u16 {
+        self.uid_counter.map_or(0, Into::into)
+    }
+}
+
 /// Internal object to manage a remote peer
 #[derive(Derivative)]
 #[derivative(Debug)]
@@ -246,6 +274,12 @@ struct RemotePeer {
     /// the current state of the peer.
     notification_cache: HashMap<Discriminant<ControllerEvent>, ControllerEvent>,
 
+    // Information about the browsable player that is currently set, if any.
+    browsable_player: Option<BrowsablePlayer>,
+
+    // Available players.
+    available_players: HashMap<u16, MediaPlayerItem>,
+
     /// The inspect node for this peer.
     #[derivative(Debug = "ignore")]
     inspect: RemotePeerInspect,
@@ -288,6 +322,8 @@ impl RemotePeer {
             last_control_connected_time: None,
             last_browse_connected_time: None,
             notification_cache: HashMap::new(),
+            browsable_player: None,
+            available_players: HashMap::new(),
             inspect: RemotePeerInspect::new(peer_id),
         }
     }
@@ -588,6 +624,43 @@ impl RemotePeer {
         trace!("Waking state watcher for {}", self.peer_id);
         self.state_change_listener.state_changed();
     }
+
+    fn update_available_players(&mut self, players: &[MediaPlayerItem]) {
+        self.available_players.clear();
+        trace!(%self.peer_id, "Available players updated: {players:?}");
+        players.iter().for_each(|p| {
+            let _ = self.available_players.insert(p.player_id(), p.clone());
+        });
+    }
+
+    /// Finds the player ID of the addressed player or the player ID of one of the available players
+    /// with highest browse level. The player ID is only returned if browsing is supported.
+    fn get_candidate_browse_player(&self) -> Option<u16> {
+        // let mut players: Vec<&MediaPlayerItem> = Vec::new();
+        self.notification_cache
+            .get(&discriminant(&ControllerEvent::AddressedPlayerChanged(0)))
+            .map_or_else(
+                || {
+                    let mut players: Vec<&MediaPlayerItem> =
+                        self.available_players.values().collect();
+                    players.sort_unstable_by(|a, b| b.browse_level().cmp(&a.browse_level()));
+                    players.first().map(|p| *p)
+                },
+                |e| match e {
+                    ControllerEvent::AddressedPlayerChanged(player_id) => {
+                        self.available_players.get(player_id)
+                    }
+                    _ => panic!("Shouldn't reach here"),
+                },
+            )
+            .and_then(|p| {
+                if p.browse_level() > BrowseLevel::NotBrowsable {
+                    Some(p.player_id())
+                } else {
+                    None
+                }
+            })
+    }
 }
 
 impl Drop for RemotePeer {
@@ -647,15 +720,16 @@ async fn send_vendor_dependent_command_internal(
     Ok(buf)
 }
 
-async fn send_browsing_command_internal(
+async fn send_browse_command_internal(
     peer: Arc<RwLock<RemotePeer>>,
     pdu_id: u8,
-    command: BrowsePreamble,
+    payload: &[u8],
 ) -> Result<Vec<u8>, Error> {
+    let preamble = BrowsePreamble::new(pdu_id, payload.to_vec());
     let avctp_peer = peer.write().browse_connection()?;
 
-    let mut buf = vec![0; command.encoded_len()];
-    let _ = command.encode(&mut buf[..])?;
+    let mut buf = vec![0; preamble.encoded_len()];
+    let _ = preamble.encode(&mut buf[..])?;
     let mut stream = avctp_peer.send_command(&buf[..])?;
 
     // Wait for result.
@@ -751,6 +825,17 @@ impl RemotePeerHandle {
         self.peer.read().browse_connected()
     }
 
+    pub fn get_browsable_player(&self) -> Option<BrowsablePlayer> {
+        self.peer.read().browsable_player.clone()
+    }
+
+    pub fn set_browsable_player(&self, player: Option<BrowsablePlayer>) {
+        let mut lock = self.peer.write();
+        let peer_id = lock.peer_id;
+        info!(%peer_id, "Changing browsable player to {:?}", player.as_ref().map(|p| p.player_id));
+        lock.browsable_player = player;
+    }
+
     /// Sends a single passthrough keycode over the control channel.
     pub fn send_avc_passthrough<'a>(
         &self,
@@ -797,12 +882,12 @@ impl RemotePeerHandle {
     /// into a browse preamble and will return its parameters, so that the
     /// upstream can further decode the message into a specific AVRCP response
     /// message.
-    pub fn send_browsing_command<'a>(
-        &self,
+    pub fn send_browse_command<'a>(
+        &'a self,
         pdu_id: u8,
-        command: BrowsePreamble,
+        payload: &'a [u8],
     ) -> impl Future<Output = Result<Vec<u8>, Error>> + 'a {
-        send_browsing_command_internal(self.peer.clone(), pdu_id, command)
+        send_browse_command_internal(self.peer.clone(), pdu_id, payload)
     }
 
     /// Retrieve the events supported by the peer by issuing a GetCapabilities command.
@@ -834,9 +919,14 @@ impl RemotePeerHandle {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+    use crate::packets::Error as PacketError;
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion, AvrcpTargetFeatures};
+    use assert_matches::assert_matches;
+    use async_utils::PollExt;
+    use bt_avctp::{AvctpCommand, AvctpCommandStream};
+    use futures::{pin_mut, task::Poll, TryStreamExt};
 
     use {
         diagnostics_assertions::assert_data_tree,
@@ -849,7 +939,6 @@ mod tests {
         fuchsia_bluetooth::types::Channel,
         fuchsia_inspect_derive::WithInspect,
         fuchsia_zircon::DurationNum,
-        futures::{pin_mut, task::Poll},
         std::convert::TryInto,
     };
 
@@ -1728,5 +1817,189 @@ mod tests {
                 browse_connections: 1u64,
             }
         });
+    }
+
+    #[track_caller]
+    pub(crate) fn get_next_avctp_command(
+        exec: &mut fasync::TestExecutor,
+        command_stream: &mut AvctpCommandStream,
+    ) -> AvctpCommand {
+        exec.run_until_stalled(&mut command_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("has valid command")
+    }
+
+    /// Helper function for decoding AVCTP command. It checks that the PduId of the message is
+    /// equal to the expected PduId.
+    #[track_caller]
+    pub(crate) fn decode_avctp_command(command: &AvctpCommand, expected_pdu_id: PduId) -> Vec<u8> {
+        // Decode the provided `command` into a PduId and command parameters.
+        match BrowseChannelHandler::decode_command(command) {
+            Ok((id, packet)) if id == expected_pdu_id => packet,
+            result => panic!("[Browse Channel] Received unexpected result: {:?}", result),
+        }
+    }
+
+    /// Helper function to reply to the command with an AVCTP response.
+    pub(crate) fn send_avctp_response(
+        pdu_id: PduId,
+        response: &impl Encodable<Error = PacketError>,
+        command: &AvctpCommand,
+    ) {
+        let mut buf = vec![0; response.encoded_len()];
+        response.encode(&mut buf[..]).expect("should have succeeded");
+
+        // Send the response back to the remote peer.
+        let response_packet = BrowsePreamble::new(u8::from(&pdu_id), buf);
+        let mut response_buf = vec![0; response_packet.encoded_len()];
+        response_packet.encode(&mut response_buf[..]).expect("Encoding should work");
+
+        let _ = command.send_response(&response_buf[..]).expect("should have succeeded");
+    }
+
+    #[fuchsia::test]
+    fn test_get_candidate_browse_player() {
+        let _exec = fasync::TestExecutor::new();
+
+        // Set up peer for testing with available players information.
+        let id = PeerId(1);
+        let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
+        peer_handle.peer.write().update_available_players(&[
+            // Browsable, OnlyBrowsableWhenAddressed.
+            MediaPlayerItem::new(
+                1,
+                1,
+                1,
+                PlaybackStatus::Playing,
+                [0x0000000000B701EF, 0],
+                "player 1".to_string(),
+            ),
+            // Not browsable
+            MediaPlayerItem::new(
+                2,
+                1,
+                1,
+                PlaybackStatus::Playing,
+                [0x0000000000B70167, 0],
+                "player 2".to_string(),
+            ),
+            // Browsable.
+            MediaPlayerItem::new(
+                3,
+                1,
+                1,
+                PlaybackStatus::Playing,
+                [0x0000000000B7016F, 0],
+                "player 3".to_string(),
+            ),
+        ]);
+
+        // Without addressed player set, player ID with highest browse support level is returned if it exists.
+        assert_eq!(
+            peer_handle.peer.read().get_candidate_browse_player().expect("should have returned ID"),
+            3
+        );
+
+        // With addressed player set, addressed player ID is returned if it supports browsing.
+        peer_handle
+            .peer
+            .write()
+            .handle_new_controller_notification_event(ControllerEvent::AddressedPlayerChanged(1));
+        assert_eq!(
+            peer_handle.peer.read().get_candidate_browse_player().expect("should have returned ID"),
+            1
+        );
+
+        // With addressed player set to non-browsing supporting player, none is returned.
+        peer_handle
+            .peer
+            .write()
+            .handle_new_controller_notification_event(ControllerEvent::AddressedPlayerChanged(2));
+        assert!(peer_handle.peer.read().get_candidate_browse_player().is_none());
+    }
+
+    #[fuchsia::test]
+    fn successful_post_browse_connection_setup() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let id = PeerId(842);
+        let (peer_handle, _target_delegate, _profile_requests) = setup_remote_peer(id);
+
+        // Set the descriptor to simulate service found for peer.
+        peer_handle.set_target_descriptor(AvrcpService::Target {
+            features: AvrcpTargetFeatures::CATEGORY1,
+            psm: Psm::AVCTP,
+            protocol_version: AvrcpProtocolVersion(1, 6),
+        });
+        // Peer initiates control connection to us.
+        let (_remote, channel) = Channel::create();
+        let peer = AvcPeer::new(channel);
+        peer_handle.set_control_connection(peer);
+        // Run to update watcher state.
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Peer initiates a browse connection.
+        let (remote1, local1) = Channel::create();
+        let local = AvctpPeer::new(local1);
+        let remote = AvctpPeer::new(remote1);
+        let mut remote_command_stream = remote.take_command_stream();
+        peer_handle.set_browse_connection(local);
+        // Run to update watcher state.
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Should have sent a request to get all players.
+        // Expect get folder items command with media player scope.
+        let command = get_next_avctp_command(&mut exec, &mut remote_command_stream);
+        let params = decode_avctp_command(&command, PduId::GetFolderItems);
+        let cmd =
+            GetFolderItemsCommand::decode(&params).expect("should have received valid command");
+        assert_matches!(cmd.scope(), Scope::MediaPlayerList);
+
+        const PLAYER_1_ID: u16 = 1003; // player with higher browseability.
+        const PLAYER_2_ID: u16 = 1004;
+        let mock_players = vec![
+            BrowseableItem::MediaPlayer(MediaPlayerItem::new(
+                PLAYER_1_ID,
+                1,
+                1,
+                PlaybackStatus::Playing,
+                // Browsable.
+                [0x0000000000B7016F as u64, 0x02000000000000 as u64],
+                "player 1".to_string(),
+            )),
+            BrowseableItem::MediaPlayer(MediaPlayerItem::new(
+                PLAYER_2_ID,
+                1,
+                1,
+                PlaybackStatus::Playing,
+                // Browsable, OnlyBrowsableWhenAddressed.
+                [0x0000000000B701EF as u64, 0x02000000000000 as u64],
+                "player 2".to_string(),
+            )),
+        ];
+        let mock_resp = GetFolderItemsResponse::new_success(1, mock_players);
+        send_avctp_response(PduId::GetFolderItems, &mock_resp, &command);
+
+        // Should have sent a request to set browsed player.
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        let command = get_next_avctp_command(&mut exec, &mut remote_command_stream);
+        // Ensure command params are correct.
+        let params = decode_avctp_command(&command, PduId::SetBrowsedPlayer);
+        let cmd =
+            SetBrowsedPlayerCommand::decode(&params).expect("should have received valid command");
+        assert_eq!(cmd.player_id(), 1003); // Player with "higher" browsing capability is set as browsed player.
+                                           // Create mock response.
+        let resp =
+            SetBrowsedPlayerResponse::new_success(0, 0, vec![]).expect("should not return error");
+        send_avctp_response(PduId::SetBrowsedPlayer, &resp, &command);
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+
+        // Should have set browsed player.
+        let player = peer_handle.get_browsable_player().expect("should have been set");
+        assert_eq!(player.player_id, PLAYER_1_ID);
+        assert_eq!(player.uid_counter, None);
+        assert_eq!(player.num_items, 0);
+        assert_eq!(player.sub_folders.len(), 0);
     }
 }

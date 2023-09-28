@@ -57,7 +57,7 @@ impl BrowseControllerService {
             BrowseControllerRequest::GetMediaPlayerItems { start_index, end_index, responder } => {
                 responder.send(
                     self.controller
-                        .get_media_player_items(start_index, end_index)
+                        .get_media_player_items(start_index, end_index, false)
                         .await
                         .as_deref()
                         .map_err(|e| *e),

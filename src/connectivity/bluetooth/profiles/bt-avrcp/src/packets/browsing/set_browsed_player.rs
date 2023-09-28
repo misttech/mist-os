@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    packet_encoding::{Decodable, Encodable},
-    std::convert::{TryFrom, TryInto},
-    tracing::warn,
-};
+use packet_encoding::{Decodable, Encodable};
+use std::convert::{TryFrom, TryInto};
+use tracing::{info, warn};
 
 use crate::packets::{
     adjust_byte_size, AdvancedDecodable, CharsetId, Error, PacketResult, StatusCode,
@@ -77,7 +75,7 @@ impl SetBrowsedPlayerResponse {
     /// The minimum packet size of a SetBrowsedPlayerResponse for success status.
     /// The fields are: Status (1 byte) and all the fields represented in
     /// `SetBrowsedPlayerResponseParams::MIN_PACKET_SIZE`.
-    const MIN_SUCCESS_RESPONSE_SIZE: usize = 10;
+    const MIN_SUCCESS_RESPONSE_SIZE: usize = 1 + SetBrowsedPlayerResponseParams::MIN_PACKET_SIZE;
 
     #[cfg(test)]
     pub fn new_success(
@@ -115,7 +113,7 @@ impl Decodable for SetBrowsedPlayerResponse {
         if buf.len() < Self::MIN_SUCCESS_RESPONSE_SIZE {
             return Err(Error::InvalidMessageLength);
         }
-        Ok(Self::Success(SetBrowsedPlayerResponseParams::decode(&buf[1..])?))
+        SetBrowsedPlayerResponseParams::decode(&buf[1..]).map(|r| Self::Success(r))
     }
 }
 
@@ -221,23 +219,28 @@ impl AdvancedDecodable for SetBrowsedPlayerResponseParams {
             }
             let mut name_len: usize =
                 u16::from_be_bytes(buf[next_idx..next_idx + 2].try_into().unwrap()) as usize;
+            next_idx += 2;
             if should_adjust {
                 name_len = adjust_byte_size(name_len)?;
             }
-            if buf.len() < next_idx + 2 + name_len {
+            if buf.len() < next_idx + name_len {
                 return Err(Error::InvalidMessage);
             }
             // TODO(fxdev.bug/100467): add support to appropriately convert non-utf8
             // charset ID folder names to utf8 names.
+            let default_name = format!("Folder {:?}", processed + 1);
             let name = if is_utf8 {
                 let mut name_arr = vec![0; name_len];
-                name_arr.copy_from_slice(&buf[next_idx + 2..next_idx + 2 + name_len]);
-                String::from_utf8(name_arr).map_err(|_| Error::ParameterEncodingError)?
+                name_arr.copy_from_slice(&buf[next_idx..next_idx + name_len]);
+                String::from_utf8(name_arr).or_else(|e| {
+                    info!(%e, "Browsable player folder name conversion caused error, falling back to placeholder name {default_name}");
+                    Ok(default_name)
+                })?
             } else {
-                format!("Folder {:?}", processed + 1)
+                default_name
             };
             folder_names.push(name);
-            next_idx += 2 + name_len;
+            next_idx += name_len;
         }
 
         if next_idx != buf.len() {

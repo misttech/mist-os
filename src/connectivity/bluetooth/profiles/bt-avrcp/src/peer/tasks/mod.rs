@@ -20,50 +20,89 @@ use tracing::{error, info, trace, warn};
 
 mod notification_stream;
 
-use crate::packets::{Error as PacketError, *};
-use crate::peer::{
-    get_supported_events_internal, send_browsing_command_internal, AVCTPConnectionType,
-    ControllerEvent, PeerChannelState, RemotePeer,
-};
+use crate::packets::{Error as PacketError, MediaPlayerItem};
+use crate::peer::*;
 use crate::profile::*;
 use crate::types::PeerError as Error;
 
-// TODO(fxbug.dev/105464): consider calling this function on available players
-// changed notification event instead of on browse connection setup completion.
-async fn record_player_capabilities(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> {
-    if peer.read().target_descriptor.is_none() {
-        return Ok(());
-    }
-    trace!("Recording player capabilities for target peer {:?}", peer.read().id());
+async fn get_available_players(
+    peer: Arc<RwLock<RemotePeer>>,
+) -> Result<Vec<MediaPlayerItem>, Error> {
+    // TODO(fxbug.dev/130791): get all the available players instead of just 10.
     let command = GetFolderItemsCommand::new_media_player_list(0, 9);
     let mut payload = vec![0; command.encoded_len()];
     let _ = command.encode(&mut payload[..])?;
     let pdu_id = PduId::GetFolderItems;
-    let cmd_buf = BrowsePreamble::new(u8::from(&pdu_id), payload.to_vec());
+    let peer_id = peer.read().id();
 
+    trace!(%peer_id, "Fetching available players for target peer");
     let resp_buf: Vec<u8> =
-        { send_browsing_command_internal(peer.clone(), u8::from(&pdu_id), cmd_buf).await? };
+        { send_browse_command_internal(peer.clone(), u8::from(&pdu_id), &payload).await? };
     let response = GetFolderItemsResponse::decode(&resp_buf[..])?;
     match response {
         GetFolderItemsResponse::Failure(status) => {
-            error!("GetFolderItems command failed: {:?}", status);
-            return Err(Error::CommandFailed);
+            error!(%peer_id, ?status, "GetFolderItems command failed");
+            Err(Error::CommandFailed)
         }
         GetFolderItemsResponse::Success(r) => {
             let players = r
                 .item_list()
                 .into_iter()
-                .map(|i| fidl_fuchsia_bluetooth_avrcp::MediaPlayerItem::try_from(i))
-                .collect::<Result<
-                    Vec<fidl_fuchsia_bluetooth_avrcp::MediaPlayerItem>,
-                    fidl_fuchsia_bluetooth_avrcp::BrowseControllerError,
-                >>()
-                .map_err(|e| format_err!("Failed to convert to FIDL media player item {:?}", e))?;
-            let peer_guard = peer.write();
-            peer_guard.inspect.metrics().target_player_features(peer_guard.id(), players);
+                .map(|i: BrowseableItem| i.try_into_media_player())
+                .collect::<Result<Vec<MediaPlayerItem>, PacketError>>()
+                .map_err(|e| Error::PacketError(e))?;
+            Ok(players)
         }
+    }
+}
+
+// TODO(fxbug.dev/105464): consider calling this function on available players
+// changed notification event instead of on browse connection setup completion.
+async fn set_browsed_player(peer: Arc<RwLock<RemotePeer>>) -> Result<(), Error> {
+    if peer.read().target_descriptor.is_none() {
+        return Ok(());
+    }
+    let players = get_available_players(peer.clone()).await?;
+    let peer_id = peer.read().id();
+
+    // Record player features.
+    {
+        let mut lock = peer.write();
+        trace!(%peer_id, "Recording player capabilities for target peer");
+        lock.inspect.metrics().target_player_features(peer_id, &players);
+        lock.update_available_players(&players);
+    }
+
+    if players.len() == 0 {
+        return Err(Error::GenericError(format_err!("No available players")));
+    }
+
+    // Set browsed player to addressed player or player with highest browse support.
+    let player_id = peer
+        .read()
+        .get_candidate_browse_player()
+        .ok_or(Error::GenericError(format_err!("No player available for browsing")))?;
+    let command = SetBrowsedPlayerCommand::new(player_id);
+    let mut payload = vec![0; command.encoded_len()];
+    let _ = command.encode(&mut payload[..])?;
+
+    let resp_buf: Vec<u8> = {
+        send_browse_command_internal(peer.clone(), u8::from(&PduId::SetBrowsedPlayer), &payload)
+            .await?
     };
-    Ok(())
+    let response = SetBrowsedPlayerResponse::decode(&resp_buf[..]);
+    let response = response?;
+    match response {
+        SetBrowsedPlayerResponse::Success(params) => {
+            info!(%peer_id, "Setting initial browsable player to {player_id}");
+            peer.write().browsable_player = Some(BrowsablePlayer::new(player_id, params));
+            Ok(())
+        }
+        SetBrowsedPlayerResponse::Failure(status) => {
+            error!(%peer_id, ?status, "SetBrowsedPlayer command failed");
+            Err(Error::CommandFailed)
+        }
+    }
 }
 
 /// Processes incoming commands from the control stream and dispatches them to the control command
@@ -204,7 +243,6 @@ fn handle_notification(
 /// The control channel should be in `Connecting` state before spawning this task.
 /// TODO(fxbug.dev/85761): Refactor logic into RemotePeer to avoid multiple lock accesses.
 async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnectionType) {
-    use crate::peer::{MAX_CONNECTION_EST_TIME, MIN_CONNECTION_EST_TIME};
     let random_delay: zx::Duration = zx::Duration::from_nanos(
         rand::thread_rng()
             .gen_range(MIN_CONNECTION_EST_TIME.into_nanos()..MAX_CONNECTION_EST_TIME.into_nanos()),
@@ -305,11 +343,13 @@ fn start_browse_stream_processing_task(peer: Arc<RwLock<RemotePeer>>) -> fasync:
     fasync::Task::spawn(process_browse_stream(peer).map(|_| ()))
 }
 
-/// Spawns a task that records metrics related to a peer.
-fn run_metrics_logging_task(peer: Arc<RwLock<RemotePeer>>) -> fasync::Task<()> {
+/// Spawns a task that:
+/// - records metrics related to a peer
+/// - sets browsed player for the peer
+fn run_post_browse_setup_task(peer: Arc<RwLock<RemotePeer>>) -> fasync::Task<()> {
     fasync::Task::spawn(async move {
-        if let Err(e) = record_player_capabilities(peer).await {
-            trace!("failed to record player capabilities: {:?}", e);
+        if let Err(e) = set_browsed_player(peer).await {
+            info!("Could not set browsed player: {:?}", e);
         }
     })
 }
@@ -428,8 +468,7 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
                     browse_channel_task = Some(start_browse_stream_processing_task(peer.clone()));
                 }
 
-                // Run metrics logging task after browse connection is set up.
-                post_browse_setup_task = Some(run_metrics_logging_task(peer.clone()));
+                post_browse_setup_task = Some(run_post_browse_setup_task(peer.clone()));
             }
         }
     }

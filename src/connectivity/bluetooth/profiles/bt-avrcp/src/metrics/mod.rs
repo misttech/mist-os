@@ -3,39 +3,16 @@
 // found in the LICENSE file.
 
 use bt_metrics::MetricsLogger;
-use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, NumericProperty};
 use fuchsia_inspect_derive::Inspect;
 use parking_lot::Mutex;
 use std::{collections::HashMap, collections::HashSet, sync::Arc};
 
+use crate::packets::{BrowseLevel, MediaPlayerItem};
 use crate::profile::{AvrcpControllerFeatures, AvrcpTargetFeatures};
 
 pub const METRICS_NODE_NAME: &str = "metrics";
-
-// Enum to express the level of browsing supported from a peer's available
-// players.
-#[derive(Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
-enum BrowseLevel {
-    NotBrowsable = 1,
-    OnlyBrowsableWhenAddressed = 2,
-    // Player that supports browsing without `OnlyBrowsableWhenAddressed`.
-    Browsable = 3,
-}
-
-impl From<&fidl_avrcp::MediaPlayerItem> for BrowseLevel {
-    fn from(src: &fidl_avrcp::MediaPlayerItem) -> Self {
-        let feature_bits = src.feature_bits.unwrap_or(fidl_avrcp::PlayerFeatureBits::empty());
-        if !feature_bits.contains(fidl_avrcp::PlayerFeatureBits::BROWSING) {
-            return Self::NotBrowsable;
-        }
-        if feature_bits.contains(fidl_avrcp::PlayerFeatureBits::ONLY_BROWSABLE_WHEN_ADDRESSED) {
-            return Self::OnlyBrowsableWhenAddressed;
-        }
-        Self::Browsable
-    }
-}
 
 impl From<BrowseLevel>
     for bt_metrics::AvrcpTargetDistinctPeerPlayerCapabilitiesMetricDimensionBrowsing
@@ -246,7 +223,7 @@ impl MetricsNode {
     }
 
     /// A target role peer's players are fetched for feature examination.
-    pub fn target_player_features(&self, id: PeerId, players: Vec<fidl_avrcp::MediaPlayerItem>) {
+    pub fn target_player_features(&self, id: PeerId, players: &[MediaPlayerItem]) {
         if players.len() == 0 {
             return;
         }
@@ -254,8 +231,7 @@ impl MetricsNode {
         // See AVRCP v1.6.2 section 6.10.2.1 for complete features.
         // Browsing (Octet 7 bit 3).
         // OnlyBrowsableWhenAddressed (Octet 7 bit 7).
-        let highest_browse_support: BrowseLevel =
-            players.into_iter().map(|p| BrowseLevel::from(&p)).max().unwrap();
+        let highest_browse_support = players.iter().map(|p| p.browse_level()).max().unwrap();
         let support_updated: bool;
         {
             let mut inner = self.inner.lock();
@@ -280,9 +256,11 @@ impl MetricsNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::packets::PlaybackStatus;
     use async_utils::PollExt;
     use bt_metrics::respond_to_metrics_req_for_test;
     use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
     use fidl_fuchsia_metrics::{MetricEventLoggerMarker, MetricEventPayload};
     use fuchsia_async as fasync;
     use fuchsia_inspect_derive::WithInspect;
@@ -447,13 +425,14 @@ mod tests {
         let id1 = PeerId(1101);
         metrics.target_player_features(
             id1,
-            vec![fidl_avrcp::MediaPlayerItem {
-                player_id: Some(1),
-                major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                displayable_name: Some("player 1".to_string()),
-                feature_bits: Some(NOT_BROWSABLE),
-                ..Default::default()
-            }],
+            &[MediaPlayerItem::new(
+                1,
+                fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                0,
+                PlaybackStatus::Stopped,
+                [NOT_BROWSABLE.bits(), 0],
+                "player 1".to_string(),
+            )],
         );
         assert_data_tree!(inspect, root: {
             metrics: contains {
@@ -476,21 +455,23 @@ mod tests {
         let id1 = PeerId(1101);
         metrics.target_player_features(
             id1,
-            vec![
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(1),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("player 1".to_string()),
-                    feature_bits: Some(NOT_BROWSABLE),
-                    ..Default::default()
-                },
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(2),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("player 2".to_string()),
-                    feature_bits: Some(NOT_BROWSABLE),
-                    ..Default::default()
-                },
+            &[
+                MediaPlayerItem::new(
+                    1,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [NOT_BROWSABLE.bits(), 0],
+                    "player 1".to_string(),
+                ),
+                MediaPlayerItem::new(
+                    2,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [NOT_BROWSABLE.bits(), 0],
+                    "player 2".to_string(),
+                ),
             ],
         );
         // Metrics is not incremented since the highest level of support
@@ -511,21 +492,23 @@ mod tests {
         let id2 = PeerId(1102);
         metrics.target_player_features(
             id2,
-            vec![
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(1),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("player 1".to_string()),
-                    feature_bits: Some(BROWSABLE_WHEN_ADDRESSED),
-                    ..Default::default()
-                },
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(2),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("player 2".to_string()),
-                    feature_bits: Some(BROWSABLE),
-                    ..Default::default()
-                },
+            &[
+                MediaPlayerItem::new(
+                    1,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [BROWSABLE_WHEN_ADDRESSED.bits(), 0],
+                    "player 1".to_string(),
+                ),
+                MediaPlayerItem::new(
+                    2,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [BROWSABLE.bits(), 0],
+                    "player 2".to_string(),
+                ),
             ],
         );
         // `..._support_browsing` metric is incremented since it's the highest
@@ -553,21 +536,23 @@ mod tests {
         let id1 = PeerId(1102);
         metrics.target_player_features(
             id1,
-            vec![
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(1),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("player 1".to_string()),
-                    feature_bits: Some(BROWSABLE_WHEN_ADDRESSED),
-                    ..Default::default()
-                },
-                fidl_avrcp::MediaPlayerItem {
-                    player_id: Some(1004),
-                    major_type: Some(fidl_avrcp::MajorPlayerType::AUDIO),
-                    displayable_name: Some("other player".to_string()),
-                    feature_bits: Some(NOT_BROWSABLE),
-                    ..Default::default()
-                },
+            &[
+                MediaPlayerItem::new(
+                    1,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [BROWSABLE_WHEN_ADDRESSED.bits(), 0],
+                    "player 1".to_string(),
+                ),
+                MediaPlayerItem::new(
+                    2,
+                    fidl_avrcp::MajorPlayerType::AUDIO.bits(),
+                    0,
+                    PlaybackStatus::Stopped,
+                    [NOT_BROWSABLE.bits(), 0],
+                    "player 2".to_string(),
+                ),
             ],
         );
         // `...only_browsable_when_addressed` metric is incremented since the
