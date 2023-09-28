@@ -351,7 +351,13 @@ impl Target {
                         _ => None,
                     }
                 } else {
-                    None
+                    // We did not get any addresses that were fastboot addresses
+                    // do we have a serial number? If so throw it as USB
+                    if self.serial.borrow().is_some() {
+                        Some(FastbootInterface::Usb)
+                    } else {
+                        None
+                    }
                 }
             }
             Some(s) => Some(s),
@@ -1161,7 +1167,7 @@ impl From<&Target> for ffx::TargetInfo {
 
         let fastboot_interface = target.infer_fastboot_interface();
         let info = target.get_compatibility_status();
-        
+
         Self {
             nodename: target.nodename(),
             serial_number: target.serial(),
