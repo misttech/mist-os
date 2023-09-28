@@ -438,7 +438,7 @@ pub struct TypeShape {
     pub has_flexible_envelope: bool,
 }
 pub struct MethodParameter<'a> {
-    pub field_shape_v1: FieldShape,
+    pub field_shape_v2: FieldShape,
     pub maybe_attributes: &'a Option<Vec<Attribute>>,
     pub _type: Type,
     pub name: &'a Identifier,
@@ -493,7 +493,7 @@ pub struct StructMember {
     pub _type: Type,
     pub name: Identifier,
     pub location: Option<Location>,
-    pub field_shape_v1: FieldShape,
+    pub field_shape_v2: FieldShape,
     pub maybe_attributes: Option<Vec<Attribute>>,
     pub maybe_default_value: Option<Constant>,
     pub experimental_maybe_from_alias: Option<TypeConstructor>,
@@ -509,7 +509,7 @@ pub struct Struct {
     pub anonymous: Option<bool>,
     pub members: Vec<StructMember>,
     pub resource: bool,
-    pub type_shape_v1: TypeShape,
+    pub type_shape_v2: TypeShape,
 }
 
 impl Struct {
@@ -544,7 +544,7 @@ pub struct Table {
     pub members: Vec<TableMember>,
     pub strict: bool,
     pub resource: bool,
-    pub type_shape_v1: TypeShape,
+    pub type_shape_v2: TypeShape,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -571,7 +571,7 @@ pub struct Union {
     pub members: Vec<UnionMember>,
     pub strict: bool,
     pub resource: bool,
-    pub type_shape_v1: TypeShape,
+    pub type_shape_v2: TypeShape,
 }
 
 impl Union {
@@ -832,15 +832,15 @@ fn get_payload_parameters<'a>(
             // Flatten the struct members into method parameters.
             for member in &struct_decl.members {
                 let offset_field_shape = FieldShape {
-                    offset: member.field_shape_v1.offset + 16,
-                    padding: member.field_shape_v1.padding,
+                    offset: member.field_shape_v2.offset + 16,
+                    padding: member.field_shape_v2.padding,
                 };
                 out.push(MethodParameter {
                     maybe_attributes: &member.maybe_attributes,
                     _type: member._type.clone(),
                     name: &member.name,
                     location: &member.location,
-                    field_shape_v1: offset_field_shape,
+                    field_shape_v2: offset_field_shape,
                     experimental_maybe_from_alias: member.experimental_maybe_from_alias.as_ref(),
                 });
             }
@@ -864,7 +864,7 @@ fn get_payload_parameters<'a>(
                     _type: member._type.clone().unwrap(),
                     name: &member.name.as_ref().unwrap(),
                     location: &member.location,
-                    field_shape_v1: offset_field_shape,
+                    field_shape_v2: offset_field_shape,
                     experimental_maybe_from_alias: None,
                 });
             }
@@ -878,7 +878,7 @@ fn get_payload_parameters<'a>(
                 _type: Type::Identifier { identifier: identifier.clone(), nullable: false },
                 name: &UNFLATTENED_PARAMETER_NAME,
                 location: &union_decl.location,
-                field_shape_v1: EMPTY_FIELD_SHAPE.clone(),
+                field_shape_v2: EMPTY_FIELD_SHAPE.clone(),
                 experimental_maybe_from_alias: None,
             });
             Ok(Some(out))
