@@ -94,42 +94,10 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 	l.SetFlags(logger.Ldate | logger.Ltime | logger.LUTC | logger.Lshortfile)
 	ctx = logger.WithLogger(ctx, l)
 
-	downgradeBuild, err := c.downgradeBuildConfig.GetBuild(ctx, deviceClient, outputDir)
-	if err != nil {
-		return fmt.Errorf("failed to get downgrade build: %w", err)
-	}
-
-	upgradeBuild, err := c.upgradeBuildConfig.GetBuild(ctx, deviceClient, outputDir)
-	if err != nil {
-		return fmt.Errorf("failed to get upgrade build: %w", err)
-	}
-
+	// Adapt the builds for the device.
 	chainedBuilds, err := c.chainedBuildConfig.GetBuilds(ctx, deviceClient, outputDir)
 	if err != nil {
-		return fmt.Errorf("failed to get chained builds: %w", err)
-	}
-
-	// Adapt the builds for the device.
-	if downgradeBuild != nil {
-		downgradeBuild, err = c.installerConfig.ConfigureBuild(ctx, deviceClient, downgradeBuild)
-		if err != nil {
-			return fmt.Errorf("failed to configure downgrade build for device: %w", err)
-		}
-
-		if downgradeBuild == nil {
-			return fmt.Errorf("installer did not configure a downgrade build")
-		}
-	}
-
-	if upgradeBuild != nil {
-		upgradeBuild, err = c.installerConfig.ConfigureBuild(ctx, deviceClient, upgradeBuild)
-		if err != nil {
-			return fmt.Errorf("failed to configure upgrade build for device: %w", err)
-		}
-
-		if upgradeBuild == nil {
-			return fmt.Errorf("installer did not configure an upgrade build")
-		}
+		return fmt.Errorf("failed to get builds: %w", err)
 	}
 
 	for i, build := range chainedBuilds {
@@ -144,18 +112,16 @@ func doTest(ctx context.Context, deviceClient *device.Client) error {
 		chainedBuilds[i] = build
 	}
 
-	if downgradeBuild == nil && len(chainedBuilds) > 0 {
-		downgradeBuild = chainedBuilds[0]
-		chainedBuilds = chainedBuilds[1:]
+	if len(chainedBuilds) == 0 {
+		return nil
 	}
 
-	if upgradeBuild != nil {
-		chainedBuilds = append(chainedBuilds, upgradeBuild)
-	}
+	initialBuild := chainedBuilds[0]
+	chainedBuilds = chainedBuilds[1:]
 
 	ch := make(chan *sl4f.Client, 1)
 	if err := util.RunWithTimeout(ctx, c.paveTimeout, func() error {
-		rpcClient, err := initializeDevice(ctx, deviceClient, downgradeBuild)
+		rpcClient, err := initializeDevice(ctx, deviceClient, initialBuild)
 		ch <- rpcClient
 		return err
 	}); err != nil {

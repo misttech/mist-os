@@ -20,8 +20,6 @@ type config struct {
 	installerConfig            *cli.InstallerConfig
 	deviceConfig               *cli.DeviceConfig
 	chainedBuildConfig         *cli.RepeatableBuildConfig
-	downgradeBuildConfig       *cli.BuildConfig
-	upgradeBuildConfig         *cli.BuildConfig
 	paveTimeout                time.Duration
 	cycleCount                 uint
 	cycleTimeout               time.Duration
@@ -45,12 +43,10 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	archiveConfig := cli.NewArchiveConfig(fs, testDataPath)
 	deviceConfig := cli.NewDeviceConfig(fs, testDataPath)
 	c := &config{
-		archiveConfig:        archiveConfig,
-		deviceConfig:         deviceConfig,
-		installerConfig:      installerConfig,
-		chainedBuildConfig:   cli.NewRepeatableBuildConfig(fs, archiveConfig, deviceConfig, "", ""),
-		downgradeBuildConfig: cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, "", "downgrade-", true),
-		upgradeBuildConfig:   cli.NewBuildConfigWithPrefix(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), "upgrade-", false),
+		archiveConfig:      archiveConfig,
+		deviceConfig:       deviceConfig,
+		installerConfig:    installerConfig,
+		chainedBuildConfig: cli.NewRepeatableBuildConfig(fs, archiveConfig, deviceConfig, os.Getenv("BUILDBUCKET_ID"), ""),
 	}
 
 	fs.DurationVar(&c.paveTimeout, "pave-timeout", 5*time.Minute, "Err if a pave takes longer than this time (default is 5 minutes)")
@@ -67,14 +63,6 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 }
 
 func (c *config) validate() error {
-	if err := c.downgradeBuildConfig.Validate(); err != nil {
-		return err
-	}
-
-	if err := c.upgradeBuildConfig.Validate(); err != nil {
-		return err
-	}
-
 	if c.cycleCount < 1 {
 		return fmt.Errorf("-cycle-count must be >= 1")
 	}
