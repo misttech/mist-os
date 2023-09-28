@@ -59,6 +59,22 @@ extern zx_status_t ffx_socket_read(ffx_lib_context_t* ctx, zx_handle_t handle, c
                                    uint64_t out_len, uint64_t* bytes_read);
 extern zx_status_t ffx_socket_write(ffx_lib_context_t* ctx, zx_handle_t handle, const char* buf,
                                     uint64_t buf_len);
+extern zx_status_t ffx_event_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out);
+extern zx_status_t ffx_eventpair_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out0,
+                                        zx_handle_t* out1);
+extern zx_status_t ffx_object_signal(ffx_lib_context_t* ctx, zx_handle_t hdl, uint32_t clear_mask,
+                                     uint32_t set_mask);
+extern zx_status_t ffx_object_signal_peer(ffx_lib_context_t* ctx, zx_handle_t hdl,
+                                          uint32_t clear_mask);
+// Attempts to poll the object for any of the following signals masked in "signals." This does not
+// have an analogue regarding zircon object syscalls, as this does not accept a timeout or something
+// similar. This is intended for higher level asynchronous programs to use. Similar to the other
+// "*read" calls in this ABI, this either returns a well-defined error given a handle in bad state,
+// or returns ZX_ERR_SHOULD_WAIT in the event that there are no signals available for the handle.
+// The user will then need to refer to the handle notifier fd (see ffx_connect_handle_notifier) to
+// determine when the object is ready with a signal.
+extern zx_status_t ffx_object_signal_poll(ffx_lib_context_t* ctx, zx_handle_t hdl, uint32_t signals,
+                                          uint32_t* signals_out);
 
 // Opens a file descriptor that delivers zircon handle numbers that are ready to be read.
 // There can only be one file descriptor for the lifetime of a library module, so all calls to this

@@ -6,12 +6,17 @@ use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use crate::waker::handle_notifier_waker;
-use fidl::{AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Rights, Status};
+use fidl::{
+    AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Peered, Rights, Status,
+};
+use fuchsia_async::OnSignals;
 use fuchsia_zircon_status as zx_status;
 use fuchsia_zircon_types as zx_types;
+use std::future::Future;
 use std::mem::ManuallyDrop;
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
 
@@ -76,6 +81,30 @@ pub(crate) enum LibraryCommand {
         buf: ExtBuffer<u8>,
         handles: ExtBuffer<zx_types::zx_handle_disposition_t>,
         responder: Responder<zx_status::Status>,
+    },
+    EventCreate {
+        responder: Responder<fidl::Event>,
+    },
+    EventPairCreate {
+        responder: Responder<(fidl::EventPair, fidl::EventPair)>,
+    },
+    ObjectSignal {
+        handle: fidl::Handle,
+        clear_mask: fidl::Signals,
+        set_mask: fidl::Signals,
+        responder: Responder<zx_status::Status>,
+    },
+    ObjectSignalPeer {
+        handle: fidl::Handle,
+        clear_mask: fidl::Signals,
+        set_mask: fidl::Signals,
+        responder: Responder<zx_status::Status>,
+    },
+    ObjectSignalPoll {
+        lib: Arc<LibContext>,
+        handle: fidl::Handle,
+        signals: fidl::Signals,
+        responder: Responder<CmdResult<fidl::Signals>>,
     },
     SocketCreate {
         options: fidl::SocketOpts,
@@ -290,6 +319,42 @@ impl LibraryCommand {
                     Err(e) => e,
                 };
                 responder.send(status).unwrap();
+            }
+            Self::EventCreate { responder } => {
+                responder.send(fidl::Event::create()).unwrap();
+            }
+            Self::EventPairCreate { responder } => {
+                responder.send(fidl::EventPair::create()).unwrap();
+            }
+            Self::ObjectSignal { handle, clear_mask, set_mask, responder } => {
+                let handle = ManuallyDrop::new(handle);
+                let status = match handle.signal_handle(clear_mask, set_mask) {
+                    Ok(_) => zx_status::Status::OK,
+                    Err(e) => e,
+                };
+                responder.send(status).unwrap();
+            }
+            Self::ObjectSignalPeer { handle, clear_mask, set_mask, responder } => {
+                // Any handle that has a peer can be converted into an EventPair.
+                let handle: ManuallyDrop<fidl::EventPair> = ManuallyDrop::new(handle.into());
+                let status = match handle.signal_peer(clear_mask, set_mask) {
+                    Ok(_) => zx_status::Status::OK,
+                    Err(e) => e,
+                };
+                responder.send(status).unwrap();
+            }
+            Self::ObjectSignalPoll { lib, handle, signals, responder } => {
+                let mut on_signals = OnSignals::new(&handle, signals);
+                let waker =
+                    handle_notifier_waker(handle.raw_handle(), lib.notification_sender().await);
+                let task_ctx = &mut Context::from_waker(&waker);
+                let res = match Pin::new(&mut on_signals).poll(task_ctx) {
+                    Poll::Ready(res) => res,
+                    Poll::Pending => Err(zx_status::Status::SHOULD_WAIT),
+                };
+                // Prevent the handle from closing prematurely.
+                std::mem::forget(handle);
+                responder.send(res).unwrap();
             }
             Self::SocketCreate { options, responder } => {
                 match options {

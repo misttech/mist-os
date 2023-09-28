@@ -352,6 +352,87 @@ pub unsafe extern "C" fn ffx_connect_handle_notifier(ctx: *const LibContext) -> 
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_event_create(
+    ctx: *const LibContext,
+    _options: u32,
+    out: *mut zx_types::zx_handle_t,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    ctx.run(LibraryCommand::EventCreate { responder: tx });
+    let hdl = rx.recv().unwrap();
+    unsafe { *out = hdl.into_raw() };
+    zx_status::Status::OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_eventpair_create(
+    ctx: *const LibContext,
+    _options: u32,
+    out0: *mut zx_types::zx_handle_t,
+    out1: *mut zx_types::zx_handle_t,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    ctx.run(LibraryCommand::EventPairCreate { responder: tx });
+    let (hdl0, hdl1) = rx.recv().unwrap();
+    unsafe { *out0 = hdl0.into_raw() };
+    unsafe { *out1 = hdl1.into_raw() };
+    zx_status::Status::OK
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_object_signal(
+    ctx: *const LibContext,
+    hdl: zx_types::zx_handle_t,
+    clear_mask: u32,
+    set_mask: u32,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(hdl) };
+    let clear_mask = unsafe { fidl::Signals::from_bits_unchecked(clear_mask) };
+    let set_mask = unsafe { fidl::Signals::from_bits_unchecked(set_mask) };
+    ctx.run(LibraryCommand::ObjectSignal { handle, clear_mask, set_mask, responder: tx });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_object_signal_peer(
+    ctx: *const LibContext,
+    hdl: zx_types::zx_handle_t,
+    clear_mask: u32,
+    set_mask: u32,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(hdl) };
+    let clear_mask = unsafe { fidl::Signals::from_bits_unchecked(clear_mask) };
+    let set_mask = unsafe { fidl::Signals::from_bits_unchecked(set_mask) };
+    ctx.run(LibraryCommand::ObjectSignalPeer { handle, clear_mask, set_mask, responder: tx });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_object_signal_poll(
+    ctx: *const LibContext,
+    hdl: zx_types::zx_handle_t,
+    signals: u32,
+    signals_out: *mut u32,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let handle = unsafe { fidl::Handle::from_raw(hdl) };
+    let signals = unsafe { fidl::Signals::from_bits_unchecked(signals) };
+    ctx.run(LibraryCommand::ObjectSignalPoll { lib: ctx.clone(), handle, signals, responder: tx });
+    match rx.recv().unwrap() {
+        Ok(sig) => safe_write(signals_out, sig.bits()),
+        Err(status) => return status,
+    }
+    zx_status::Status::OK
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_channel_create(
     ctx: *const LibContext,
     _options: u32,
@@ -373,6 +454,7 @@ mod test {
     use super::*;
     use byteorder::{NativeEndian, ReadBytesExt};
     use fidl::AsHandleRef;
+    use futures_test as _;
     use std::fs::File;
     use std::io::Read;
     use std::os::fd::{FromRawFd, RawFd};
@@ -803,6 +885,23 @@ mod test {
     }
 
     #[test]
+    fn event_pair_signal_peer_peer_closed() {
+        let lib_ctx = testing_lib_context();
+        let (a, b) = fidl::EventPair::create();
+        drop(b);
+        let result = unsafe {
+            ffx_object_signal_peer(
+                lib_ctx,
+                a.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::PEER_CLOSED);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
     fn channel_write_peer_closed() {
         let lib_ctx = testing_lib_context();
         let (a, b) = fidl::Channel::create();
@@ -839,6 +938,141 @@ mod test {
             )
         };
         assert_eq!(result, zx_status::Status::PEER_CLOSED);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_events_null_out() {
+        let lib_ctx = testing_lib_context();
+        let event = fidl::Event::create();
+        let result = unsafe {
+            ffx_object_signal(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let result = unsafe {
+            ffx_object_signal_poll(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::USER_0.bits(),
+                std::ptr::null_mut(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_events_one_signal() {
+        let lib_ctx = testing_lib_context();
+        let event = fidl::Event::create();
+        let result = unsafe {
+            ffx_object_signal(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut out = 0u32;
+        let result = unsafe {
+            ffx_object_signal_poll(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::USER_0.bits(),
+                &mut out,
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_events_many_signals() {
+        let lib_ctx = testing_lib_context();
+        let event = fidl::Event::create();
+        let result = unsafe {
+            ffx_object_signal(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut out = 0u32;
+        let signals = fidl::Signals::from_bits(
+            fidl::Signals::USER_0.bits()
+                | fidl::Signals::OBJECT_ALL.bits()
+                | fidl::Signals::USER_2.bits(),
+        )
+        .unwrap();
+        let result = unsafe {
+            ffx_object_signal_poll(lib_ctx, event.raw_handle(), signals.bits(), &mut out)
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_event_pair() {
+        let lib_ctx = testing_lib_context();
+        let (event, _otherevent) = fidl::EventPair::create();
+        let result = unsafe {
+            ffx_object_signal(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut out = 0u32;
+        let signals = fidl::Signals::from_bits(
+            fidl::Signals::USER_0.bits()
+                | fidl::Signals::OBJECT_ALL.bits()
+                | fidl::Signals::USER_2.bits(),
+        )
+        .unwrap();
+        let result = unsafe {
+            ffx_object_signal_poll(lib_ctx, event.raw_handle(), signals.bits(), &mut out)
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_peer_event_pair() {
+        let lib_ctx = testing_lib_context();
+        let (tx, rx) = fidl::EventPair::create();
+        let result = unsafe {
+            ffx_object_signal_peer(
+                lib_ctx,
+                tx.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut out = 0u32;
+        let signals = fidl::Signals::from_bits(
+            fidl::Signals::USER_0.bits()
+                | fidl::Signals::OBJECT_ALL.bits()
+                | fidl::Signals::USER_2.bits(),
+        )
+        .unwrap();
+        let result =
+            unsafe { ffx_object_signal_poll(lib_ctx, rx.raw_handle(), signals.bits(), &mut out) };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
         unsafe { destroy_ffx_lib_context(lib_ctx) }
     }
 
@@ -897,6 +1131,86 @@ mod test {
         assert_eq!(bytes_read, 4);
         let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();
         assert_eq!(read_handle, a.raw_handle());
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_pending() {
+        let lib_ctx = testing_lib_context();
+        let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
+        assert!(fd > 0);
+        let mut notifier_file = unsafe { File::from_raw_fd(fd) };
+        let event = fidl::Event::create();
+        let mut out = 0u32;
+        let signals = fidl::Signals::from_bits(
+            fidl::Signals::USER_0.bits()
+                | fidl::Signals::OBJECT_ALL.bits()
+                | fidl::Signals::USER_2.bits(),
+        )
+        .unwrap();
+        let result = unsafe {
+            ffx_object_signal_poll(lib_ctx, event.raw_handle(), signals.bits(), &mut out)
+        };
+        assert_eq!(result, zx_status::Status::SHOULD_WAIT);
+        let result = unsafe {
+            ffx_object_signal(
+                lib_ctx,
+                event.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut notifier_buf = [0u8; 4];
+        let bytes_read = notifier_file.read(&mut notifier_buf).unwrap();
+        let mut notifier_buf_reader = std::io::Cursor::new(notifier_buf);
+        assert_eq!(bytes_read, 4);
+        let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();
+        assert_eq!(read_handle, event.raw_handle());
+        let result = unsafe {
+            ffx_object_signal_poll(lib_ctx, event.raw_handle(), signals.bits(), &mut out)
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
+        unsafe { destroy_ffx_lib_context(lib_ctx) }
+    }
+
+    #[test]
+    fn user_signal_peer_pending() {
+        let lib_ctx = testing_lib_context();
+        let fd: RawFd = unsafe { ffx_connect_handle_notifier(lib_ctx) };
+        assert!(fd > 0);
+        let mut notifier_file = unsafe { File::from_raw_fd(fd) };
+        let (tx, rx) = fidl::EventPair::create();
+        let mut out = 0u32;
+        let signals = fidl::Signals::from_bits(
+            fidl::Signals::USER_0.bits()
+                | fidl::Signals::OBJECT_ALL.bits()
+                | fidl::Signals::USER_2.bits(),
+        )
+        .unwrap();
+        let result =
+            unsafe { ffx_object_signal_poll(lib_ctx, rx.raw_handle(), signals.bits(), &mut out) };
+        assert_eq!(result, zx_status::Status::SHOULD_WAIT);
+        let result = unsafe {
+            ffx_object_signal_peer(
+                lib_ctx,
+                tx.raw_handle(),
+                fidl::Signals::empty().bits(),
+                fidl::Signals::USER_0.bits(),
+            )
+        };
+        assert_eq!(result, zx_status::Status::OK);
+        let mut notifier_buf = [0u8; 4];
+        let bytes_read = notifier_file.read(&mut notifier_buf).unwrap();
+        let mut notifier_buf_reader = std::io::Cursor::new(notifier_buf);
+        assert_eq!(bytes_read, 4);
+        let read_handle = notifier_buf_reader.read_u32::<NativeEndian>().unwrap();
+        assert_eq!(read_handle, rx.raw_handle());
+        let result =
+            unsafe { ffx_object_signal_poll(lib_ctx, rx.raw_handle(), signals.bits(), &mut out) };
+        assert_eq!(result, zx_status::Status::OK);
+        assert_eq!(out, fidl::Signals::USER_0.bits());
         unsafe { destroy_ffx_lib_context(lib_ctx) }
     }
 }
