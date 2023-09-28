@@ -103,6 +103,7 @@ impl From<String> for HostAddr {
 
 #[async_trait(?Send)]
 pub(crate) trait HostPipeChildBuilder {
+    type NodeType: Clone;
     async fn new(
         &self,
         addr: SocketAddr,
@@ -111,6 +112,7 @@ pub(crate) trait HostPipeChildBuilder {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
+        node: Self::NodeType,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError>
     where
         Self: Sized;
@@ -125,6 +127,7 @@ pub(crate) struct HostPipeChildDefaultBuilder<'a> {
 
 #[async_trait(?Send)]
 impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
+    type NodeType = Arc<overnet_core::Router>;
     async fn new(
         &self,
         addr: SocketAddr,
@@ -133,6 +136,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
         event_queue: events::Queue<TargetEvent>,
         watchdogs: bool,
         ssh_timeout: u16,
+        node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let ctx = ffx_config::global_env_context().expect("Global env context uninitialized");
         let verbose_ssh = ffx_config::logging::debugging_on(&ctx).await;
@@ -146,6 +150,7 @@ impl HostPipeChildBuilder for HostPipeChildDefaultBuilder<'_> {
             watchdogs,
             ssh_timeout,
             verbose_ssh,
+            node,
         )
         .await
     }
@@ -230,6 +235,7 @@ impl HostPipeChild {
         watchdogs: bool,
         ssh_timeout: u16,
         verbose_ssh: bool,
+        node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
         let args = vec![
@@ -250,6 +256,7 @@ impl HostPipeChild {
             watchdogs,
             ssh_timeout,
             verbose_ssh,
+            node,
         )
         .await
     }
@@ -264,6 +271,7 @@ impl HostPipeChild {
         watchdogs: bool,
         ssh_timeout: u16,
         verbose_ssh: bool,
+        node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         let id_string = format!("{}", id);
 
@@ -282,6 +290,7 @@ impl HostPipeChild {
             watchdogs,
             ssh_timeout,
             verbose_ssh,
+            Arc::clone(&node),
         )
         .await
         {
@@ -296,6 +305,7 @@ impl HostPipeChild {
                     watchdogs,
                     ssh_timeout,
                     verbose_ssh,
+                    node,
                 )
                 .await
             }
@@ -312,6 +322,7 @@ impl HostPipeChild {
         watchdogs: bool,
         ssh_timeout: u16,
         verbose_ssh: bool,
+        node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         if verbose_ssh {
             args.insert(0, "-v");
@@ -334,10 +345,8 @@ impl HostPipeChild {
 
         let mut error_message = String::from("");
 
-        // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
-        // instead -- this one is very deeply embedded, but isn't used by tests (that I've found) (until now).
         let (pipe_rx, mut pipe_tx) =
-            futures::AsyncReadExt::split(overnet_pipe(hoist::hoist().node()).map_err(|e| {
+            futures::AsyncReadExt::split(overnet_pipe(node).map_err(|e| {
                 PipeError::PipeCreationFailed(
                     format!("creating local overnet pipe: {e}"),
                     addr.to_string(),
@@ -720,6 +729,7 @@ pub(crate) async fn spawn<'a>(
     target: Weak<Target>,
     watchdogs: bool,
     ssh_timeout: u16,
+    node: Arc<overnet_core::Router>,
 ) -> Result<HostPipeConnection<HostPipeChildDefaultBuilder<'a>>, anyhow::Error> {
     let host_pipe_child_builder = HostPipeChildDefaultBuilder { ssh_path: "ssh" };
     HostPipeConnection::<HostPipeChildDefaultBuilder<'_>>::spawn_with_builder(
@@ -728,6 +738,7 @@ pub(crate) async fn spawn<'a>(
         ssh_timeout,
         RETRY_DELAY,
         watchdogs,
+        node,
     )
     .await
     .map_err(|e| anyhow!(e))
@@ -742,6 +753,7 @@ where
         builder: T,
         ssh_timeout: u16,
         watchdogs: bool,
+        node: T::NodeType,
     ) -> Result<Arc<HostPipeChild>, PipeError> {
         let target = target.upgrade().ok_or(PipeError::TargetGone)?;
         let target_nodename: String = target.nodename_str();
@@ -760,6 +772,7 @@ where
                 target.events.clone(),
                 watchdogs,
                 ssh_timeout,
+                node,
             )
             .await
             .map_err(|e| PipeError::PipeCreationFailed(e.to_string(), target_nodename.clone()))?;
@@ -784,9 +797,11 @@ where
         ssh_timeout: u16,
         relaunch_command_delay: Duration,
         watchdogs: bool,
+        node: T::NodeType,
     ) -> Result<Self, PipeError> {
-        let hpc = Self::start_child_pipe(&target, host_pipe_child_builder, ssh_timeout, watchdogs)
-            .await?;
+        let hpc =
+            Self::start_child_pipe(&target, host_pipe_child_builder, ssh_timeout, watchdogs, node)
+                .await?;
         let target = target.upgrade().ok_or(PipeError::TargetGone)?;
 
         Ok(Self {
@@ -799,7 +814,7 @@ where
         })
     }
 
-    pub async fn wait(&mut self) -> Result<(), anyhow::Error> {
+    pub async fn wait(&mut self, node: &T::NodeType) -> Result<(), anyhow::Error> {
         loop {
             // Waits on the running the command. If it exits successfully (disconnect
             // due to peer dropping) then will set the target to disconnected
@@ -846,6 +861,7 @@ where
                 self.host_pipe_child_builder,
                 self.ssh_timeout,
                 self.watchdogs,
+                node.clone(),
             )
             .await?;
             self.inner = hpc;
@@ -938,6 +954,7 @@ mod test {
 
     #[async_trait(?Send)]
     impl HostPipeChildBuilder for FakeHostPipeChildBuilder<'_> {
+        type NodeType = ();
         async fn new(
             &self,
             addr: SocketAddr,
@@ -946,6 +963,7 @@ mod test {
             event_queue: events::Queue<TargetEvent>,
             watchdogs: bool,
             ssh_timeout: u16,
+            _node: (),
         ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
             match self.operation_type {
                 ChildOperationType::Normal => {
@@ -959,7 +977,17 @@ mod test {
                 }
                 ChildOperationType::DefaultBuilder => {
                     let builder = HostPipeChildDefaultBuilder { ssh_path: self.ssh_path };
-                    builder.new(addr, id, stderr_buf, event_queue, watchdogs, ssh_timeout).await
+                    builder
+                        .new(
+                            addr,
+                            id,
+                            stderr_buf,
+                            event_queue,
+                            watchdogs,
+                            ssh_timeout,
+                            hoist::Hoist::new(None).unwrap().node(),
+                        )
+                        .await
                 }
             }
         }
@@ -1028,6 +1056,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -1050,6 +1079,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await;
         assert!(res.is_err());
@@ -1083,6 +1113,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await;
         assert_matches!(res, Ok(_));
@@ -1242,6 +1273,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await
         .expect_err("host connection");
@@ -1292,6 +1324,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await
         .expect("host connection");
@@ -1342,6 +1375,7 @@ mod test {
             30,
             Duration::default(),
             false,
+            (),
         )
         .await
         .expect("host connection");

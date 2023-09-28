@@ -1022,7 +1022,10 @@ impl Target {
 
             let ssh_timeout: u16 =
                 ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(50);
-            let nr = spawn(weak_target.clone(), watchdogs, ssh_timeout).await;
+            let node = hoist::hoist().node();
+            let nr =
+                spawn(weak_target.clone(), watchdogs, ssh_timeout, std::sync::Arc::clone(&node))
+                    .await;
 
             match nr {
                 Ok(mut hp) => {
@@ -1034,7 +1037,7 @@ impl Target {
                     }
 
                     // wait for the host pipe to exit.
-                    let r = hp.wait().await;
+                    let r = hp.wait(&node).await;
                     // XXX(raggi): decide what to do with this log data:
                     tracing::info!("HostPipeConnection returned: {:?}", r);
                 }
