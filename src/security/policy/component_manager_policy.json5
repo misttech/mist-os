@@ -21,13 +21,6 @@
                 // VmexResource protocol on eng builds.
                 "/core/test_manager/**",
                 "/core/testing/**",
-
-                // TODO(fxbug.dev/105101): remove all dart runners when Dart is
-                // extracted from fuchsia.git into an external repository.
-                "/core/dart_jit_runner",
-                "/core/dart_aot_runner",
-                "/core/dart_jit_product_runner",
-                "/core/dart_aot_product_runner",
             ],
             main_process_critical: [
                 "/bootstrap/archivist",
@@ -650,8 +643,6 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/cr50_agent",
-                    "/core/account",
-                    "/core/account/credential_manager",
 
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this capability
                     // no longer run in the sshd realm.
@@ -670,35 +661,6 @@
                     "/bootstrap/cr50_agent",
                     "/bootstrap/console-launcher",
                     "/bootstrap/miscsvc",
-
-                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this capability
-                    // no longer run in the sshd realm.
-                    "/core/sshd-host/shell:**",
-                ],
-            },
-
-            // TODO(fxbug.dev/91765) - Remove source moniker after from target.
-            {
-                source_moniker: "/core/account/credential_manager",
-                source: "component",
-                source_name: "fuchsia.identity.credential.Manager",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/account/credential_manager",
-                    "/core/account/password_authenticator",
-                ],
-            },
-
-            // TODO(https://fxbug.dev/91765)
-            {
-                source_moniker: "/core/account/password_authenticator",
-                source: "component",
-                source_name: "fuchsia.identity.account.AccountManager",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/account",
-                    "/core/account/password_authenticator",
-                    "/core/session-manager/session:session",
 
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this capability
                     // no longer run in the sshd realm.
@@ -828,8 +790,6 @@
                     "/bootstrap/power_manager",
                     "/bootstrap/sysinfo",
                     "/bootstrap/vboot-fwparam",
-                    "/core/account/account_manager/account_handlers:**",
-                    "/core/account/password_authenticator",
                     "/core/audio_recording",
                     "/core/driver_playground",
                     "/core/factory",
