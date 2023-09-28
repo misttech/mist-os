@@ -949,12 +949,9 @@ impl<S: HandleOwner> ObjectHandle for DataObjectHandle<S> {
 #[async_trait]
 impl<S: HandleOwner> GetProperties for DataObjectHandle<S> {
     async fn get_properties(&self) -> Result<ObjectProperties, Error> {
-        // Take a read guard since we need to return a consistent view of all object properties.
-        let fs = self.store().filesystem();
-        let _guard = fs
-            .lock_manager()
-            .read_lock(lock_keys![LockKey::object(self.store().store_object_id, self.object_id())])
-            .await;
+        // We don't take a read guard here since the object properties are contained in a single
+        // object, which cannot be inconsistent with itself. The LSM tree does not return
+        // intermediate states for a single object.
         let item = self
             .store()
             .tree

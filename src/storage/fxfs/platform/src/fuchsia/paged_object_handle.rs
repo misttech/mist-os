@@ -860,7 +860,9 @@ impl PagedObjectHandle {
         // the handle and *then* remove the properties from `inner`.
         let (dirty_page_count, data_size, crtime, mtime) = {
             let mut inner = self.inner.lock().unwrap();
-            if self.was_file_modified_since_last_call()? {
+
+            // If there are no dirty pages, the client can't have modified anything.
+            if inner.dirty_page_count > 0 && self.was_file_modified_since_last_call()? {
                 inner.dirty_mtime = DirtyTimestamp::Some(Timestamp::now());
             }
             (
