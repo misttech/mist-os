@@ -14,7 +14,6 @@ rustc_library("hoist") {
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
-    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-net",

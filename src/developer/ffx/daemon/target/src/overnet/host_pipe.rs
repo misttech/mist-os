@@ -12,7 +12,7 @@ use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
 use futures::io::{copy_buf, AsyncBufRead, BufReader};
-use futures::AsyncReadExt;
+use futures::{AsyncReadExt, FutureExt};
 use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
 use shared_child::SharedChild;
 use std::{
@@ -337,7 +337,7 @@ impl HostPipeChild {
         // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
         // instead -- this one is very deeply embedded, but isn't used by tests (that I've found) (until now).
         let (pipe_rx, mut pipe_tx) =
-            futures::AsyncReadExt::split(overnet_pipe(hoist::hoist()).map_err(|e| {
+            futures::AsyncReadExt::split(overnet_pipe(hoist::hoist().node()).map_err(|e| {
                 PipeError::PipeCreationFailed(
                     format!("creating local overnet pipe: {e}"),
                     addr.to_string(),
@@ -858,10 +858,42 @@ where
 }
 
 /// creates the socket for overnet. IoError is possible from socket operations.
-fn overnet_pipe(overnet_instance: &hoist::Hoist) -> Result<fidl::AsyncSocket, io::Error> {
+fn overnet_pipe(node: Arc<overnet_core::Router>) -> Result<fidl::AsyncSocket, io::Error> {
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
     let local_socket = fidl::AsyncSocket::from_socket(local_socket)?;
-    overnet_instance.start_client_socket(remote_socket).detach();
+    let (errors_sender, errors) = futures::channel::mpsc::unbounded();
+    Task::spawn(
+        futures::future::join(
+            async move {
+                if let Err(e) = async move {
+                    let (mut rx, mut tx) =
+                        fuchsia_async::Socket::from_socket(remote_socket)?.split();
+                    circuit::multi_stream::multi_stream_node_connection_to_async(
+                        node.circuit_node(),
+                        &mut rx,
+                        &mut tx,
+                        false,
+                        circuit::Quality::LOCAL_SOCKET,
+                        errors_sender,
+                        "remote_control_runner".to_owned(),
+                    )
+                    .await?;
+                    Result::<(), anyhow::Error>::Ok(())
+                }
+                .await
+                {
+                    tracing::warn!("Host pipe circuit failed: {:?}", e);
+                }
+            },
+            errors
+                .map(|e| {
+                    tracing::warn!("A host pipe circuit stream failed: {e:?}");
+                })
+                .collect::<()>(),
+        )
+        .map(|((), ())| ()),
+    )
+    .detach();
 
     Ok(local_socket)
 }
