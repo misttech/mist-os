@@ -260,6 +260,39 @@ TEST_P(AttrTest, ModeReportedCorrectly) {
   EXPECT_TRUE(S_ISREG(stat_buf.st_mode));
 }
 
+// Writing to a file with client side stream support will set the vmo as modified. When getting the
+// mtime of the file the filesystem checks to see if the vmo has been modified. If the mtime is
+// explicitly set then the filesystem needs to clear the vmo's modified status.
+TEST_P(AttrTest, SetModificationTimeOfDirtyFile) {
+  auto now = GetCurrentTimeNanos();
+  ASSERT_TRUE(now) << "Failed to fetch the current time";
+  zx_time_t ten_hours_ago = *now - ZX_HOUR(10);
+
+  const std::string file = GetPath("file.txt");
+  int fd = open(file.c_str(), O_CREAT | O_RDWR, 0644);
+  EXPECT_GT(fd, 0);
+
+  std::string_view data = "some-data";
+  ASSERT_EQ(write(fd, data.data(), data.size()), static_cast<ssize_t>(data.size()));
+
+  std::timespec ts[2];
+  ts[0].tv_nsec = UTIME_OMIT;
+  ts[1].tv_sec = static_cast<time_t>(ten_hours_ago / ZX_SEC(1));
+  ts[1].tv_nsec = static_cast<time_t>(ten_hours_ago % ZX_SEC(1));
+  ASSERT_EQ(futimens(fd, ts), 0);
+
+  struct stat statb1;
+  ASSERT_EQ(fstat(fd, &statb1), 0);
+  zx_time_t expected_mtime = static_cast<zx_time_t>(
+      fbl::round_down(static_cast<uint64_t>(ten_hours_ago),
+                      static_cast<uint64_t>(fs().GetTraits().timestamp_granularity.to_nsecs())));
+  ASSERT_EQ(statb1.st_mtim.tv_sec, static_cast<time_t>(expected_mtime / ZX_SEC(1)));
+  ASSERT_EQ(statb1.st_mtim.tv_nsec, static_cast<time_t>(expected_mtime % ZX_SEC(1)));
+
+  ASSERT_EQ(close(fd), 0);
+  ASSERT_EQ(unlink(file.c_str()), 0);
+}
+
 INSTANTIATE_TEST_SUITE_P(/*no prefix*/, AttrTest, testing::ValuesIn(AllTestFilesystems()),
                          testing::PrintToStringParamName());
 

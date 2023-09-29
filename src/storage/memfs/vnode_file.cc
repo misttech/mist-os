@@ -88,6 +88,23 @@ zx_status_t VnodeFile::GetAttributes(fs::VnodeAttributes* attr) {
   return ZX_OK;
 }
 
+zx_status_t VnodeFile::SetAttributes(fs::VnodeAttributesUpdate attr) {
+  // Reset the vmo stats when mtime is explicitly set.
+  if (attr.has_modification_time()) {
+    fs::SharedLock lock(mutex_);
+    if (paged_vmo().is_valid()) {
+      zx_pager_vmo_stats vmo_stats;
+      zx_status_t status =
+          zx_pager_query_vmo_stats(memfs_.pager_for_next_vdso_syscalls().get(), paged_vmo().get(),
+                                   ZX_PAGER_RESET_VMO_STATS, &vmo_stats, sizeof(vmo_stats));
+      if (status != ZX_OK) {
+        return status;
+      }
+    }
+  }
+  return Vnode::SetAttributes(attr);
+}
+
 zx_status_t VnodeFile::GetNodeInfoForProtocol([[maybe_unused]] fs::VnodeProtocol protocol,
                                               [[maybe_unused]] fs::Rights rights,
                                               fs::VnodeRepresentation* info) {

@@ -25,6 +25,7 @@ class VnodeFile final : public Vnode {
 
   zx_status_t Truncate(size_t len) final;
   zx_status_t GetAttributes(fs::VnodeAttributes* a) final;
+  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) final;
   zx_status_t GetNodeInfoForProtocol(fs::VnodeProtocol protocol, fs::Rights rights,
                                      fs::VnodeRepresentation* info) final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;

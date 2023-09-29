@@ -16,7 +16,7 @@ class Dnode;
 
 class Vnode : public fs::PagedVnode {
  public:
-  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) final;
+  zx_status_t SetAttributes(fs::VnodeAttributesUpdate a) override;
   void Sync(SyncCallback closure) override;
 
   // To be more specific: Is this vnode connected into the directory hierarchy?
