@@ -19,7 +19,6 @@ use {
         create_proxy, create_request_stream, ClientEnd, ControlHandle, Proxy, RequestStream,
         ServerEnd,
     },
-    fidl::AsHandleRef,
     fidl_connector::Connect,
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_element as felement, fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_app as fuiapp,
@@ -32,7 +31,7 @@ use {
     },
     realm_management,
     std::{collections::HashMap, sync::Arc},
-    tracing::{debug, error, info},
+    tracing::{error, info},
 };
 
 // Timeout duration for a ViewControllerProxy to close, in seconds.
@@ -258,10 +257,12 @@ impl ElementManager {
         element: &mut Element,
         initial_annotations: Vec<felement::Annotation>,
         annotation_controller: Option<ClientEnd<felement::AnnotationControllerMarker>>,
-    ) -> Result<(fuiapp::ViewProviderProxy, felement::ViewControllerProxy), Error> {
+    ) -> Result<felement::ViewControllerProxy, Error> {
         let view_provider = element.connect_to_protocol::<fuiapp::ViewProviderMarker>()?;
 
         let link_token_pair = scenic::flatland::ViewCreationTokenPair::new()?;
+
+        // Drop the view provider once it has received the view creation token.
         view_provider.create_view2(fuiapp::CreateView2Args {
             view_creation_token: Some(link_token_pair.view_creation_token),
             ..Default::default()
@@ -284,7 +285,7 @@ impl ElementManager {
                 .map_err(|err| format_err!("Failed to present element: {:?}", err))?;
         }
 
-        Ok((view_provider, view_controller_proxy))
+        Ok(view_controller_proxy)
     }
 
     async fn handle_propose_element(
@@ -345,7 +346,7 @@ impl ElementManager {
             create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
         let initial_view_annotations = annotation_holder.get_annotations().unwrap();
 
-        let (view_provider_proxy, view_controller_proxy) = self
+        let view_controller_proxy = self
             .present_view_for_element(
                 &mut element,
                 initial_view_annotations,
@@ -367,11 +368,9 @@ impl ElementManager {
         }?;
 
         fasync::Task::local(run_element_until_closed(
-            element,
             annotation_holder,
             element_controller_stream,
             annotation_controller_stream,
-            view_provider_proxy,
             view_controller_proxy,
         ))
         .detach();
@@ -393,11 +392,9 @@ impl ElementManager {
 /// The Element will also listen for any incoming events from the element controller and
 /// forward them to the view controller.
 async fn run_element_until_closed(
-    element: Element,
     annotation_holder: AnnotationHolder,
     controller_stream: Option<felement::ControllerRequestStream>,
     annotation_controller_stream: felement::AnnotationControllerRequestStream,
-    view_provider_proxy: fuiapp::ViewProviderProxy,
     view_controller_proxy: felement::ViewControllerProxy,
 ) {
     let annotation_holder = Arc::new(Mutex::new(annotation_holder));
@@ -408,22 +405,7 @@ async fn run_element_until_closed(
         annotation_controller_stream,
     ));
 
-    let moniker = format!("{}:{}", element.collection(), element.name());
     select!(
-        _ = await_element_close(view_provider_proxy, moniker).fuse() => {
-            // signals that a element has died without being told to close.
-            // We could tell the view to dismiss here but we need to signal
-            // that there was a crash. The current contract is that if the
-            // view controller binding closes without a dismiss then the
-            // presenter should treat this as a crash and respond accordingly.
-
-            // We want to allow the presenter the ability to dismiss
-            // the view so we tell it to dismiss and then wait for
-            // the view controller stream to close.
-            let _ = view_controller_proxy.dismiss();
-            let timeout = fuchsia_async::Timer::new(VIEW_CONTROLLER_DISMISS_TIMEOUT.after_now());
-            wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
-        },
         _ = wait_for_view_controller_close(view_controller_proxy.clone()).fuse() =>  {
             // signals that the presenter would like to close the element.
             // We do not need to do anything here but exit which will cause
@@ -440,18 +422,6 @@ async fn run_element_until_closed(
             wait_for_view_controller_close_or_timeout(view_controller_proxy, timeout).await;
         },
     );
-}
-
-/// Waits for the element to signal that it closed, via a component stopped
-/// event. Note that a component process that exits will trigger the events.
-async fn await_element_close(view_provider: fuiapp::ViewProviderProxy, moniker: String) {
-    let channel = view_provider.into_channel().unwrap_or_else(|e| {
-        panic!("could not get ViewProvider channel for moniker: {moniker}: {:?}", e)
-    });
-    debug!(%moniker, "await_element_close()");
-    let _ =
-        fasync::OnSignals::new(&channel.as_handle_ref(), zx::Signals::CHANNEL_PEER_CLOSED).await;
-    debug!(%moniker, "element closed");
 }
 
 /// Waits for this view controller to close.

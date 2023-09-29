@@ -58,10 +58,12 @@ impl Element {
         }
     }
 
+    #[allow(unused)]
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    #[allow(unused)]
     pub fn collection(&self) -> &str {
         &self.collection
     }
