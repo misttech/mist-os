@@ -20,7 +20,6 @@
 
 #include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/lib/escher/util/epsilon_compare.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
@@ -31,6 +30,7 @@
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
+#include "src/ui/scenic/lib/flatland/tests/logging_event_loop.h"
 #include "src/ui/scenic/lib/flatland/tests/mock_flatland_presenter.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
@@ -216,7 +216,7 @@ fuchsia::ui::composition::ViewBoundProtocols NoViewProtocols() { return {}; }
 class FlatlandTest;
 using FlatlandDisplayTest = FlatlandTest;
 
-class FlatlandTest : public gtest::RealLoopFixture {
+class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
  public:
   FlatlandTest()
       : uber_struct_system_(std::make_shared<UberStructSystem>()),

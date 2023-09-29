@@ -12,7 +12,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
+#include "src/ui/scenic/lib/flatland/tests/logging_event_loop.h"
 #include "src/ui/scenic/lib/flatland/uber_struct_system.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 
@@ -34,7 +34,7 @@ using fuchsia::ui::views::ViewportCreationToken;
 namespace flatland {
 namespace test {
 
-class LinkSystemTest : public gtest::RealLoopFixture {
+class LinkSystemTest : public LoggingEventLoop, public ::testing::Test {
  public:
   LinkSystemTest()
       : uber_struct_system_(std::make_shared<UberStructSystem>()),
@@ -51,14 +51,14 @@ class LinkSystemTest : public gtest::RealLoopFixture {
   }
 
   void SetUp() override {
-    gtest::RealLoopFixture::SetUp();
+    ::testing::Test::SetUp();
     // UnownedDispatcherHolder is safe to use because the dispatcher will be valid until TearDown().
     dispatcher_holder_ = std::make_shared<utils::UnownedDispatcherHolder>(dispatcher());
   }
 
   void TearDown() override {
     dispatcher_holder_.reset();
-    gtest::RealLoopFixture::TearDown();
+    ::testing::Test::TearDown();
   }
 
   const std::shared_ptr<UberStructSystem> uber_struct_system_;

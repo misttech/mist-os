@@ -17,8 +17,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/flatland/flatland_presenter_impl.h"
+#include "src/ui/scenic/lib/flatland/tests/logging_event_loop.h"
 #include "src/ui/scenic/lib/scheduling/tests/mocks/frame_scheduler_mocks.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
@@ -30,7 +30,7 @@ namespace {
 
 // This harness uses a real loop instead of a test loop since the multithreading test requires the
 // tasks posted by the FlatlandPresenterImpl to run without blocking the worker threads.
-class FlatlandPresenterTest : public gtest::RealLoopFixture {
+class FlatlandPresenterTest : public LoggingEventLoop, public ::testing::Test {
  public:
   std::shared_ptr<FlatlandPresenterImpl> CreateFlatlandPresenterImpl(
       scheduling::FrameScheduler& scheduler) {

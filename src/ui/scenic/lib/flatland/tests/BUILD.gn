@@ -19,6 +19,7 @@ executable("unittests") {
     "global_transform_data_unittest.cc",
     "hanging_get_helper_unittest.cc",
     "link_system_unittest.cc",
+    "logging_event_loop.cc",
     "mock_flatland_presenter.h",
     "scene_dumper_unittest.cc",
     "transform_graph_unittest.cc",

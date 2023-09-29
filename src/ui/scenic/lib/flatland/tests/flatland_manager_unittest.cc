@@ -11,8 +11,8 @@
 #include <gtest/gtest.h>
 
 #include "fuchsia/ui/composition/cpp/fidl.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
+#include "src/ui/scenic/lib/flatland/tests/logging_event_loop.h"
 #include "src/ui/scenic/lib/flatland/tests/mock_flatland_presenter.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
 #include "src/ui/scenic/lib/scheduling/id.h"
@@ -64,14 +64,14 @@ using fuchsia::ui::composition::OnNextFrameBeginValues;
 
 namespace {
 
-class FlatlandManagerTest : public gtest::RealLoopFixture {
+class FlatlandManagerTest : public LoggingEventLoop, public ::testing::Test {
  public:
   FlatlandManagerTest()
       : uber_struct_system_(std::make_shared<UberStructSystem>()),
         link_system_(std::make_shared<LinkSystem>(uber_struct_system_->GetNextInstanceId())) {}
 
   void SetUp() override {
-    gtest::RealLoopFixture::SetUp();
+    ::testing::Test::SetUp();
 
     mock_flatland_presenter_ = std::make_shared<::testing::StrictMock<MockFlatlandPresenter>>();
 
@@ -171,7 +171,7 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
       removed_sessions_.clear();
     }
 
-    gtest::RealLoopFixture::TearDown();
+    ::testing::Test::TearDown();
   }
 
   fidl::InterfacePtr<fuchsia::ui::composition::Flatland> CreateFlatland() {
