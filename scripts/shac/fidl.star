@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "compiled_tool_path", "get_fuchsia_dir", "os_exec")
+load("./common.star", "FORMATTER_MSG", "compiled_tool_path", "os_exec")
 
 def _filter_fidl_files(files):
     return [
