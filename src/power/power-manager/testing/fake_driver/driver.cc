@@ -18,7 +18,7 @@ Driver::Driver(fdf::DriverStartArgs start_args,
 
 zx::result<> Driver::Start() {
   auto* node_ptr = &node();
-  auto result = AddDriverAndControl(node_ptr, "soc_thermal", "thermal", temperature_connector_,
+  auto result = AddDriverAndControl(node_ptr, "soc_thermal", "temperature", temperature_connector_,
                                     control_connector_);
   if (result.is_error()) {
     FDF_SLOG(ERROR, "Failed to add driver and its control", KV("status", result.status_string()));
@@ -34,7 +34,7 @@ zx::result<> Driver::AddDriverAndControl(fidl::ClientEnd<fuchsia_driver_framewor
                                          std::string_view driver_class_name,
                                          driver_devfs::Connector<A>& driver_devfs_connector,
                                          driver_devfs::Connector<B>& control_devfs_connector) {
-  // Create driver with topo suffix `/soc_thermal` and class path `/dev/class/thermal/000
+  // Create driver with topo suffix `/soc_thermal` and class path `/dev/class/temperature/000
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::Node>*> add_child_result =
       AddChild(parent, driver_node_name, driver_class_name, driver_devfs_connector);
   if (add_child_result.is_error()) {
