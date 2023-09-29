@@ -7,7 +7,7 @@ use fidl;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
     ClientSelectorConfiguration, Format, FormattedContent, PerformanceConfiguration, ReaderError,
-    SelectorArgument, StreamMode, StreamParameters,
+    Selector, SelectorArgument, StreamMode, StreamParameters,
 };
 use fuchsia_async::{self as fasync, DurationExt, Task, TimeoutExt};
 use fuchsia_component::client;
@@ -87,30 +87,40 @@ impl ComponentSelector {
 }
 
 pub trait ToSelectorArguments {
-    fn to_selector_arguments(self) -> Vec<String>;
+    fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>>;
 }
 
 impl ToSelectorArguments for String {
-    fn to_selector_arguments(self) -> Vec<String> {
-        vec![self]
+    fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>> {
+        Box::new([SelectorArgument::RawSelector(self)].into_iter())
     }
 }
 
 impl ToSelectorArguments for &str {
-    fn to_selector_arguments(self) -> Vec<String> {
-        vec![self.to_string()]
+    fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>> {
+        Box::new([SelectorArgument::RawSelector(self.to_string())].into_iter())
     }
 }
 
 impl ToSelectorArguments for ComponentSelector {
-    fn to_selector_arguments(self) -> Vec<String> {
+    fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>> {
         let moniker = self.moniker_str();
         // If not tree selectors were provided, select the full tree.
         if self.tree_selectors.is_empty() {
-            vec![format!("{}:root", moniker)]
+            Box::new([SelectorArgument::RawSelector(format!("{}:root", moniker))].into_iter())
         } else {
-            self.tree_selectors.iter().map(|s| format!("{}:{}", moniker, s)).collect()
+            Box::new(
+                self.tree_selectors
+                    .into_iter()
+                    .map(move |s| SelectorArgument::RawSelector(format!("{moniker}:{s}"))),
+            )
         }
+    }
+}
+
+impl ToSelectorArguments for Selector {
+    fn to_selector_arguments(self) -> Box<dyn Iterator<Item = SelectorArgument>> {
+        Box::new([SelectorArgument::StructuredSelector(self)].into_iter())
     }
 }
 
@@ -119,7 +129,7 @@ impl ToSelectorArguments for ComponentSelector {
 #[derive(Clone)]
 pub struct ArchiveReader {
     archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
-    selectors: Vec<String>,
+    selectors: Vec<SelectorArgument>,
     should_retry: bool,
     minimum_schema_count: usize,
     timeout: Option<Duration>,
@@ -175,7 +185,7 @@ impl ArchiveReader {
 
     /// Requests a single component tree (or sub-tree).
     pub fn add_selector(&mut self, selector: impl ToSelectorArguments) -> &mut Self {
-        self.selectors.extend(selector.to_selector_arguments().into_iter());
+        self.selectors.extend(selector.to_selector_arguments());
         self
     }
 
@@ -332,12 +342,7 @@ impl ArchiveReader {
         stream_parameters.client_selector_configuration = if self.selectors.is_empty() {
             Some(ClientSelectorConfiguration::SelectAll(true))
         } else {
-            Some(ClientSelectorConfiguration::Selectors(
-                self.selectors
-                    .iter()
-                    .map(|selector| SelectorArgument::RawSelector(selector.clone()))
-                    .collect(),
-            ))
+            Some(ClientSelectorConfiguration::Selectors(self.selectors.iter().cloned().collect()))
         };
 
         stream_parameters.performance_configuration = Some(PerformanceConfiguration {
@@ -561,10 +566,32 @@ mod tests {
             }
         });
 
+        // add_selector can take either a String or a Selector.
+        let lazy_property_selector = Selector {
+            component_selector: Some(fdiagnostics::ComponentSelector {
+                moniker_segments: Some(vec![
+                    fdiagnostics::StringSelector::ExactMatch(format!(
+                        "realm_builder:{}",
+                        instance.root.child_name()
+                    )),
+                    fdiagnostics::StringSelector::ExactMatch("test_component".into()),
+                ]),
+                ..Default::default()
+            }),
+            tree_selector: Some(fdiagnostics::TreeSelector::PropertySelector(
+                fdiagnostics::PropertySelector {
+                    node_path: vec![
+                        fdiagnostics::StringSelector::ExactMatch("root".into()),
+                        fdiagnostics::StringSelector::ExactMatch("lazy-node".into()),
+                    ],
+                    target_properties: fdiagnostics::StringSelector::ExactMatch("a".into()),
+                },
+            )),
+            ..Default::default()
+        };
+        let int_property_selector = format!("{component_selector}:root:int");
         let mut reader = ArchiveReader::new();
-        reader
-            .add_selector(format!("{component_selector}:root:int"))
-            .add_selector(format!("{component_selector}:root/lazy-node:a"));
+        reader.add_selector(int_property_selector).add_selector(lazy_property_selector);
         let response = reader.snapshot::<Inspect>().await?;
 
         assert_eq!(response.len(), 1);
@@ -625,16 +652,22 @@ mod tests {
     async fn component_selector() {
         let selector = ComponentSelector::new(vec!["a".to_string()]);
         assert_eq!(selector.moniker_str(), "a");
-        let arguments: Vec<String> = selector.to_selector_arguments();
-        assert_eq!(arguments, vec!["a:root".to_string()]);
+        let arguments: Vec<_> = selector.to_selector_arguments().collect();
+        assert_eq!(arguments, vec![SelectorArgument::RawSelector("a:root".to_string())]);
 
         let selector =
             ComponentSelector::new(vec!["b".to_string(), "c".to_string(), "a".to_string()]);
         assert_eq!(selector.moniker_str(), "b/c/a");
 
         let selector = selector.with_tree_selector("root/b/c:d").with_tree_selector("root/e:f");
-        let arguments: Vec<String> = selector.to_selector_arguments();
-        assert_eq!(arguments, vec!["b/c/a:root/b/c:d".to_string(), "b/c/a:root/e:f".to_string(),]);
+        let arguments: Vec<_> = selector.to_selector_arguments().collect();
+        assert_eq!(
+            arguments,
+            vec![
+                SelectorArgument::RawSelector("b/c/a:root/b/c:d".into()),
+                SelectorArgument::RawSelector("b/c/a:root/e:f".into()),
+            ]
+        );
     }
 
     #[fuchsia::test]
