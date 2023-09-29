@@ -518,6 +518,10 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-period-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-threshold-ms=0")
 	qemuCmd.AddKernelArg("kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0")
+	// TODO(fxbug.dev/133949): Remove when set by default.
+	if !strings.Contains(strings.Join(args, " "), "kernel.experimental.serial_migration") {
+		qemuCmd.AddKernelArg("kernel.experimental.serial_migration=true")
+	}
 
 	// Add entropy to simulate bootloader entropy.
 	entropy := make([]byte, minEntropyBytes)
