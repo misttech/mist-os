@@ -4,6 +4,16 @@
 
 FORMATTER_MSG = "File not formatted. Run `fx format-code` to fix."
 
+def os_exec(ctx, cmd, *args, **kwargs):
+    """Runs `ctx.os.exec()`, validating that the executable path is absolute.
+    """
+    if not cmd[0].startswith("/"):
+        fail("%s is not absolute" % cmd[0])
+    return ctx.os.exec(cmd, *args, **kwargs)
+
+def get_fuchsia_dir(ctx):
+    return ctx.scm.root + "/" + ctx.vars.get("fuchsia_dir")
+
 def cipd_platform_name(ctx):
     """Returns CIPD's name for the current host platform.
 
@@ -19,7 +29,7 @@ def cipd_platform_name(ctx):
 
 def get_build_dir(ctx):
     """Returns the path to the build output directory."""
-    return ctx.vars.get("fuchsia_build_dir")
+    return get_fuchsia_dir(ctx) + "/" + ctx.vars.get("fuchsia_build_dir")
 
 def compiled_tool_path(ctx, tool_name):
     """Returns the path to a compiled tool in the build directory."""

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "compiled_tool_path")
+load("./common.star", "FORMATTER_MSG", "compiled_tool_path", "get_fuchsia_dir", "os_exec")
 
 def _filter_fidl_files(files):
     return [
@@ -23,7 +23,7 @@ def _fidl_format(ctx):
 
     procs = []
     for f in _filter_fidl_files(ctx.scm.affected_files()):
-        procs.append((f, ctx.os.exec([exe, f])))
+        procs.append((f, os_exec(ctx, [exe, f])))
     for f, proc in procs:
         formatted = proc.wait().stdout
         original = str(ctx.io.read_file(f))
@@ -44,7 +44,7 @@ def _gidl_format(ctx):
     exe = compiled_tool_path(ctx, "gidl-format")
 
     procs = [
-        (f, ctx.os.exec([exe, f]))
+        (f, os_exec(ctx, [exe, f]))
         for f in ctx.scm.affected_files()
         if f.endswith(".gidl")
     ]
@@ -69,7 +69,8 @@ def _fidl_lint(ctx):
     if not fidl_files:
         return
 
-    results = json.decode(ctx.os.exec(
+    results = json.decode(os_exec(
+        ctx,
         [
             compiled_tool_path(ctx, "fidl-lint"),
             "--format=json",
@@ -101,7 +102,9 @@ def _fidl_lint(ctx):
             line = result["start_line"],
             col = result["start_char"] + 1,
             end_line = result["end_line"],
-            end_col = result["end_char"] + 1,
+            end_col = (
+                result["end_char"] + 1 if result["start_char"] != result["end_char"] else 0
+            ),
             replacements = replacements,
         )
 

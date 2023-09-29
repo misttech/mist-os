@@ -4,7 +4,7 @@
 
 # keep-sorted start
 load("./cml.star", "register_cml_checks")
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path", "get_fuchsia_dir", "os_exec")
 load("./dart.star", "register_dart_checks")
 load("./fidl.star", "register_fidl_checks")
 load("./go.star", "register_go_checks")
@@ -29,15 +29,17 @@ def _gn_format(ctx):
     if not gn_files:
         return
 
-    gn = "prebuilt/third_party/gn/%s/gn" % cipd_platform_name(ctx)
+    gn = "%s/prebuilt/third_party/gn/%s/gn" % (get_fuchsia_dir(ctx), cipd_platform_name(ctx))
 
-    unformatted_files = ctx.os.exec(
+    unformatted_files = os_exec(
+        ctx,
         [gn, "format", "--dry-run"] + gn_files,
         ok_retcodes = [0, 2],
     ).wait().stdout.splitlines()
 
     for f in unformatted_files:
-        formatted_contents = ctx.os.exec(
+        formatted_contents = os_exec(
+            ctx,
             [gn, "format", "--stdin"],
             stdin = ctx.io.read_file(f),
         ).wait().stdout
@@ -57,7 +59,7 @@ def _doc_checker(ctx):
         return
 
     exe = compiled_tool_path(ctx, "doc-checker")
-    res = ctx.os.exec([exe, "--local-links-only"], ok_retcodes = [0, 1]).wait()
+    res = os_exec(ctx, [exe, "--local-links-only", "--root", get_fuchsia_dir(ctx)], ok_retcodes = [0, 1]).wait()
     if res.retcode == 0:
         return
     lines = res.stdout.split("\n")
@@ -85,7 +87,8 @@ def _mdlint(ctx):
     if not any([f.startswith(rfc_dir) for f in affected_files]):
         return
     mdlint = compiled_tool_path(ctx, "mdlint")
-    res = ctx.os.exec(
+    res = os_exec(
+        ctx,
         [
             mdlint,
             "--json",

@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _rustfmt(ctx):
     """Runs rustfmt on a Rust code base.
@@ -23,14 +23,17 @@ def _rustfmt(ctx):
         return
 
     base_cmd = [
-        "prebuilt/third_party/rust/%s/bin/rustfmt" % cipd_platform_name(ctx),
+        "%s/prebuilt/third_party/rust/%s/bin/rustfmt" % (
+            get_fuchsia_dir(ctx),
+            cipd_platform_name(ctx),
+        ),
         "--config-path",
         "rustfmt.toml",
         "--unstable-features",
         "--skip-children",
     ]
 
-    res = ctx.os.exec(base_cmd + ["--check", "--files-with-diff"] + rust_files, ok_retcodes = [0, 1]).wait()
+    res = os_exec(ctx, base_cmd + ["--check", "--files-with-diff"] + rust_files, ok_retcodes = [0, 1]).wait()
     unformatted = res.stdout.splitlines()
     if res.retcode and not unformatted:
         fail("rustfmt failed:\n%s" % res.stderr)
@@ -40,7 +43,7 @@ def _rustfmt(ctx):
         filepath = f[len(ctx.scm.root) + 1:]
         procs.append((
             filepath,
-            ctx.os.exec(base_cmd + ["--emit", "stdout", filepath]),
+            os_exec(ctx, base_cmd + ["--emit", "stdout", filepath]),
         ))
 
     for filepath, proc in procs:

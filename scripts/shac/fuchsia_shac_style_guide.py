@@ -14,6 +14,9 @@ import json
 import sys
 
 
+COMMON_DOT_STAR = "scripts/shac/common.star"
+
+
 def main():
     findings = collections.defaultdict(list)
     path = sys.argv[1]
@@ -24,7 +27,7 @@ def main():
     for node in ast.walk(tree):
         if (
             isinstance(node, ast.Call)
-            and ast.unparse(node).startswith("ctx.emit.finding(")
+            and ast.unparse(node.func) == "ctx.emit.finding"
             and not any(kw.arg == "message" for kw in node.keywords)
         ):
             # shac requires `message` except for findings emitted by formatters,
@@ -36,12 +39,25 @@ def main():
                 "`message` argument to `ctx.emit.finding()` must be set."
             )
 
-        if isinstance(node, ast.Call) and ast.unparse(node).startswith(
-            "print("
-        ):
+        if isinstance(node, ast.Call) and ast.unparse(node.func) == "print":
             findings[node].append(
                 "Do not commit shac check code that calls `print()`, "
                 "it's only to be used for debugging."
+            )
+
+        if (
+            isinstance(node, ast.Call)
+            and ast.unparse(node.func) == "ctx.os.exec"
+            and path != COMMON_DOT_STAR
+        ):
+            # All paths passed to `os_exec()` must be absolute in order for
+            # inherited checks in //vendor repositories to work. It's nontrivial
+            # to validate that statically, so instead we validate it at runtime
+            # in a custom wrapper function, and statically enforce that that
+            # wrapper function is used instead of `os_exec()`.
+            findings[node].append(
+                f"Don't call `ctx.os.exec()` directly, call `os_exec()` "
+                f"from //{COMMON_DOT_STAR}."
             )
 
     print(
@@ -60,18 +76,6 @@ def main():
             indent=2,
         )
     )
-
-
-def location_finding_kwargs(node: ast.AST):
-    res = {
-        "line": node.lineno,
-        "col": node.col_offset + 1,
-    }
-    if node.end_lineno:
-        res["end_line"] = node.end_lineno
-    if node.end_col_offset:
-        res["end_col"] = node.end_col_offset + 1
-    return res
 
 
 if __name__ == "__main__":

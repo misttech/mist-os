@@ -10,6 +10,11 @@ ignore: "/third_party/golibs"
 ignore: "/third_party/rust_crates/vendor"
 vars: [
   {
+    name: "fuchsia_dir"
+    description: "relative path to the fuchsia build output directory"
+    default: "."
+  },
+  {
     name: "fuchsia_build_dir"
     description: "relative path to the fuchsia build output directory"
     default: "out/default"

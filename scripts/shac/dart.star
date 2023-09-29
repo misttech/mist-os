@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _dart_format(ctx):
     """Runs `dart format`.
@@ -14,12 +14,15 @@ def _dart_format(ctx):
     if not dart_files:
         return
 
-    dart_exe = "prebuilt/third_party/dart/%s/bin/dart" % cipd_platform_name(ctx)
+    dart_exe = "%s/prebuilt/third_party/dart/%s/bin/dart" % (
+        get_fuchsia_dir(ctx),
+        cipd_platform_name(ctx),
+    )
 
     procs = [
         (
             f,
-            ctx.os.exec([dart_exe, "format", "--output=json", f]),
+            os_exec(ctx, [dart_exe, "format", "--output=json", f]),
         )
         for f in dart_files
     ]

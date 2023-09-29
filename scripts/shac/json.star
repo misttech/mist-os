@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "compiled_tool_path")
+load("./common.star", "FORMATTER_MSG", "compiled_tool_path", "os_exec")
 
 _JSON5_EXTS = (
     ".json5",
@@ -25,7 +25,7 @@ def _json5_format(ctx):
 
     procs = []
     for f in json5_files:
-        procs.append((f, ctx.os.exec([exe, f])))
+        procs.append((f, os_exec(ctx, [exe, f])))
 
     for f, proc in procs:
         formatted = proc.wait().stdout

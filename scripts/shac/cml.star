@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "compiled_tool_path")
+load("./common.star", "FORMATTER_MSG", "compiled_tool_path", "os_exec")
 
 def _cml_format(ctx):
     """Runs `cmc format` on .cml files.
@@ -19,7 +19,7 @@ def _cml_format(ctx):
 
     procs = []
     for f in cml_files:
-        procs.append((f, ctx.os.exec([exe, "format", f])))
+        procs.append((f, os_exec(ctx, [exe, "format", f])))
 
     for f, proc in procs:
         formatted = proc.wait().stdout

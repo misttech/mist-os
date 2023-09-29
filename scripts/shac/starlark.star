@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _buildifier(ctx):
     """Checks Starlark/Bazel file formatting using buildifier."""
@@ -19,11 +19,15 @@ def _buildifier(ctx):
         return
 
     base_cmd = [
-        "prebuilt/third_party/buildifier/%s/buildifier" % cipd_platform_name(ctx),
+        "%s/prebuilt/third_party/buildifier/%s/buildifier" % (
+            get_fuchsia_dir(ctx),
+            cipd_platform_name(ctx),
+        ),
         "-lint=off",
     ]
 
-    res = ctx.os.exec(
+    res = os_exec(
+        ctx,
         base_cmd + ["-mode=check"] + starlark_files,
         ok_retcodes = (0, 4),
     ).wait()
@@ -47,7 +51,7 @@ def _buildifier(ctx):
             name = filepath,
         )
 
-    ctx.os.exec(base_cmd + tempfiles.values()).wait()
+    os_exec(ctx, base_cmd + tempfiles.values()).wait()
 
     for filepath, temp in tempfiles.items():
         formatted = ctx.io.read_file(temp)
@@ -68,8 +72,11 @@ def _fuchsia_shac_style_guide(ctx):
     procs = []
     for f in starlark_files:
         procs.append(
-            (f, ctx.os.exec([
-                "prebuilt/third_party/python3/%s/bin/python3" % cipd_platform_name(ctx),
+            (f, os_exec(ctx, [
+                "%s/prebuilt/third_party/python3/%s/bin/python3" % (
+                    get_fuchsia_dir(ctx),
+                    cipd_platform_name(ctx),
+                ),
                 "scripts/shac/fuchsia_shac_style_guide.py",
                 f,
             ])),

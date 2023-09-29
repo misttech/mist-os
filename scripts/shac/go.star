@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name")
+load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _gofmt(ctx):
     """Runs gofmt on a Go code base.
@@ -15,13 +15,16 @@ def _gofmt(ctx):
         return
 
     base_cmd = [
-        "prebuilt/third_party/go/%s/bin/gofmt" % cipd_platform_name(ctx),
+        "%s/prebuilt/third_party/go/%s/bin/gofmt" % (
+            get_fuchsia_dir(ctx),
+            cipd_platform_name(ctx),
+        ),
         "-s",  # simplify
     ]
 
-    unformatted = ctx.os.exec(base_cmd + ["-l"] + go_files).wait().stdout.splitlines()
+    unformatted = os_exec(ctx, base_cmd + ["-l"] + go_files).wait().stdout.splitlines()
     for f in unformatted:
-        new_contents = ctx.os.exec(base_cmd + [f]).wait().stdout
+        new_contents = os_exec(ctx, base_cmd + [f]).wait().stdout
         ctx.emit.finding(
             level = "error",
             message = FORMATTER_MSG,

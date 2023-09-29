@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "cipd_platform_name")
+load("./common.star", "cipd_platform_name", "get_fuchsia_dir", "os_exec")
 
 def _keep_sorted(ctx):
     """Enforces keep-sorted directives in source files.
@@ -12,7 +12,10 @@ def _keep_sorted(ctx):
     Args:
       ctx: A ctx instance.
     """
-    exe = "prebuilt/third_party/keep-sorted/%s/keep-sorted" % cipd_platform_name(ctx)
+    exe = "%s/prebuilt/third_party/keep-sorted/%s/keep-sorted" % (
+        get_fuchsia_dir(ctx),
+        cipd_platform_name(ctx),
+    )
 
     files = ctx.scm.affected_files().keys()
     findings = []
@@ -21,11 +24,14 @@ def _keep_sorted(ctx):
     # length limit.
     batch_size = 20000
     for i in range(0, len(files), batch_size):
-        res = ctx.os.exec(
+        res = os_exec(
+            ctx,
             [exe, "--mode=lint"] + files[i:i + batch_size],
             ok_retcodes = (0, 1),
         ).wait()
         if res.retcode == 1:
+            if not res.stdout:
+                fail(res.stderr)
             findings.extend(json.decode(res.stdout))
 
     for finding in findings:
