@@ -285,7 +285,6 @@ test_runfiles = [
   "exec_proc_exe_workload",
   "exec_state_workload",
   "priority_execve",
-  "sigaltstack_check",
 ]
 
 # These runfiles are binaries used by the test binaries. They need to be placed in the specific
