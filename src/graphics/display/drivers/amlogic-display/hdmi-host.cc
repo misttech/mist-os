@@ -21,7 +21,8 @@ namespace amlogic_display {
 namespace {
 
 void TranslateDisplayMode(fidl::AnyArena& allocator, const display_mode_t& in_mode,
-                          const ColorParam& in_color, DisplayMode* out_mode) {
+                          const fuchsia_hardware_hdmi::wire::ColorParam& in_color,
+                          fuchsia_hardware_hdmi::wire::DisplayMode* out_mode) {
   // Serves to translate between banjo struct display_mode_t and fidl struct DisplayMode
   fuchsia_hardware_hdmi::wire::StandardDisplayMode mode{
       .pixel_clock_10khz = in_mode.pixel_clock_10khz,
@@ -37,7 +38,7 @@ void TranslateDisplayMode(fidl::AnyArena& allocator, const display_mode_t& in_mo
   };
   out_mode->set_mode(allocator, mode);
 
-  ColorParam color{
+  fuchsia_hardware_hdmi::wire::ColorParam color{
       .input_color_format = in_color.input_color_format,
       .output_color_format = in_color.output_color_format,
       .color_depth = in_color.color_depth,
@@ -253,7 +254,7 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
   WRITE32_REG(HHI, HHI_VDAC_CNTL1_G12A, 8);  // set Cdac_pwd [whatever that is]
 
   fidl::Arena<2048> allocator;
-  DisplayMode translated_mode(allocator);
+  fuchsia_hardware_hdmi::wire::DisplayMode translated_mode(allocator);
   TranslateDisplayMode(allocator, mode, color_, &translated_mode);
   auto res = hdmi_->ModeSet(1, translated_mode);  // only supports 1 display for now
   if ((res.status() != ZX_OK) || res->is_error()) {
@@ -301,7 +302,7 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
 }
 
 zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) {
-  auto ops = std::make_unique<EdidOp[]>(op_count);
+  auto ops = std::make_unique<fuchsia_hardware_hdmi::wire::EdidOp[]>(op_count);
   auto writes = std::make_unique<fidl::VectorView<uint8_t>[]>(op_count);
   auto reads = std::make_unique<uint16_t[]>(op_count);
   size_t write_cnt = 0;
@@ -321,7 +322,8 @@ zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count
       write_cnt++;
     }
   }
-  auto all_ops = fidl::VectorView<EdidOp>::FromExternal(ops.get(), op_count);
+  auto all_ops =
+      fidl::VectorView<fuchsia_hardware_hdmi::wire::EdidOp>::FromExternal(ops.get(), op_count);
   auto all_writes =
       fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(writes.get(), write_cnt);
   auto all_reads = fidl::VectorView<uint16_t>::FromExternal(reads.get(), read_cnt);

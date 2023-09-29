@@ -15,12 +15,6 @@
 
 namespace amlogic_display {
 
-using fuchsia_hardware_hdmi::wire::ColorDepth;
-using fuchsia_hardware_hdmi::wire::ColorFormat;
-using fuchsia_hardware_hdmi::wire::ColorParam;
-using fuchsia_hardware_hdmi::wire::DisplayMode;
-using fuchsia_hardware_hdmi::wire::EdidOp;
-
 #define VID_PLL_DIV_1 0
 #define VID_PLL_DIV_2 1
 #define VID_PLL_DIV_3 2
@@ -108,7 +102,7 @@ class HdmiHost {
 
   zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count);
 
-  void UpdateOutputColorFormat(ColorFormat output_color_format) {
+  void UpdateOutputColorFormat(fuchsia_hardware_hdmi::wire::ColorFormat output_color_format) {
     color_.output_color_format = output_color_format;
   }
 
@@ -133,10 +127,10 @@ class HdmiHost {
   std::optional<fdf::MmioBuffer> hhi_mmio_;
   std::optional<fdf::MmioBuffer> gpio_mux_mmio_;
 
-  ColorParam color_{
-      .input_color_format = ColorFormat::kCf444,
-      .output_color_format = ColorFormat::kCf444,
-      .color_depth = ColorDepth::kCd24B,
+  fuchsia_hardware_hdmi::wire::ColorParam color_{
+      .input_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
+      .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
+      .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
   };
 };
 
