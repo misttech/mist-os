@@ -579,7 +579,7 @@ From //build/board.gni:106
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:41
+From //boards/x64.gni:33
 
 **Overridden from the default:** `false`
 
