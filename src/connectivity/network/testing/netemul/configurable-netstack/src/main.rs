@@ -309,7 +309,7 @@ async fn configure_interface(
                 .await?
             {
                 Ok(()) => Ok(()),
-                // TODO(https://fxbug.dev/129218): Remove or revise once calls
+                // TODO(https://fxbug.dev/130864): Remove or revise once calls
                 // to fuchsia.net.stack/Stack.AddForwardingEntry() are replaced
                 // with their fuchsia.net.routes.admin equivalent.
                 Err(e @ fnet_stack::Error::AlreadyExists) => {

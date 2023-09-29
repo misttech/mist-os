@@ -207,7 +207,7 @@ func (r *routeSetV4Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 }
 
 func (*routeSetV4Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV4AuthenticateForInterfaceResult, error) {
-	_ = syslog.WarnTf(routeSetV4Name, "TODO(https://fxbug.dev/129218): implement interface authentication")
+	_ = syslog.WarnTf(routeSetV4Name, "TODO(https://fxbug.dev/117846): implement interface authentication")
 	var result routesAdmin.RouteSetV4AuthenticateForInterfaceResult
 	result.SetResponse(routesAdmin.RouteSetV4AuthenticateForInterfaceResponse{})
 	return result, nil
@@ -284,7 +284,7 @@ func (r *routeSetV6Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 }
 
 func (*routeSetV6Impl) AuthenticateForInterface(ctx_ fidl.Context, credential admin.ProofOfInterfaceAuthorization) (routesAdmin.RouteSetV6AuthenticateForInterfaceResult, error) {
-	_ = syslog.WarnTf(routeSetV6Name, "TODO(https://fxbug.dev/129218): implement interface authentication")
+	_ = syslog.WarnTf(routeSetV6Name, "TODO(https://fxbug.dev/117846): implement interface authentication")
 	var result routesAdmin.RouteSetV6AuthenticateForInterfaceResult
 	result.SetResponse(routesAdmin.RouteSetV6AuthenticateForInterfaceResponse{})
 	return result, nil
