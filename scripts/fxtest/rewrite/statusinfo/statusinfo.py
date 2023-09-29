@@ -308,7 +308,9 @@ def _pad_to_size(input: str, width: int, left=False) -> str:
     return input
 
 
-def _wrap(style_list: typing.List[typing.Any], string: str, style: bool = True) -> str:
+def _wrap(
+    style_list: typing.List[typing.Any], string: str, style: bool = True
+) -> str:
     """Wrap a string in a style, resetting the style after the string is printed.
 
     Args:
@@ -393,7 +395,9 @@ def green_highlight(input: str, style=True) -> str:
     Returns:
         str: Styled string.
     """
-    return _wrap([colorama.Fore.GREEN, colorama.Style.BRIGHT], input, style=style)
+    return _wrap(
+        [colorama.Fore.GREEN, colorama.Style.BRIGHT], input, style=style
+    )
 
 
 def dim(input: str, style=True) -> str:

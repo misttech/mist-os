@@ -28,10 +28,16 @@ class TestArgOptions(unittest.TestCase):
 
         parser = argparse.ArgumentParser()
         parser.add_argument(
-            "-m", "--main-option", action=arg_option.SelectionAction, dest="option"
+            "-m",
+            "--main-option",
+            action=arg_option.SelectionAction,
+            dest="option",
         )
         parser.add_argument(
-            "-a", "--alt-option", action=arg_option.SelectionAction, dest="option"
+            "-a",
+            "--alt-option",
+            action=arg_option.SelectionAction,
+            dest="option",
         )
         parser.add_argument("option", action=arg_option.SelectionAction)
 
@@ -98,7 +104,9 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
 
             cmd = await command.AsyncCommand.create("ls", ".", env={"CWD": td})
             events = []
-            complete = await cmd.run_to_completion(lambda event: events.append(event))
+            complete = await cmd.run_to_completion(
+                lambda event: events.append(event)
+            )
             self.assertEqual(len(events), 2, f"Events was actually {events}")
 
             self.assertStdout(events[0], b"temp-file.txt\n")
@@ -121,7 +129,9 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
                 "ls", ".", env={"CWD": td}, timeout=3600
             )
             events = []
-            complete = await cmd.run_to_completion(lambda event: events.append(event))
+            complete = await cmd.run_to_completion(
+                lambda event: events.append(event)
+            )
             self.assertEqual(len(events), 2, f"Events was actually {events}")
 
             self.assertStdout(events[0], b"temp-file.txt\n")
@@ -225,7 +235,10 @@ class TestCommand(unittest.IsolatedAsyncioTestCase):
                 f.write(BASH_LONG)
             for name in paths:
                 st = os.stat(name)
-                os.chmod(name, st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+                os.chmod(
+                    name,
+                    st.st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH,
+                )
 
             # Make sure we can run the commands to start with, and they do not hang.
             cmd = await command.AsyncCommand.create(

@@ -211,7 +211,9 @@ class Fastboot:
             ) from err
 
     # List all the private methods in alphabetical order
-    def _get_fastboot_node(self, fastboot_node_id: Optional[str] = None) -> None:
+    def _get_fastboot_node(
+        self, fastboot_node_id: Optional[str] = None
+    ) -> None:
         """Gets the fastboot node id and stores it in `self._fastboot_node_id`.
 
         Runs `ffx target list` and look for corresponding device information.
@@ -264,7 +266,9 @@ class Fastboot:
         for target in self._ffx.get_target_list():
             if target["nodename"] == self._device_name:
                 return target
-        raise errors.FfxCommandError(f"'{self._device_name}' is not connected to host")
+        raise errors.FfxCommandError(
+            f"'{self._device_name}' is not connected to host"
+        )
 
     def _is_a_single_ip_address(self) -> bool:
         """Returns True if "address" field of `ffx target show` has one ip
@@ -292,7 +296,9 @@ class Fastboot:
 
         try:
             common.wait_for_state(
-                state_fn=self.is_in_fastboot_mode, expected_state=True, timeout=timeout
+                state_fn=self.is_in_fastboot_mode,
+                expected_state=True,
+                timeout=timeout,
             )
             _LOGGER.info("%s is in fastboot mode...", self._device_name)
         except errors.HoneyDewTimeoutError as err:
@@ -316,7 +322,9 @@ class Fastboot:
 
         try:
             common.wait_for_state(
-                state_fn=self.is_in_fuchsia_mode, expected_state=True, timeout=timeout
+                state_fn=self.is_in_fuchsia_mode,
+                expected_state=True,
+                timeout=timeout,
             )
             _LOGGER.info("%s is in fuchsia mode...", self._device_name)
         except errors.HoneyDewTimeoutError as err:
@@ -337,7 +345,8 @@ class Fastboot:
             errors.FuchsiaDeviceError: If failed to get valid TCP address.
         """
         _LOGGER.info(
-            "Waiting for a valid TCP address assigned to %s in fastboot " "mode...",
+            "Waiting for a valid TCP address assigned to %s in fastboot "
+            "mode...",
             self._device_name,
         )
 

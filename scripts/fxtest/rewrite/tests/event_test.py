@@ -44,7 +44,9 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
                 (0, None, True, None),
             ],
         )
-        self.assertEqual(raw_events[0].timestamp, recorder._monotonic_time_start)
+        self.assertEqual(
+            raw_events[0].timestamp, recorder._monotonic_time_start
+        )
 
     async def test_empty_run_async(self):
         """Test a start/end run, but ensure that we receive at least one event asynchronously."""
@@ -86,25 +88,37 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         recorder.emit_verbatim_message("Print verbatim stuff")
         build_id = recorder.emit_build_start(["//test:one"])
         recorder.emit_end(id=build_id)
-        preflight_id = recorder.emit_event_group("Preflight checks", queued_events=2)
-        pre_id_1 = recorder.emit_program_start("check", ["--one"], parent=preflight_id)
-        pre_id_2 = recorder.emit_program_start("check", ["--two"], parent=preflight_id)
+        preflight_id = recorder.emit_event_group(
+            "Preflight checks", queued_events=2
+        )
+        pre_id_1 = recorder.emit_program_start(
+            "check", ["--one"], parent=preflight_id
+        )
+        pre_id_2 = recorder.emit_program_start(
+            "check", ["--two"], parent=preflight_id
+        )
         recorder.emit_program_output(
             pre_id_1, "Check OK", event.ProgramOutputStream.STDOUT
         )
         recorder.emit_program_output(
-            pre_id_2, "Check warning, but still OK", event.ProgramOutputStream.STDERR
+            pre_id_2,
+            "Check warning, but still OK",
+            event.ProgramOutputStream.STDERR,
         )
         recorder.emit_program_termination(pre_id_1, 0)
         recorder.emit_program_termination(
             pre_id_2, 1, "Had a check error, continuing..."
         )
-        parse_id = recorder.emit_start_file_parsing("tests.json", "/home/tests.json")
+        parse_id = recorder.emit_start_file_parsing(
+            "tests.json", "/home/tests.json"
+        )
         recorder.emit_end(id=parse_id)
         recorder.emit_test_file_loaded(
             [
                 tests_json_file.TestEntry(
-                    tests_json_file.TestSection("my-test", "//src/my-test", "linux")
+                    tests_json_file.TestSection(
+                        "my-test", "//src/my-test", "linux"
+                    )
                 ),
                 tests_json_file.TestEntry(
                     tests_json_file.TestSection(
@@ -139,7 +153,9 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         suite_id = recorder.emit_test_suite_started(
             "my-test", hermetic=True, parent=test_group_id
         )
-        recorder.emit_test_suite_ended(suite_id, event.TestSuiteStatus.PASSED, None)
+        recorder.emit_test_suite_ended(
+            suite_id, event.TestSuiteStatus.PASSED, None
+        )
         recorder.emit_end(id=test_group_id)
         recorder.emit_end()
 
@@ -148,19 +164,23 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         for e in events:
             string_output = recorder.event_string(e)
             self.assertFalse(
-                "BUG" in string_output, f"Bug found in event output: {string_output}"
+                "BUG" in string_output,
+                f"Bug found in event output: {string_output}",
             )
             if e.starting:
                 self.assertTrue(
-                    ":S]" in string_output, f"Expected S marker: {string_output}"
+                    ":S]" in string_output,
+                    f"Expected S marker: {string_output}",
                 )
             if e.ending:
                 self.assertTrue(
-                    ":E]" in string_output, f"Expected E marker: {string_output}"
+                    ":E]" in string_output,
+                    f"Expected E marker: {string_output}",
                 )
             if not e.starting and not e.ending and e.id is not None:
                 self.assertTrue(
-                    ":I]" in string_output, f"Expected I marker: {string_output}"
+                    ":I]" in string_output,
+                    f"Expected I marker: {string_output}",
                 )
             if e.id is None:
                 self.assertTrue(

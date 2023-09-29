@@ -49,7 +49,8 @@ _MOCK_DEVICE_PROPERTIES: Dict[str, Dict[str, Any]] = {
 
 _MOCK_ARGS: Dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
-        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"), logs_dir="/tmp/logs"
+        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
+        logs_dir="/tmp/logs",
     ),
 }
 
@@ -136,7 +137,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
-        self.assertIsInstance(self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
+        self.assertIsInstance(
+            self.fd_obj, fuchsia_device_interface.FuchsiaDevice
+        )
 
     # List all the tests related to affordances in alphabetical order
     def test_fuchsia_device_is_bluetooth_avrcp_capable(self) -> None:
@@ -153,27 +156,39 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     def test_fuchsia_device_is_reboot_capable(self) -> None:
         """Test case to make sure fuchsia device is reboot capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.RebootCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.RebootCapableDevice
+        )
 
     def test_fuchsia_device_is_screenshot_capable(self) -> None:
         """Test case to make sure fuchsia device is screenshot capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.ScreenshotCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.ScreenshotCapableDevice
+        )
 
     def test_fuchsia_device_is_session_capable(self) -> None:
         """Test case to make sure fuchsia device is session capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.SessionCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.SessionCapableDevice
+        )
 
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.TracingCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.TracingCapableDevice
+        )
 
     def test_fuchsia_device_is_user_input_capable(self) -> None:
         """Test case to make sure fuchsia device is user_input capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.UserInputCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.UserInputCapableDevice
+        )
 
     def test_fuchsia_device_is_wlan_policy_capable(self) -> None:
         """Test case to make sure fuchsia device is wlan_policy capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.WlanPolicyCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.WlanPolicyCapableDevice
+        )
 
     # List all the tests related to public methods in alphabetical order
     def test_close(self) -> None:
@@ -199,7 +214,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
     ) -> None:
         """Testcase for FuchsiaDevice._build_info property"""
         # pylint: disable=protected-access
-        self.assertEqual(self.fd_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"])
+        self.assertEqual(
+            self.fd_obj._build_info, _MOCK_DEVICE_PROPERTIES["build_info"]
+        )
 
         mock_fc_connect_device_proxy.assert_called_once()
         mock_buildinfo_provider.assert_called()
@@ -339,7 +356,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         mock_fc_connect_device_proxy.assert_called_once()
 
     # List all the tests related to private methods in alphabetical order
-    @mock.patch.object(fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+    )
     @mock.patch.object(
         fuchsia_device.fuchsia_controller_transport.fuchsia_controller,
         "Context",
@@ -396,7 +415,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "log_message",
         new_callable=mock.AsyncMock,
     )
-    def test_send_log_command(self, parameterized_dict, mock_rcs_log_message) -> None:
+    def test_send_log_command(
+        self, parameterized_dict, mock_rcs_log_message
+    ) -> None:
         """Testcase for FuchsiaDevice._send_log_command()"""
         # pylint: disable=protected-access
         self.fd_obj._send_log_command(
@@ -458,7 +479,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         "reboot",
         new_callable=mock.AsyncMock,
     )
-    def test_send_reboot_command_error_is_peer_closed(self, mock_admin_reboot) -> None:
+    def test_send_reboot_command_error_is_peer_closed(
+        self, mock_admin_reboot
+    ) -> None:
         """Testcase for FuchsiaDevice._send_reboot_command() when the reboot
         FIDL call raises a ZX_ERR_PEER_CLOSED error.  This error should not
         result in `FuchsiaControllerError` being raised."""
@@ -509,7 +532,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS
         ),
     )
-    def test_send_snapshot_command_get_snapshot_error(self, *unused_args) -> None:
+    def test_send_snapshot_command_get_snapshot_error(
+        self, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the
         get_snapshot FIDL call raises an exception.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
@@ -552,7 +577,9 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             fuchsia_controller.ZxStatus.ZX_ERR_INVALID_ARGS, 0
         ),
     )
-    def test_send_snapshot_command_get_attr_status_not_ok(self, *unused_args) -> None:
+    def test_send_snapshot_command_get_attr_status_not_ok(
+        self, *unused_args
+    ) -> None:
         """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
         FIDL call returns a non-OK status code.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""

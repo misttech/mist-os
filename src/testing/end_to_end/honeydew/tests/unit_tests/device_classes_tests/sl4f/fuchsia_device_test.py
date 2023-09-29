@@ -93,7 +93,9 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
-        self.assertIsInstance(self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
+        self.assertIsInstance(
+            self.fd_obj, fuchsia_device_interface.FuchsiaDevice
+        )
 
     # List all the tests related to affordances in alphabetical order
     def test_fuchsia_device_is_bluetooth_gap_capable(self) -> None:
@@ -104,27 +106,39 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
 
     def test_fuchsia_device_is_reboot_capable(self) -> None:
         """Test case to make sure fuchsia device is reboot capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.RebootCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.RebootCapableDevice
+        )
 
     def test_fuchsia_device_is_screenshot_capable(self) -> None:
         """Test case to make sure fuchsia device is screenshot capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.ScreenshotCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.ScreenshotCapableDevice
+        )
 
     def test_fuchsia_device_is_session_capable(self) -> None:
         """Test case to make sure fuchsia device is session capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.SessionCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.SessionCapableDevice
+        )
 
     def test_fuchsia_device_is_tracing_capable(self) -> None:
         """Test case to make sure fuchsia device is tracing capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.TracingCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.TracingCapableDevice
+        )
 
     def test_fuchsia_device_is_user_input_capable(self) -> None:
         """Test case to make sure fuchsia device is user_input capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.UserInputCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.UserInputCapableDevice
+        )
 
     def test_fuchsia_device_is_wlan_policy_capable(self) -> None:
         """Test case to make sure fuchsia device is wlan_policy capable"""
-        self.assertIsInstance(self.fd_obj, affordances_capable.WlanPolicyCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.WlanPolicyCapableDevice
+        )
 
     # List all the tests related to transports in alphabetical order
     def test_fuchsia_device_is_sl4f_capable(self) -> None:
@@ -147,7 +161,8 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         """Testcase for FuchsiaDevice._build_info property"""
         # pylint: disable=protected-access
         self.assertEqual(
-            self.fd_obj._build_info, {"version": _MOCK_DEVICE_PROPERTIES["build_info"]}
+            self.fd_obj._build_info,
+            {"version": _MOCK_DEVICE_PROPERTIES["build_info"]},
         )
         mock_sl4f_run.assert_called()
 
@@ -179,11 +194,15 @@ class FuchsiaDeviceSL4FTests(unittest.TestCase):
         )
         mock_sl4f_run.assert_called()
 
-    @mock.patch.object(fuchsia_device.FuchsiaDevice, "health_check", autospec=True)
+    @mock.patch.object(
+        fuchsia_device.FuchsiaDevice, "health_check", autospec=True
+    )
     @mock.patch.object(
         fuchsia_device.sl4f_transport.SL4F, "start_server", autospec=True
     )
-    def test_on_device_boot(self, mock_sl4f_start_server, mock_health_check) -> None:
+    def test_on_device_boot(
+        self, mock_sl4f_start_server, mock_health_check
+    ) -> None:
         """Testcase for FuchsiaDevice.on_device_boot()"""
         self.fd_obj.on_device_boot()
 

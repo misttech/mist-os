@@ -15,7 +15,9 @@ class CommonUtilsTests(unittest.TestCase):
 
     def test_wait_for_state_success(self) -> None:
         """Test case for common.wait_for_state() success case."""
-        common.wait_for_state(state_fn=lambda: True, expected_state=True, timeout=1)
+        common.wait_for_state(
+            state_fn=lambda: True, expected_state=True, timeout=1
+        )
 
     def test_wait_for_state_fail(self) -> None:
         """Test case for common.wait_for_state() failure case."""

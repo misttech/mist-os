@@ -48,7 +48,9 @@ class Tracing(tracing.Tracing):
         self._tracing_active: bool = False
 
         # `_reset_state` need to be called on every device bootup
-        self._reboot_affordance.register_for_on_device_boot(fn=self._reset_state)
+        self._reboot_affordance.register_for_on_device_boot(
+            fn=self._reset_state
+        )
 
     def _reset_state(self) -> None:
         """Resets the session_initialized and tracing_active parameters."""
@@ -57,7 +59,9 @@ class Tracing(tracing.Tracing):
 
     # List all the public methods in alphabetical order
     def initialize(
-        self, categories: Optional[List[str]] = None, buffer_size: Optional[int] = None
+        self,
+        categories: Optional[List[str]] = None,
+        buffer_size: Optional[int] = None,
     ) -> None:
         """Initializes a trace sessions.
 
@@ -92,7 +96,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot start: Trace session is not " f"initialized on {self._name}"
+                "Cannot start: Trace session is not "
+                f"initialized on {self._name}"
             )
         _LOGGER.info("Starting trace on '%s'", self._name)
         self._sl4f.run(method=_SL4F_METHODS["Start"])
@@ -108,7 +113,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot stop: Trace session is not " f"initialized on {self._name}"
+                "Cannot stop: Trace session is not "
+                f"initialized on {self._name}"
             )
         if not self._tracing_active:
             raise errors.FuchsiaStateError(
@@ -127,12 +133,14 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot terminate: Trace session is " f"not initialized on {self._name}"
+                "Cannot terminate: Trace session is "
+                f"not initialized on {self._name}"
             )
 
         _LOGGER.info("Terminating trace session on '%s'", self._name)
         self._sl4f.run(
-            method=_SL4F_METHODS["Terminate"], params={"results_destination": "Ignore"}
+            method=_SL4F_METHODS["Terminate"],
+            params={"results_destination": "Ignore"},
         )
         self._tracing_active = False
         self._session_initialized = False
@@ -161,7 +169,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot terminate: Trace session is " f"not initialized on {self._name}"
+                "Cannot terminate: Trace session is "
+                f"not initialized on {self._name}"
             )
 
         _LOGGER.info("Terminating trace session on '%s'", self._name)

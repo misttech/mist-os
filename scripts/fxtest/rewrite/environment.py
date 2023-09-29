@@ -68,7 +68,9 @@ class ExecutionEnvironment:
         # Fuchsia directory during build time.
         build_dir_file = os.path.join(fuchsia_dir, ".fx-build-dir")
         if not os.path.isfile(build_dir_file):
-            raise EnvironmentError(f"Expected file .fx-build-dir at {build_dir_file}")
+            raise EnvironmentError(
+                f"Expected file .fx-build-dir at {build_dir_file}"
+            )
         with open(build_dir_file) as f:
             out_dir = os.path.join(fuchsia_dir, f.readline().strip())
         if not os.path.isdir(out_dir):
@@ -84,7 +86,8 @@ class ExecutionEnvironment:
             else flags.logpath
             if flags.logpath
             else os.path.join(
-                out_dir, f"fxtest-{datetime.datetime.now().isoformat()}.log.json.gz"
+                out_dir,
+                f"fxtest-{datetime.datetime.now().isoformat()}.log.json.gz",
             )
         )
 
@@ -92,7 +95,9 @@ class ExecutionEnvironment:
         # under the output directory.
         tests_json_file = os.path.join(out_dir, "tests.json")
         test_list_file = os.path.join(out_dir, "test-list.json")
-        package_repositories_file = os.path.join(out_dir, "package-repositories.json")
+        package_repositories_file = os.path.join(
+            out_dir, "package-repositories.json"
+        )
         for expected_file in [
             tests_json_file,
             test_list_file,

@@ -79,13 +79,20 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
     @parameterized.expand(
         [
             ({"label": "play_command", "command": BluetoothAvrcpCommand.PLAY},),
-            ({"label": "pause_command", "command": BluetoothAvrcpCommand.PAUSE},),
+            (
+                {
+                    "label": "pause_command",
+                    "command": BluetoothAvrcpCommand.PAUSE,
+                },
+            ),
         ],
         name_func=_custom_test_name_func,
     )
     def test_send_avrcp_command(self, parameterized_dict) -> None:
         """Test for Bluetooth.send_avrcp_command() method."""
-        self.bluetooth_obj.send_avrcp_command(command=parameterized_dict["command"])
+        self.bluetooth_obj.send_avrcp_command(
+            command=parameterized_dict["command"]
+        )
 
         self.sl4f_obj.run.assert_called()
 

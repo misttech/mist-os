@@ -52,7 +52,9 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.wlan_policy.create_client_controller()
         self.device.wlan_policy.remove_all_networks()
-        networks: list[NetworkConfig] = self.device.wlan_policy.get_saved_networks()
+        networks: list[
+            NetworkConfig
+        ] = self.device.wlan_policy.get_saved_networks()
 
         asserts.assert_equal(len(networks), 0)
 

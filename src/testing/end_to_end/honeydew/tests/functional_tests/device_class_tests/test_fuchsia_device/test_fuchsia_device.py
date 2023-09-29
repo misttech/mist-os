@@ -48,9 +48,13 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_device_instance(self) -> None:
         """Test case to make sure DUT is a FuchsiaDevice"""
         if self._is_fuchsia_controller_based_device(self.device):
-            asserts.assert_is_instance(self.device, fc_fuchsia_device.FuchsiaDevice)
+            asserts.assert_is_instance(
+                self.device, fc_fuchsia_device.FuchsiaDevice
+            )
         else:
-            asserts.assert_is_instance(self.device, sl4f_fuchsia_device.FuchsiaDevice)
+            asserts.assert_is_instance(
+                self.device, sl4f_fuchsia_device.FuchsiaDevice
+            )
 
     def test_device_type(self) -> None:
         """Test case for device_type"""
@@ -105,11 +109,13 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
         self.device.log_message_to_device(
-            message="This is a test ERROR message", level=custom_types.LEVEL.ERROR
+            message="This is a test ERROR message",
+            level=custom_types.LEVEL.ERROR,
         )
 
         self.device.log_message_to_device(
-            message="This is a test WARNING message", level=custom_types.LEVEL.WARNING
+            message="This is a test WARNING message",
+            level=custom_types.LEVEL.WARNING,
         )
 
         self.device.log_message_to_device(

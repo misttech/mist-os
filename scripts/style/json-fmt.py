@@ -91,7 +91,9 @@ def main():
                     json_file.write(formatted + "\n")
         except json.JSONDecodeError:
             if not args.quiet:
-                print(f"Exception encountered while processing {json_file.name}")
+                print(
+                    f"Exception encountered while processing {json_file.name}"
+                )
             if not args.ignore_errors:
                 raise
 

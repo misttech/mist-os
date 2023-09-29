@@ -12,7 +12,8 @@ from honeydew import errors
 from honeydew.interfaces.device_classes import fuchsia_device
 
 TILE_URL = (
-    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/" "flatland-view-provider.cm"
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+    "flatland-view-provider.cm"
 )
 
 

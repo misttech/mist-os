@@ -11,7 +11,6 @@ import unittest
 
 
 class GnLabelTest(unittest.TestCase):
-
     def test_from_str(self):
         label = GnLabel.from_str("//path/to/foo")
         self.assertEqual(label.gn_str, "//path/to/foo")
@@ -51,35 +50,40 @@ class GnLabelTest(unittest.TestCase):
 
     def test_without_toolchain(self):
         label = GnLabel.from_str(
-            "//path/to/foo(//some:toolchain)").without_toolchain()
+            "//path/to/foo(//some:toolchain)"
+        ).without_toolchain()
         self.assertEqual(label, GnLabel.from_str("//path/to/foo"))
 
     def test_ensure_toolchain(self):
         toolchain = GnLabel.from_str("//some/toolchain")
         label = GnLabel.from_str("//path/to/foo").ensure_toolchain(toolchain)
         self.assertEqual(
-            label, GnLabel.from_str("//path/to/foo(//some/toolchain)"))
+            label, GnLabel.from_str("//path/to/foo(//some/toolchain)")
+        )
 
     def test_ensure_toolchain_does_not_replace(self):
         toolchain = GnLabel.from_str("//some/toolchain")
-        label = GnLabel.from_str("//path/to/foo(//some/other/toolchain)"
-                                ).ensure_toolchain(toolchain)
+        label = GnLabel.from_str(
+            "//path/to/foo(//some/other/toolchain)"
+        ).ensure_toolchain(toolchain)
         self.assertEqual(
-            label, GnLabel.from_str("//path/to/foo(//some/other/toolchain)"))
+            label, GnLabel.from_str("//path/to/foo(//some/other/toolchain)")
+        )
 
     def test_rebase_package_path(self):
         path = GnLabel.from_str("//path/to/foo").rebased_path(
-            Path("rebase/dir"))
+            Path("rebase/dir")
+        )
         self.assertEqual(path, Path("rebase/dir/path/to/foo"))
 
     def test_code_search_url(self):
         url = GnLabel.from_str("//path/to/foo:bar").code_search_url()
         self.assertEqual(
             url,
-            "https://cs.opensource.google/fuchsia/fuchsia/+/main:path/to/foo")
+            "https://cs.opensource.google/fuchsia/fuchsia/+/main:path/to/foo",
+        )
 
     def test_is_host_target(self):
-
         def is_host_target(s):
             return GnLabel.from_str(s).is_host_target()
 
@@ -89,7 +93,6 @@ class GnLabelTest(unittest.TestCase):
         self.assertFalse(is_host_target("//foo:bar(//not_host)"))
 
     def test_is_third_party(self):
-
         def is_3p(s):
             return GnLabel.from_str(s).is_3rd_party()
 
@@ -101,25 +104,28 @@ class GnLabelTest(unittest.TestCase):
     def test_is_3p_rust_crate(self):
         self.assertFalse(GnLabel.from_str("//foo:bar").is_3p_rust_crate())
         self.assertTrue(
-            GnLabel.from_str(
-                "//third_party/rust_crates:foo").is_3p_rust_crate())
+            GnLabel.from_str("//third_party/rust_crates:foo").is_3p_rust_crate()
+        )
 
     def test_is_3p_golib(self):
         self.assertFalse(GnLabel.from_str("//foo:bar").is_3p_golib())
         self.assertTrue(
-            GnLabel.from_str("//third_party/golibs:foo").is_3p_golib())
+            GnLabel.from_str("//third_party/golibs:foo").is_3p_golib()
+        )
 
     def test_create_child(self):
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
         child = parent.create_child(Path("path2/to/child"))
         self.assertEqual(
-            child, GnLabel.from_str("//path1/to/foo/path2/to/child"))
+            child, GnLabel.from_str("//path1/to/foo/path2/to/child")
+        )
 
     def test_create_child_from_str(self):
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
         child = parent.create_child_from_str("path2/to/child:baz")
         self.assertEqual(
-            child, GnLabel.from_str("//path1/to/foo/path2/to/child:baz"))
+            child, GnLabel.from_str("//path1/to/foo/path2/to/child:baz")
+        )
 
     def test_create_child_from_absolute_str(self):
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
@@ -131,7 +137,8 @@ class GnLabelTest(unittest.TestCase):
         with self.assertRaises(AssertionError) as context:
             parent.create_child(Path("../path"))
         self.assertEqual(
-            ".. not supported but got '../path'", str(context.exception))
+            ".. not supported but got '../path'", str(context.exception)
+        )
 
     def test_gt(self):
         # Testing greater_than indirectly by sorting
@@ -141,15 +148,18 @@ class GnLabelTest(unittest.TestCase):
                 GnLabel.from_str("//path3:foo2"),
                 GnLabel.from_str("//path3:foo1"),
                 GnLabel.from_str("//path1"),
-            ])
+            ]
+        )
         self.assertListEqual(
-            sorted_labels, [
+            sorted_labels,
+            [
                 GnLabel.from_str("//path1"),
                 GnLabel.from_str("//path2"),
                 GnLabel.from_str("//path3:foo1"),
                 GnLabel.from_str("//path3:foo2"),
-            ])
+            ],
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

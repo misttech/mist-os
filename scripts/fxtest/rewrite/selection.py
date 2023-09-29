@@ -91,7 +91,9 @@ async def select_tests(
         }
         entries = list(filter(Test.is_device_test, entries))
 
-    def make_final_scores(partial: typing.Dict[str, int]) -> typing.Dict[str, int]:
+    def make_final_scores(
+        partial: typing.Dict[str, int]
+    ) -> typing.Dict[str, int]:
         filtered_entry_scores.update(partial)
         return filtered_entry_scores
 
@@ -153,13 +155,17 @@ async def select_tests(
                 # and output of the programs run under the group are
                 # useful in the log output, but too verbose to include
                 # in the status output.
-                id = recorder.emit_event_group(f"Matching {group}", hide_children=True)
+                id = recorder.emit_event_group(
+                    f"Matching {group}", hide_children=True
+                )
 
             label = _TestDistanceMeasurer(entries, extract_label)
             name = _TestDistanceMeasurer(entries, extract_name)
             component = _TestDistanceMeasurer(entries, extract_component)
             package = _TestDistanceMeasurer(entries, extract_package)
-            trailing_path = _TestDistanceMeasurer(entries, extract_trailing_path)
+            trailing_path = _TestDistanceMeasurer(
+                entries, extract_trailing_path
+            )
 
             async def closest_name_match() -> typing.List[_TestDistance]:
                 lowest_score_dict: defaultdict[Test, int] = defaultdict(
@@ -169,13 +175,19 @@ async def select_tests(
                 tasks = (
                     [label.distances(n, recorder, id) for n in group.names]
                     + [name.distances(n, recorder, id) for n in group.names]
-                    + [component.distances(n, recorder, id) for n in group.names]
+                    + [
+                        component.distances(n, recorder, id)
+                        for n in group.names
+                    ]
                     + [package.distances(n, recorder, id) for n in group.names]
-                    + [trailing_path.distances(n, recorder, id) for n in group.names]
+                    + [
+                        trailing_path.distances(n, recorder, id)
+                        for n in group.names
+                    ]
                 )
-                results: typing.List[typing.List[_TestDistance]] = await asyncio.gather(
-                    *tasks
-                )
+                results: typing.List[
+                    typing.List[_TestDistance]
+                ] = await asyncio.gather(*tasks)
                 for result in itertools.chain(*results):
                     if result.test not in lowest_score_dict:
                         tests.append(result.test)
@@ -183,22 +195,30 @@ async def select_tests(
                         lowest_score_dict[result.test], result.distance
                     )
 
-                return [_TestDistance(test, lowest_score_dict[test]) for test in tests]
+                return [
+                    _TestDistance(test, lowest_score_dict[test])
+                    for test in tests
+                ]
 
             match_tries = (
                 [closest_name_match()]
-                + [component.distances(c, recorder, id) for c in group.components]
+                + [
+                    component.distances(c, recorder, id)
+                    for c in group.components
+                ]
                 + [package.distances(p, recorder, id) for p in group.packages]
             )
 
-            distances: typing.List[typing.List[_TestDistance]] = await asyncio.gather(
-                *match_tries
-            )
+            distances: typing.List[
+                typing.List[_TestDistance]
+            ] = await asyncio.gather(*match_tries)
             match_distances: defaultdict[Test, int] = defaultdict(
                 lambda: NO_MATCH_DISTANCE
             )
             for td in itertools.chain(*distances):
-                match_distances[td.test] = min(match_distances[td.test], td.distance)
+                match_distances[td.test] = min(
+                    match_distances[td.test], td.distance
+                )
 
             for entry in entries:
                 # The final score for a match group is the worst match
@@ -227,10 +247,14 @@ async def select_tests(
     if PERFECT_MATCH_DISTANCE in best_matches.values():
         # There was a perfect match. Omit any test that is not a perfect match.
         omitted_fuzzy_matches = [
-            t for t in tests_to_run if best_matches[t.name()] != PERFECT_MATCH_DISTANCE
+            t
+            for t in tests_to_run
+            if best_matches[t.name()] != PERFECT_MATCH_DISTANCE
         ]
         tests_to_run = {
-            t for t in tests_to_run if best_matches[t.name()] == PERFECT_MATCH_DISTANCE
+            t
+            for t in tests_to_run
+            if best_matches[t.name()] == PERFECT_MATCH_DISTANCE
         }
 
     # Ensure tests match the input ordering for consistency.
@@ -292,7 +316,9 @@ class _TestDistanceMeasurer:
                     if os.path.exists(expected_path):
                         program_prefix = [expected_path]
                     else:
-                        raise RuntimeError("Could not find matcher script dldist")
+                        raise RuntimeError(
+                            "Could not find matcher script dldist"
+                        )
 
             output = await execution.run_command(
                 *program_prefix,
@@ -307,9 +333,12 @@ class _TestDistanceMeasurer:
             )
 
             if output is not None and output.return_code == 0:
-                vals = [int(line) for line in output.stdout.strip().splitlines()]
+                vals = [
+                    int(line) for line in output.stdout.strip().splitlines()
+                ]
                 return [
-                    _TestDistance(t[0], v) for t, v in zip(self._test_and_key, vals)
+                    _TestDistance(t[0], v)
+                    for t, v in zip(self._test_and_key, vals)
                 ]
 
             return []
@@ -361,18 +390,24 @@ def _parse_selection_command_line(
         token = selection.pop(0)
         if token == "--and":
             if not cur_group:
-                raise SelectionError("Cannot use --and at the beginning of a selection")
+                raise SelectionError(
+                    "Cannot use --and at the beginning of a selection"
+                )
             try:
                 token = selection.pop(0)
                 if token == "--and":
-                    raise SelectionError("Cannot use --and immediately after --and")
+                    raise SelectionError(
+                        "Cannot use --and immediately after --and"
+                    )
                 if token in special_tokens:
                     pop_for_arg(token)
                 else:
                     cur_group.names.add(token)
 
             except IndexError:
-                raise SelectionError("--and must be followed by another selection")
+                raise SelectionError(
+                    "--and must be followed by another selection"
+                )
         elif token in special_tokens:
             rotate_group()
             pop_for_arg(token)

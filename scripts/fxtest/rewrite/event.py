@@ -610,7 +610,9 @@ class EventRecorder:
                 GLOBAL_RUN_ID,
                 self._monotonic_time_start,
                 starting=True,
-                payload=EventPayloadUnion(start_timestamp=self._system_time_start),
+                payload=EventPayloadUnion(
+                    start_timestamp=self._system_time_start
+                ),
             )
         )
 
@@ -668,7 +670,9 @@ class EventRecorder:
             )
         )
 
-    def _emit_user_message(self, message: str, level: MessageLevel = MessageLevel.INFO):
+    def _emit_user_message(
+        self, message: str, level: MessageLevel = MessageLevel.INFO
+    ):
         """Emit a message to display to a user.
 
         Args:
@@ -740,7 +744,9 @@ class EventRecorder:
                 self._get_timestamp(),
                 parent=parent,
                 starting=True,
-                payload=EventPayloadUnion(parsing_file=FileParsingPayload(name, path)),
+                payload=EventPayloadUnion(
+                    parsing_file=FileParsingPayload(name, path)
+                ),
             )
         )
         return id
@@ -970,7 +976,9 @@ class EventRecorder:
                 id,
                 self._get_timestamp(),
                 starting=True,
-                payload=EventPayloadUnion(test_group=TestGroupPayload(test_count)),
+                payload=EventPayloadUnion(
+                    test_group=TestGroupPayload(test_count)
+                ),
             )
         )
         return id

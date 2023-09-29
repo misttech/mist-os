@@ -101,16 +101,21 @@ class HttpUtilsTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(http_utils.urllib.request, "urlopen", autospec=True)
-    def test_send_http_request_success(self, parameterized_dict, mock_urlopen) -> None:
+    def test_send_http_request_success(
+        self, parameterized_dict, mock_urlopen
+    ) -> None:
         """Test case for http_utils.send_http_request() success case."""
 
         urlopen_return_value = mock.MagicMock()
-        urlopen_return_value.read.return_value = parameterized_dict["urlopen_resp"]
+        urlopen_return_value.read.return_value = parameterized_dict[
+            "urlopen_resp"
+        ]
         urlopen_return_value.__enter__.return_value = urlopen_return_value
         mock_urlopen.return_value = urlopen_return_value
 
         result: Dict[str, Any] = http_utils.send_http_request(
-            url=parameterized_dict["url"], **parameterized_dict["optional_params"]
+            url=parameterized_dict["url"],
+            **parameterized_dict["optional_params"],
         )
 
         expected_output: Dict[str, Any] = json.loads(
@@ -127,7 +132,9 @@ class HttpUtilsTests(unittest.TestCase):
         side_effect=RemoteDisconnected,
         autospec=True,
     )
-    def test_send_http_request_with_exceptions_to_skip(self, mock_urlopen) -> None:
+    def test_send_http_request_with_exceptions_to_skip(
+        self, mock_urlopen
+    ) -> None:
         """Testcase to make sure http_utils.send_http_request() do not
         fail when it receives an exception that is part of exceptions_to_skip
         input arg"""

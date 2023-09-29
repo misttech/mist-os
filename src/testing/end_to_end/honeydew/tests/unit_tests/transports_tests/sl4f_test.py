@@ -42,8 +42,12 @@ _MOCK_ARGS: Dict[str, Any] = {
     "sl4f_server_address_ipv6_localhost": custom_types.Sl4fServerAddress(
         ip=_IPV6_LOCALHOST, port=_SL4F_PORT_REMOTE
     ),
-    "target_ssh_address_ipv4": custom_types.TargetSshAddress(ip=_IPV4, port=_SSH_PORT),
-    "target_ssh_address_ipv6": custom_types.TargetSshAddress(ip=_IPV6, port=_SSH_PORT),
+    "target_ssh_address_ipv4": custom_types.TargetSshAddress(
+        ip=_IPV4, port=_SSH_PORT
+    ),
+    "target_ssh_address_ipv6": custom_types.TargetSshAddress(
+        ip=_IPV6, port=_SSH_PORT
+    ),
     "target_ssh_address_ipv6_localhost": custom_types.TargetSshAddress(
         ip=_IPV6_LOCALHOST, port=_SSH_PORT
     ),
@@ -102,14 +106,18 @@ class Sl4fTests(unittest.TestCase):
             (
                 {
                     "label": "ipv4_address",
-                    "sl4f_server_address": _MOCK_ARGS["sl4f_server_address_ipv4"],
+                    "sl4f_server_address": _MOCK_ARGS[
+                        "sl4f_server_address_ipv4"
+                    ],
                     "expected_url": _EXPECTED_VALUES["url_ipv4"],
                 },
             ),
             (
                 {
                     "label": "ipv6_address",
-                    "sl4f_server_address": _MOCK_ARGS["sl4f_server_address_ipv6"],
+                    "sl4f_server_address": _MOCK_ARGS[
+                        "sl4f_server_address_ipv6"
+                    ],
                     "expected_url": _EXPECTED_VALUES["url_ipv6"],
                 },
             ),
@@ -126,7 +134,9 @@ class Sl4fTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(sl4f.SL4F, "_get_sl4f_server_address", autospec=True)
-    def test_sl4f_url(self, parameterized_dict, mock_get_sl4f_server_address) -> None:
+    def test_sl4f_url(
+        self, parameterized_dict, mock_get_sl4f_server_address
+    ) -> None:
         """Testcase for SL4F.url property.
 
         It also tests SL4F._get_ip_version()."""
@@ -223,7 +233,9 @@ class Sl4fTests(unittest.TestCase):
         method: str = parameterized_dict["method"]
         optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
-        response: Dict[str, Any] = self.sl4f_obj.run(method=method, **optional_params)
+        response: Dict[str, Any] = self.sl4f_obj.run(
+            method=method, **optional_params
+        )
 
         self.assertEqual(response, parameterized_dict["mock_http_response"])
 
@@ -248,7 +260,9 @@ class Sl4fTests(unittest.TestCase):
         """Testcase for SL4F.run() failure case when there is 'error' in SL4F
         response received"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.run(method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0)
+            self.sl4f_obj.run(
+                method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
+            )
 
         mock_sl4f_url.assert_called()
         mock_send_http_request.assert_called()
@@ -271,7 +285,9 @@ class Sl4fTests(unittest.TestCase):
         """Testcase for SL4F.run() failure case when there is an exception
         thrown while sending HTTP request"""
         with self.assertRaises(errors.Sl4fError):
-            self.sl4f_obj.run(method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0)
+            self.sl4f_obj.run(
+                method=_MOCK_ARGS["sl4f_request"], attempts=5, interval=0
+            )
 
         mock_sl4f_url.assert_called()
         mock_send_http_request.assert_called_once()
@@ -332,7 +348,9 @@ class Sl4fTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(sl4f.ffx_transport.FFX, "get_target_ssh_address", autospec=True)
+    @mock.patch.object(
+        sl4f.ffx_transport.FFX, "get_target_ssh_address", autospec=True
+    )
     def test_get_sl4f_server_address(
         self, parameterized_dict, mock_get_target_ssh_address
     ) -> None:
@@ -387,7 +405,9 @@ class Sl4fTests(unittest.TestCase):
     )
     def test_normalize_ip_addr(self, parameterized_dict) -> None:
         """Test case for FuchsiaDeviceBase._normalize_ip_addr()"""
-        with mock.patch.object(sl4f.sys, "version_info", parameterized_dict["py_ver"]):
+        with mock.patch.object(
+            sl4f.sys, "version_info", parameterized_dict["py_ver"]
+        ):
             self.assertEqual(
                 self.sl4f_obj._normalize_ip_addr(parameterized_dict["ip"]),
                 parameterized_dict["expected"],

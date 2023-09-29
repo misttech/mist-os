@@ -187,7 +187,9 @@ class AsyncCommand:
 
         try:
 
-            async def make_process(output_pipe: typing.Union[int, typing.TextIO]):
+            async def make_process(
+                output_pipe: typing.Union[int, typing.TextIO]
+            ):
                 return await asyncio.subprocess.create_subprocess_exec(
                     program,
                     *args,
@@ -222,7 +224,9 @@ class AsyncCommand:
 
             return AsyncCommand(command, base_command, timeout=timeout)
         except FileNotFoundError as e:
-            raise AsyncCommandError(f"The program '{e.filename}' was not found.")
+            raise AsyncCommandError(
+                f"The program '{e.filename}' was not found."
+            )
         except Exception as e:
             raise AsyncCommandError(f"An unknown error occurred: {e}")
 
@@ -314,7 +318,9 @@ class AsyncCommand:
             async for line in input_stream:
                 await self._event_queue.put(event_type(text=line))
 
-        async def timeout_handler(timeout: float, timeout_signal: asyncio.Event):
+        async def timeout_handler(
+            timeout: float, timeout_signal: asyncio.Event
+        ):
             """Handle timeouts.
 
             We first send SIGTERM after the timeout, and if the program has

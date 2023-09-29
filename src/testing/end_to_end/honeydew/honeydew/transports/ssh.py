@@ -34,7 +34,8 @@ _OPTIONS_LIST: List[str] = [
 ]
 _OPTIONS: str = " ".join(_OPTIONS_LIST)
 _SSH_COMMAND: str = (
-    "ssh {options} -i {private_key} -p {port} " "{username}@{ip_address} {command}"
+    "ssh {options} -i {private_key} -p {port} "
+    "{username}@{ip_address} {command}"
 )
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -60,7 +61,9 @@ class SSH:
         self._private_key: str = private_key
         self._username: str = username or _DEFAULTS["USERNAME"]
 
-    def check_connection(self, timeout: float = _TIMEOUTS["CONNECTION"]) -> None:
+    def check_connection(
+        self, timeout: float = _TIMEOUTS["CONNECTION"]
+    ) -> None:
         """Checks the SSH connection from host to Fuchsia device.
 
         Args:
@@ -85,7 +88,9 @@ class SSH:
             )
         _LOGGER.debug("%s is available via ssh.", self._name)
 
-    def run(self, command: str, timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]) -> str:
+    def run(
+        self, command: str, timeout: float = _TIMEOUTS["COMMAND_RESPONSE"]
+    ) -> str:
         """Run command on Fuchsia device from host via SSH and return output.
 
         Args:
@@ -100,7 +105,9 @@ class SSH:
             errors.FfxCommandError: If failed to get the target SSH address.
         """
         ffx = ffx_transport.FFX(target=self._name)
-        target_ssh_address: custom_types.TargetSshAddress = ffx.get_target_ssh_address()
+        target_ssh_address: custom_types.TargetSshAddress = (
+            ffx.get_target_ssh_address()
+        )
 
         ssh_command: str = _SSH_COMMAND.format(
             options=_OPTIONS,
@@ -116,14 +123,20 @@ class SSH:
                 ssh_command.split(), timeout=timeout
             ).decode()
             _LOGGER.debug(
-                "Output returned by SSH command '%s' is: '%s'", ssh_command, output
+                "Output returned by SSH command '%s' is: '%s'",
+                ssh_command,
+                output,
             )
             return output
         except subprocess.CalledProcessError as err:
             if err.stdout:
-                _LOGGER.debug("stdout returned by the command is: %s", err.stdout)
+                _LOGGER.debug(
+                    "stdout returned by the command is: %s", err.stdout
+                )
             if err.stderr:
-                _LOGGER.debug("stderr returned by the command is: %s", err.stdout)
+                _LOGGER.debug(
+                    "stderr returned by the command is: %s", err.stdout
+                )
 
             raise errors.SSHCommandError(err) from err
         except Exception as err:  # pylint: disable=broad-except

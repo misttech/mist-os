@@ -27,7 +27,9 @@ class PackageRepository:
 
     @classmethod
     @functools.lru_cache()
-    def from_env(cls, exec_env: environment.ExecutionEnvironment) -> typing.Self:
+    def from_env(
+        cls, exec_env: environment.ExecutionEnvironment
+    ) -> typing.Self:
         """Create a package repository wrapper from an environment.
 
         Args:
@@ -63,4 +65,6 @@ class PackageRepository:
             return cls(name_to_merkle)
 
         except Exception as e:
-            raise PackageRepositoryError(f"Error loading package repository: {e}")
+            raise PackageRepositoryError(
+                f"Error loading package repository: {e}"
+            )

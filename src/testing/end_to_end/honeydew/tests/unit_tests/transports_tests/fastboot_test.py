@@ -28,7 +28,10 @@ _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: Dict[str, Any] = {
     "serial": _USB_BASED_FASTBOOT_NODE_ID,
     "target_type": "someproduct_latest_eng.someproduct",
     "target_state": "Product",
-    "addresses": ["fe80::de1d:c975:e647:cf39%zx-d88c799b0e3b", "172.16.243.231"],
+    "addresses": [
+        "fe80::de1d:c975:e647:cf39%zx-d88c799b0e3b",
+        "172.16.243.231",
+    ],
     "is_default": True,
 }
 
@@ -131,10 +134,15 @@ class FastbootTests(unittest.TestCase):
     def test_node_id_when_fastboot_node_id_passed(self) -> None:
         """Testcase for Fastboot.node_id when `fastboot_node_id` arg was passed
         during initialization"""
-        self.assertEqual(self.fastboot_obj.node_id, _INPUT_ARGS["fastboot_node_id"])
+        self.assertEqual(
+            self.fastboot_obj.node_id, _INPUT_ARGS["fastboot_node_id"]
+        )
 
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fuchsia_mode", return_value=False, autospec=True
+        fastboot.Fastboot,
+        "is_in_fuchsia_mode",
+        return_value=False,
+        autospec=True,
     )
     def test_boot_to_fastboot_mode_when_not_in_fuchsia_mode(
         self, mock_is_in_fuchsia_mode
@@ -146,10 +154,15 @@ class FastbootTests(unittest.TestCase):
 
         mock_is_in_fuchsia_mode.assert_called()
 
-    @mock.patch.object(fastboot.Fastboot, "_wait_for_fastboot_mode", autospec=True)
+    @mock.patch.object(
+        fastboot.Fastboot, "_wait_for_fastboot_mode", autospec=True
+    )
     @mock.patch.object(fastboot.ffx_transport.FFX, "run", autospec=True)
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fuchsia_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fuchsia_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_boot_to_fastboot_mode_when_in_fuchsia_mode(
         self, mock_is_in_fuchsia_mode, mock_ffx_run, mock_wait_for_fastboot_mode
@@ -169,7 +182,10 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fuchsia_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fuchsia_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_boot_to_fastboot_mode_failed(
         self, mock_is_in_fuchsia_mode, mock_ffx_run
@@ -183,7 +199,10 @@ class FastbootTests(unittest.TestCase):
         mock_ffx_run.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=False, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=False,
+        autospec=True,
     )
     def test_boot_to_fuchsia_mode_when_not_in_fastboot_mode(
         self, mock_is_in_fastboot_mode
@@ -195,13 +214,21 @@ class FastbootTests(unittest.TestCase):
 
         mock_is_in_fastboot_mode.assert_called()
 
-    @mock.patch.object(fastboot.Fastboot, "_wait_for_fuchsia_mode", autospec=True)
+    @mock.patch.object(
+        fastboot.Fastboot, "_wait_for_fuchsia_mode", autospec=True
+    )
     @mock.patch.object(fastboot.Fastboot, "run", autospec=True)
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_boot_to_fuchsia_mode_when_in_fastboot_mode(
-        self, mock_is_in_fastboot_mode, mock_fastboot_run, mock_wait_for_fuchsia_mode
+        self,
+        mock_is_in_fastboot_mode,
+        mock_fastboot_run,
+        mock_wait_for_fuchsia_mode,
     ) -> None:
         """Test case for Fastboot.boot_to_fuchsia_mode() when device is in
         fastboot mode"""
@@ -218,7 +245,10 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_boot_to_fuchsia_mode_failed(
         self, mock_is_in_fastboot_mode, mock_fastboot_run
@@ -265,9 +295,12 @@ class FastbootTests(unittest.TestCase):
         self, parameterized_dict, mock_get_target_info
     ) -> None:
         """Test case for Fastboot.is_in_fastboot_mode()"""
-        mock_get_target_info.side_effect = [parameterized_dict["ffx_target_info"]]
+        mock_get_target_info.side_effect = [
+            parameterized_dict["ffx_target_info"]
+        ]
         self.assertEqual(
-            self.fastboot_obj.is_in_fastboot_mode(), parameterized_dict["expected"]
+            self.fastboot_obj.is_in_fastboot_mode(),
+            parameterized_dict["expected"],
         )
         mock_get_target_info.assert_called()
 
@@ -290,7 +323,9 @@ class FastbootTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
-    @mock.patch.object(fastboot.ffx_transport.FFX, "is_target_connected", autospec=True)
+    @mock.patch.object(
+        fastboot.ffx_transport.FFX, "is_target_connected", autospec=True
+    )
     def test_is_in_fuchsia_mode(
         self, parameterized_dict, mock_ffx_is_target_connected
     ) -> None:
@@ -299,14 +334,20 @@ class FastbootTests(unittest.TestCase):
             "is_target_connected"
         ]
         self.assertEqual(
-            self.fastboot_obj.is_in_fuchsia_mode(), parameterized_dict["expected"]
+            self.fastboot_obj.is_in_fuchsia_mode(),
+            parameterized_dict["expected"],
         )
         mock_ffx_is_target_connected.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=False, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=False,
+        autospec=True,
     )
-    def test_run_when_not_in_fastboot_mode(self, mock_is_in_fastboot_mode) -> None:
+    def test_run_when_not_in_fastboot_mode(
+        self, mock_is_in_fastboot_mode
+    ) -> None:
         """Test case for Fastboot.run() when device is not in fastboot mode."""
         with self.assertRaises(errors.FuchsiaStateError):
             self.fastboot_obj.run(cmd=_INPUT_ARGS["run_cmd"])
@@ -319,7 +360,10 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_run_when_in_fastboot_mode_success(
         self, mock_is_in_fastboot_mode, mock_subprocess_check_output
@@ -369,14 +413,22 @@ class FastbootTests(unittest.TestCase):
     )
     @mock.patch.object(fastboot.subprocess, "check_output", autospec=True)
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_run_when_in_fastboot_mode_exceptions(
-        self, parameterized_dict, mock_is_in_fastboot_mode, mock_subprocess_check_output
+        self,
+        parameterized_dict,
+        mock_is_in_fastboot_mode,
+        mock_subprocess_check_output,
     ) -> None:
         """Test case for Fastboot.run() when device is in fastboot mode and
         returns in exceptions."""
-        mock_subprocess_check_output.side_effect = parameterized_dict["check_output"]
+        mock_subprocess_check_output.side_effect = parameterized_dict[
+            "check_output"
+        ]
 
         with self.assertRaises(parameterized_dict["expected_exception"]):
             self.fastboot_obj.run(cmd=_INPUT_ARGS["run_cmd"])
@@ -391,7 +443,10 @@ class FastbootTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fastboot.Fastboot, "is_in_fastboot_mode", return_value=True, autospec=True
+        fastboot.Fastboot,
+        "is_in_fastboot_mode",
+        return_value=True,
+        autospec=True,
     )
     def test_run_when_in_fastboot_mode_with_exceptions_to_skip(
         self, mock_is_in_fastboot_mode, mock_subprocess_check_output
@@ -436,8 +491,12 @@ class FastbootTests(unittest.TestCase):
         mock_fastboot_get_target_info.assert_called()
 
     @mock.patch.object(fastboot.Fastboot, "boot_to_fuchsia_mode", autospec=True)
-    @mock.patch.object(fastboot.Fastboot, "_wait_for_valid_tcp_address", autospec=True)
-    @mock.patch.object(fastboot.Fastboot, "boot_to_fastboot_mode", autospec=True)
+    @mock.patch.object(
+        fastboot.Fastboot, "_wait_for_valid_tcp_address", autospec=True
+    )
+    @mock.patch.object(
+        fastboot.Fastboot, "boot_to_fastboot_mode", autospec=True
+    )
     @mock.patch.object(
         fastboot.Fastboot,
         "_get_target_info",
@@ -487,18 +546,26 @@ class FastbootTests(unittest.TestCase):
         return_value=_FFX_TARGET_LIST_WHEN_IN_FUCHSIA_MODE,
         autospec=True,
     )
-    def test_get_target_info_when_connected(self, mock_ffx_get_target_list) -> None:
+    def test_get_target_info_when_connected(
+        self, mock_ffx_get_target_list
+    ) -> None:
         """Test case for Fastboot._get_target_info() when device is
         connected."""
         self.assertEqual(
-            self.fastboot_obj._get_target_info(), _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE
+            self.fastboot_obj._get_target_info(),
+            _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
         )
         mock_ffx_get_target_list.assert_called()
 
     @mock.patch.object(
-        fastboot.ffx_transport.FFX, "get_target_list", return_value=[], autospec=True
+        fastboot.ffx_transport.FFX,
+        "get_target_list",
+        return_value=[],
+        autospec=True,
     )
-    def test_get_target_info_when_not_connected(self, mock_ffx_get_target_list) -> None:
+    def test_get_target_info_when_not_connected(
+        self, mock_ffx_get_target_list
+    ) -> None:
         """Test case for Fastboot._get_target_info() when device is not
         connected."""
         with self.assertRaises(errors.FfxCommandError):
@@ -538,7 +605,8 @@ class FastbootTests(unittest.TestCase):
             "get_target_info"
         ]
         self.assertEqual(
-            self.fastboot_obj._is_a_single_ip_address(), parameterized_dict["expected"]
+            self.fastboot_obj._is_a_single_ip_address(),
+            parameterized_dict["expected"],
         )
         mock_fastboot_get_target_info.assert_called()
 
@@ -554,7 +622,9 @@ class FastbootTests(unittest.TestCase):
         side_effect=errors.HoneyDewTimeoutError("error"),
         autospec=True,
     )
-    def test_wait_for_fastboot_mode_exception(self, mock_wait_for_state) -> None:
+    def test_wait_for_fastboot_mode_exception(
+        self, mock_wait_for_state
+    ) -> None:
         """Test case for Fastboot._wait_for_fastboot_mode() failure case."""
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj._wait_for_fastboot_mode()
@@ -579,7 +649,9 @@ class FastbootTests(unittest.TestCase):
         mock_wait_for_state.assert_called()
 
     @mock.patch.object(fastboot.common, "wait_for_state", autospec=True)
-    def test_wait_for_valid_tcp_address_success(self, mock_wait_for_state) -> None:
+    def test_wait_for_valid_tcp_address_success(
+        self, mock_wait_for_state
+    ) -> None:
         """Test case for Fastboot._wait_for_valid_tcp_address() success case."""
         self.fastboot_obj._wait_for_valid_tcp_address()
         mock_wait_for_state.assert_called()
@@ -590,7 +662,9 @@ class FastbootTests(unittest.TestCase):
         side_effect=errors.HoneyDewTimeoutError("error"),
         autospec=True,
     )
-    def test_wait_for_valid_tcp_address_exception(self, mock_wait_for_state) -> None:
+    def test_wait_for_valid_tcp_address_exception(
+        self, mock_wait_for_state
+    ) -> None:
         """Test case for Fastboot._wait_for_valid_tcp_address() failure case."""
         with self.assertRaises(errors.FuchsiaDeviceError):
             self.fastboot_obj._wait_for_valid_tcp_address()

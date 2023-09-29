@@ -8,7 +8,9 @@ from honeydew.affordances.sl4f.bluetooth import bluetooth_common
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 
 
-class BluetoothGap(bluetooth_common.BluetoothCommon, bluetooth_gap.BluetoothGap):
+class BluetoothGap(
+    bluetooth_common.BluetoothCommon, bluetooth_gap.BluetoothGap
+):
     """BluetoothGap Common affordance implementation using SL4F.
 
     Args:

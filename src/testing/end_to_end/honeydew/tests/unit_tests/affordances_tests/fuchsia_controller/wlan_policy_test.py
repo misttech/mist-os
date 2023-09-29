@@ -6,7 +6,9 @@
 
 import unittest
 
-from honeydew.affordances.fuchsia_controller.wlan import wlan_policy as fc_wlan_policy
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy as fc_wlan_policy,
+)
 from honeydew.typing.wlan import SecurityType
 
 

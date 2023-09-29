@@ -51,13 +51,16 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_get_target_name(self) -> None:
         """Test case for FFX.get_target_name()."""
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
-        asserts.assert_equal(self.device.ffx.get_target_name(), self.device.device_name)
+        asserts.assert_equal(
+            self.device.ffx.get_target_name(), self.device.device_name
+        )
 
     def test_get_target_ssh_address(self) -> None:
         """Test case for FFX.get_target_ssh_address()."""
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
         asserts.assert_is_instance(
-            self.device.ffx.get_target_ssh_address(), custom_types.TargetSshAddress
+            self.device.ffx.get_target_ssh_address(),
+            custom_types.TargetSshAddress,
         )
 
     def test_get_target_type(self) -> None:

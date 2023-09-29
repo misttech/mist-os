@@ -32,7 +32,9 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 class TracingFCTests(unittest.TestCase):
     """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
-    @mock.patch.object(fc_transport.fuchsia_controller, "Context", autospec=True)
+    @mock.patch.object(
+        fc_transport.fuchsia_controller, "Context", autospec=True
+    )
     def setUp(self, _mock_fc_context) -> None:
         super().setUp()
         self.device_name: str = "fuchsia-emulator"
@@ -157,9 +159,9 @@ class TracingFCTests(unittest.TestCase):
 
         # Check whether an `errors.FuchsiaStateError` exception is raised when
         # state is not valid.
-        if not parameterized_dict.get("session_initialized") or parameterized_dict.get(
-            "tracing_active"
-        ):
+        if not parameterized_dict.get(
+            "session_initialized"
+        ) or parameterized_dict.get("tracing_active"):
             with self.assertRaises(errors.FuchsiaStateError):
                 self.tracing_obj.start()
         else:
@@ -175,7 +177,9 @@ class TracingFCTests(unittest.TestCase):
         "start_tracing",
         new_callable=mock.AsyncMock,
     )
-    def test_start_error(self, mock_tracingcontroller_start, *unused_args) -> None:
+    def test_start_error(
+        self, mock_tracingcontroller_start, *unused_args
+    ) -> None:
         """Test for Tracing.start() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.tracing_obj.initialize()
@@ -261,7 +265,9 @@ class TracingFCTests(unittest.TestCase):
         "stop_tracing",
         new_callable=mock.AsyncMock,
     )
-    def test_stop_error(self, mock_tracingcontroller_stop, *unused_args) -> None:
+    def test_stop_error(
+        self, mock_tracingcontroller_stop, *unused_args
+    ) -> None:
         """Test for Tracing.stop() when the FIDL call raises an error.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         self.tracing_obj.initialize()
@@ -389,7 +395,10 @@ class TracingFCTests(unittest.TestCase):
             bytes(return_value, encoding="utf-8"),
             fc.ZxStatus(fc.ZxStatus.ZX_ERR_PEER_CLOSED),
         ]
-        mock_fc_socket.create.return_value = (mock.MagicMock(), mock_client_socket)
+        mock_fc_socket.create.return_value = (
+            mock.MagicMock(),
+            mock_client_socket,
+        )
 
         # Perform setup based on parameters.
         if parameterized_dict.get("session_initialized"):

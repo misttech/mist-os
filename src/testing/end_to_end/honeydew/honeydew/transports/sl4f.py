@@ -75,7 +75,9 @@ class SL4F:
         )
 
         if self._get_ip_version(sl4f_server_address.ip) == 6:
-            return f"http://[{sl4f_server_address.ip}]:{sl4f_server_address.port}"
+            return (
+                f"http://[{sl4f_server_address.ip}]:{sl4f_server_address.port}"
+            )
         else:
             return f"http://{sl4f_server_address.ip}:{sl4f_server_address.port}"
 
@@ -92,7 +94,9 @@ class SL4F:
         device_name: str = get_device_name_resp["result"]
 
         if device_name != self._name:
-            raise errors.Sl4fError(f"Failed to start SL4F server on '{self._name}'.")
+            raise errors.Sl4fError(
+                f"Failed to start SL4F server on '{self._name}'."
+            )
 
     def run(
         self,
@@ -206,7 +210,9 @@ class SL4F:
         # Device addr is localhost, assume that means that ports were forwarded
         # from a remote workstation/laptop with a device attached.
         sl4f_port: int = _SL4F_PORT["LOCAL"]
-        if ipaddress.ip_address(self._normalize_ip_addr(sl4f_server_ip)).is_loopback:
+        if ipaddress.ip_address(
+            self._normalize_ip_addr(sl4f_server_ip)
+        ).is_loopback:
             sl4f_port = _SL4F_PORT["REMOTE"]
 
         return custom_types.Sl4fServerAddress(ip=sl4f_server_ip, port=sl4f_port)

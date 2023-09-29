@@ -146,7 +146,9 @@ class InitTests(unittest.TestCase):
         "start_server",
         autospec=True,
     )
-    @mock.patch("honeydew._get_device_class", return_value=sl4f_x64.X64, autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class", return_value=sl4f_x64.X64, autospec=True
+    )
     def test_create_device_return_sl4f_specific_device(
         self,
         parameterized_dict,
@@ -231,7 +233,9 @@ class InitTests(unittest.TestCase):
         return_value=_MOCK_ARGS["ffx_config"],
         autospec=True,
     )
-    @mock.patch("honeydew._get_device_class", return_value=fc_x64.X64, autospec=True)
+    @mock.patch(
+        "honeydew._get_device_class", return_value=fc_x64.X64, autospec=True
+    )
     def test_create_device_return_fc_specific_device(
         self,
         mock_get_device_class,
@@ -291,7 +295,9 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it returns a device
         from an IpPort."""
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse("[::1]:8088")
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8088"
+        )
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = device_name
@@ -347,7 +353,9 @@ class InitTests(unittest.TestCase):
         """Test case for honeydew.create_device() where it raises an error due
         to an exception in add_target."""
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse("[::1]:8022")
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022"
+        )
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.add_target.side_effect = subprocess.CalledProcessError(
@@ -405,7 +413,9 @@ class InitTests(unittest.TestCase):
         because the returned target name is different from the given one."""
 
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse("[::1]:8022")
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022"
+        )
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = "not-a-fuchsia-name"
@@ -460,7 +470,9 @@ class InitTests(unittest.TestCase):
         target since it is already registered."""
 
         device_name = "fuchsia-1234"
-        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse("[::1]:8022")
+        device_ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "[::1]:8022"
+        )
 
         mock_ffx.return_value = mock_ffx
         mock_ffx.get_target_name.return_value = "fuchsia-1234"
@@ -556,7 +568,9 @@ class InitTests(unittest.TestCase):
 
     def test_get_device_classes(self) -> None:
         """Test case for honeydew.get_device_classes()."""
-        device_classes_path: str = os.path.dirname(honeydew.device_classes.__file__)
+        device_classes_path: str = os.path.dirname(
+            honeydew.device_classes.__file__
+        )
         device_classes_module: str = honeydew._DEVICE_CLASSES_MODULE
         expected_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]] = {
             honeydew.device_classes.sl4f.fuchsia_device.FuchsiaDevice,
@@ -569,7 +583,9 @@ class InitTests(unittest.TestCase):
             honeydew.device_classes.fuchsia_controller.x64.X64,
         }
         self.assertEqual(
-            honeydew.get_device_classes(device_classes_path, device_classes_module),
+            honeydew.get_device_classes(
+                device_classes_path, device_classes_module
+            ),
             expected_device_classes,
         )
 
@@ -598,19 +614,31 @@ class InitTests(unittest.TestCase):
     )
     def test_register_device_classes(self, parameterized_dict) -> None:
         """Test case for honeydew.register_device_classes()."""
-        fuchsia_device_classes: Any = parameterized_dict["fuchsia_device_classes"]
-        honeydew.register_device_classes(fuchsia_device_classes=fuchsia_device_classes)
+        fuchsia_device_classes: Any = parameterized_dict[
+            "fuchsia_device_classes"
+        ]
+        honeydew.register_device_classes(
+            fuchsia_device_classes=fuchsia_device_classes
+        )
         self.assertTrue(
-            set(fuchsia_device_classes).issubset(honeydew._REGISTERED_DEVICE_CLASSES)
+            set(fuchsia_device_classes).issubset(
+                honeydew._REGISTERED_DEVICE_CLASSES
+            )
         )
 
     # List all the tests related to private methods in alphabetical order
     @mock.patch(
-        "honeydew.get_device_classes", return_value={sl4f_x64.X64}, autospec=True
+        "honeydew.get_device_classes",
+        return_value={sl4f_x64.X64},
+        autospec=True,
     )
-    def test_get_all_register_device_classes(self, mock_get_device_classes) -> None:
+    def test_get_all_register_device_classes(
+        self, mock_get_device_classes
+    ) -> None:
         """Test case for honeydew._get_all_register_device_classes()."""
-        self.assertEqual(honeydew._get_all_register_device_classes(), {sl4f_x64.X64})
+        self.assertEqual(
+            honeydew._get_all_register_device_classes(), {sl4f_x64.X64}
+        )
         mock_get_device_classes.assert_called_once()
 
     @mock.patch.object(
@@ -644,7 +672,10 @@ class InitTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        honeydew.ffx_transport.FFX, "get_target_type", return_value="x64", autospec=True
+        honeydew.ffx_transport.FFX,
+        "get_target_type",
+        return_value="x64",
+        autospec=True,
     )
     def test_get_device_class_return_specific_sl4f_device(
         self, mock_get_target_type, mock_get_all_register_device_classes
@@ -695,7 +726,10 @@ class InitTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        honeydew.ffx_transport.FFX, "get_target_type", return_value="x64", autospec=True
+        honeydew.ffx_transport.FFX,
+        "get_target_type",
+        return_value="x64",
+        autospec=True,
     )
     def test_get_device_class_return_specific_fc_device(
         self, mock_get_target_type, mock_get_all_register_device_classes

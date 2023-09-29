@@ -84,7 +84,12 @@ class TracingSL4FTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ({"label": "when_session_is_initialized", "session_initialized": True},),
+            (
+                {
+                    "label": "when_session_is_initialized",
+                    "session_initialized": True,
+                },
+            ),
             (
                 {
                     "label": "when_session_is_not_initialized",
@@ -185,7 +190,9 @@ class TracingSL4FTests(unittest.TestCase):
                     "label": "with_tracing_download_default_file_name",
                     "session_initialized": True,
                     "return_value": {
-                        "data": base64.b64encode("samp_trace_data".encode("utf-8")),
+                        "data": base64.b64encode(
+                            "samp_trace_data".encode("utf-8")
+                        ),
                     },
                 },
             ),
@@ -195,7 +202,9 @@ class TracingSL4FTests(unittest.TestCase):
                     "session_initialized": True,
                     "trace_file": "trace.fxt",
                     "return_value": {
-                        "data": base64.b64encode("samp_trace_data".encode("utf-8")),
+                        "data": base64.b64encode(
+                            "samp_trace_data".encode("utf-8")
+                        ),
                     },
                 },
             ),

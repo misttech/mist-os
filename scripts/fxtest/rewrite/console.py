@@ -121,7 +121,9 @@ async def console_printer(
         if do_status_output_event.is_set():
             status_lines = _create_status_lines_from_state(flags, state)
 
-            termout.write_lines(status_lines[: flags.status_lines], lines_to_print)
+            termout.write_lines(
+                status_lines[: flags.status_lines], lines_to_print
+            )
         elif lines_to_print:
             print("\n".join(lines_to_print))
 
@@ -194,7 +196,9 @@ class TaskStatus:
 
     def total_tasks(self) -> int:
         return (
-            self.tasks_running + self.tasks_complete + self.tasks_queued_but_not_running
+            self.tasks_running
+            + self.tasks_complete
+            + self.tasks_queued_but_not_running
         )
 
 
@@ -262,7 +266,9 @@ def _create_status_lines_from_state(
 
 def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     # Generate a mapping of each duration to its children.
-    duration_children: typing.Dict[event.Id, typing.List[event.Id]] = defaultdict(list)
+    duration_children: typing.Dict[
+        event.Id, typing.List[event.Id]
+    ] = defaultdict(list)
     all_durations: typing.Dict[event.Id, DurationInfo] = dict()
 
     for id, duration in chain(
@@ -292,7 +298,9 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
 
     # Stack of duration event.Ids to process. Second
     # element of the tuple tracks indent level.
-    work_stack: typing.List[typing.Tuple[event.Id, int]] = [(event.GLOBAL_RUN_ID, 0)]
+    work_stack: typing.List[typing.Tuple[event.Id, int]] = [
+        (event.GLOBAL_RUN_ID, 0)
+    ]
     while work_stack:
         id, indent = work_stack.pop()
         info: DurationInfo | None = None
@@ -315,7 +323,9 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
                     )
                     / info.expected_child_tasks,
                 )
-            duration_print_infos.append(DurationPrintInfo(info, indent, progress))
+            duration_print_infos.append(
+                DurationPrintInfo(info, indent, progress)
+            )
 
         if info is not None and info.hide_children:
             # Skip processing children of this duration for display.
@@ -339,7 +349,9 @@ def _produce_task_status_from_state(state: ConsoleState) -> TaskStatus:
     )
 
 
-def _format_duration_lines(flags: args.Flags, status: TaskStatus) -> typing.List[str]:
+def _format_duration_lines(
+    flags: args.Flags, status: TaskStatus
+) -> typing.List[str]:
     """Given the processed status for all tasks, format output based
     on the flags.
 
@@ -415,7 +427,9 @@ async def _console_event_loop(
             old_duration = state.active_durations.pop(next_event.id)
             state.complete_durations[next_event.id] = old_duration
             elapsed_time = next_event.timestamp - old_duration.start_monotonic
-            verbose_suffix = f" [duration={datetime.timedelta(seconds=elapsed_time)}]"
+            verbose_suffix = (
+                f" [duration={datetime.timedelta(seconds=elapsed_time)}]"
+            )
             if next_event.id == event.GLOBAL_RUN_ID:
                 state.end_duration = elapsed_time
 
@@ -437,17 +451,23 @@ async def _console_event_loop(
 
                 if next_event.id == event.GLOBAL_RUN_ID:
                     state.active_durations[next_event.id] = DurationInfo(
-                        "fx test", next_event.timestamp, parent=next_event.parent
+                        "fx test",
+                        next_event.timestamp,
+                        parent=next_event.parent,
                     )
                 elif next_event.payload.parsing_file is not None:
-                    styled_name = statusinfo.highlight("parsing", style=flags.style)
+                    styled_name = statusinfo.highlight(
+                        "parsing", style=flags.style
+                    )
                     state.active_durations[next_event.id] = DurationInfo(
                         f"{styled_name} {next_event.payload.parsing_file.name}",
                         next_event.timestamp,
                         parent=next_event.parent,
                     )
                 elif next_event.payload.program_execution is not None:
-                    styled_name = statusinfo.highlight("running", style=flags.style)
+                    styled_name = statusinfo.highlight(
+                        "running", style=flags.style
+                    )
                     state.active_durations[next_event.id] = DurationInfo(
                         f"{styled_name} {next_event.payload.program_execution.to_formatted_command_line()}",
                         next_event.timestamp,
@@ -458,7 +478,9 @@ async def _console_event_loop(
                     or next_event.payload.test_group is not None
                 ):
                     group: event.EventGroupPayload = next_event.payload.event_group or next_event.payload.test_group  # type: ignore
-                    styled_name = statusinfo.highlight(group.name, style=flags.style)
+                    styled_name = statusinfo.highlight(
+                        group.name, style=flags.style
+                    )
                     state.active_durations[next_event.id] = DurationInfo(
                         styled_name,
                         next_event.timestamp,
@@ -493,7 +515,9 @@ async def _console_event_loop(
                         style=flags.style,
                     )
                     state.active_durations[next_event.id] = DurationInfo(
-                        styled_name, next_event.timestamp, parent=next_event.parent
+                        styled_name,
+                        next_event.timestamp,
+                        parent=next_event.parent,
                     )
 
             if next_event.payload.process_env is not None:
@@ -538,7 +562,8 @@ async def _console_event_loop(
                 # Print a result to the user when tests are selected.
                 count = len(next_event.payload.test_selections.selected)
                 label = statusinfo.highlight(
-                    f"{count} test{'s' if count != 1 else ''}", style=flags.style
+                    f"{count} test{'s' if count != 1 else ''}",
+                    style=flags.style,
                 )
                 suffix = statusinfo.highlight(
                     f" {flags.count} times" if flags.count > 1 else "",
@@ -581,7 +606,8 @@ async def _console_event_loop(
                 ] = next_event.payload.test_suite_started.name
                 label = "Starting:"
                 val = statusinfo.green_highlight(
-                    next_event.payload.test_suite_started.name, style=flags.style
+                    next_event.payload.test_suite_started.name,
+                    style=flags.style,
                 )
                 # Explicitly mark if the suite is hermetic or not.
                 hermeticity = (
@@ -596,21 +622,29 @@ async def _console_event_loop(
                 assert next_event.id
                 payload = next_event.payload.test_suite_ended
                 if payload.status == event.TestSuiteStatus.PASSED:
-                    label = statusinfo.green_highlight("PASSED", style=flags.style)
+                    label = statusinfo.green_highlight(
+                        "PASSED", style=flags.style
+                    )
                 elif payload.status == event.TestSuiteStatus.FAILED:
-                    label = statusinfo.error_highlight("FAILED", style=flags.style)
+                    label = statusinfo.error_highlight(
+                        "FAILED", style=flags.style
+                    )
                 elif payload.status == event.TestSuiteStatus.SKIPPED:
                     label = statusinfo.highlight("SKIPPED", style=flags.style)
                 elif payload.status == event.TestSuiteStatus.ABORTED:
                     label = statusinfo.highlight("ABORTED", style=flags.style)
                 elif payload.status == event.TestSuiteStatus.TIMEOUT:
-                    label = statusinfo.error_highlight("TIMEOUT", style=flags.style)
+                    label = statusinfo.error_highlight(
+                        "TIMEOUT", style=flags.style
+                    )
                 else:
                     label = statusinfo.error_highlight(
                         "BUG: UNKNOWN", style=flags.style
                     )
 
-                state.test_results[payload.status].add(test_suite_names[next_event.id])
+                state.test_results[payload.status].add(
+                    test_suite_names[next_event.id]
+                )
 
                 suffix = ""
                 if payload.message:

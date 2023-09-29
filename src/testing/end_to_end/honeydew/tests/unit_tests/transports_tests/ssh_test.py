@@ -22,7 +22,9 @@ _INPUT_ARGS: Dict[str, Any] = {
 }
 
 _MOCK_ARGS: Dict[str, Any] = {
-    "target_ssh_address": custom_types.TargetSshAddress(ip="11.22.33.44", port=22),
+    "target_ssh_address": custom_types.TargetSshAddress(
+        ip="11.22.33.44", port=22
+    ),
 }
 
 
@@ -54,7 +56,9 @@ class SshTests(unittest.TestCase):
         side_effect=[subprocess.CalledProcessError, b"some output"],
         autospec=True,
     )
-    def test_ssh_check_connection_success(self, mock_ssh_run, mock_sleep) -> None:
+    def test_ssh_check_connection_success(
+        self, mock_ssh_run, mock_sleep
+    ) -> None:
         """Testcase for SSH.check_connection() success case"""
         self.ssh_obj.check_connection(timeout=5)
 
@@ -78,7 +82,10 @@ class SshTests(unittest.TestCase):
         mock_sleep.assert_called()
 
     @mock.patch.object(
-        ssh.subprocess, "check_output", return_value=b"some output", autospec=True
+        ssh.subprocess,
+        "check_output",
+        return_value=b"some output",
+        autospec=True,
     )
     @mock.patch.object(
         ssh.ffx_transport.FFX,
@@ -86,9 +93,13 @@ class SshTests(unittest.TestCase):
         return_value=_MOCK_ARGS["target_ssh_address"],
         autospec=True,
     )
-    def test_ssh_run(self, mock_get_target_ssh_address, mock_check_output) -> None:
+    def test_ssh_run(
+        self, mock_get_target_ssh_address, mock_check_output
+    ) -> None:
         """Testcase for SSH.run()"""
-        self.assertEqual(self.ssh_obj.run(command="some_command"), "some output")
+        self.assertEqual(
+            self.ssh_obj.run(command="some_command"), "some output"
+        )
 
         mock_get_target_ssh_address.assert_called()
         mock_check_output.assert_called()

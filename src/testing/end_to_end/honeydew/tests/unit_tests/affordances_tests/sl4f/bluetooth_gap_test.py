@@ -95,8 +95,18 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ({"label": "pair_classic", "transport": BluetoothTransport.CLASSIC},),
-            ({"label": "pair_low_energy", "transport": BluetoothTransport.LOW_ENERGY},),
+            (
+                {
+                    "label": "pair_classic",
+                    "transport": BluetoothTransport.CLASSIC,
+                },
+            ),
+            (
+                {
+                    "label": "pair_low_energy",
+                    "transport": BluetoothTransport.LOW_ENERGY,
+                },
+            ),
         ],
         name_func=_custom_test_name_func,
     )
@@ -104,7 +114,8 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         """Test for Bluetooth.connect_device() method."""
         dummy_identifier = "0"
         self.bluetooth_obj.connect_device(
-            identifier=dummy_identifier, transport=parameterized_dict["transport"]
+            identifier=dummy_identifier,
+            transport=parameterized_dict["transport"],
         )
 
         self.sl4f_obj.run.assert_called()
@@ -139,8 +150,18 @@ class BluetoothGapSL4FTests(unittest.TestCase):
 
     @parameterized.expand(
         [
-            ({"label": "pair_classic", "transport": BluetoothTransport.CLASSIC},),
-            ({"label": "pair_low_energy", "transport": BluetoothTransport.LOW_ENERGY},),
+            (
+                {
+                    "label": "pair_classic",
+                    "transport": BluetoothTransport.CLASSIC,
+                },
+            ),
+            (
+                {
+                    "label": "pair_low_energy",
+                    "transport": BluetoothTransport.LOW_ENERGY,
+                },
+            ),
         ],
         name_func=_custom_test_name_func,
     )
@@ -148,7 +169,8 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         """Test for Bluetooth.pair_device() method."""
         dummy_identifier = "0"
         self.bluetooth_obj.pair_device(
-            identifier=dummy_identifier, transport=parameterized_dict["transport"]
+            identifier=dummy_identifier,
+            transport=parameterized_dict["transport"],
         )
 
         self.sl4f_obj.run.assert_called()
@@ -162,7 +184,9 @@ class BluetoothGapSL4FTests(unittest.TestCase):
     )
     def test_request_discovery(self, parameterized_dict) -> None:
         """Test for Bluetooth.request_discovery() method."""
-        self.bluetooth_obj.request_discovery(discovery=parameterized_dict["discovery"])
+        self.bluetooth_obj.request_discovery(
+            discovery=parameterized_dict["discovery"]
+        )
 
         self.sl4f_obj.run.assert_called()
 

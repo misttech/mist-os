@@ -205,7 +205,10 @@ class FfxCliTests(unittest.TestCase):
         mock_is_target_connected.assert_called()
 
     @mock.patch.object(
-        ffx.FFX, "run", return_value=_MOCK_ARGS["ffx_target_show_output"], autospec=True
+        ffx.FFX,
+        "run",
+        return_value=_MOCK_ARGS["ffx_target_show_output"],
+        autospec=True,
     )
     def test_get_target_information_when_connected(self, mock_ffx_run) -> None:
         """Verify get_target_information() succeeds when target is connected to
@@ -225,7 +228,9 @@ class FfxCliTests(unittest.TestCase):
         ),
         autospec=True,
     )
-    def test_get_target_information_raises_timeout_expired(self, mock_ffx_run) -> None:
+    def test_get_target_information_raises_timeout_expired(
+        self, mock_ffx_run
+    ) -> None:
         """Verify get_target_information raising subprocess.TimeoutExpired."""
         with self.assertRaises(subprocess.TimeoutExpired):
             self.ffx_obj.get_target_information()
@@ -269,7 +274,10 @@ class FfxCliTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        ffx.FFX, "run", return_value=_MOCK_ARGS["ffx_target_list_output"], autospec=True
+        ffx.FFX,
+        "run",
+        return_value=_MOCK_ARGS["ffx_target_list_output"],
+        autospec=True,
     )
     def test_get_target_list(self, parameterized_dict, mock_ffx_run) -> None:
         """Test case for get_target_list()."""
@@ -301,7 +309,9 @@ class FfxCliTests(unittest.TestCase):
     def test_get_target_ssh_address(self, mock_ffx_run) -> None:
         """Verify get_target_ssh_address returns SSH information of the fuchsia
         device."""
-        self.assertEqual(self.ffx_obj.get_target_ssh_address(), _TARGET_SSH_ADDRESS)
+        self.assertEqual(
+            self.ffx_obj.get_target_ssh_address(), _TARGET_SSH_ADDRESS
+        )
         mock_ffx_run.assert_called()
 
     @parameterized.expand(
@@ -376,10 +386,13 @@ class FfxCliTests(unittest.TestCase):
         self, parameterized_dict, mock_get_target_list
     ) -> None:
         """Test case for is_target_connected()"""
-        mock_get_target_list.side_effect = [parameterized_dict["get_target_list"]]
+        mock_get_target_list.side_effect = [
+            parameterized_dict["get_target_list"]
+        ]
 
         self.assertEqual(
-            self.ffx_obj.is_target_connected(), parameterized_dict["expected_value"]
+            self.ffx_obj.is_target_connected(),
+            parameterized_dict["expected_value"],
         )
 
         mock_get_target_list.assert_called()
@@ -436,7 +449,10 @@ class FfxCliTests(unittest.TestCase):
         mock_subprocess_check_output.assert_called()
 
     @mock.patch.object(
-        ffx.subprocess, "check_output", side_effect=RuntimeError("error"), autospec=True
+        ffx.subprocess,
+        "check_output",
+        side_effect=RuntimeError("error"),
+        autospec=True,
     )
     def test_ffx_run_with_exceptions_to_skip(
         self, mock_subprocess_check_output
@@ -454,7 +470,9 @@ class FfxCliTests(unittest.TestCase):
     @mock.patch.object(ffx.subprocess, "check_output", autospec=True)
     def test_add_target(self, mock_subprocess_check_output) -> None:
         """Test case for ffx_cli.add_target()."""
-        ip_port: custom_types.IpPort = custom_types.IpPort.parse("127.0.0.1:8082")
+        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "127.0.0.1:8082"
+        )
         ffx.FFX.add_target(target_ip_port=ip_port)
 
         mock_subprocess_check_output.assert_called_once()
@@ -489,8 +507,12 @@ class FfxCliTests(unittest.TestCase):
         self, parameterized_dict, mock_subprocess_check_output
     ) -> None:
         """Verify ffx_cli.add_target raise exception in failure cases."""
-        ip_port: custom_types.IpPort = custom_types.IpPort.parse("127.0.0.1:8082")
-        mock_subprocess_check_output.side_effect = parameterized_dict["side_effect"]
+        ip_port: custom_types.IpPort = custom_types.IpPort.parse(
+            "127.0.0.1:8082"
+        )
+        mock_subprocess_check_output.side_effect = parameterized_dict[
+            "side_effect"
+        ]
 
         expected = parameterized_dict["expected"]
 
@@ -542,7 +564,9 @@ class FfxCliTests(unittest.TestCase):
         self, parameterized_dict, mock_ffx_get_target_information
     ) -> None:
         """Verify get_target_ssh_address raise exception in failure cases."""
-        mock_ffx_get_target_information.side_effect = parameterized_dict["side_effect"]
+        mock_ffx_get_target_information.side_effect = parameterized_dict[
+            "side_effect"
+        ]
 
         with self.assertRaises(errors.FfxCommandError):
             self.ffx_obj.get_target_name()

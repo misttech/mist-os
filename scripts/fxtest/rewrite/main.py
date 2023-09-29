@@ -83,7 +83,9 @@ async def async_main_wrapper(
 
 
 async def async_main(
-    flags: args.Flags, tasks: typing.List[asyncio.Task], recorder: event.EventRecorder
+    flags: args.Flags,
+    tasks: typing.List[asyncio.Task],
+    recorder: event.EventRecorder,
 ) -> int:
     """Main logic of fx test.
 
@@ -136,7 +138,9 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
     try:
         exec_env = environment.ExecutionEnvironment.initialize_from_args(flags)
     except environment.EnvironmentError as e:
-        recorder.emit_end(f"Failed to initialize environment: {e}\nDid you run fx set?")
+        recorder.emit_end(
+            f"Failed to initialize environment: {e}\nDid you run fx set?"
+        )
         return 1
     recorder.emit_process_env(exec_env.__dict__)
 
@@ -147,7 +151,9 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
                 log.writer(recorder, gzip.open(exec_env.log_file, "wt"))
             )
         )
-        recorder.emit_instruction_message(f"Logging all output to: {exec_env.log_file}")
+        recorder.emit_instruction_message(
+            f"Logging all output to: {exec_env.log_file}"
+        )
         recorder.emit_instruction_message(
             "Use the `--logpath` argument to specify a log location or `--no-log` to disable\n"
         )
@@ -217,7 +223,9 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_info_message("Selected the following tests:")
         for s in selections.selected:
             recorder.emit_info_message(f"  {s.info.name}")
-        recorder.emit_instruction_message("\nWill not run any tests, --dry specified")
+        recorder.emit_instruction_message(
+            "\nWill not run any tests, --dry specified"
+        )
         recorder.emit_end()
         return 0
 
@@ -259,12 +267,15 @@ async def load_test_list(
     # Load the tests.json file.
     try:
         parse_id = recorder.emit_start_file_parsing(
-            exec_env.relative_to_root(exec_env.test_json_file), exec_env.test_json_file
+            exec_env.relative_to_root(exec_env.test_json_file),
+            exec_env.test_json_file,
         )
         test_file_entries: typing.List[
             tests_json_file.TestEntry
         ] = tests_json_file.TestEntry.from_file(exec_env.test_json_file)
-        recorder.emit_test_file_loaded(test_file_entries, exec_env.test_json_file)
+        recorder.emit_test_file_loaded(
+            test_file_entries, exec_env.test_json_file
+        )
         recorder.emit_end(id=parse_id)
     except (tests_json_file.TestFileError, json.JSONDecodeError, IOError) as e:
         recorder.emit_end("Failed to parse: " + str(e), id=parse_id)
@@ -273,7 +284,8 @@ async def load_test_list(
     # Load the test-list.json file.
     try:
         parse_id = recorder.emit_start_file_parsing(
-            exec_env.relative_to_root(exec_env.test_list_file), exec_env.test_list_file
+            exec_env.relative_to_root(exec_env.test_list_file),
+            exec_env.test_list_file,
         )
         test_list_entries = test_list_file.TestListFile.entries_from_file(
             exec_env.test_list_file
@@ -290,7 +302,9 @@ async def load_test_list(
         )
         return tests
     except ValueError as e:
-        recorder.emit_end(f"tests.json and test-list.json are inconsistent: {e}")
+        recorder.emit_end(
+            f"tests.json and test-list.json are inconsistent: {e}"
+        )
         raise e
 
 
@@ -359,7 +373,9 @@ async def validate_test_selections(
                 # match thresholds due to this union, we adjust the
                 # threshold when there is more than a single value to
                 # match against.
-                all_args = group.names.union(group.components).union(group.packages)
+                all_args = group.names.union(group.components).union(
+                    group.packages
+                )
                 arg_threshold_pairs.append(
                     (
                         ",".join(list(all_args)),
@@ -516,7 +532,9 @@ def read_delivery_blob_type(
         int | None: The delivery blob type, if found. None otherwise.
     """
     expected_path = os.path.join(exec_env.out_dir, "delivery_blob_config.json")
-    id = recorder.emit_start_file_parsing("delivery_blob_config.json", expected_path)
+    id = recorder.emit_start_file_parsing(
+        "delivery_blob_config.json", expected_path
+    )
     if not os.path.isfile(expected_path):
         recorder.emit_end(
             error="Could not find delivery_blob_config.json in output", id=id
@@ -635,7 +653,9 @@ async def run_all_tests(
     """
     max_parallel = flags.parallel
     if tests.has_device_test() and not await has_device_connected(recorder):
-        recorder.emit_warning_message("\nCould not find a running package server.")
+        recorder.emit_warning_message(
+            "\nCould not find a running package server."
+        )
         recorder.emit_instruction_message(
             "\nYou do not seem to have a package server running, but you have selected at least one device test.\nEnsure that you have `fx serve` running and that you have selected your desired device using `fx set-device`.\n"
         )
@@ -683,7 +703,9 @@ async def run_all_tests(
 
         for exec in execs:
             if exec.is_hermetic():
-                run_state.hermetic_test_queue.put_nowait(ExecEntry(exec, abort_group))
+                run_state.hermetic_test_queue.put_nowait(
+                    ExecEntry(exec, abort_group)
+                )
             else:
                 run_state.non_hermetic_test_queue.put_nowait(
                     ExecEntry(exec, abort_group)
@@ -732,7 +754,9 @@ async def run_all_tests(
                 if not to_run.abort_group.is_set():
                     # Only run if this group was not already aborted.
                     command_line = " ".join(to_run.exec.command_line())
-                    recorder.emit_instruction_message(f"Command: {command_line}")
+                    recorder.emit_instruction_message(
+                        f"Command: {command_line}"
+                    )
 
                     # Wait for the command completion and any other signal that
                     # means we should stop running the test.
@@ -814,7 +838,9 @@ async def run_commands_in_parallel(
     assert recorder
 
     parent = recorder.emit_event_group(group_name, queued_events=len(commands))
-    output: typing.List[typing.Optional[command.CommandOutput]] = [None] * len(commands)
+    output: typing.List[typing.Optional[command.CommandOutput]] = [None] * len(
+        commands
+    )
     in_progress: typing.Set[asyncio.Task] = set()
 
     index = 0

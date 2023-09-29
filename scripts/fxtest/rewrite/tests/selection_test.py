@@ -42,7 +42,9 @@ class MatchGroupTest(unittest.TestCase):
     def test_parse_single(self):
         """Test parsing and formatting single arguments."""
         name_group = selection._parse_selection_command_line(["name"])
-        package_group = selection._parse_selection_command_line(["--package", "name"])
+        package_group = selection._parse_selection_command_line(
+            ["--package", "name"]
+        )
         component_group = selection._parse_selection_command_line(
             ["--component", "name"]
         )
@@ -70,7 +72,9 @@ class MatchGroupTest(unittest.TestCase):
         )
         self.assertEqual(len(groups), 1)
 
-        self.assertMatchContents(groups[0], {"name"}, {"package"}, {"component"})
+        self.assertMatchContents(
+            groups[0], {"name"}, {"package"}, {"component"}
+        )
         self.assertEqual(
             str(groups[0]),
             "name --and --package package --and --component component",
@@ -136,11 +140,15 @@ class MatchGroupTest(unittest.TestCase):
         # --package and --component require an argument
         self.assertRaises(
             selection.SelectionError,
-            lambda: selection._parse_selection_command_line(["value", "--component"]),
+            lambda: selection._parse_selection_command_line(
+                ["value", "--component"]
+            ),
         )
         self.assertRaises(
             selection.SelectionError,
-            lambda: selection._parse_selection_command_line(["value", "--package"]),
+            lambda: selection._parse_selection_command_line(
+                ["value", "--package"]
+            ),
         )
 
 
@@ -224,10 +232,13 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(host_selected.selected), 1)
         self.assertEqual(
-            host_selected.best_score["host_x64/baz"], selection.PERFECT_MATCH_DISTANCE
+            host_selected.best_score["host_x64/baz"],
+            selection.PERFECT_MATCH_DISTANCE,
         )
         self.assertEqual(
-            host_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"],
+            host_selected.best_score[
+                "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"
+            ],
             selection.NO_MATCH_DISTANCE,
         )
         self.assertFalse(host_selected.has_device_test())
@@ -237,11 +248,14 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(len(device_selected.selected), 1)
         self.assertEqual(
-            device_selected.best_score["fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"],
+            device_selected.best_score[
+                "fuchsia-pkg://fuchsia.com/foo#meta/bar.cm"
+            ],
             selection.PERFECT_MATCH_DISTANCE,
         )
         self.assertAlmostEqual(
-            device_selected.best_score["host_x64/baz"], selection.NO_MATCH_DISTANCE
+            device_selected.best_score["host_x64/baz"],
+            selection.NO_MATCH_DISTANCE,
         )
         self.assertTrue(device_selected.has_device_test())
 
@@ -255,8 +269,12 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         select_path = await selection.select_tests(tests, ["//src/tests"])
         select_name1 = await selection.select_tests(tests, ["foo-pkg"])
         select_name2 = await selection.select_tests(tests, ["bar-test"])
-        select_pkg = await selection.select_tests(tests, ["--package", "foo-pkg"])
-        select_cm = await selection.select_tests(tests, ["--component", "bar-test"])
+        select_pkg = await selection.select_tests(
+            tests, ["--package", "foo-pkg"]
+        )
+        select_cm = await selection.select_tests(
+            tests, ["--component", "bar-test"]
+        )
         url_prefix = await selection.select_tests(
             tests, ["fuchsia-pkg://fuchsia.com/foo-pkg"]
         )

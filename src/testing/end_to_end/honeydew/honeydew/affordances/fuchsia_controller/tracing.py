@@ -41,7 +41,9 @@ class Tracing(tracing.Tracing):
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: Optional[f_tracingcontroller.Controller.Client]
+        self._trace_controller_proxy: Optional[
+            f_tracingcontroller.Controller.Client
+        ]
         self._trace_socket: Optional[fc.Socket]
         self._session_initialized: bool
         self._tracing_active: bool
@@ -62,7 +64,9 @@ class Tracing(tracing.Tracing):
 
     # List all the public methods in alphabetical order
     def initialize(
-        self, categories: Optional[List[str]] = None, buffer_size: Optional[int] = None
+        self,
+        categories: Optional[List[str]] = None,
+        buffer_size: Optional[int] = None,
     ) -> None:
         """Initializes a trace session.
 
@@ -83,7 +87,9 @@ class Tracing(tracing.Tracing):
 
         assert self._trace_controller_proxy is None
         self._trace_controller_proxy = f_tracingcontroller.Controller.Client(
-            self._fc_transport.connect_device_proxy(_FC_PROXIES["TracingController"])
+            self._fc_transport.connect_device_proxy(
+                _FC_PROXIES["TracingController"]
+            )
         )
         trace_socket_server, trace_socket_client = fc.Socket.create()
 
@@ -91,7 +97,8 @@ class Tracing(tracing.Tracing):
             # 1-way FIDL calls do not return a Coroutine, so async isn't needed
             self._trace_controller_proxy.initialize_tracing(
                 config=f_tracingcontroller.TraceConfig(
-                    categories=categories, buffer_size_megabytes_hint=buffer_size
+                    categories=categories,
+                    buffer_size_megabytes_hint=buffer_size,
                 ),
                 output=trace_socket_server.take(),
             )
@@ -112,7 +119,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot start: Trace session is not " f"initialized on {self._name}"
+                "Cannot start: Trace session is not "
+                f"initialized on {self._name}"
             )
         if self._tracing_active:
             raise errors.FuchsiaStateError(
@@ -145,7 +153,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot stop: Trace session is not " f"initialized on {self._name}"
+                "Cannot stop: Trace session is not "
+                f"initialized on {self._name}"
             )
         if not self._tracing_active:
             raise errors.FuchsiaStateError(
@@ -274,7 +283,9 @@ class Tracing(tracing.Tracing):
                 drain_task = tg.create_task(self._drain_socket_async())
             tg.create_task(
                 self._trace_controller_proxy.terminate_tracing(
-                    options=f_tracingcontroller.TerminateOptions(write_results=download)
+                    options=f_tracingcontroller.TerminateOptions(
+                        write_results=download
+                    )
                 )
             )
 
@@ -298,7 +309,8 @@ class Tracing(tracing.Tracing):
         """
         if not self._session_initialized:
             raise errors.FuchsiaStateError(
-                "Cannot terminate: Trace session is " f"not initialized on {self._name}"
+                "Cannot terminate: Trace session is "
+                f"not initialized on {self._name}"
             )
         _LOGGER.info("Terminating trace session on '%s'", self._name)
 

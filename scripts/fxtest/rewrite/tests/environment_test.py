@@ -40,7 +40,9 @@ class TestExecutionEnvironment(unittest.TestCase):
                 self.assertTrue(
                     env.log_file and env.log_file.startswith(out_dir), str(env)
                 )
-                self.assertTrue(env.log_file and "fxtest" in env.log_file, str(env))
+                self.assertTrue(
+                    env.log_file and "fxtest" in env.log_file, str(env)
+                )
                 self.assertEqual(
                     env.test_json_file, os.path.join(out_dir, "tests.json")
                 )

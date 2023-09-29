@@ -15,7 +15,9 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances.ffx import session as session_ffx
 from honeydew.interfaces.affordances import session
-from honeydew.interfaces.auxiliary_devices import power_switch as power_switch_interface
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.interfaces.device_classes import transports_capable
@@ -196,7 +198,9 @@ class BaseFuchsiaDevice(
             self.ssh.check_connection()
         self.ffx.check_connection()
 
-    def log_message_to_device(self, message: str, level: custom_types.LEVEL) -> None:
+    def log_message_to_device(
+        self, message: str, level: custom_types.LEVEL
+    ) -> None:
         """Log message to fuchsia device at specified level.
 
         Args:
@@ -269,7 +273,8 @@ class BaseFuchsiaDevice(
         """
         _LOGGER.info("Rebooting %s...", self.device_name)
         self.log_message_to_device(
-            message=f"Rebooting {self.device_name}...", level=custom_types.LEVEL.INFO
+            message=f"Rebooting {self.device_name}...",
+            level=custom_types.LEVEL.INFO,
         )
 
         self._send_reboot_command()
@@ -287,7 +292,9 @@ class BaseFuchsiaDevice(
         """Register a function that will be called in on_device_boot."""
         self._on_device_boot_fns.append(fn)
 
-    def snapshot(self, directory: str, snapshot_file: Optional[str] = None) -> str:
+    def snapshot(
+        self, directory: str, snapshot_file: Optional[str] = None
+    ) -> str:
         """Captures the snapshot of the device.
 
         Args:

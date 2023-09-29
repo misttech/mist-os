@@ -107,7 +107,10 @@ def dataparse(cls):
                 else:
                     origin_vals = val
 
-                val = [x.to_dict() if hasattr(x, "to_dict") else x for x in origin_vals]
+                val = [
+                    x.to_dict() if hasattr(x, "to_dict") else x
+                    for x in origin_vals
+                ]
             if isinstance(val, enum.Enum):
                 val = val.value
 
@@ -198,7 +201,8 @@ def dataparse(cls):
                     # Handle parsing lists.
                     build_args[f.name] = [
                         real_args.from_dict(val)
-                        if real_args is not None and hasattr(real_args, "from_dict")
+                        if real_args is not None
+                        and hasattr(real_args, "from_dict")
                         else val
                         for val in input[name]
                     ]
@@ -208,18 +212,23 @@ def dataparse(cls):
                     build_args[f.name] = set(
                         [
                             real_args.from_dict(val)
-                            if real_args is not None and hasattr(real_args, "from_dict")
+                            if real_args is not None
+                            and hasattr(real_args, "from_dict")
                             else val
                             for val in input[name]
                         ]
                     )
-                elif isinstance(real_type, type) and issubclass(real_type, enum.Enum):
+                elif isinstance(real_type, type) and issubclass(
+                    real_type, enum.Enum
+                ):
                     # Handle enums.
                     # The value stored in the incoming dict is the value of
                     # the enum. Create a map of value name to enum, and
                     # select the correct one if it is present.
                     v: enum.Enum
-                    values = {v.value: v for v in real_type.__members__.values()}
+                    values = {
+                        v.value: v for v in real_type.__members__.values()
+                    }
                     if input[name] not in values:
                         raise DataParseError(
                             f"Enum {real_type} is missing field {input[name]}"

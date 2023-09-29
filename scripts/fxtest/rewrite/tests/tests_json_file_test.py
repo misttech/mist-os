@@ -87,7 +87,9 @@ class TestFileTest(unittest.TestCase):
             with open(path, "w") as f:
                 f.write("3 {}")
 
-            self.assertRaises(json.JSONDecodeError, lambda: TestEntry.from_file(path))
+            self.assertRaises(
+                json.JSONDecodeError, lambda: TestEntry.from_file(path)
+            )
 
     def test_missing_file(self):
         """Ensure an exception is raised if the file does not exist."""

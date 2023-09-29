@@ -74,7 +74,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 build_dir = os.path.join(real_fuchsia_dir, f.read().strip())
             print(build_dir)
             assert os.path.isdir(build_dir)
-            shutil.copy(os.path.join(build_dir, "host-tools", "dldist"), dldist_path)
+            shutil.copy(
+                os.path.join(build_dir, "host-tools", "dldist"), dldist_path
+            )
 
         self.test_data_path = os.path.join(cur_path, "test_data/build_output")
 
@@ -93,7 +95,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"path was {self.test_data_path} for {__file__}",
         )
 
-        with open(os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w") as f:
+        with open(
+            os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w"
+        ) as f:
             f.write("out/default")
 
         self.out_dir = os.path.join(self.fuchsia_dir.name, "out/default")
@@ -209,7 +213,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(len(selection_events), 1)
         selection_event = selection_events[0]
-        self.assertEqual(len(selection_event.selected), self.TOTAL_TESTS_IN_INPUT)
+        self.assertEqual(
+            len(selection_event.selected), self.TOTAL_TESTS_IN_INPUT
+        )
 
     async def test_fuzzy_dry_run(self):
         """Test a dry run of the command for fuzzy matching"""
@@ -238,7 +244,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         recorder = event.EventRecorder()
         ret = await main.async_main_wrapper(
-            args.parse_args(["--simple", "--dry"] + [flag_name]), recorder=recorder
+            args.parse_args(["--simple", "--dry"] + [flag_name]),
+            recorder=recorder,
         )
         self.assertEqual(ret, 0)
 
@@ -253,9 +260,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(selection_event.selected), expected_count)
 
     @parameterized.expand(
-        [("--use-package-hash", DEVICE_TESTS_IN_INPUT), ("--no-use-package-hash", 0)]
+        [
+            ("--use-package-hash", DEVICE_TESTS_IN_INPUT),
+            ("--no-use-package-hash", 0),
+        ]
     )
-    async def test_use_package_hash(self, flag_name: str, expected_hash_matches: int):
+    async def test_use_package_hash(
+        self, flag_name: str, expected_hash_matches: int
+    ):
         """Test ?hash= is used only when --use-package-hash is set"""
 
         command_mock = self._mock_run_command(0)
@@ -267,7 +279,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(ret, 0)
 
-        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
 
         self.assertIsSubset(
             {
@@ -336,7 +350,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         ret = await main.async_main_wrapper(args.parse_args(["--simple"]))
         self.assertEqual(ret, 0)
 
-        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
         call_prefixes.update(
             self._make_call_args_prefix_set(subprocess_mock.call_args_list)
         )
@@ -344,7 +360,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         # Make sure we built, published, and ran the device test.
         self.assertIsSubset(
             {
-                ("fx", "build", "src/sys:foo_test_package", "host_x64/bar_test"),
+                (
+                    "fx",
+                    "build",
+                    "src/sys:foo_test_package",
+                    "host_x64/bar_test",
+                ),
                 ("fx", "ffx", "repository", "publish"),
                 ("fx", "ffx", "test", "run"),
             },
@@ -362,13 +383,19 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         self._mock_has_device_connected(True)
         self._mock_has_tests_in_base(False)
 
-        ret = await main.async_main_wrapper(args.parse_args(["--simple", "--no-build"]))
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--no-build"])
+        )
         self.assertEqual(ret, 0)
 
-        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
 
         self.assertFalse(("fx", "build") in call_prefixes)
-        self.assertFalse(("fx", "ffx", "repository", "publish") in call_prefixes)
+        self.assertFalse(
+            ("fx", "ffx", "repository", "publish") in call_prefixes
+        )
 
         self.assertIsSubset(
             {
@@ -402,7 +429,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         # One of them will run before the other, which means --fail
         # prevents one of them from starting, and we expect to see
         # only bar_test (since baz_test is defined later in the file)
-        call_prefixes = self._make_call_args_prefix_set(command_mock.call_args_list)
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
         self.assertEqual(ret, 1)
 
         self.assertTrue(any(["bar_test" in v[0] for v in call_prefixes]))
@@ -418,7 +447,9 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         # Run each test 3 times, no parallel to better match behavior of failure case test.
         ret = await main.async_main_wrapper(
-            args.parse_args(["--simple", "--no-build", "--count=3", "--parallel=1"])
+            args.parse_args(
+                ["--simple", "--no-build", "--count=3", "--parallel=1"]
+            )
         )
         self.assertEqual(ret, 0)
 

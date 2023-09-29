@@ -44,7 +44,8 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.user_input.tap(
-                    location=custom_types.Coordinate(x=1, y=2), tap_event_count=1
+                    location=custom_types.Coordinate(x=1, y=2),
+                    tap_event_count=1,
                 )
             return
 

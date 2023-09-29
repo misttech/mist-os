@@ -18,7 +18,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def accept_pairing(
-        self, input_mode: BluetoothAcceptPairing, output_mode: BluetoothAcceptPairing
+        self,
+        input_mode: BluetoothAcceptPairing,
+        output_mode: BluetoothAcceptPairing,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
@@ -28,7 +30,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         raise NotImplementedError
 
-    def connect_device(self, identifier: str, transport: BluetoothTransport) -> None:
+    def connect_device(
+        self, identifier: str, transport: BluetoothTransport
+    ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
@@ -74,7 +78,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         """
         raise NotImplementedError
 
-    def pair_device(self, identifier: str, transport: BluetoothTransport) -> None:
+    def pair_device(
+        self, identifier: str, transport: BluetoothTransport
+    ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:

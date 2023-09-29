@@ -9,36 +9,36 @@ import unittest
 
 
 class GnLicenseMetadataDBTest(unittest.TestCase):
-
     def test_load_from_list(self):
         input = [
-            {   # l1
+            {  # l1
                 "target_label": "//foo:license(//toolchain)",
                 "public_package_name": "l1",
-                "license_files": [ "//license1", "//license2"] ,
+                "license_files": ["//license1", "//license2"],
             },
             {
                 # l2
                 "target_label": "//bar:lic(//toolchain)",
                 "public_package_name": "l2",
-                "license_files": [ "license3" ] , # Relative
+                "license_files": ["license3"],  # Relative
             },
             {
                 # al1
                 "target_label": "//foo:target(//toolchain)",
-                "license_labels": [ "//foo:license(//toolchain)" ] ,
+                "license_labels": ["//foo:license(//toolchain)"],
             },
             {
                 # al2
                 "target_label": "//bar(//toolchain)",
-                "license_labels": [ "//bar:lic(//toolchain)" ],
-            }
+                "license_labels": ["//bar:lic(//toolchain)"],
+            },
         ]
 
         db = GnLicenseMetadataDB.from_json_list(input)
 
-        l1 = db.licenses_by_label[GnLabel.from_str(
-            "//foo:license(//toolchain)")]
+        l1 = db.licenses_by_label[
+            GnLabel.from_str("//foo:license(//toolchain)")
+        ]
         self.assertEqual(
             l1,
             GnLicenseMetadata(
@@ -46,8 +46,10 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
                 public_package_name="l1",
                 license_files=(
                     GnLabel.from_str("//license1"),
-                    GnLabel.from_str("//license2")),
-            ))
+                    GnLabel.from_str("//license2"),
+                ),
+            ),
+        )
 
         l2 = db.licenses_by_label[GnLabel.from_str("//bar:lic(//toolchain)")]
         self.assertEqual(
@@ -56,23 +58,30 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
                 target_label=GnLabel.from_str("//bar:lic(//toolchain)"),
                 public_package_name="l2",
                 license_files=(GnLabel.from_str("//bar/license3"),),
-            ))
+            ),
+        )
 
-        al1 = db.applicable_licenses_by_target[GnLabel.from_str(
-            "//foo:target(//toolchain)")]
+        al1 = db.applicable_licenses_by_target[
+            GnLabel.from_str("//foo:target(//toolchain)")
+        ]
         self.assertEqual(
-            al1.target_label, GnLabel.from_str("//foo:target(//toolchain)"))
+            al1.target_label, GnLabel.from_str("//foo:target(//toolchain)")
+        )
         self.assertEqual(
             al1.license_labels,
-            (GnLabel.from_str("//foo:license(//toolchain)"),))
+            (GnLabel.from_str("//foo:license(//toolchain)"),),
+        )
 
-        al2 = db.applicable_licenses_by_target[GnLabel.from_str(
-            "//bar(//toolchain)")]
+        al2 = db.applicable_licenses_by_target[
+            GnLabel.from_str("//bar(//toolchain)")
+        ]
         self.assertEqual(
-            al2.target_label, GnLabel.from_str("//bar(//toolchain)"))
+            al2.target_label, GnLabel.from_str("//bar(//toolchain)")
+        )
         self.assertEqual(
-            al2.license_labels, (GnLabel.from_str("//bar:lic(//toolchain)"),))
+            al2.license_labels, (GnLabel.from_str("//bar:lic(//toolchain)"),)
+        )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

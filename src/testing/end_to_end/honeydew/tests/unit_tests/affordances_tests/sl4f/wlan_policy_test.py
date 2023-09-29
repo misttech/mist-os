@@ -74,7 +74,10 @@ class WlanPolicySL4FTests(unittest.TestCase):
                     },
                     "expected_value": [
                         NetworkConfig(
-                            "1234abcd", SecurityType.WEP, "password", "helloWorld"
+                            "1234abcd",
+                            SecurityType.WEP,
+                            "password",
+                            "helloWorld",
                         ),
                         NetworkConfig(
                             "test", SecurityType.WPA3, "password", "helloWorld"
@@ -121,7 +124,9 @@ class WlanPolicySL4FTests(unittest.TestCase):
         if not isinstance(parameterized_dict["return_value"]["result"], list):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_saved_networks()
-        elif not isinstance(parameterized_dict["return_value"]["result"][0], dict):
+        elif not isinstance(
+            parameterized_dict["return_value"]["result"][0], dict
+        ):
             with self.assertRaises(TypeError):
                 self.wlan_obj.get_saved_networks()
         elif not isinstance(
@@ -131,7 +136,8 @@ class WlanPolicySL4FTests(unittest.TestCase):
                 self.wlan_obj.get_saved_networks()
         else:
             self.assertEqual(
-                self.wlan_obj.get_saved_networks(), parameterized_dict["expected_value"]
+                self.wlan_obj.get_saved_networks(),
+                parameterized_dict["expected_value"],
             )
 
         self.sl4f_obj.run.assert_called()
@@ -247,7 +253,9 @@ class WlanPolicySL4FTests(unittest.TestCase):
         else:
             resp = self.wlan_obj.get_update()
 
-            self.assertEqual(resp.state, parameterized_dict["expected_value"]["state"])
+            self.assertEqual(
+                resp.state, parameterized_dict["expected_value"]["state"]
+            )
             self.assertEqual(
                 resp.networks, parameterized_dict["expected_value"]["networks"]
             )
@@ -264,7 +272,9 @@ class WlanPolicySL4FTests(unittest.TestCase):
     def test_save_network(self) -> None:
         """Test for WlanPolicy.save_network()."""
 
-        self.wlan_obj.save_network(target_ssid="test", security_type=SecurityType.NONE)
+        self.wlan_obj.save_network(
+            target_ssid="test", security_type=SecurityType.NONE
+        )
 
         self.sl4f_obj.run.assert_called()
 

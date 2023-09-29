@@ -172,7 +172,8 @@ class Test:
         """
         try:
             ret: typing.List[Test] = [
-                cls(entry, test_list_entries[entry.test.name]) for entry in test_entries
+                cls(entry, test_list_entries[entry.test.name])
+                for entry in test_entries
             ]
             # Ignore type for now. With Python 3.11 we can use typing.Self.
             return ret  # type:ignore

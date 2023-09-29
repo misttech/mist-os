@@ -87,8 +87,10 @@ class TestExecution:
             component_url = execution.component_url
             if self._flags.use_package_hash:
                 try:
-                    package_repo = package_repository.PackageRepository.from_env(
-                        self._exec_env
+                    package_repo = (
+                        package_repository.PackageRepository.from_env(
+                            self._exec_env
+                        )
                     )
 
                     name = extract_package_name_from_url(component_url)
@@ -120,18 +122,26 @@ class TestExecution:
             if execution.realm:
                 extra_args += ["--realm", execution.realm]
             if execution.max_severity_logs and self._flags.restrict_logs:
-                extra_args += ["--max-severity-logs", execution.max_severity_logs]
+                extra_args += [
+                    "--max-severity-logs",
+                    execution.max_severity_logs,
+                ]
             if min_severity_logs:
                 for min_severity_log in min_severity_logs:
                     extra_args += ["--min-severity-logs", min_severity_log]
             if self._test.build.test.parallel is not None:
-                extra_args += ["--parallel", str(self._test.build.test.parallel)]
+                extra_args += [
+                    "--parallel",
+                    str(self._test.build.test.parallel),
+                ]
             if self._flags.also_run_disabled_tests:
                 extra_args += ["--run-disabled"]
 
             return ["fx", "ffx", "test", "run"] + extra_args + [component_url]
         elif self._test.build.test.path:
-            return [os.path.join(self._exec_env.out_dir, self._test.build.test.path)]
+            return [
+                os.path.join(self._exec_env.out_dir, self._test.build.test.path)
+            ]
         else:
             raise TestCouldNotRun(
                 f"We do not know how to run this test: {str(self._test)}"
@@ -272,7 +282,9 @@ async def run_command(
     if recorder is not None:
         id = recorder.emit_program_start(name, list(args), env, parent=parent)
     try:
-        symbolizer_args = None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
+        symbolizer_args = (
+            None if not symbolize else ["fx", "ffx", "debug", "symbolize"]
+        )
         started = await command.AsyncCommand.create(
             name,
             *args,
@@ -298,7 +310,9 @@ async def run_command(
                         print_verbatim=print_verbatim,
                     )
                 if isinstance(current_event, command.TerminationEvent):
-                    recorder.emit_program_termination(id, current_event.return_code)
+                    recorder.emit_program_termination(
+                        id, current_event.return_code
+                    )
 
         return await started.run_to_completion(callback=handle_event)
     except command.AsyncCommandError as e:

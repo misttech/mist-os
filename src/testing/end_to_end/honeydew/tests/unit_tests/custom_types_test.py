@@ -20,7 +20,9 @@ class CustomTypesTests(unittest.TestCase):
             (
                 "valid_ipv4",
                 "127.0.0.1:8081",
-                custom_types.IpPort(ip=ipaddress.ip_address("127.0.0.1"), port=8081),
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("127.0.0.1"), port=8081
+                ),
             ),
             (
                 "valid_ipv6",
@@ -30,12 +32,16 @@ class CustomTypesTests(unittest.TestCase):
             (
                 "valid_ipv6_scope",
                 "[::1%eth0]:8081",
-                custom_types.IpPort(ip=ipaddress.ip_address("::1%eth0"), port=8081),
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%eth0"), port=8081
+                ),
             ),
             (
                 "valid_ipv6_scope_digit",
                 "[::1%123]:8081",
-                custom_types.IpPort(ip=ipaddress.ip_address("::1%123"), port=8081),
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%123"), port=8081
+                ),
             ),
             (
                 "valid_ipv6_no_brackets",
@@ -67,7 +73,9 @@ class CustomTypesTests(unittest.TestCase):
         [
             (
                 "valid_ipv4",
-                custom_types.IpPort(ip=ipaddress.ip_address("127.0.0.1"), port=8081),
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("127.0.0.1"), port=8081
+                ),
                 "127.0.0.1:8081",
             ),
             (
@@ -77,12 +85,16 @@ class CustomTypesTests(unittest.TestCase):
             ),
             (
                 "valid_ipv6_scope",
-                custom_types.IpPort(ip=ipaddress.ip_address("::1%eth0"), port=8081),
+                custom_types.IpPort(
+                    ip=ipaddress.ip_address("::1%eth0"), port=8081
+                ),
                 "[::1%eth0]:8081",
             ),
         ]
     )
-    def test_ipport_str(self, _, ip_port: custom_types.IpPort, expected: str) -> None:
+    def test_ipport_str(
+        self, _, ip_port: custom_types.IpPort, expected: str
+    ) -> None:
         """Test cases for IpPort.__str__."""
         got = str(ip_port)
         self.assertEqual(got, expected)

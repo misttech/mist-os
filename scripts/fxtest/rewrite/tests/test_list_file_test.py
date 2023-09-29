@@ -22,7 +22,10 @@ class TestListFileParsingTest(unittest.TestCase):
     def test_from_file(self):
         """Test basic loading of a test-list.json file."""
         contents = TestListFile(
-            data=[TestListEntry("my_test", tags=[]), TestListEntry("my_test2", tags=[])]
+            data=[
+                TestListEntry("my_test", tags=[]),
+                TestListEntry("my_test2", tags=[]),
+            ]
         ).to_dict()  # type:ignore
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -31,7 +34,9 @@ class TestListFileParsingTest(unittest.TestCase):
                 json.dump(contents, f)
 
             entries = TestListFile.entries_from_file(path)
-            self.assertSetEqual(set(entries.keys()), set(["my_test", "my_test2"]))
+            self.assertSetEqual(
+                set(entries.keys()), set(["my_test", "my_test2"])
+            )
 
 
 class TestListFileJoiningTest(unittest.TestCase):
@@ -42,10 +47,14 @@ class TestListFileJoiningTest(unittest.TestCase):
 
         tests_file = [
             TestEntry(
-                test=TestSection(name="my_test", label="//src/my_test", os="linux")
+                test=TestSection(
+                    name="my_test", label="//src/my_test", os="linux"
+                )
             ),
             TestEntry(
-                test=TestSection(name="my_test2", label="//src/my_test2", os="linux")
+                test=TestSection(
+                    name="my_test2", label="//src/my_test2", os="linux"
+                )
             ),
         ]
         test_list_file = {
@@ -78,13 +87,16 @@ class TestListFileJoiningTest(unittest.TestCase):
 
         tests_file = [
             TestEntry(
-                test=TestSection(name="my_test", label="//src/my_test", os="linux")
+                test=TestSection(
+                    name="my_test", label="//src/my_test", os="linux"
+                )
             ),
         ]
         test_list_file: typing.Dict[str, TestListEntry] = {}
 
         self.assertRaises(
-            ValueError, lambda: Test.join_test_descriptions(tests_file, test_list_file)
+            ValueError,
+            lambda: Test.join_test_descriptions(tests_file, test_list_file),
         )
 
 

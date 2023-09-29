@@ -12,7 +12,9 @@ import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.transports import fuchsia_controller as fuchsia_controller_transport
+from honeydew.transports import (
+    fuchsia_controller as fuchsia_controller_transport,
+)
 
 _INPUT_ARGS: Dict[str, Any] = {
     "device_name": "fuchsia-emulator",
@@ -20,7 +22,8 @@ _INPUT_ARGS: Dict[str, Any] = {
 
 _MOCK_ARGS: Dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
-        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"), logs_dir="/tmp/logs"
+        isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
+        logs_dir="/tmp/logs",
     ),
 }
 
@@ -32,8 +35,10 @@ class FuchsiaControllerTests(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        self.fuchsia_controller_obj = fuchsia_controller_transport.FuchsiaController(
-            device_name=_INPUT_ARGS["device_name"]
+        self.fuchsia_controller_obj = (
+            fuchsia_controller_transport.FuchsiaController(
+                device_name=_INPUT_ARGS["device_name"]
+            )
         )
 
     @mock.patch.object(
@@ -42,7 +47,9 @@ class FuchsiaControllerTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller, "Context", autospec=True
+        fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
     )
     @mock.patch.object(
         fuchsia_controller_transport.ffx_transport,
@@ -65,7 +72,9 @@ class FuchsiaControllerTests(unittest.TestCase):
         mock_remote_control_proxy.assert_called()
 
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller, "Context", autospec=True
+        fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
     )
     def test_create_context_creation_error(self, mock_fc_context) -> None:
         """Verify create_context() when the fuchsia controller Context creation
@@ -85,7 +94,9 @@ class FuchsiaControllerTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller, "Context", autospec=True
+        fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
     )
     def test_create_context_proxy_error(
         self, mock_fc_context, mock_remote_control_proxy
@@ -112,7 +123,9 @@ class FuchsiaControllerTests(unittest.TestCase):
         autospec=True,
     )
     @mock.patch.object(
-        fuchsia_controller_transport.fuchsia_controller, "Context", autospec=True
+        fuchsia_controller_transport.fuchsia_controller,
+        "Context",
+        autospec=True,
     )
     def test_connect_device_proxy(
         self, mock_fc_context, mock_remote_control_proxy

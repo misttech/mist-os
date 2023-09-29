@@ -19,7 +19,9 @@ class Sl4fMethods(StrEnum):
     STOP_MOCK_PLAYER = "media_session_facade.StopMockPlayer"
 
 
-class BluetoothAvrcp(bluetooth_common.BluetoothCommon, bluetooth_avrcp.BluetoothAvrcp):
+class BluetoothAvrcp(
+    bluetooth_common.BluetoothCommon, bluetooth_avrcp.BluetoothAvrcp
+):
     """SL4F based implementation for BluetoothAvrcp Profile affordance."""
 
     # List all the public methods in alphabetical order
@@ -31,7 +33,9 @@ class BluetoothAvrcp(bluetooth_common.BluetoothCommon, bluetooth_avrcp.Bluetooth
         Raises:
             errors.Sl4fError: On failure.
         """
-        self._sl4f.run(method=Sl4fMethods.INIT_AVRCP, params={"target_id": target_id})
+        self._sl4f.run(
+            method=Sl4fMethods.INIT_AVRCP, params={"target_id": target_id}
+        )
 
     def list_received_requests(self) -> list:
         """List received requests received from source device.

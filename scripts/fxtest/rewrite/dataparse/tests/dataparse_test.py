@@ -137,9 +137,12 @@ class TestDataParse(unittest.TestCase):
         self.assertIsInstance(weather.suggested_cities, set)
         for v in weather.suggested_cities or set():
             self.assertIsInstance(v, City)
-        self.assertSetEqual(weather.weather_station_ids or set(), {1000, 2000, 1050})
         self.assertSetEqual(
-            weather.suggested_cities or set(), set([City("Oakland"), City("San Jose")])
+            weather.weather_station_ids or set(), {1000, 2000, 1050}
+        )
+        self.assertSetEqual(
+            weather.suggested_cities or set(),
+            set([City("Oakland"), City("San Jose")]),
         )
         self.assertDictEqual(weather_dict, weather.to_dict())  # type:ignore
 
@@ -204,7 +207,9 @@ class TestDataParse(unittest.TestCase):
 
         has_null: HasNull = HasNull.from_dict({"value": None})  # type:ignore
         self.assertEqual(has_null, HasNull())
-        out_dict: typing.Dict[str, typing.Any] = has_null.to_dict()  # type:ignore
+        out_dict: typing.Dict[
+            str, typing.Any
+        ] = has_null.to_dict()  # type:ignore
         # Omit nulls in output.
         self.assertFalse(hasattr(out_dict, "value"))
 
@@ -223,7 +228,8 @@ class TestDataParseErrors(unittest.TestCase):
             val: typing.Union[int, float]
 
         self.assertRaises(
-            DataParseError, lambda: BadUnion.from_dict({"val": 30})  # type:ignore
+            DataParseError,
+            lambda: BadUnion.from_dict({"val": 30}),  # type:ignore
         )  # type:ignore
 
     def test_invalid_class(self):
@@ -260,8 +266,12 @@ class TestDataParseEnums(unittest.TestCase):
         value2_dict = value2.to_dict()  # type:ignore
         self.assertEqual(value2_dict["status"], "OK")
 
-        self.assertEqual(value, ContainsEnum.from_dict(value_dict))  # type:ignore
-        self.assertEqual(value2, ContainsEnum.from_dict(value2_dict))  # type:ignore
+        self.assertEqual(
+            value, ContainsEnum.from_dict(value_dict)
+        )  # type:ignore
+        self.assertEqual(
+            value2, ContainsEnum.from_dict(value2_dict)
+        )  # type:ignore
 
     def test_invalid_enum_parsing(self):
         """Test that we throw an error when we encounter an unexpected enum value."""

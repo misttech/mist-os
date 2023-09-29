@@ -57,7 +57,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     @mock.patch.object(
         base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
     )
-    def setUp(self, mock_ssh_check_connection, mock_ffx_check_connection) -> None:
+    def setUp(
+        self, mock_ssh_check_connection, mock_ffx_check_connection
+    ) -> None:
         super().setUp()
 
         # pylint: disable=abstract-class-instantiated
@@ -110,17 +112,24 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         base_fuchsia_device.ssh_transport.SSH, "check_connection", autospec=True
     )
     def test_fuchsia_device_init(
-        self, parameterized_dict, mock_ssh_check_connection, mock_ffx_check_connection
+        self,
+        parameterized_dict,
+        mock_ssh_check_connection,
+        mock_ffx_check_connection,
     ) -> None:
         """Verify FuchsiaDevice class instantiation"""
         optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
         device_name: str = parameterized_dict["mandatory_params"]["device_name"]
-        ssh_private_key: str = parameterized_dict["mandatory_params"]["ssh_private_key"]
+        ssh_private_key: str = parameterized_dict["mandatory_params"][
+            "ssh_private_key"
+        ]
 
         # pylint: disable=abstract-class-instantiated
         _ = base_fuchsia_device.BaseFuchsiaDevice(
-            device_name=device_name, ssh_private_key=ssh_private_key, **optional_params
+            device_name=device_name,
+            ssh_private_key=ssh_private_key,
+            **optional_params,
         )  # type: ignore[abstract]
 
         mock_ffx_check_connection.assert_called()
@@ -128,7 +137,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
 
     def test_device_is_a_fuchsia_device(self) -> None:
         """Test case to make sure DUT is a fuchsia device"""
-        self.assertIsInstance(self.fd_obj, fuchsia_device_interface.FuchsiaDevice)
+        self.assertIsInstance(
+            self.fd_obj, fuchsia_device_interface.FuchsiaDevice
+        )
 
     # List all the tests related to static properties in alphabetical order
     @mock.patch.object(
@@ -212,7 +223,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     # List all the tests related to transports in alphabetical order
     def test_fuchsia_device_is_fastboot_capable(self) -> None:
         """Test case to make sure fuchsia device is Fastboot capable"""
-        self.assertIsInstance(self.fd_obj, transports_capable.FastbootCapableDevice)
+        self.assertIsInstance(
+            self.fd_obj, transports_capable.FastbootCapableDevice
+        )
 
     def test_fuchsia_device_is_ffx_capable(self) -> None:
         """Test case to make sure fuchsia device is FFX capable"""
@@ -254,7 +267,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         name_func=_custom_test_name_func,
     )
     @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_send_log_command", autospec=True
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "_send_log_command",
+        autospec=True,
     )
     def test_log_message_to_device(
         self, parameterized_dict, mock_send_log_command
@@ -326,10 +341,15 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True
     )
     @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_send_log_command", autospec=True
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "_send_log_command",
+        autospec=True,
     )
     def test_power_cycle(
-        self, mock_send_log_command, mock_on_device_boot, mock_is_target_connected
+        self,
+        mock_send_log_command,
+        mock_on_device_boot,
+        mock_is_target_connected,
     ) -> None:
         """Testcase for BaseFuchsiaDevice.power_cycle()"""
         power_switch = mock.MagicMock(
@@ -353,10 +373,14 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True
     )
     @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_send_log_command", autospec=True
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "_send_log_command",
+        autospec=True,
     )
     @mock.patch.object(
-        base_fuchsia_device.BaseFuchsiaDevice, "_send_reboot_command", autospec=True
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "_send_reboot_command",
+        autospec=True,
     )
     def test_reboot(
         self,
@@ -419,7 +443,8 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
 
         if "snapshot_file" in optional_params:
             self.assertEqual(
-                snapshot_file_path, f"{directory}/{optional_params['snapshot_file']}"
+                snapshot_file_path,
+                f"{directory}/{optional_params['snapshot_file']}",
             )
         else:
             self.assertRegex(
@@ -460,7 +485,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self, mock_ffx_is_target_connected, mock_sleep, mock_time
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_offline() failure case"""
-        with self.assertRaisesRegex(errors.FuchsiaDeviceError, "failed to go offline"):
+        with self.assertRaisesRegex(
+            errors.FuchsiaDeviceError, "failed to go offline"
+        ):
             self.fd_obj.wait_for_offline(timeout=2)
 
         mock_ffx_is_target_connected.assert_called()
@@ -495,7 +522,9 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self, mock_ffx_is_target_connected, mock_time, mock_sleep
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_online() failure case"""
-        with self.assertRaisesRegex(errors.FuchsiaDeviceError, "failed to go online"):
+        with self.assertRaisesRegex(
+            errors.FuchsiaDeviceError, "failed to go online"
+        ):
             self.fd_obj.wait_for_online(timeout=2)
 
         mock_ffx_is_target_connected.assert_called()

@@ -15,7 +15,9 @@ from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_gap
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.interfaces.affordances.wlan import wlan_policy
-from honeydew.interfaces.auxiliary_devices import power_switch as power_switch_interface
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
 from honeydew.utils import properties
 
 TIMEOUTS: Dict[str, float] = {
@@ -170,7 +172,9 @@ class FuchsiaDevice(abc.ABC):
         """Ensure device is healthy."""
 
     @abc.abstractmethod
-    def log_message_to_device(self, message: str, level: custom_types.LEVEL) -> None:
+    def log_message_to_device(
+        self, message: str, level: custom_types.LEVEL
+    ) -> None:
         """Log message to fuchsia device at specified level.
 
         Args:
@@ -205,7 +209,9 @@ class FuchsiaDevice(abc.ABC):
         """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
-    def snapshot(self, directory: str, snapshot_file: Optional[str] = None) -> str:
+    def snapshot(
+        self, directory: str, snapshot_file: Optional[str] = None
+    ) -> str:
         """Captures the snapshot of the device.
 
         Args:

@@ -64,7 +64,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         self._sl4f.run(method=Sl4fMethods.INIT_SYS)
 
     def accept_pairing(
-        self, input_mode: BluetoothAcceptPairing, output_mode: BluetoothAcceptPairing
+        self,
+        input_mode: BluetoothAcceptPairing,
+        output_mode: BluetoothAcceptPairing,
     ) -> None:
         """Sets device to accept Bluetooth pairing.
 
@@ -80,7 +82,9 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             params={"input": input_mode, "output": output_mode},
         )
 
-    def connect_device(self, identifier: str, transport: BluetoothTransport) -> None:
+    def connect_device(
+        self, identifier: str, transport: BluetoothTransport
+    ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
@@ -158,11 +162,15 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
             KeyError: If the Sl4f call returns no "result".
         """
-        known_devices = self._sl4f.run(method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES)
+        known_devices = self._sl4f.run(
+            method=Sl4fMethods.GET_KNOWN_REMOTE_DEVICES
+        )
         return known_devices["result"]
 
     # TODO(b/301499667): Update transport to bluetooth_transport
-    def pair_device(self, identifier: str, transport: BluetoothTransport) -> None:
+    def pair_device(
+        self, identifier: str, transport: BluetoothTransport
+    ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
@@ -189,7 +197,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
-            method=Sl4fMethods.REQUEST_DISCOVERY, params={"discovery": discovery}
+            method=Sl4fMethods.REQUEST_DISCOVERY,
+            params={"discovery": discovery},
         )
 
     def set_discoverable(self, discoverable: bool) -> None:
@@ -203,5 +212,6 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
-            method=Sl4fMethods.SET_DISCOVERABLE, params={"discoverable": discoverable}
+            method=Sl4fMethods.SET_DISCOVERABLE,
+            params={"discoverable": discoverable},
         )

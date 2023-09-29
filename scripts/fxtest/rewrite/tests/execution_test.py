@@ -173,7 +173,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         test = execution.TestExecution(
             test_list_file.Test(
                 tests_json_file.TestEntry(
-                    tests_json_file.TestSection("foo", "//foo", "fuchsia", parallel=1)
+                    tests_json_file.TestSection(
+                        "foo", "//foo", "fuchsia", parallel=1
+                    )
                 ),
                 test_list_file.TestListEntry(
                     "foo",
@@ -224,14 +226,18 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(os.path.isfile, f"{ls_path} is not a file")
             os.symlink(ls_path, os.path.join(tmp, "ls"))
 
-            exec_env = environment.ExecutionEnvironment("/fuchsia", tmp, None, "", "")
+            exec_env = environment.ExecutionEnvironment(
+                "/fuchsia", tmp, None, "", ""
+            )
 
             flags = args.parse_args([])
 
             test = execution.TestExecution(
                 test_list_file.Test(
                     tests_json_file.TestEntry(
-                        tests_json_file.TestSection("foo", "//foo", "linux", path="ls")
+                        tests_json_file.TestSection(
+                            "foo", "//foo", "linux", path="ls"
+                        )
                     ),
                     test_list_file.TestListEntry("foo", [], execution=None),
                 ),
@@ -253,7 +259,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
 
             assert output is not None
 
-            self.assertFalse(any([e.error is not None async for e in recorder.iter()]))
+            self.assertFalse(
+                any([e.error is not None async for e in recorder.iter()])
+            )
 
     async def test_test_execution_with_package_hash(self):
         """Ensure that test execution respects --use-package-hash"""
@@ -291,7 +299,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                         tests_json_file.TestSection(name, "//foo", "linux")
                     ),
                     test_list_file.TestListEntry(
-                        name, [], execution=test_list_file.TestListExecutionEntry(name)
+                        name,
+                        [],
+                        execution=test_list_file.TestListExecutionEntry(name),
                     ),
                 )
 
@@ -309,7 +319,9 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertIsNotNone(
                     execution.TestExecution(
-                        test, exec_env, args.parse_args(["--no-use-package-hash"])
+                        test,
+                        exec_env,
+                        args.parse_args(["--no-use-package-hash"]),
                     ).command_line()
                 )
 

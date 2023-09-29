@@ -27,7 +27,9 @@ class UserInput(user_input.UserInput):
     def tap(
         self,
         location: custom_types.Coordinate,
-        touch_screen_size: custom_types.Size = user_input.DEFAULTS["TOUCH_SCREEN_SIZE"],
+        touch_screen_size: custom_types.Size = user_input.DEFAULTS[
+            "TOUCH_SCREEN_SIZE"
+        ],
         tap_event_count: int = user_input.DEFAULTS["TAP_EVENT_COUNT"],
         duration: int = user_input.DEFAULTS["DURATION"],
     ) -> None:

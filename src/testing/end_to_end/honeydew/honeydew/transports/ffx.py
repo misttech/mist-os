@@ -107,7 +107,8 @@ class FFX:
 
     @staticmethod
     def add_target(
-        target_ip_port: custom_types.IpPort, timeout: float = _TIMEOUTS["FFX_CLI"]
+        target_ip_port: custom_types.IpPort,
+        timeout: float = _TIMEOUTS["FFX_CLI"],
     ):
         """Adds a target to the ffx collection
 
@@ -121,7 +122,9 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = FFX._generate_ffx_cmd(target=None, cmd=_FFX_CMDS["TARGET_ADD"])
+        cmd: List[str] = FFX._generate_ffx_cmd(
+            target=None, cmd=_FFX_CMDS["TARGET_ADD"]
+        )
         cmd.append(str(target_ip_port))
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(cmd))
@@ -175,7 +178,9 @@ class FFX:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
             ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
-            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), ffx_target_show_info)
+            _LOGGER.debug(
+                "`%s` returned: %s", " ".join(cmd), ffx_target_show_info
+            )
 
             return ffx_target_show_info
         except subprocess.TimeoutExpired as err:
@@ -203,7 +208,9 @@ class FFX:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
             ffx_target_list_info: List[Dict[str, Any]] = json.loads(output)
-            _LOGGER.debug("`%s` returned: %s", " ".join(cmd), ffx_target_list_info)
+            _LOGGER.debug(
+                "`%s` returned: %s", " ".join(cmd), ffx_target_list_info
+            )
 
             return ffx_target_list_info
         except Exception as err:  # pylint: disable=broad-except
@@ -242,9 +249,9 @@ class FFX:
         #  },
 
         try:
-            ffx_target_show_info: List[Dict[str, Any]] = self.get_target_information(
-                timeout
-            )
+            ffx_target_show_info: List[
+                Dict[str, Any]
+            ] = self.get_target_information(timeout)
             target_entry: Dict[str, Any] = self._get_label_entry(
                 ffx_target_show_info, label_value="target"
             )
@@ -344,7 +351,9 @@ class FFX:
         )
         return board_entry["value"]
 
-    def is_target_connected(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> bool:
+    def is_target_connected(
+        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+    ) -> bool:
         """Checks if target is connected to the host according to FFX.
 
             * If device name shows up under `ffx target list` with `rcs_state`
@@ -360,13 +369,18 @@ class FFX:
             True if target is connected, False otherwise.
         """
         try:
-            target_list: List[Dict[str, Any]] = self.get_target_list(timeout=timeout)
+            target_list: List[Dict[str, Any]] = self.get_target_list(
+                timeout=timeout
+            )
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.warning(err)
             return False
 
         for target in target_list:
-            if target["nodename"] == self._target and target["rcs_state"] == "Y":
+            if (
+                target["nodename"] == self._target
+                and target["rcs_state"] == "Y"
+            ):
                 return True
         return False
 

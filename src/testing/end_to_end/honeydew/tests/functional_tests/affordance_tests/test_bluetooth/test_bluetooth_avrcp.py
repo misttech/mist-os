@@ -67,7 +67,9 @@ class BluetoothAvrcpAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
             return
         # Currently fails sending commands since we only test single device
         with asserts.assert_raises(Sl4fError):
-            self.device.bluetooth_avrcp.send_avrcp_command(BluetoothAvrcpCommand.PLAY)
+            self.device.bluetooth_avrcp.send_avrcp_command(
+                BluetoothAvrcpCommand.PLAY
+            )
 
     def test_stop_mock_player(self) -> None:
         """Test for Bluetooth.stop_mock_player() method"""

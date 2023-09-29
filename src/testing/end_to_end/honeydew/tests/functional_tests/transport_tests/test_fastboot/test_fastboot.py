@@ -68,7 +68,8 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             "expected_values"
         ].get("node_id"):
             asserts.assert_equal(
-                self._fastboot_node_id, self.user_params["expected_values"]["node_id"]
+                self._fastboot_node_id,
+                self.user_params["expected_values"]["node_id"],
             )
         else:
             asserts.assert_is_not_none(self._fastboot_node_id)
@@ -83,7 +84,8 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
         asserts.assert_false(
             self.device.fastboot.is_in_fuchsia_mode(),
-            msg=f"{self.device.device_name} is in fuchsia mode when not " f"expected",
+            msg=f"{self.device.device_name} is in fuchsia mode when not "
+            f"expected",
         )
         asserts.assert_true(
             self.device.fastboot.is_in_fastboot_mode(),

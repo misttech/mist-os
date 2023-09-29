@@ -12,6 +12,7 @@ from typing import List
 @dataclasses.dataclass(frozen=True)
 class GnLabel:
     """Utility for handling Gn target labels"""
+
     """The original GN label string, e.g. `//foo/bar:baz(//toolchain)`"""
     gn_str: str
     """The path part of the label, e.g. `foo/bar` in `//foo/bar:baz`"""
@@ -24,8 +25,11 @@ class GnLabel:
     def from_str(original_str: str) -> "GnLabel":
         """Constructs a GnLabel instance from a GN target label string"""
         assert original_str.startswith(
-            "//"), f"label must start with // but got {original_str}"
-        assert ".." not in original_str, f".. is not supported but got {original_str}"
+            "//"
+        ), f"label must start with // but got {original_str}"
+        assert (
+            ".." not in original_str
+        ), f".. is not supported but got {original_str}"
         label_and_toolchain = original_str.split("(", maxsplit=1)
         if len(label_and_toolchain) == 2:
             toolchain = GnLabel.from_str(label_and_toolchain[1][:-1])
@@ -55,7 +59,8 @@ class GnLabel:
     def check_type(other) -> "GnLabel":
         """Asserts that `other` is of type GnLabel"""
         assert isinstance(
-            other, GnLabel), f"{other} type {type(other)} is not {GnLabel}"
+            other, GnLabel
+        ), f"{other} type {type(other)} is not {GnLabel}"
         return other
 
     def check_types_in_list(list: List["GnLabel"]) -> List["GnLabel"]:
@@ -77,7 +82,8 @@ class GnLabel:
             return self
         else:
             return dataclasses.replace(
-                self, toolchain=toolchain, gn_str=f"{self.gn_str}({toolchain})")
+                self, toolchain=toolchain, gn_str=f"{self.gn_str}({toolchain})"
+            )
 
     def rebased_path(self, base_dir: Path) -> Path:
         """Returns package_path rebased to a given base_dir."""

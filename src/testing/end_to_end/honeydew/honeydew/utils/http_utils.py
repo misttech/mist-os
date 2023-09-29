@@ -95,7 +95,9 @@ def send_http_request(
             )
 
             if attempt < attempts:
-                _LOGGER.warning("%s on iteration %s/%s", err_msg, attempt, attempts)
+                _LOGGER.warning(
+                    "%s on iteration %s/%s", err_msg, attempt, attempts
+                )
                 continue
             raise errors.HttpRequestError(err_msg) from err
     raise errors.HttpRequestError(

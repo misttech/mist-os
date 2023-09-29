@@ -57,7 +57,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         self._sl4f.run(method=Sl4fMethods.CREATE_CLIENT_CONTROLLER)
 
     def get_saved_networks(self) -> list[NetworkConfig]:
-        resp: dict[str, object] = self._sl4f.run(method=Sl4fMethods.GET_SAVED_NETWORKS)
+        resp: dict[str, object] = self._sl4f.run(
+            method=Sl4fMethods.GET_SAVED_NETWORKS
+        )
         result: object = resp.get("result", [])
 
         if not isinstance(result, list):
@@ -101,7 +103,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
         if not isinstance(result["networks"], list):
             raise TypeError(
-                'Expected "networks" to be list, ' f'got {type(result["networks"])}'
+                'Expected "networks" to be list, '
+                f'got {type(result["networks"])}'
             )
 
         network_states: list[NetworkState] = []
@@ -119,7 +122,8 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             network_states.append(
                 NetworkState(
                     network_identifier=NetworkIdentifier(
-                        ssid=ssid, security_type=SecurityType(security_type.lower())
+                        ssid=ssid,
+                        security_type=SecurityType(security_type.lower()),
                     ),
                     connection_state=ConnectionState(state),
                     disconnect_status=DisconnectStatus(status),

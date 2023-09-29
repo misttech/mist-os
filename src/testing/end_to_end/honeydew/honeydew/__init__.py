@@ -91,7 +91,8 @@ def create_device(
 
 
 def get_all_affordances(
-    device_name: str, transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT
+    device_name: str,
+    transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT,
 ) -> List[str]:
     """Returns list of all affordances implemented for this device class.
 
@@ -195,7 +196,9 @@ def register_device_classes(
 
 
 # List all the private methods in alphabetical order
-def _get_all_register_device_classes() -> Set[Type[fuchsia_device.FuchsiaDevice]]:
+def _get_all_register_device_classes() -> (
+    Set[Type[fuchsia_device.FuchsiaDevice]]
+):
     """Get list of all custom fuchsia device class implementations registered
     with HoneyDew.
 
@@ -211,7 +214,9 @@ def _get_all_register_device_classes() -> Set[Type[fuchsia_device.FuchsiaDevice]
         Type[fuchsia_device.FuchsiaDevice]
     ] = _REGISTERED_DEVICE_CLASSES.union(this_package_device_classes)
 
-    _LOGGER.info("Registered device classes with HoneyDew '%s'", all_device_classes)
+    _LOGGER.info(
+        "Registered device classes with HoneyDew '%s'", all_device_classes
+    )
     return all_device_classes
 
 
@@ -242,7 +247,8 @@ def _get_device_class(
             )
             return device_class
     _LOGGER.info(
-        "Didn't find any matching device class implementation for '%s'", device_name
+        "Didn't find any matching device class implementation for '%s'",
+        device_name,
     )
 
     default_device_class: Optional[Type[fuchsia_device.FuchsiaDevice]] = None
@@ -268,7 +274,9 @@ def _get_device_class(
     return default_device_class
 
 
-def _add_and_verify_device(device_name: str, device_ip_port: custom_types.IpPort):
+def _add_and_verify_device(
+    device_name: str, device_ip_port: custom_types.IpPort
+):
     """Adds the device to the ffx target collection and verifies names match.
 
     If the device is already in the collection, only verifies names match.

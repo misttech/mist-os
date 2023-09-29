@@ -81,7 +81,9 @@ class TracingAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 directory=tmpdir, trace_file="trace.fxt"
             )
 
-            asserts.assert_equal(res, f"{tmpdir}/trace.fxt", msg="trace not downloaded")
+            asserts.assert_equal(
+                res, f"{tmpdir}/trace.fxt", msg="trace not downloaded"
+            )
             asserts.assert_true(
                 os.path.exists(f"{tmpdir}/trace.fxt"), msg="trace failed"
             )

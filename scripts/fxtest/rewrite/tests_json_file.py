@@ -86,7 +86,9 @@ class TestEntry:
     environments: typing.List[EnvironmentEntry] | None = None
 
     @classmethod
-    def from_file(cls: typing.Type[typing.Self], file: str) -> typing.List[typing.Self]:
+    def from_file(
+        cls: typing.Type[typing.Self], file: str
+    ) -> typing.List[typing.Self]:
         """Parse the file at the given path into a list of TestEntry.
 
         This returns a list of entries because the ordering of the

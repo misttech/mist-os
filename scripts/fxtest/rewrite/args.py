@@ -72,7 +72,9 @@ class Flags:
             raise FlagError("--suggestion-count must be non-negative")
 
         if not termout.is_valid() and self.status:
-            raise FlagError("Refusing to output interactive status to a non-TTY.")
+            raise FlagError(
+                "Refusing to output interactive status to a non-TTY."
+            )
 
         if self.simple:
             self.style = False
@@ -157,7 +159,9 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         nargs="*",
         help="Add requirements to the preceding filter",
     )
-    selection.add_argument("selection", action=arg_option.SelectionAction, nargs="*")
+    selection.add_argument(
+        "selection", action=arg_option.SelectionAction, nargs="*"
+    )
     selection.add_argument(
         "--fuzzy",
         type=int,
@@ -211,7 +215,10 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         default=1,
     )
     execution.add_argument(
-        "--limit", type=int, help="Stop execution after this many tests", default=None
+        "--limit",
+        type=int,
+        help="Stop execution after this many tests",
+        default=None,
     )
     execution.add_argument(
         "-f",
