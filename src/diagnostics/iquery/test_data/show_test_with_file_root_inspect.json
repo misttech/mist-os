@@ -6,7 +6,7 @@
             "filename": "root.inspect",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder\\:CHILD_NAME/test",
+        "moniker": "realm_builder:CHILD_NAME/test",
         "payload": {
             "root": {
                 "array:0xd": [

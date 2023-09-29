@@ -110,11 +110,11 @@ class ArchiveReaderTest : public gtest::RealLoopFixture {
   }
 
   std::string cm1_moniker() {
-    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app";
+    return "realm_builder:" + realm_->component().GetChildName() + "/test_app";
   }
 
   std::string cm2_moniker() {
-    return "realm_builder\\:" + realm_->component().GetChildName() + "/test_app_2";
+    return "realm_builder:" + realm_->component().GetChildName() + "/test_app_2";
   }
 
   void CheckLog(std::optional<diagnostics::reader::LogsData> maybeLog,

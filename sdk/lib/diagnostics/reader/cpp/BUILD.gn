@@ -43,6 +43,7 @@ executable("archive_reader_test") {
   testonly = true
   output_name = "archive_reader_test"
   sources = [
+    "archive_reader_unittest.cc",
     "inspect_unittest.cc",
     "logs_unittest.cc",
   ]

@@ -85,7 +85,8 @@ impl fmt::Display for SelectorsResult {
     }
 }
 
-fn get_selectors(component_selector: String, hierarchy: DiagnosticsHierarchy) -> Vec<String> {
+fn get_selectors(moniker: String, hierarchy: DiagnosticsHierarchy) -> Vec<String> {
+    let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
     hierarchy
         .property_iter()
         .flat_map(|(node_path, maybe_property)| maybe_property.map(|prop| (node_path, prop)))

@@ -6,7 +6,7 @@
             "filename": "fuchsia.inspect.deprecated.Inspect",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder\\:CHILD_NAME/test",
+        "moniker": "realm_builder:CHILD_NAME/test",
         "payload": {
             "root": {
                 "table:0x0": {

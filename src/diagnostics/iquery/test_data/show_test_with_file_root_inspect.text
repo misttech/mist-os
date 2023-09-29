@@ -1,4 +1,4 @@
-realm_builder\:CHILD_NAME/test:
+realm_builder:CHILD_NAME/test:
   metadata:
     filename = root.inspect
     component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm

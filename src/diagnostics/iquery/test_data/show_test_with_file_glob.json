@@ -6,7 +6,7 @@
             "filename": "fuchsia.inspect.Tree",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder\\:CHILD_NAME/test",
+        "moniker": "realm_builder:CHILD_NAME/test",
         "payload": {
             "root": {
                 "array:0xd": [
@@ -172,7 +172,7 @@
             "filename": "fuchsia.inspect.deprecated.Inspect",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder\\:CHILD_NAME/test",
+        "moniker": "realm_builder:CHILD_NAME/test",
         "payload": {
             "root": {
                 "table:0x0": {
@@ -241,7 +241,7 @@
             "filename": "root.inspect",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder\\:CHILD_NAME/test",
+        "moniker": "realm_builder:CHILD_NAME/test",
         "payload": {
             "root": {
                 "array:0xd": [

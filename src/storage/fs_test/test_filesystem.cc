@@ -134,10 +134,11 @@ void TestFilesystem::TakeSnapshot(std::optional<InspectData>* out) const {
   bool done = false;
 
   fpromise::result<std::vector<InspectData>, std::string> data_or_err;
-  diagnostics::reader::ArchiveReader reader(std::move(accessor),
-                                            {filesystem_->GetComponentSelector() + ":root"});
+  auto component_selector =
+      diagnostics::reader::SanitizeMonikerForSelectors(filesystem_->GetMoniker());
+  diagnostics::reader::ArchiveReader reader(std::move(accessor), {component_selector + ":root"});
   auto promise =
-      reader.SnapshotInspectUntilPresent({filesystem_->GetComponentSelector()})
+      reader.SnapshotInspectUntilPresent({filesystem_->GetMoniker()})
           .then([&](fpromise::result<std::vector<InspectData>, std::string>& inspect_data) {
             {
               std::unique_lock<std::mutex> lock(m);

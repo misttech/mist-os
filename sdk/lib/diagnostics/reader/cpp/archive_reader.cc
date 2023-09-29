@@ -216,4 +216,16 @@ fuchsia::diagnostics::BatchIteratorPtr ArchiveReader::GetBatchIterator(
   return iterator;
 }
 
+std::string SanitizeMonikerForSelectors(std::string_view moniker) {
+  std::string result(moniker);
+  const size_t ESCAPED_LEN = 2;
+  const size_t COLON_LEN = 1;
+  size_t index = 0;
+  while ((index = result.find(":", index)) != std::string::npos) {
+    result.replace(index, COLON_LEN, "\\:");
+    index += ESCAPED_LEN;
+  }
+  return result;
+}
+
 }  // namespace diagnostics::reader

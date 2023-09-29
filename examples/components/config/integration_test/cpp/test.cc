@@ -58,7 +58,7 @@ TEST_F(IntegrationTest, ConfigCpp) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
-  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
+  auto moniker = "realm_builder:" + realm.component().GetChildName() + "/" + child_name;
 
   auto data = GetInspect(child_name, moniker);
 
@@ -87,7 +87,7 @@ TEST_F(IntegrationTest, ConfigCppReplaceSome) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
-  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
+  auto moniker = "realm_builder:" + realm.component().GetChildName() + "/" + child_name;
 
   auto data = GetInspect(child_name, moniker);
 
@@ -113,7 +113,7 @@ TEST_F(IntegrationTest, ConfigCppReplaceAllPackaged) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
-  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
+  auto moniker = "realm_builder:" + realm.component().GetChildName() + "/" + child_name;
 
   auto data = GetInspect(child_name, moniker);
 
@@ -142,7 +142,7 @@ TEST_F(IntegrationTest, ConfigCppSetAllWhenEmpty) {
       .source = component_testing::ParentRef(),
       .targets = {component_testing::ChildRef{child_name}}});
   auto realm = realm_builder.Build();
-  auto moniker = "realm_builder\\:" + realm.component().GetChildName() + "/" + child_name;
+  auto moniker = "realm_builder:" + realm.component().GetChildName() + "/" + child_name;
 
   auto data = GetInspect(child_name, moniker);
 

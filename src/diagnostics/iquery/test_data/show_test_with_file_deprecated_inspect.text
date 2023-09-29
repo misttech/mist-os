@@ -1,4 +1,4 @@
-realm_builder\:CHILD_NAME/test:
+realm_builder:CHILD_NAME/test:
   metadata:
     filename = fuchsia.inspect.deprecated.Inspect
     component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/test_component.cm
@@ -48,4 +48,4 @@ realm_builder\:CHILD_NAME/test:
             double_value = 100.000000
             name = (2,2)
             value = 4
-        
+

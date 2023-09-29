@@ -349,7 +349,7 @@ fn clean_and_test_timestamps(map: &mut serde_json::Map<String, Value>) {
             (
                 test_topology::REALM_NAME_PATTERN
                     .replace(&key, "realm-name")
-                    .replace(r"realm_builder\:realm-name", "realm_builder"),
+                    .replace(r"realm_builder:realm-name", "realm_builder"),
                 value,
             )
         })
@@ -563,7 +563,7 @@ async fn verify_diagnostics_persistence_publication(published: Published) {
 }
 
 fn expected_stored_data(number: Option<i32>) -> String {
-    const BASE_SIZE: usize = 86;
+    const BASE_SIZE: usize = 84;
     let (persist_size, variant) = match number {
         None => (BASE_SIZE, "".to_string()),
         Some(number) => {
@@ -614,7 +614,7 @@ fn expected_diagnostics_persistence_inspect(published: Published) -> String {
                             "before_monotonic":0,
                             "after_monotonic":0
                         },
-                        "@persist_size": 100,
+                        "@persist_size": 98,
                         "realm_builder/single_counter": {
                             "samples": {
                                 "optional": %NUMBER%,

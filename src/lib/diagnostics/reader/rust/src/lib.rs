@@ -543,9 +543,10 @@ mod tests {
     async fn inspect_data_for_component() -> Result<(), anyhow::Error> {
         let instance = start_component().await?;
 
-        let moniker = format!("realm_builder\\:{}/test_component", instance.root.child_name());
+        let moniker = format!("realm_builder:{}/test_component", instance.root.child_name());
+        let component_selector = selectors::sanitize_moniker_for_selectors(&moniker);
         let results = ArchiveReader::new()
-            .add_selector(format!("{}:root", moniker))
+            .add_selector(format!("{component_selector}:root"))
             .snapshot::<Inspect>()
             .await?;
 
@@ -562,8 +563,8 @@ mod tests {
 
         let mut reader = ArchiveReader::new();
         reader
-            .add_selector(format!("{}:root:int", moniker))
-            .add_selector(format!("{}:root/lazy-node:a", moniker));
+            .add_selector(format!("{component_selector}:root:int"))
+            .add_selector(format!("{component_selector}:root/lazy-node:a"));
         let response = reader.snapshot::<Inspect>().await?;
 
         assert_eq!(response.len(), 1);

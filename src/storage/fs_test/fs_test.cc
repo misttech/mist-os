@@ -570,9 +570,9 @@ class BlobfsInstance : public FilesystemInstance {
     fs_.reset();
   }
 
-  std::string GetComponentSelector() const override {
+  std::string GetMoniker() const override {
     return component_.collection_name().has_value()
-               ? *component_.collection_name() + "\\:" + component_.child_name()
+               ? *component_.collection_name() + ":" + component_.child_name()
                : component_.child_name();
   }
 

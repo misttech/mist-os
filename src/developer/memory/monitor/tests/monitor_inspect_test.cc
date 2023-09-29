@@ -37,9 +37,11 @@ class InspectTest : public gtest::RealLoopFixture {
 
   ~InspectTest() { DestroyChild(); }
 
-  std::string ChildName() { return std::string(kTestCollectionName) + "\\:" + child_name_; }
+  std::string ChildName() { return std::string(kTestCollectionName) + ":" + child_name_; }
 
-  std::string ChildSelector() { return ChildName() + ":root"; }
+  std::string ChildSelector() {
+    return diagnostics::reader::SanitizeMonikerForSelectors(ChildName()) + ":root";
+  }
 
   fuchsia::component::decl::ChildRef ChildRef() {
     return {

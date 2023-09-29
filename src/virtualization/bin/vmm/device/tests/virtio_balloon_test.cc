@@ -97,10 +97,9 @@ class VirtioBalloonTest : public TestWithDevice {
 
   template <typename T>
   T InspectValue(std::string value_name) {
-    return GetInspect(
-               "realm_builder\\:" + realm_->component().GetChildName() + "/" + kComponentName +
-                   ":root",
-               "realm_builder\\:" + realm_->component().GetChildName() + "/" + kComponentName)
+    return GetInspect("realm_builder\\:" + realm_->component().GetChildName() + "/" +
+                          kComponentName + ":root",
+                      "realm_builder:" + realm_->component().GetChildName() + "/" + kComponentName)
         .GetByPath({"root", std::move(value_name)})
         .Get<T>();
   }

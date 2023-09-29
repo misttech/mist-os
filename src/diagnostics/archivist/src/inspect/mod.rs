@@ -327,10 +327,10 @@ impl ReaderServer {
         // and filtering it using the provided selector regular expressions. Each filtered
         // inspect hierarchy is then added to an accumulator as a HierarchyData to be converted
         // into a JSON string and returned.
-        let sanitized_moniker = pumped_inspect_data.identity.moniker.sanitized();
-        let sanitized_moniker = match &self.output_rewriter {
-            None => sanitized_moniker,
-            Some(rewriter) => rewriter.rewrite_moniker(sanitized_moniker),
+        let moniker = pumped_inspect_data.identity.moniker.to_string();
+        let moniker = match &self.output_rewriter {
+            None => moniker,
+            Some(rewriter) => rewriter.rewrite_moniker(moniker),
         };
 
         if let Some(configured_selectors) = &self.selectors {
@@ -376,7 +376,7 @@ impl ReaderServer {
             parent_trace_id,
         );
         Some(Data::for_inspect(
-            sanitized_moniker,
+            moniker,
             hierarchy_data.hierarchy,
             hierarchy_data.timestamp.into_nanos(),
             identity.url.clone(),

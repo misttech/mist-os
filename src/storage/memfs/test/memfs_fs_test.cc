@@ -67,8 +67,8 @@ class MemfsInstance : public fs_test::FilesystemInstance {
 
   fs_management::SingleVolumeFilesystemInterface* fs() override { return nullptr; }
 
-  std::string GetComponentSelector() const override {
-    ZX_ASSERT_MSG(false, "GetComponentSelector unimplemented for MemfsInstance");
+  std::string GetMoniker() const override {
+    ZX_ASSERT_MSG(false, "GetMoniker unimplemented for MemfsInstance");
     return "";
   }
 

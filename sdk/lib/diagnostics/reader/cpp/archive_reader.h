@@ -72,6 +72,8 @@ class ArchiveReader {
 
 void EmplaceInspect(rapidjson::Document document, std::vector<InspectData>* out);
 
+std::string SanitizeMonikerForSelectors(std::string_view moniker);
+
 }  // namespace diagnostics::reader
 
 #endif  // LIB_DIAGNOSTICS_READER_CPP_ARCHIVE_READER_H_

@@ -25,10 +25,11 @@ pub enum ListResultItem {
 
 impl ListResultItem {
     pub fn into_moniker(self) -> String {
-        match self {
+        let moniker = match self {
             Self::Moniker(moniker) => moniker,
             Self::MonikerWithUrl(MonikerWithUrl { moniker, .. }) => moniker,
-        }
+        };
+        selectors::sanitize_moniker_for_selectors(&moniker)
     }
 }
 

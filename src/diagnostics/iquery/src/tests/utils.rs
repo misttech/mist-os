@@ -274,6 +274,14 @@ impl<'a> CommandAssertion<'a> {
                     include_data = true;
                 }
             }
+            if line.starts_with("realm_builder:") {
+                if !line.starts_with(&format!("realm_builder:{}", self.instance_child_name)) {
+                    include_data = false;
+                    continue;
+                } else {
+                    include_data = true;
+                }
+            }
 
             result.push_str(line);
             result.push_str("\n");
