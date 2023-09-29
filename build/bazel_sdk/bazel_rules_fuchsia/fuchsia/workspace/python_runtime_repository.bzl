@@ -38,6 +38,7 @@ def _python_runtime_repository_impl(ctx):
     ctx.file(
         "BUILD.bazel",
         _BUILD_CONTENT,
+        executable = False,
     )
 
 python_runtime_repository = repository_rule(

@@ -52,7 +52,7 @@ def _record_path_dependency(repo_ctx, path_str):
         repo_ctx.path(Label("@//:" + path_str))
 
 def _compact_python_runtime_impl(repo_ctx):
-    repo_ctx.file("WORKSPACE.bzl", "")
+    repo_ctx.file("WORKSPACE.bzl", "", executable = False)
 
     # If content_hash_file is provided, make sure this repository rule
     # is re-run whenever its content changes.

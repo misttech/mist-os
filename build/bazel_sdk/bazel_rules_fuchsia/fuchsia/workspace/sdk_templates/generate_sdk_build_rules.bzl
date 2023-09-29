@@ -144,7 +144,7 @@ def _generate_sysroot_build_rules(ctx, meta, relative_dir, build_file, process_c
         strip_prefix = "../%s/%s" % (ctx.attr.name, libs_base)
 
         per_arch_build_file = build_file.dirname.get_child(arch).get_child("BUILD.bazel")
-        ctx.file(per_arch_build_file, content = _header())
+        ctx.file(per_arch_build_file, content = _header(), executable = False)
         _merge_template(
             ctx,
             per_arch_build_file,
@@ -459,7 +459,7 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
 
     for arch in arch_list:
         per_arch_build_file = build_file.dirname.get_child(arch).get_child("BUILD.bazel")
-        ctx.file(per_arch_build_file, content = _header())
+        ctx.file(per_arch_build_file, content = _header(), executable = False)
 
         linklib = meta["binaries"][arch]["link"]
         _merge_template(ctx, per_arch_build_file, tmpl_linklib, {
@@ -498,11 +498,11 @@ def _merge_template(ctx, target_build_file, template_file, subs):
     else:
         existing_content = ""
 
-    ctx.template(target_build_file, template_file, subs)
+    ctx.template(target_build_file, template_file, subs, executable = False)
 
     if existing_content != "":
         new_content = ctx.read(target_build_file)
-        ctx.file(target_build_file, content = existing_content + "\n" + new_content)
+        ctx.file(target_build_file, content = existing_content + "\n" + new_content, executable = False)
 
 def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_contents):
     generators = {
@@ -527,7 +527,7 @@ def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_conte
             continue
 
         if not build_file.exists:
-            ctx.file(build_file, content = _header())
+            ctx.file(build_file, content = _header(), executable = False)
 
         generator = generators[t]
         generator(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents)
@@ -633,7 +633,7 @@ def generate_sdk_constants(repo_ctx, manifests):
     generated_content += "# The following list of CPU names use Fuchsia conventions.\n"
     generated_content += "constants = %s\n" % constants
 
-    repo_ctx.file("generated_constants.bzl", generated_content)
+    repo_ctx.file("generated_constants.bzl", generated_content, executable = False)
 
     return constants
 

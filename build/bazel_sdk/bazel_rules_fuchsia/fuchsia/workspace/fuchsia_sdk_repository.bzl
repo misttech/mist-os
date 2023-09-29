@@ -83,6 +83,7 @@ def _merge_rules_fuchsia(ctx):
         substitutions = {
             "{{__FUCHSIA_SDK_INCLUDE__}}": rules_fuchsia_build_fragment,
         },
+        executable = False,
     )
 
 def _fuchsia_sdk_repository_impl(ctx):
@@ -102,7 +103,7 @@ def _fuchsia_sdk_repository_impl(ctx):
     else:
         fail("The fuchsia sdk no longer supports downloading content via the cipd tool. Please use local_paths or provide a local fuchsia build.")
 
-    ctx.file("WORKSPACE.bazel", content = "")
+    ctx.file("WORKSPACE.bazel", content = "", executable = False)
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
@@ -110,6 +111,7 @@ def _fuchsia_sdk_repository_impl(ctx):
         substitutions = {
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
         },
+        executable = False,
     )
 
     # Extract the target CPU names supported by our SDK manifests, then

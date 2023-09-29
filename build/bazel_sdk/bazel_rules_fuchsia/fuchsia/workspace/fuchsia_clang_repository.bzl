@@ -64,7 +64,7 @@ def _fuchsia_clang_repository_impl(ctx):
     # https://github.com/bazelbuild/bazel/issues/3901
     fuchsia_sdk_path = ctx.path(ctx.attr.sdk_root_label.relative("//:BUILD.bazel")).dirname
 
-    ctx.file("WORKSPACE.bazel", content = "")
+    ctx.file("WORKSPACE.bazel", content = "", executable = False)
 
     ctx.symlink(
         Label("//fuchsia/workspace/clang_templates:defs.bzl"),
@@ -114,6 +114,7 @@ def _fuchsia_clang_repository_impl(ctx):
         substitutions = {
             "%{CLANG_VERSION}": clang_version,
         },
+        executable = False,
     )
 
     # To properly use a custom Bazel C++ sysroot, the following are necessary:
