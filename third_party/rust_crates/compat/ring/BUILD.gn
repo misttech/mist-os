@@ -2,12 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# C and Assembly parts of ring 0.16.14
+# C and Assembly parts of ring 0.16.15
 #
 # More advanced usages of might require more sophisticated
 # build rules
 
-ring_crate = "../../vendor/ring-0.16.14"
+ring_crate = "../../vendor/ring-0.16.15"
 
 config("ring-config") {
   if (current_cpu == "riscv64") {
@@ -336,7 +336,7 @@ static_library("ring-curve25519") {
   include_dirs = [ "$ring_crate/include" ]
   configs += [ ":ring-config" ]
 
-  sources = [ "$ring_crate/third_party/fiat/curve25519.c" ]
+  sources = [ "$ring_crate/crypto/curve25519/curve25519.c" ]
 }
 
 static_library("ring-cpu-intel") {
