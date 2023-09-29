@@ -4466,6 +4466,19 @@ mod macro_test {
     }
 
     #[test]
+    fn type_with_lifetime_and_no_ip_parameter() {
+        #[allow(dead_code)]
+        #[derive(GenericOverIp)]
+        #[generic_over_ip()]
+        struct Generic<'a> {
+            field: &'a (),
+        }
+
+        assert_ip_generic_is::<Generic<'static>, Ipv4, Generic<'static>>();
+        assert_ip_generic_is::<Generic<'static>, Ipv6, Generic<'static>>();
+    }
+
+    #[test]
     fn type_with_params_list_with_trailing_comma() {
         trait IpExtensionTraitWithVeryLongName {}
         trait OtherIpExtensionTraitWithVeryLongName {}

@@ -91,11 +91,14 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
     if expect_trailing_angle_bracket {
         assert_matches!(impl_generics.pop(), Some(TokenTree::Punct(p)) if p.as_char() == '>');
     }
+
+    // Add a trailing comma if `impl_generics` is non-empty and doesn't have one.
     match impl_generics.last() {
-        Some(TokenTree::Punct(p)) if p.as_char() == ',' => {
-            let _ = impl_generics.pop();
+        Some(TokenTree::Punct(p)) if p.as_char() == ',' => {}
+        None => {}
+        Some(_) => {
+            impl_generics.push(parse_quote! { , });
         }
-        Some(_) | None => (),
     }
 
     let impl_generics = impl_generics.into_iter().collect::<TokenStream2>();
@@ -129,7 +132,7 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
             );
 
             quote! {
-                impl <#impl_generics, #generic_ip_name: Ip>
+                impl <#impl_generics #generic_ip_name: Ip>
                 GenericOverIp<IpType> for #name #type_generics
                 where #bound_if_generic_over_ip #extra_bounds_target: #(#extra_bounds)+*, {
                     type Type = #name #generic_bounds;
@@ -139,7 +142,7 @@ fn impl_derive_generic_over_ip(ast: &syn::DeriveInput) -> TokenStream2 {
         None => {
             // The type is IP-invariant so `GenericOverIp::Type` is always Self.`
             quote! {
-                impl <IpType: Ip, #impl_generics> GenericOverIp<IpType> for #name #type_generics {
+                impl <#impl_generics IpType: Ip> GenericOverIp<IpType> for #name #type_generics {
                     type Type = Self;
                 }
             }
