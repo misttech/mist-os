@@ -11,35 +11,6 @@ on the first error.
 
 import argparse
 import json
-import os
-
-
-def sort(data):
-    if isinstance(data, dict):
-        return {
-            key: (
-                sort(value)
-                if key
-                not in [
-                    "args",
-                    "arguments",
-                    "children",
-                    "injected-services",
-                    "networks",
-                    "setup",
-                    "test",
-                ]
-                else value
-            )
-            for key, value in data.items()
-        }
-    elif isinstance(data, list):
-        inner = (sort(datum) for datum in data)
-        if any(isinstance(datum, dict) for datum in data):
-            return list(inner)
-        return sorted(inner)
-    else:
-        return data
 
 
 def main():
