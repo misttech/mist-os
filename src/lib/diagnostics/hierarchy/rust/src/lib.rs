@@ -312,17 +312,6 @@ property_type_getters_ref!(
     [StringList, string_list, [String]]
 );
 
-// TODO(fxbug.dev/302138500): remove once soft-migration is done.
-impl<Key> Property<Key> {
-    /// Returns the "uint" value or `None` if the property isn't of that type.
-    pub fn uint_ref(&self) -> Option<&u64> {
-        match self {
-            Property::Uint(_, value) => Some(value),
-            _ => None,
-        }
-    }
-}
-
 struct WorkStackEntry<'a, Key> {
     node: &'a DiagnosticsHierarchy<Key>,
     key: Vec<&'a str>,
