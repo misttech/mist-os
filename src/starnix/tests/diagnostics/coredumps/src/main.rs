@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_reader::{ArchiveReader, DiagnosticsHierarchy, Inspect};
+use diagnostics_reader::{ArchiveReader, Inspect};
 use fuchsia_component_test::ScopedInstance;
+use parse_starnix_inspect::CoredumpReport;
 
 #[fuchsia::main]
 async fn main() {
@@ -65,13 +66,6 @@ async fn main() {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct CoredumpReport {
-    idx: usize,
-    pid: i64,
-    argv: String,
-}
-
 // Snapshotting inspect can be a bit racy -- over enough runs we'll end up reading the node
 // hierarchy at points where the node exists but none of its children, where nodes exist but not
 // one of their properties, etc. Return an Option here for cases where we couldn't actually read the
@@ -85,58 +79,5 @@ async fn get_coredumps_from_inspect() -> Option<Vec<CoredumpReport>> {
         .await
         .ok()?;
     assert_eq!(kernel_inspect.len(), 1);
-
-    // Examine all of the properties and children so that we are alerted that this test may need to
-    // be updated if coredump reports gain new information.
-    let DiagnosticsHierarchy { name, properties, children, .. } = kernel_inspect[0]
-        .payload
-        .as_ref()?
-        .get_child_by_path(&["container", "kernel", "coredumps"])
-        .cloned()?;
-    assert_eq!(name, "coredumps");
-    assert_eq!(properties, vec![]);
-
-    let mut reports = vec![];
-    for DiagnosticsHierarchy {
-        name: idx_str,
-        properties: coredump_properties,
-        children: coredump_children,
-        ..
-    } in children
-    {
-        assert_eq!(coredump_children, vec![], "coredump reports aren't expected to have children");
-
-        let mut argv = None;
-        let mut pid = None;
-        for property in coredump_properties {
-            match property.name() {
-                "argv" => {
-                    argv = Some(
-                        property
-                            .string()
-                            .expect("starnix should put a string in the argv property")
-                            .to_string(),
-                    )
-                }
-
-                // TODO(https://fxbug.dev/130834) i64/int in kernel shows up as u64/uint here
-                "pid" => {
-                    pid = Some(
-                        property.uint().expect("starnix should put a uint in the pid property")
-                            as i64,
-                    )
-                }
-                other => panic!("unrecognized coredump report property `{other}`"),
-            }
-        }
-
-        reports.push(CoredumpReport {
-            idx: idx_str.parse().expect("starnix coredump node names should be integers"),
-            pid: pid.expect("retrieving pid property"),
-            argv: argv.expect("retrieving argv property"),
-        });
-    }
-    reports.sort();
-
-    Some(reports)
+    CoredumpReport::extract_from_snapshot(&kernel_inspect[0])
 }
