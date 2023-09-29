@@ -387,23 +387,13 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(set(c.remote_action.always_download), set([depfile]))
 
         with mock.patch.object(
-            cxx_remote_wrapper.CxxRemoteAction, "_rewrite_remote_depfile"
-        ) as mock_rewrite:
-            with mock.patch.object(
-                cxx_remote_wrapper.CxxRemoteAction,
-                "_depfile_exists",
-                return_value=True,
-            ) as mock_exists:
-                with mock.patch.object(
-                    remote_action.RemoteAction,
-                    "_run_maybe_remotely",
-                    return_value=cl_utils.SubprocessResult(0),
-                ) as mock_remote:
-                    exit_code = c.run()
+            remote_action.RemoteAction,
+            "_run_maybe_remotely",
+            return_value=cl_utils.SubprocessResult(0),
+        ) as mock_remote:
+            exit_code = c.run()
 
         self.assertEqual(exit_code, 0)
-        mock_rewrite.assert_called_with()
-        mock_exists.assert_called_with()
 
     def test_rewrite_remote_depfile(self):
         compiler = Path("ppc-macho-g++")

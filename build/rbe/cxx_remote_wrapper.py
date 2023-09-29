@@ -194,10 +194,10 @@ class CxxRemoteAction(object):
         ]
 
     def _post_remote_success_action(self) -> int:
-        # Remotely generated gcc depfiles may contain absolute paths
-        # that are not suitable for local use.  Rewrite them.
-        if self.compiler_type == cxx.Compiler.GCC and self._depfile_exists():
-            self._rewrite_remote_depfile()
+        # To prevent remotely produced depfiles from containing absolute paths
+        # to the remote build environment, use -no-canonical-prefixes (clang and
+        # gcc).  Otherwise, you will need to self._rewrite_remote_depfile().
+
         # TODO: if downloads were skipped, need to force-download depfile
         return 0
 
