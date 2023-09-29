@@ -138,8 +138,11 @@ where
     let mut tasks = Vec::new();
     let transfer_entry_count = transfer_manifest.entries.len() as u64;
     for (i, transfer_entry) in transfer_manifest.entries.iter().enumerate() {
-        // Avoid using base_url.join().
-        let te_remote_dir = format!("{}/{}", base_url, transfer_entry.remote.as_str());
+        let te_remote_dir = match url::Url::parse(transfer_entry.remote.as_str()) {
+            Ok(url) => url.to_string(),
+            // Avoid using base_url.join().
+            Err(_) => format!("{}/{}", base_url, transfer_entry.remote.as_str()),
+        };
 
         let te_local_dir = safe_join(&local_dir, transfer_entry.local.as_std_path())
             .context("parsing path: `entries[].local`")
@@ -147,8 +150,11 @@ where
         let artifact_entry_count = transfer_entry.entries.len() as u64;
         for (k, artifact_entry) in transfer_entry.entries.iter().enumerate() {
             // Avoid using te_remote_dir.join().
-            let remote_file =
-                url::Url::parse(&format!("{}/{}", te_remote_dir, artifact_entry.name.as_str()))?;
+            let remote_file = url::Url::parse(&format!(
+                "{}/{}",
+                te_remote_dir.trim_end_matches('/'),
+                artifact_entry.name.as_str()
+            ))?;
 
             let local_file = safe_join(&te_local_dir, artifact_entry.name.as_std_path())
                 .context("parsing path: `entries[].entries[].name`")
