@@ -236,8 +236,21 @@ impl ChunkedArchiveHeader {
     }
 }
 
-pub(crate) struct ChunkedArchive {
-    chunks: Vec<(/*chunk_size*/ usize, /*chunk_data*/ Vec<u8>)>,
+/// In-memory representation of a compressed chunk.
+pub struct CompressedChunk {
+    /// Compressed data for this chunk.
+    pub compressed_data: Vec<u8>,
+    /// Size of this chunk when decompressed.
+    pub decompressed_size: usize,
+}
+
+/// In-memory representation of a compressed chunked archive.
+pub struct ChunkedArchive {
+    /// Chunks this archive contains, in order. Right now we only allow creating archives with
+    /// contiguous compressed and decompressed space.
+    chunks: Vec<CompressedChunk>,
+    /// Size used to chunk input when creating this archive. Last chunk may be smaller than this amount.
+    chunk_size: usize,
 }
 
 impl ChunkedArchive {
@@ -250,7 +263,7 @@ impl ChunkedArchive {
     /// but this function can also be executed within a locally scoped pool.
     pub fn new(data: &[u8], chunk_alignment: usize) -> Result<Self, ChunkedArchiveError> {
         let chunk_size = ChunkedArchive::chunk_size_for(data.len(), chunk_alignment);
-        let mut chunks: Vec<Result<(usize, Vec<u8>), ChunkedArchiveError>> = vec![];
+        let mut chunks: Vec<Result<CompressedChunk, ChunkedArchiveError>> = vec![];
         data.par_chunks(chunk_size)
             .map(|chunk| {
                 // Creating and destroying zstd::bulk::Compressor objects is expensive. A single
@@ -267,31 +280,47 @@ impl ChunkedArchive {
                             compressor
                         });
                 }
-                let compressed = COMPRESSOR.with(|compressor| {
+                let compressed_data = COMPRESSOR.with(|compressor| {
                     let mut compressor = compressor.borrow_mut();
                     compressor.compress(chunk).map_err(ChunkedArchiveError::DecompressionError)
                 })?;
-                Ok((chunk.len(), compressed))
+                Ok(CompressedChunk { compressed_data, decompressed_size: chunk.len() })
             })
             .collect_into_vec(&mut chunks);
         let chunks: Vec<_> = chunks.into_iter().try_collect()?;
-        Ok(ChunkedArchive { chunks })
+        Ok(ChunkedArchive { chunks, chunk_size })
+    }
+
+    /// Accessor for compressed chunk data.
+    pub fn chunks(&self) -> &Vec<CompressedChunk> {
+        &self.chunks
+    }
+
+    /// The chunk size calculated for this archive during compression. Represents how input data
+    /// was chunked for compression. Note that the final chunk may be smaller than this amount
+    /// when decompressed.
+    pub fn chunk_size(&self) -> usize {
+        self.chunk_size
+    }
+
+    /// Sum of sizes of all compressed chunks.
+    pub fn compressed_data_size(&self) -> usize {
+        self.chunks.iter().map(|chunk| chunk.compressed_data.len()).sum()
     }
 
     /// Total size of the archive in bytes.
     pub fn serialized_size(&self) -> usize {
-        let (seek_table, compressed_size) = self.make_seek_table();
-        ChunkedArchiveHeader::header_length(seek_table.len()) + compressed_size
+        ChunkedArchiveHeader::header_length(self.chunks.len()) + self.compressed_data_size()
     }
 
     /// Write the archive to `writer`.
     pub fn write(self, mut writer: impl std::io::Write) -> Result<(), std::io::Error> {
-        let (seek_table, _compressed_size) = self.make_seek_table();
+        let seek_table = self.make_seek_table();
         let header = ChunkedArchiveHeader::new(&seek_table).unwrap();
         writer.write_all(header.as_bytes())?;
         writer.write_all(seek_table.as_slice().as_bytes())?;
-        for (_, chunk) in self.chunks {
-            writer.write_all(&chunk)?;
+        for chunk in self.chunks {
+            writer.write_all(&chunk.compressed_data)?;
         }
         Ok(())
     }
@@ -309,23 +338,23 @@ impl ChunkedArchive {
     }
 
     /// Create the seek table for this archive.
-    fn make_seek_table(&self) -> (Vec<SeekTableEntry>, usize) {
+    fn make_seek_table(&self) -> Vec<SeekTableEntry> {
         let header_length = ChunkedArchiveHeader::header_length(self.chunks.len());
         let mut seek_table = vec![];
         seek_table.reserve(self.chunks.len());
         let mut compressed_size: usize = 0;
         let mut decompressed_offset: usize = 0;
-        for (chunk_size, chunk) in &self.chunks {
+        for chunk in &self.chunks {
             seek_table.push(SeekTableEntry {
                 decompressed_offset: (decompressed_offset as u64).into(),
-                decompressed_size: (*chunk_size as u64).into(),
+                decompressed_size: (chunk.decompressed_size as u64).into(),
                 compressed_offset: ((header_length + compressed_size) as u64).into(),
-                compressed_size: (chunk.len() as u64).into(),
+                compressed_size: (chunk.compressed_data.len() as u64).into(),
             });
-            compressed_size += chunk.len();
-            decompressed_offset += *chunk_size;
+            compressed_size += chunk.compressed_data.len();
+            decompressed_offset += chunk.decompressed_size;
         }
-        (seek_table, compressed_size)
+        seek_table
     }
 }
 
