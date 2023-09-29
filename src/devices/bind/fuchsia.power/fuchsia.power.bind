@@ -9,3 +9,8 @@ extend uint fuchsia.BIND_PROTOCOL {
   IMPL = 0x6E,
   SENSOR = 0x97,
 };
+
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  SENSOR = 0x10,  // fuchsia.hardware.power.sensor.Service
+  DEVICE = 0x15,  // fuchsia.hardware.power.Service
+};

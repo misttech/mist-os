@@ -13,7 +13,7 @@
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
-#include <bind/fuchsia/hardware/power/sensor/cpp/bind.h>
+#include <bind/fuchsia/power/cpp/bind.h>
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <ddktl/device.h>
 
@@ -140,7 +140,7 @@ zx_status_t Nelson::PowerInit() {
   };
   const ddk::BindRule kPowerSensorRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
-                              bind_fuchsia_hardware_power_sensor::BIND_FIDL_PROTOCOL_DEVICE),
+                              bind_fuchsia_power::BIND_FIDL_PROTOCOL_SENSOR),
   };
   const device_bind_prop_t kGpioProperties[] = {
       ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -153,8 +153,7 @@ zx_status_t Nelson::PowerInit() {
   };
 
   const device_bind_prop_t kPowerSensorProperties[] = {
-      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
-                        bind_fuchsia_hardware_power_sensor::BIND_FIDL_PROTOCOL_DEVICE),
+      ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_power::BIND_FIDL_PROTOCOL_SENSOR),
       ddk::MakeProperty(bind_fuchsia::POWER_SENSOR_DOMAIN,
                         bind_fuchsia_amlogic_platform_s905d3::BIND_POWER_SENSOR_DOMAIN_AUDIO),
   };
