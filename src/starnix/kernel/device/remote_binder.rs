@@ -670,7 +670,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         });
         let remote_binder_connection = receiver.await??;
 
-        scopeguard::defer_on_success! {
+        scopeguard::defer! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
             remote_binder_connection.close();
