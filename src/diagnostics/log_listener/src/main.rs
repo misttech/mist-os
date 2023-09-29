@@ -8,6 +8,7 @@
 //! writes them to disk.
 
 use anyhow::{format_err, Error};
+use argh::EarlyExit;
 use argh::FromArgs;
 use async_trait::async_trait;
 use chrono::TimeZone;
@@ -15,7 +16,6 @@ use ffx_writer::Format;
 use ffx_writer::MachineWriter;
 use fidl_fuchsia_diagnostics::StreamParameters;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_syslog_listener as syslog_listener;
 use fuchsia_syslog_listener::LogProcessor;
@@ -28,7 +28,6 @@ use log_formatter::DefaultLogFormatter;
 use log_formatter::LogEntry;
 use log_formatter::Symbolize;
 use log_utils::log_formatter::BootTimeAccessor;
-use log_utils::DumpCommand;
 use log_utils::LogCommand;
 use log_utils::LogSubCommand;
 use log_utils::WatchCommand;
@@ -248,6 +247,7 @@ struct LogListenerOptions {
     filter: LogFilterOptions,
     local: LocalOptions,
     selectors: Vec<LogInterestSelector>,
+    print_deprecation_warning: bool,
 }
 
 impl Default for LogListenerOptions {
@@ -264,6 +264,7 @@ impl Default for LogListenerOptions {
             },
             local: LocalOptions::default(),
             selectors: vec![],
+            print_deprecation_warning: false,
         }
     }
 }
@@ -547,7 +548,18 @@ fn check_for_param(i: usize, args: &[String]) -> Result<bool, String> {
     return Err(format!("'{}' is missing a parameter", flag));
 }
 
-fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
+fn warn_deprecated_and_gone(flag: &str, replacement: Option<&str>) {
+    if let Some(replacement) = replacement {
+        eprintln!("IMPORTANT: {flag} IS DEPRECATED and being removed. Please use: {replacement}.");
+    } else {
+        eprintln!("IMPORTANT: {flag} IS DEPRECATED and being removed.");
+    }
+}
+
+fn parse_flags(
+    args: &[String],
+    print_deprecation_warning: bool,
+) -> Result<LogListenerOptions, String> {
     let mut options = LogListenerOptions::default();
     let mut i = 0;
     let mut severity_passed = false;
@@ -557,9 +569,15 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
 
         match argument.as_ref() {
             "--begin" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--begin", None);
+                }
                 options.local.begin.extend(args[i + 1].split(",").map(String::from));
             }
             "--end" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--end", None);
+                }
                 options.local.end.extend(args[i + 1].split(",").map(String::from));
             }
             "--tag" => {
@@ -576,6 +594,9 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                 }
             }
             "--ignore-tag" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--ignore-tag", Some("--exclude-tags"));
+                }
                 let tag = &args[i + 1];
                 if tag.len() > MAX_TAG_LEN_BYTES as usize {
                     return Err(format!(
@@ -586,12 +607,21 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                 options.local.ignore_tags.insert(tag.to_owned());
             }
             "--only" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--only", None);
+                }
                 options.local.only.extend(args[i + 1].split(",").map(String::from));
             }
             "--pretty" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--pretty", None);
+                }
                 options.local.is_pretty = true;
             }
             "--since_now" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--since_now", Some("--since now"));
+                }
                 options.local.since_time = Some(zx::Time::get_monotonic().into_nanos());
             }
             "--suppress" => {
@@ -661,6 +691,9 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                 }
             }
             "--file" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--file", None);
+                }
                 options.local.file = Some((&args[i + 1]).clone());
             }
             "--file_capacity" => match args[i + 1].parse::<u64>() {
@@ -676,6 +709,9 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
             },
             "--startup_sleep" => match args[i + 1].parse::<u64>() {
                 Ok(n) => {
+                    if print_deprecation_warning {
+                        warn_deprecated_and_gone("--startup_sleep", None);
+                    }
                     options.local.startup_sleep = n;
                 }
                 Err(_) => {
@@ -695,6 +731,9 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                 options.local.time_format = args[i + 1].clone();
             }
             "--dump_logs" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--dump_logs", Some("dump"));
+                }
                 options.local.dump_logs = true;
             }
             "--select" => {
@@ -747,9 +786,15 @@ fn parse_flags(args: &[String]) -> Result<LogListenerOptions, String> {
                 }
             }
             "--hide_metadata" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--hide_metadata", Some("--show-metadata false"));
+                }
                 options.local.hide_metadata = true;
             }
             "--color_components" => {
+                if print_deprecation_warning {
+                    warn_deprecated_and_gone("--color_components", None);
+                }
                 options.local.color_components = true;
             }
             a => {
@@ -1037,47 +1082,28 @@ impl Symbolize for Symbolizer {
     }
 }
 
+#[derive(Debug, thiserror::Error)]
+enum LogError {
+    #[error(transparent)]
+    UnknownError(#[from] anyhow::Error),
+    #[error("Early exit: {:?}", error)]
+    EarlyExit { error: EarlyExit },
+}
+
+impl From<EarlyExit> for LogError {
+    fn from(error: EarlyExit) -> Self {
+        Self::EarlyExit { error }
+    }
+}
+
 /// Converts raw process arguments (env::args()) into a LogCommand.
-fn log_command_from_args(raw_arguments: Vec<String>) -> (LogCommand, LogSubCommand) {
-    // Existing clients pass --dump_logs yes
-    // or --dump_logs to us sometimes. argh doesn't support
-    // underscores in flags so this is a hack to workaround
-    // that restriction.
-    // TODO(https://fxbug.dev/133105): Remove hack. This is needed
-    // because various things are calling log_listener
-    // with --dump_logs, so we need this hack to continue
-    // supporting the old flag in the rewrite until all usages
-    // of the old one can be removed.
-    let mut prev_was_dump_logs = false;
-    let mut should_dump_logs = false;
-    let args: Vec<&str> = raw_arguments
-        .iter()
-        .map(|value| value.as_str())
-        .skip(1)
-        .filter(|value| {
-            if *value == "--dump_logs" {
-                prev_was_dump_logs = true;
-                // This is true even if "yes" isn't passed
-                // to maintain previous behavior.
-                should_dump_logs = true;
-                return false;
-            }
-            if prev_was_dump_logs && *value == "yes" {
-                prev_was_dump_logs = false;
-                return false;
-            }
-            prev_was_dump_logs = false;
-            true
-        })
-        .collect();
-    let cmd = LogCommand::from_args(&[raw_arguments[0].as_str()], args.as_slice())
-        .unwrap_or_else(|early_exit| handle_early_exit(early_exit));
-    let sub_command = if should_dump_logs {
-        LogSubCommand::Dump(DumpCommand {})
-    } else {
-        cmd.sub_command.clone().unwrap_or(LogSubCommand::Watch(WatchCommand {}))
-    };
-    (cmd, sub_command)
+fn log_command_from_args(
+    raw_arguments: Vec<String>,
+) -> Result<(LogCommand, LogSubCommand), LogError> {
+    let args: Vec<&str> = raw_arguments.iter().map(|value| value.as_str()).skip(1).collect();
+    let cmd = LogCommand::from_args(&[raw_arguments[0].as_str()], args.as_slice())?;
+    let sub_command = cmd.sub_command.clone().unwrap_or(LogSubCommand::Watch(WatchCommand {}));
+    Ok((cmd, sub_command))
 }
 
 // Pretty-prints an early exit and exits with an appropriate status code.
@@ -1099,12 +1125,12 @@ fn handle_early_exit(early_exit: argh::EarlyExit) -> ! {
 }
 
 /// Main entrypoint for the log_listener rewrite
-async fn new_log_main() -> Result<(), Error> {
+async fn log_main() -> Result<(), LogError> {
     let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
     let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
     let is_json =
         std::env::vars().any(|value| value == ("machine".to_string(), "json".to_string()));
-    let (mut cmd, sub_command) = log_command_from_args(env::args().collect());
+    let (mut cmd, sub_command) = log_command_from_args(env::args().collect())?;
     let stream_mode = if matches!(sub_command, LogSubCommand::Dump(..)) {
         fidl_fuchsia_diagnostics::StreamMode::Snapshot
     } else {
@@ -1151,21 +1177,21 @@ async fn new_log_main() -> Result<(), Error> {
     Ok(())
 }
 
-fn run_log_listener(options: Option<LogListenerOptions>) -> Result<(), Error> {
-    let mut executor = fasync::LocalExecutor::new();
-    let (filter_options, local_options, selectors) = match options {
-        None => (None, LocalOptions::default(), None),
-        Some(o) => (Some(o.filter), o.local, Some(o.selectors)),
+async fn run_log_listener(options: Option<LogListenerOptions>) -> Result<(), Error> {
+    let (filter_options, local_options, selectors, print_deprecation_warning) = match options {
+        None => (None, LocalOptions::default(), None, false),
+        Some(o) => (Some(o.filter), o.local, Some(o.selectors), o.print_deprecation_warning),
     };
+    if print_deprecation_warning {
+        eprintln!("\nWARNING: The command you are using is deprecated.");
+        eprintln!("Please run log_listener log --help for updated syntax.");
+        let sleep_time = time::Duration::from_secs(2);
+        thread::sleep(sleep_time);
+    }
     let dump_logs = local_options.dump_logs;
     let l = new_listener(local_options)?;
-    let listener_fut = syslog_listener::run_log_listener(
-        l,
-        filter_options.as_ref(),
-        dump_logs,
-        selectors.as_deref(),
-    );
-    executor.run_singlethreaded(listener_fut)?;
+    syslog_listener::run_log_listener(l, filter_options.as_ref(), dump_logs, selectors.as_deref())
+        .await?;
     Ok(())
 }
 
@@ -1173,30 +1199,49 @@ fn fmt_regex_icase(capture_name: &str, search_key: &str) -> String {
     format!(r#"(?i)(?P<{}>(?:{}))"#, capture_name, search_key)
 }
 
-fn main() -> Result<(), Error> {
-    // NOTE: This comparison is needed to workaround
-    // Rust's dead code detection.
-    if "".to_string() == "" && ENABLE_REWRITE {
-        let mut executor = fasync::LocalExecutor::new();
-        return executor.run_singlethreaded(new_log_main());
-    }
+async fn run_legacy_mode(print_deprecation_warning: bool) -> Result<(), Error> {
     let args: Vec<String> = env::args().collect();
     if args.len() > 1 && (args[1] == "--help" || args[1] == "-h") {
         return Err(format_err!("{}\n", help(args[0].as_ref())));
     }
-    let options =
-        parse_flags(&args[1..]).map_err(|e| format_err!("{}\n{}\n", e, help(args[0].as_ref())))?;
+    let mut options = parse_flags(&args[1..], print_deprecation_warning)
+        .map_err(|e| format_err!("{}\n{}\n", e, help(args[0].as_ref())))?;
 
+    if print_deprecation_warning {
+        options.print_deprecation_warning = true;
+    }
     let sleep_time = time::Duration::from_millis(options.local.startup_sleep);
     thread::sleep(sleep_time);
 
-    run_log_listener(Some(options))
+    run_log_listener(Some(options)).await
+}
+
+#[fuchsia_async::run_singlethreaded]
+async fn main() -> Result<(), Error> {
+    // NOTE: This comparison is needed to workaround
+    // Rust's dead code detection.
+    if "".to_string() == "" && ENABLE_REWRITE {
+        match log_main().await {
+            Ok(_) => return Ok(()),
+            Err(LogError::EarlyExit { error }) => {
+                if run_legacy_mode(true).await.is_err() {
+                    handle_early_exit(error);
+                }
+                return Ok(());
+            }
+            Err(other) => {
+                return Err(other.into());
+            }
+        }
+    }
+    run_legacy_mode(false).await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use fuchsia_async as fasync;
     use std::fs::File;
     use std::io::Read;
     use tempfile::TempDir;
@@ -1214,27 +1259,12 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_parse_args() {
-        let (_cmd, subcommand) =
-            log_command_from_args(vec!["log_listener".to_string(), "--dump_logs".to_string()]);
-        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
-
-        let (_cmd, subcommand) = log_command_from_args(vec![
-            "log_listener".to_string(),
-            "--dump_logs".to_string(),
-            "yes".to_string(),
-        ]);
-        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
-
-        let (cmd, subcommand) = log_command_from_args(vec![
-            "log_listener".to_string(),
-            "--dump_logs".to_string(),
-            "yes".to_string(),
-            "--tag".to_string(),
-            "yes".to_string(),
-        ]);
-        assert_eq!(subcommand, LogSubCommand::Dump(DumpCommand {}));
-        assert_eq!(cmd.tag, vec!["yes".to_string()]);
+    fn test_fallback() {
+        assert_eq!(
+            log_command_from_args(vec!["log_listener".to_string(), "--dump_logs".to_string()])
+                .is_err(),
+            true
+        );
     }
 
     #[fuchsia::test]
@@ -1653,7 +1683,7 @@ mod tests {
         use super::*;
 
         fn parse_flag_test_helper(args: &[String], options: Option<&LogListenerOptions>) {
-            match parse_flags(args) {
+            match parse_flags(args, false) {
                 Ok(l) => match options {
                     None => {
                         panic!("parse_flags should have returned error, got: {:?}", l);
