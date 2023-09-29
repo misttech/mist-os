@@ -102,7 +102,7 @@ From //build/images/args.gni:140
 
 **Current value (from the default):** `true`
 
-From //build/config/fuchsia/platform_version.gni:53
+From //build/config/fuchsia/platform_version.gni:54
 
 ### archivist_max_cached_logs_bytes
 
@@ -966,7 +966,7 @@ If true, build for N+1 api level, where N is platform_version.in_development_api
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:18
+From //build/config/fuchsia/platform_version.gni:19
 
 ### cache_package_labels
 
@@ -3238,7 +3238,7 @@ From //src/fonts/build/font_args.gni:12
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:23
+From //build/config/fuchsia/platform_version.gni:24
 
 ### fuchsia_async_trace_level_logging
 
@@ -3909,7 +3909,7 @@ platform-version-roller when the API level is incremented.
 
 **Current value (from the default):** `false`
 
-From //build/config/fuchsia/platform_version.gni:52
+From //build/config/fuchsia/platform_version.gni:53
 
 ### include_shell_commands_package
 
@@ -5281,7 +5281,7 @@ Allows building the platform source code for a specific API level.
 
 **Current value (from the default):** `-1`
 
-From //build/config/fuchsia/platform_version.gni:21
+From //build/config/fuchsia/platform_version.gni:22
 
 ### package_flavor_selections
 
