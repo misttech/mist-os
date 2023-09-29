@@ -251,6 +251,7 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "asinhf",
     "asinhl",
     "asinl",
+    "asprintf",
     "atan",
     "atan2",
     "atan2f",
