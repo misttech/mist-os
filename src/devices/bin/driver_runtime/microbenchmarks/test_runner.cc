@@ -10,5 +10,5 @@ int main(int argc, char** argv) {
   if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
     return status;
   }
-  return perftest::PerfTestMain(argc, argv, "driver_runtime.microbenchmarks");
+  return perftest::PerfTestMain(argc, argv, "fuchsia.driver_runtime");
 }

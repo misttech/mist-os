@@ -20,6 +20,7 @@ test_list = [
   "archivist_benchmarks_test",
   "audio_mixer_profiler_test",
   "diagnostics_benchmarks_test",
+  "driver_runtime_microbenchmarks_test",
   "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
   "input_latency_benchmarks_test",
@@ -212,6 +213,7 @@ if (is_host) {
     "fuchsia.diagnostics.txt",
     "fuchsia.diagnostics_log_rust.core.txt",
     "fuchsia.diagnostics_log_rust.encoding.txt",
+    "fuchsia.driver_runtime_microbenchmarks.txt",
     "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
@@ -308,6 +310,7 @@ if (is_host) {
 group("package_deps") {
   testonly = true
   public_deps = [
+    "//src/devices/bin/driver_runtime/microbenchmarks",
     "//src/diagnostics:benchmarks",
     "//src/lib/diagnostics:benchmarks",
     "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",

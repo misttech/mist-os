@@ -7,6 +7,7 @@
 #include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/runtime/testing/cpp/internal/test_dispatcher_builder.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/cpp/channel.h>
 #include <lib/fdf/cpp/channel_read.h>
@@ -59,11 +60,19 @@ class RuntimeDispatcher : public AsyncDispatcher {
       // Reset the runtime to 0 threads.
       fdf_env_reset();
     }
-    auto dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
-        &fake_driver_, {}, "client",
-        [&](fdf_dispatcher_t* dispatcher) { shutdown_completion_.Signal(); });
-    ASSERT_OK(dispatcher.status_value());
-    dispatcher_ = *std::move(dispatcher);
+
+    zx::result<fdf::SynchronizedDispatcher> sync_dispatcher;
+    if (use_threads) {
+      sync_dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+          &fake_driver_, {}, "client",
+          [&](fdf_dispatcher_t* dispatcher) { shutdown_completion_.Signal(); });
+    } else {
+      sync_dispatcher = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
+          &fake_driver_, {}, "client",
+          [&](fdf_dispatcher_t* dispatcher) { shutdown_completion_.Signal(); });
+    }
+    ASSERT_OK(sync_dispatcher.status_value());
+    dispatcher_ = *std::move(sync_dispatcher);
   }
 
   zx_status_t RunUntilIdleIfNoThreads() override {

@@ -173,11 +173,11 @@ class ChannelDispatcherTest {
 
 void RegisterTests() {
   driver_runtime_benchmark::RegisterTest<ChannelDispatcherTest>(
-      "RoundTrip_ChannelPort_Synchronized",
+      "RoundTrip_ChannelDispatcher_Synchronized",
       /* dispatcher_options= */ 0,
       /* msg_count= */ 1, /* msg_size= */ 4);
   driver_runtime_benchmark::RegisterTest<ChannelDispatcherTest>(
-      "RoundTrip_ChannelPort_AllowSyncCalls",
+      "RoundTrip_ChannelDispatcher_AllowSyncCalls",
       /* dispatcher_options = */ FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS,
       /* msg_count= */ 1, /* msg_size= */ 4);
 
