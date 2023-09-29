@@ -1556,15 +1556,17 @@ mod test {
 
         pin_mut!(selecting_fut, wait_fut);
 
-        let main_future = async {
-            select! {
-                _ = selecting_fut => unreachable!("should keep retransmitting DHCPDISCOVER forever"),
-                () = wait_fut => (),
-            }
-        };
-        pin_mut!(main_future);
+        {
+            let main_future = async {
+                select! {
+                    _ = selecting_fut => unreachable!("should keep retransmitting DHCPDISCOVER forever"),
+                    () = wait_fut => (),
+                }
+            };
+            pin_mut!(main_future);
 
-        run_with_accelerated_time(&mut executor, time, &mut main_future);
+            run_with_accelerated_time(&mut executor, time, &mut main_future);
+        }
 
         stop_sender.unbounded_send(()).expect("sending stop signal should succeed");
 
