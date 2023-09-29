@@ -56,11 +56,16 @@ devicetree::ScanState DevicetreeChosenNodeMatcherBase::HandleBootstrapStdout(
 
   auto addr = (*reg)[0].address();
   if (addr) {
+    auto translated_addr = decoder.TranslateAddress(*addr);
+    if (!translated_addr) {
+      return devicetree::ScanState::kDone;
+    }
+
     if (!uart_matcher_(decoder)) {
       return devicetree::ScanState::kDone;
     }
 
-    uart_dcfg_.mmio_phys = *addr;
+    uart_dcfg_.mmio_phys = *translated_addr;
     uart_dcfg_.irq = 0;
 
     if (reg_offset) {
