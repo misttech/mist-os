@@ -305,7 +305,6 @@ async fn register_keyboard_related_input_handlers(
     assembly = add_text_settings_handler(assembly, input_handlers_node, metrics_logger.clone());
     assembly = add_keymap_handler(assembly, input_handlers_node);
     assembly = add_key_meaning_modifier_handler(assembly, input_handlers_node);
-    assembly = assembly.add_autorepeater(input_handlers_node);
     assembly = add_dead_keys_handler(assembly, icu_data_loader, input_handlers_node);
     assembly = add_ime(assembly, input_handlers_node, metrics_logger.clone()).await;
 
