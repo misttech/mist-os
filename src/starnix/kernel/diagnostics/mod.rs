@@ -5,6 +5,7 @@
 use crate::{lock::Mutex, logging::log_debug, task::Task};
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
+use fuchsia_zircon::AsHandleRef;
 
 /// The maximum number of failed tasks to record.
 ///
@@ -29,6 +30,18 @@ impl CoreDumpList {
     pub fn record_core_dump(&self, task: &Task) {
         let mut list = self.list.lock();
         list.add_entry(|crash_node| {
+            let process_koid = task
+                .thread_group
+                .process
+                .get_koid()
+                .expect("handles for processes with crashing threads are still valid");
+            let thread_koid = task
+                .thread
+                .read()
+                .as_ref()
+                .expect("coredumps occur in tasks with associated threads")
+                .get_koid()
+                .expect("handles for crashing threads are still valid");
             let pid = task.thread_group.leader as i64;
             let mut argv = task
                 .read_argv()
@@ -45,6 +58,8 @@ impl CoreDumpList {
             }
 
             log_debug!(pid, %argv, "Recording task with a coredump.");
+            crash_node.record_uint("thread_koid", thread_koid.raw_koid());
+            crash_node.record_uint("process_koid", process_koid.raw_koid());
             crash_node.record_int("pid", pid);
             crash_node.record_string("argv", argv);
         });

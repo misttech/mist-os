@@ -7,6 +7,8 @@ use diagnostics_data::{DiagnosticsHierarchy, InspectData};
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CoredumpReport {
     pub idx: usize,
+    pub thread_koid: u64,
+    pub process_koid: u64,
     pub pid: i64,
     pub argv: String,
 }
@@ -43,6 +45,8 @@ impl CoredumpReport {
             );
 
             let mut argv = None;
+            let mut process_koid = None;
+            let mut thread_koid = None;
             let mut pid = None;
             for property in coredump_properties {
                 match property.name() {
@@ -53,6 +57,14 @@ impl CoredumpReport {
                                 .expect("getting argv string from report node")
                                 .to_string(),
                         )
+                    }
+                    "thread_koid" => {
+                        thread_koid =
+                            Some(property.uint().expect("getting thread koid from report node"))
+                    }
+                    "process_koid" => {
+                        process_koid =
+                            Some(property.uint().expect("getting process koid from report node"))
                     }
 
                     // TODO(https://fxbug.dev/130834) i64/int in kernel shows up as u64/uint here
@@ -65,6 +77,8 @@ impl CoredumpReport {
 
             reports.push(Self {
                 idx: idx_str.parse().expect("starnix coredump node names should be integers"),
+                thread_koid: thread_koid.expect("retrieving thread koid property"),
+                process_koid: process_koid.expect("retrieving process koid property"),
                 pid: pid.expect("retrieving pid property"),
                 argv: argv.expect("retrieving argv property"),
             });
