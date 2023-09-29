@@ -58,6 +58,20 @@ def main():
         dest="sort_keys",
         help="Indicates whether object keys should be sorted.",
     )
+    parser.add_argument(
+        "--ignore-errors",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        dest="ignore_errors",
+        help="Indicates whether invalid JSON should be ignored.",
+    )
+    parser.add_argument(
+        "--quiet",
+        default=False,
+        action=argparse.BooleanOptionalAction,
+        dest="quiet",
+        help="Don't print any output.",
+    )
 
     args = parser.parse_args()
     for json_file in args.file:
@@ -65,7 +79,6 @@ def main():
             with json_file:
                 original = json_file.read()
                 data = json.loads(original)
-                (root, ext) = os.path.splitext(json_file.name)
                 formatted = json.dumps(
                     data,
                     indent=4,
@@ -77,8 +90,10 @@ def main():
                     json_file.truncate()
                     json_file.write(formatted + "\n")
         except json.JSONDecodeError:
-            print(f"Exception encountered while processing {json_file.name}")
-            raise
+            if not args.quiet:
+                print(f"Exception encountered while processing {json_file.name}")
+            if not args.ignore_errors:
+                raise
 
 
 if __name__ == "__main__":

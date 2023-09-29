@@ -254,7 +254,7 @@ fi
 
 readonly PY_TOOL="${FUCHSIA_DIR}/scripts/fuchsia-vendored-python"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
-readonly JSON_FMT_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/json-fmt.py --no-sort-keys"
+readonly JSON_FMT_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/json-fmt.py --no-sort-keys --ignore-errors --quiet"
 readonly PY_FMT_CMD="${PREBUILT_BLACK_DIR}/black --quiet"
 
 readonly FIX_HEADER_GUARDS_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/check-header-guards.py --fix"
