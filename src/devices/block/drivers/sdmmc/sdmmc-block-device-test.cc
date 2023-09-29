@@ -417,16 +417,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
   EXPECT_OK(op7->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, AutoCmd12ForSdMultiBlockTransfer) {
+TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
   AddSdDevice();
-
-  sdmmc_.set_host_info({
-      .caps = SDMMC_HOST_CAP_AUTO_CMD12,
-      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
-      .max_transfer_size_non_dma = 0,
-      .prefs = 0,
-  });
-  EXPECT_OK(dut_->Init());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -446,10 +438,10 @@ TEST_F(SdmmcBlockDeviceTest, AutoCmd12ForSdMultiBlockTransfer) {
   CallbackContext ctx(5);
 
   sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
-    EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_AUTO12);
+    EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
   sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
-    EXPECT_TRUE(req.cmd_flags & SDMMC_CMD_AUTO12);
+    EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
   });
 
   user_.Queue(op1->operation(), OperationCallback, &ctx);
@@ -462,53 +454,6 @@ TEST_F(SdmmcBlockDeviceTest, AutoCmd12ForSdMultiBlockTransfer) {
 
   const std::map<uint32_t, uint32_t> command_counts = sdmmc_.command_counts();
   EXPECT_EQ(command_counts.find(SDMMC_STOP_TRANSMISSION), command_counts.end());
-}
-
-TEST_F(SdmmcBlockDeviceTest, ManualCmd12ForSdMultiBlockTransfer) {
-  AddSdDevice();
-
-  sdmmc_.set_host_info({
-      .caps = 0,
-      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
-      .max_transfer_size_non_dma = 0,
-      .prefs = 0,
-  });
-  EXPECT_OK(dut_->Init());
-
-  std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
-
-  std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
-
-  std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
-
-  std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
-
-  std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
-
-  CallbackContext ctx(5);
-
-  sdmmc_.set_command_callback(SDMMC_READ_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
-    EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
-  });
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK, [](const sdmmc_req_t& req) -> void {
-    EXPECT_FALSE(req.cmd_flags & SDMMC_CMD_AUTO12);
-  });
-
-  user_.Queue(op1->operation(), OperationCallback, &ctx);
-  user_.Queue(op2->operation(), OperationCallback, &ctx);
-  user_.Queue(op3->operation(), OperationCallback, &ctx);
-  user_.Queue(op4->operation(), OperationCallback, &ctx);
-  user_.Queue(op5->operation(), OperationCallback, &ctx);
-
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
-
-  // Cmd12 applies regardless of single or multiple block transfer.
-  EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 4);
 }
 
 TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
@@ -1842,102 +1787,6 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
   io_retries = root->node().get_property<inspect::UintPropertyValue>("io_retries");
   ASSERT_NOT_NULL(io_retries);
   EXPECT_EQ(io_retries->value(), 9);
-}
-
-TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
-  // Cmd12 is not used for MMC (pre-defined) block transfer.
-  AddSdDevice();
-
-  sdmmc_.set_host_info({
-      .caps = 0,
-      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
-      .max_transfer_size_non_dma = 0,
-      .prefs = 0,
-  });
-  EXPECT_OK(dut_->Init());
-
-  ASSERT_TRUE(parent_->GetLatestChild()->GetInspectVmo().is_valid());
-
-  // Transfer failed, stop succeeded, error count should increment.
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
-
-  std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op1));
-
-  CallbackContext ctx1(1);
-
-  user_.Queue(op1->operation(), OperationCallback, &ctx1);
-
-  EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
-
-  EXPECT_TRUE(op1->private_storage()->completed);
-  EXPECT_NOT_OK(op1->private_storage()->status);
-
-  inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
-
-  const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
-  ASSERT_NOT_NULL(root);
-
-  const auto* io_errors = root->node().get_property<inspect::UintPropertyValue>("io_errors");
-  ASSERT_NOT_NULL(io_errors);
-
-  EXPECT_EQ(io_errors->value(), 1);
-
-  // Transfer succeeded, stop failed, error count should increment.
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_OK; });
-  sdmmc_.set_command_callback(SDMMC_STOP_TRANSMISSION,
-                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
-
-  std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
-
-  CallbackContext ctx2(1);
-
-  user_.Queue(op2->operation(), OperationCallback, &ctx2);
-
-  EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
-
-  EXPECT_TRUE(op2->private_storage()->completed);
-  EXPECT_OK(op2->private_storage()->status);
-
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
-
-  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
-  ASSERT_NOT_NULL(root);
-
-  io_errors = root->node().get_property<inspect::UintPropertyValue>("io_errors");
-  ASSERT_NOT_NULL(io_errors);
-
-  EXPECT_EQ(io_errors->value(), 2);
-
-  // Transfer and stop failed, error count should only increase by 1.
-  sdmmc_.set_command_callback(SDMMC_WRITE_MULTIPLE_BLOCK,
-                              [](const sdmmc_req_t& req) -> zx_status_t { return ZX_ERR_IO; });
-
-  std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op3));
-
-  CallbackContext ctx3(1);
-
-  user_.Queue(op3->operation(), OperationCallback, &ctx3);
-
-  EXPECT_OK(sync_completion_wait(&ctx3.completion, zx::duration::infinite().get()));
-
-  EXPECT_TRUE(op3->private_storage()->completed);
-  EXPECT_NOT_OK(op3->private_storage()->status);
-
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
-
-  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
-  ASSERT_NOT_NULL(root);
-
-  io_errors = root->node().get_property<inspect::UintPropertyValue>("io_errors");
-  ASSERT_NOT_NULL(io_errors);
-
-  EXPECT_EQ(io_errors->value(), 3);
 }
 
 TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {

@@ -203,13 +203,9 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
     return st;
   }
 
-  // TODO(fxbug.dev/124654): Consider enabling for SD as well. Also consider reviving
-  // SDMMC_READ_BLOCK/SDMMC_WRITE_BLOCK for single-block transfers, now that FUA won't be supported
-  // for SDMMC.
   // For single-block transfers, we could get higher performance by using SDMMC_READ_BLOCK/
   // SDMMC_WRITE_BLOCK without the need to SDMMC_SET_BLOCK_COUNT or SDMMC_STOP_TRANSMISSION.
   // However, we always do multiple-block transfers for simplicity.
-  const bool pre_defined_transfer_mode = !is_sd_;
   ZX_DEBUG_ASSERT(btxns.size() >= 1);
   const block_read_write_t& txn = btxns[0].operation()->rw;
   const bool is_read = txn.command.opcode == BLOCK_OPCODE_READ;
@@ -217,32 +213,23 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
   const uint32_t cmd_idx = is_read ? SDMMC_READ_MULTIPLE_BLOCK : SDMMC_WRITE_MULTIPLE_BLOCK;
 
   std::optional<sdmmc_req_t> set_block_count;
-  bool manual_stop_transmission = false;
   uint32_t cmd_flags = is_read ? SDMMC_READ_MULTIPLE_BLOCK_FLAGS : SDMMC_WRITE_MULTIPLE_BLOCK_FLAGS;
   uint32_t total_data_transfer_blocks = 0;
   for (const auto& btxn : btxns) {
     total_data_transfer_blocks += btxn.operation()->rw.length;
   }
 
-  if (pre_defined_transfer_mode) {
-    // TODO(fxbug.dev/126205): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
-    // performance.
-    set_block_count = {
-        .cmd_idx = SDMMC_SET_BLOCK_COUNT,
-        .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
-        .arg = total_data_transfer_blocks,
-    };
-    if (command_packing) {
-      set_block_count->arg |= MMC_SET_BLOCK_COUNT_PACKED;
-      if (!is_read) {
-        set_block_count->arg++;  // +1 for header block.
-      }
-    }
-  } else {
-    if (sdmmc_->host_info().caps & SDMMC_HOST_CAP_AUTO_CMD12) {
-      cmd_flags |= SDMMC_CMD_AUTO12;
-    } else {
-      manual_stop_transmission = true;
+  // TODO(fxbug.dev/126205): Consider using SDMMC_CMD_AUTO23, which is likely to enhance
+  // performance.
+  set_block_count = {
+      .cmd_idx = SDMMC_SET_BLOCK_COUNT,
+      .cmd_flags = SDMMC_SET_BLOCK_COUNT_FLAGS,
+      .arg = total_data_transfer_blocks,
+  };
+  if (command_packing) {
+    set_block_count->arg |= MMC_SET_BLOCK_COUNT_PACKED;
+    if (!is_read) {
+      set_block_count->arg++;  // +1 for header block.
     }
   }
 
@@ -340,17 +327,6 @@ zx_status_t SdmmcBlockDevice::ReadWrite(const std::vector<BlockOperation>& btxns
   if (st != ZX_OK) {
     zxlogf(ERROR, "do_txn error %d", st);
     properties_.io_errors_.Add(1);
-  }
-
-  // SdmmcIoRequestWithRetries sends STOP_TRANSMISSION (cmd12) when an error occurs, so it only
-  // needs to be sent here if SET_BLOCK_COUNT isn't used, the request succeeded, and the controller
-  // doesn't support auto cmd12.
-  if (st == ZX_OK && manual_stop_transmission) {
-    zx_status_t stop_st = sdmmc_->SdmmcStopTransmission();
-    if (stop_st != ZX_OK) {
-      zxlogf(WARNING, "do_txn stop transmission error %d", stop_st);
-      properties_.io_errors_.Add(1);
-    }
   }
 
   zxlogf(DEBUG, "do_txn complete");
