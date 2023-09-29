@@ -106,17 +106,18 @@ pub trait ToolSuite: Sized {
         match err {
             Error::Help { command, mut output, code } => {
                 let cmd = command.join(" ");
-                writeln!(&mut output).and_then(|_| {
-                    writeln!(&mut output)?;
-                    print_command_list(
-                        &mut output,
-                        &Vec::from_iter(
-                            Self::global_command_list().iter().cloned().map(FfxToolInfo::from),
-                        ),
-                    )?;
-                    writeln!(&mut output, "Note: There may be more commands available, use `{cmd} commands` for a complete list.")?;
-                    writeln!(&mut output, "See '{cmd} <command> help' for more information on a specific command.")
-                }).expect("Failed to append command list to help");
+                writeln!(&mut output)
+                    .and_then(|_| {
+                        writeln!(&mut output)?;
+                        print_command_list(
+                            &mut output,
+                            &Vec::from_iter(
+                                Self::global_command_list().iter().cloned().map(FfxToolInfo::from),
+                            ),
+                        )?;
+                        crate::Ffx::more_commands_help(&mut output, &cmd)
+                    })
+                    .expect("Failed to append command list to help");
                 Error::Help { command, output, code }
             }
             err => err,

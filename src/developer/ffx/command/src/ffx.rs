@@ -12,7 +12,7 @@ use std::{collections::HashMap, fmt::Write, path::PathBuf};
 
 /// The environment variable name used for overriding the command name in help
 /// output.
-const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
+pub const FFX_WRAPPER_INVOKE: &'static str = "FFX_WRAPPER_INVOKE";
 
 #[derive(Clone, Debug, PartialEq)]
 /// The relevant argument and environment variables necessary to parse or
@@ -210,7 +210,7 @@ impl Ffx {
         self.load_context_with_env(exe_kind, env_vars)
     }
 
-    fn load_context_with_env(
+    pub fn load_context_with_env(
         &self,
         exe_kind: ExecutableKind,
         env_vars: HashMap<String, String>,
@@ -258,6 +258,17 @@ impl Ffx {
             )
             .map_err(|e| user_error!(e)),
         }
+    }
+
+    /// Appends information about there being more commands available if run in
+    /// a different way. Used in contexts where we can't get the list of
+    /// commands because we couldn't parse the command line correctly.
+    pub fn more_commands_help(output: &mut impl Write, cmd: &str) -> std::fmt::Result {
+        writeln!(
+            output,
+            "Note: There may be more commands available, use `{cmd} commands` for a complete list."
+        )?;
+        writeln!(output, "See '{cmd} <command> help' for more information on a specific command.")
     }
 }
 
