@@ -11,7 +11,8 @@ _process_versions_args = [
   rebase_path(version_history_path, root_build_dir),
 ]
 
-platform_version = exec_script(python_exe_src, _process_versions_args, "json")
+platform_version =
+    exec_script(python_exe_src, _process_versions_args, "json", [ _script ])
 
 declare_args() {
   # If true, build for N+1 api level, where N is platform_version.in_development_api_level
