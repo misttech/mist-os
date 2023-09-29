@@ -1025,7 +1025,8 @@ nearest power of 2 from the cpu timer counter.
 
 
 If set, tries to initialize the dap debug aperture at a hard coded address for the particular
-system on chip. Currently accepted values are amlogic-t931g, amlogic-s905d2, and amlogic-s905d3g.
+system on chip. Currently accepted values are amlogic-t931g, amlogic-s905d2, amlogic-s905d3g, and
+amlogic-a311d.
 
 ### kernel.smp.maxcpus=\<uint32_t>
 

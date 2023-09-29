@@ -154,6 +154,9 @@ kernel_cmdline("vim3") {
     # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
     # netdevice migration.
     "netsvc.interface=/dwmac/dwmac/Designware-MAC/netdevice-migration/network-device",
+
+    # Enable the Debug Access Port (DAP) for improved lockup/crash diagnostics.
+    "kernel.arm64.debug.dap-rom-soc=amlogic-a311d",
   ]
 }
 

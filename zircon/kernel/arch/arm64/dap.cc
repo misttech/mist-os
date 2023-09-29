@@ -70,6 +70,7 @@ void arm_dap_init(uint level) {
     t931g,
     s905d2,
     s905d3g,
+    a311d,
   } soc = None;
 
   // Parse the valid options out of the kernel command line
@@ -80,6 +81,8 @@ void arm_dap_init(uint level) {
     soc = s905d2;
   } else if (strcmp(gBootOptions->arm64_debug_dap_rom_soc.data(), "amlogic-s905d3g") == 0) {
     soc = s905d3g;
+  } else if (strcmp(gBootOptions->arm64_debug_dap_rom_soc.data(), "amlogic-a311d") == 0) {
+    soc = a311d;
   } else if (strcmp(gBootOptions->arm64_debug_dap_rom_soc.data(), "") != 0) {
     dprintf(INFO, "ARM DAP: unrecognized non-empty option passed '%s'\n",
             gBootOptions->arm64_debug_dap_rom_soc.data());
@@ -116,7 +119,8 @@ void arm_dap_init(uint level) {
 
     switch (soc) {
       case t931g:
-        // two dap register windows for T931G
+      case a311d:
+        // two dap register windows for t931g and a311d
         dap_apertures = {t931g_aperture, ktl::size(t931g_aperture)};
         break;
       case s905d2:
