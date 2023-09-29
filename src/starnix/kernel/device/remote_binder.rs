@@ -189,49 +189,38 @@ type SynchronousResponder = Box<dyn FnOnce(Result<(), Errno>) -> Result<(), fidl
 enum TaskRequest {
     /// Set the associated vmo for the binder connection. See the SetVmo method in the Binder FIDL
     /// protocol.
-    SetVmo(
-        // remote_binder_connection,
-        #[derivative(Debug = "ignore")] Arc<RemoteBinderConnection>,
-        // vmo
-        fidl::Vmo,
-        // mapped_address
-        u64,
-        // responder.
+    SetVmo {
+        #[derivative(Debug = "ignore")]
+        remote_binder_connection: Arc<RemoteBinderConnection>,
+        vmo: fidl::Vmo,
+        mapped_address: u64,
         // a synchronous function avoids thread hops.
-        #[derivative(Debug = "ignore")] SynchronousResponder,
-    ),
+        #[derivative(Debug = "ignore")]
+        responder: SynchronousResponder,
+    },
     /// Execute the given ioctl. See the Ioctl method in the Binder FIDL
     /// protocol.
-    Ioctl(
+    Ioctl {
         // remote_binder_connection,
-        #[derivative(Debug = "ignore")] Arc<RemoteBinderConnection>,
-        // request
-        u32,
-        // parameter
-        u64,
-        // KOID,
-        u64,
-        // responder.
+        #[derivative(Debug = "ignore")]
+        remote_binder_connection: Arc<RemoteBinderConnection>,
+        request: u32,
+        parameter: u64,
+        koid: u64,
         // a synchronous function avoids thread hops.
-        #[derivative(Debug = "ignore")] SynchronousResponder,
-    ),
+        #[derivative(Debug = "ignore")]
+        responder: SynchronousResponder,
+    },
     /// Open the binder device driver situated at `path` in the Task filesystem namespace.
-    Open(
-        // path
-        Vec<u8>,
-        // process_accessor
-        ClientEnd<fbinder::ProcessAccessorMarker>,
-        // process
-        zx::Process,
-        // responder
-        oneshot::Sender<Result<Arc<RemoteBinderConnection>, Errno>>,
-    ),
+    Open {
+        path: Vec<u8>,
+        process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
+        process: zx::Process,
+        responder: oneshot::Sender<Result<Arc<RemoteBinderConnection>, Errno>>,
+    },
     /// Have the task returns to userspace. `spawn_thread` must be returned to the caller through
     /// the ioctl command parameter.
-    Return(
-        // spawn_thread
-        bool,
-    ),
+    Return { spawn_thread: bool },
 }
 
 /// A `TaskRequest` that is associated with a given thread koid. Each thread koid must be
@@ -400,7 +389,7 @@ impl RemoteBinderHandleState {
             // And add the request to the unassigned queue.
             self.unassigned_requests.push_back(request);
             // Not unassigned task ready. Request userspace to spawn a new one.
-            self.enqueue_taskless_request(TaskRequest::Return(true));
+            self.enqueue_taskless_request(TaskRequest::Return { spawn_thread: true });
         }
     }
 
@@ -535,12 +524,12 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         }
                         Ok(())
                     });
-                self.lock().enqueue_taskless_request(TaskRequest::SetVmo(
+                self.lock().enqueue_taskless_request(TaskRequest::SetVmo {
                     remote_binder_connection,
                     vmo,
                     mapped_address,
                     responder,
-                ));
+                });
                 waiter.await;
             }
             fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
@@ -568,13 +557,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     });
                 self.lock().enqueue_task_request(BoundTaskRequest {
                     koid: tid,
-                    request: TaskRequest::Ioctl(
+                    request: TaskRequest::Ioctl {
                         remote_binder_connection,
                         request,
                         parameter,
-                        tid,
+                        koid: tid,
                         responder,
-                    ),
+                    },
                 });
                 waiter.await;
             }
@@ -673,15 +662,15 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<(), Error> {
         // Open the device.
         let (sender, receiver) = oneshot::channel::<Result<Arc<RemoteBinderConnection>, Errno>>();
-        self.lock().enqueue_taskless_request(TaskRequest::Open(
+        self.lock().enqueue_taskless_request(TaskRequest::Open {
             path,
             process_accessor,
             process,
-            sender,
-        ));
+            responder: sender,
+        });
         let remote_binder_connection = receiver.await??;
 
-        scopeguard::defer! {
+        scopeguard::defer_on_success! {
             // When leaving the current scope, close the connection, even if some operation are in
             // progress. This should kick the tasks back with an error.
             remote_binder_connection.close();
@@ -833,7 +822,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             if let Some(result) = state.exit.as_ref() {
                 return result
                     .map_err(|c| errno_from_code!(c.error_code() as i16))
-                    .map(|_| TaskRequest::Return(false));
+                    .map(|_| TaskRequest::Return { spawn_thread: false });
             }
             // Taskless request have the highest priority.
             if let Some(request) = state.taskless_requests.pop_front() {
@@ -953,25 +942,30 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         self.lock().register_waiting_task(current_task.get_tid());
         loop {
             let interruption = match self.get_next_task(current_task)? {
-                TaskRequest::Open(path, process_accessor, process, responder) => {
+                TaskRequest::Open { path, process_accessor, process, responder } => {
                     let result = self.open(current_task, path, process_accessor, process);
                     let interruption = must_interrupt(&result);
                     responder.send(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
-                TaskRequest::SetVmo(remote_binder_connection, vmo, mapped_address, responder) => {
+                TaskRequest::SetVmo {
+                    remote_binder_connection,
+                    vmo,
+                    mapped_address,
+                    responder,
+                } => {
                     let result = remote_binder_connection.map_external_vmo(vmo, mapped_address);
                     let interruption = must_interrupt(&result);
                     responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
-                TaskRequest::Ioctl(
+                TaskRequest::Ioctl {
                     remote_binder_connection,
                     request,
                     parameter,
                     koid,
                     responder,
-                ) => {
+                } => {
                     trace_duration!(
                         trace_category_starnix!(),
                         trace_name_remote_binder_ioctl_worker_process!()
@@ -992,7 +986,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
                 }
-                TaskRequest::Return(spawn_thread) => {
+                TaskRequest::Return { spawn_thread } => {
                     let wait_command = uapi::remote_binder_wait_command {
                         spawn_thread: if spawn_thread { 1 } else { 0 },
                     };
