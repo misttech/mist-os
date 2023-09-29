@@ -200,9 +200,6 @@ name. Second, the `Service` suffix is banned.
 
 #### Explicit "`open`/`ajar`/`closed`" modifier {#explicit-open-ajar-closed}
 
-Note: `open`, `ajar`, and `closed` protocols is a new feature which is not fully
-released yet.
-
 For protocols, `open`, `ajar`, or `closed` should should always be specified
 rather than relying on defaults. That is, always prefer `open protocol Foo {
 ...` to just `protocol Foo { ...`.
@@ -249,8 +246,6 @@ and possibly renaming the existing method.
 
 #### Explicit "`strict`/`flexible`" modifier {#explicit-strict-flexible-method}
 
-Note: `strict` and `flexible` methods is a new feature which is not fully
-released yet.
 
 For methods and events, `strict` or `flexible` should should always be specified
 rather than relying on defaults. That is, always prefer `flexible Foo();` to
@@ -324,13 +319,13 @@ defaults. That is, always prefer `flexible bits ...` to just `bits ...`.
 
 ### Syntax
 
- * Use 4 space indents.
- * Never use tabs.
- * Avoid trailing whitespace.
- * Separate declarations for `bits`, `enum`, `protocol`, `struct`, `table`,
-   and `union` constructs from other declarations with
-   one blank line (two consecutive newline characters).
- * End files with exactly one newline character.
+* Use 4 space indents.
+* Never use tabs.
+* Avoid trailing whitespace.
+* Separate declarations for `bits`, `enum`, `protocol`, `struct`, `table`,
+  and `union` constructs from other declarations with
+  one blank line (two consecutive newline characters).
+* End files with exactly one newline character.
 
 ### Comments
 
@@ -446,11 +441,11 @@ While a library can be broken down in multiple FIDL [Files](#files), there
 can only be a single library overview. Consider these recommendations for library
 overviews:
 
- * If the overview is short and the library consists of a single file, you can
-   place the overview in the `library` statement at the top of the library file.
- * If the library consists of multiple files, create a standalone file
-   `overview.fidl` to document the library. The 'overview.fidl' file should not
-   contain any declarations, type aliases, or protocol definitions.
+* If the overview is short and the library consists of a single file, you can
+  place the overview in the `library` statement at the top of the library file.
+* If the library consists of multiple files, create a standalone file
+  `overview.fidl` to document the library. The 'overview.fidl' file should not
+  contain any declarations, type aliases, or protocol definitions.
 
 #### Non flow-through comments
 
@@ -462,14 +457,14 @@ comment, keep in mind the following.
 
 Regular comments:
 
- * Descriptions of parameters, arguments, function
- * Usage notes
+* Descriptions of parameters, arguments, function
+* Usage notes
 
 Non flow-through comments:
 
- * Internal "todo" comments
- * Copyright notices
- * Implementation details
+* Internal "todo" comments
+* Copyright notices
+* Implementation details
 
 Both style of comments can be combined:
 
@@ -496,10 +491,9 @@ library. Declarations, including protocols, can reference each other and
 themselves throughout the library, regardless of the file in which they appear.
 Divide libraries into files to maximize readability.
 
- * Prefer a DAG dependency diagram for files in a library.
- * Prefer keeping mutually referring definitions textually close to each other,
-   ideally in the same file.
- * For complex libraries, prefer defining pure data types or constants in leaf
-   files and defining protocols that reference those types together in a trunk
-   file.
-
+* Prefer a DAG dependency diagram for files in a library.
+* Prefer keeping mutually referring definitions textually close to each other,
+  ideally in the same file.
+* For complex libraries, prefer defining pure data types or constants in leaf
+  files and defining protocols that reference those types together in a trunk
+  file.
