@@ -1,0 +1,49 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/licenses/generated_licenses_spdx.gni")
+import("//build/licenses/license.gni")
+import("//build/testing/golden_files.gni")
+
+license("license_1") {
+  public_package_name = "License 1"
+  license_files = [ "text1.txt" ]
+}
+
+license("license_2") {
+  public_package_name = "License 2"
+  license_files = [ "text2.txt" ]
+}
+
+group("foo") {
+  applicable_licenses = [ ":license_1" ]
+  deps = []
+}
+
+group("bar") {
+  applicable_licenses = [ ":license_2" ]
+  deps = [ ":foo" ]
+}
+
+group("baz") {
+  applicable_licenses = []
+  deps = [ ":bar" ]
+}
+
+generated_licenses_spdx("actual_spdx") {
+  target = ":baz"
+  spdx_root_package_name = "Example"
+  output = "${target_out_dir}/actual.spdx.json"
+}
+
+golden_files("golden_test") {
+  testonly = true
+  deps = [ ":actual_spdx" ]
+  comparisons = [
+    {
+      golden = "golden.spdx.json"
+      candidate = "${target_out_dir}/actual.spdx.json"
+    },
+  ]
+}

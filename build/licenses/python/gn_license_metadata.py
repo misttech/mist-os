@@ -25,7 +25,9 @@ class GnLicenseMetadata:
 
     def from_json_dict(dict) -> "GnLicenseMetadata":
         target_label = GnLabel.from_str(dict["target_label"])
-        assert target_label.toolchain, f"Label must have a toolchain part: {target_label}"
+        assert (
+            target_label.toolchain
+        ), f"Label must have a toolchain part: {target_label}"
 
         public_package_name = dict["public_package_name"]
         license_files = [
@@ -52,7 +54,9 @@ class GnApplicableLicensesMetadata:
     def from_json_dict(data) -> "GnApplicableLicensesMetadata":
         assert isinstance(data, dict)
         target_label = GnLabel.from_str(data["target_label"])
-        assert target_label.toolchain, f"Label must have a toolchain part: {target_label}"
+        assert (
+            target_label.toolchain
+        ), f"Label must have a toolchain part: {target_label}"
 
         license_labels = [GnLabel.from_str(s) for s in data["license_labels"]]
 
@@ -65,6 +69,7 @@ class GnApplicableLicensesMetadata:
 @dataclasses.dataclass
 class GnLicenseMetadataDB:
     """An in-memory DB of licensing GN metadata"""
+
     """GnLicenseMetadata by the license's GN label"""
     licenses_by_label: Dict[GnLabel, GnLicenseMetadata]
     """GnApplicableLicensesMetadata by the target label they apply to"""
@@ -92,9 +97,11 @@ class GnLicenseMetadataDB:
                 license_metadata = GnLicenseMetadata.from_json_dict(d)
                 assert license_metadata.target_label not in licenses_by_label
                 licenses_by_label[
-                    license_metadata.target_label] = license_metadata
+                    license_metadata.target_label
+                ] = license_metadata
             elif GnApplicableLicensesMetadata.is_applicable_licenses_metadata_dict(
-                    d):
+                d
+            ):
                 application = GnApplicableLicensesMetadata.from_json_dict(d)
                 if application.target_label in applicable_licenses_by_target:
                     # TODO(133723): Remove once there are no more targets suffering from fxb/133723.
@@ -103,10 +110,18 @@ class GnLicenseMetadataDB:
                     )
                     continue
                 applicable_licenses_by_target[
-                    application.target_label] = application
+                    application.target_label
+                ] = application
             else:
                 raise RuntimeError(f"Unexpected json element: {d}")
 
+        # Remove applicable_licenses for targets that are license targets.
+        # Those are meaningless.
+        for label in licenses_by_label.keys():
+            if label in applicable_licenses_by_target:
+                applicable_licenses_by_target.pop(label)
+
         return GnLicenseMetadataDB(
             licenses_by_label=licenses_by_label,
-            applicable_licenses_by_target=applicable_licenses_by_target)
+            applicable_licenses_by_target=applicable_licenses_by_target,
+        )

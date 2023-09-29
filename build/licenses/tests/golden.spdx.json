@@ -1,0 +1,67 @@
+{
+    "spdxVersion": "SPDX-2.3",
+    "SPDXID": "SPDXRef-DOCUMENT",
+    "name": "Example",
+    "documentNamespace": "",
+    "creationInfo": {
+        "creators": [
+            "Tool: spdx_writer.py"
+        ]
+    },
+    "dataLicense": "CC0-1.0",
+    "documentDescribes": [
+        "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
+        "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
+        "SPDXRef-Package-Root"
+    ],
+    "packages": [
+        {
+            "SPDXID": "SPDXRef-Package-Root",
+            "name": "Example"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
+            "name": "License 1",
+            "licenseConcluded": "LicenseRef-3c15dcecfa4d293d236bdf07d11c34fa"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
+            "name": "License 2",
+            "licenseConcluded": "LicenseRef-424806e005c0c4b3c66f0eafab89c7b6"
+        }
+    ],
+    "relationships": [
+        {
+            "spdxElementId": "SPDXRef-Package-Root",
+            "relatedSpdxElement": "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-Root",
+            "relatedSpdxElement": "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
+            "relationshipType": "CONTAINS"
+        }
+    ],
+    "hasExtractedLicensingInfos": [
+        {
+            "name": "License 1",
+            "licenseId": "LicenseRef-3c15dcecfa4d293d236bdf07d11c34fa",
+            "extractedText": "some license text",
+            "crossRefs": [
+                {
+                    "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text1.txt"
+                }
+            ]
+        },
+        {
+            "name": "License 2",
+            "licenseId": "LicenseRef-424806e005c0c4b3c66f0eafab89c7b6",
+            "extractedText": "another sample license text",
+            "crossRefs": [
+                {
+                    "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text2.txt"
+                }
+            ]
+        }
+    ]
+}

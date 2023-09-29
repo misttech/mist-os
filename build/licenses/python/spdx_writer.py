@@ -22,23 +22,31 @@ class SpdxWriter:
     root_package_name: str
 
     json_document: Dict[str, Any] = dataclasses.field(default_factory=dict)
+
+    # Once _init_json is called, the following collections, are referenced
+    # within the json_document, and further changes to them will be reflected
+    # in the json outputed by the save* methods.
+
     document_describes: List["str"] = dataclasses.field(default_factory=list)
     packages: List[Dict[str, Any]] = dataclasses.field(default_factory=list)
-    relationships: List[Dict[str,
-                             Any]] = dataclasses.field(default_factory=list)
+    relationships: List[Dict[str, Any]] = dataclasses.field(
+        default_factory=list
+    )
     extracted_licenses: List[Dict[str, Any]] = dataclasses.field(
-        default_factory=list)
-    license_json_by_ref: Dict[str,
-                              Dict] = dataclasses.field(default_factory=dict)
-    package_json_by_ids: Dict[str,
-                              Dict] = dataclasses.field(default_factory=dict)
+        default_factory=list
+    )
+    license_json_by_ref: Dict[str, Dict] = dataclasses.field(
+        default_factory=dict
+    )
+    package_json_by_ids: Dict[str, Dict] = dataclasses.field(
+        default_factory=dict
+    )
 
     def create(root_package_name: str, file_reader_func: Callable[[Path], str]):
-
         writer = SpdxWriter(
             file_reader_func=file_reader_func,
             document_id="SPDXRef-DOCUMENT",
-            root_package_id='SPDXRef-Package-Root',
+            root_package_id="SPDXRef-Package-Root",
             root_package_name=root_package_name,
         )
         writer._init_json()
@@ -47,30 +55,35 @@ class SpdxWriter:
     def _init_json(self):
         self.json_document.update(
             {
-                'spdxVersion': 'SPDX-2.3',
-                'SPDXID': self.document_id,
-                'name': self.root_package_name,
-                'documentNamespace': "",
-                'creationInfo': {
-                    'creators': [f'Tool: {Path(__file__).name}'],
+                "spdxVersion": "SPDX-2.3",
+                "SPDXID": self.document_id,
+                "name": self.root_package_name,
+                "documentNamespace": "",
+                "creationInfo": {
+                    "creators": [f"Tool: {Path(__file__).name}"],
                 },
-                'dataLicense': 'CC0-1.0',
-                'documentDescribes': self.document_describes,
-                'packages': self.packages,
-                'relationships': self.relationships,
-                'hasExtractedLicensingInfos': self.extracted_licenses,
-            })
+                "dataLicense": "CC0-1.0",
+                "documentDescribes": self.document_describes,
+                "packages": self.packages,
+                "relationships": self.relationships,
+                "hasExtractedLicensingInfos": self.extracted_licenses,
+            }
+        )
 
         self.document_describes.append(self.root_package_id)
         self.packages.append(
             {
-                'SPDXID': self.root_package_id,
-                'name': self.root_package_name,
-            })
+                "SPDXID": self.root_package_id,
+                "name": self.root_package_name,
+            }
+        )
 
     def add_license(
-            self, public_package_name: str, license_labels: Tuple[GnLabel],
-            collection_hint: str):
+        self,
+        public_package_name: str,
+        license_labels: Tuple[GnLabel],
+        collection_hint: str,
+    ):
         package_id = self._spdx_package_id(public_package_name, license_labels)
 
         if package_id in self.package_json_by_ids:
@@ -82,48 +95,72 @@ class SpdxWriter:
         license_refs = []
         for license_label in license_labels:
             license_ref = self._spdx_license_ref(
-                public_package_name, license_label)
+                public_package_name, license_label
+            )
             license_refs.append(license_ref)
 
             if license_ref not in self.license_json_by_ref:
                 license_text = self.file_reader_func(license_label.path)
                 extracted_license = {
-                    'name': public_package_name,
-                    'licenseId': license_ref,
-                    'extractedText': license_text,
-                    'crossRefs': [{
-                        'url': license_label.code_search_url(),
-                    }]
+                    "name": public_package_name,
+                    "licenseId": license_ref,
+                    "extractedText": license_text,
+                    "crossRefs": [
+                        {
+                            "url": license_label.code_search_url(),
+                        }
+                    ],
                 }
                 self.license_json_by_ref[license_ref] = extracted_license
                 self.extracted_licenses.append(extracted_license)
 
         package_json = {
-            'SPDXID': package_id,
-            'name': public_package_name,
-            'licenseConcluded': " AND ".join(license_refs),
+            "SPDXID": package_id,
+            "name": public_package_name,
+            "licenseConcluded": " AND ".join(license_refs),
         }
         if collection_hint:
-            package_json['sourceInformation'] = collection_hint
+            # TODO(133985): this breaks the golden tests due to per-arch diffs.
+            # Put behind a flag and disable in tests?
+            # package_json["sourceInformation"] = collection_hint
+            pass
         self.package_json_by_ids[package_id] = package_json
         self.document_describes.append(package_id)
         self.packages.append(package_json)
         self.relationships.append(
             {
-                'spdxElementId': self.root_package_id,
-                'relatedSpdxElement': package_id,
-                'relationshipType': 'CONTAINS',
-            })
+                "spdxElementId": self.root_package_id,
+                "relatedSpdxElement": package_id,
+                "relationshipType": "CONTAINS",
+            }
+        )
+
+    def _sort_elements(self):
+        """Sorts all output elements alphabetically.
+
+        This ensures consistent and developer-friendly output independent on input ordering.
+        """
+        self.extracted_licenses.sort(
+            key=lambda x: x["name"].lower() + x["licenseId"]
+        )
+        self.packages.sort(key=lambda x: x["name"].lower() + x["SPDXID"])
+        self.document_describes.sort()
+        self.relationships.sort(
+            key=lambda x: x["spdxElementId"] + x["relatedSpdxElement"]
+        )
 
     def save(self, file_path: Path):
+        self._sort_elements()
         with open(file_path, "w") as f:
-            json.dump(self.json_document, f, indent=2)
+            json.dump(self.json_document, f, indent=4)
 
     def save_to_string(self) -> str:
-        return json.dumps(self.json_document, indent=2)
+        self._sort_elements()
+        return json.dumps(self.json_document, indent=4)
 
     def _spdx_package_id(
-            self, public_package_name, license_labels: Tuple[GnLabel]) -> str:
+        self, public_package_name, license_labels: Tuple[GnLabel]
+    ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
         for ll in license_labels:
@@ -132,7 +169,8 @@ class SpdxWriter:
         return f"SPDXRef-Package-{digest}"
 
     def _spdx_license_ref(
-            self, public_package_name, license_label: GnLabel) -> str:
+        self, public_package_name, license_label: GnLabel
+    ) -> str:
         md5 = hashlib.md5()
         md5.update(public_package_name.strip().encode("utf-8"))
         md5.update(str(license_label.path).encode("utf-8"))

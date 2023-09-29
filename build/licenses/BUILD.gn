@@ -4,5 +4,8 @@
 
 group("tests") {
   testonly = true
-  deps = [ "python:host_tests($host_toolchain)" ]
+  deps = [
+    "python:host_tests(${host_toolchain})",
+    "tests:golden_test",
+  ]
 }

@@ -1,0 +1,78 @@
+# Copyright 2023 The Chromium Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_action.gni")
+
+# Collects license metadata and generates a license SPDX json file for a given target.
+#
+# Parameters:
+#
+#   target (required)
+#     The GN target to analyze and produce the SPDX for.
+#
+#   output (required)
+#     The name of the output file. E.g. `foo.spdx.json`.
+#
+#   spdx_root_package_name (required)
+#     The name to use for the main package in the SPDX document.
+#     This is used in debugging and license reviews, and should
+#     correspond with a stable, developer-friendly, short name of
+#     the target.
+#
+template("generated_licenses_spdx") {
+  assert(defined(invoker.target), "Must specify `target`")
+  assert(defined(invoker.spdx_root_package_name),
+         "Must specify `spdx_root_package_name`")
+  assert(defined(invoker.output), "Must specify `output`")
+
+  _targets = {
+    main_target = target_name
+    generated_metadata = "${target_name}.licenses_metadata"
+  }
+
+  _files = {
+    generated_metadata =
+        "${target_out_dir}/${target_name}.licenses_metadata.json"
+    generated_spdx = invoker.output
+    generated_depfile = "${target_gen_dir}/${target_name}.d"
+  }
+
+  generated_file(_targets.generated_metadata) {
+    outputs = [ _files.generated_metadata ]
+    data_keys = [
+      "license",
+      "applicable_licenses",
+    ]
+    deps = [ invoker.target ]
+    output_conversion = "json"
+  }
+
+  python_action(_targets.main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    binary_label = "//build/licenses/python:generated_licenses_spdx_tool(${host_toolchain})"
+    inputs = [ _files.generated_metadata ]
+    outputs = [ _files.generated_spdx ]
+
+    # Depsfile is generated for all the read licenses files listed in
+    # generated_metadata_target.
+    depfile = _files.generated_depfile
+    args = [
+      "--generated-license-metadata",
+      rebase_path(_files.generated_metadata, root_build_dir),
+      "--fuchsia-source-path",
+      rebase_path("//", root_build_dir),
+      "--spdx-root-package-name",
+      invoker.spdx_root_package_name,
+      "--spdx-output",
+      rebase_path(_files.generated_spdx, root_build_dir),
+      "--dep-file",
+      rebase_path(_files.generated_depfile, root_build_dir),
+    ]
+    deps = [ ":${_targets.generated_metadata}" ]
+  }
+}
