@@ -8,6 +8,7 @@
             "custom_artifacts",
             "framebuffer",
             "magma",
+            "self_profile",
             "test_data",
         ],
     },

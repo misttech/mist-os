@@ -1,0 +1,79 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/starnix/kernel/starnix.gni")
+
+group("self_profile") {
+  testonly = true
+
+  deps = []
+
+  # This asserts on the relative timing of starnix operations which are only predictable in release.
+  if (!is_debug) {
+    deps += [ ":starnix_self_profile_test" ]
+  }
+}
+
+rustc_binary("bin") {
+  testonly = true
+  edition = "2021"
+  output_name = "starnix_self_profile_test"
+
+  sources = [ "src/main.rs" ]
+
+  deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//src/lib/diagnostics/inspect/contrib/self_profiles_report",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/sys/lib/component-events",
+  ]
+}
+
+_bin_name = "linux_pipe_writer"
+if (is_linux) {
+  executable(_bin_name) {
+    testonly = true
+    sources = [ "src/pipe_writer.cc" ]
+
+    # TODO(https://fxbug.dev/116773) enable sanitizers
+    exclude_toolchain_tags = [ "instrumented" ]
+  }
+}
+
+# TODO(https://fxbug.dev/302378657) use starnix_linux_component() for this
+_pipe_writer_bin_label = ":${_bin_name}($target_linux_toolchain)"
+_pipe_writer_out_dir = get_label_info(_pipe_writer_bin_label, "root_out_dir")
+resource("linux_pipe_writer_resource") {
+  testonly = true
+  sources = [ "${_pipe_writer_out_dir}/${_bin_name}" ]
+  outputs = [ "data/tests/${_bin_name}" ]
+  deps = [ _pipe_writer_bin_label ]
+}
+
+fuchsia_component("pipe_writer") {
+  testonly = true
+  manifest = "meta/pipe_writer.cml"
+  deps = [ ":linux_pipe_writer_resource" ]
+}
+
+fuchsia_test_component("integration_test") {
+  manifest = "meta/integration_test.cml"
+  deps = [
+    ":bin",
+    ":pipe_writer",
+  ]
+  test_type = "system"
+}
+
+fuchsia_test_package("starnix_self_profile_test") {
+  test_components = [ ":integration_test" ]
+  subpackages = [
+    "//src/starnix/kernel:starnix_kernel_package",
+    "//src/starnix/containers/debian:debian_package",
+  ]
+}
