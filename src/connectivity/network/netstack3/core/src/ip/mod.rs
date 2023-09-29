@@ -61,7 +61,10 @@ use crate::{
         TracingContext,
     },
     data_structures::token_bucket::TokenBucket,
-    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
+    device::{
+        AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination, Id, StrongId,
+        WeakDeviceId,
+    },
     ip::{
         device::{
             state::IpDeviceStateIpExt, BufferIpv4DeviceHandler, IpDeviceIpExt,
@@ -84,7 +87,7 @@ use crate::{
     socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
-    BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
+    BindingsTypes, BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
 /// Default IPv4 TTL.
@@ -892,68 +895,43 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-impl<
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IpStateRoutingTable<Ipv4>>,
-    > IpStateContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<I, C, L> IpStateContext<I, C> for Locked<&SyncCtx<C>, L>
+where
+    I: IpLayerIpExt,
+    C: NonSyncContext,
+    L: LockBefore<crate::lock_ordering::IpStateRoutingTable<I>>,
+
+    // These bounds ensure that we can fulfill all the traits for the associated
+    // type `IpDeviceIdCtx` below and keep the compiler happy where we don't
+    // have implementations that are generic on Ip.
+    for<'a> Locked<&'a SyncCtx<C>, crate::lock_ordering::IpStateRoutingTable<I>>:
+        DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+            + IpForwardingDeviceContext<I>
+            + IpDeviceStateContext<I, C>,
 {
-    type IpDeviceIdCtx<'a> =
-        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
+    type IpDeviceIdCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::IpStateRoutingTable<I>>;
 
     fn with_ip_routing_table<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
         let (cache, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
+            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
         cb(&mut locked, &cache)
     }
 
     fn with_ip_routing_table_mut<
         O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv4, Self::DeviceId>) -> O,
+        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<I, Self::DeviceId>) -> O,
     >(
         &mut self,
         cb: F,
     ) -> O {
         let (mut cache, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>();
-        cb(&mut locked, &mut cache)
-    }
-}
-
-impl<
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IpStateRoutingTable<Ipv6>>,
-    > IpStateContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
-{
-    type IpDeviceIdCtx<'a> =
-        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
-
-    fn with_ip_routing_table<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv6, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (cache, mut locked) =
-            self.read_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
-        cb(&mut locked, &cache)
-    }
-
-    fn with_ip_routing_table_mut<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv6, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let (mut cache, mut locked) =
-            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>();
+            self.write_lock_and::<crate::lock_ordering::IpStateRoutingTable<I>>();
         cb(&mut locked, &mut cache)
     }
 }
@@ -1215,143 +1193,180 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDev
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStateFragmentCache<Ipv4>> for SyncCtx<C> {
-    type Data = IpPacketFragmentCache<Ipv4, C::Instant>;
-    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<Ipv4, C::Instant>> where Self: 'l;
+impl<I, C> LockFor<crate::lock_ordering::IpStateFragmentCache<I>> for SyncCtx<C>
+where
+    I: Ip,
+    C: BindingsTypes,
+{
+    type Data = IpPacketFragmentCache<I, C::Instant>;
+    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<I, C::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv4.inner.fragment_cache.lock()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: Ip, II>(LockGuard<'l, IpPacketFragmentCache<I, II>>);
+
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.inner.fragment_cache.lock()),
+            |()| Wrap(self.state.ipv6.inner.fragment_cache.lock()),
+        );
+        guard
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStateFragmentCache<Ipv6>> for SyncCtx<C> {
-    type Data = IpPacketFragmentCache<Ipv6, C::Instant>;
-    type Guard<'l> = LockGuard<'l, IpPacketFragmentCache<Ipv6, C::Instant>> where Self: 'l;
+impl<I, C> LockFor<crate::lock_ordering::IpStatePmtuCache<I>> for SyncCtx<C>
+where
+    I: Ip,
+    C: BindingsTypes,
+{
+    type Data = PmtuCache<I, C::Instant>;
+    type Guard<'l> = LockGuard<'l, PmtuCache<I, C::Instant>> where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv6.inner.fragment_cache.lock()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: Ip, II>(LockGuard<'l, PmtuCache<I, II>>);
+
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.inner.pmtu_cache.lock()),
+            |()| Wrap(self.state.ipv6.inner.pmtu_cache.lock()),
+        );
+        guard
     }
 }
 
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStatePmtuCache<Ipv4>> for SyncCtx<C> {
-    type Data = PmtuCache<Ipv4, C::Instant>;
-    type Guard<'l> = LockGuard<'l, PmtuCache<Ipv4, C::Instant>> where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv4.inner.pmtu_cache.lock()
-    }
-}
-
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IpStatePmtuCache<Ipv6>> for SyncCtx<C> {
-    type Data = PmtuCache<Ipv6, C::Instant>;
-    type Guard<'l> = LockGuard<'l, PmtuCache<Ipv6, C::Instant>> where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv6.inner.pmtu_cache.lock()
-    }
-}
-
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv4>> for SyncCtx<C> {
-    type Data = ForwardingTable<Ipv4, DeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv4, DeviceId<C>>>
+impl<I: Ip, C: BindingsTypes> RwLockFor<crate::lock_ordering::IpStateRoutingTable<I>>
+    for SyncCtx<C>
+{
+    type Data = ForwardingTable<I, DeviceId<C>>;
+    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<I, DeviceId<C>>>
         where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv4, DeviceId<C>>>
+    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<C>>>
         where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv4.inner.table.read()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: Ip, C: DeviceLayerTypes>(
+            RwLockReadGuard<'l, ForwardingTable<I, DeviceId<C>>>,
+        );
+
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.inner.table.read()),
+            |()| Wrap(self.state.ipv6.inner.table.read()),
+        );
+        guard
     }
 
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv4.inner.table.write()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: Ip, C: DeviceLayerTypes>(
+            RwLockWriteGuard<'l, ForwardingTable<I, DeviceId<C>>>,
+        );
+
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.inner.table.write()),
+            |()| Wrap(self.state.ipv6.inner.table.write()),
+        );
+        guard
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpBoundMap<Ipv4>> for SyncCtx<C> {
-    type Data = icmp::BoundSockets<Ipv4, WeakDeviceId<C>>;
+impl<I, C> RwLockFor<crate::lock_ordering::IcmpBoundMap<I>> for SyncCtx<C>
+where
+    I: IpExt,
+    C: BindingsTypes,
+{
+    type Data = icmp::BoundSockets<I, WeakDeviceId<C>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
+            RwLockReadGuard<'l, icmp::BoundSockets<I, D>>,
+        );
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.read()),
+            |()| Wrap(self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()),
+        );
+        guard
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: IpExt, D: crate::device::WeakId>(
+            RwLockWriteGuard<'l, icmp::BoundSockets<I, D>>,
+        );
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.icmp.inner.sockets.bound_and_id_allocator.write()),
+            |()| Wrap(self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()),
+        );
+        guard
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpBoundMap<Ipv6>> for SyncCtx<C> {
-    type Data = icmp::BoundSockets<Ipv6, WeakDeviceId<C>>;
+impl<I, C> RwLockFor<crate::lock_ordering::IcmpSocketsTable<I>> for SyncCtx<C>
+where
+    I: crate::socket::datagram::DualStackIpExt,
+    C: BindingsTypes,
+{
+    type Data = icmp::SocketsState<I, WeakDeviceId<C>>;
     type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
     type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
 
     fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.read()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
+            RwLockReadGuard<'l, icmp::SocketsState<I, D>>,
+        );
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.icmp.inner.sockets.state.read()),
+            |()| Wrap(self.state.ipv6.icmp.inner.sockets.state.read()),
+        );
+        guard
     }
     fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv6.icmp.inner.sockets.bound_and_id_allocator.write()
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        pub(super) struct Wrap<'l, I: crate::socket::datagram::DualStackIpExt, D: crate::device::WeakId>(
+            RwLockWriteGuard<'l, icmp::SocketsState<I, D>>,
+        );
+        let Wrap(guard) = I::map_ip(
+            (),
+            |()| Wrap(self.state.ipv4.icmp.inner.sockets.state.write()),
+            |()| Wrap(self.state.ipv6.icmp.inner.sockets.state.write()),
+        );
+        guard
     }
 }
 
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSocketsTable<Ipv4>> for SyncCtx<C> {
-    type Data = icmp::SocketsState<Ipv4, WeakDeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv4.icmp.inner.sockets.state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv4.icmp.inner.sockets.state.write()
-    }
-}
-
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IcmpSocketsTable<Ipv6>> for SyncCtx<C> {
-    type Data = icmp::SocketsState<Ipv6, WeakDeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, Self::Data> where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, Self::Data> where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv6.icmp.inner.sockets.state.read()
-    }
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv6.icmp.inner.sockets.state.write()
-    }
-}
-
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IcmpTokenBucket<Ipv4>> for SyncCtx<C> {
+impl<I, C> LockFor<crate::lock_ordering::IcmpTokenBucket<I>> for SyncCtx<C>
+where
+    I: Ip,
+    C: BindingsTypes,
+{
     type Data = TokenBucket<C::Instant>;
     type Guard<'l> = LockGuard<'l, TokenBucket<C::Instant>>
         where Self: 'l;
 
     fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv4.icmp.as_ref().error_send_bucket.lock()
-    }
-}
-
-impl<C: NonSyncContext> LockFor<crate::lock_ordering::IcmpTokenBucket<Ipv6>> for SyncCtx<C> {
-    type Data = TokenBucket<C::Instant>;
-    type Guard<'l> = LockGuard<'l, TokenBucket<C::Instant>>
-        where Self: 'l;
-
-    fn lock(&self) -> Self::Guard<'_> {
-        self.state.ipv6.icmp.as_ref().error_send_bucket.lock()
-    }
-}
-
-impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::IpStateRoutingTable<Ipv6>> for SyncCtx<C> {
-    type Data = ForwardingTable<Ipv6, DeviceId<C>>;
-    type ReadGuard<'l> = RwLockReadGuard<'l, ForwardingTable<Ipv6, DeviceId<C>>>
-        where Self: 'l;
-    type WriteGuard<'l> = RwLockWriteGuard<'l, ForwardingTable<Ipv6, DeviceId<C>>>
-        where Self: 'l;
-
-    fn read_lock(&self) -> Self::ReadGuard<'_> {
-        self.state.ipv6.inner.table.read()
-    }
-
-    fn write_lock(&self) -> Self::WriteGuard<'_> {
-        self.state.ipv6.inner.table.write()
+        let IpInvariant(guard) = I::map_ip(
+            (),
+            |()| IpInvariant(self.state.ipv4.icmp.as_ref().error_send_bucket.lock()),
+            |()| IpInvariant(self.state.ipv6.icmp.as_ref().error_send_bucket.lock()),
+        );
+        guard
     }
 }
 

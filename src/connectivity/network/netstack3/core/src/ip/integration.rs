@@ -26,26 +26,17 @@ use crate::{
     NonSyncContext, SyncCtx,
 };
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv4>>>
-    FragmentStateContext<Ipv4, C::Instant> for Locked<&SyncCtx<C>, L>
+impl<I, C, L> FragmentStateContext<I, C::Instant> for Locked<&SyncCtx<C>, L>
+where
+    I: Ip,
+    C: NonSyncContext,
+    L: LockBefore<crate::lock_ordering::IpStateFragmentCache<I>>,
 {
-    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv4, C::Instant>) -> O>(
+    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<I, C::Instant>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<Ipv4>>();
-        cb(&mut cache)
-    }
-}
-
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv6>>>
-    FragmentStateContext<Ipv6, C::Instant> for Locked<&SyncCtx<C>, L>
-{
-    fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv6, C::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<Ipv6>>();
+        let mut cache = self.lock::<crate::lock_ordering::IpStateFragmentCache<I>>();
         cb(&mut cache)
     }
 }
