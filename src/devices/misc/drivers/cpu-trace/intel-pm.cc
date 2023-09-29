@@ -6,10 +6,7 @@
 
 #include <assert.h>
 #include <cpuid.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <lib/ddk/debug.h>
-
-#include <fbl/alloc_checker.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include "perf-mon.h"
 
@@ -139,7 +136,7 @@ static zx_status_t InitializeEventMaps() {
 
 // Each arch provides its own |InitOnce()| method.
 
-zx_status_t PerfmonDevice::InitOnce() {
+zx_status_t PerfmonController::InitOnce() {
   zx_status_t status = InitializeEventMaps();
   if (status != ZX_OK) {
     return status;
@@ -152,7 +149,7 @@ zx_status_t PerfmonDevice::InitOnce() {
 
 static bool LbrSupported(const perfmon::PmuHwProperties& props) { return props.lbr_stack_size > 0; }
 
-void PerfmonDevice::InitializeStagingState(StagingState* ss) {
+void PerfmonController::InitializeStagingState(StagingState* ss) const {
   ss->max_num_fixed = pmu_hw_properties_.common.max_num_fixed_events;
   ss->max_num_programmable = pmu_hw_properties_.common.max_num_programmable_events;
   ss->max_num_misc = pmu_hw_properties_.common.max_num_misc_events;
@@ -165,8 +162,8 @@ void PerfmonDevice::InitializeStagingState(StagingState* ss) {
            : ~0ul);
 }
 
-zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                            size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageFixedConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
+                                                size_t input_index, PmuConfig* ocfg) const {
   const size_t ii = input_index;
   const EventId id = icfg->events[ii].event;
   unsigned counter = PmuFixedCounterNumber(id);
@@ -176,11 +173,11 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
 
   if (counter == IPM_MAX_FIXED_COUNTERS || counter >= std::size(ocfg->fixed_events) ||
       counter >= ss->max_num_fixed) {
-    zxlogf(ERROR, "%s: Invalid fixed event [%zu]", __func__, ii);
+    FX_LOGS(ERROR) << "Invalid fixed event [" << ii << "]";
     return ZX_ERR_INVALID_ARGS;
   }
   if (ss->have_fixed[counter]) {
-    zxlogf(ERROR, "%s: Fixed event [%u] already provided", __func__, counter);
+    FX_LOGS(ERROR) << "Fixed event [" << counter << "] already provided";
     return ZX_ERR_INVALID_ARGS;
   }
   ss->have_fixed[counter] = true;
@@ -190,7 +187,7 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
     ocfg->fixed_initial_value[ss->num_fixed] = 0;
   } else {
     if (rate > ss->max_fixed_value) {
-      zxlogf(ERROR, "%s: Rate too large, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Rate too large, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
     }
     ocfg->fixed_initial_value[ss->num_fixed] = ss->max_fixed_value - rate + 1;
@@ -219,7 +216,7 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
   }
   if (flags & FidlPerfmonEventConfigFlags::kCollectLastBranch) {
     if (!LbrSupported(pmu_hw_properties())) {
-      zxlogf(ERROR, "%s: Last branch not supported, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Last branch not supported, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
     }
     ocfg->fixed_flags[ss->num_fixed] |= kPmuConfigFlagLastBranch;
@@ -230,8 +227,9 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
   return ZX_OK;
 }
 
-zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                                   size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageProgrammableConfig(const FidlPerfmonConfig* icfg,
+                                                       StagingState* ss, size_t input_index,
+                                                       PmuConfig* ocfg) const {
   const size_t ii = input_index;
   EventId id = icfg->events[ii].event;
   unsigned group = GetEventIdGroup(id);
@@ -242,7 +240,7 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
 
   // TODO(dje): Verify no duplicates.
   if (ss->num_programmable == ss->max_num_programmable) {
-    zxlogf(ERROR, "%s: Too many programmable counters provided", __func__);
+    FX_LOGS(ERROR) << "Too many programmable counters provided";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -252,7 +250,7 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
     ocfg->programmable_initial_value[ss->num_programmable] = 0;
   } else {
     if (rate > ss->max_programmable_value) {
-      zxlogf(ERROR, "%s: Rate too large, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Rate too large, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
     }
     ocfg->programmable_initial_value[ss->num_programmable] = ss->max_programmable_value - rate + 1;
@@ -262,24 +260,25 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
   switch (group) {
     case kGroupArch:
       if (event >= kArchEventMapSize) {
-        zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+        FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "], event: " << event
+                       << ", max: " << kArchEventMapSize;
         return ZX_ERR_INVALID_ARGS;
       }
       details = &kArchEvents[kArchEventMap[event]];
       break;
     case kGroupModel:
       if (event >= kModelEventMapSize) {
-        zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+        FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
         return ZX_ERR_INVALID_ARGS;
       }
       details = &kModelEvents[kModelEventMap[event]];
       break;
     default:
-      zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
   }
   if (details->event == 0 && details->umask == 0) {
-    zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+    FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -319,7 +318,7 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
   }
   if (flags & FidlPerfmonEventConfigFlags::kCollectLastBranch) {
     if (!LbrSupported(pmu_hw_properties())) {
-      zxlogf(ERROR, "%s: Last branch not supported, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Last branch not supported, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
     }
     ocfg->programmable_flags[ss->num_programmable] |= kPmuConfigFlagLastBranch;
@@ -330,8 +329,8 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
   return ZX_OK;
 }
 
-zx_status_t PerfmonDevice::StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                           size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
+                                               size_t input_index, PmuConfig* ocfg) {
   const size_t ii = input_index;
   EventId id = icfg->events[ii].event;
   int event = PmuLookupMiscEvent(id);
@@ -339,19 +338,19 @@ zx_status_t PerfmonDevice::StageMiscConfig(const FidlPerfmonConfig* icfg, Stagin
   bool uses_timebase = ocfg->timebase_event != kEventIdNone && rate == 0;
 
   if (event < 0) {
-    zxlogf(ERROR, "%s: Invalid misc event [%zu]", __func__, ii);
+    FX_LOGS(ERROR) << "Invalid misc event [" << ii << "]";
     return ZX_ERR_INVALID_ARGS;
   }
   if (ss->num_misc == ss->max_num_misc) {
-    zxlogf(ERROR, "%s: Too many misc counters provided", __func__);
+    FX_LOGS(ERROR) << "Too many misc counters provided";
     return ZX_ERR_INVALID_ARGS;
   }
   if (ss->have_misc[event / 64] & (1ul << (event % 64))) {
-    zxlogf(ERROR, "%s: Misc event [%zu] already provided", __func__, ii);
+    FX_LOGS(ERROR) << "Misc event [" << ii << "] already provided";
     return ZX_ERR_INVALID_ARGS;
   }
   if (rate != 0) {
-    zxlogf(ERROR, "%s: Misc event [%zu] cannot be own timebase", __func__, ii);
+    FX_LOGS(ERROR) << "Misc event [" << ii << "] cannot be own timebase";
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -366,13 +365,13 @@ zx_status_t PerfmonDevice::StageMiscConfig(const FidlPerfmonConfig* icfg, Stagin
   return ZX_OK;
 }
 
-zx_status_t PerfmonDevice::VerifyStaging(StagingState* ss, PmuConfig* ocfg) {
+zx_status_t PerfmonController::VerifyStaging(StagingState* ss, PmuConfig* ocfg) {
   PmuPerTraceState* per_trace = per_trace_state_.get();
 
   // Require something to be enabled in order to start tracing.
   // This is mostly a sanity check.
   if (per_trace->config.global_ctrl == 0) {
-    zxlogf(ERROR, "%s: Requested config doesn't collect any data", __func__);
+    FX_LOGS(ERROR) << "Requested config doesn't collect any data";
     return ZX_ERR_INVALID_ARGS;
   }
 

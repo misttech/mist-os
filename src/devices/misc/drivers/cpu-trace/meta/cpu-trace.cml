@@ -3,19 +3,26 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver/compat/compat.shard.cml",
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "driver",
-        bind: "meta/bind/cpu-trace.bindbc",
-        colocate: "true",
-        compat: "driver/cpu-trace.so",
-        default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
+        runner: "elf",
+        binary: "bin/cpu-trace",
     },
+    capabilities: [
+        { protocol: "fuchsia.perfmon.cpu.Controller" },
+    ],
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        { protocol: "fuchsia.kernel.DebugResource" },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.perfmon.cpu.Controller",
+            from: "self",
+
+            // The board or emulator may not have the hardware to support performance counters
+            availability: "optional",
+        },
     ],
 }

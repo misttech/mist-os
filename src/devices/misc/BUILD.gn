@@ -7,7 +7,6 @@ group("drivers") {
   deps = [
     "drivers/chromeos-acpi",
     "drivers/compat",
-    "drivers/cpu-trace",
     "drivers/packaged:component",
     "drivers/test",
     "drivers/test-parent:test-parent-sys",

@@ -55,7 +55,7 @@
             ],
         },
         {
-            directory: "dev-topological",
+            protocol: "fuchsia.kernel.DebugResource",
             from: "parent",
             to: "#cpuperf_provider",
         },

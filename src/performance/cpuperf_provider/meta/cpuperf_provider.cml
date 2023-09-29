@@ -2,19 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/client.shard.cml" ],
+    include: [
+        "syslog/client.shard.cml",
+        "trace/use.shard.cml",
+    ],
     program: {
         runner: "elf",
         binary: "bin/cpuperf_provider",
     },
+    children: [
+        {
+            name: "cpu-trace",
+            url: "cpu-trace#meta/cpu-trace.cm",
+        },
+    ],
     use: [
         {
-            protocol: [ "fuchsia.tracing.provider.Registry" ],
+            protocol: [ "fuchsia.perfmon.cpu.Controller" ],
+            from: "#cpu-trace",
+            availability: "optional",
         },
+    ],
+    offer: [
         {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
+            protocol: "fuchsia.kernel.DebugResource",
+            from: "parent",
+            to: "#cpu-trace",
         },
     ],
 }

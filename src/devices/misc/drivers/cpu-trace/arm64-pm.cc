@@ -5,8 +5,7 @@
 // See the README.md in this directory for documentation.
 
 #include <assert.h>
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <lib/ddk/debug.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include "perf-mon.h"
 
@@ -61,7 +60,7 @@ static zx_status_t InitializeEventMaps() {
 
 // Each arch provides its own |InitOnce()| method.
 
-zx_status_t PerfmonDevice::InitOnce() {
+zx_status_t PerfmonController::InitOnce() {
   zx_status_t status = InitializeEventMaps();
   if (status != ZX_OK) {
     return status;
@@ -72,7 +71,7 @@ zx_status_t PerfmonDevice::InitOnce() {
 
 // Architecture-provided helpers for |PmuStageConfig()|.
 
-void PerfmonDevice::InitializeStagingState(StagingState* ss) {
+void PerfmonController::InitializeStagingState(StagingState* ss) const {
   ss->max_num_fixed = pmu_hw_properties_.common.max_num_fixed_events;
   ss->max_num_programmable = pmu_hw_properties_.common.max_num_programmable_events;
   ss->max_fixed_value = (pmu_hw_properties_.common.max_fixed_counter_width < 64
@@ -84,8 +83,8 @@ void PerfmonDevice::InitializeStagingState(StagingState* ss) {
            : ~0ul);
 }
 
-zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                            size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageFixedConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
+                                                size_t input_index, PmuConfig* ocfg) const {
   const size_t ii = input_index;
   const EventId id = icfg->events[ii].event;
   EventRate rate = icfg->events[ii].rate;
@@ -94,11 +93,11 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
 
   // There's only one fixed counter on ARM64, the cycle counter.
   if (id != FIXED_CYCLE_COUNTER_ID) {
-    zxlogf(ERROR, "%s: Invalid fixed event [%zu]", __func__, ii);
+    FX_LOGS(ERROR) << "Invalid fixed event [" << ii << "]";
     return ZX_ERR_INVALID_ARGS;
   }
   if (ss->num_fixed > 0) {
-    zxlogf(ERROR, "%s: Fixed event [%u] already provided", __func__, id);
+    FX_LOGS(ERROR) << "Fixed event [" << id << "] already provided";
     return ZX_ERR_INVALID_ARGS;
   }
   ocfg->fixed_events[ss->num_fixed] = id;
@@ -113,14 +112,14 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
         ocfg->fixed_initial_value[ss->num_fixed] =
             ss->max_fixed_value - rate + 1;
 #else
-    zxlogf(ERROR, "%s: data collection rates not supported yet", __func__);
+    FX_LOGS(ERROR) << "Data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
 #endif
   }
 
   // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
   if (uses_timebase) {
-    zxlogf(ERROR, "%s: data collection rates not supported yet", __func__);
+    FX_LOGS(ERROR) << "data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -138,8 +137,9 @@ zx_status_t PerfmonDevice::StageFixedConfig(const FidlPerfmonConfig* icfg, Stagi
   return ZX_OK;
 }
 
-zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                                   size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageProgrammableConfig(const FidlPerfmonConfig* icfg,
+                                                       StagingState* ss, size_t input_index,
+                                                       PmuConfig* ocfg) const {
   const size_t ii = input_index;
   EventId id = icfg->events[ii].event;
   unsigned group = GetEventIdGroup(id);
@@ -150,7 +150,7 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
 
   // TODO(dje): Verify no duplicates.
   if (ss->num_programmable == ss->max_num_programmable) {
-    zxlogf(ERROR, "%s: Too many programmable counters provided", __func__);
+    FX_LOGS(ERROR) << "Too many programmable counters provided";
     return ZX_ERR_INVALID_ARGS;
   }
   ocfg->programmable_events[ss->num_programmable] = id;
@@ -162,13 +162,13 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
        // The cycle counter is 64 bits so there's no need to check
        // |icfg->rate[ii]| here.
         if (icfg->rate[ii] > ss->max_programmable_value) {
-            zxlogf(ERROR, "%s: Rate too large, event [%u]", __func__, ii);
+            FX_LOGS(ERROR) << "%s: Rate too large, event [%u]", __func__, ii);
             return ZX_ERR_INVALID_ARGS;
         }
         ocfg->programmable_initial_value[ss->num_programmable] =
             ss->max_programmable_value - icfg->rate[ii] + 1;
 #else
-    zxlogf(ERROR, "%s: data collection rates not supported yet", __func__);
+    FX_LOGS(ERROR) << "data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
 #endif
   }
@@ -177,18 +177,18 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
   switch (group) {
     case kGroupArch:
       if (event >= kArchEventMapSize) {
-        zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+        FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
         return ZX_ERR_INVALID_ARGS;
       }
       details = &kArchEvents[kArchEventMap[event]];
       break;
     default:
-      zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+      FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
       return ZX_ERR_INVALID_ARGS;
   }
   // Arch events have at least ARM64_PMU_REG_FLAG_{ARCH,MICROARCH} set.
   if (details->flags == 0) {
-    zxlogf(ERROR, "%s: Invalid event id, event [%zu]", __func__, ii);
+    FX_LOGS(ERROR) << "Invalid event id, event [" << ii << "]";
     return ZX_ERR_INVALID_ARGS;
   }
   ZX_DEBUG_ASSERT((details->flags & (ARM64_PMU_REG_FLAG_ARCH | ARM64_PMU_REG_FLAG_MICROARCH)) != 0);
@@ -197,7 +197,7 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
 
   // TODO(fxbug.dev/33106): Disable until overflow interrupts are working.
   if (uses_timebase) {
-    zxlogf(ERROR, "%s: data collection rates not supported yet", __func__);
+    FX_LOGS(ERROR) << "data collection rates not supported yet";
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -215,10 +215,10 @@ zx_status_t PerfmonDevice::StageProgrammableConfig(const FidlPerfmonConfig* icfg
   return ZX_OK;
 }
 
-zx_status_t PerfmonDevice::StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                           size_t input_index, PmuConfig* ocfg) {
+zx_status_t PerfmonController::StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
+                                               size_t input_index, PmuConfig* ocfg) {
   // There are no misc events yet.
-  zxlogf(ERROR, "%s: Invalid event [%zu] (no misc events)", __func__, input_index);
+  FX_LOGS(ERROR) << "Invalid event [" << input_index << "] (no misc events)";
   return ZX_ERR_INVALID_ARGS;
 }
 

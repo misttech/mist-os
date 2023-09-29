@@ -338,7 +338,6 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/gpio/bin/gpioutil:bootfs",
     "//src/devices/i2c/bin:bootfs",
     "//src/devices/power/bin/lspwr:bootfs",
-    "//src/devices/misc/drivers/cpu-trace:bootfs",
     "//src/devices/ram/bin/ram-info:bootfs",
     "//src/devices/spi/bin/spiutil:bootfs",
     "//src/devices/thermal/bin/temperature-cli:bootfs",

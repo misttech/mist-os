@@ -4,22 +4,63 @@
 
 // See the README.md in this directory for documentation.
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/platform-defs.h>
-#include <stdlib.h>
-#include <string.h>
-#include <zircon/syscalls.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <fidl/fuchsia.perfmon.cpu/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/syslog/cpp/macros.h>
 
-#include "cpu-trace-private.h"
+#include "perf-mon.h"
 
-static constexpr zx_driver_ops_t cpu_trace_driver_ops = []() {
-  zx_driver_ops_t ops{};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = perfmon_bind;
-  return ops;
-}();
+int main(int argc, char** argv) {
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  async_dispatcher_t* dispatcher = loop.dispatcher();
 
-ZIRCON_DRIVER(cpu_trace, cpu_trace_driver_ops, "zircon", "0.1");
+  auto client_end = component::Connect<fuchsia_kernel::DebugResource>();
+  if (client_end.is_error()) {
+    FX_PLOGS(ERROR, client_end.error_value()) << "Failed to get debug resource";
+    return -1;
+  }
+  auto debug_resource_response = fidl::WireSyncClient(std::move(*client_end))->Get();
+  if (!debug_resource_response.ok()) {
+    FX_PLOGS(ERROR, debug_resource_response.status()) << "Failed to get debug resource";
+    return -1;
+  }
+  zx::resource debug_resource{std::move(debug_resource_response->resource)};
+
+  perfmon::PmuHwProperties props;
+  zx_status_t status = perfmon::PerfmonController::GetHwProperties(zx_mtrace_control, &props,
+                                                                   debug_resource.borrow());
+  if (status != ZX_OK) {
+    return -1;
+  }
+
+  auto controller = std::make_unique<perfmon::PerfmonController>(props, zx_mtrace_control,
+                                                                 debug_resource.borrow());
+  zx_status_t init_status = controller->InitOnce();
+  if (init_status != ZX_OK) {
+    return -1;
+  }
+
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);
+
+  zx::result result = outgoing.ServeFromStartupInfo();
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << result.status_string();
+    return -1;
+  }
+
+  const std::string protocol_name = "fuchsia.perfmon.cpu.Controller";
+  result =
+      outgoing.AddProtocol<fuchsia_perfmon_cpu::Controller>(std::move(controller), protocol_name);
+  if (result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to add fuchsia.perfmon.cpu.Controller protocol: "
+                   << result.status_string();
+    return -1;
+  }
+
+  loop.Run();
+  return EXIT_SUCCESS;
+}

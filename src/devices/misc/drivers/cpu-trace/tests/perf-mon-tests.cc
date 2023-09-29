@@ -3,13 +3,9 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.perfmon.cpu/cpp/wire.h>
-#include <lib/ddk/debug.h>
-#include <lib/fake-bti/bti.h>
 #include <lib/zircon-internal/device/cpu-trace/perf-mon.h>
-#include <lib/zx/bti.h>
-#include <lib/zx/clock.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "../perf-mon.h"
 
@@ -23,7 +19,7 @@ using FidlPerfmonConfig = fidl_perfmon::wire::Config;
 using FidlPerfmonConfigEventFlags = fidl_perfmon::wire::EventConfigFlags;
 
 // List of events we need. This is a minimal version of
-// garnet/lib/perfmon/event-registry.{h,cc}.
+// src/performance/lib/perfmon/event-registry.{h,cc}.
 // TODO(dje): Move this DB so we can use it too (after unified build?).
 
 #ifdef __aarch64__
@@ -34,9 +30,7 @@ enum class Arm64FixedEvent : perfmon::EventId {
 #include <lib/zircon-internal/device/cpu-trace/arm64-pm-events.inc>
 };
 
-#endif
-
-#ifdef __x86_64__
+#elif defined(__x86_64__)
 
 enum class X64FixedEvent : perfmon::EventId {
 #define DEF_FIXED_EVENT(symbol, event_name, id, regnum, flags, readable_name, description) \
@@ -51,6 +45,16 @@ enum class SklMiscEvent : perfmon::EventId {
 #include <lib/zircon-internal/device/cpu-trace/skylake-misc-events.inc>
 };
 
+#elif defined(__riscv)
+
+enum class RiscvFixedEvent : perfmon::EventId {
+  FIXED_RDCYCLE = 0,
+  FIXED_RDTIME = 1,
+  FIXED_INSTRET = 2,
+};
+
+#else
+#error "unsupported arch"
 #endif
 
 // A version of |zx_mtrace_control()| that always returns ZX_OK.
@@ -63,7 +67,7 @@ static zx_status_t mtrace_control_always_ok(zx_handle_t handle, uint32_t kind, u
 static perfmon::PmuHwProperties GetFakeHwProperties() {
   perfmon::PmuHwProperties props{};
 
-#ifdef __aarch64__
+#if defined(__aarch64__)
   // VIM2 supports version 3, begin with that.
   props.common.pm_version = 3;
   // ARM has one fixed event, the cycle counter.
@@ -74,9 +78,7 @@ static perfmon::PmuHwProperties GetFakeHwProperties() {
   props.common.max_programmable_counter_width = 32;
   props.common.max_num_misc_events = 0;
   props.common.max_misc_counter_width = 0;
-#endif
-
-#ifdef __x86_64__
+#elif defined(__x86_64__)
   // Skylake supports version 4, begin with that.
   props.common.pm_version = 4;
   // Intel has 3 fixed events: instruction, unhalted reference cycles, and unhalted core cycles.
@@ -89,32 +91,39 @@ static perfmon::PmuHwProperties GetFakeHwProperties() {
   props.common.max_misc_counter_width = 32;
   props.perf_capabilities = 0;
   props.lbr_stack_size = 0;
+#elif defined(__riscv)
+  // Based on riscv zicntr and zihpm extensions
+  props.common.pm_version = 2;
+  props.common.max_num_fixed_events = 3;
+  props.common.max_fixed_counter_width = 64;
+  props.common.max_num_programmable_events = 29;
+  props.common.max_programmable_counter_width = 64;
+#else
+#error "unsupported arch"
 #endif
 
   return props;
 }
 
-class Perfmon : public zxtest::Test {
+class Perfmon : public ::testing::Test {
  public:
   void SetUp() override {
-    zx::bti bti;
-    ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
     perfmon::PmuHwProperties props{GetFakeHwProperties()};
-    device_.reset(
-        new perfmon::PerfmonDevice(nullptr, std::move(bti), props, mtrace_control_always_ok));
+    device_ = std::make_unique<perfmon::PerfmonController>(props, mtrace_control_always_ok,
+                                                           zx::unowned_resource{ZX_HANDLE_INVALID});
   }
 
-  perfmon::PerfmonDevice* device() const { return device_.get(); }
+  perfmon::PerfmonController* device() const { return device_.get(); }
 
  private:
-  std::unique_ptr<perfmon::PerfmonDevice> device_;
+  std::unique_ptr<perfmon::PerfmonController> device_;
 };
 
 TEST_F(Perfmon, BasicCycles) {
   FidlPerfmonAllocation allocation{};
   allocation.num_buffers = zx_system_get_num_cpus();
   allocation.buffer_size_in_pages = 1;
-  ASSERT_OK(device()->PmuInitialize(&allocation));
+  ASSERT_EQ(ZX_OK, device()->PmuInitialize(&allocation));
 
   FidlPerfmonConfig config;
 #if defined(__aarch64__)
@@ -122,15 +131,24 @@ TEST_F(Perfmon, BasicCycles) {
 #elif defined(__x86_64__)
   auto cycle_event_id =
       static_cast<perfmon::EventId>(X64FixedEvent::FIXED_UNHALTED_REFERENCE_CYCLES);
+#elif defined(__riscv)
+  auto cycle_event_id = static_cast<perfmon::EventId>(RiscvFixedEvent::FIXED_RDCYCLE);
 #else
 #error "unsupported arch"
 #endif
   config.events[0].event = cycle_event_id;
   config.events[0].rate = 0;
   config.events[0].flags |= FidlPerfmonEventConfigFlags::kCollectOs;
-  ASSERT_OK(device()->PmuStageConfig(&config));
 
-  ASSERT_OK(device()->PmuStart());
+#if defined(__riscv)
+  // Not yet implemented for riscv
+  ASSERT_EQ(ZX_ERR_INVALID_ARGS, device()->PmuStageConfig(&config));
+  return;
+#else
+  ASSERT_EQ(ZX_OK, device()->PmuStageConfig(&config));
+#endif
+
+  ASSERT_EQ(ZX_OK, device()->PmuStart());
   device()->PmuStop();
 }
 
@@ -142,15 +160,15 @@ TEST_F(Perfmon, OnlyNonCpuCountersSelected) {
   FidlPerfmonAllocation allocation{};
   allocation.num_buffers = zx_system_get_num_cpus();
   allocation.buffer_size_in_pages = 1;
-  ASSERT_OK(device()->PmuInitialize(&allocation));
+  ASSERT_EQ(ZX_OK, device()->PmuInitialize(&allocation));
 
   FidlPerfmonConfig config{};
   config.events[0].event = static_cast<perfmon::EventId>(SklMiscEvent::MISC_PKG_EDRAM_TEMP);
   config.events[0].rate = 0;
   config.events[0].flags |= FidlPerfmonEventConfigFlags::kCollectOs;
-  ASSERT_OK(device()->PmuStageConfig(&config));
+  ASSERT_EQ(ZX_OK, device()->PmuStageConfig(&config));
 
-  ASSERT_OK(device()->PmuStart());
+  ASSERT_EQ(ZX_OK, device()->PmuStart());
   device()->PmuStop();
 }
 

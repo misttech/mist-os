@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#ifndef SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_INTEL_PM_IMPL_H_
+#define SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_INTEL_PM_IMPL_H_
 #include <stdint.h>
 
 namespace perfmon {
@@ -60,3 +62,4 @@ struct StagingState {
 };
 
 }  // namespace perfmon
+#endif  // SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_INTEL_PM_IMPL_H_

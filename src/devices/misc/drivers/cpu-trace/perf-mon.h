@@ -6,8 +6,6 @@
 #define SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_PERF_MON_H_
 
 #include <fidl/fuchsia.perfmon.cpu/cpp/wire.h>
-#include <lib/ddk/driver.h>
-#include <lib/ddk/io-buffer.h>
 #include <lib/zx/bti.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -15,8 +13,6 @@
 #include <zircon/types.h>
 
 #include <memory>
-
-#include <ddktl/device.h>
 
 #if defined(__x86_64__)
 #include <lib/zircon-internal/device/cpu-trace/intel-pm.h>
@@ -27,12 +23,19 @@
 
 #include "arm64-pm-impl.h"
 #else
-#error "unsupported architecture"
+// include the arm files to provide type definitions
+#include <lib/zircon-internal/device/cpu-trace/arm64-pm.h>
+
+#include "unsupported-arch-impl.h"
 #endif
 
-#include "cpu-trace-private.h"
-
 namespace perfmon {
+
+// The zx_mtrace_control syscall.
+// A pointer to the syscall is provided during driver construction so that a fake version can
+// be provided in the tests.
+using mtrace_control_func_t = zx_status_t(zx_handle_t handle, uint32_t kind, uint32_t action,
+                                          uint32_t options, void* buf, size_t buf_size);
 
 namespace fidl_perfmon = fuchsia_perfmon_cpu;
 
@@ -46,6 +49,10 @@ using FidlPerfmonEventConfigFlags = fidl_perfmon::wire::EventConfigFlags;
 using PmuHwProperties = X86PmuProperties;
 using PmuConfig = X86PmuConfig;
 #elif defined(__aarch64__)
+using PmuHwProperties = Arm64PmuProperties;
+using PmuConfig = Arm64PmuConfig;
+#else
+// Use the arm versions just to provide type definitions
 using PmuHwProperties = Arm64PmuProperties;
 using PmuConfig = Arm64PmuConfig;
 #endif
@@ -107,16 +114,12 @@ struct PmuPerTraceState {
   // There is one buffer per cpu.
   uint32_t buffer_size_in_pages;
 
-  std::unique_ptr<io_buffer_t[]> buffers;
+  std::vector<zx::vmo> buffers;
+  std::vector<std::pair<zx_vaddr_t, size_t>> mappings;
 };
 
 // Devhost interface.
-
-class PerfmonDevice;
-using DeviceType =
-    ddk::Device<PerfmonDevice, ddk::Messageable<fidl_perfmon::Device>::Mixin, ddk::Unbindable>;
-
-class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::Controller> {
+class PerfmonController : public fidl::WireServer<fidl_perfmon::Controller> {
  public:
   // The page size we use.
   static constexpr uint32_t kLog2PageSize = 12;
@@ -125,24 +128,22 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
   static constexpr uint32_t kMaxPerTraceSpaceInPages = (256 * 1024 * 1024) / kPageSize;
 
   // Fetch the pmu hw properties from the kernel.
-  static zx_status_t GetHwProperties(zx_device_t* parent, mtrace_control_func_t* mtrace_control,
-                                     PmuHwProperties* out_props);
+  static zx_status_t GetHwProperties(mtrace_control_func_t* mtrace_control,
+                                     PmuHwProperties* out_props,
+                                     const zx::unowned_resource& debug_resource);
 
   // Architecture-provided routine to initialize static state.
   // TODO(dje): Move static state to the device object for better testability.
   static zx_status_t InitOnce();
 
-  explicit PerfmonDevice(zx_device_t* parent, zx::bti bti, perfmon::PmuHwProperties props,
-                         mtrace_control_func_t* mtrace_control);
-  ~PerfmonDevice() override = default;
+  explicit PerfmonController(perfmon::PmuHwProperties props, mtrace_control_func_t* mtrace_control,
+                             zx::unowned_resource debug_resource);
+  ~PerfmonController() override = default;
 
   const PmuHwProperties& pmu_hw_properties() const { return pmu_hw_properties_; }
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
-
   // Handlers for each of the operations.
-  void PmuGetProperties(FidlPerfmonProperties* props);
+  void PmuGetProperties(FidlPerfmonProperties* props) const;
   zx_status_t PmuInitialize(const FidlPerfmonAllocation* allocation);
   void PmuTerminate();
   zx_status_t PmuGetAllocation(FidlPerfmonAllocation* allocation);
@@ -153,9 +154,6 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
   void PmuStop();
 
   // FIDL server methods
-
-  void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
-
   void GetProperties(GetPropertiesCompleter::Sync& completer) override;
   void Initialize(InitializeRequestView request, InitializeCompleter::Sync& completer) override;
   void Terminate(TerminateCompleter::Sync& completer) override;
@@ -172,22 +170,20 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
 
   // Architecture-provided helpers for |PmuStageConfig()|.
   // Initialize |ss| in preparation for processing the PMU configuration.
-  void InitializeStagingState(StagingState* ss);
+  void InitializeStagingState(StagingState* ss) const;
   // Stage fixed counter |input_index| in |icfg|.
   zx_status_t StageFixedConfig(const FidlPerfmonConfig* icfg, StagingState* ss, size_t input_index,
-                               PmuConfig* ocfg);
+                               PmuConfig* ocfg) const;
   // Stage fixed counter |input_index| in |icfg|.
   zx_status_t StageProgrammableConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
-                                      size_t input_index, PmuConfig* ocfg);
+                                      size_t input_index, PmuConfig* ocfg) const;
   // Stage fixed counter |input_index| in |icfg|.
-  zx_status_t StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss, size_t input_index,
-                              PmuConfig* ocfg);
+  static zx_status_t StageMiscConfig(const FidlPerfmonConfig* icfg, StagingState* ss,
+                                     size_t input_index, PmuConfig* ocfg);
   // Verify the result. This is where the architecture can do any last
   // minute verification.
   zx_status_t VerifyStaging(StagingState* ss, PmuConfig* ocfg);
   // End of architecture-provided helpers.
-
-  zx::bti bti_;
 
   // Properties of the PMU computed when the device driver is loaded.
   const PmuHwProperties pmu_hw_properties_;
@@ -196,13 +192,6 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
   // In tests it is replaced with something suitable for the test.
   mtrace_control_func_t* const mtrace_control_;
 
-  // Only one open of this device is supported at a time. KISS for now.
-  using Binding = struct {
-    fidl::ServerBindingRef<fuchsia_perfmon_cpu::Controller> binding;
-    std::optional<ddk::UnbindTxn> unbind_txn;
-  };
-  std::optional<Binding> binding_;
-
   // Once tracing has started various things are not allowed until it stops.
   bool active_ = false;
 
@@ -210,6 +199,8 @@ class PerfmonDevice : public DeviceType, public fidl::WireServer<fidl_perfmon::C
   // TODO(dje): At the moment we only support one trace at a time.
   // "trace" == "data collection run"
   std::unique_ptr<PmuPerTraceState> per_trace_state_;
+
+  zx::unowned_resource debug_resource_;
 };
 
 }  // namespace perfmon

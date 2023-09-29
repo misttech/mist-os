@@ -2,113 +2,78 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/assembly/bootfs_files_for_assembly.gni")
-import("//build/bind/bind.gni")
 import("//build/components.gni")
-import("//build/drivers.gni")
 import("//build/test.gni")
 
-if (current_cpu != "arm64" && current_cpu != "x64") {
-  group("cpu-trace") {
-  }
-  group("tests") {
-    testonly = true
-  }
-} else {
-  source_set("perf-mon") {
-    visibility = [ ":*" ]
+source_set("perf-mon") {
+  visibility = [ ":*" ]
 
-    sources = [
-      "perf-mon.cc",
-      "perf-mon.h",
-    ]
+  sources = [
+    "perf-mon.cc",
+    "perf-mon.h",
+  ]
 
-    if (current_cpu == "arm64") {
-      sources += [ "arm64-pm.cc" ]
-    } else if (current_cpu == "x64") {
-      sources += [ "intel-pm.cc" ]
-    }
-
-    public_deps = [
-      "//src/lib/ddk",
-      "//src/lib/ddktl",
-    ]
-
-    deps = [
-      "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-      "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
-      "//src/devices/lib/driver:driver_runtime",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/zircon-internal",
-    ]
+  if (current_cpu == "arm64") {
+    sources += [ "arm64-pm.cc" ]
+  } else if (current_cpu == "x64") {
+    sources += [ "intel-pm.cc" ]
+  } else {
+    sources += [ "unsupported-arch.cc" ]
   }
 
-  driver_bind_rules("cpu_trace_bind") {
-    rules = "cpu_trace.bind"
-    bind_output = "cpu-trace.bindbc"
-    tests = "bind_tests.json"
-    deps = [ "//src/devices/bind/fuchsia.platform" ]
-  }
-
-  fuchsia_driver("cpu-trace-driver") {
-    output_name = "cpu-trace"
-    configs += [
-      "//build/config:all_source",
-      "//build/config/fuchsia:enable_zircon_asserts",
-    ]
-    sources = [ "cpu-trace.cc" ]
-
-    deps = [
-      ":cpu_trace_bind",
-      ":perf-mon",
-      "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-      "//sdk/lib/fidl",
-      "//src/devices/lib/driver",
-      "//src/lib/ddk",
-      "//src/lib/ddktl",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/zircon-internal",
-      "//zircon/system/ulib/zx",
-    ]
-  }
-
-  fuchsia_driver_component("cpu-trace") {
-    visibility = [ ":*" ]
-    component_name = "cpu-trace"
-    deps = [ ":cpu-trace-driver" ]
-    info = "cpu-trace-info.json"
-    manifest = "meta/cpu-trace.cml"
-  }
-
-  group("tests") {
-    testonly = true
-    deps = [
-      ":cpu_trace_bind_test",
-      ":perf-mon-tests",
-    ]
-  }
-
-  test("perf-mon-tests-bin") {
-    output_name = "perf-mon-tests"
-    sources = [ "tests/perf-mon-tests.cc" ]
-    deps = [
-      ":perf-mon",
-      "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
-      "//sdk/lib/fdio",
-      "//sdk/lib/fit",
-      "//src/devices/lib/driver",
-      "//src/devices/testing/fake-bti",
-      "//src/devices/testing/no_ddk",
-      "//zircon/system/ulib/zircon-internal",
-      "//zircon/system/ulib/zxtest",
-    ]
-  }
-
-  fuchsia_unittest_package("perf-mon-tests") {
-    deps = [ ":perf-mon-tests-bin" ]
-  }
+  deps = [
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/zircon-internal",
+  ]
 }
 
-bootfs_files_for_assembly("bootfs") {
-  deps = [ ":cpu-trace" ]
+executable("cpu-trace-bin") {
+  output_name = "cpu-trace"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  sources = [ "cpu-trace.cc" ]
+
+  deps = [
+    ":perf-mon",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/fidl",
+    "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_package_with_single_component("cpu-trace") {
+  manifest = "meta/cpu-trace.cml"
+  deps = [ ":cpu-trace-bin" ]
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":perf-mon-tests" ]
+}
+
+test("perf-mon-tests-bin") {
+  output_name = "perf-mon-tests"
+  sources = [ "tests/perf-mon-tests.cc" ]
+  deps = [
+    ":perf-mon",
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/lib/fdio",
+    "//sdk/lib/fit",
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_unittest_package("perf-mon-tests") {
+  deps = [ ":perf-mon-tests-bin" ]
 }

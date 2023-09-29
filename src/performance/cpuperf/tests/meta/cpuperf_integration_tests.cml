@@ -9,14 +9,20 @@
     program: {
         binary: "bin/cpuperf_integration_tests",
     },
+    children: [
+        {
+            name: "cpu-trace",
+            url: "cpu-trace#meta/cpu-trace.cm",
+        },
+    ],
     use: [
         {
             protocol: [ "fuchsia.process.Launcher" ],
         },
         {
-            directory: "sys",
-            rights: [ "r*" ],
-            path: "/dev/sys",
+            protocol: "fuchsia.perfmon.cpu.Controller",
+            from: "#cpu-trace",
+            availability: "optional",
         },
         {
             storage: "data",
@@ -25,6 +31,13 @@
         {
             storage: "tmp",
             path: "/tmp",
+        },
+    ],
+    offer: [
+        {
+            protocol: "fuchsia.kernel.DebugResource",
+            from: "parent",
+            to: "#cpu-trace",
         },
     ],
 }

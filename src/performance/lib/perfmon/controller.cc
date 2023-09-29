@@ -20,7 +20,7 @@
 
 namespace perfmon {
 
-const char kPerfMonDev[] = "/dev/sys/cpu-trace/perfmon";
+const char kPerfMonDev[] = "/svc/fuchsia.perfmon.cpu.Controller";
 
 static uint32_t RoundUpToPages(uint32_t value) {
   uint32_t size = fbl::round_up(value, Controller::kPageSize);
@@ -45,35 +45,23 @@ static uint32_t GetBufferSizeInPages(CollectionMode mode, uint32_t requested_siz
 }
 
 bool Controller::IsSupported() {
-  // The device path isn't present if it's not supported.
-  struct stat stat_buffer;
-  if (stat(kPerfMonDev, &stat_buffer) != 0)
+  zx::result<fidl::ClientEnd<fuchsia_perfmon_cpu::Controller>> client_end =
+      component::Connect<fuchsia_perfmon_cpu::Controller>(kPerfMonDev);
+  if (client_end.is_error()) {
     return false;
-  return S_ISCHR(stat_buffer.st_mode);
+  }
+  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> client{std::move(*client_end)};
+  return client->GetProperties().is_ok();
 }
 
 bool Controller::GetProperties(Properties* props) {
-  zx::result<fidl::ClientEnd<fuchsia_perfmon_cpu::Device>> client_end =
-      component::Connect<fuchsia_perfmon_cpu::Device>(kPerfMonDev);
+  zx::result<fidl::ClientEnd<fuchsia_perfmon_cpu::Controller>> client_end =
+      component::Connect<fuchsia_perfmon_cpu::Controller>(kPerfMonDev);
   if (client_end.is_error()) {
     FX_PLOGS(ERROR, client_end.error_value()) << "Error connecting to " << kPerfMonDev;
     return false;
   }
-  fidl::SyncClient<fuchsia_perfmon_cpu::Device> device_client{std::move(*client_end)};
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_perfmon_cpu::Controller>();
-  if (controller_endpoints.is_error()) {
-    FX_PLOGS(ERROR, controller_endpoints.error_value())
-        << "Failed to create fidl endpoints for fuchsia.perfmon.cpu.Controller";
-    return false;
-  }
-  if (auto status = device_client->OpenSession(std::move(controller_endpoints->server));
-      status.is_error()) {
-    FX_LOGS(ERROR) << "Error opening session on " << kPerfMonDev << ": " << status.error_value();
-    return false;
-  }
-
-  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> client;
+  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> client{std::move(*client_end)};
 
   auto properties = client->GetProperties();
   if (properties.is_error()) {
@@ -133,27 +121,13 @@ bool Controller::Create(uint32_t buffer_size_in_pages, const Config& config,
     return false;
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_perfmon_cpu::Device>> client_end =
-      component::Connect<fuchsia_perfmon_cpu::Device>(kPerfMonDev);
+  zx::result<fidl::ClientEnd<fuchsia_perfmon_cpu::Controller>> client_end =
+      component::Connect<fuchsia_perfmon_cpu::Controller>(kPerfMonDev);
   if (client_end.is_error()) {
     FX_PLOGS(ERROR, client_end.error_value()) << "Error connecting to " << kPerfMonDev;
     return false;
   }
-  fidl::SyncClient<fuchsia_perfmon_cpu::Device> device_client{std::move(*client_end)};
-
-  auto controller_endpoints = fidl::CreateEndpoints<fuchsia_perfmon_cpu::Controller>();
-  if (controller_endpoints.is_error()) {
-    FX_PLOGS(ERROR, controller_endpoints.error_value())
-        << "Failed to create fidl endpoints for fuchsia.perfmon.cpu.Controller";
-    return false;
-  }
-  if (auto status = device_client->OpenSession(std::move(controller_endpoints->server));
-      status.is_error()) {
-    FX_LOGS(ERROR) << "Error opening session on " << kPerfMonDev << ": " << status.error_value();
-    return false;
-  }
-
-  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> client;
+  fidl::SyncClient<fuchsia_perfmon_cpu::Controller> client{std::move(*client_end)};
 
   CollectionMode mode = config.GetMode();
   uint32_t num_traces = zx_system_get_num_cpus();
