@@ -1264,7 +1264,6 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
 
   root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
   root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
-  root_node_.CreateUint("input_panel_type", panel_info.panel_type, &inspector_);
   return ZX_OK;
 }
 
