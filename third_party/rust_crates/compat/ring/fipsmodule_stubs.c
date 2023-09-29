@@ -42,13 +42,7 @@ extern void GFp_nistz256_point_add_affine(P256_POINT *r, const P256_POINT *a,
 extern void GFp_aes_hw_set_encrypt_key(void) {
   abort();
 }
-extern void GFp_aes_nohw_set_encrypt_key(void) {
-  abort();
-}
 extern void GFp_aes_hw_encrypt(void) {
-  abort();
-}
-extern void GFp_aes_nohw_encrypt(void) {
   abort();
 }
 extern void GFp_aes_hw_ctr32_encrypt_blocks(void) {
