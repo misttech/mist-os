@@ -130,6 +130,7 @@ function format-file() {
       format-cc-file "$1" ;;
     *.config) format-full-file "${JSON_FMT_CMD}" "$1" ;;
     *.json) format-full-file "${JSON_FMT_CMD}" "$1" ;;
+    *.py) format-full-file "${PY_FMT_CMD}" "$1" ;;
   esac
 }
 
@@ -254,6 +255,8 @@ fi
 readonly PY_TOOL="${FUCHSIA_DIR}/scripts/fuchsia-vendored-python"
 readonly CLANG_CMD="${PREBUILT_CLANG_DIR}/bin/clang-format -style=file -fallback-style=Google -sort-includes -i"
 readonly JSON_FMT_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/json-fmt.py --no-sort-keys --ignore-errors --quiet"
+readonly PY_FMT_CMD="${PREBUILT_BLACK_DIR}/black --quiet --config ${FUCHSIA_DIR}/pyproject.toml"
+
 readonly FIX_HEADER_GUARDS_CMD="${PY_TOOL} ${FUCHSIA_DIR}/scripts/style/check-header-guards.py --fix"
 
 # Mapping from tool name to a list of extensions for files to which the tool
