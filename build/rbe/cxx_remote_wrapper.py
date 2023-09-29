@@ -32,9 +32,6 @@ def msg(text: str):
     print(f"[{_SCRIPT_BASENAME}] {text}")
 
 
-REMOTE_COMPILER_SWAPPER = _SCRIPT_DIR / "cxx-swap-remote-compiler.sh"
-
-
 def _main_arg_parser() -> argparse.ArgumentParser:
     """Construct the argument parser, called by main()."""
     parser = argparse.ArgumentParser(
@@ -274,15 +271,11 @@ class CxxRemoteAction(object):
                 list(fuchsia.gcc_support_tools(self.compiler_path))
             )
 
-        # Support for remote cross-compilation:
+        # Support for remote cross-compilation is missing.
         if self.host_platform != fuchsia.REMOTE_PLATFORM:
-            # compiler path is relative to current working dir
-            compiler_swapper_rel = os.path.relpath(
-                REMOTE_COMPILER_SWAPPER, start=self.working_dir
-            )
-            remote_inputs.extend([self.remote_compiler, compiler_swapper_rel])
-            # Let --remote_wrapper apply the prefix to the command remotely.
-            remote_options.append(f"--remote_wrapper={compiler_swapper_rel}")
+            msg("Remote cross-compilation is not supported yet.")
+            self._prepare_status = 1
+            return self._prepare_status
 
         self.vprintlist("remote inputs", remote_inputs)
         self.vprintlist("remote output files", remote_output_files)
