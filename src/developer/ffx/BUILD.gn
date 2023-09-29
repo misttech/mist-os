@@ -27,7 +27,7 @@ if (is_host) {
     deps = [
       ":host",
       "frontends/ffx:ffx_bin($host_toolchain)",
-      "tools($host_toolchain)",
+      "tools:bins($host_toolchain)",
     ]
   }
 
