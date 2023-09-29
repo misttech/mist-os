@@ -54,3 +54,5 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   GENERIC = 0x0,
   QEMU = 0x1,
 };
+
+uint DRIVER_FRAMEWORK_VERSION;

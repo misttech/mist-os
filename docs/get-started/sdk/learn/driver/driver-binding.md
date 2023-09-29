@@ -285,7 +285,7 @@ Moniker  : root.sys.platform.pt.PCI0.bus.00_06_0_.pci-00_06.0-fidl
 [ 8/ 11] : Key fuchsia.BIND_PCI_TOPO          Value 0x000030
 [ 9/ 11] : Key "fuchsia.hardware.pci.Device"  Value true
 [10/ 11] : Key fuchsia.BIND_PROTOCOL          Value 0x000000
-[11/ 11] : Key "fuchsia.driver.framework.dfv2" Value true
+[11/ 11] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ```
 
 Congratulations! You have successfully bound a driver component to a device node

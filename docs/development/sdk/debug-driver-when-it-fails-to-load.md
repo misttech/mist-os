@@ -186,7 +186,7 @@ Driver : None
 [ 3/ 6] : Key fuchsia.BIND_ACPI_BUS_TYPE Value 0x000001
 [ 4/ 6] : Key "fuchsia.hardware.acpi.Device" Value true
 [ 5/ 6] : Key fuchsia.BIND_PROTOCOL Value 0x00001e
-[ 6/ 6] : Key "fuchsia.driver.framework.dfv2" Value true
+[ 6/ 6] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ...
 Name : 00_15_2
 Moniker : root.sys.platform.pt.pci.00_15_2
@@ -200,7 +200,7 @@ Driver : None
 [ 6/ 9] : Key fuchsia.BIND_PCI_INTERFACE Value 0x000000
 [ 7/ 9] : Key fuchsia.BIND_PCI_REVISION Value 0x000021
 [ 8/ 9] : Key fuchsia.BIND_PCI_TOPO Value 0x0000aa
-[ 9/ 9] : Key "fuchsia.driver.framework.dfv2" Value true
+[ 9/ 9] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ...
 ```
 

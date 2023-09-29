@@ -15,6 +15,8 @@
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "src/devices/bin/driver_manager/testing/fake_driver_index.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
@@ -1055,8 +1057,9 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
             args.properties()[0].value.int_value() == 0x2301
 
             && args.properties()[1].key.is_string_value() &&
-            args.properties()[1].key.string_value().get() == "fuchsia.driver.framework.dfv2" &&
-            args.properties()[1].value.is_bool_value() && args.properties()[1].value.bool_value()
+            args.properties()[1].key.string_value().get() ==
+                bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION &&
+            args.properties()[1].value.is_int_value() && args.properties()[1].value.int_value() == 2
 
         ) {
           return zx::ok(FakeDriverIndex::MatchResult{

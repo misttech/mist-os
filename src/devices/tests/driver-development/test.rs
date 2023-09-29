@@ -6,8 +6,8 @@ mod test_utils;
 
 use {
     anyhow::{Context, Result},
-    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_framework as fdf,
-    fidl_fuchsia_driver_test as fdt,
+    bind_fuchsia_platform, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_test as fdt,
     fuchsia_async::{self as fasync},
     fuchsia_component_test::{RealmBuilder, RealmInstance},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
@@ -26,8 +26,10 @@ fn get_no_protocol_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
             value: fdf::NodePropertyValue::IntValue(28), // ZX_PROTOCOL_MISC
         },
         fdf::NodeProperty {
-            key: fdf::NodePropertyKey::StringValue(String::from("fuchsia.driver.framework.dfv2")),
-            value: fdf::NodePropertyValue::BoolValue(true),
+            key: fdf::NodePropertyKey::StringValue(String::from(
+                bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+            )),
+            value: fdf::NodePropertyValue::IntValue(2),
         },
     ])
 }
@@ -39,8 +41,10 @@ fn get_test_parent_dfv2_property_list() -> Option<[fdf::NodeProperty; 2]> {
             value: fdf::NodePropertyValue::IntValue(bind_fuchsia_test::BIND_PROTOCOL_PARENT),
         },
         fdf::NodeProperty {
-            key: fdf::NodePropertyKey::StringValue(String::from("fuchsia.driver.framework.dfv2")),
-            value: fdf::NodePropertyValue::BoolValue(true),
+            key: fdf::NodePropertyKey::StringValue(String::from(
+                bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION,
+            )),
+            value: fdf::NodePropertyValue::IntValue(2),
         },
     ])
 }

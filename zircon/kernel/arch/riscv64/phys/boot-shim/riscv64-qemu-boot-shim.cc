@@ -17,7 +17,6 @@
 #include <lib/zbi-format/board.h>
 #include <lib/zbi-format/zbi.h>
 
-#include <bind/fuchsia/platform/cpp/bind.h>
 #include <phys/allocation.h>
 #include <phys/boot-zbi.h>
 #include <phys/main.h>
@@ -188,8 +187,8 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   };
   shim.Get<TimerItem>().set_payload(kTimerItem);
   shim.Get<PlatformIdItem>().set_payload(zbi_platform_id_t{
-      .vid = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_QEMU,
-      .pid = bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_QEMU,
+      .vid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_VID.QEMU
+      .pid = 1,  // fuchsia.platform.BIND_PLATFORM_DEV_PID.QEMU
       .board_name = "qemu-riscv64",
   });
   shim.Get<BoardInfoItem>().set_payload(zbi_board_info_t{

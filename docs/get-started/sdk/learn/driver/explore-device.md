@@ -141,7 +141,7 @@ Driver   : None
 [ 8/ 11] : Key fuchsia.BIND_PCI_TOPO          Value 0x000030
 [ 9/ 11] : Key "fuchsia.hardware.pci.Device"  Value true
 [10/ 11] : Key fuchsia.BIND_PROTOCOL          Value 0x000000
-[11/ 11] : Key "fuchsia.driver.framework.dfv2" Value true
+[11/ 11] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ```
 
 Notice that this device does not currently have a driver loaded (the `Driver`

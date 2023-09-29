@@ -8,10 +8,7 @@ import("//build/drivers.gni")
 driver_bind_rules("pci-sdhci-bind") {
   rules = "pci-sdhci.bind"
   tests = "pci-sdhci-bind-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.driver.framework",
-    "//src/devices/bind/fuchsia.pci",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.pci" ]
 }
 
 fuchsia_driver("pci-sdhci-driver") {

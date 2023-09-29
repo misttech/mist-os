@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 using fuchsia.acpi;
-using fuchsia.driver.framework;
 
 accept fuchsia.acpi.HID {
 	"GOOG0016",

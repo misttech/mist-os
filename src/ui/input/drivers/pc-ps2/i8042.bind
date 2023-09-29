@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 using fuchsia.acpi;
-using fuchsia.driver.framework;
 
 fuchsia.BIND_COMPOSITE == 1;
 if fuchsia.acpi.HID == "PNP0303" {

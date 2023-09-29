@@ -46,7 +46,7 @@ Driver   : None
 3 Properties
 [ 1/  3] : Key "fuchsia.hardware.i2c.Service"  Value Enum(fuchsia.hardware.i2c.Service.ZirconTransport)
 [ 2/  3] : Key fuchsia.BIND_I2C_ADDRESS        Value 0x0000ff
-[ 3/  3] : Key "fuchsia.driver.framework.dfv2" Value true
+[ 3/  3] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ```
 
 The output above shows that the `i2c-child` node has the following node properties:

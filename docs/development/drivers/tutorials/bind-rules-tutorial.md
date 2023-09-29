@@ -200,7 +200,7 @@ Driver   : None
 [ 3/  6] : Key fuchsia.BIND_ACPI_BUS_TYPE     Value 0x000001
 [ 4/  6] : Key "fuchsia.hardware.acpi.Device" Value true
 [ 5/  6] : Key fuchsia.BIND_PROTOCOL          Value 0x00001e
-[ 6/  6] : Key "fuchsia.driver.framework.dfv2" Value true
+[ 6/  6] : Key "fuchsia.platform.DRIVER_FRAMEWORK_VERSION" Value 0x000002
 ```
 
 You can then write the following:

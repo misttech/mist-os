@@ -8,10 +8,7 @@ import("//build/drivers.gni")
 driver_bind_rules("igc_bind") {
   rules = "igc.bind"
   tests = "bind-tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.driver.framework",
-    "//src/devices/bind/fuchsia.pci",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.pci" ]
 }
 
 source_set("igc_core") {

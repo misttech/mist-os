@@ -19,9 +19,9 @@ driver_bind_rules("intel_i2c_bind_dfv2") {
   bind_output = "intel_i2c_dfv2.bindbc"
   deps = [
     "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.driver.framework",
     "//src/devices/bind/fuchsia.intel.platform.pci",
     "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.platform",
   ]
 }
 

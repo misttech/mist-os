@@ -752,6 +752,7 @@ zx_status_t Device::SetProps(fbl::Array<const zx_device_prop_t> props) {
   return ZX_OK;
 }
 
+// TODO(fxb/134319): Insert DRIVER_FRAMEWORK_VERSION to the properties.
 zx_status_t Device::SetStrProps(fbl::Array<const StrProperty> str_props) {
   // This function should only be called once.
   ZX_DEBUG_ASSERT(!str_props_.data());

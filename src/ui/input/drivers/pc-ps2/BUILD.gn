@@ -10,10 +10,7 @@ import("//build/test.gni")
 driver_bind_rules("i8042_bind") {
   rules = "i8042.bind"
   tests = "bind_tests.json"
-  deps = [
-    "//src/devices/bind/fuchsia.acpi",
-    "//src/devices/bind/fuchsia.driver.framework",
-  ]
+  deps = [ "//src/devices/bind/fuchsia.acpi" ]
 }
 
 group("tests") {

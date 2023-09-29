@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <utility>
 
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "src/devices/bin/driver_manager/v2/node_removal_tracker.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/fxl/strings/join_strings.h"
@@ -809,8 +811,8 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   }
 
   // We set a property for DFv2 devices.
-  child->properties_.emplace_back(
-      fdf::MakeProperty(child->arena_, "fuchsia.driver.framework.dfv2", true));
+  child->properties_.emplace_back(fdf::MakeProperty(
+      child->arena_, bind_fuchsia_platform::DRIVER_FRAMEWORK_VERSION, static_cast<uint32_t>(2)));
 
   child->SetAndPublishInspect();
 
