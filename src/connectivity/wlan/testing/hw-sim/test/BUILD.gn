@@ -5,18 +5,12 @@
 import("//build/components.gni")
 import("//build/testing/environments.gni")
 
-fuchsia_component("test-root") {
-  testonly = true
-  manifest = "meta/test-root.cml"
-  deps = [ "//src/storage/memfs:memfs_component" ]
-}
-
-# Generates a component, package, and test package for the given test case.
-# Each test case runs in its own component, and each test component must be in a package that is a
-# subpackage of a fuchsia_test_package that uses ":test-root" as the test_component.
-#
-# This will create a package named "${target_name}-integration-test" that contains the full
-# integration test for the input test case.
+# Template to generate all the components and packages required for a hw-sim integration test.
+# This outputs:
+#   - A component named "${target_name}-test-root-component" which is the unique test root for this
+#   test case.
+#   - A package named "${target_name}-wlan-hw-sim-integration-test" that contains the full
+#   integration test for the input test case, including the test root component and realm factory.
 #
 # Parameters
 #   manifest (required)
@@ -32,24 +26,62 @@ template("_hw_sim_integration_test") {
   assert(defined(invoker.deps))
 
   component_name = "${target_name}-component"
-  test_suite_package_name = "${target_name}-test-suite"
-  output_package_name = "${target_name}-integration-test"
+  test_suite_package_name = "${target_name}-wlan-hw-sim-test-suite"
+  integration_test_package_name = "${target_name}-wlan-hw-sim-integration-test"
 
+  # Component containing test suite and wlantap-driver, used only in this BUILD file.
   fuchsia_component(component_name) {
     testonly = true
     component_name = "test-suite"
     manifest = invoker.manifest
+    visibility = [ ":*" ]
     deps = invoker.deps +
            [ "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver" ]
   }
 
+  # Test suite package. Will be subpackaged by the integration test package.
   fuchsia_package(test_suite_package_name) {
     testonly = true
-    package_name = "test-suite"
+    package_name = "${test_suite_package_name}"
     deps = [ ":$component_name" ]
+    visibility = [ ":*" ]
   }
 
-  fuchsia_test_package(output_package_name) {
+  # Generates component manifest for the test root component.
+  test_root_name = "${target_name}-test-root"
+  test_root_manifest_target = "${test_root_name}-manifest"
+  test_root_manifest = "${target_gen_dir}/${test_root_name}.cml"
+  generated_file(test_root_manifest_target) {
+    testonly = true
+    contents = {
+      include = [
+        "//src/connectivity/wlan/testing/hw-sim/test/meta/test-root.shard.cml",
+      ]
+      children = [
+        {
+          name = "test_suite"
+          url = "${test_suite_package_name}#meta/test-suite.cm"
+        },
+      ]
+    }
+    outputs = [ test_root_manifest ]
+    output_conversion = "json"
+    visibility = [ ":*" ]
+  }
+
+  # Create test-root using generated component manifest.
+  test_root_component = "${test_root_name}-component"
+  fuchsia_component(test_root_component) {
+    testonly = true
+    manifest = test_root_manifest
+    deps = [
+      ":${test_root_manifest_target}",
+      "//src/storage/memfs:memfs_component",
+    ]
+  }
+
+  # Package containing full integration test.
+  fuchsia_test_package(integration_test_package_name) {
     if (defined(invoker.test_specs)) {
       test_specs = invoker.test_specs
     } else {
@@ -59,12 +91,13 @@ template("_hw_sim_integration_test") {
         }
       }
     }
-    test_components = [ ":test-root" ]
+    test_components = [ ":${test_root_component}" ]
     subpackages = [
       "../testing/realm-factory",
       "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
-      ":$test_suite_package_name",
+      ":${test_suite_package_name}",
     ]
+    visibility = [ ":*" ]
   }
 }
 
@@ -182,26 +215,26 @@ _hw_sim_integration_test("rate-selection") {
 group("wlan-hw-sim-component-tests") {
   testonly = true
   deps = [
-    ":autoconnect-idle-iface-integration-test",
-    ":connect-to-all-modern-bss-protections-integration-test",
-    ":connect-to-open-network-integration-test",
-    ":connect-to-wpa1-network-integration-test",
-    ":connect-with-bad-password-integration-test",
-    ":connect-with-failed-association-integration-test",
-    ":connect-with-wrong-credential-type-integration-test",
-    ":ethernet-tx-rx-integration-test",
-    ":handle-tx-event-hooks-integration-test",
-    ":multiple-clients-ap-integration-test",
-    ":open-ap-connect-integration-test",
-    ":rate-selection-integration-test",
-    ":reconnect-to-wpa2-network-integration-test",
-    ":run-without-regulatory-manager-integration-test",
-    ":scan-contemporary-privacy-integration-test",
-    ":scan-legacy-privacy-integration-test",
-    ":set-country-integration-test",
-    ":sim-client-vs-sim-ap-integration-test",
-    ":simulate-scan-integration-test",
-    ":verify-ethernet-integration-test",
-    ":verify-wlan-inspect-integration-test",
+    ":autoconnect-idle-iface-wlan-hw-sim-integration-test",
+    ":connect-to-all-modern-bss-protections-wlan-hw-sim-integration-test",
+    ":connect-to-open-network-wlan-hw-sim-integration-test",
+    ":connect-to-wpa1-network-wlan-hw-sim-integration-test",
+    ":connect-with-bad-password-wlan-hw-sim-integration-test",
+    ":connect-with-failed-association-wlan-hw-sim-integration-test",
+    ":connect-with-wrong-credential-type-wlan-hw-sim-integration-test",
+    ":ethernet-tx-rx-wlan-hw-sim-integration-test",
+    ":handle-tx-event-hooks-wlan-hw-sim-integration-test",
+    ":multiple-clients-ap-wlan-hw-sim-integration-test",
+    ":open-ap-connect-wlan-hw-sim-integration-test",
+    ":rate-selection-wlan-hw-sim-integration-test",
+    ":reconnect-to-wpa2-network-wlan-hw-sim-integration-test",
+    ":run-without-regulatory-manager-wlan-hw-sim-integration-test",
+    ":scan-contemporary-privacy-wlan-hw-sim-integration-test",
+    ":scan-legacy-privacy-wlan-hw-sim-integration-test",
+    ":set-country-wlan-hw-sim-integration-test",
+    ":sim-client-vs-sim-ap-wlan-hw-sim-integration-test",
+    ":simulate-scan-wlan-hw-sim-integration-test",
+    ":verify-ethernet-wlan-hw-sim-integration-test",
+    ":verify-wlan-inspect-wlan-hw-sim-integration-test",
   ]
 }
