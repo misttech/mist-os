@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDMMC_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fuchsia/hardware/sdmmc/cpp/banjo.h>
 #include <lib/sdmmc/hw.h>
 #include <lib/stdcompat/span.h>
@@ -12,6 +13,8 @@
 #include <lib/zx/time.h>
 
 #include <array>
+
+#include "sdmmc-root-device.h"
 
 namespace sdmmc {
 
@@ -28,8 +31,10 @@ class SdmmcDevice {
   // For testing.
   explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host), host_info_({}) {}
 
-  zx_status_t Init();
+  // root_device is only needed if attempting to use FIDL instead of Banjo.
+  zx_status_t Init(SdmmcRootDevice* root_device = nullptr);
 
+  bool use_fidl() const { return use_fidl_; }
   const sdmmc_host_info_t& host_info() const { return host_info_; }
 
   bool UseDma() const { return host_info_.caps & SDMMC_HOST_CAP_DMA; }
@@ -112,7 +117,11 @@ class SdmmcDevice {
 
   inline uint32_t RcaArg() const { return rca_ << 16; }
 
+  bool use_fidl_ = false;
   const ddk::SdmmcProtocolClient host_;
+  // The FIDL client to communicate with Sdmmc device.
+  fdf::WireSharedClient<fuchsia_hardware_sdmmc::Sdmmc> client_;
+
   sdmmc_host_info_t host_info_;
   sdmmc_voltage_t signal_voltage_ = SDMMC_VOLTAGE_V330;
   uint16_t rca_ = 0;  // APP_CMD requires the initial RCA to be zero.

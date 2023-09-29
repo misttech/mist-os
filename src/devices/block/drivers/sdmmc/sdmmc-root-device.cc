@@ -13,6 +13,9 @@
 
 #include <fbl/alloc_checker.h>
 
+#include "sdio-controller-device.h"
+#include "sdmmc-block-device.h"
+
 namespace sdmmc {
 
 zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
@@ -95,7 +98,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
   auto sdmmc = std::make_unique<SdmmcDevice>(parent());
-  zx_status_t st = sdmmc->Init();
+  zx_status_t st = sdmmc->Init(this);
   if (st != ZX_OK) {
     zxlogf(ERROR, "failed to get host info");
     return txn.Reply(st);

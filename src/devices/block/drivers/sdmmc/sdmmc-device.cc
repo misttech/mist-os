@@ -35,8 +35,21 @@ constexpr void UpdateBits(uint32_t* x, uint32_t mask, uint32_t loc, uint32_t val
 
 namespace sdmmc {
 
-zx_status_t SdmmcDevice::Init() {
-  if (!host_.is_valid()) {
+zx_status_t SdmmcDevice::Init(SdmmcRootDevice* root_device) {
+  // Prefer FIDL over Banjo.
+  if (root_device != nullptr) {
+    auto client_end =
+        root_device->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
+    if (client_end.is_ok()) {
+      client_.Bind(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
+
+      fdf::Arena arena('SDMC');
+      auto result = client_.sync().buffer(arena)->HostInfo();
+      use_fidl_ = result.ok();
+    }
+  }
+
+  if (!use_fidl_ && !host_.is_valid()) {
     zxlogf(ERROR, "failed to get sdmmc protocol");
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -586,42 +599,316 @@ zx_status_t SdmmcDevice::MmcSwitch(uint8_t index, uint8_t value) {
   return Request(req, unused_response);
 }
 
-zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) { return host_.HostInfo(info); }
+zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) {
+  if (!use_fidl_) {
+    return host_.HostInfo(info);
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->HostInfo();
+  if (!result.ok()) {
+    zxlogf(ERROR, "HostInfo request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  auto& response = result.value();
+  info->caps = response->info.caps;
+  info->max_transfer_size = response->info.max_transfer_size;
+  info->max_transfer_size_non_dma = response->info.max_transfer_size_non_dma;
+  info->max_buffer_regions = response->info.max_buffer_regions;
+  info->prefs = response->info.prefs;
+  return ZX_OK;
+}
 
 zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
-  return host_.SetSignalVoltage(voltage);
+  if (!use_fidl_) {
+    return host_.SetSignalVoltage(voltage);
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcVoltage wire_voltage;
+  switch (voltage) {
+    case SDMMC_VOLTAGE_V330:
+      wire_voltage = fuchsia_hardware_sdmmc::wire::SdmmcVoltage::kV330;
+      break;
+    case SDMMC_VOLTAGE_V180:
+      wire_voltage = fuchsia_hardware_sdmmc::wire::SdmmcVoltage::kV180;
+      break;
+    case SDMMC_VOLTAGE_MAX:
+      wire_voltage = fuchsia_hardware_sdmmc::wire::SdmmcVoltage::kMax;
+      break;
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->SetSignalVoltage(wire_voltage);
+  if (!result.ok()) {
+    zxlogf(ERROR, "SetSignalVoltage request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
 }
 
 zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
-  return host_.SetBusWidth(bus_width);
+  if (!use_fidl_) {
+    return host_.SetBusWidth(bus_width);
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcBusWidth wire_bus_width;
+  switch (bus_width) {
+    case SDMMC_BUS_WIDTH_ONE:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne;
+      break;
+    case SDMMC_BUS_WIDTH_FOUR:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour;
+      break;
+    case SDMMC_BUS_WIDTH_EIGHT:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight;
+      break;
+    case SDMMC_BUS_WIDTH_MAX:
+      wire_bus_width = fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kMax;
+      break;
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->SetBusWidth(wire_bus_width);
+  if (!result.ok()) {
+    zxlogf(ERROR, "SetBusWidth request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
 }
 
-zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) { return host_.SetBusFreq(bus_freq); }
+zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) {
+  if (!use_fidl_) {
+    return host_.SetBusFreq(bus_freq);
+  }
 
-zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) { return host_.SetTiming(timing); }
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->SetBusFreq(bus_freq);
+  if (!result.ok()) {
+    zxlogf(ERROR, "SetBusFreq request failed: %s", result.status_string());
+    return result.status();
+  }
 
-zx_status_t SdmmcDevice::HwReset() { return host_.HwReset(); }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
+}
 
-zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) { return host_.PerformTuning(cmd_idx); }
+zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) {
+  if (!use_fidl_) {
+    return host_.SetTiming(timing);
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcTiming wire_timing;
+  switch (timing) {
+    case SDMMC_TIMING_LEGACY:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kLegacy;
+      break;
+    case SDMMC_TIMING_HS:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs;
+      break;
+    case SDMMC_TIMING_HSDDR:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr;
+      break;
+    case SDMMC_TIMING_HS200:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs200;
+      break;
+    case SDMMC_TIMING_HS400:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400;
+      break;
+    case SDMMC_TIMING_SDR12:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kSdr12;
+      break;
+    case SDMMC_TIMING_SDR25:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kSdr25;
+      break;
+    case SDMMC_TIMING_SDR104:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kSdr104;
+      break;
+    case SDMMC_TIMING_DDR50:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50;
+      break;
+    case SDMMC_TIMING_MAX:
+      wire_timing = fuchsia_hardware_sdmmc::wire::SdmmcTiming::kMax;
+      break;
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->SetTiming(wire_timing);
+  if (!result.ok()) {
+    zxlogf(ERROR, "SetTiming request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
+}
+
+zx_status_t SdmmcDevice::HwReset() {
+  if (!use_fidl_) {
+    return host_.HwReset();
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->HwReset();
+  if (!result.ok()) {
+    zxlogf(ERROR, "HwReset request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
+}
+
+zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) {
+  if (!use_fidl_) {
+    return host_.PerformTuning(cmd_idx);
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->PerformTuning(cmd_idx);
+  if (!result.ok()) {
+    zxlogf(ERROR, "PerformTuning request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
+}
 
 zx_status_t SdmmcDevice::RegisterInBandInterrupt(
     void* interrupt_cb_ctx, const in_band_interrupt_protocol_ops_t* interrupt_cb_ops) {
-  return host_.RegisterInBandInterrupt(interrupt_cb_ctx, interrupt_cb_ops);
+  if (!use_fidl_) {
+    return host_.RegisterInBandInterrupt(interrupt_cb_ctx, interrupt_cb_ops);
+  }
+
+  // TODO(b/300145353): For now, not supported by aml-sdmmc.
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
-void SdmmcDevice::AckInBandInterrupt() { return host_.AckInBandInterrupt(); }
+void SdmmcDevice::AckInBandInterrupt() {
+  if (!use_fidl_) {
+    return host_.AckInBandInterrupt();
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->AckInBandInterrupt();
+  if (!result.ok()) {
+    zxlogf(ERROR, "AckInBandInterrupt request failed: %s", result.status_string());
+  }
+}
 
 zx_status_t SdmmcDevice::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
                                      uint64_t offset, uint64_t size, uint32_t vmo_rights) {
-  return host_.RegisterVmo(vmo_id, client_id, std::move(vmo), offset, size, vmo_rights);
+  if (!use_fidl_) {
+    return host_.RegisterVmo(vmo_id, client_id, std::move(vmo), offset, size, vmo_rights);
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->RegisterVmo(vmo_id, client_id, std::move(vmo), offset,
+                                                          size, vmo_rights);
+  if (!result.ok()) {
+    zxlogf(ERROR, "RegisterVmo request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  return ZX_OK;
 }
 
 zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
-  return host_.UnregisterVmo(vmo_id, client_id, out_vmo);
+  if (!use_fidl_) {
+    return host_.UnregisterVmo(vmo_id, client_id, out_vmo);
+  }
+
+  fdf::Arena arena('SDMC');
+  auto result = client_.sync().buffer(arena)->UnregisterVmo(vmo_id, client_id);
+  if (!result.ok()) {
+    zxlogf(ERROR, "UnregisterVmo request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  *out_vmo = std::move(result.value()->vmo);
+  return ZX_OK;
 }
 
 zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4]) const {
-  return host_.Request(req, out_response);
+  if (!use_fidl_) {
+    return host_.Request(req, out_response);
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcReq wire_req;
+  wire_req.cmd_idx = req->cmd_idx;
+  wire_req.cmd_flags = req->cmd_flags;
+  wire_req.arg = req->arg;
+  wire_req.blocksize = req->blocksize;
+  wire_req.suppress_error_messages = req->suppress_error_messages;
+  wire_req.client_id = req->client_id;
+
+  fdf::Arena arena('SDMC');
+  wire_req.buffers.Allocate(arena, req->buffers_count);
+  for (size_t i = 0; i < req->buffers_count; i++) {
+    if (req->buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
+      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId;
+      wire_req.buffers[i].buffer =
+          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(req->buffers_list[i].buffer.vmo_id);
+    } else {
+      if (req->buffers_list[i].type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
+        return ZX_ERR_INVALID_ARGS;
+      }
+      zx::vmo dup;
+      // TODO(b/300145353): Remove duplication when removing Banjo.
+      zx_status_t status = zx_handle_duplicate(req->buffers_list[i].buffer.vmo,
+                                               ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
+        return status;
+      }
+      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
+      wire_req.buffers[i].buffer =
+          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
+    }
+
+    wire_req.buffers[i].offset = req->buffers_list[i].offset;
+    wire_req.buffers[i].size = req->buffers_list[i].size;
+  }
+
+  auto result = client_.sync().buffer(arena)->Request(std::move(wire_req));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Request request failed: %s", result.status_string());
+    return result.status();
+  }
+
+  if (result->is_error()) {
+    return result->error_value();
+  }
+  for (int i = 0; i < 4; i++) {
+    out_response[i] = result.value()->response[i];
+  }
+  return ZX_OK;
 }
 
 }  // namespace sdmmc

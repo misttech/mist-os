@@ -165,6 +165,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
     inspect::UintProperty max_packed_writes_;            // Set once by the init thread.
     inspect::UintProperty max_packed_reads_effective_;   // Set once by the init thread.
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
+    inspect::BoolProperty use_fidl_;                     // Set once by the init thread.
   } properties_;
 };
 

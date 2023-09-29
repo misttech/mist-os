@@ -11,9 +11,6 @@
 
 #include <ddktl/device.h>
 
-#include "sdio-controller-device.h"
-#include "sdmmc-block-device.h"
-
 namespace sdmmc {
 
 class SdmmcRootDevice;
