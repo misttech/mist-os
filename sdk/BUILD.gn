@@ -156,6 +156,7 @@ sdk_molecule("fuchsia_idk_atoms") {
 
   if (!sdk_inside_supported_api_sub_build) {
     deps += [
+      ":core_bindlib",
       ":core_cc_source_library",
       ":core_dart_library",
       ":core_data",
@@ -356,6 +357,14 @@ sdk_molecule("host_tools") {
       deps += [ "$dep($toolchain)" ]
     }
   }
+}
+
+sdk_molecule("core_bindlib") {
+  deps = [
+    "//src/devices/bind/fuchsia:fuchsia_sdk",
+    "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_sdk",
+  ]
 }
 
 sdk_molecule("core_packages") {

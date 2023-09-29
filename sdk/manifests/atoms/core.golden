@@ -229,6 +229,9 @@
 //src/developer/ffx/plugins/scrutiny:sdk
 //src/developer/ffx:bin_sdk
 //src/devices/bin/driver_runtime:driver_runtime_sdk_manifest
+//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk
+//src/devices/bind/fuchsia.platform:fuchsia.platform_sdk
+//src/devices/bind/fuchsia:fuchsia_sdk
 //src/lib/fidl/cpp:cpp_base_sdk
 //src/lib/fidl/cpp:cpp_sdk
 //src/lib/fidl/cpp:hlcpp_conversion_sdk
