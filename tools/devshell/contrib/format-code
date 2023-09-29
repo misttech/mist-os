@@ -327,7 +327,7 @@ print-and-execute "${PREBUILT_SHAC}" fmt \
   --no-recurse \
   --quiet \
   -C "$FUCHSIA_DIR" \
-  --var fuchsia_build_dir="${FUCHSIA_BUILD_DIR}" \
+  --var fuchsia_build_dir="${FUCHSIA_BUILD_DIR#"$FUCHSIA_DIR/"}" \
   "${shac_files[@]}"
 
 [[ -n "$PARALLEL" ]] && wait
