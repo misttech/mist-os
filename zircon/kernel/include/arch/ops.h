@@ -45,8 +45,8 @@ void arch_sync_cache_range(vaddr_t start, size_t len);
 // This will only be invoked with interrupts disabled.  This function
 // must not re-enter the scheduler.
 // flush_done should be signaled after state is flushed.
-class Event;
-void arch_flush_state_and_halt(Event *flush_done) __NO_RETURN;
+class MpUnplugEvent;
+void arch_flush_state_and_halt(MpUnplugEvent *flush_done) __NO_RETURN;
 
 int arch_idle_thread_routine(void *) __NO_RETURN;
 

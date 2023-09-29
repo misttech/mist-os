@@ -13,12 +13,12 @@
 #include <zircon/types.h>
 
 #include <arch/mp.h>
+#include <arch/mp_unplug_event.h>
 #include <arch/ops.h>
 #include <arch/riscv64.h>
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <dev/interrupt.h>
-#include <kernel/event.h>
 #include <lk/init.h>
 #include <lk/main.h>
 #include <vm/vm.h>
@@ -161,7 +161,7 @@ uint32_t arch_cpu_num_to_hart_id(cpu_num_t cpu_num) {
 
 void arch_mp_init_percpu() { interrupt_init_percpu(); }
 
-void arch_flush_state_and_halt(Event* flush_done) {
+void arch_flush_state_and_halt(MpUnplugEvent* flush_done) {
   DEBUG_ASSERT(arch_ints_disabled());
   Thread::Current::Get()->preemption_state().PreemptDisable();
   flush_done->Signal();

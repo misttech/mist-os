@@ -24,6 +24,7 @@
 #include <new>
 
 #include <arch/mp.h>
+#include <arch/mp_unplug_event.h>
 #include <arch/ops.h>
 #include <arch/x86.h>
 #include <arch/x86/apic.h>
@@ -38,7 +39,6 @@
 #include <hwreg/x86msr.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/cpu.h>
-#include <kernel/event.h>
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
 #include <ktl/align.h>
@@ -594,7 +594,7 @@ zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) {
 }
 
 /* Used to suspend work on a CPU until it is further shutdown */
-void arch_flush_state_and_halt(Event* flush_done) {
+void arch_flush_state_and_halt(MpUnplugEvent* flush_done) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   __asm__ volatile("wbinvd" : : : "memory");

@@ -23,6 +23,7 @@
 #include <zircon/types.h>
 
 #include <arch/mp.h>
+#include <arch/mp_unplug_event.h>
 #include <arch/ops.h>
 #include <dev/interrupt.h>
 #include <fbl/algorithm.h>
@@ -217,7 +218,7 @@ void mp_sync_exec(mp_ipi_target_t target, cpu_mask_t mask, mp_sync_task_t task, 
 static void mp_unplug_trampoline() TA_REQ(thread_lock) __NO_RETURN;
 static void mp_unplug_trampoline() {
   Thread* ct = Thread::Current::Get();
-  auto unplug_done = reinterpret_cast<Event*>(ct->task_state().arg());
+  auto unplug_done = reinterpret_cast<MpUnplugEvent*>(ct->task_state().arg());
 
   lockup_secondary_shutdown();
 
@@ -327,7 +328,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
   // immediately (or very soon, if for some reason there is another
   // HIGHEST_PRIORITY task scheduled in between when we resume the
   // thread and when the CPU is woken up).
-  Event unplug_done;
+  MpUnplugEvent unplug_done;
   thread = Thread::CreateEtc(nullptr, "unplug_thread", nullptr, &unplug_done,
                              SchedulerState::BaseProfile{HIGHEST_PRIORITY}, mp_unplug_trampoline);
   if (thread == nullptr) {
@@ -351,7 +352,16 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
   }
 
   // Wait for the unplug thread to get scheduled on the target.
+  //
+  // TODO(johngro): Look into a better way to do this.  We are in serious
+  // trouble if this wait operation fails.  We have our unplug event on our
+  // stack, but the thread we created to unplug the CPU has either not signaled
+  // it in time, or we had some other trouble waiting on our event.  Unwinding
+  // now, as we are about to do, leaves us in a situation where the thread may
+  // suddenly come back to life and start to corrupt our stack as it tries to
+  // signal a MpUnplugEvent object which no longer exists.
   status = unplug_done.WaitDeadline(deadline, Interruptible::No);
+  ASSERT(status == ZX_OK);
   if (status != ZX_OK) {
     return status;
   }

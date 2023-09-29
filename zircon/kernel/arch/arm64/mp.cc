@@ -12,11 +12,11 @@
 #include <zircon/types.h>
 
 #include <arch/mp.h>
+#include <arch/mp_unplug_event.h>
 #include <arch/ops.h>
 #include <arch/quirks.h>
 #include <dev/interrupt.h>
 #include <kernel/cpu.h>
-#include <kernel/event.h>
 #include <ktl/iterator.h>
 
 #include <ktl/enforce.h>
@@ -114,7 +114,7 @@ void arm64_init_percpu_early(void) {
 
 void arch_mp_init_percpu(void) { interrupt_init_percpu(); }
 
-void arch_flush_state_and_halt(Event* flush_done) {
+void arch_flush_state_and_halt(MpUnplugEvent* flush_done) {
   DEBUG_ASSERT(arch_ints_disabled());
   Thread::Current::Get()->preemption_state().PreemptDisable();
   flush_done->Signal();
