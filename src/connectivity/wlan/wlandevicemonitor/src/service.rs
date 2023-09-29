@@ -440,7 +440,17 @@ async fn destroy_iface(
     info!("destroy_iface(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
     let phy_ownership = &iface.phy_ownership;
-    let phy = phys.get(&phy_ownership.phy_id).ok_or(zx::Status::NOT_FOUND)?;
+    let phy = match phys.get(&phy_ownership.phy_id) {
+        Some(phy) => phy,
+        None => {
+            ifaces.remove(&id);
+            error!(
+                "Attempting to remove interface (ID: {}) from non-existent PHY (ID: {})",
+                id, phy_ownership.phy_id
+            );
+            return Err(zx::Status::NOT_FOUND);
+        }
+    };
     let phy_req = fidl_dev::DestroyIfaceRequest { id: phy_ownership.phy_assigned_id };
     let destroy_iface_result = phy.proxy.destroy_iface(&phy_req).await.map_err(move |e| {
         error!("Error sending 'DestroyIface' request to phy {:?}: {}", phy_ownership, e);
@@ -1810,6 +1820,37 @@ mod tests {
         );
         pin_mut!(fut);
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
+    }
+
+    #[test]
+    fn destroy_iface_phy_not_found() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        // Set the PHY ID of the interface to be some non-existent PHY ID.
+        let (proxy, _) = create_proxy::<fidl_sme::GenericSmeMarker>()
+            .expect("Failed to create generic SME proxy");
+        test_values.ifaces.insert(
+            1,
+            device::IfaceDevice {
+                phy_ownership: PhyOwnership { phy_id: 0, phy_assigned_id: 0 },
+                generic_sme: proxy,
+                inspect_node: None,
+                inspect_vmo: None,
+            },
+        );
+
+        // Destroy the interface that does not have a parent PHY ID.
+        let fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            1,
+        );
+        pin_mut!(fut);
+        assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
+
+        assert!(test_values.ifaces.get(&1).is_none());
     }
 
     #[test]
