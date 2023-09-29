@@ -12,6 +12,8 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_hardware_network as fhardware_network;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
 
 use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
@@ -103,6 +105,7 @@ impl NetdeviceWorker {
         let mut task = fuchsia_async::Task::spawn(task).fuse();
 
         let mut buff = [0u8; DEFAULT_BUFFER_LENGTH];
+        let mut last_wifi_drop_log = fasync::Time::INFINITE_PAST;
         loop {
             // Extract result into an enum to avoid too much code in  macro.
             let rx: netdevice_client::Buffer<_> = futures::select! {
@@ -148,7 +151,19 @@ impl NetdeviceWorker {
                 &id.external_state().handler.device_class,
                 &buff[..frame_length],
             ) {
-                FilterResult::Drop => continue,
+                FilterResult::Drop => {
+                    // This being hardcoded in Netstack is possibly surprising.
+                    // Log a loud warning with some throttling to warn users.
+                    let now = fasync::Time::now();
+                    if now - last_wifi_drop_log >= zx::Duration::from_seconds(5) {
+                        tracing::warn!(
+                            "Dropping frame destined to TCP port 22 on WiFi interface. \
+                            See https://fxbug.dev/134298."
+                        );
+                        last_wifi_drop_log = now;
+                    }
+                    continue;
+                }
                 FilterResult::Accept => (),
             }
 
