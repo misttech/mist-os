@@ -6,9 +6,10 @@ use {
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_wlan_common::WlanMacRole,
     fidl_fuchsia_wlan_device_service::{
-        DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
+        CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
     },
     fuchsia_zircon as zx,
+    ieee80211::MacAddr,
 };
 
 pub mod ap;
@@ -53,6 +54,29 @@ pub async fn get_phy_list(monitor_proxy: &DeviceMonitorProxy) -> Result<Vec<u16>
     Ok(phys)
 }
 
+pub async fn create_iface(
+    monitor_proxy: &DeviceMonitorProxy,
+    phy_id: u16,
+    role: WlanMacRole,
+    sta_addr: MacAddr,
+) -> Result<u16, Error> {
+    let req = CreateIfaceRequest { phy_id, role, sta_addr };
+
+    let response = monitor_proxy.create_iface(&req).await.context("Error creating iface")?;
+
+    zx::Status::ok(response.0)
+        .map_err(|e| return anyhow::anyhow!("Create iface returned non-OK status: {}", e))?;
+
+    match response.1.clone() {
+        Some(resp) => {
+            let iface_id = resp.iface_id;
+            tracing::info!("Created iface {:?}", iface_id);
+            Ok(iface_id)
+        }
+        None => Err(format_err!("No iface id returned")),
+    }
+}
+
 pub async fn destroy_iface(monitor_proxy: &DeviceMonitorProxy, iface_id: u16) -> Result<(), Error> {
     let req = DestroyIfaceRequest { iface_id };
 
@@ -86,7 +110,8 @@ mod tests {
         super::*,
         fidl_fuchsia_wlan_common::WlanMacRole,
         fidl_fuchsia_wlan_device_service::{
-            DeviceMonitorMarker, DeviceMonitorRequest, DeviceMonitorRequestStream,
+            CreateIfaceResponse, DeviceMonitorMarker, DeviceMonitorRequest,
+            DeviceMonitorRequestStream,
         },
         fuchsia_async::TestExecutor,
         futures::{task::Poll, StreamExt},
@@ -142,6 +167,22 @@ mod tests {
         }
     }
 
+    pub fn respond_to_create_iface_request(
+        exec: &mut TestExecutor,
+        req_stream: &mut DeviceMonitorRequestStream,
+        fake_status: i32,
+        fake_iface_id: u16,
+    ) {
+        let req = exec.run_until_stalled(&mut req_stream.next());
+        let responder = assert_variant !(
+            req,
+            Poll::Ready(Some(Ok(DeviceMonitorRequest::CreateIface{req : _, responder})))
+            => responder);
+
+        let response = CreateIfaceResponse { iface_id: fake_iface_id };
+        responder.send(fake_status, Some(&response)).expect("sending fake response with iface id");
+    }
+
     #[test]
     fn test_get_wlan_sta_addr_ok() {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
@@ -188,5 +229,34 @@ mod tests {
 
         let err = exec.run_singlethreaded(&mut mac_addr_fut).expect_err("should be an error");
         assert!(format!("{}", err).contains("Error querying iface"));
+    }
+
+    #[test]
+    fn test_create_iface_ok() {
+        let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
+        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0]);
+
+        pin_mut!(iface_id_fut);
+
+        assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
+        respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_OK, 15);
+
+        let iface_id = exec.run_singlethreaded(&mut iface_id_fut).expect("should get an iface id");
+
+        assert_eq!(iface_id, 15);
+    }
+
+    #[test]
+    fn test_create_iface_internal_err() {
+        let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
+        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0]);
+
+        pin_mut!(iface_id_fut);
+
+        assert_variant!(exec.run_until_stalled(&mut iface_id_fut), Poll::Pending);
+        respond_to_create_iface_request(&mut exec, &mut req_stream, zx::sys::ZX_ERR_INTERNAL, 15);
+
+        let err = exec.run_singlethreaded(&mut iface_id_fut).expect_err("Should get an error");
+        assert!(format!("{}", err).contains("INTERNAL"));
     }
 }

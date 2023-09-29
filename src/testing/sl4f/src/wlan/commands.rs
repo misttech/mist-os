@@ -5,7 +5,8 @@
 use crate::server::Facade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use ieee80211::Ssid;
+use fidl_fuchsia_wlan_common as fidl_common;
+use ieee80211::{MacAddr, Ssid};
 use serde_json::{from_value, to_value, Value};
 use std::convert::TryFrom;
 use tracing::*;
@@ -75,6 +76,51 @@ impl Facade for WlanFacade {
                 info!(tag = "WlanFacade", "Getting the phy id list.");
                 let result = self.get_phy_id_list().await?;
                 to_value(result).map_err(|e| format_err!("error handling get_phy_id_list: {}", e))
+            }
+            "create_iface" => {
+                info!(tag = "WlanFacade", "Performing wlan create_iface");
+                let phy_id = match args.get("phy_id") {
+                    Some(phy_id) => match phy_id.as_u64() {
+                        Some(phy_id) => phy_id as u16,
+                        None => return Err(format_err!("Could not parse phy id")),
+                    },
+                    None => return Err(format_err!("Please provide target phy id")),
+                };
+
+                let role = if let Some(role) = args.get("role") {
+                    match role.as_str() {
+                        Some("Ap") => fidl_common::WlanMacRole::Ap,
+                        Some("Client") => fidl_common::WlanMacRole::Client,
+                        None => return Err(format_err!("Could not parse role")),
+                        other => return Err(format_err!("Invalid iface role: {:?}", other)),
+                    }
+                } else {
+                    return Err(format_err!("Please provide a role for the new iface"));
+                };
+
+                const DEFAULT_MAC: MacAddr = [0, 0, 0, 0, 0, 0];
+
+                let sta_addr: MacAddr = if let Some(mac) = args.get("sta_addr") {
+                    match mac.as_str() {
+                        Some(mac) => match serde_json::from_str(mac) {
+                            Ok(mac) => mac,
+                            Err(e) => {
+                                println!("Could not parse mac: {:?}, using default addr", e);
+                                DEFAULT_MAC
+                            }
+                        },
+                        None => {
+                            println!("Could not convert sta_addr to string, using default addr");
+                            DEFAULT_MAC
+                        }
+                    }
+                } else {
+                    println!("No MAC provided in args, using default addr");
+                    DEFAULT_MAC
+                };
+
+                let result = self.create_iface(phy_id, role, sta_addr).await?;
+                to_value(result).map_err(|e| format_err!("error handling create_iface: {}", e))
             }
             "destroy_iface" => {
                 info!(tag = "WlanFacade", "Performing wlan destroy_iface");

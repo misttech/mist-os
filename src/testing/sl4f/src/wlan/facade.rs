@@ -4,11 +4,12 @@
 
 use crate::wlan::types;
 use anyhow::{Context as _, Error};
+use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_device_service::{DeviceMonitorMarker, DeviceMonitorProxy};
 use fidl_fuchsia_wlan_internal as fidl_internal;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_zircon as zx;
-use ieee80211::Ssid;
+use ieee80211::{MacAddr, Ssid};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -121,6 +122,19 @@ impl WlanFacade {
             .context("Connect: failed to get client iface sme proxy")?;
         wlan_service_util::client::connect(&sme_proxy, target_ssid, target_pwd, target_bss_desc)
             .await
+    }
+
+    pub async fn create_iface(
+        &self,
+        phy_id: u16,
+        role: fidl_common::WlanMacRole,
+        sta_addr: MacAddr,
+    ) -> Result<u16, Error> {
+        let iface_id = wlan_service_util::create_iface(&self.monitor_svc, phy_id, role, sta_addr)
+            .await
+            .context("Create: Failed to create iface")?;
+
+        Ok(iface_id)
     }
 
     /// Destroys a WLAN interface by input interface ID.
