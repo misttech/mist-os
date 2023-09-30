@@ -17,6 +17,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/connectivity/overnet/lib/ascendd",
+    "//src/connectivity/overnet/lib/core",
     "//src/connectivity/overnet/lib/hoist",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/daemon/core:lib",

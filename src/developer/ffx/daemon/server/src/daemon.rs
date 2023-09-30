@@ -51,6 +51,7 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     rc::Rc,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -213,7 +214,10 @@ impl DaemonProtocolProvider for Daemon {
             .await
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
-        target.run_host_pipe(&hoist::hoist().node());
+        let Some(overnet_node) = self.overnet_node.as_ref() else {
+            bail!("Attempting to get target event queue when daemon is not started");
+        };
+        target.run_host_pipe(overnet_node);
         let events = target.events.clone();
         Ok((target, events))
     }
@@ -338,6 +342,8 @@ pub struct Daemon {
     // The purpose of this vector is to keep the reference strong count positive until the daemon is
     // dropped.
     tasks: Vec<Rc<Task<()>>>,
+    // This daemon's node on the Overnet mesh.
+    overnet_node: Option<Arc<overnet_core::Router>>,
 }
 
 impl Daemon {
@@ -353,11 +359,13 @@ impl Daemon {
             protocol_register: ProtocolRegister::new(create_protocol_register_map()),
             ascendd: Rc::new(Cell::new(None)),
             tasks: Vec::new(),
+            overnet_node: None,
         }
     }
 
     pub async fn start(&mut self, hoist: &Hoist) -> Result<()> {
         tracing::debug!("starting daemon");
+        self.overnet_node = Some(hoist.node());
         let context =
             ffx_config::global_env_context().context("Discovering ffx environment context")?;
 
@@ -374,7 +382,7 @@ impl Daemon {
         self.start_signal_monitoring(quit_tx.clone());
         let should_start_expiry = context.get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
         if should_start_expiry == true {
-            self.start_target_expiry(Duration::from_secs(1));
+            self.start_target_expiry(Duration::from_secs(1), hoist.node());
         }
         self.serve(&context, hoist, quit_tx, quit_rx).await.context("Serving clients")
     }
@@ -422,8 +430,11 @@ impl Daemon {
             let nodename = target.nodename().unwrap_or("<No Nodename>".to_string());
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
+        let Some(overnet_node) = self.overnet_node.as_ref() else {
+            bail!("Attempting to connect to RCS when daemon is not started");
+        };
         // Ensure auto-connect has at least started.
-        target.run_host_pipe(&hoist::hoist().node());
+        target.run_host_pipe(overnet_node);
         target
             .events
             .wait_for(None, |e| e == TargetEvent::RcsActivated)
@@ -552,7 +563,11 @@ impl Daemon {
         });
     }
 
-    fn start_target_expiry(&mut self, frequency: Duration) {
+    fn start_target_expiry(
+        &mut self,
+        frequency: Duration,
+        overnet_node: Arc<overnet_core::Router>,
+    ) {
         let target_collection = Rc::downgrade(&self.target_collection);
         self.tasks.push(Rc::new(Task::local(async move {
             loop {
@@ -562,16 +577,11 @@ impl Daemon {
                 match target_collection.upgrade() {
                     Some(target_collection) => {
                         for target in target_collection.targets() {
-                            #[cfg(test)]
-                            let skip_host_pipe =
-                                test::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
-                            #[cfg(not(test))]
-                            let skip_host_pipe = false;
                             // Manually-added remote targets will not be discovered by mDNS,
                             // and as a result will not have host-pipe triggered automatically
                             // by the mDNS event handler.
-                            if target.is_manual() && !skip_host_pipe {
-                                target.run_host_pipe(&hoist::hoist().node());
+                            if target.is_manual() {
+                                target.run_host_pipe(&overnet_node);
                             }
                             target.expire_state();
                             if target.is_manual() && !target.is_connected() {
@@ -907,9 +917,6 @@ mod test {
         cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::SystemTime,
     };
 
-    pub static SKIP_HOST_PIPE: std::sync::atomic::AtomicBool =
-        std::sync::atomic::AtomicBool::new(false);
-
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1007,6 +1014,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_expiry() {
+        let local_hoist = hoist::Hoist::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
         let mut daemon = Daemon::new(socket_path);
@@ -1017,7 +1025,7 @@ mod test {
 
         assert_eq!(TargetConnectionState::Mdns(then), target.get_connection_state());
 
-        daemon.start_target_expiry(Duration::from_millis(1));
+        daemon.start_target_expiry(Duration::from_millis(1), local_hoist.node());
 
         while target.get_connection_state() == TargetConnectionState::Mdns(then) {
             futures_lite::future::yield_now().await
@@ -1028,6 +1036,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_ephemeral_target_expiry() {
+        let local_hoist = hoist::Hoist::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
         let mut daemon = Daemon::new(socket_path);
@@ -1065,8 +1074,7 @@ mod test {
         assert_eq!(TargetConnectionState::Mdns(then), expiring_target.get_connection_state());
         assert_eq!(TargetConnectionState::Mdns(then), persistent_target.get_connection_state());
 
-        SKIP_HOST_PIPE.store(true, std::sync::atomic::Ordering::Relaxed);
-        daemon.start_target_expiry(Duration::from_millis(1));
+        daemon.start_target_expiry(Duration::from_millis(1), local_hoist.node());
 
         while expiring_target.get_connection_state() == TargetConnectionState::Mdns(then) {
             futures_lite::future::yield_now().await
