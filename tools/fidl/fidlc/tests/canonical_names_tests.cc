@@ -394,11 +394,11 @@ type MyBits = bits {
 TEST(CanonicalNamesTests, BadProtocolMethods) {
   TestLibrary library;
   library.AddFile("bad/fi-0079.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrDuplicateElementNameCanonical);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "protocol method");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "myMethod");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "MyMethod");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_method");
+
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kProtocolMethod, "MyMethod", "myMethod",
+                     library.find_source_span("myMethod"), "my_method");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(CanonicalNamesTests, BadMethodParameters) {

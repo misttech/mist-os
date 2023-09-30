@@ -1186,20 +1186,14 @@ protocol MyProtocol {
     MyOtherMethod(MyVectorAlias) -> (MyAliasAlias);
 };
 )FIDL");
-  ASSERT_FALSE(library.Compile());
 
-  ASSERT_EQ(library.errors().size(), 4);
-
-  ASSERT_ERR(library.errors()[0], fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "bool");
-  ASSERT_ERR(library.errors()[1], fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[1]->msg.c_str(), "example/Handle");
-
-  ASSERT_ERR(library.errors()[2], fidl::ErrInvalidMethodPayloadType);
-  ASSERT_SUBSTR(library.errors()[2]->msg.c_str(), "vector<bool>");
-  ASSERT_ERR(library.errors()[3], fidl::ErrInvalidMethodPayloadType);
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "bool");
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "example/Handle");
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "vector<bool>");
   // TODO(fxbug.dev/93999): Should be "vector<bool>:optional".
-  ASSERT_SUBSTR(library.errors()[3]->msg.c_str(), "vector<bool>?");
+  library.ExpectFail(fidl::ErrInvalidMethodPayloadType, "vector<bool>?");
+
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadMethodNamedInvalidKind) {

@@ -21,6 +21,14 @@
     }                                                    \
   }
 
+#define ASSERT_COMPILER_DIAGNOSTICS(library) \
+  {                                          \
+    TestLibrary& library_ref = (library);    \
+    if (!library_ref.CheckCompile()) {       \
+      FAIL("Diagnostics mismatch");          \
+    }                                        \
+  }
+
 #define ASSERT_WARNED_DURING_COMPILE(library, warn)    \
   {                                                    \
     TestLibrary& library_ref = (library);              \

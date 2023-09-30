@@ -84,11 +84,16 @@ TEST(FlatAstTests, GoodCompareHandles) {
 TEST(FlatAstTests, BadCannotReferenceAnonymousName) {
   TestLibrary library;
   library.AddFile("bad/fi-0058.test.fidl");
-  ASSERT_FALSE(library.Compile());
 
-  for (const auto& err : library.errors()) {
-    EXPECT_ERR(err, fidl::ErrAnonymousNameReference);
-  }
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocolMyInfallibleRequest");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocolMyInfallibleResponse");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocolMyFallibleRequest");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocol_MyFallible_Result");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocol_MyFallible_Response");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocol_MyFallible_Error");
+  library.ExpectFail(fidl::ErrAnonymousNameReference, "MyProtocolMyEventRequest");
+
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(FlatAstTests, BadAnonymousNameConflict) {
