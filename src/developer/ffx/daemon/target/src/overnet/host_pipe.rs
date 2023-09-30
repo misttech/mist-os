@@ -192,7 +192,7 @@ fn setup_watchdogs() {
     });
 }
 
-async fn write_ssh_log(line: &String) {
+async fn write_ssh_log(prefix: &str, line: &String) {
     let ctx = match ffx_config::global_env_context() {
         Some(c) => c,
         None => {
@@ -216,7 +216,7 @@ async fn write_ssh_log(line: &String) {
     };
     const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
     let timestamp = chrono::Local::now().format(TIME_FORMAT);
-    writeln!(&mut f, "{timestamp}: {line}")
+    writeln!(&mut f, "{timestamp}: {prefix} {line}")
         .unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
 }
 
@@ -392,7 +392,18 @@ impl HostPipeChild {
         let mut stderr_lines = futures_lite::io::BufReader::new(stderr).lines();
         // Check for early exit.
         if ssh_host_address.is_none() {
-            if let Some(Ok(l)) = stderr_lines.next().await {
+            while let Some(Ok(l)) = stderr_lines.next().await {
+                write_ssh_log("E", &l).await;
+                // If we are running with "ssh -v", the stderr will also contain the initial
+                // "OpenSSH" line; then any additional debugging messages will begin with "debug1".
+                if l.contains("OpenSSH") {
+                    continue;
+                }
+                if l.starts_with("debug1:") {
+                    continue;
+                }
+                // At this point, we just want to look at one line to see if it is the compatibility
+                // failure.
                 tracing::debug!("Reading stderr:  {}", l);
                 if l.contains("Unrecognized argument: --abi-revision") {
                     // It is an older image, so use the legacy command.
@@ -413,6 +424,7 @@ impl HostPipeChild {
                     }
                     return Err(PipeError::NoCompatibilityCheck);
                 }
+                break;
             }
         }
 
@@ -438,7 +450,7 @@ impl HostPipeChild {
                         // know the connection is established, the error messages
                         // go to the event queue as normal.
                         if verbose_ssh {
-                            write_ssh_log(&line).await;
+                            write_ssh_log("E", &line).await;
                         } else {
                             tracing::info!("SSH stderr: {}", line);
                             stderr_buf.push_line(line.clone());
@@ -583,7 +595,7 @@ async fn parse_ssh_connection<R: AsyncBufRead + Unpin>(
         return Err(std::io::Error::from(std::io::ErrorKind::UnexpectedEof).into());
     }
 
-    write_ssh_log(&line).await;
+    write_ssh_log("O", &line).await;
 
     if line.starts_with("{") {
         parse_ssh_connection_with_info(&line)
