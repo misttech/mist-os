@@ -218,8 +218,6 @@ zx::result<> Vout::PowerOff() {
       hdmi_.hdmi_host->HostOff();
       return zx::ok();
     }
-    case VoutType::kUnknown:
-      break;
   }
   zxlogf(ERROR, "Unrecognized Vout type %u", type_);
   return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -259,8 +257,6 @@ zx::result<> Vout::PowerOn() {
       hdmi_.cur_display_mode_ = {};
       return zx::ok();
     }
-    case VoutType::kUnknown:
-      break;
   }
   zxlogf(ERROR, "Unrecognized Vout type %u", type_);
   return zx::error(ZX_ERR_NOT_SUPPORTED);

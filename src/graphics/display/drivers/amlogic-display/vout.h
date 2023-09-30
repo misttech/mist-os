@@ -19,7 +19,7 @@
 
 namespace amlogic_display {
 
-enum VoutType { kDsi, kHdmi, kUnknown };
+enum VoutType { kDsi, kHdmi };
 
 class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
@@ -142,7 +142,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   void Dump();
 
  private:
-  VoutType type_ = VoutType::kUnknown;
+  VoutType type_;
 
   // Features
   bool supports_hpd_ = false;
