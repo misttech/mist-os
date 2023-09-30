@@ -18,7 +18,6 @@ use {
     },
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
-    delivery_blob::DELIVERY_PATH_PREFIX,
     fidl::endpoints::{create_proxy, ClientEnd, Proxy as _, ServerEnd},
     fidl_fuchsia_fxfs::{
         BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderRequest, BlobReaderRequestStream,
@@ -65,6 +64,26 @@ use {
 /// It is not possible to open or read a blob until it is written and verified.
 pub struct BlobDirectory {
     directory: Arc<FxDirectory>,
+}
+
+/// Instead of constantly switching back and forth between strings and hashes. Do it once and then
+/// just pass around a reference to that.
+pub(crate) struct Identifier {
+    pub string: String,
+    pub hash: Hash,
+}
+
+impl Identifier {
+    pub fn from_str(string: &str) -> Result<Self, Error> {
+        Ok(Self {
+            string: string.to_owned(),
+            hash: Hash::from_str(string).map_err(|_| FxfsError::InvalidArgs)?,
+        })
+    }
+
+    pub fn from_hash(hash: Hash) -> Self {
+        Self { string: hash.to_string(), hash }
+    }
 }
 
 #[async_trait]
@@ -158,7 +177,7 @@ impl BlobDirectory {
             let mut num = 0;
             let limit = self.directory.directory().owner().dirent_cache().limit();
             while let Some((name, object_id, _)) = iter.get() {
-                dirents.push((name.to_string(), object_id));
+                dirents.push((Identifier::from_str(name)?, object_id));
                 iter.advance().await?;
                 num += 1;
                 if num >= limit {
@@ -168,11 +187,11 @@ impl BlobDirectory {
             dirents
         };
 
-        for (name, object_id) in dirents {
-            if let Ok(node) = self.get_or_load_node(object_id, &name).await {
+        for (identifier, object_id) in dirents {
+            if let Ok(node) = self.get_or_load_node(object_id, &identifier).await {
                 self.directory.directory().owner().dirent_cache().insert(
                     self.directory.object_id(),
-                    name,
+                    identifier.string,
                     node,
                 );
             }
@@ -180,22 +199,13 @@ impl BlobDirectory {
         Ok(())
     }
 
-    pub async fn lookup(
+    pub(crate) async fn lookup(
         self: &Arc<Self>,
         flags: fio::OpenFlags,
-        mut path: Path,
+        id: Identifier,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
-        if path.is_empty() {
-            return Ok(OpenedNode::new(self.clone()));
-        }
-        if !path.is_single_component() {
-            bail!(FxfsError::NotFound);
-        }
         let store = self.store();
         let fs = store.filesystem();
-        let name = path.next().unwrap();
-        let name = name.strip_prefix(DELIVERY_PATH_PREFIX).unwrap_or(name);
-        let hash = Hash::from_str(name).map_err(|_| FxfsError::InvalidArgs)?;
 
         // TODO(fxbug.dev/122125): Create the transaction here if we might need to create the object
         // so that we have a lock in place.
@@ -203,21 +213,16 @@ impl BlobDirectory {
 
         // A lock needs to be held over searching the directory and incrementing the open count.
         let guard = fs.lock_manager().read_lock(keys.clone()).await;
+        let key = (self.directory.object_id(), id.string.clone());
 
-        let child_node = match self
-            .directory
-            .directory()
-            .owner()
-            .dirent_cache()
-            .lookup(&(self.directory.object_id(), name.to_owned()))
-        {
+        let child_node = match self.directory.directory().owner().dirent_cache().lookup(&key) {
             Some(node) => Some(node),
             None => {
-                if let Some((object_id, _)) = self.directory.directory().lookup(name).await? {
-                    let node = self.get_or_load_node(object_id, name).await?;
+                if let Some((object_id, _)) = self.directory.directory().lookup(&id.string).await? {
+                    let node = self.get_or_load_node(object_id, &id).await?;
                     self.directory.directory().owner().dirent_cache().insert(
-                        self.directory.object_id(),
-                        name.to_string(),
+                        key.0,
+                        key.1,
                         node.clone(),
                     );
                     Some(node)
@@ -259,7 +264,7 @@ impl BlobDirectory {
                 .await?;
 
                 let node = OpenedNode::new(
-                    FxDeliveryBlob::new(self.clone(), hash, handle) as Arc<dyn FxNode>
+                    FxDeliveryBlob::new(self.clone(), id.hash, handle) as Arc<dyn FxNode>
                 );
 
                 // Add the object to the graveyard so that it's cleaned up if we crash.
@@ -280,13 +285,12 @@ impl BlobDirectory {
     async fn get_or_load_node(
         self: &Arc<Self>,
         object_id: u64,
-        name: &str,
+        id: &Identifier,
     ) -> Result<Arc<dyn FxNode>, Error> {
         let volume = self.volume();
         match volume.cache().get_or_reserve(object_id).await {
             GetResult::Node(node) => Ok(node),
             GetResult::Placeholder(placeholder) => {
-                let hash = Hash::from_str(name).map_err(|_| FxfsError::Inconsistent)?;
                 let object =
                     ObjectStore::open_object(volume, object_id, HandleOptions::default(), None)
                         .await?;
@@ -295,7 +299,7 @@ impl BlobDirectory {
                         // If the file is uncompressed and is small enough, it may not have any
                         // metadata stored on disk.
                         (
-                            MerkleTree::from_levels(vec![vec![hash]]),
+                            MerkleTree::from_levels(vec![vec![id.hash]]),
                             BlobMetadata {
                                 hashes: vec![],
                                 chunk_size: 0,
@@ -307,14 +311,14 @@ impl BlobDirectory {
                     Some(data) => {
                         let mut metadata: BlobMetadata = bincode::deserialize_from(&*data)?;
                         let tree = if metadata.hashes.is_empty() {
-                            MerkleTree::from_levels(vec![vec![hash]])
+                            MerkleTree::from_levels(vec![vec![id.hash]])
                         } else {
                             let mut builder = MerkleTreeBuilder::new();
                             for hash in std::mem::take(&mut metadata.hashes) {
                                 builder.push_data_hash(hash.into());
                             }
                             let tree = builder.finish();
-                            ensure!(tree.root() == hash, FxfsError::Inconsistent);
+                            ensure!(tree.root() == id.hash, FxfsError::Inconsistent);
                             tree
                         };
                         (tree, metadata)
@@ -342,11 +346,7 @@ impl BlobDirectory {
             | fio::OpenFlags::CREATE_IF_ABSENT
             | fio::OpenFlags::RIGHT_WRITABLE
             | fio::OpenFlags::RIGHT_READABLE;
-        let path = Path::validate_and_split(hash.to_string()).map_err(|e| {
-            tracing::error!("failed to validate path: {:?}", e);
-            CreateBlobError::Internal
-        })?;
-        let node = match self.lookup(flags, path).await {
+        let node = match self.lookup(flags, Identifier::from_hash(hash)).await {
             Ok(node) => node,
             Err(e) => {
                 if FxfsError::AlreadyExists.matches(&e) {
@@ -489,31 +489,22 @@ impl DirectoryEntry for BlobDirectory {
     ) {
         flags.to_object_request(server_end).spawn(&scope.clone(), move |object_request| {
             async move {
-                let node = self.lookup(flags, path.clone()).await.map_err(|e| {
-                    debug!(?e, "lookup failed");
-                    map_to_status(e)
-                })?;
-                if node.is::<BlobDirectory>() {
+                if path.is_empty() {
                     object_request.create_connection(
                         scope,
-                        node.downcast::<BlobDirectory>().unwrap_or_else(|_| unreachable!()).take(),
+                        OpenedNode::new(self.clone())
+                            .downcast::<BlobDirectory>()
+                            .unwrap_or_else(|_| unreachable!())
+                            .take(),
                         flags,
                         MutableConnection::create,
                     )
-                } else if node.is::<FxBlob>() {
-                    tracing::error!(
-                        "Tried to open an existing blob via open(). Reading blobs is only supported
-                            via the BlobReader."
-                    );
-                    return Err(Status::NOT_SUPPORTED);
-                } else if node.is::<FxDeliveryBlob>() {
-                    tracing::error!(
-                        "Tried to create a delivery blob via open(). Blob creation is only
-                            supported via the BlobCreator."
-                    );
-                    return Err(Status::NOT_SUPPORTED);
                 } else {
-                    unreachable!();
+                    tracing::error!(
+                        "Tried to open a blob via open(). Use the BlobCreator or BlobReader
+                            instead."
+                    );
+                    Err(Status::NOT_SUPPORTED)
                 }
             }
             .boxed()

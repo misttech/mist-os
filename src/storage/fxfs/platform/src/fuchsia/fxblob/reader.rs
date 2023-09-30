@@ -4,7 +4,10 @@
 use {
     crate::{
         fuchsia::errors::map_to_status,
-        fxblob::{blob::FxBlob, directory::BlobDirectory},
+        fxblob::{
+            blob::FxBlob,
+            directory::{BlobDirectory, Identifier},
+        },
     },
     anyhow::Error,
     fidl_fuchsia_io::{self as fio},
@@ -12,15 +15,13 @@ use {
     fuchsia_zircon::{self as zx},
     fxfs::errors::FxfsError,
     std::sync::Arc,
-    vfs::path::Path,
 };
 
 /// Implementation for VMO-backed FIDL interface for reading blobs
 impl BlobDirectory {
     pub async fn get_blob_vmo(self: &Arc<Self>, hash: Hash) -> Result<zx::Vmo, Error> {
-        let path = Path::validate_and_split(format!("{hash}"))?;
-        let node =
-            self.lookup(fio::OpenFlags::RIGHT_READABLE, path).await.map_err(map_to_status)?;
+        let id = Identifier::from_hash(hash);
+        let node = self.lookup(fio::OpenFlags::RIGHT_READABLE, id).await.map_err(map_to_status)?;
         let any_blob = node.clone().into_any();
         let blob = any_blob.downcast_ref::<FxBlob>().ok_or(FxfsError::Internal)?;
         let vmo = blob.get_child_reference_vmo()?;
