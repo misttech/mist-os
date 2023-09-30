@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_PERF_MON_H_
-#define SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_PERF_MON_H_
+#ifndef SRC_PERFORMANCE_CPU_TRACE_PERF_MON_H_
+#define SRC_PERFORMANCE_CPU_TRACE_PERF_MON_H_
 
 #include <fidl/fuchsia.perfmon.cpu/cpp/wire.h>
 #include <lib/zx/bti.h>
@@ -205,4 +205,4 @@ class PerfmonController : public fidl::WireServer<fidl_perfmon::Controller> {
 
 }  // namespace perfmon
 
-#endif  // SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_PERF_MON_H_
+#endif  // SRC_PERFORMANCE_CPU_TRACE_PERF_MON_H_

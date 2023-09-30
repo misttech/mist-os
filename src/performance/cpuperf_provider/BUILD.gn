@@ -76,7 +76,7 @@ executable("bin") {
 
 fuchsia_package_with_single_component("cpuperf_provider") {
   manifest = "meta/cpuperf_provider.cml"
-  subpackages = [ "//src/devices/misc/drivers/cpu-trace" ]
+  subpackages = [ "//src/performance/cpu-trace" ]
   deps = [ ":bin" ]
 }
 
@@ -136,7 +136,7 @@ fuchsia_test_package("cpuperf_provider_tests") {
   }
   subpackages = [
     "//src/performance/trace_manager",
-    "//src/devices/misc/drivers/cpu-trace",
+    "//src/performance/cpu-trace",
   ]
 
   if (current_cpu == "riscv64") {

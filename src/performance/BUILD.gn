@@ -4,6 +4,7 @@
 group("tests") {
   testonly = true
   deps = [
+    "cpu-trace:tests",
     "cpuperf:tests",
     "cpuperf_provider:tests",
     "experimental/profiler:tests",

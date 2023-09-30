@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_ARM64_PM_IMPL_H_
-#define SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_ARM64_PM_IMPL_H_
+#ifndef SRC_PERFORMANCE_CPU_TRACE_ARM64_PM_IMPL_H_
+#define SRC_PERFORMANCE_CPU_TRACE_ARM64_PM_IMPL_H_
 #include <stdint.h>
 
 namespace perfmon {
@@ -23,4 +23,4 @@ struct StagingState {
 };
 
 }  // namespace perfmon
-#endif  // SRC_DEVICES_MISC_DRIVERS_CPU_TRACE_ARM64_PM_IMPL_H_
+#endif  // SRC_PERFORMANCE_CPU_TRACE_ARM64_PM_IMPL_H_
