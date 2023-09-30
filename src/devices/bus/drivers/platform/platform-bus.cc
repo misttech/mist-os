@@ -40,7 +40,6 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
-#include "src/devices/bus/drivers/platform/cpu-trace.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 
 namespace {
@@ -885,24 +884,6 @@ static void sys_device_release(void* ctx) {
   delete p;
 }
 
-// cpu-trace provides access to the cpu's tracing and performance counters.
-// As such the "device" is the cpu itself.
-static void InitCpuTrace(zx_device_t* parent, const zx::iommu& dummy_iommu) {
-  zx::bti cpu_trace_bti;
-  zx_status_t status = zx::bti::create(dummy_iommu, 0, CPU_TRACE_BTI_ID, &cpu_trace_bti);
-  if (status != ZX_OK) {
-    // This is not fatal.
-    zxlogf(ERROR, "platform-bus: error %d in bti_create(cpu_trace_bti)", status);
-    return;
-  }
-
-  status = publish_cpu_trace(cpu_trace_bti.release(), parent);
-  if (status != ZX_OK) {
-    // This is not fatal.
-    zxlogf(INFO, "publish_cpu_trace returned %d", status);
-  }
-}
-
 static zx_protocol_device_t sys_device_proto = []() {
   zx_protocol_device_t result = {};
 
@@ -956,15 +937,6 @@ zx_status_t PlatformBus::Create(zx_device_t* parent, const char* name, zx::chann
   // devmgr is now in charge of the device.
   platform_bus::PlatformBus* bus_ptr = bus.release();
   suspend_ptr->pbus_instance = bus_ptr;
-
-  // Create /dev/sys/cpu-trace.
-  // But only do so if we have an iommu handle. Normally we do, but tests
-  // may create us without a root resource, and thus without the iommu
-  // handle.
-  if (bus_ptr->iommu_handle_.is_valid()) {
-    // Failure is not fatal. Error message already printed.
-    InitCpuTrace(suspend_ptr->sys_root, bus_ptr->iommu_handle_);
-  }
 
   return ZX_OK;
 }
