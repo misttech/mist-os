@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/board.gni")
 import("//build/group_with_inputs.gni")
 
 # Create a product assembly config file from the lists of packages and config
@@ -71,24 +70,6 @@ import("//build/group_with_inputs.gni")
 #   testonly
 #   visibility
 template("product_assembly_configuration") {
-  # Board-provided drivers shouldn't be part of the product assembly config,
-  # but we don't yet have that mechanism in place, so we will insert them here
-  # as if they are product-provided.
-  #
-  # But only include them on "minimal" feature_set_level products.  This is
-  # the default if `platform` is omitted, or `platform.feature_set_level` is
-  # unspecified.  include_board_drivers = true
-  include_board_drivers = true
-  if (defined(invoker.platform)) {
-    _platform = invoker.platform
-    if (defined(_platform.feature_set_level) &&
-        _platform.feature_set_level != "minimal") {
-      include_board_drivers = false
-    } else {
-      not_needed([ "_platform" ])
-    }
-  }
-
   labels = {
     # So it can be reused.
     target_name = target_name
@@ -161,19 +142,6 @@ template("product_assembly_configuration") {
     if (defined(invoker.base_driver_packages)) {
       foreach(package, invoker.base_driver_packages) {
         base_driver_package_labels += [ package.package_target ]
-      }
-    }
-
-    # Board-provided drivers shouldn't be part of the product assembly config,
-    # but we don't yet have that mechanism in place, so we will insert them here
-    # as if they are product-provided.
-    #
-    # This is a GN arg defined in `//build/board.gni`, and is set in the _board_
-    # gni files that are imported into `args.gni`.
-    board_driver_package_labels = []
-    if (include_board_drivers) {
-      foreach(package, board_provided_drivers) {
-        board_driver_package_labels += [ package.package_target ]
       }
     }
   }
@@ -299,37 +267,6 @@ template("product_assembly_configuration") {
 
         driver_package_manifests += [ _manifest_path ]
         base_driver_packages += [
-          # This scope needs to serialize to json and deserialize
-          # to a DriverDetails Assembly config struct
-          {
-            package = _manifest_path_rebased
-            components = driver_package.driver_components
-          },
-        ]
-      }
-    }
-
-    # The board drivers are added to a separate list from the base drivers, so
-    # that they can be distinguised better in the GN build graph.
-    #
-    # As a global GN build arg, it is always defined, so the if(defined()) check
-    # is not necessary here.
-    board_driver_packages = []
-    board_driver_package_manifests = []
-    if (include_board_drivers) {
-      foreach(driver_package, board_provided_drivers) {
-        assert(
-            defined(driver_package.package_target),
-            "board driver did not supply a package target: ${driver_package}")
-        _package_out_dir =
-            get_label_info(driver_package.package_target, "target_out_dir")
-        _package_name = get_label_info(driver_package.package_target, "name")
-        _manifest_path =
-            "${_package_out_dir}/${_package_name}/package_manifest.json"
-        _manifest_path_rebased = rebase_path(_manifest_path, root_build_dir)
-
-        board_driver_package_manifests += [ _manifest_path ]
-        board_driver_packages += [
           # This scope needs to serialize to json and deserialize
           # to a DriverDetails Assembly config struct
           {
@@ -545,10 +482,7 @@ template("product_assembly_configuration") {
         cache = files.cache_packages
       }
 
-      # Pass both the board-provided and the product-provided base drivers in the config
-      # until we have support for the board input to product assembly to provide
-      # drivers.
-      base_drivers = files.base_driver_packages + files.board_driver_packages
+      base_drivers = files.base_driver_packages
     }
   }
 
@@ -619,17 +553,6 @@ template("product_assembly_configuration") {
     deps = labels.cache_package_config_data_deps
   }
 
-  # Create a target for the board-provided driver packages, so they appear in
-  # the dep graph as distinct from the product-provided driver packages, and
-  # validate that they produce all of the manifests whose paths were computed
-  # from the labels.
-  group_with_inputs(labels.board_driver_package_set) {
-    forward_variables_from(invoker, [ "testonly" ])
-    visibility = [ ":${labels.target_name}" ]
-    inputs = files.board_driver_package_manifests
-    deps = labels.board_driver_package_labels
-  }
-
   group_with_inputs(labels.target_name) {
     forward_variables_from(invoker,
                            [
@@ -660,7 +583,6 @@ template("product_assembly_configuration") {
       ":${labels.base_driver_package_set}",
       ":${labels.base_package_config_data}",
       ":${labels.base_package_set}",
-      ":${labels.board_driver_package_set}",
       ":${labels.cache_package_config_data}",
       ":${labels.cache_package_set}",
     ]
