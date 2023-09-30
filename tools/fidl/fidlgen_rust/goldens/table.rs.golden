@@ -24,18 +24,16 @@ use fuchsia_zircon as zx;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct EmptyTable {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for EmptyTable {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ExtensionTable {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for ExtensionTable {}
@@ -45,9 +43,8 @@ pub struct NewerSimpleTable {
     pub x: Option<i64>,
     pub y: Option<i64>,
     pub z: Option<i64>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for NewerSimpleTable {}
@@ -55,9 +52,8 @@ impl fidl::Persistable for NewerSimpleTable {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OlderSimpleTable {
     pub x: Option<i64>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for OlderSimpleTable {}
@@ -67,9 +63,8 @@ pub struct ReverseOrdinalTable {
     pub z: Option<i64>,
     pub y: Option<i64>,
     pub x: Option<i64>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for ReverseOrdinalTable {}
@@ -78,9 +73,8 @@ impl fidl::Persistable for ReverseOrdinalTable {}
 pub struct SimpleTable {
     pub x: Option<i64>,
     pub y: Option<i64>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for SimpleTable {}
@@ -151,9 +145,8 @@ pub struct SixtyFourOrdinalTable {
     pub v62: Option<i64>,
     pub v63: Option<i64>,
     pub v64: Option<ExtensionTable>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for SixtyFourOrdinalTable {}
@@ -161,9 +154,8 @@ impl fidl::Persistable for SixtyFourOrdinalTable {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableWithAttributes {
     pub x: Option<i64>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for TableWithAttributes {}

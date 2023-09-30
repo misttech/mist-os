@@ -170,9 +170,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayFieldsErrRespo
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequest {}
@@ -180,9 +179,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableRequ
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableRequest {}
@@ -190,9 +188,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableReques
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {}
@@ -200,9 +197,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableRespo
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {}
@@ -210,9 +206,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventTableErrR
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrResponse {}
@@ -220,9 +215,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventTableErrRes
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {}
@@ -230,9 +224,8 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayTableErrRe
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequest {}
@@ -240,9 +233,8 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableRequ
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {}
@@ -250,9 +242,8 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableRes
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrResponse {}
@@ -260,9 +251,8 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventTableErrR
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {}
@@ -270,9 +260,8 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayTableErr
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest {}
@@ -280,9 +269,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableRequest 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictEventTableRequest {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
@@ -290,9 +278,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableRequest {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse {}
@@ -300,9 +287,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableResponse 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrResponse {}
@@ -310,9 +296,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventTableErrRespo
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {}
@@ -320,9 +305,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableErrResp
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableResponse {}
@@ -330,9 +314,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayTableRespons
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictEventTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableErrResponse {}
@@ -340,9 +323,8 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictEventTableErrRespons
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
     pub some_field: Option<i32>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrResponse {}
@@ -350,11 +332,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayTableErrRespon
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -381,22 +361,19 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -407,11 +384,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionRequ
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -438,22 +413,19 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -464,11 +436,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionReques
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -495,22 +465,19 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -521,11 +488,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionRespo
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -552,22 +517,19 @@ impl UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -578,11 +540,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolFlexibleEventUnionErrR
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -609,22 +569,19 @@ impl UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -635,11 +592,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictEventUnionErrRes
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -666,22 +621,19 @@ impl UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -692,11 +644,9 @@ impl fidl::Persistable for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrRe
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -723,22 +673,19 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -749,11 +696,9 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionRequ
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -780,22 +725,19 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -806,11 +748,9 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionRes
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -837,22 +777,19 @@ impl UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -863,11 +800,9 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictEventUnionErrR
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -894,22 +829,19 @@ impl UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -920,11 +852,9 @@ impl fidl::Persistable for UnknownInteractionsClosedProtocolStrictTwoWayUnionErr
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionRequest {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -951,22 +881,19 @@ impl UnknownInteractionsProtocolFlexibleEventUnionRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -977,11 +904,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionRequest 
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictEventUnionRequest {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionRequest::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionRequestUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1008,22 +933,19 @@ impl UnknownInteractionsProtocolStrictEventUnionRequest {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1034,11 +956,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionRequest {}
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1065,22 +985,19 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1091,11 +1008,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictTwoWayUnionResponse 
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolFlexibleEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1122,22 +1037,19 @@ impl UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1148,11 +1060,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleEventUnionErrRespo
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1179,22 +1089,19 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1205,11 +1112,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResp
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::unknown()` to construct and `UnknownInteractionsProtocolFlexibleTwoWayUnionResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1236,22 +1141,19 @@ impl UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1262,11 +1164,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolFlexibleTwoWayUnionRespons
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictEventUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolStrictEventUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictEventUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1293,22 +1193,19 @@ impl UnknownInteractionsProtocolStrictEventUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1319,11 +1216,9 @@ impl fidl::Persistable for UnknownInteractionsProtocolStrictEventUnionErrRespons
 #[derive(Clone, Debug)]
 pub enum UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     SomeField(i32),
-    #[deprecated = "Use `UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::unknown()` to construct and `UnknownInteractionsProtocolStrictTwoWayUnionErrResponseUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -1350,22 +1245,19 @@ impl UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::SomeField(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -13423,10 +13315,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -13434,8 +13325,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -13497,9 +13387,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -13557,10 +13445,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolStrictEventUnionRequest::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsAjarProtocolStrictEventUnionRequest::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -13568,8 +13455,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictEventUnionRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -13631,9 +13517,10 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsAjarProtocolStrictEventUnionRequest::__Unknown {
-                        ordinal,
-                    };
+                    *self =
+                        UnknownInteractionsAjarProtocolStrictEventUnionRequest::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -13693,10 +13580,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -13704,8 +13590,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -13767,9 +13652,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -13824,27 +13707,21 @@ mod internal {
                 );
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::SomeField(
-                    ref val,
-                ) => fidl::encoding::encode_in_envelope::<i32>(
+            UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::SomeField(ref val) => {
+                fidl::encoding::encode_in_envelope::<i32>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::__Unknown {
-                    ..
-                } => Err(fidl::Error::UnknownUnionTag),
+                    encoder, offset + 8, _depth
+                )
             }
+            UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+        }
         }
     }
 
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -13908,10 +13785,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::__Unknown {
-                            ordinal,
-                        };
+                    *self = UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -13974,8 +13848,7 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::__Unknown {
+                UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::__SourceBreaking {
                     ..
                 } => Err(fidl::Error::UnknownUnionTag),
             }
@@ -13985,8 +13858,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14050,9 +13922,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14115,8 +13985,7 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::__Unknown {
+                UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::__SourceBreaking {
                     ..
                 } => Err(fidl::Error::UnknownUnionTag),
             }
@@ -14126,8 +13995,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14191,10 +14059,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::__Unknown {
-                            ordinal,
-                        };
+                    *self = UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14254,10 +14119,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsClosedProtocolStrictEventUnionRequest::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsClosedProtocolStrictEventUnionRequest::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -14265,8 +14129,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictEventUnionRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14328,9 +14191,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsClosedProtocolStrictEventUnionRequest::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsClosedProtocolStrictEventUnionRequest::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14393,8 +14254,7 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::__Unknown {
+                UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::__SourceBreaking {
                     ..
                 } => Err(fidl::Error::UnknownUnionTag),
             }
@@ -14404,8 +14264,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14469,9 +14328,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14526,27 +14383,21 @@ mod internal {
                 );
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::SomeField(
-                    ref val,
-                ) => fidl::encoding::encode_in_envelope::<i32>(
+            UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::SomeField(ref val) => {
+                fidl::encoding::encode_in_envelope::<i32>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
-                #[allow(deprecated)]
-                UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::__Unknown {
-                    ..
-                } => Err(fidl::Error::UnknownUnionTag),
+                    encoder, offset + 8, _depth
+                )
             }
+            UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+        }
         }
     }
 
     impl fidl::encoding::Decode<Self> for UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14610,10 +14461,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::__Unknown {
-                            ordinal,
-                        };
+                    *self = UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14666,19 +14514,14 @@ mod internal {
             encoder.debug_check_bounds::<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(
-                    ref val,
-                ) => fidl::encoding::encode_in_envelope::<i32>(
+            UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SomeField(ref val) => {
+                fidl::encoding::encode_in_envelope::<i32>(
                     <i32 as fidl::encoding::ValueTypeMarker>::borrow(val),
-                    encoder,
-                    offset + 8,
-                    _depth,
-                ),
-                #[allow(deprecated)]
-                UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::__Unknown {
-                    ..
-                } => Err(fidl::Error::UnknownUnionTag),
+                    encoder, offset + 8, _depth
+                )
             }
+            UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
+        }
         }
     }
 
@@ -14687,8 +14530,7 @@ mod internal {
     {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14743,10 +14585,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::__Unknown {
-                            ordinal,
-                        };
+                    *self = UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14803,10 +14642,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolFlexibleEventUnionRequest::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolFlexibleEventUnionRequest::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -14814,8 +14652,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleEventUnionRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -14877,7 +14714,9 @@ mod internal {
                         decoder.drop_next_handle()?;
                     }
                     *self =
-                        UnknownInteractionsProtocolFlexibleEventUnionRequest::__Unknown { ordinal };
+                        UnknownInteractionsProtocolFlexibleEventUnionRequest::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -14934,8 +14773,7 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolStrictEventUnionRequest::__Unknown { .. } => {
+                UnknownInteractionsProtocolStrictEventUnionRequest::__SourceBreaking { .. } => {
                     Err(fidl::Error::UnknownUnionTag)
                 }
             }
@@ -14945,8 +14783,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictEventUnionRequest {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15006,8 +14843,9 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self =
-                        UnknownInteractionsProtocolStrictEventUnionRequest::__Unknown { ordinal };
+                    *self = UnknownInteractionsProtocolStrictEventUnionRequest::__SourceBreaking {
+                        unknown_ordinal: ordinal,
+                    };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15064,10 +14902,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolStrictTwoWayUnionResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolStrictTwoWayUnionResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15075,8 +14912,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayUnionResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15138,7 +14974,9 @@ mod internal {
                         decoder.drop_next_handle()?;
                     }
                     *self =
-                        UnknownInteractionsProtocolStrictTwoWayUnionResponse::__Unknown { ordinal };
+                        UnknownInteractionsProtocolStrictTwoWayUnionResponse::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15198,10 +15036,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolFlexibleEventUnionErrResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolFlexibleEventUnionErrResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15209,8 +15046,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15272,9 +15108,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsProtocolFlexibleEventUnionErrResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsProtocolFlexibleEventUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15335,10 +15169,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15346,8 +15179,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15410,9 +15242,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self = UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15470,10 +15300,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15481,8 +15310,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15544,9 +15372,10 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self =
+                        UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15604,10 +15433,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolStrictEventUnionErrResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolStrictEventUnionErrResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15615,8 +15443,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictEventUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15678,9 +15505,10 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsProtocolStrictEventUnionErrResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self =
+                        UnknownInteractionsProtocolStrictEventUnionErrResponse::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -15738,10 +15566,9 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::__Unknown { .. } => {
-                    Err(fidl::Error::UnknownUnionTag)
-                }
+                UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::__SourceBreaking {
+                    ..
+                } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -15749,8 +15576,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -15812,9 +15638,10 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::__Unknown {
-                        ordinal,
-                    };
+                    *self =
+                        UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::__SourceBreaking {
+                            unknown_ordinal: ordinal,
+                        };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

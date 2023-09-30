@@ -70,9 +70,8 @@ impl fidl::Standalone for HandlesInTypes {}
 
 #[derive(Debug, Default, PartialEq)]
 pub struct EmptyResourceTable {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Standalone for EmptyResourceTable {}
@@ -80,19 +79,16 @@ impl fidl::Standalone for EmptyResourceTable {}
 #[derive(Debug, Default, PartialEq)]
 pub struct TableWithHandle {
     pub h: Option<fidl::Vmo>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Standalone for TableWithHandle {}
 
 #[derive(Debug)]
 pub enum EmptyResourceUnion {
-    #[deprecated = "Use `EmptyResourceUnion::unknown()` to construct and `EmptyResourceUnionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown { ordinal: u64 },
+    __SourceBreaking { unknown_ordinal: u64 },
 }
 
 /// Pattern that matches an unknown `EmptyResourceUnion` member.
@@ -116,22 +112,19 @@ impl EmptyResourceUnion {
     #[inline]
     pub fn ordinal(&self) -> u64 {
         match *self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
         }
     }
 }
@@ -141,11 +134,9 @@ impl fidl::Standalone for EmptyResourceUnion {}
 #[derive(Debug)]
 pub enum UnionWithHandle {
     H(fidl::Vmo),
-    #[deprecated = "Use `UnionWithHandle::unknown()` to construct and `UnionWithHandleUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -172,22 +163,19 @@ impl UnionWithHandle {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::H(_) => 1,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -918,8 +906,7 @@ mod internal {
             encoder.debug_check_bounds::<EmptyResourceUnion>(offset);
             encoder.write_num::<u64>(self.ordinal(), offset);
             match self {
-                #[allow(deprecated)]
-                EmptyResourceUnion::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                EmptyResourceUnion::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -927,8 +914,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for EmptyResourceUnion {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -967,7 +953,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = EmptyResourceUnion::__Unknown { ordinal };
+                    *self = EmptyResourceUnion::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -1031,8 +1017,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                UnionWithHandle::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                UnionWithHandle::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -1040,8 +1025,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnionWithHandle {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -1102,7 +1086,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnionWithHandle::__Unknown { ordinal };
+                    *self = UnionWithHandle::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

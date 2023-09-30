@@ -115,9 +115,8 @@ impl fidl::Persistable for OnlyAppearsInImportingLibrary {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct OnlyRust {
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for OnlyRust {}

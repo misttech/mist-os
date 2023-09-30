@@ -11,8 +11,6 @@
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 {{- if .IsStrict }}
 #[repr({{ .UnderlyingType }})]
-{{- else }}
-#[non_exhaustive]
 {{- end }}
 pub enum {{ .Name }} {
     {{- range .Members }}
@@ -22,9 +20,8 @@ pub enum {{ .Name }} {
     {{ .Name }}{{ if $.IsStrict }} = {{ .Value }}{{ end }},
     {{- end }}
     {{- if .IsFlexible }}
-    #[deprecated = "Use `{{ .Name }}::unknown()` to construct and `{{ .Name }}Unknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown({{ .UnderlyingType }}),
+    __SourceBreaking { unknown_ordinal: {{ .UnderlyingType }} },
     {{- end }}
 }
 
@@ -66,15 +63,13 @@ impl {{ .Name }} {
             {{- range .Members }}
             {{ .Value }} => Self::{{ .Name }},
             {{- end }}
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown({{ .UnknownValueForTmpl | printf "%#x" }})
+        Self::__SourceBreaking { unknown_ordinal: {{ .UnknownValueForTmpl | printf "%#x" }} }
     }
 
     #[inline]
@@ -83,16 +78,14 @@ impl {{ .Name }} {
             {{- range .Members }}
             Self::{{ .Name }} => {{ .Value }},
             {{- end }}
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             {{- if .Members }}
             _ => false,
             {{- end }}

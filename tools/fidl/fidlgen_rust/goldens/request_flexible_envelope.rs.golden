@@ -54,11 +54,9 @@ impl fidl::Persistable for ProtocolRequestStrictResponseFlexibleResponse {}
 pub enum FlexibleFoo {
     S(String),
     I(i32),
-    #[deprecated = "Use `FlexibleFoo::unknown()` to construct and `FlexibleFooUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -87,22 +85,19 @@ impl FlexibleFoo {
         match *self {
             Self::S(_) => 1,
             Self::I(_) => 2,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1046,8 +1041,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                FlexibleFoo::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                FlexibleFoo::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -1055,8 +1049,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for FlexibleFoo {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -1135,7 +1128,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = FlexibleFoo::__Unknown { ordinal };
+                    *self = FlexibleFoo::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {

@@ -16,9 +16,8 @@ pub struct {{ .Name }} {
     {{- end }}
     pub {{ .Name }}: Option<{{ .Type.Owned }}>,
     {{- end }}
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}

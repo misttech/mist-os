@@ -84,8 +84,7 @@ fn flexible_enum() {
     assert_eq!(FlexibleAnimal::from_primitive(3), None);
     assert_eq!(FlexibleAnimal::from_primitive_allow_unknown(0), FlexibleAnimal::Dog);
 
-    #[allow(deprecated)] // allow referencing __Unknown
-    let unknown3 = FlexibleAnimal::__Unknown(3);
+    let unknown3 = FlexibleAnimal::__SourceBreaking { unknown_ordinal: 3 };
     assert_eq!(FlexibleAnimal::from_primitive_allow_unknown(3), unknown3);
 
     assert_eq!(FlexibleAnimal::Cat.into_primitive(), 1);
@@ -101,8 +100,7 @@ fn flexible_enum() {
 fn flexible_empty_enum() {
     assert_eq!(FlexibleEmptyEnum::from_primitive(3), None);
 
-    #[allow(deprecated)] // allow referencing __Unknown
-    let unknown3 = FlexibleEmptyEnum::__Unknown(3);
+    let unknown3 = FlexibleEmptyEnum::__SourceBreaking { unknown_ordinal: 3 };
     assert_eq!(FlexibleEmptyEnum::from_primitive_allow_unknown(3), unknown3);
 
     assert_eq!(FlexibleEmptyEnum::unknown().into_primitive(), i32::MAX);

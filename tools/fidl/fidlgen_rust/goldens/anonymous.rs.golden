@@ -72,14 +72,14 @@ impl Flags {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum Op {
     Add,
     Mul,
     Div,
-    #[deprecated = "Use `Op::unknown()` to construct and `OpUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking {
+        unknown_ordinal: u32,
+    },
 }
 
 /// Pattern that matches an unknown `Op` member.
@@ -107,15 +107,13 @@ impl Op {
             1 => Self::Add,
             2 => Self::Mul,
             3 => Self::Div,
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0xffffffff)
+        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
     }
 
     #[inline]
@@ -124,29 +122,27 @@ impl Op {
             Self::Add => 1,
             Self::Mul => 2,
             Self::Div => 3,
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             _ => false,
         }
     }
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[non_exhaustive]
 pub enum SomeProtocolSomeMethodError {
     ErrorOne,
     ErrorTwo,
-    #[deprecated = "Use `SomeProtocolSomeMethodError::unknown()` to construct and `SomeProtocolSomeMethodErrorUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown(u32),
+    __SourceBreaking {
+        unknown_ordinal: u32,
+    },
 }
 
 /// Pattern that matches an unknown `SomeProtocolSomeMethodError` member.
@@ -172,15 +168,13 @@ impl SomeProtocolSomeMethodError {
         match prim {
             1 => Self::ErrorOne,
             2 => Self::ErrorTwo,
-            #[allow(deprecated)]
-            x => Self::__Unknown(x),
+            unknown_ordinal => Self::__SourceBreaking { unknown_ordinal },
         }
     }
 
     #[inline]
     pub fn unknown() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown(0xffffffff)
+        Self::__SourceBreaking { unknown_ordinal: 0xffffffff }
     }
 
     #[inline]
@@ -188,16 +182,14 @@ impl SomeProtocolSomeMethodError {
         match self {
             Self::ErrorOne => 1,
             Self::ErrorTwo => 2,
-            #[allow(deprecated)]
-            Self::__Unknown(x) => x,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown(_) => true,
+            Self::__SourceBreaking { unknown_ordinal: _ } => true,
             _ => false,
         }
     }
@@ -240,9 +232,8 @@ pub struct FunctionApplication {
     pub func: Option<String>,
     pub args: Option<Vec<Option<Box<Expression>>>>,
     pub flags: Option<Flags>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for FunctionApplication {}
@@ -250,9 +241,8 @@ impl fidl::Persistable for FunctionApplication {}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TableMember {
     pub table_data: Option<Vec<TableData>>,
-    #[deprecated = "Use `..Default::default()` to construct and `..` to match."]
     #[doc(hidden)]
-    pub __non_exhaustive: (),
+    pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
 impl fidl::Persistable for TableMember {}
@@ -262,11 +252,9 @@ pub enum Expression {
     Value(u64),
     BinOp(OverrideTest),
     FunctionApplication(FunctionApplication),
-    #[deprecated = "Use `Expression::unknown()` to construct and `ExpressionUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -297,22 +285,19 @@ impl Expression {
             Self::Value(_) => 1,
             Self::BinOp(_) => 2,
             Self::FunctionApplication(_) => 3,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -323,11 +308,9 @@ impl fidl::Persistable for Expression {}
 #[derive(Clone, Debug)]
 pub enum UnionMember {
     UnionData(u8),
-    #[deprecated = "Use `UnionMember::unknown()` to construct and `UnionMemberUnknown!()` to exhaustively match."]
     #[doc(hidden)]
-    #[non_exhaustive]
-    __Unknown {
-        ordinal: u64,
+    __SourceBreaking {
+        unknown_ordinal: u64,
     },
 }
 
@@ -354,22 +337,19 @@ impl UnionMember {
     pub fn ordinal(&self) -> u64 {
         match *self {
             Self::UnionData(_) => 2,
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal } => ordinal,
+            Self::__SourceBreaking { unknown_ordinal } => unknown_ordinal,
         }
     }
 
     #[inline]
     pub fn unknown_variant_for_testing() -> Self {
-        #[allow(deprecated)]
-        Self::__Unknown { ordinal: 0 }
+        Self::__SourceBreaking { unknown_ordinal: 0 }
     }
 
     #[inline]
     pub fn is_unknown(&self) -> bool {
         match self {
-            #[allow(deprecated)]
-            Self::__Unknown { .. } => true,
+            Self::__SourceBreaking { .. } => true,
             _ => false,
         }
     }
@@ -1958,8 +1938,7 @@ mod internal {
                         _depth,
                     )
                 }
-                #[allow(deprecated)]
-                Expression::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                Expression::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -1967,8 +1946,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for Expression {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -2058,7 +2036,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = Expression::__Unknown { ordinal };
+                    *self = Expression::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
@@ -2110,8 +2088,7 @@ mod internal {
                     offset + 8,
                     _depth,
                 ),
-                #[allow(deprecated)]
-                UnionMember::__Unknown { .. } => Err(fidl::Error::UnknownUnionTag),
+                UnionMember::__SourceBreaking { .. } => Err(fidl::Error::UnknownUnionTag),
             }
         }
     }
@@ -2119,8 +2096,7 @@ mod internal {
     impl fidl::encoding::Decode<Self> for UnionMember {
         #[inline(always)]
         fn new_empty() -> Self {
-            #[allow(deprecated)]
-            Self::__Unknown { ordinal: 0 }
+            Self::__SourceBreaking { unknown_ordinal: 0 }
         }
 
         #[inline]
@@ -2175,7 +2151,7 @@ mod internal {
                     for _ in 0..num_handles {
                         decoder.drop_next_handle()?;
                     }
-                    *self = UnionMember::__Unknown { ordinal };
+                    *self = UnionMember::__SourceBreaking { unknown_ordinal: ordinal };
                 }
             }
             if !inlined && decoder.next_out_of_line() != next_out_of_line + (num_bytes as usize) {
