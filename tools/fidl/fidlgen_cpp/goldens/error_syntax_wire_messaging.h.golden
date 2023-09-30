@@ -338,9 +338,7 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::Exa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -371,9 +369,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::Ex
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(24 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -392,9 +388,7 @@ struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSynt
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -415,9 +409,7 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_errorsyntax::Exa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 4294967295;
-  static constexpr uint32_t kMaxOutOfLineV1 = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -448,9 +440,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_errorsyntax::Ex
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(24 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -469,9 +459,7 @@ struct TypeTraits<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSynt
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -495,7 +483,7 @@ struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::Transact
 template <>
 struct ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>> final
     : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>>> {
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<40> bytes_;
   ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>> handles_storage_;
 };
 template <>
@@ -511,7 +499,7 @@ struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::Transact
 template <>
 struct ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>> final
     : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>>> {
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<40> bytes_;
   ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>> handles_storage_;
 };
 template <>
@@ -550,7 +538,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSynt
   ~WireResult() = default;
 
  private:
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<40> bytes_;
   ::fidl::DecodedValue<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>> decoded_;
 };
 
@@ -603,7 +591,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_errorsyntax::ExampleUseOfErrorSynt
   ~WireResult() = default;
 
  private:
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<40> bytes_;
   ::fidl::DecodedValue<::fidl::WireResponse<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>> decoded_;
 };
 

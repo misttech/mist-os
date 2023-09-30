@@ -27,7 +27,6 @@ func (u *UnionName) AsParameters(ty *Type, hi *HandleInformation) []Parameter {
 	return []Parameter{{
 		Type:              *ty,
 		nameVariants:      ty.nameVariants,
-		OffsetV1:          0,
 		OffsetV2:          0,
 		HandleInformation: hi,
 	}}
@@ -50,9 +49,7 @@ type Union struct {
 	WireOrdinalEnum     name
 	WireInvalidOrdinal  name
 	Members             []UnionMember
-	BackingBufferTypeV1 string
 	BackingBufferTypeV2 string
-	TypeShapeV1         TypeShape
 	TypeShapeV2         TypeShape
 
 	// Result points to the Result this union is being used to represent, if this
@@ -100,7 +97,6 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 	u := Union{
 		UnionName:          UnionName{nameVariants: name},
 		Attributes:         Attributes{val.Attributes},
-		TypeShapeV1:        TypeShape{val.TypeShapeV1},
 		TypeShapeV2:        TypeShape{val.TypeShapeV2},
 		AnonymousChildren:  c.getAnonymousChildren(val),
 		Strictness:         val.Strictness,
@@ -111,9 +107,6 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 		TagInvalid:         tagEnum.nest("Invalid"),
 		WireOrdinalEnum:    wireOrdinalEnum,
 		WireInvalidOrdinal: wireOrdinalEnum.nest("Invalid"),
-		BackingBufferTypeV1: computeAllocation(
-			TypeShape{val.TypeShapeV1}.MaxTotalSize(), TypeShape{val.TypeShapeV1}.MaxHandles, boundednessBounded).
-			BackingBufferType(),
 		BackingBufferTypeV2: computeAllocation(
 			TypeShape{val.TypeShapeV2}.MaxTotalSize(), TypeShape{val.TypeShapeV2}.MaxHandles, boundednessBounded).
 			BackingBufferType(),

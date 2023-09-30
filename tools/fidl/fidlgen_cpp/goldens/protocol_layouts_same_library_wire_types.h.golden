@@ -3036,10 +3036,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::TablePayload> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3129,10 +3127,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3222,10 +3218,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3315,10 +3309,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3408,10 +3400,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3501,10 +3491,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3594,10 +3582,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3687,10 +3673,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3780,10 +3764,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 16;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 24;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3874,10 +3856,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::UnionPayload> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -3990,10 +3970,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4106,10 +4084,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4222,10 +4198,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4350,10 +4324,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4466,10 +4438,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr uint32_t kMaxOutOfLineV1 = 40;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4594,10 +4564,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWa
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4722,10 +4690,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::ComposedProtocolOnNam
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr uint32_t kMaxOutOfLineV1 = 40;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4850,10 +4816,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLoc
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -4978,10 +4942,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnLocalWi
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr uint32_t kMaxOutOfLineV1 = 40;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -5106,10 +5068,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -5222,10 +5182,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -5338,10 +5296,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAno
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 16;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -5466,10 +5422,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonReq
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -5582,10 +5536,8 @@ struct TypeTraits<::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWit
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = 24;
-  static constexpr uint32_t kMaxOutOfLineV1 = 40;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;

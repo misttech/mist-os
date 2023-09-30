@@ -313,9 +313,7 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
@@ -343,9 +341,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProt
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(24 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 32;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -364,9 +360,7 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHe
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   static constexpr uint32_t kMaxOutOfLine = 32;
-  static constexpr uint32_t kMaxOutOfLineV1 = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -388,9 +382,7 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProto
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = false;
@@ -418,9 +410,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProt
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(24 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -439,9 +429,7 @@ struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnion
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   static constexpr uint32_t kMaxOutOfLine = 8;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = false;
   static constexpr bool kHasPointer = true;
@@ -466,7 +454,7 @@ struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::Transact
 template <>
 struct ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> final
     : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>>> {
-  ::fidl::internal::InlineMessageBuffer<72> bytes_;
+  ::fidl::internal::InlineMessageBuffer<64> bytes_;
   ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> handles_storage_;
 };
 template <>
@@ -521,7 +509,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_union::TestProtocol::StrictUnionHe
   ~WireResult() = default;
 
  private:
-  ::fidl::internal::InlineMessageBuffer<72> bytes_;
+  ::fidl::internal::InlineMessageBuffer<64> bytes_;
   ::fidl::DecodedValue<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> decoded_;
 };
 

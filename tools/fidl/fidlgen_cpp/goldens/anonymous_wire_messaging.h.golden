@@ -208,9 +208,7 @@ struct TypeTraits<::fidl::internal::TransactionalRequest<::test_anonymous::SomeP
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(32 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(40 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 48;
-  static constexpr uint32_t kMaxOutOfLineV1 = 72;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -242,9 +240,7 @@ struct TypeTraits<::fidl::internal::TransactionalResponse<::test_anonymous::Some
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
-  static constexpr uint32_t kPrimarySizeV1 = FIDL_ALIGN(24 + sizeof(fidl_message_header_t));
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -263,9 +259,7 @@ struct TypeTraits<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMetho
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  static constexpr uint32_t kPrimarySizeV1 = 24;
   static constexpr uint32_t kMaxOutOfLine = 0;
-  static constexpr uint32_t kMaxOutOfLineV1 = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasEnvelope = true;
   static constexpr bool kHasPointer = true;
@@ -289,7 +283,7 @@ struct ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::Transact
 template <>
 struct ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> final
     : public ::fidl::internal::ChannelMessageStorageBase<::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>>> {
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<32> bytes_;
   ::fidl::internal::IncomingMessageHandleStorage<::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::SomeMethod>> handles_storage_;
 };
 template <>
@@ -328,7 +322,7 @@ class [[nodiscard]] ::fidl::WireResult<::test_anonymous::SomeProtocol::SomeMetho
   ~WireResult() = default;
 
  private:
-  ::fidl::internal::InlineMessageBuffer<48> bytes_;
+  ::fidl::internal::InlineMessageBuffer<32> bytes_;
   ::fidl::DecodedValue<::fidl::WireResponse<::test_anonymous::SomeProtocol::SomeMethod>> decoded_;
 };
 

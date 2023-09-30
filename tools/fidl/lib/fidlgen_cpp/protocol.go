@@ -343,7 +343,6 @@ type protocolInner struct {
 
 	// ClientAllocation is the allocation behavior of the client when receiving
 	// FIDL events over this protocol.
-	SyncEventAllocationV1 allocation
 	SyncEventAllocationV2 allocation
 	Methods               []Method
 	Openness              fidlgen.Openness
@@ -496,7 +495,6 @@ func newProtocol(inner protocolInner) Protocol {
 }
 
 type messageInner struct {
-	TypeShapeV1     TypeShape
 	TypeShapeV2     TypeShape
 	HlCodingTable   *name
 	WireCodingTable *name
@@ -508,9 +506,7 @@ type messageInner struct {
 // message should be created using newMessage.
 type message struct {
 	messageInner
-	ClientAllocationV1 allocation
 	ClientAllocationV2 allocation
-	ServerAllocationV1 allocation
 	ServerAllocationV2 allocation
 }
 
@@ -537,18 +533,10 @@ func newMessage(inner messageInner, args []Parameter, wire wireTypeNames,
 	direction messageDirection) message {
 	return message{
 		messageInner: inner,
-		ClientAllocationV1: computeAllocation(
-			inner.TypeShapeV1.MaxTotalSize(),
-			inner.TypeShapeV1.MaxHandles,
-			direction.queryBoundedness(clientContext, inner.TypeShapeV1.HasFlexibleEnvelope)),
 		ClientAllocationV2: computeAllocation(
 			inner.TypeShapeV2.MaxTotalSize(),
 			inner.TypeShapeV2.MaxHandles,
 			direction.queryBoundedness(clientContext, inner.TypeShapeV2.HasFlexibleEnvelope)),
-		ServerAllocationV1: computeAllocation(
-			inner.TypeShapeV1.MaxTotalSize(),
-			inner.TypeShapeV1.MaxHandles,
-			direction.queryBoundedness(serverContext, inner.TypeShapeV1.HasFlexibleEnvelope)),
 		ServerAllocationV2: computeAllocation(
 			inner.TypeShapeV2.MaxTotalSize(),
 			inner.TypeShapeV2.MaxHandles,
@@ -658,9 +646,7 @@ type methodInner struct {
 	IncomingMessageHandleStorageForResponse name
 
 	baseCodingTableName string
-	requestTypeShapeV1  TypeShape
 	requestTypeShapeV2  TypeShape
-	responseTypeShapeV1 TypeShape
 	responseTypeShapeV2 TypeShape
 
 	Attributes
@@ -1020,14 +1006,12 @@ func newMethod(inner methodInner, hl hlMessagingDetails, wire wireTypeNames, p f
 			Unified: inner.protocolName.Wire.Namespace().member(dynamicFlagsName),
 		},
 		Request: newMessage(messageInner{
-			TypeShapeV1:     inner.requestTypeShapeV1,
 			TypeShapeV2:     inner.requestTypeShapeV2,
 			HlCodingTable:   hlRequestCodingTable,
 			WireCodingTable: wireRequestCodingTable,
 			IsResource:      inner.RequestIsResource,
 		}, inner.RequestArgs, wire, messageDirectionRequest),
 		Response: newMessage(messageInner{
-			TypeShapeV1:     inner.responseTypeShapeV1,
 			TypeShapeV2:     inner.responseTypeShapeV2,
 			HlCodingTable:   hlResponseCodingTable,
 			WireCodingTable: wireResponseCodingTable,
@@ -1067,7 +1051,6 @@ func (m *Method) methodKind() methodKind {
 type Parameter struct {
 	nameVariants
 	Type              Type
-	OffsetV1          int
 	OffsetV2          int
 	HandleInformation *HandleInformation
 	NaturalConstraint string
@@ -1082,10 +1065,7 @@ var _ Member = (*Parameter)(nil)
 
 func anyEventHasFlexibleEnvelope(methods []Method) bool {
 	for _, m := range methods {
-		if m.Response.TypeShapeV1.HasFlexibleEnvelope != m.Response.TypeShapeV2.HasFlexibleEnvelope {
-			panic("expected type shape v1 and v2 flexible envelope values to be identical")
-		}
-		if !m.HasRequest && m.HasResponse && m.Response.TypeShapeV1.HasFlexibleEnvelope {
+		if !m.HasRequest && m.HasResponse && m.Response.TypeShapeV2.HasFlexibleEnvelope {
 			return true
 		}
 	}
@@ -1122,14 +1102,12 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		methodMarker := protocolName.nest(name.Wire.Name())
 
 		var requestChildren []ScopedLayout
-		var requestTypeShapeV1 fidlgen.TypeShape
 		var requestTypeShapeV2 fidlgen.TypeShape
 		var requestIsResource bool
 		var requestPayloadName fidlgen.EncodedCompoundIdentifier
 		var requestPayloadArgs []Parameter
 		requestFlattened := true
 		if v.RequestPayload != nil {
-			requestTypeShapeV1 = v.RequestPayload.TypeShapeV1
 			requestTypeShapeV2 = v.RequestPayload.TypeShapeV2
 			requestPayloadName = v.RequestPayload.Identifier
 			if val, ok := c.structs[v.RequestPayload.Identifier]; ok {
@@ -1144,14 +1122,12 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		}
 
 		var responseChildren []ScopedLayout
-		var responseTypeShapeV1 fidlgen.TypeShape
 		var responseTypeShapeV2 fidlgen.TypeShape
 		var responseIsResource bool
 		var responsePayloadName fidlgen.EncodedCompoundIdentifier
 		var responsePayloadArgs []Parameter
 		responseFlattened := true
 		if v.ResponsePayload != nil {
-			responseTypeShapeV1 = v.ResponsePayload.TypeShapeV1
 			responseTypeShapeV2 = v.ResponsePayload.TypeShapeV2
 			responsePayloadName = v.ResponsePayload.Identifier
 			if val, ok := c.structs[v.ResponsePayload.Identifier]; ok {
@@ -1184,9 +1160,7 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 			// reserved words logic, since that's the behavior in fidlc.
 			baseCodingTableName:                     codingTableName + string(v.Name),
 			Marker:                                  methodMarker,
-			requestTypeShapeV1:                      TypeShape{requestTypeShapeV1},
 			requestTypeShapeV2:                      TypeShape{requestTypeShapeV2},
-			responseTypeShapeV1:                     TypeShape{responseTypeShapeV1},
 			responseTypeShapeV2:                     TypeShape{responseTypeShapeV2},
 			wireMethod:                              wireMethod,
 			unifiedMethod:                           unifiedMethod,
@@ -1221,28 +1195,20 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 	}
 
 	// Always include room to receive an epitaph.
-	var maxEventSizeV1 int = kEpitaphSize
 	var maxEventSizeV2 int = kEpitaphSize
 	for _, method := range methods {
 		if method.HasRequest || !method.HasResponsePayload {
 			continue
-		}
-		if size := method.responseTypeShapeV1.MaxTotalSize(); size > maxEventSizeV1 {
-			maxEventSizeV1 = size
 		}
 		if size := method.responseTypeShapeV2.MaxTotalSize(); size > maxEventSizeV2 {
 			maxEventSizeV2 = size
 		}
 	}
 
-	var maxEventNumHandlesV1 int
 	var maxEventNumHandlesV2 int
 	for _, method := range methods {
 		if method.HasRequest || !method.HasResponsePayload {
 			continue
-		}
-		if size := method.responseTypeShapeV1.MaxHandles; size > maxEventNumHandlesV1 {
-			maxEventNumHandlesV1 = size
 		}
 		if size := method.responseTypeShapeV2.MaxHandles; size > maxEventNumHandlesV2 {
 			maxEventNumHandlesV2 = size
@@ -1262,9 +1228,6 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		DiscoverableName:            p.GetProtocolName(),
 		IncomingEventsStorage:       IncomingEventsStorage.template(protocolName.Wire),
 		IncomingEventsHandleStorage: IncomingEventsHandleStorage.template(protocolName.Wire),
-		SyncEventAllocationV1: computeAllocation(
-			maxEventSizeV1, maxEventNumHandlesV1, messageDirectionResponse.queryBoundedness(
-				clientContext, anyEventHasFlexibleEnvelope(methods))),
 		SyncEventAllocationV2: computeAllocation(
 			maxEventSizeV2, maxEventNumHandlesV2, messageDirectionResponse.queryBoundedness(
 				clientContext, anyEventHasFlexibleEnvelope(methods))),
@@ -1287,7 +1250,6 @@ func (c *compiler) compileParameterSingleton(name fidlgen.EncodedCompoundIdentif
 	return []Parameter{{
 		Type:              c.compileType(typ),
 		nameVariants:      c.compileNameVariants(name),
-		OffsetV1:          0,
 		OffsetV2:          0,
 		HandleInformation: c.fieldHandleInformation(&typ),
 	}}
@@ -1300,7 +1262,6 @@ func (c *compiler) compileParameterArray(val fidlgen.Struct) []Parameter {
 		params = append(params, Parameter{
 			Type:              c.compileType(v.Type),
 			nameVariants:      structMemberContext.transform(v.Name),
-			OffsetV1:          v.FieldShapeV1.Offset,
 			OffsetV2:          v.FieldShapeV2.Offset,
 			HandleInformation: c.fieldHandleInformation(&v.Type),
 		})

@@ -39,7 +39,6 @@ func (u *TableName) AsParameters(ty *Type, hi *HandleInformation) []Parameter {
 	return []Parameter{{
 		Type:              *ty,
 		nameVariants:      ty.nameVariants,
-		OffsetV1:          0,
 		OffsetV2:          0,
 		HandleInformation: hi,
 	}}
@@ -57,9 +56,7 @@ type Table struct {
 	CodingTableType     name
 	Members             []TableMember
 	BiggestOrdinal      int
-	BackingBufferTypeV1 string
 	BackingBufferTypeV2 string
-	TypeShapeV1         TypeShape
 	TypeShapeV2         TypeShape
 
 	// WireTableFrame is the name of the table frame type associated with
@@ -136,15 +133,11 @@ func (c *compiler) compileTable(val fidlgen.Table) *Table {
 		TableName:         TableName{nameVariants: name},
 		Attributes:        Attributes{val.Attributes},
 		AnonymousChildren: c.getAnonymousChildren(val),
-		TypeShapeV1:       TypeShape{val.TypeShapeV1},
 		TypeShapeV2:       TypeShape{val.TypeShapeV2},
 		Resourceness:      val.Resourceness,
 		CodingTableType:   codingTableType,
 		Members:           nil,
 		BiggestOrdinal:    0,
-		BackingBufferTypeV1: computeAllocation(
-			TypeShape{val.TypeShapeV1}.MaxTotalSize(), TypeShape{val.TypeShapeV1}.MaxHandles, boundednessBounded).
-			BackingBufferType(),
 		BackingBufferTypeV2: computeAllocation(
 			TypeShape{val.TypeShapeV2}.MaxTotalSize(), TypeShape{val.TypeShapeV2}.MaxHandles, boundednessBounded).
 			BackingBufferType(),

@@ -31,7 +31,7 @@ class [[nodiscard]] {{ .WireResult }} final : public {{ .BaseWireResult }} {
 
   {{- if .HasResponse }}
    private:
-    {{ .Response.ClientAllocationV1.BackingBufferType }} bytes_;
+    {{ .Response.ClientAllocationV2.BackingBufferType }} bytes_;
     {{- if .HasResponsePayload }}
       ::fidl::DecodedValue<{{ .WireResponse }}> decoded_;
     {{- end }}

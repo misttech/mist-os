@@ -63,10 +63,8 @@ struct TypeTraits<{{ . }}> {
   static constexpr uint32_t kMaxNumHandles = {{ .TypeShapeV2.MaxHandles }};
   static constexpr uint32_t kMaxDepth = {{ .TypeShapeV2.Depth }};
   static constexpr uint32_t kPrimarySize = {{ .TypeShapeV2.InlineSize }};
-  static constexpr uint32_t kPrimarySizeV1 = {{ .TypeShapeV1.InlineSize }};
   [[maybe_unused]]
   static constexpr uint32_t kMaxOutOfLine = {{ .TypeShapeV2.MaxOutOfLine }};
-  static constexpr uint32_t kMaxOutOfLineV1 = {{ .TypeShapeV1.MaxOutOfLine }};
   static constexpr bool kHasFlexibleEnvelope = {{ .TypeShapeV2.HasFlexibleEnvelope }};
   static constexpr bool kHasEnvelope = {{ .TypeShapeV2.HasEnvelope }};
   static constexpr bool kHasPointer = {{ .TypeShapeV2.HasPointer }};
@@ -93,7 +91,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
       {{- if $i }}, {{ end -}}
     ::fidl::internal::WireStructMemberCodingInfo<{{ $m.Type }}, {{ $m.WireConstraint }}, IsRecursive>()
     {{- end }});
-  static constexpr bool kHasPadding = {{ or (gt (len .PaddingV1) 0) (gt (len .PaddingV2) 0) }};
+  static constexpr bool kHasPadding = {{ gt (len .PaddingV2) 0 }};
   using Base = WireStructCodingTraitsBase<{{ . }}, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>;
   static constexpr bool is_memcpy_compatible = Base::is_memcpy_compatible;
 
