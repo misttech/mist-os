@@ -19,7 +19,10 @@
 
 namespace amlogic_display {
 
-enum VoutType { kDsi, kHdmi };
+enum class VoutType : uint8_t {
+  kDsi,
+  kHdmi,
+};
 
 class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
@@ -56,56 +59,12 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   VoutType type() { return type_; }
   bool supports_hpd() const { return supports_hpd_; }
-  uint32_t display_width() {
-    switch (type_) {
-      case kDsi:
-        return dsi_.disp_setting.h_active;
-      case kHdmi:
-        return hdmi_.cur_display_mode_.h_addressable;
-      default:
-        return 0;
-    }
-  }
-  uint32_t display_height() {
-    switch (type_) {
-      case kDsi:
-        return dsi_.disp_setting.v_active;
-      case kHdmi:
-        return hdmi_.cur_display_mode_.v_addressable;
-      default:
-        return 0;
-    }
-  }
-  uint32_t fb_width() {
-    switch (type_) {
-      case kDsi:
-        return dsi_.width;
-      case kHdmi:
-        return hdmi_.cur_display_mode_.h_addressable;
-      default:
-        return 0;
-    }
-  }
-  uint32_t fb_height() {
-    switch (type_) {
-      case kDsi:
-        return dsi_.height;
-      case kHdmi:
-        return hdmi_.cur_display_mode_.v_addressable;
-      default:
-        return 0;
-    }
-  }
 
-  uint32_t panel_type() {
-    switch (type_) {
-      case kDsi:
-        return dsi_.dsi_host->panel_type();
-      case kHdmi:
-      default:
-        return 0;
-    }
-  }
+  uint32_t display_width() const;
+  uint32_t display_height() const;
+  uint32_t fb_width() const;
+  uint32_t fb_height() const;
+  uint32_t panel_type() const;
 
   void DisplayConnected();
   void DisplayDisconnected();

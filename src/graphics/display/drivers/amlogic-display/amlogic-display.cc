@@ -97,9 +97,8 @@ ColorSpaceConversionMode GetColorSpaceConversionMode(VoutType vout_type) {
       return ColorSpaceConversionMode::kRgbInternalRgbOut;
     case VoutType::kHdmi:
       return ColorSpaceConversionMode::kRgbInternalYuvOut;
-    default:
-      ZX_ASSERT_MSG(false, "Invalid VoutType: %d", static_cast<int>(vout_type));
   }
+  ZX_ASSERT_MSG(false, "Invalid VoutType: %u", static_cast<uint8_t>(vout_type));
 }
 
 bool GetFullHardwareResetFromKernelCommandLine(zx_device_t* device) {
@@ -1249,7 +1248,7 @@ zx_status_t AmlogicDisplay::InitializeHdmiVout() {
   }
   vout_ = std::move(create_hdmi_vout_result).value();
 
-  root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
+  root_node_.CreateInt("vout_type", static_cast<int>(vout_->type()), &inspector_);
   return ZX_OK;
 }
 
@@ -1272,7 +1271,7 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
     display_attached_ = true;
   }
 
-  root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
+  root_node_.CreateInt("vout_type", static_cast<int>(vout_->type()), &inspector_);
   root_node_.CreateUint("panel_type", vout_->panel_type(), &inspector_);
   return ZX_OK;
 }

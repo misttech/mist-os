@@ -79,6 +79,61 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host)
       supports_hpd_(kHdmiSupportedFeatures.hpd),
       hdmi_{.hdmi_host = std::move(hdmi_host)} {}
 
+uint32_t Vout::display_width() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return dsi_.disp_setting.h_active;
+    case VoutType::kHdmi:
+      return hdmi_.cur_display_mode_.h_addressable;
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+  return 0;
+}
+
+uint32_t Vout::display_height() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return dsi_.disp_setting.v_active;
+    case VoutType::kHdmi:
+      return hdmi_.cur_display_mode_.v_addressable;
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+  return 0;
+}
+
+uint32_t Vout::fb_width() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return dsi_.width;
+    case VoutType::kHdmi:
+      return hdmi_.cur_display_mode_.h_addressable;
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+  return 0;
+}
+
+uint32_t Vout::fb_height() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return dsi_.height;
+    case VoutType::kHdmi:
+      return hdmi_.cur_display_mode_.v_addressable;
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+  return 0;
+}
+
+uint32_t Vout::panel_type() const {
+  switch (type_) {
+    case VoutType::kDsi:
+      return dsi_.dsi_host->panel_type();
+    case VoutType::kHdmi:
+      return 0;
+  }
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+  return 0;
+}
+
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
                                                       uint32_t width, uint32_t height) {
   zx::result<std::unique_ptr<DsiHost>> dsi_host_result = DsiHost::Create(parent, panel_type);
@@ -171,7 +226,7 @@ void Vout::PopulateAddedDisplayArgs(
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
-      break;
+      return;
     case VoutType::kHdmi:
       args->display_id = display::ToBanjoDisplayId(display_id);
       args->edid_present = true;
@@ -180,31 +235,31 @@ void Vout::PopulateAddedDisplayArgs(
       args->pixel_format_list = pixel_formats.data();
       args->pixel_format_count = pixel_formats.size();
       args->cursor_info_count = 0;
-      break;
-    default:
-      zxlogf(ERROR, "Unrecognized vout type %u", type_);
       return;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 void Vout::DisplayConnected() {
   switch (type_) {
-    case kHdmi:
+    case VoutType::kHdmi:
       hdmi_.cur_display_mode_ = {};
-      break;
-    default:
-      break;
+      return;
+    case VoutType::kDsi:
+      return;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 void Vout::DisplayDisconnected() {
   switch (type_) {
-    case kHdmi:
+    case VoutType::kHdmi:
       hdmi_.hdmi_host->HostOff();
-      break;
-    default:
-      break;
+      return;
+    case VoutType::kDsi:
+      return;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 zx::result<> Vout::PowerOff() {
@@ -219,8 +274,7 @@ zx::result<> Vout::PowerOff() {
       return zx::ok();
     }
   }
-  zxlogf(ERROR, "Unrecognized Vout type %u", type_);
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 zx::result<> Vout::PowerOn() {
@@ -258,16 +312,15 @@ zx::result<> Vout::PowerOn() {
       return zx::ok();
     }
   }
-  zxlogf(ERROR, "Unrecognized Vout type %u", type_);
-  return zx::error(ZX_ERR_NOT_SUPPORTED);
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
   ZX_DEBUG_ASSERT(mode != nullptr);
   switch (type_) {
-    case kDsi:
+    case VoutType::kDsi:
       return true;
-    case kHdmi:
+    case VoutType::kHdmi:
       // `cur_display_mode_` stores the most recently applied display mode,
       // which is guaranteed to be supported. We skip the check if `mode` equals
       // to `cur_display_mode_`.
@@ -278,17 +331,16 @@ bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
       // We should replace `display_mode_t` (banjo type) with an internal type.
       return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) == 0 ||
              hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
-    default:
-      return true;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
   ZX_DEBUG_ASSERT(mode != nullptr);
   switch (type_) {
-    case kDsi:
+    case VoutType::kDsi:
       return zx::ok();
-    case kHdmi: {
+    case VoutType::kHdmi: {
       if (!memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t))) {
         // No new configs
         return zx::ok();
@@ -303,32 +355,31 @@ zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
       memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
       return zx::ok();
     }
-    default:
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 zx::result<> Vout::OnDisplaysChanged(added_display_info_t& info) {
   switch (type_) {
-    case kDsi:
+    case VoutType::kDsi:
       return zx::ok();
-    case kHdmi:
+    case VoutType::kHdmi:
       hdmi_.hdmi_host->UpdateOutputColorFormat(
           info.is_standard_srgb_out ? fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb
                                     : fuchsia_hardware_hdmi::wire::ColorFormat::kCf444);
       return zx::ok();
-    default:
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 zx_status_t Vout::I2cImplTransact(const i2c_impl_op_t* op_list, size_t op_count) {
   switch (type_) {
-    case kHdmi:
+    case VoutType::kHdmi:
       return hdmi_.hdmi_host->EdidTransfer(op_list, op_count);
-    default:
+    case VoutType::kDsi:
       return ZX_ERR_NOT_SUPPORTED;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 void Vout::Dump() {
@@ -358,7 +409,7 @@ void Vout::Dump() {
              dsi_.disp_setting.bit_rate_max);
       zxlogf(INFO, "clock_factor = 0x%x (%u)", dsi_.disp_setting.clock_factor,
              dsi_.disp_setting.clock_factor);
-      break;
+      return;
     case VoutType::kHdmi:
       zxlogf(INFO, "pixel_clock_10khz = 0x%x (%u)", hdmi_.cur_display_mode_.pixel_clock_10khz,
              hdmi_.cur_display_mode_.pixel_clock_10khz);
@@ -380,10 +431,9 @@ void Vout::Dump() {
              hdmi_.cur_display_mode_.v_blanking);
       zxlogf(INFO, "flags = 0x%x (%u)", hdmi_.cur_display_mode_.flags,
              hdmi_.cur_display_mode_.flags);
-      break;
-    default:
-      zxlogf(ERROR, "Unrecognized Vout type %u", type_);
+      return;
   }
+  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
 }  // namespace amlogic_display
