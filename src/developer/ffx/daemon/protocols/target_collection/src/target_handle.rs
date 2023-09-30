@@ -102,7 +102,14 @@ impl TargetHandleInner {
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                self.target.run_host_pipe();
+                #[cfg(test)]
+                let skip_host_pipe =
+                    crate::tests::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
+                #[cfg(not(test))]
+                let skip_host_pipe = false;
+                if !skip_host_pipe {
+                    self.target.run_host_pipe(&hoist::hoist().node());
+                }
                 let rcs = wait_for_rcs(&self.target).await?;
                 match rcs {
                     Ok(mut c) => {

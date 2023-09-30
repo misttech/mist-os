@@ -34,6 +34,7 @@ use std::{
     hash::{Hash, Hasher},
     net::{IpAddr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
+    sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use timeout::timeout;
@@ -126,10 +127,15 @@ impl EventSynthesizer<TargetEvent> for TargetEventSynthesizer {
     }
 }
 
+pub(crate) struct HostPipeState {
+    pub task: Task<()>,
+    pub overnet_node: Arc<overnet_core::Router>,
+}
+
 pub struct Target {
     pub events: events::Queue<TargetEvent>,
 
-    pub(crate) host_pipe: RefCell<Option<Task<()>>>,
+    pub(crate) host_pipe: RefCell<Option<HostPipeState>>,
 
     // id is the locally created "primary identifier" for this target.
     id: u64,
@@ -979,9 +985,10 @@ impl Target {
     /// `HostPipe`.
     pub fn maybe_reconnect(self: &Rc<Self>) {
         if self.host_pipe.borrow().is_some() {
-            drop(self.host_pipe.take());
+            let HostPipeState { task, overnet_node } = self.host_pipe.take().unwrap();
+            drop(task);
             tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
-            self.run_host_pipe();
+            self.run_host_pipe(&overnet_node);
         }
     }
 
@@ -990,7 +997,7 @@ impl Target {
     }
 
     #[tracing::instrument]
-    pub fn run_host_pipe(self: &Rc<Self>) {
+    pub fn run_host_pipe(self: &Rc<Self>, overnet_node: &Arc<overnet_core::Router>) {
         if self.host_pipe.borrow().is_some() {
             tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
@@ -998,67 +1005,75 @@ impl Target {
 
         let weak_target = Rc::downgrade(self);
         let target_name_str = format!("{}@{}", self.nodename_str(), self.id());
-        self.host_pipe.borrow_mut().replace(Task::local(async move {
-            // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
-            // to the RCS connected state. If we're already in that state, and the RCS connection is
-            // active, we don't need a host pipe. This will start happening more as we introduce USB
-            // links, where the first thing we hear about a target is its appearance as an Overnet peer,
-            // and thus we have an RCS connection from inception.
-            {
-                let Some(target) = weak_target.upgrade() else {
+        let node = Arc::clone(overnet_node);
+        let overnet_node = Arc::clone(overnet_node);
+        self.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(async move {
+                // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
+                // to the RCS connected state. If we're already in that state, and the RCS connection is
+                // active, we don't need a host pipe. This will start happening more as we introduce USB
+                // links, where the first thing we hear about a target is its appearance as an Overnet peer,
+                // and thus we have an RCS connection from inception.
+                {
+                    let Some(target) = weak_target.upgrade() else {
                     // weird that self is already gone, but ¯\_(ツ)_/¯
                     return;
                 };
-                let state = target.state.borrow().clone();
-                if let TargetConnectionState::Rcs(rcs) = state {
-                    if knock_rcs(&rcs.proxy).await.is_ok() {
-                        return;
+                    let state = target.state.borrow().clone();
+                    if let TargetConnectionState::Rcs(rcs) = state {
+                        if knock_rcs(&rcs.proxy).await.is_ok() {
+                            return;
+                        }
                     }
                 }
-            }
 
-            let watchdogs: bool =
-                ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
+                let watchdogs: bool =
+                    ffx_config::get("watchdogs.host_pipe.enabled").await.unwrap_or(false);
 
-            let ssh_timeout: u16 =
-                ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(50);
-            let node = hoist::hoist().node();
-            let nr =
-                spawn(weak_target.clone(), watchdogs, ssh_timeout, std::sync::Arc::clone(&node))
-                    .await;
+                let ssh_timeout: u16 =
+                    ffx_config::get(CONFIG_HOST_PIPE_SSH_TIMEOUT).await.unwrap_or(50);
+                let nr = spawn(
+                    weak_target.clone(),
+                    watchdogs,
+                    ssh_timeout,
+                    std::sync::Arc::clone(&node),
+                )
+                .await;
 
-            match nr {
-                Ok(mut hp) => {
-                    tracing::debug!("host pipe spawn returned OK for {target_name_str}");
-                    let compatibility_status = hp.get_compatibility_status();
+                match nr {
+                    Ok(mut hp) => {
+                        tracing::debug!("host pipe spawn returned OK for {target_name_str}");
+                        let compatibility_status = hp.get_compatibility_status();
 
-                    if let Some(target) = weak_target.upgrade() {
-                        target.set_compatibility_status(&compatibility_status);
+                        if let Some(target) = weak_target.upgrade() {
+                            target.set_compatibility_status(&compatibility_status);
+                        }
+
+                        // wait for the host pipe to exit.
+                        let r = hp.wait(&node).await;
+                        // XXX(raggi): decide what to do with this log data:
+                        tracing::info!("HostPipeConnection returned: {:?}", r);
                     }
-
-                    // wait for the host pipe to exit.
-                    let r = hp.wait(&node).await;
-                    // XXX(raggi): decide what to do with this log data:
-                    tracing::info!("HostPipeConnection returned: {:?}", r);
-                }
-                Err(e) => {
-                    tracing::warn!("Host pipe spawn {:?}", e);
-                    let compatibility_status = Some(CompatibilityInfo {
-                        status: CompatibilityState::Error,
-                        platform_abi: 0,
-                        message: format!("Host connection failed: {e}"),
-                    });
-                    if let Some(target) = weak_target.upgrade() {
-                        target.set_compatibility_status(&compatibility_status);
+                    Err(e) => {
+                        tracing::warn!("Host pipe spawn {:?}", e);
+                        let compatibility_status = Some(CompatibilityInfo {
+                            status: CompatibilityState::Error,
+                            platform_abi: 0,
+                            message: format!("Host connection failed: {e}"),
+                        });
+                        if let Some(target) = weak_target.upgrade() {
+                            target.set_compatibility_status(&compatibility_status);
+                        }
                     }
                 }
-            }
 
-            weak_target.upgrade().and_then(|target| {
-                tracing::debug!("Exiting run_host_pipe for {target_name_str}");
-                target.host_pipe.borrow_mut().take()
-            });
-        }));
+                weak_target.upgrade().and_then(|target| {
+                    tracing::debug!("Exiting run_host_pipe for {target_name_str}");
+                    target.host_pipe.borrow_mut().take()
+                });
+            }),
+            overnet_node,
+        });
     }
 
     pub fn is_host_pipe_running(&self) -> bool {
@@ -1068,7 +1083,7 @@ impl Target {
     #[tracing::instrument]
     pub async fn init_remote_proxy(self: &Rc<Self>) -> Result<RemoteControlProxy> {
         // Ensure auto-connect has at least started.
-        self.run_host_pipe();
+        self.run_host_pipe(&hoist::hoist().node());
         match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
             Ok(()) => (),
             Err(e) => {
@@ -1441,6 +1456,7 @@ mod test {
     // Most of this is now handled in `task.rs`
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_disconnect_multiple_invocations() {
+        let node = Hoist::new(None).unwrap().node();
         let t = Rc::new(Target::new_named("flabbadoobiedoo"));
         {
             let addr: TargetAddr = TargetAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
@@ -1448,9 +1464,9 @@ mod test {
         }
         // Assures multiple "simultaneous" invocations to start the target
         // doesn't put it into a bad state that would hang.
-        t.run_host_pipe();
-        t.run_host_pipe();
-        t.run_host_pipe();
+        t.run_host_pipe(&node);
+        t.run_host_pipe(&node);
+        t.run_host_pipe(&node);
     }
 
     struct RcsStateTest {
@@ -1491,7 +1507,7 @@ mod test {
             ));
             t.addrs_insert(TargetAddr::new(a2, 2, 0));
             if test.loop_started {
-                t.run_host_pipe();
+                t.run_host_pipe(&local_hoist.node());
             }
             {
                 *t.state.borrow_mut() = if test.rcs_is_some {
@@ -2173,9 +2189,13 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_disconnect() {
+        let local_hoist = Hoist::new(None).unwrap();
         let target = Target::new();
         target.set_state(TargetConnectionState::Mdns(Instant::now()));
-        target.host_pipe.borrow_mut().replace(Task::local(future::pending()));
+        target.host_pipe.borrow_mut().replace(HostPipeState {
+            task: Task::local(future::pending()),
+            overnet_node: local_hoist.node(),
+        });
 
         target.disconnect();
 
@@ -2197,7 +2217,7 @@ mod test {
             &NodeId { id: 1234 },
         );
         target.set_state(TargetConnectionState::Rcs(conn));
-        target.run_host_pipe();
+        target.run_host_pipe(&local_hoist.node());
         // Let run_host_pipe()'s spawned task run
         Timer::new(Duration::from_millis(50)).await;
         target.update_connection_state(|_| TargetConnectionState::Disconnected);

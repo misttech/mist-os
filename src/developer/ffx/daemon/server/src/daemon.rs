@@ -213,7 +213,7 @@ impl DaemonProtocolProvider for Daemon {
             .await
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
-        target.run_host_pipe();
+        target.run_host_pipe(&hoist::hoist().node());
         let events = target.events.clone();
         Ok((target, events))
     }
@@ -423,7 +423,7 @@ impl Daemon {
             bail!("Attempting to connect to RCS on a zedboot target: {}", nodename);
         }
         // Ensure auto-connect has at least started.
-        target.run_host_pipe();
+        target.run_host_pipe(&hoist::hoist().node());
         target
             .events
             .wait_for(None, |e| e == TargetEvent::RcsActivated)
@@ -562,11 +562,16 @@ impl Daemon {
                 match target_collection.upgrade() {
                     Some(target_collection) => {
                         for target in target_collection.targets() {
+                            #[cfg(test)]
+                            let skip_host_pipe =
+                                test::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
+                            #[cfg(not(test))]
+                            let skip_host_pipe = false;
                             // Manually-added remote targets will not be discovered by mDNS,
                             // and as a result will not have host-pipe triggered automatically
                             // by the mDNS event handler.
-                            if target.is_manual() {
-                                target.run_host_pipe();
+                            if target.is_manual() && !skip_host_pipe {
+                                target.run_host_pipe(&hoist::hoist().node());
                             }
                             target.expire_state();
                             if target.is_manual() && !target.is_connected() {
@@ -902,6 +907,9 @@ mod test {
         cell::RefCell, collections::BTreeSet, iter::FromIterator, str::FromStr, time::SystemTime,
     };
 
+    pub static SKIP_HOST_PIPE: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+
     fn spawn_test_daemon() -> (DaemonProxy, Daemon, Task<Result<()>>) {
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
@@ -1057,6 +1065,7 @@ mod test {
         assert_eq!(TargetConnectionState::Mdns(then), expiring_target.get_connection_state());
         assert_eq!(TargetConnectionState::Mdns(then), persistent_target.get_connection_state());
 
+        SKIP_HOST_PIPE.store(true, std::sync::atomic::Ordering::Relaxed);
         daemon.start_target_expiry(Duration::from_millis(1));
 
         while expiring_target.get_connection_state() == TargetConnectionState::Mdns(then) {
