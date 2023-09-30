@@ -190,24 +190,24 @@ class AmlogicDisplay
   // protocol before this is called.
   zx_status_t InitializeSysmemAllocator();
 
-  // Initializes the video output (Vout) hardware submodule of the Video
-  // Processing Unit. The type of display (MIPI-DSI or HDMI) is based on the
-  // panel metadata provided by the board driver.
+  // Allocates and initializes the video output (Vout) hardware submodule of
+  // the Video Processing Unit. The type of display (MIPI-DSI or HDMI) is based
+  // on the panel metadata provided by the board driver.
   //
   // Must be called once and only once per driver binding procedure.
-  // `vout_` must be already allocated and not yet initialized.
+  // `vout_` must not be allocated nor initialized.
   zx_status_t InitializeVout();
 
-  // A helper initializing the video output (Vout) hardware submodule for
-  // MIPI-DSI displays.
+  // A helper allocating and initializing the video output (Vout) hardware
+  // submodule for MIPI-DSI displays.
   //
-  // `vout_` must be already allocated and not yet initialized.
+  // `vout_` must not be allocated nor initialized.
   zx_status_t InitializeMipiDsiVout(display_panel_t panel_info);
 
-  // A helper initializing the video output (Vout) hardware submodule for HDMI
-  // displays.
+  // A helper allocating and initializing the video output (Vout) hardware
+  // submodule for HDMI displays.
   //
-  // `vout_` must be already allocated and not yet initialized.
+  // `vout_` must not be allocated nor initialized.
   zx_status_t InitializeHdmiVout();
 
   // Starts the Vsync interrupt handler thread.

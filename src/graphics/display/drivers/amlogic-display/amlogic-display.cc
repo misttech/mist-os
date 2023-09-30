@@ -1230,6 +1230,8 @@ zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
 }
 
 zx_status_t AmlogicDisplay::InitializeHdmiVout() {
+  ZX_DEBUG_ASSERT(vout_ == nullptr);
+
   zx::result<fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi>> hdmi_client_result =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
   if (hdmi_client_result.is_error()) {
@@ -1238,27 +1240,35 @@ zx_status_t AmlogicDisplay::InitializeHdmiVout() {
     return hdmi_client_result.status_value();
   }
 
-  zx::result<> init_hdmi_result = vout_->InitHdmi(parent_, std::move(hdmi_client_result.value()));
-  if (!init_hdmi_result.is_ok()) {
-    zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s", init_hdmi_result.status_string());
-    return init_hdmi_result.status_value();
+  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
+      Vout::CreateHdmiVout(parent_, std::move(hdmi_client_result.value()));
+  if (!create_hdmi_vout_result.is_ok()) {
+    zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
+           create_hdmi_vout_result.status_string());
+    return create_hdmi_vout_result.status_value();
   }
+  vout_ = std::move(create_hdmi_vout_result).value();
 
   root_node_.CreateUint("vout_type", vout_->type(), &inspector_);
   return ZX_OK;
 }
 
 zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
+  ZX_DEBUG_ASSERT(vout_ == nullptr);
+
   zxlogf(INFO, "Provided Display Info: %" PRIu32 " x %" PRIu32 " with panel type %" PRIu32,
          panel_info.width, panel_info.height, panel_info.panel_type);
   {
     fbl::AutoLock lock(&display_mutex_);
-    zx::result<> init_dsi_result =
-        vout_->InitDsi(parent_, panel_info.panel_type, panel_info.width, panel_info.height);
-    if (!init_dsi_result.is_ok()) {
-      zxlogf(ERROR, "Failed to initialize DSI Vout device: %s", init_dsi_result.status_string());
-      return init_dsi_result.status_value();
+    zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
+        Vout::CreateDsiVout(parent_, panel_info.panel_type, panel_info.width, panel_info.height);
+    if (!create_dsi_vout_result.is_ok()) {
+      zxlogf(ERROR, "Failed to initialize DSI Vout device: %s",
+             create_dsi_vout_result.status_string());
+      return create_dsi_vout_result.status_value();
     }
+    vout_ = std::move(create_dsi_vout_result).value();
+
     display_attached_ = true;
   }
 
@@ -1268,7 +1278,7 @@ zx_status_t AmlogicDisplay::InitializeMipiDsiVout(display_panel_t panel_info) {
 }
 
 zx_status_t AmlogicDisplay::InitializeVout() {
-  ZX_ASSERT(vout_ != nullptr);
+  ZX_ASSERT(vout_ == nullptr);
 
   display_panel_t panel_info;
   size_t actual_bytes;
@@ -1443,17 +1453,13 @@ zx_status_t AmlogicDisplay::Bind() {
     return status;
   }
 
-  fbl::AllocChecker ac;
-  vout_ = fbl::make_unique_checked<Vout>(&ac);
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
   status = InitializeVout();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to initalize Vout: %s", zx_status_get_string(status));
     return status;
   }
 
+  fbl::AllocChecker ac;
   vpu_ = fbl::make_unique_checked<Vpu>(&ac);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;

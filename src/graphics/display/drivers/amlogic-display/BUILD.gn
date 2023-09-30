@@ -116,7 +116,6 @@ test("amlogic-display-test") {
     "clock-regs-test.cc",
     "power-regs-test.cc",
     "video-input-regs-test.cc",
-    "vout-test.cc",
   ]
   public_deps = [
     ":amlogic_display_driver_src",

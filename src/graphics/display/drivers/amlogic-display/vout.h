@@ -23,11 +23,32 @@ enum VoutType { kDsi, kHdmi, kUnknown };
 
 class Vout : public ddk::I2cImplProtocol<Vout> {
  public:
-  Vout() = default;
-  zx::result<> InitDsi(zx_device_t* parent, uint32_t panel_type, uint32_t width, uint32_t height);
-  zx::result<> InitHdmi(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
+  // Returns a non-null pointer to the Vout instance outputting DSI signal on
+  // success.
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVout(zx_device_t* parent, uint32_t panel_type,
+                                                         uint32_t width, uint32_t height);
+
+  // Returns a non-null pointer to the Vout instance outputting HDMI signal on
+  // success.
+  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(
+      zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
+
   // Sets only the display size, feature bits and panel settings for testing.
-  zx::result<> InitDsiForTesting(uint32_t panel_type, uint32_t width, uint32_t height);
+  // Returns a non-null pointer to the Vout instance on success.
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVoutForTesting(uint32_t panel_type,
+                                                                   uint32_t width, uint32_t height);
+
+  // Creates a Vout instance that outputs MIPI-DSI signal.
+  Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
+       uint32_t height, display_setting_t display_setting);
+
+  // Creates a Vout instance that outputs HDMI signal.
+  explicit Vout(std::unique_ptr<HdmiHost> hdmi_host);
+
+  Vout(Vout&&) = delete;
+  Vout(const Vout&) = delete;
+  Vout& operator=(Vout&&) = delete;
+  Vout& operator=(const Vout&) = delete;
 
   void PopulateAddedDisplayArgs(
       added_display_args_t* args, display::DisplayId display_id,
