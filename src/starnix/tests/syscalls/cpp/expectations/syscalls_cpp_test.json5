@@ -35,6 +35,9 @@
 
                 // TODO(https://fxbug.dev/128842)
                 "VdsoTest.VdsoCanBeMadvised",
+
+                // TODO(b/302340440)
+                "ExtendedPstate.Signals",
             ],
         },
     ],
