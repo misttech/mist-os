@@ -22,6 +22,7 @@ use protocols::prelude::*;
 use std::{
     net::{IpAddr, SocketAddr, SocketAddrV4, SocketAddrV6},
     rc::Rc,
+    sync::Arc,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tasks::TaskManager;
@@ -87,6 +88,7 @@ async fn add_manual_target(
     tc: &TargetCollection,
     addr: SocketAddr,
     lifetime: Option<Duration>,
+    overnet_node: &Arc<overnet_core::Router>,
 ) -> Rc<Target> {
     tracing::debug!("Adding manual targets, addr: {addr:?}");
     // Expiry is the SystemTime (represented as seconds after the UNIX_EPOCH) at which a manual
@@ -123,13 +125,9 @@ async fn add_manual_target(
     }
 
     let target = tc.merge_insert(target);
-    #[cfg(test)]
-    let skip_host_pipe = tests::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
-    #[cfg(not(test))]
-    let skip_host_pipe = false;
-    if !skip_host_pipe && !is_fastboot_tcp {
+    if !is_fastboot_tcp {
         tracing::info!("Running host pipe");
-        target.run_host_pipe(&hoist::hoist().node());
+        target.run_host_pipe(overnet_node);
     }
     target
 }
@@ -155,7 +153,11 @@ async fn remove_manual_target(
 
 impl TargetCollectionProtocol {
     #[tracing::instrument(skip(self, tc))]
-    async fn load_manual_targets(&self, tc: &TargetCollection) {
+    async fn load_manual_targets(
+        &self,
+        tc: &TargetCollection,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) {
         // The FFX config value for a manual target contains a target ID (typically the IP:PORT
         // combo) and a timeout (which is None, if the target is indefinitely persistent).
         for (unparsed_addr, val) in self.manual_targets.get_or_default().await {
@@ -194,12 +196,19 @@ impl TargetCollectionProtocol {
                     } else {
                         lifetime_from_epoch - elapsed
                     };
-                    add_manual_target(self.manual_targets.clone(), tc, sa, Some(remaining)).await;
+                    add_manual_target(
+                        self.manual_targets.clone(),
+                        tc,
+                        sa,
+                        Some(remaining),
+                        overnet_node,
+                    )
+                    .await;
                 }
             } else {
                 // Manual targets without a lifetime are always reloaded.
                 tracing::debug!("Loading manual target: {:?}", sa);
-                add_manual_target(self.manual_targets.clone(), tc, sa, None).await;
+                add_manual_target(self.manual_targets.clone(), tc, sa, None, overnet_node).await;
             }
         }
     }
@@ -292,6 +301,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                             &target_collection,
                             addr,
                             None,
+                            &cx.overnet_node(),
                         )
                         .await;
                         return add_target_responder.success().map_err(Into::into);
@@ -324,9 +334,14 @@ impl FidlProtocol for TargetCollectionProtocol {
                     target_collection.clone(),
                     addr.clone(),
                 )));
-                let target =
-                    add_manual_target(self.manual_targets.clone(), &target_collection, addr, None)
-                        .await;
+                let target = add_manual_target(
+                    self.manual_targets.clone(),
+                    &target_collection,
+                    addr,
+                    None,
+                    &cx.overnet_node(),
+                )
+                .await;
                 // If the target is in fastboot then skip rcs
                 match target.get_connection_state() {
                     TargetConnectionState::Fastboot(_) => {
@@ -395,6 +410,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     &target_collection,
                     addr,
                     Some(Duration::from_secs(connect_timeout_seconds)),
+                    &cx.overnet_node(),
                 )
                 .await;
                 responder.send().map_err(Into::into)
@@ -454,17 +470,19 @@ impl FidlProtocol for TargetCollectionProtocol {
 
     async fn start(&mut self, cx: &Context) -> Result<()> {
         let target_collection = cx.get_target_collection().await?;
-        self.load_manual_targets(&target_collection).await;
+        let node = cx.overnet_node();
+        self.load_manual_targets(&target_collection, &node).await;
         let mdns = self.open_mdns_proxy(cx).await?;
         let fastboot = self.open_fastboot_target_stream_proxy(cx).await?;
         let tc = cx.get_target_collection().await?;
         let tc_clone = tc.clone();
+        let node_clone = Arc::clone(&node);
         self.tasks.spawn(async move {
             while let Ok(Some(e)) = mdns.get_next_event().await {
                 match *e {
                     ffx::MdnsEventType::TargetFound(t)
                     | ffx::MdnsEventType::TargetRediscovered(t) => {
-                        handle_discovered_target(&tc_clone, t);
+                        handle_discovered_target(&tc_clone, t, &node_clone);
                     }
                     _ => {}
                 }
@@ -495,7 +513,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                 if let Some(emu_target_action) = watcher.emulator_target_detected().await {
                     match emu_target_action {
                         EmulatorTargetAction::Add(emu_target) => {
-                            let target = handle_discovered_target(&tc2, emu_target);
+                            let target = handle_discovered_target(&tc2, emu_target, &node);
                             if let Some(t) = target {
                                 tracing::info!(
                                     "Emulator target added. {:?} state: {:?}",
@@ -542,7 +560,11 @@ fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget
 }
 
 #[tracing::instrument(skip(tc))]
-fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Option<Rc<Target>> {
+fn handle_discovered_target(
+    tc: &Rc<TargetCollection>,
+    t: ffx::TargetInfo,
+    overnet_node: &Arc<overnet_core::Router>,
+) -> Option<Rc<Target>> {
     tracing::debug!("Discovered target {t:?}");
     let ssh_address = t.ssh_address;
     let mut t = TargetInfo {
@@ -595,13 +617,9 @@ fn handle_discovered_target(tc: &Rc<TargetCollection>, t: ffx::TargetInfo) -> Op
         let new_target = Target::from_target_info(t);
         new_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
         let target = tc.merge_insert(new_target);
-        #[cfg(test)]
-        let skip_host_pipe = tests::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
-        #[cfg(not(test))]
-        let skip_host_pipe = false;
-        if !skip_host_pipe && !target.is_host_pipe_running() {
+        if !target.is_host_pipe_running() {
             tracing::debug!("Starting host_pipe for {:?}", &target.addrs());
-            target.run_host_pipe(&hoist::hoist().node());
+            target.run_host_pipe(overnet_node);
         } else {
             tracing::debug!("host pipe already running for {:?}", &target.addrs());
         }
@@ -623,12 +641,9 @@ mod tests {
     use std::{cell::RefCell, path::Path, str::FromStr};
     use tempfile::tempdir;
 
-    pub static SKIP_HOST_PIPE: std::sync::atomic::AtomicBool =
-        std::sync::atomic::AtomicBool::new(false);
-
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_non_fastboot() {
-        SKIP_HOST_PIPE.store(true, std::sync::atomic::Ordering::Relaxed);
+        let local_hoist = hoist::Hoist::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
         let tc = Rc::new(TargetCollection::new());
         tc.merge_insert(t.clone());
@@ -637,14 +652,15 @@ mod tests {
         handle_discovered_target(
             &tc,
             ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..Default::default() },
+            &local_hoist.node(),
         );
-        // TODO: Re-enable this
-        //assert!(t.is_host_pipe_running());
+        assert!(t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_fastboot() {
+        let local_hoist = hoist::Hoist::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
         let tc = Rc::new(TargetCollection::new());
         tc.merge_insert(t.clone());
@@ -658,6 +674,7 @@ mod tests {
                 fastboot_interface: Some(ffx::FastbootInterface::Tcp),
                 ..Default::default()
             },
+            &local_hoist.node(),
         );
         assert!(!t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Fastboot(t) if t > before_update);
@@ -743,9 +760,7 @@ mod tests {
             .set(json!(temp_dir.display().to_string()))
             .await
             .unwrap();
-        // Work around to make the host pipe connection not be able to
-        // built. Without this, we get a panic "'Tried to get overnet hoist before it was initialized'"
-        SKIP_HOST_PIPE.store(true, std::sync::atomic::Ordering::Relaxed);
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -903,7 +918,10 @@ mod tests {
             .unwrap();
         let target_collection =
             Context::new(fake_daemon.clone()).get_target_collection().await.unwrap();
-        tc_impl.borrow().load_manual_targets(&target_collection).await;
+        tc_impl
+            .borrow()
+            .load_manual_targets(&target_collection, &hoist::Hoist::new(None).unwrap().node())
+            .await;
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let res = list_targets(None, &proxy).await;
         assert_eq!(2, res.len());
@@ -1122,7 +1140,10 @@ mod tests {
         let target_collection = Context::new(fake_daemon).get_target_collection().await.unwrap();
         // This happens in FidlProtocol::start(), but we want to avoid binding the
         // network sockets in unit tests, thus not calling start.
-        tc_impl.borrow().load_manual_targets(&target_collection).await;
+        tc_impl
+            .borrow()
+            .load_manual_targets(&target_collection, &hoist::Hoist::new(None).unwrap().node())
+            .await;
 
         let target = target_collection.get("127.0.0.1:8022".to_string()).unwrap();
         assert_eq!(target.ssh_address(), Some("127.0.0.1:8022".parse::<SocketAddr>().unwrap()));

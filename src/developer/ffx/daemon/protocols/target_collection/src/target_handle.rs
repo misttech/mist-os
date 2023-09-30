@@ -44,8 +44,8 @@ struct TargetHandleInner {
 }
 
 impl TargetHandleInner {
-    #[tracing::instrument(skip(self, _cx))]
-    async fn handle(&self, _cx: &Context, req: ffx::TargetRequest) -> Result<()> {
+    #[tracing::instrument(skip(self, cx))]
+    async fn handle(&self, cx: &Context, req: ffx::TargetRequest) -> Result<()> {
         tracing::debug!("handling request {req:?}");
         match req {
             ffx::TargetRequest::GetSshLogs { responder } => {
@@ -102,14 +102,7 @@ impl TargetHandleInner {
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                #[cfg(test)]
-                let skip_host_pipe =
-                    crate::tests::SKIP_HOST_PIPE.load(std::sync::atomic::Ordering::Relaxed);
-                #[cfg(not(test))]
-                let skip_host_pipe = false;
-                if !skip_host_pipe {
-                    self.target.run_host_pipe(&hoist::hoist().node());
-                }
+                self.target.run_host_pipe(&cx.overnet_node());
                 let rcs = wait_for_rcs(&self.target).await?;
                 match rcs {
                     Ok(mut c) => {
@@ -350,6 +343,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_open_rcs_valid() {
         const TEST_NODE_NAME: &'static str = "villete";
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let local_hoist = Hoist::new(None).unwrap();
         let hoist2 = Hoist::new(None).unwrap();
         let (rx2, tx2) = fidl::Socket::create_stream();

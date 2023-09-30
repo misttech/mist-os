@@ -17,3 +17,5 @@ pub use context::{Context, DaemonProtocolProvider};
 pub use core_protocol_macros::ffx_protocol;
 pub use protocols::{FidlInstancedStreamHandler, FidlProtocol, FidlStreamHandler, StreamHandler};
 pub use register::{NameToStreamHandlerMap, ProtocolError, ProtocolRegister};
+
+pub use context::FAKE_OVERNET_NODES;

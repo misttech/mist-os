@@ -66,9 +66,19 @@ pub struct Context {
     inner: Rc<dyn DaemonProtocolProvider>,
 }
 
+pub static FAKE_OVERNET_NODES: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 impl Context {
     pub fn new(t: impl DaemonProtocolProvider + 'static) -> Self {
         Self { inner: Rc::new(t) }
+    }
+
+    pub fn overnet_node(&self) -> std::sync::Arc<overnet_core::Router> {
+        if FAKE_OVERNET_NODES.load(std::sync::atomic::Ordering::Relaxed) {
+            return hoist::Hoist::new(None).unwrap().node();
+        }
+        hoist::hoist().node()
     }
 
     pub async fn open_target_proxy<P>(
