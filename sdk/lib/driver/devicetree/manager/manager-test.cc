@@ -9,11 +9,11 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/devicetree/visitors/default/default.h>
+#include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/visitors/driver-visitor.h>
 
 #include <memory>
 #include <sstream>

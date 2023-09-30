@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_VISITORS_MULTIVISITOR_H_
-#define LIB_VISITORS_MULTIVISITOR_H_
+#ifndef LIB_DRIVER_DEVICETREE_VISITORS_MULTIVISITOR_H_
+#define LIB_DRIVER_DEVICETREE_VISITORS_MULTIVISITOR_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
 
@@ -34,10 +34,14 @@ class MultiVisitor : public Visitor {
   }
 
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+    zx::result<> final_status = zx::ok();
     for (size_t i = 0; i < visitors_.size(); i++) {
-      [[maybe_unused]] auto status = visitors_[i]->Visit(node, decoder);
+      auto status = visitors_[i]->Visit(node, decoder);
+      if (status.is_error()) {
+        final_status = zx::error(ZX_ERR_INTERNAL);
+      }
     }
-    return zx::ok();
+    return final_status;
   }
 
  private:
@@ -46,4 +50,4 @@ class MultiVisitor : public Visitor {
 
 }  // namespace fdf_devicetree
 
-#endif  // LIB_VISITORS_MULTIVISITOR_H_
+#endif  // LIB_DRIVER_DEVICETREE_VISITORS_MULTIVISITOR_H_

@@ -23,6 +23,7 @@ devicetree("example-board-dt") {
   golden = "dts/example-board.golden.dts"
   outputs = [ "$target_out_dir/example-board.dtb" ]
   deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
+  visitors = [ "//sdk/lib/driver/devicetree/examples/example-visitor" ]
 }
 
 fuchsia_driver("example-board-driver") {
@@ -34,6 +35,7 @@ fuchsia_driver("example-board-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:load-visitors",
     "//sdk/lib/driver/devicetree/visitors/default",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bin/driver_runtime",
@@ -41,7 +43,10 @@ fuchsia_driver("example-board-driver") {
 }
 
 fuchsia_driver_component("example-board") {
-  deps = [ ":example-board-driver" ]
+  deps = [
+    ":example-board-driver",
+    ":example-board-dt.visitors",
+  ]
   info = "example-board-info.json"
   manifest = "meta/example-board.cml"
 }

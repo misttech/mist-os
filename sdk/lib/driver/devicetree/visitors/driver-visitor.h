@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_VISITORS_DRIVER_VISITOR_H_
-#define LIB_VISITORS_DRIVER_VISITOR_H_
+#ifndef LIB_DRIVER_DEVICETREE_VISITORS_DRIVER_VISITOR_H_
+#define LIB_DRIVER_DEVICETREE_VISITORS_DRIVER_VISITOR_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
 #include <lib/fit/function.h>
@@ -50,4 +50,4 @@ class DriverVisitor : public Visitor {
 
 }  // namespace fdf_devicetree
 
-#endif  // LIB_VISITORS_DRIVER_VISITOR_H_
+#endif  // LIB_DRIVER_DEVICETREE_VISITORS_DRIVER_VISITOR_H_

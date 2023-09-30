@@ -6,7 +6,7 @@
 #ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_DEFAULT_H_
 #define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_DEFAULT_H_
 
-#include <lib/visitors/multivisitor.h>
+#include <lib/driver/devicetree/visitors/multivisitor.h>
 
 #include "bind-property.h"
 #include "bti.h"

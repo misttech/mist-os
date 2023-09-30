@@ -2,23 +2,44 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-config("visitor.headers") {
-  include_dirs = [ "include" ]
+source_set("registry") {
+  public = [ "registry.h" ]
+  public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
+}
+
+source_set("load-visitors") {
+  sources = [ "load-visitors.cc" ]
+
+  public = [ "load-visitors.h" ]
+
+  deps = [
+    ":registration",
+    "default:default",
+    "//sdk/lib/driver/logging/cpp",
+  ]
+
+  public_deps = [
+    ":registry",
+    "//sdk/lib/driver/incoming/cpp",
+  ]
 }
 
 source_set("driver-visitor") {
   sources = [ "driver-visitor.cc" ]
-  public = [ "include/lib/visitors/driver-visitor.h" ]
+  public = [ "driver-visitor.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
     "//zircon/system/ulib/zx",
   ]
-  public_configs = [ ":visitor.headers" ]
 }
 
 source_set("multivisitor") {
-  public = [ "include/lib/visitors/multivisitor.h" ]
+  public = [ "multivisitor.h" ]
   public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
-  public_configs = [ ":visitor.headers" ]
+}
+
+source_set("registration") {
+  public = [ "registration.h" ]
+  public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
 }

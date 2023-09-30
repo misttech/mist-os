@@ -276,12 +276,77 @@ template("dts") {
   }
 }
 
+# Defines a devicetree visitor target.
+#
+# Parameters
+#
+#   * sources
+#     - Required: Device tree visitor source files (.cc and .h) that will be
+#       used to parse the devicetree related to the schema.
+#       TODO(fxbug.dev/133362) Generate the visitor from schema file.
+#     - Type: List(path).
+#
+#   * deps
+#     - Optional: Usual GN meaning.
+#
+template("devicetree_visitor") {
+  loadable_module(target_name) {
+    # Save the target name as forward_variables_from below might override it.
+    _target_name = target_name
+
+    forward_variables_from(invoker, "*")
+
+    if (!defined(output_dir)) {
+      output_dir = root_out_dir
+    }
+    if (!defined(output_name)) {
+      output_name = _target_name
+    }
+    if (!defined(output_extension)) {
+      output_extension = "so"
+    }
+
+    _output_file_name = output_name
+    if (output_extension != "") {
+      _output_file_name += ".$output_extension"
+    }
+    _output_file = "$output_dir/$_output_file_name"
+    _rebased_output_file = rebase_path(_output_file, root_build_dir)
+
+    if (!defined(ldflags)) {
+      ldflags = []
+    }
+
+    _version_script = "//build/devicetree/visitor.ld"
+    ldflags += [ "-Wl,--version-script=" +
+                 rebase_path(_version_script, root_build_dir) ]
+
+    metadata = {
+      devicetree_barrier = []
+
+      # Used by the distribution_manifest template.
+      distribution_entries = [
+        {
+          source = _rebased_output_file
+          destination = "lib/visitors/$_output_file_name"
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          elf_runtime_dir = "lib/${toolchain_variant.libprefix}"
+        },
+      ]
+    }
+  }
+}
+
 # Defines a devicetree to be built into a devicetree blob.
 #
-# There are two public targets. The main target compiles the devicetree source
-# and runs all the necessary verification checks. The additional target
-# "$target_name.dtb" can be used to get the output devicetree blob using
-# `get_target_output("$target_name.dtb")`.
+# There are three public targets -
+# 1. The main target compiles the devicetree source and runs all the necessary
+# verification checks.
+# 2. The target "$target_name.dtb" can be used to get the output devicetree
+# blob using `get_target_output("$target_name.dtb")`.
+# 3. The target "$target_name.visitors" can be used to compile and add all the
+# visitor libraries into the board driver package. The visitors can be loaded
+# at runtime using the load-visitors library by the board driver.
 #
 # Parameters
 #
@@ -297,7 +362,13 @@ template("dts") {
 #       indirectly by the includes and headers.
 #
 #   * deps
-#     - Optional: Other devicetree fragment targets referenced by the source.
+#     - Optional: Other devicetree fragments and header file targets referenced
+#       by the source.
+#     - Type: list(label)
+#     - Default: []
+#
+#   * visitors
+#     - Optional: Devicetree visitor targets related to the source.
 #     - Type: list(label)
 #     - Default: []
 #
@@ -309,6 +380,8 @@ template("dts") {
 #
 template("devicetree") {
   compiled_dtb_target = "$target_name.dtb"
+
+  visitors_target = "$target_name.visitors"
 
   decompiled_dts_target = "_devicetree.$target_name.decompiled"
 
@@ -343,6 +416,12 @@ template("devicetree") {
         candidate = dts_outputs[0]
       },
     ]
+  }
+
+  group(visitors_target) {
+    if (defined(invoker.visitors)) {
+      deps = invoker.visitors
+    }
   }
 
   group(target_name) {

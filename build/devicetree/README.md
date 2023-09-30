@@ -12,6 +12,16 @@ GN templates and scripts for compiling device tree source files and validating a
   }
   ```
 
+* Define a "devicetree_visitor" to provide visitors for devicetree validation and parsing.
+See //src/devices/devicetree/example for detailed illustration.
+  ```
+  import("//build/devicetree/devicetree.gni")
+
+  devicetree_visitor("device-x") {
+    sources = [ "device-x-visitor.h", "device-x-visitor.cc" ]
+  }
+  ```
+
 * Use "devicetree" template to compile a device tree source file for a board. This additionally compares the resulting dts file with a golden.
   ```
   import("//build/devicetree/devicetree.gni")
@@ -20,12 +30,16 @@ GN templates and scripts for compiling device tree source files and validating a
     sources = [ "dts/board-x.dts" ]
     # Dependencies for fragments referenced in board-x.dts
     deps = [ ":chipset-x" ]
+    visitors = [ ":device-x" ]
     golden = "dts/board-x.golden.dts"
   }
   ```
   The output dtb is available by default at `get_target_outputs(":board-x.dtb")` which is equivalent
   to `$target_out_dir/board-x.dtb`. The output path can also be specified by defining `outputs`
   variable during invocation.
+
+  The collection of visitors listed in `visitors` is grouped under `$target_name.visitors` label. This
+  should be added as dependency to the board driver package to include the visitor libraries in it.
 
 * Use "dtb" to compile a `.dts/.dts.S` file into `.dtb`.
   ```
