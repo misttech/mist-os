@@ -36,7 +36,7 @@ func TestCreateAndEditPackage(t *testing.T) {
 		t.Fatalf("%s should not be found in package", newResource)
 	}
 
-	pkg, err := pkgRepo.EditPackage(ctx, fullPkgName, "testpackage_prime/0", func(tempDir string) error {
+	pkg, err := pkgRepo.EditPackage(ctx, srcPkg, "testpackage_prime/0", func(tempDir string) error {
 		contents := bytes.NewReader([]byte(newResource))
 		data, err := io.ReadAll(contents)
 		if err != nil {

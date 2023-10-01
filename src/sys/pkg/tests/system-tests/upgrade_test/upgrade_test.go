@@ -16,7 +16,6 @@ import (
 	"testing"
 	"time"
 
-	pmBuild "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/check"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/flash"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/pave"
@@ -188,7 +187,7 @@ func doTestOTAs(
 	}
 
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImageMerkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
+	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -200,7 +199,7 @@ func doTestOTAs(
 	var lastError error
 	for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
 		logger.Infof(ctx, "checking device version (attempt %d of %d)", attempt, c.downgradeOTAAttempts)
-		upToDate, lastError = check.IsDeviceUpToDate(ctx, device, expectedSystemImageMerkle)
+		upToDate, lastError = check.IsDeviceUpToDate(ctx, device, expectedSystemImage)
 		if lastError == nil {
 			logger.Infof(ctx, "Got device version, upToDate: %t", upToDate)
 			break
@@ -317,7 +316,7 @@ func initializeDevice(
 	startTime := time.Now()
 
 	var repo *packages.Repository
-	var expectedSystemImageMerkle *pmBuild.MerkleRoot
+	var expectedSystemImage *packages.Package
 	var err error
 
 	if build != nil {
@@ -332,11 +331,11 @@ func initializeDevice(
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}
 
-		merkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
+		systemImage, err := repo.LookupUpdateSystemImage(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 		}
-		expectedSystemImageMerkle = &merkle
+		expectedSystemImage = &systemImage
 	}
 
 	if err := script.RunScript(ctx, device, repo, nil, c.beforeInitScript); err != nil {
@@ -345,7 +344,7 @@ func initializeDevice(
 
 	if build != nil {
 		// Only pave if the device is not running the expected version.
-		upToDate, err := check.IsDeviceUpToDate(ctx, device, *expectedSystemImageMerkle)
+		upToDate, err := check.IsDeviceUpToDate(ctx, device, *expectedSystemImage)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
 		}
@@ -388,7 +387,7 @@ func initializeDevice(
 		ctx,
 		device,
 		rpcClient,
-		expectedSystemImageMerkle,
+		expectedSystemImage,
 		expectedConfig,
 		true,
 	); err != nil {
@@ -415,9 +414,9 @@ func systemOTA(
 	checkABR bool,
 	checkForUnknownFirmware bool,
 ) error {
-	expectedSystemImageMerkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
+	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
 	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return fmt.Errorf("error extracting expected system image: %w", err)
 	}
 
 	return otaToPackage(
@@ -425,7 +424,7 @@ func systemOTA(
 		device,
 		rpcClient,
 		repo,
-		expectedSystemImageMerkle,
+		expectedSystemImage,
 		"fuchsia-pkg://fuchsia.com/update/0",
 		checkABR,
 		checkForUnknownFirmware,
@@ -465,49 +464,69 @@ func buildAndOtaToPackage(
 		return fmt.Errorf("failed to intialize ZBITool: %q", err)
 	}
 
-	systemImagePrime := "system_image_prime/0"
-	systemImagePrimePkg, err := repo.EditPackage(ctx, "system_image/0", systemImagePrime, func(tempDir string) error {
-		newResource := "Hello World!"
-		contents := bytes.NewReader([]byte(newResource))
-		data, err := io.ReadAll((contents))
-		if err != nil {
-			return fmt.Errorf("failed to read new content %q %w", systemImagePrime, err)
-		}
-
-		tempPath := filepath.Join(tempDir, "dummy2.txt")
-		if err := os.MkdirAll(filepath.Dir(tempPath), os.ModePerm); err != nil {
-			return fmt.Errorf("failed to create parent directories for %q: %w", tempPath, err)
-		}
-
-		if err := os.WriteFile(tempPath, data, 0644); err != nil {
-			return fmt.Errorf("failed to write new data for %q to %q: %w", systemImagePrime, tempPath, err)
-		}
-
-		return nil
-	})
-
+	srcUpdate, err := repo.OpenPackage(ctx, "update/0")
 	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", systemImagePrime, err)
+		return fmt.Errorf("failed to open update/0 package: %w", err)
 	}
 
-	systemImagePrimeMerkle := systemImagePrimePkg.Merkle()
+	srcSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to open system_image/0 from %s update package: %w",
+			srcUpdate.Path(),
+			err,
+		)
+	}
 
-	updatePrime := "update_prime/0"
+	dstSystemImagePath := "system_image_prime/0"
+	dstSystemImage, err := repo.EditPackage(
+		ctx,
+		srcSystemImage,
+		dstSystemImagePath,
+		func(tempDir string) error {
+			newResource := "Hello World!"
+			contents := bytes.NewReader([]byte(newResource))
+			data, err := io.ReadAll((contents))
+			if err != nil {
+				return fmt.Errorf("failed to read new content %q: %w", srcSystemImage.Path(), err)
+			}
+
+			tempPath := filepath.Join(tempDir, "dummy2.txt")
+			if err := os.MkdirAll(filepath.Dir(tempPath), os.ModePerm); err != nil {
+				return fmt.Errorf("failed to create parent directories for %q: %w", tempPath, err)
+			}
+
+			if err := os.WriteFile(tempPath, data, 0600); err != nil {
+				return fmt.Errorf(
+					"failed to write new data for %q to %q: %w",
+					dstSystemImagePath,
+					tempPath,
+					err,
+				)
+			}
+
+			return nil
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create the %q package: %w", dstSystemImagePath, err)
+	}
+
+	dstUpdatePath := "update_prime/0"
 	_, err = repo.EditUpdatePackageWithNewSystemImageMerkle(
 		ctx,
 		avbTool,
 		zbiTool,
-		systemImagePrimeMerkle,
-		"update/0",
-		updatePrime,
+		dstSystemImage.Merkle(),
+		srcUpdate,
+		dstUpdatePath,
 		c.bootfsCompression,
 		func(path string) error {
 			return nil
 		},
 	)
-
 	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", updatePrime, err)
+		return fmt.Errorf("failed to create the %q package: %w", dstUpdatePath, err)
 	}
 
 	return otaToPackage(
@@ -515,8 +534,8 @@ func buildAndOtaToPackage(
 		device,
 		rpcClient,
 		repo,
-		systemImagePrimeMerkle,
-		"fuchsia-pkg://fuchsia.com/update_prime/0",
+		dstSystemImage,
+		fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s", dstUpdatePath),
 		checkABR,
 		true,
 	)
@@ -527,7 +546,7 @@ func otaToPackage(
 	device *device.Client,
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
-	expectedSystemImageMerkle pmBuild.MerkleRoot,
+	dstSystemImage packages.Package,
 	updatePackageURL string,
 	checkABR bool,
 	checkForUnknownFirmware bool,
@@ -537,12 +556,15 @@ func otaToPackage(
 		return fmt.Errorf("error determining target config: %w", err)
 	}
 
-	upToDate, err := check.IsDeviceUpToDate(ctx, device, expectedSystemImageMerkle)
+	upToDate, err := check.IsDeviceUpToDate(ctx, device, dstSystemImage)
 	if err != nil {
 		return fmt.Errorf("failed to check if device is up to date: %w", err)
 	}
 	if upToDate {
-		return fmt.Errorf("device already updated to the expected version %q", expectedSystemImageMerkle)
+		return fmt.Errorf(
+			"device already updated to the expected version %q",
+			dstSystemImage.Merkle(),
+		)
 	}
 
 	u, err := c.installerConfig.Updater(repo, updatePackageURL, checkForUnknownFirmware)
@@ -574,7 +596,7 @@ func otaToPackage(
 		ctx,
 		device,
 		*rpcClient,
-		&expectedSystemImageMerkle,
+		&dstSystemImage,
 		expectedConfig,
 		checkABR,
 	); err != nil {

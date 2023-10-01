@@ -156,44 +156,44 @@ func (r *Repository) Serve(ctx context.Context, localHostname string, repoName s
 	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName, repoPort)
 }
 
-func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (build.MerkleRoot, error) {
-	return r.lookupUpdateContentPackageMerkle(ctx, "update/0", "system_image/0")
+func (r *Repository) LookupUpdateSystemImage(ctx context.Context) (Package, error) {
+	return r.lookupUpdateContentPackage(ctx, "update/0", "system_image/0")
 }
 
-func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (build.MerkleRoot, error) {
-	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime/0", "system_image/0")
+func (r *Repository) LookupUpdatePrimeSystemImage(ctx context.Context) (Package, error) {
+	return r.lookupUpdateContentPackage(ctx, "update_prime/0", "system_image/0")
 }
 
 func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle build.MerkleRoot) error {
-	systemImageMerkle, err := r.LookupUpdateSystemImageMerkle(ctx)
+	systemImage, err := r.LookupUpdateSystemImage(ctx)
 	if err != nil {
 		return err
 	}
-	if merkle == systemImageMerkle {
+	if merkle == systemImage.Merkle() {
 		return nil
 	}
 
-	systemPrimeImage2Merkle, err := r.LookupUpdatePrimeSystemImage2Merkle(ctx)
+	systemPrimeImage, err := r.LookupUpdatePrimeSystemImage(ctx)
 	if err != nil {
 		return err
 	}
-	if merkle == systemPrimeImage2Merkle {
+	if merkle == systemPrimeImage.Merkle() {
 		return nil
 	}
 
 	return fmt.Errorf("expected device to be running a system image of %s or %s, got %s",
-		systemImageMerkle, systemPrimeImage2Merkle, merkle)
+		systemImage.Merkle(), systemPrimeImage.Merkle(), merkle)
 }
 
-func (r *Repository) lookupUpdateContentPackageMerkle(
+func (r *Repository) lookupUpdateContentPackage(
 	ctx context.Context,
 	updatePackageName string,
 	contentPackageName string,
-) (build.MerkleRoot, error) {
+) (Package, error) {
 	// Extract the "packages" file from the "update" package.
 	p, err := r.OpenPackage(ctx, updatePackageName)
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf(
+		return Package{}, fmt.Errorf(
 			"failed to open package %s: %w",
 			updatePackageName,
 			err,
@@ -201,7 +201,7 @@ func (r *Repository) lookupUpdateContentPackageMerkle(
 	}
 	f, err := p.Open(ctx, "packages.json")
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf(
+		return Package{}, fmt.Errorf(
 			"failed to open packages.json in %s: %w",
 			updatePackageName,
 			err,
@@ -210,7 +210,7 @@ func (r *Repository) lookupUpdateContentPackageMerkle(
 
 	packages, err := util.ParsePackagesJSON(f)
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf(
+		return Package{}, fmt.Errorf(
 			"failed to parse packages.json from %s: %w",
 			updatePackageName,
 			err,
@@ -219,14 +219,14 @@ func (r *Repository) lookupUpdateContentPackageMerkle(
 
 	merkleRoot, ok := packages[contentPackageName]
 	if !ok {
-		return build.MerkleRoot{}, fmt.Errorf(
+		return Package{}, fmt.Errorf(
 			"could not find merkle for %s in %s",
 			contentPackageName,
 			updatePackageName,
 		)
 	}
 
-	return merkleRoot, nil
+	return newPackage(ctx, r, contentPackageName, merkleRoot)
 }
 
 // CreatePackage creates a package in this repository named `packagePath` by:
@@ -238,42 +238,42 @@ func (r *Repository) CreatePackage(
 	ctx context.Context,
 	packagePath string,
 	createFunc func(path string) error,
-) (build.MerkleRoot, error) {
+) (Package, error) {
 	logger.Infof(ctx, "creating package %q", packagePath)
 
 	// Extract the package name from the path. The variant currently is optional, but if specified, must be "0".
 	packageName, packageVariant, found := strings.Cut(packagePath, "/")
 	if found && packageVariant != "0" {
-		return build.MerkleRoot{}, fmt.Errorf("invalid package path found: %q", packagePath)
+		return Package{}, fmt.Errorf("invalid package path found: %q", packagePath)
 	}
 	packageVariant = "0"
 
 	// Create temp directory. The content of this directory will be included in the package.
 	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf("failed to create a temp directory: %w", err)
+		return Package{}, fmt.Errorf("failed to create a temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	// Package content will be created by the user by leveraging the createFunc closure.
 	if err := createFunc(tempDir); err != nil {
-		return build.MerkleRoot{}, fmt.Errorf("failed to create content of the package: %w", err)
+		return Package{}, fmt.Errorf("failed to create content of the package: %w", err)
 	}
 
 	// Create package from the temp directory. The package builder doesn't use
 	// the repository name, so it can be set as `testrepository.com`.
 	pkgBuilder, err := NewPackageBuilderFromDir(tempDir, packageName, packageVariant, "testrepository.com")
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf("failed to parse the package from %q: %w", tempDir, err)
+		return Package{}, fmt.Errorf("failed to parse the package from %q: %w", tempDir, err)
 	}
 
-	// Publish the package and ger the merkle of the package.
-	_, pkgMerkle, err := pkgBuilder.Publish(ctx, r)
+	// Publish the package and get the merkle of the package.
+	pkg, err := pkgBuilder.Publish(ctx, r)
 	if err != nil {
-		return build.MerkleRoot{}, fmt.Errorf("failed to publish the package %q: %w", packagePath, err)
+		return Package{}, fmt.Errorf("failed to publish the package %q: %w", packagePath, err)
 	}
 
-	return pkgMerkle, nil
+	return pkg, nil
 }
 
 // EditPackage takes the content of the source package from srcPackagePath,
@@ -281,36 +281,23 @@ func (r *Repository) CreatePackage(
 // content at destination with the help of editFunc closure.
 func (r *Repository) EditPackage(
 	ctx context.Context,
-	srcPackagePath string,
+	srcPackage Package,
 	dstPackagePath string,
 	editFunc func(path string) error,
 ) (Package, error) {
-	logger.Infof(ctx, "editing package %q. will create %q", srcPackagePath, dstPackagePath)
-
-	// First get the source package located at srcPackagePath
-	pkg, err := r.OpenPackage(ctx, srcPackagePath)
-	if err != nil {
-		return Package{}, fmt.Errorf("failed to open the package %q: %w", srcPackagePath, err)
-	}
+	logger.Infof(ctx, "editing package %q. will create %q", srcPackage.Path(), dstPackagePath)
 
 	// Next create a destination package based on the content oft the source package.
-	pkgMerkle, err := r.CreatePackage(ctx, dstPackagePath, func(tempDir string) error {
-		if err := pkg.Expand(ctx, tempDir); err != nil {
+	pkg, err := r.CreatePackage(ctx, dstPackagePath, func(tempDir string) error {
+		if err := srcPackage.Expand(ctx, tempDir); err != nil {
 			return fmt.Errorf("failed to expand the package to %s: %w", tempDir, err)
 		}
 
 		// User can edit the content and return it.
 		return editFunc(tempDir)
 	})
-
 	if err != nil {
 		return Package{}, fmt.Errorf("failed to create the package %q: %w", dstPackagePath, err)
-	}
-
-	// Get the newly edited package located at pkgMerkle and return it.
-	pkg, err = newPackage(ctx, r, dstPackagePath, pkgMerkle)
-	if err != nil {
-		return Package{}, fmt.Errorf("failed to edit the package %q: %w", pkgMerkle, err)
 	}
 
 	return pkg, nil
@@ -321,12 +308,12 @@ func (r *Repository) EditPackage(
 func (r *Repository) EditUpdatePackageWithVBMetaProperties(
 	ctx context.Context,
 	avbTool *avb.AVBTool,
-	srcUpdatePackage string,
-	dstUpdatePackage string,
+	srcUpdatePackage Package,
+	dstUpdatePackagePath string,
 	repoName string,
 	vbmetaPropertyFiles map[string]string,
 	editFunc func(path string) error) (Package, error) {
-	return r.EditPackage(ctx, srcUpdatePackage, dstUpdatePackage, func(tempDir string) error {
+	return r.EditPackage(ctx, srcUpdatePackage, dstUpdatePackagePath, func(tempDir string) error {
 		if err := editFunc(tempDir); err != nil {
 			return err
 		}
@@ -381,8 +368,8 @@ func (r *Repository) EditUpdatePackage(
 	ctx context.Context,
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
-	srcUpdatePackage string,
-	dstUpdatePackage string,
+	srcUpdatePackage Package,
+	dstUpdatePackagePath string,
 	repoName string,
 	editFunc func(path string) error,
 ) (Package, error) {
@@ -392,7 +379,7 @@ func (r *Repository) EditUpdatePackage(
 		ctx,
 		avbTool,
 		srcUpdatePackage,
-		dstUpdatePackage,
+		dstUpdatePackagePath,
 		repoName,
 		vbmetaPropertyFiles,
 		func(path string) error {
@@ -405,16 +392,18 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
 	systemImageMerkle build.MerkleRoot,
-	srcUpdatePackagePath string,
+	srcUpdatePackage Package,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
 	editFunc func(path string) error,
 ) (Package, error) {
 	repoName := "fuchsia.com"
 
-	return r.EditUpdatePackage(ctx,
-		avbTool, zbiTool,
-		srcUpdatePackagePath,
+	return r.EditUpdatePackage(
+		ctx,
+		avbTool,
+		zbiTool,
+		srcUpdatePackage,
 		dstUpdatePackagePath,
 		repoName,
 		func(tempDir string) error {

@@ -200,19 +200,19 @@ func TestPublish(t *testing.T) {
 	pkgBuilder.AddResource(newResource, bytes.NewReader([]byte(newResource)))
 
 	// Update repo with updated package. We don't check the merkle since the package includes randomly generated files.
-	actualPkgName, pkgMerkle, err := pkgBuilder.Publish(ctx, pkgRepo)
+	actualPkg, err := pkgBuilder.Publish(ctx, pkgRepo)
 	if err != nil {
 		t.Fatalf("Publishing package failed. %s", err)
 	}
 
-	if actualPkgName != fullPkgName {
-		t.Fatalf("package path should be %q, not %q", fullPkgName, actualPkgName)
+	if actualPkg.Path() != fullPkgName {
+		t.Fatalf("package path should be %q, not %q", fullPkgName, actualPkg.Path())
 	}
 
 	deliveryBlobType := 1
-	_, err = pkgRepo.BlobStore.OpenBlob(ctx, &deliveryBlobType, pkgMerkle)
+	_, err = pkgRepo.BlobStore.OpenBlob(ctx, &deliveryBlobType, actualPkg.Merkle())
 	if err != nil {
-		t.Fatalf("Delivery blob does not exist '%s'. %s", pkgMerkle, err)
+		t.Fatalf("Delivery blob does not exist '%s'. %s", actualPkg.Merkle(), err)
 	}
 
 	ffx, err := ffx.NewFFXTool("host-tools/ffx")

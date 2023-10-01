@@ -228,12 +228,12 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 	}
 	defer pkgBuilder.Close()
 
-	pkgPath, pkgMerkle, err := pkgBuilder.Publish(ctx, u.repo)
+	pkg, err := pkgBuilder.Publish(ctx, u.repo)
 	if err != nil {
 		return fmt.Errorf("Failed to publish update package: %w", err)
 	}
 
-	logger.Infof(ctx, "published %q as %q to %q", pkgPath, pkgMerkle, u.repo)
+	logger.Infof(ctx, "published %q as %q to %q", pkg.Path(), pkg.Merkle(), u.repo)
 
 	server, err := c.ServePackageRepository(ctx, u.repo, repoName, true, nil)
 	if err != nil {
@@ -387,14 +387,14 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	}
 	defer pkgBuilder.Close()
 
-	pkgPath, pkgMerkle, err := pkgBuilder.Publish(ctx, u.repo)
+	pkg, err = pkgBuilder.Publish(ctx, u.repo)
 	if err != nil {
 		return fmt.Errorf("Failed to publish update package: %w", err)
 	}
 
-	logger.Infof(ctx, "published %q as %q to %q", pkgPath, pkgMerkle, u.repo)
+	logger.Infof(ctx, "published %q as %q to %q", pkg.Path(), pkg.Merkle(), u.repo)
 
-	omahaPackageURL := fmt.Sprintf("fuchsia-pkg://trigger-ota/%s?hash=%s", pkgPath, pkgMerkle)
+	omahaPackageURL := fmt.Sprintf("fuchsia-pkg://trigger-ota/%s?hash=%s", pkg.Path(), pkg.Merkle())
 
 	// Configure the Omaha server with the new omaha package URL.
 	if err := u.omahaTool.SetPkgURL(ctx, omahaPackageURL); err != nil {
