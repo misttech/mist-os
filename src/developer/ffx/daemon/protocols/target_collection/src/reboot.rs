@@ -27,6 +27,7 @@ use std::net::IpAddr;
 use std::process::Command;
 use std::rc::Rc;
 use std::rc::Weak;
+use std::sync::Arc;
 use tasks::TaskManager;
 
 // TODO(125639): Remove when Power Manager stabilizes
@@ -42,33 +43,27 @@ pub(crate) struct RebootController {
     fastboot_proxy: Once<ffx::FastbootProxy>,
     admin_proxy: Once<AdminProxy>,
     tasks: TaskManager,
+    overnet_node: Arc<overnet_core::Router>,
 }
 
 impl RebootController {
-    pub(crate) fn new(target: Rc<Target>) -> Self {
+    pub(crate) fn new(target: Rc<Target>, overnet_node: Arc<overnet_core::Router>) -> Self {
         Self {
             target,
             remote_proxy: Once::new(),
             fastboot_proxy: Once::new(),
             admin_proxy: Once::new(),
             tasks: Default::default(),
+            overnet_node,
         }
     }
 
     async fn get_remote_proxy(&self) -> Result<RemoteControlProxy> {
-        #[cfg(test)]
-        let node = if protocols::FAKE_OVERNET_NODES.load(std::sync::atomic::Ordering::Relaxed) {
-            hoist::Hoist::new(None).unwrap().node()
-        } else {
-            hoist::hoist().node()
-        };
-        #[cfg(not(test))]
-        let node = hoist::hoist().node();
         // TODO(awdavies): Factor out init_remote_proxy from the target, OR
         // move the impl(s) here that rely on remote control to use init_remote_proxy
         // instead.
         self.remote_proxy
-            .get_or_try_init(self.target.init_remote_proxy(&node))
+            .get_or_try_init(self.target.init_remote_proxy(&self.overnet_node))
             .await
             .map(|proxy| proxy.clone())
     }
@@ -110,10 +105,9 @@ impl RebootController {
     ) -> Result<()> {
         let mut fastboot_manager = Fastboot::new(self.target.clone());
         let stream = fastboot.into_stream()?;
+        let overnet_node = Arc::clone(&self.overnet_node);
         self.tasks.spawn(async move {
-            match fastboot_manager
-                .handle_fastboot_requests_from_stream(stream, &hoist::hoist().node())
-                .await
+            match fastboot_manager.handle_fastboot_requests_from_stream(stream, &overnet_node).await
             {
                 Ok(_) => tracing::trace!("Fastboot proxy finished - client disconnected"),
                 Err(e) => tracing::error!("Handling fastboot requests: {:?}", e),
@@ -444,6 +438,7 @@ mod tests {
     }
 
     async fn setup() -> (Rc<Target>, TargetProxy) {
+        let overnet_node = hoist::Hoist::new(None).unwrap().node();
         let target = Target::new_named("scooby-dooby-doo");
         let fastboot_proxy = Once::new();
         let _ = fastboot_proxy.get_or_init(setup_fastboot()).await;
@@ -456,6 +451,7 @@ mod tests {
             remote_proxy,
             admin_proxy,
             tasks: Default::default(),
+            overnet_node,
         };
         let (proxy, mut stream) = create_proxy_and_stream::<TargetMarker>().unwrap();
         fuchsia_async::Task::local(async move {
@@ -474,7 +470,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_product() -> Result<()> {
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Product)
@@ -484,7 +479,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_recovery() -> Result<()> {
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Recovery)
@@ -494,7 +488,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_bootloader() -> Result<()> {
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Bootloader)

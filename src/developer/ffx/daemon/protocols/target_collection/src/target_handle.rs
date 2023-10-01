@@ -25,7 +25,7 @@ impl TargetHandle {
         cx: Context,
         handle: ServerEnd<ffx::TargetMarker>,
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
-        let reboot_controller = reboot::RebootController::new(target.clone());
+        let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node());
         let inner = TargetHandleInner { target, reboot_controller };
         let stream = handle.into_stream()?;
         let fut = Box::pin(async move {
@@ -249,6 +249,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_valid_target_state() {
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         const TEST_SOCKETADDR: &'static str = "[fe80::1%1]:22";
         let daemon = FakeDaemonBuilder::new().build();
         let cx = Context::new(daemon);
