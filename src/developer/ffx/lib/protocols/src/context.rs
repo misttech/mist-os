@@ -11,6 +11,7 @@ use fidl::endpoints::Proxy;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::rc::Rc;
+use std::sync::Arc;
 
 #[async_trait(?Send)]
 pub trait DaemonProtocolProvider {
@@ -23,6 +24,10 @@ pub trait DaemonProtocolProvider {
         moniker: &str,
         capability_name: &str,
     ) -> Result<fidl::Channel>;
+
+    fn overnet_node(&self) -> Result<Arc<overnet_core::Router>> {
+        unimplemented!()
+    }
 
     async fn open_remote_control(
         &self,
@@ -66,19 +71,13 @@ pub struct Context {
     inner: Rc<dyn DaemonProtocolProvider>,
 }
 
-pub static FAKE_OVERNET_NODES: std::sync::atomic::AtomicBool =
-    std::sync::atomic::AtomicBool::new(false);
-
 impl Context {
     pub fn new(t: impl DaemonProtocolProvider + 'static) -> Self {
         Self { inner: Rc::new(t) }
     }
 
-    pub fn overnet_node(&self) -> std::sync::Arc<overnet_core::Router> {
-        if FAKE_OVERNET_NODES.load(std::sync::atomic::Ordering::Relaxed) {
-            return hoist::Hoist::new(None).unwrap().node();
-        }
-        hoist::hoist().node()
+    pub fn overnet_node(&self) -> Result<Arc<overnet_core::Router>> {
+        self.inner.overnet_node()
     }
 
     pub async fn open_target_proxy<P>(

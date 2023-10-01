@@ -116,6 +116,7 @@ pub struct FakeDaemon {
     register: Option<ProtocolRegister>,
     target_collection: Rc<TargetCollection>,
     rcs_handler: Option<Arc<dyn Fn(rcs::RemoteControlRequest, Option<String>)>>,
+    overnet_node: Arc<overnet_core::Router>,
 }
 
 impl FakeDaemon {
@@ -143,6 +144,7 @@ impl Default for FakeDaemon {
             register: Default::default(),
             target_collection: Default::default(),
             rcs_handler: Default::default(),
+            overnet_node: hoist::Hoist::new(None).unwrap().node(),
         }
     }
 }
@@ -161,6 +163,10 @@ impl DaemonProtocolProvider for FakeDaemon {
             )
             .await?;
         Ok(client)
+    }
+
+    fn overnet_node(&self) -> Result<Arc<overnet_core::Router>> {
+        Ok(Arc::clone(&self.overnet_node))
     }
 
     async fn open_remote_control(

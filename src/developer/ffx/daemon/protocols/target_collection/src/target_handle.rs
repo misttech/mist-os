@@ -25,7 +25,7 @@ impl TargetHandle {
         cx: Context,
         handle: ServerEnd<ffx::TargetMarker>,
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
-        let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node());
+        let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
         let inner = TargetHandleInner { target, reboot_controller };
         let stream = handle.into_stream()?;
         let fut = Box::pin(async move {
@@ -102,7 +102,7 @@ impl TargetHandleInner {
                 responder.send().map_err(Into::into)
             }
             ffx::TargetRequest::OpenRemoteControl { remote_control, responder } => {
-                self.target.run_host_pipe(&cx.overnet_node());
+                self.target.run_host_pipe(&cx.overnet_node()?);
                 let rcs = wait_for_rcs(&self.target).await?;
                 match rcs {
                     Ok(mut c) => {
@@ -249,7 +249,6 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_valid_target_state() {
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         const TEST_SOCKETADDR: &'static str = "[fe80::1%1]:22";
         let daemon = FakeDaemonBuilder::new().build();
         let cx = Context::new(daemon);
@@ -344,7 +343,6 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_open_rcs_valid() {
         const TEST_NODE_NAME: &'static str = "villete";
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let local_hoist = Hoist::new(None).unwrap();
         let hoist2 = Hoist::new(None).unwrap();
         let (rx2, tx2) = fidl::Socket::create_stream();

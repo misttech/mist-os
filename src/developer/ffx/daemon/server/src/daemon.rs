@@ -194,6 +194,12 @@ impl DaemonProtocolProvider for Daemon {
         Ok(client)
     }
 
+    fn overnet_node(&self) -> Result<Arc<overnet_core::Router>> {
+        self.overnet_node.clone().ok_or_else(|| {
+            anyhow!("Attempting to get overnet node for protocol when daemon is not started")
+        })
+    }
+
     async fn open_target_proxy(
         &self,
         target_identifier: Option<String>,

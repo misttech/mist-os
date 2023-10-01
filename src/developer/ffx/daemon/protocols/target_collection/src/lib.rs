@@ -301,7 +301,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                             &target_collection,
                             addr,
                             None,
-                            &cx.overnet_node(),
+                            &cx.overnet_node()?,
                         )
                         .await;
                         return add_target_responder.success().map_err(Into::into);
@@ -339,7 +339,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     &target_collection,
                     addr,
                     None,
-                    &cx.overnet_node(),
+                    &cx.overnet_node()?,
                 )
                 .await;
                 // If the target is in fastboot then skip rcs
@@ -410,7 +410,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     &target_collection,
                     addr,
                     Some(Duration::from_secs(connect_timeout_seconds)),
-                    &cx.overnet_node(),
+                    &cx.overnet_node()?,
                 )
                 .await;
                 responder.send().map_err(Into::into)
@@ -470,7 +470,7 @@ impl FidlProtocol for TargetCollectionProtocol {
 
     async fn start(&mut self, cx: &Context) -> Result<()> {
         let target_collection = cx.get_target_collection().await?;
-        let node = cx.overnet_node();
+        let node = cx.overnet_node()?;
         self.load_manual_targets(&target_collection, &node).await;
         let mdns = self.open_mdns_proxy(cx).await?;
         let fastboot = self.open_fastboot_target_stream_proxy(cx).await?;
@@ -760,7 +760,6 @@ mod tests {
             .set(json!(temp_dir.display().to_string()))
             .await
             .unwrap();
-        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
