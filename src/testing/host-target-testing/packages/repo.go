@@ -137,7 +137,7 @@ func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, err
 			)
 		}
 
-		return newPackage(ctx, r, merkle)
+		return newPackage(ctx, r, path, merkle)
 	}
 
 	return Package{}, fmt.Errorf("could not find package: %q", path)
@@ -308,7 +308,7 @@ func (r *Repository) EditPackage(
 	}
 
 	// Get the newly edited package located at pkgMerkle and return it.
-	pkg, err = newPackage(ctx, r, pkgMerkle)
+	pkg, err = newPackage(ctx, r, dstPackagePath, pkgMerkle)
 	if err != nil {
 		return Package{}, fmt.Errorf("failed to edit the package %q: %w", pkgMerkle, err)
 	}

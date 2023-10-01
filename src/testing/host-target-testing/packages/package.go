@@ -21,11 +21,17 @@ type FileData []byte
 type Package struct {
 	merkle   build.MerkleRoot
 	repo     *Repository
+	path     string
 	contents build.MetaContents
 }
 
 // newPackage extracts out a package from the repository.
-func newPackage(ctx context.Context, repo *Repository, merkle build.MerkleRoot) (Package, error) {
+func newPackage(
+	ctx context.Context,
+	repo *Repository,
+	path string,
+	merkle build.MerkleRoot,
+) (Package, error) {
 	// Need to parse out the package meta.far to find the package contents.
 	blob, err := repo.OpenUncompressedBlob(ctx, merkle)
 	if err != nil {
@@ -52,8 +58,14 @@ func newPackage(ctx context.Context, repo *Repository, merkle build.MerkleRoot) 
 	return Package{
 		merkle:   merkle,
 		repo:     repo,
+		path:     path,
 		contents: contents,
 	}, nil
+}
+
+// Path returns the package path.
+func (p *Package) Path() string {
+	return p.path
 }
 
 // Merkle returns the meta.far merkle.

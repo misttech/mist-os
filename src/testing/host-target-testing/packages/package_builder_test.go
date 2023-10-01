@@ -90,7 +90,7 @@ func expandPackage(t *testing.T, pkgRepo *Repository, merkle build.MerkleRoot, d
 	ctx := context.Background()
 
 	// Parse the package we want.
-	pkg, err := newPackage(ctx, pkgRepo, merkle)
+	pkg, err := newPackage(ctx, pkgRepo, "", merkle)
 	if err != nil {
 		t.Fatalf("failed to read package: %s", err)
 	}
