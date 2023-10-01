@@ -8,7 +8,10 @@ import("//build/go/go_test.gni")
 if (is_host) {
   go_library("zbi") {
     testonly = true
-    deps = [ "//tools/lib/logger" ]
+    deps = [
+      "//src/sys/pkg/bin/pm/build",
+      "//tools/lib/logger",
+    ]
     sources = [
       "zbi.go",
       "zbi_test.go",

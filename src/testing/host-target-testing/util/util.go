@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -159,13 +160,13 @@ func DecodePackagesJSON(rd io.Reader) (*PackageJSON, error) {
 // express purpose of returning a map of package names and variant keys
 // to the package's Merkle root as a value. This mimics the behavior of the
 // function that parsed the legacy "packages" file format.
-func ParsePackagesJSON(rd io.Reader) (map[string]string, error) {
+func ParsePackagesJSON(rd io.Reader) (map[string]build.MerkleRoot, error) {
 	p, err := DecodePackagesJSON(rd)
 	if err != nil {
 		return nil, err
 	}
 
-	packages := make(map[string]string)
+	packages := make(map[string]build.MerkleRoot)
 	for _, pkgURL := range p.Content {
 		u, err := url.Parse(pkgURL)
 		if err != nil {
@@ -181,9 +182,14 @@ func ParsePackagesJSON(rd io.Reader) (map[string]string, error) {
 			pathComponents := strings.Split(u.Path, "/")
 			if len(pathComponents) >= 1 {
 				if hash, ok := u.Query()["hash"]; ok {
-					packages[u.Path[1:]] = hash[0]
+					merkle, err := build.DecodeMerkleRoot([]byte(hash[0]))
+					if err != nil {
+						return nil, err
+					}
+
+					packages[u.Path[1:]] = merkle
 				} else {
-					packages[u.Path[1:]] = ""
+					return nil, fmt.Errorf("package %s doesn't have a merkle", u.Path[1:])
 				}
 			}
 		}
@@ -213,7 +219,13 @@ func RehostPackagesJSON(rd io.Reader, w io.Writer, newHostname string) error {
 	return json.NewEncoder(w).Encode(p)
 }
 
-func UpdateHashValuePackagesJSON(rd io.Reader, w io.Writer, repoName string, pkgUrlPath string, value string) error {
+func UpdateHashValuePackagesJSON(
+	rd io.Reader,
+	w io.Writer,
+	repoName string,
+	pkgUrlPath string,
+	merkle build.MerkleRoot,
+) error {
 	p, err := DecodePackagesJSON(rd)
 	if err != nil {
 		return err
@@ -227,7 +239,7 @@ func UpdateHashValuePackagesJSON(rd io.Reader, w io.Writer, repoName string, pkg
 
 		if u.Host == repoName && u.Path == "/"+pkgUrlPath {
 			queryValues := u.Query()
-			queryValues.Set("hash", value)
+			queryValues.Set("hash", merkle.String())
 			u.RawQuery = queryValues.Encode()
 		}
 

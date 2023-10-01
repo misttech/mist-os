@@ -15,6 +15,7 @@ if (is_host) {
       "../paver",
       "../sl4f",
       "../util",
+      "//src/sys/pkg/bin/pm/build",
       "//third_party/golibs:golang.org/x/crypto",
       "//tools/lib/logger",
       "//tools/lib/retry",

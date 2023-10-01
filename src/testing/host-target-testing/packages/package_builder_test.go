@@ -19,7 +19,7 @@ import (
 )
 
 // createTestPackage fills the given directory with a new repository.
-func createTestPackage(t *testing.T, dir string) (*Repository, string) {
+func createTestPackage(t *testing.T, dir string) (*Repository, build.MerkleRoot) {
 	ctx := context.Background()
 
 	// Initialize a repo.
@@ -45,13 +45,17 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 	if err := json.Unmarshal(manifest, &packageManifest); err != nil {
 		t.Fatal(err)
 	}
-	metaMerkle := ""
+
+	foundMerkle := false
+	var metaMerkle build.MerkleRoot
 	for _, blob := range packageManifest.Blobs {
 		if blob.Path == "meta/" {
-			metaMerkle = blob.Merkle.String()
+			foundMerkle = true
+			metaMerkle = blob.Merkle
+			break
 		}
 	}
-	if metaMerkle == "" {
+	if !foundMerkle {
 		t.Fatal("did not find meta.far in manifest")
 	}
 
@@ -82,7 +86,7 @@ func createTestPackage(t *testing.T, dir string) (*Repository, string) {
 }
 
 // expandPackage expands the given merkle from the given repository into the given directory.
-func expandPackage(t *testing.T, pkgRepo *Repository, merkle string, dir string) {
+func expandPackage(t *testing.T, pkgRepo *Repository, merkle build.MerkleRoot, dir string) {
 	ctx := context.Background()
 
 	// Parse the package we want.
@@ -205,7 +209,8 @@ func TestPublish(t *testing.T) {
 		t.Fatalf("package path should be %q, not %q", fullPkgName, actualPkgName)
 	}
 
-	_, err = pkgRepo.BlobStore.OpenBlob(ctx, "1/"+pkgMerkle)
+	deliveryBlobType := 1
+	_, err = pkgRepo.BlobStore.OpenBlob(ctx, &deliveryBlobType, pkgMerkle)
 	if err != nil {
 		t.Fatalf("Delivery blob does not exist '%s'. %s", pkgMerkle, err)
 	}

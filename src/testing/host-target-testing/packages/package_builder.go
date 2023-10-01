@@ -144,26 +144,26 @@ func latestABIRevision() uint64 {
 
 // Publish the package to the repository. Returns the TUF package path and
 // merkle on success, or a error on failure.
-func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (string, string, error) {
+func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (string, build.MerkleRoot, error) {
 	// Create Config.
 	dir, err := os.MkdirTemp("", "pm-temp-config")
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create temp directory for the config: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to create temp directory for the config: %w", err)
 	}
 	defer os.RemoveAll(dir)
 
 	cfg, err := tempConfig(dir, p.Name, p.Version, p.Repository)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create temp config to fill with our data: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to create temp config to fill with our data: %w", err)
 	}
 
 	pkgManifestPath := filepath.Join(filepath.Dir(cfg.ManifestPath), "package")
 	if err := os.MkdirAll(filepath.Join(pkgManifestPath, "meta"), os.ModePerm); err != nil {
-		return "", "", fmt.Errorf("failed to make parent dirs for meta/package: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to make parent dirs for meta/package: %w", err)
 	}
 	mfst, err := os.Create(cfg.ManifestPath)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create package manifest path: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to create package manifest path: %w", err)
 	}
 	defer mfst.Close()
 
@@ -173,71 +173,73 @@ func (p *PackageBuilder) Publish(ctx context.Context, pkgRepo *Repository) (stri
 			continue
 		}
 		if _, err := fmt.Fprintf(mfst, "%s=%s\n", relativePath, sourcePath); err != nil {
-			return "", "", fmt.Errorf("failed to record entry %q as %q into manifest: %w", p.Name, sourcePath, err)
+			return "", build.MerkleRoot{}, fmt.Errorf("failed to record entry %q as %q into manifest: %w", p.Name, sourcePath, err)
 		}
 	}
 
 	manifest, err := cfg.Manifest()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to create mainfest: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to create mainfest: %w", err)
 	}
 
 	abiPath, ok := manifest.Meta()["meta/fuchsia.abi/abi-revision"]
 	if ok {
 		abiRevision, err := build.ReadABIRevisionFromFile(abiPath)
 		if err != nil {
-			return "", "", fmt.Errorf("failed to get abi revision: %w", err)
+			return "", build.MerkleRoot{}, fmt.Errorf("failed to get abi revision: %w", err)
 		}
 		cfg.PkgABIRevision = *abiRevision
 	}
 
 	// Save changes to config.
 	if err := build.Update(cfg); err != nil {
-		return "", "", fmt.Errorf("failed to update config: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to update config: %w", err)
 	}
 	if _, err := build.Seal(cfg); err != nil {
-		return "", "", fmt.Errorf("failed to seal config: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to seal config: %w", err)
 	}
 
 	pkgPath := fmt.Sprintf("%s/%s", p.Name, p.Version)
 	blobs, err := cfg.BlobInfo()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to extract blobs: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to extract blobs: %w", err)
 	}
 
-	pkgMerkle := ""
+	foundPkgMerkle := false
+	pkgMerkle := build.MerkleRoot{}
 	for _, blob := range blobs {
 		if blob.Path == "meta/" {
-			pkgMerkle = blob.Merkle.String()
+			foundPkgMerkle = true
+			pkgMerkle = blob.Merkle
 			break
 		}
 	}
 
-	if pkgMerkle == "" {
-		return "", "", fmt.Errorf("could not find meta.far merkle")
+	if !foundPkgMerkle {
+		return "", build.MerkleRoot{}, fmt.Errorf("could not find meta.far merkle")
 	}
 
 	logger.Infof(ctx, "publishing %q to merkle %q", pkgPath, pkgMerkle)
 
 	outputManifest, err := cfg.OutputManifest()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to output manifest: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to output manifest: %w", err)
 	}
 
 	content, err := json.Marshal(outputManifest)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to convert manifest to JSON: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to convert manifest to JSON: %w", err)
 	}
 
 	outputManifestPath := path.Join(cfg.OutputDir, "package_manifest.json")
 	if err := os.WriteFile(outputManifestPath, content, os.ModePerm); err != nil {
-		return "", "", fmt.Errorf("failed to write manifest JSON to %q: %w", outputManifestPath, err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to write manifest JSON to %q: %w", outputManifestPath, err)
 	}
 
 	// Publish new config to repo.
 	err = pkgRepo.Publish(ctx, outputManifestPath)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to publish manifest: %w", err)
+		return "", build.MerkleRoot{}, fmt.Errorf("failed to publish manifest: %w", err)
 	}
 	logger.Infof(ctx, "package %q as %q published and committed", pkgPath, pkgMerkle)
 

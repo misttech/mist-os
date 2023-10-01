@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -70,11 +71,12 @@ func (z *ZBITool) MakeImageArgsZbi(ctx context.Context, destPath string, imageAr
 // * create zbi manifest to generate new bootfs and zbi
 // * generate new bootfs
 // * generate new zbi under tempDir
-func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
-	systemImageMerkle string,
+func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(
+	ctx context.Context,
+	systemImageMerkle build.MerkleRoot,
 	pkgDir string,
-	bootfsCompression string) error {
-
+	bootfsCompression string,
+) error {
 	// Create zbitemp directory to store the overwritten zbi
 	tempDirForNewZbi, err := os.MkdirTemp("", "")
 	if err != nil {
@@ -134,7 +136,7 @@ func (z *ZBITool) UpdateZBIWithNewSystemImageMerkle(ctx context.Context,
 	lines := strings.Split(string(content), "\n")
 	for i, line := range lines {
 		if strings.Contains(line, "zircon.system.pkgfs.cmd") {
-			lines[i] = basePackagePrefix + systemImageMerkle
+			lines[i] = basePackagePrefix + systemImageMerkle.String()
 		}
 	}
 

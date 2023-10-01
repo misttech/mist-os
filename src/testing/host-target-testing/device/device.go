@@ -19,14 +19,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/artifacts"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/paver"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
-	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
-
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
+	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -209,14 +209,14 @@ func (c *Client) GetSSHConnection(ctx context.Context) (string, error) {
 	return strings.Split(string(stdout.Bytes()), " ")[0], nil
 }
 
-func (c *Client) GetSystemImageMerkle(ctx context.Context) (string, error) {
+func (c *Client) GetSystemImageMerkle(ctx context.Context) (build.MerkleRoot, error) {
 	const systemImageMeta = "/system/meta"
-	merkle, err := c.ReadRemotePath(ctx, systemImageMeta)
+	merkleBytes, err := c.ReadRemotePath(ctx, systemImageMeta)
 	if err != nil {
-		return "", err
+		return build.MerkleRoot{}, err
 	}
 
-	return strings.TrimSpace(string(merkle)), nil
+	return build.DecodeMerkleRoot([]byte(strings.TrimSpace(string(merkleBytes))))
 }
 
 // Reboot asks the device to reboot. It waits until the device reconnects

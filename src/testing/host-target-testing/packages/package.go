@@ -19,15 +19,15 @@ import (
 type FileData []byte
 
 type Package struct {
-	merkle   string
+	merkle   build.MerkleRoot
 	repo     *Repository
 	contents build.MetaContents
 }
 
 // newPackage extracts out a package from the repository.
-func newPackage(ctx context.Context, repo *Repository, merkle string) (Package, error) {
+func newPackage(ctx context.Context, repo *Repository, merkle build.MerkleRoot) (Package, error) {
 	// Need to parse out the package meta.far to find the package contents.
-	blob, err := repo.OpenBlob(ctx, merkle)
+	blob, err := repo.OpenUncompressedBlob(ctx, merkle)
 	if err != nil {
 		return Package{}, err
 	}
@@ -57,7 +57,7 @@ func newPackage(ctx context.Context, repo *Repository, merkle string) (Package, 
 }
 
 // Merkle returns the meta.far merkle.
-func (p *Package) Merkle() string {
+func (p *Package) Merkle() build.MerkleRoot {
 	return p.merkle
 }
 
@@ -68,7 +68,7 @@ func (p *Package) Open(ctx context.Context, path string) (*os.File, error) {
 		return nil, os.ErrNotExist
 	}
 
-	return p.repo.OpenBlob(ctx, merkle.String())
+	return p.repo.OpenUncompressedBlob(ctx, merkle)
 }
 
 // ReadFile reads a file from a package.
@@ -95,7 +95,7 @@ func (p *Package) Expand(ctx context.Context, dir string) error {
 			return fmt.Errorf("could not export %s to %s. %w", path, realPath, err)
 		}
 	}
-	blob, err := p.repo.OpenBlob(ctx, p.merkle)
+	blob, err := p.repo.OpenUncompressedBlob(ctx, p.merkle)
 	if err != nil {
 		return fmt.Errorf("failed to open meta.far blob. %w", err)
 	}

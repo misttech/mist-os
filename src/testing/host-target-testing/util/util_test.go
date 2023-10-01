@@ -9,6 +9,13 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
+)
+
+const (
+	merkleA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	merkleB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 )
 
 func pkgURL(name, hash string) string {
@@ -17,7 +24,7 @@ func pkgURL(name, hash string) string {
 
 type pkgMerkle struct {
 	name string
-	hash string
+	hash build.MerkleRoot
 }
 
 func TestParsePackagesJSON(t *testing.T) {
@@ -59,20 +66,27 @@ func TestParsePackagesJSON(t *testing.T) {
 		},
 		{
 			id:        "variant-less package succeeds",
-			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg", "abc"))),
-			pkgs:      []pkgMerkle{{"pkg", "abc"}},
+			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg", merkleA))),
+			pkgs:      []pkgMerkle{{"pkg", build.MustDecodeMerkleRoot(merkleA)}},
 			expectErr: false,
 		},
 		{
 			id:        "variant package succeeds",
-			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg/0", "abc"))),
-			pkgs:      []pkgMerkle{{"pkg/0", "abc"}},
+			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s"]}`, pkgURL("pkg/0", merkleA))),
+			pkgs:      []pkgMerkle{{"pkg/0", build.MustDecodeMerkleRoot(merkleA)}},
 			expectErr: false,
 		},
 		{
-			id:        "multiple packages succeed",
-			json:      []byte(fmt.Sprintf(`{"version":"1","content":["%s","%s"]}`, pkgURL("pkg/0", "abc"), pkgURL("another/0", "def"))),
-			pkgs:      []pkgMerkle{{"pkg/0", "abc"}, {"another/0", "def"}},
+			id: "multiple packages succeed",
+			json: []byte(fmt.Sprintf(
+				`{"version":"1","content":["%s","%s"]}`,
+				pkgURL("pkg/0", merkleA),
+				pkgURL("another/0", merkleB)),
+			),
+			pkgs: []pkgMerkle{
+				{"pkg/0", build.MustDecodeMerkleRoot(merkleA)},
+				{"another/0", build.MustDecodeMerkleRoot(merkleB)},
+			},
 			expectErr: false,
 		},
 	}

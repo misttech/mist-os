@@ -21,6 +21,7 @@ import (
 
 	tuf_data "github.com/theupdateframework/go-tuf/data"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/repo"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -40,13 +41,51 @@ type httpBlobStore struct {
 }
 
 func (f httpBlobStore) Open(path string) (fs.File, error) {
-	if !strings.HasPrefix(path, "blobs/") {
+	parts := strings.Split(path, "/")
+
+	switch len(parts) {
+	case 2:
+		if parts[0] != "blobs" {
+			return nil, os.ErrNotExist
+		}
+
+		merkle, err := build.DecodeMerkleRoot([]byte(parts[1]))
+		if err != nil {
+			return nil, os.ErrNotExist
+		}
+
+		return f.blobStore.OpenBlob(f.ctx, nil, merkle)
+	case 3:
+		if parts[0] != "blobs" {
+			return nil, os.ErrNotExist
+		}
+
+		var deliveryBlobType *int
+		if d, err := strconv.Atoi(parts[1]); err == nil {
+			deliveryBlobType = &d
+		} else {
+			return nil, os.ErrNotExist
+		}
+
+		merkle, err := build.DecodeMerkleRoot([]byte(parts[2]))
+		if err != nil {
+			return nil, os.ErrNotExist
+		}
+
+		return f.blobStore.OpenBlob(f.ctx, deliveryBlobType, merkle)
+	default:
 		return nil, os.ErrNotExist
 	}
-	return f.blobStore.OpenBlob(f.ctx, strings.TrimPrefix(path, "blobs/"))
 }
 
-func newServer(ctx context.Context, dir string, blobStore BlobStore, localHostname string, repoName string, repoPort int) (*Server, error) {
+func newServer(
+	ctx context.Context,
+	dir string,
+	blobStore BlobStore,
+	localHostname string,
+	repoName string,
+	repoPort int,
+) (*Server, error) {
 	listener, err := net.Listen("tcp", ":"+strconv.Itoa(repoPort))
 	if err != nil {
 		return nil, err

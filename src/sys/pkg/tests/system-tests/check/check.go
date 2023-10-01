@@ -11,6 +11,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/device"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/sl4f"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -19,7 +20,7 @@ import (
 func IsDeviceUpToDate(
 	ctx context.Context,
 	device *device.Client,
-	expectedSystemImageMerkle string,
+	expectedSystemImageMerkle build.MerkleRoot,
 ) (bool, error) {
 	remoteSystemImageMerkle, err := device.GetSystemImageMerkle(ctx)
 	if err != nil {
@@ -132,20 +133,20 @@ func ValidateDevice(
 	ctx context.Context,
 	device *device.Client,
 	rpcClient *sl4f.Client,
-	expectedSystemImageMerkle string,
+	expectedSystemImageMerkle *build.MerkleRoot,
 	expectedConfig *sl4f.Configuration,
 	warnOnABR bool,
 ) error {
 	// At the this point the system should have been updated to the target
 	// system version. Confirm the update by fetching the device's current
 	// /system/meta, and making sure it is the correct version.
-	if expectedSystemImageMerkle != "" {
-		upToDate, err := IsDeviceUpToDate(ctx, device, expectedSystemImageMerkle)
+	if expectedSystemImageMerkle != nil {
+		upToDate, err := IsDeviceUpToDate(ctx, device, *expectedSystemImageMerkle)
 		if err != nil {
 			return fmt.Errorf("failed to check if device is up to date: %w", err)
 		}
 		if !upToDate {
-			return fmt.Errorf("system version failed to update to %q", expectedSystemImageMerkle)
+			return fmt.Errorf("system version failed to update to %q", *expectedSystemImageMerkle)
 		}
 	}
 

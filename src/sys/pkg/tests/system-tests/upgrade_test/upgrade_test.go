@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	pmBuild "go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/check"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/flash"
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/tests/system-tests/pave"
@@ -316,7 +317,7 @@ func initializeDevice(
 	startTime := time.Now()
 
 	var repo *packages.Repository
-	var expectedSystemImageMerkle string
+	var expectedSystemImageMerkle *pmBuild.MerkleRoot
 	var err error
 
 	if build != nil {
@@ -331,10 +332,11 @@ func initializeDevice(
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}
 
-		expectedSystemImageMerkle, err = repo.LookupUpdateSystemImageMerkle(ctx)
+		merkle, err := repo.LookupUpdateSystemImageMerkle(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 		}
+		expectedSystemImageMerkle = &merkle
 	}
 
 	if err := script.RunScript(ctx, device, repo, nil, c.beforeInitScript); err != nil {
@@ -343,7 +345,7 @@ func initializeDevice(
 
 	if build != nil {
 		// Only pave if the device is not running the expected version.
-		upToDate, err := check.IsDeviceUpToDate(ctx, device, expectedSystemImageMerkle)
+		upToDate, err := check.IsDeviceUpToDate(ctx, device, *expectedSystemImageMerkle)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
 		}
@@ -525,7 +527,7 @@ func otaToPackage(
 	device *device.Client,
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
-	expectedSystemImageMerkle string,
+	expectedSystemImageMerkle pmBuild.MerkleRoot,
 	updatePackageURL string,
 	checkABR bool,
 	checkForUnknownFirmware bool,
@@ -572,7 +574,7 @@ func otaToPackage(
 		ctx,
 		device,
 		*rpcClient,
-		expectedSystemImageMerkle,
+		&expectedSystemImageMerkle,
 		expectedConfig,
 		checkABR,
 	); err != nil {

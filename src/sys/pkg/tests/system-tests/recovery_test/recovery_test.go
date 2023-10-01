@@ -166,7 +166,7 @@ func doTestRecovery(
 		ctx,
 		device,
 		*rpcClient,
-		expectedSystemImageMerkle,
+		&expectedSystemImageMerkle,
 		expectedConfig,
 		false,
 	); err != nil {
@@ -270,7 +270,7 @@ func initializeDevice(
 		ctx,
 		device,
 		rpcClient,
-		expectedSystemImageMerkle,
+		&expectedSystemImageMerkle,
 		expectedConfig,
 		false,
 	); err != nil {

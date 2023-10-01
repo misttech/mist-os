@@ -11,8 +11,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
@@ -22,7 +24,7 @@ import (
 
 type BlobStore interface {
 	Dir() string
-	OpenBlob(ctx context.Context, merkle string) (*os.File, error)
+	OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error)
 }
 
 type DirBlobStore struct {
@@ -33,8 +35,17 @@ func NewDirBlobStore(dir string) BlobStore {
 	return &DirBlobStore{dir}
 }
 
-func (fs *DirBlobStore) OpenBlob(ctx context.Context, merkle string) (*os.File, error) {
-	return os.Open(filepath.Join(fs.dir, merkle))
+func (fs *DirBlobStore) blobPath(deliveryBlobType *int, merkle build.MerkleRoot) string {
+	if deliveryBlobType == nil {
+		return filepath.Join(fs.dir, merkle.String())
+	} else {
+		return filepath.Join(fs.dir, strconv.Itoa(*deliveryBlobType), merkle.String())
+	}
+}
+
+func (fs *DirBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error) {
+	path := fs.blobPath(deliveryBlobType, merkle)
+	return os.Open(path)
 }
 
 func (fs *DirBlobStore) Dir() string {
@@ -92,7 +103,13 @@ func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.
 		return nil, fmt.Errorf("failed to extract packages: %w", err)
 	}
 
-	return NewRepository(ctx, filepath.Join(dst, "amber-files"), NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")), ffx, deliveryBlobType)
+	return NewRepository(
+		ctx,
+		filepath.Join(dst, "amber-files"),
+		NewDirBlobStore(filepath.Join(dst, "amber-files", "repository", "blobs")),
+		ffx,
+		deliveryBlobType,
+	)
 }
 
 // OpenPackage opens a package from the repository.
@@ -110,30 +127,44 @@ func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, err
 	}
 
 	if target, ok := s.Signed.Targets[path]; ok {
-		return newPackage(ctx, r, target.Custom.Merkle)
+		merkle, err := build.DecodeMerkleRoot([]byte(target.Custom.Merkle))
+		if err != nil {
+			return Package{}, fmt.Errorf(
+				"failed to parse package %s merkle %q from TUF: %w",
+				path,
+				merkle,
+				err,
+			)
+		}
+
+		return newPackage(ctx, r, merkle)
 	}
 
 	return Package{}, fmt.Errorf("could not find package: %q", path)
 
 }
 
-func (r *Repository) OpenBlob(ctx context.Context, merkle string) (*os.File, error) {
-	return r.BlobStore.OpenBlob(ctx, merkle)
+func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
+	return r.BlobStore.OpenBlob(ctx, nil, merkle)
+}
+
+func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
+	return r.BlobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
 }
 
 func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string, repoPort int) (*Server, error) {
 	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName, repoPort)
 }
 
-func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (string, error) {
+func (r *Repository) LookupUpdateSystemImageMerkle(ctx context.Context) (build.MerkleRoot, error) {
 	return r.lookupUpdateContentPackageMerkle(ctx, "update/0", "system_image/0")
 }
 
-func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (string, error) {
+func (r *Repository) LookupUpdatePrimeSystemImage2Merkle(ctx context.Context) (build.MerkleRoot, error) {
 	return r.lookupUpdateContentPackageMerkle(ctx, "update_prime/0", "system_image/0")
 }
 
-func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle string) error {
+func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle build.MerkleRoot) error {
 	systemImageMerkle, err := r.LookupUpdateSystemImageMerkle(ctx)
 	if err != nil {
 		return err
@@ -154,28 +185,48 @@ func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context
 		systemImageMerkle, systemPrimeImage2Merkle, merkle)
 }
 
-func (r *Repository) lookupUpdateContentPackageMerkle(ctx context.Context, updatePackageName string, contentPackageName string) (string, error) {
+func (r *Repository) lookupUpdateContentPackageMerkle(
+	ctx context.Context,
+	updatePackageName string,
+	contentPackageName string,
+) (build.MerkleRoot, error) {
 	// Extract the "packages" file from the "update" package.
 	p, err := r.OpenPackage(ctx, updatePackageName)
 	if err != nil {
-		return "", err
+		return build.MerkleRoot{}, fmt.Errorf(
+			"failed to open package %s: %w",
+			updatePackageName,
+			err,
+		)
 	}
 	f, err := p.Open(ctx, "packages.json")
 	if err != nil {
-		return "", err
+		return build.MerkleRoot{}, fmt.Errorf(
+			"failed to open packages.json in %s: %w",
+			updatePackageName,
+			err,
+		)
 	}
 
 	packages, err := util.ParsePackagesJSON(f)
 	if err != nil {
-		return "", err
+		return build.MerkleRoot{}, fmt.Errorf(
+			"failed to parse packages.json from %s: %w",
+			updatePackageName,
+			err,
+		)
 	}
 
-	merkle, ok := packages[contentPackageName]
+	merkleRoot, ok := packages[contentPackageName]
 	if !ok {
-		return "", fmt.Errorf("could not find %s merkle", contentPackageName)
+		return build.MerkleRoot{}, fmt.Errorf(
+			"could not find merkle for %s in %s",
+			contentPackageName,
+			updatePackageName,
+		)
 	}
 
-	return merkle, nil
+	return merkleRoot, nil
 }
 
 // CreatePackage creates a package in this repository named `packagePath` by:
@@ -187,39 +238,39 @@ func (r *Repository) CreatePackage(
 	ctx context.Context,
 	packagePath string,
 	createFunc func(path string) error,
-) (string, error) {
+) (build.MerkleRoot, error) {
 	logger.Infof(ctx, "creating package %q", packagePath)
 
 	// Extract the package name from the path. The variant currently is optional, but if specified, must be "0".
 	packageName, packageVariant, found := strings.Cut(packagePath, "/")
 	if found && packageVariant != "0" {
-		return "", fmt.Errorf("invalid package path found: %q", packagePath)
+		return build.MerkleRoot{}, fmt.Errorf("invalid package path found: %q", packagePath)
 	}
 	packageVariant = "0"
 
 	// Create temp directory. The content of this directory will be included in the package.
 	tempDir, err := os.MkdirTemp("", "")
 	if err != nil {
-		return "", fmt.Errorf("failed to create a temp directory: %w", err)
+		return build.MerkleRoot{}, fmt.Errorf("failed to create a temp directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	// Package content will be created by the user by leveraging the createFunc closure.
 	if err := createFunc(tempDir); err != nil {
-		return "", fmt.Errorf("failed to create content of the package: %w", err)
+		return build.MerkleRoot{}, fmt.Errorf("failed to create content of the package: %w", err)
 	}
 
 	// Create package from the temp directory. The package builder doesn't use
 	// the repository name, so it can be set as `testrepository.com`.
 	pkgBuilder, err := NewPackageBuilderFromDir(tempDir, packageName, packageVariant, "testrepository.com")
 	if err != nil {
-		return "", fmt.Errorf("failed to parse the package from %q: %w", tempDir, err)
+		return build.MerkleRoot{}, fmt.Errorf("failed to parse the package from %q: %w", tempDir, err)
 	}
 
 	// Publish the package and ger the merkle of the package.
 	_, pkgMerkle, err := pkgBuilder.Publish(ctx, r)
 	if err != nil {
-		return "", fmt.Errorf("failed to publish the package %q: %w", packagePath, err)
+		return build.MerkleRoot{}, fmt.Errorf("failed to publish the package %q: %w", packagePath, err)
 	}
 
 	return pkgMerkle, nil
@@ -353,7 +404,7 @@ func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
 	ctx context.Context,
 	avbTool *avb.AVBTool,
 	zbiTool *zbi.ZBITool,
-	systemImageMerkle string,
+	systemImageMerkle build.MerkleRoot,
 	srcUpdatePackagePath string,
 	dstUpdatePackagePath string,
 	bootfsCompression string,
