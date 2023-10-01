@@ -56,11 +56,19 @@ impl RebootController {
     }
 
     async fn get_remote_proxy(&self) -> Result<RemoteControlProxy> {
+        #[cfg(test)]
+        let node = if protocols::FAKE_OVERNET_NODES.load(std::sync::atomic::Ordering::Relaxed) {
+            hoist::Hoist::new(None).unwrap().node()
+        } else {
+            hoist::hoist().node()
+        };
+        #[cfg(not(test))]
+        let node = hoist::hoist().node();
         // TODO(awdavies): Factor out init_remote_proxy from the target, OR
         // move the impl(s) here that rely on remote control to use init_remote_proxy
         // instead.
         self.remote_proxy
-            .get_or_try_init(self.target.init_remote_proxy())
+            .get_or_try_init(self.target.init_remote_proxy(&node))
             .await
             .map(|proxy| proxy.clone())
     }
@@ -103,7 +111,10 @@ impl RebootController {
         let mut fastboot_manager = Fastboot::new(self.target.clone());
         let stream = fastboot.into_stream()?;
         self.tasks.spawn(async move {
-            match fastboot_manager.handle_fastboot_requests_from_stream(stream).await {
+            match fastboot_manager
+                .handle_fastboot_requests_from_stream(stream, &hoist::hoist().node())
+                .await
+            {
                 Ok(_) => tracing::trace!("Fastboot proxy finished - client disconnected"),
                 Err(e) => tracing::error!("Handling fastboot requests: {:?}", e),
             }
@@ -463,6 +474,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_product() -> Result<()> {
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Product)
@@ -472,6 +484,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_recovery() -> Result<()> {
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Recovery)
@@ -481,6 +494,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_reboot_bootloader() -> Result<()> {
+        protocols::FAKE_OVERNET_NODES.store(true, std::sync::atomic::Ordering::Relaxed);
         let (_, proxy) = setup().await;
         proxy
             .reboot(TargetRebootState::Bootloader)

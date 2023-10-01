@@ -31,7 +31,7 @@ use futures::{
     io::{AsyncRead, AsyncWrite},
     TryStreamExt,
 };
-use std::{convert::TryInto, fs::read, rc::Rc};
+use std::{convert::TryInto, fs::read, rc::Rc, sync::Arc};
 use usb_bulk::AsyncInterface as Interface;
 
 pub mod client;
@@ -72,29 +72,34 @@ impl Fastboot {
     pub async fn handle_fastboot_requests_from_stream(
         &mut self,
         mut stream: FastbootRequestStream,
+        overnet_node: &Arc<overnet_core::Router>,
     ) -> Result<()> {
         while let Some(req) = stream.try_next().await? {
             tracing::debug!("Got fastboot request: {:#?}", req);
             if let Some((_, interface)) = self.target.fastboot_address() {
                 match interface {
-                    FastbootInterface::Tcp => match self.tcp.handle_fastboot_request(req).await {
-                        Ok(_) => (),
-                        Err(e) => {
-                            self.tcp.clear_interface().await;
-                            return Err(e);
+                    FastbootInterface::Tcp => {
+                        match self.tcp.handle_fastboot_request(req, overnet_node).await {
+                            Ok(_) => (),
+                            Err(e) => {
+                                self.tcp.clear_interface().await;
+                                return Err(e);
+                            }
                         }
-                    },
-                    FastbootInterface::Udp => match self.udp.handle_fastboot_request(req).await {
-                        Ok(_) => (),
-                        Err(e) => {
-                            self.udp.clear_interface().await;
-                            return Err(e);
+                    }
+                    FastbootInterface::Udp => {
+                        match self.udp.handle_fastboot_request(req, overnet_node).await {
+                            Ok(_) => (),
+                            Err(e) => {
+                                self.udp.clear_interface().await;
+                                return Err(e);
+                            }
                         }
-                    },
+                    }
                     _ => bail!("Unexpected interface type {:?}", self.target.fastboot_interface()),
                 }
             } else {
-                match self.usb.handle_fastboot_request(req).await {
+                match self.usb.handle_fastboot_request(req, overnet_node).await {
                     Ok(_) => (),
                     Err(e) => {
                         self.usb.clear_interface().await;

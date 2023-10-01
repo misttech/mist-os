@@ -29,7 +29,7 @@ use futures::{
     prelude::*,
     select_biased, try_join,
 };
-use std::{net::SocketAddr, rc::Rc, time::Duration, time::Instant};
+use std::{net::SocketAddr, rc::Rc, sync::Arc, time::Duration, time::Instant};
 
 /// Timeout in seconds to wait for target after a reboot to fastboot mode
 const FASTBOOT_REBOOT_RECONNECT_TIMEOUT: &str = "fastboot.reboot.reconnect_timeout";
@@ -159,13 +159,17 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         Err(RebootError::TimedOut)
     }
 
-    async fn reboot_from_product(&self, listener: &RebootListenerProxy) -> Result<(), RebootError> {
+    async fn reboot_from_product(
+        &self,
+        listener: &RebootListenerProxy,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<(), RebootError> {
         if listener.is_closed() {
             return Err(RebootError::FailedToSendOnReboot);
         }
         listener.on_reboot().map_err(|_| RebootError::FailedToSendOnReboot)?;
         match self
-            .get_admin_proxy()
+            .get_admin_proxy(overnet_node)
             .await
             .map_err(|_| RebootError::TargetCommunication)?
             .reboot_to_bootloader()
@@ -180,11 +184,15 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         }
     }
 
-    async fn prepare_device(&self, listener: &RebootListenerProxy) -> Result<(), RebootError> {
+    async fn prepare_device(
+        &self,
+        listener: &RebootListenerProxy,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<(), RebootError> {
         match self.target.get_connection_state() {
             TargetConnectionState::Fastboot(_) => Ok(()),
             TargetConnectionState::Zedboot(_) => self.reboot_from_zedboot(listener).await,
-            _ => self.reboot_from_product(listener).await,
+            _ => self.reboot_from_product(listener, overnet_node).await,
         }
     }
 
@@ -207,14 +215,18 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
             .await
     }
 
-    pub async fn handle_fastboot_request(&mut self, req: FastbootRequest) -> Result<()> {
+    pub async fn handle_fastboot_request(
+        &mut self,
+        req: FastbootRequest,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<()> {
         tracing::debug!("fastboot - received req: {:?}", req);
         match req {
             FastbootRequest::Prepare { listener, responder } => {
                 let res = future::ready(
                     listener.into_proxy().map_err(|_| RebootError::TargetCommunication),
                 )
-                .and_then(|proxy| async move { self.prepare_device(&proxy).await })
+                .and_then(|proxy| async move { self.prepare_device(&proxy, overnet_node).await })
                 .await;
 
                 match res {
@@ -546,21 +558,33 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
         Ok(())
     }
 
-    async fn get_remote_proxy(&self) -> Result<RemoteControlProxy> {
+    async fn get_remote_proxy(
+        &self,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<RemoteControlProxy> {
         self.remote_proxy
-            .get_or_try_init(self.target.init_remote_proxy())
+            .get_or_try_init(self.target.init_remote_proxy(overnet_node))
             .await
             .map(|proxy| proxy.clone())
     }
 
-    async fn get_admin_proxy(&self) -> Result<AdminProxy> {
-        self.admin_proxy.get_or_try_init(self.init_admin_proxy()).await.map(|proxy| proxy.clone())
+    async fn get_admin_proxy(
+        &self,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<AdminProxy> {
+        self.admin_proxy
+            .get_or_try_init(self.init_admin_proxy(overnet_node))
+            .await
+            .map(|proxy| proxy.clone())
     }
 
-    async fn init_admin_proxy(&self) -> Result<AdminProxy> {
+    async fn init_admin_proxy(
+        &self,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<AdminProxy> {
         let (proxy, server_end) =
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
-        self.get_remote_proxy()
+        self.get_remote_proxy(overnet_node)
             .await?
             .connect_capability(
                 ADMIN_MONIKER,
@@ -716,6 +740,7 @@ mod test {
         timeout_at_end: bool,
         init: impl FnOnce(&mut TestFactory),
     ) -> (Rc<Target>, FastbootProxy) {
+        let node = hoist::Hoist::new(None).unwrap().node();
         let target = Target::new_named("scooby-dooby-doo");
         let mut factory = TestFactory::new(replies, timeout_at_end);
         init(&mut factory);
@@ -724,7 +749,7 @@ mod test {
         fuchsia_async::Task::local(async move {
             loop {
                 match stream.try_next().await {
-                    Ok(Some(req)) => match fb.handle_fastboot_request(req).await {
+                    Ok(Some(req)) => match fb.handle_fastboot_request(req, &node).await {
                         Ok(_) => (),
                         Err(e) => {
                             fb.clear_interface().await;

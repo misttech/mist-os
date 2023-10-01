@@ -1016,9 +1016,9 @@ impl Target {
                 // and thus we have an RCS connection from inception.
                 {
                     let Some(target) = weak_target.upgrade() else {
-                    // weird that self is already gone, but ¯\_(ツ)_/¯
-                    return;
-                };
+                        // weird that self is already gone, but ¯\_(ツ)_/¯
+                        return;
+                    };
                     let state = target.state.borrow().clone();
                     if let TargetConnectionState::Rcs(rcs) = state {
                         if knock_rcs(&rcs.proxy).await.is_ok() {
@@ -1081,9 +1081,12 @@ impl Target {
     }
 
     #[tracing::instrument]
-    pub async fn init_remote_proxy(self: &Rc<Self>) -> Result<RemoteControlProxy> {
+    pub async fn init_remote_proxy(
+        self: &Rc<Self>,
+        overnet_node: &Arc<overnet_core::Router>,
+    ) -> Result<RemoteControlProxy> {
         // Ensure auto-connect has at least started.
-        self.run_host_pipe(&hoist::hoist().node());
+        self.run_host_pipe(overnet_node);
         match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
             Ok(()) => (),
             Err(e) => {
