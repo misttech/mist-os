@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
+use starnix_sync::{EventWaitGuard, InterruptibleEvent};
 use std::{
     collections::HashMap,
     sync::{
@@ -67,7 +68,7 @@ impl HandleWaitCanceler {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 struct WaitKey {
     raw: u64,
 }
@@ -142,10 +143,6 @@ impl PortWaiter {
             wait_queues: Default::default(),
             user_events: Default::default(),
         })
-    }
-
-    fn weak(self: &Arc<Self>) -> WaiterRef {
-        WaiterRef(Arc::downgrade(&self))
     }
 
     /// Waits until the given deadline has passed or the waiter is woken up. See wait_until().
@@ -251,7 +248,7 @@ impl PortWaiter {
         };
 
         if is_waiting {
-            current_task.run_in_state(RunState::Waiter(self.weak()), callback)
+            current_task.run_in_state(RunState::Waiter(WaiterRef::from_port(self)), callback)
         } else {
             callback()
         }
@@ -376,7 +373,7 @@ impl Waiter {
 
     /// Create a weak reference to this waiter.
     fn weak(&self) -> WaiterRef {
-        self.inner.weak()
+        WaiterRef::from_port(&self.inner)
     }
 
     /// Wait until the waiter is woken up.
@@ -459,10 +456,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue
-                    .waiters
-                    .lock()
-                    .retain(|entry| entry.waiter.0.as_ptr() != Arc::as_ptr(&self.inner))
+                wait_queue.waiters.lock().retain(|entry| entry.waiter != *self)
             }
         }
     }
@@ -474,25 +468,83 @@ impl Default for Waiter {
     }
 }
 
+pub struct SimpleWaiter {
+    event: Arc<InterruptibleEvent>,
+    wait_queues: Vec<Weak<WaitQueueImpl>>,
+}
+
+impl SimpleWaiter {
+    pub fn new(event: &Arc<InterruptibleEvent>) -> (SimpleWaiter, EventWaitGuard<'_>) {
+        (SimpleWaiter { event: event.clone(), wait_queues: Default::default() }, event.begin_wait())
+    }
+}
+
+impl Drop for SimpleWaiter {
+    fn drop(&mut self) {
+        for wait_queue in &self.wait_queues {
+            if let Some(wait_queue) = wait_queue.upgrade() {
+                wait_queue.waiters.lock().retain(|entry| entry.waiter != self.event)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum WaiterKind {
+    Port(Weak<PortWaiter>),
+    Event(Weak<InterruptibleEvent>),
+}
+
+impl Default for WaiterKind {
+    fn default() -> Self {
+        WaiterKind::Port(Default::default())
+    }
+}
+
 /// A weak reference to a Waiter. Intended for holding in wait queues or stashing elsewhere for
 /// calling queue_events later.
 #[derive(Debug, Default, Clone)]
-pub struct WaiterRef(Weak<PortWaiter>);
+pub struct WaiterRef(WaiterKind);
 
 impl WaiterRef {
+    fn from_port(waiter: &Arc<PortWaiter>) -> WaiterRef {
+        WaiterRef(WaiterKind::Port(Arc::downgrade(waiter)))
+    }
+
+    fn from_event(event: &Arc<InterruptibleEvent>) -> WaiterRef {
+        WaiterRef(WaiterKind::Event(Arc::downgrade(event)))
+    }
+
     pub fn is_valid(&self) -> bool {
-        self.0.strong_count() != 0
+        match &self.0 {
+            WaiterKind::Port(waiter) => waiter.strong_count() != 0,
+            WaiterKind::Event(event) => event.strong_count() != 0,
+        }
     }
 
     pub fn interrupt(&self) {
-        if let Some(waiter) = self.0.upgrade() {
-            waiter.interrupt();
+        match &self.0 {
+            WaiterKind::Port(waiter) => {
+                if let Some(waiter) = waiter.upgrade() {
+                    waiter.interrupt();
+                }
+            }
+            WaiterKind::Event(event) => {
+                if let Some(event) = event.upgrade() {
+                    event.interrupt();
+                }
+            }
         }
     }
 
     fn remove_callback(&self, key: &WaitKey) {
-        if let Some(waiter) = self.0.upgrade() {
-            waiter.remove_callback(key);
+        match &self.0 {
+            WaiterKind::Port(waiter) => {
+                if let Some(waiter) = waiter.upgrade() {
+                    waiter.remove_callback(key);
+                }
+            }
+            _ => (),
         }
     }
 
@@ -501,30 +553,64 @@ impl WaiterRef {
     /// TODO(abarth): This function does not appear to be called when the WaitQueue is dropped,
     /// which appears to be a leak.
     fn will_remove_from_wait_queue(&self, key: &WaitKey) {
-        if let Some(waiter) = self.0.upgrade() {
-            waiter.wait_queues.lock().remove(key);
+        match &self.0 {
+            WaiterKind::Port(waiter) => {
+                if let Some(waiter) = waiter.upgrade() {
+                    waiter.wait_queues.lock().remove(key);
+                }
+            }
+            _ => (),
         }
     }
 
-    fn queue_events(&self, key: &WaitKey, events: WaitEvents) -> bool {
-        if let Some(waiter) = self.0.upgrade() {
-            waiter.queue_events(key, events);
-            true
-        } else {
-            false
+    /// Notify the waiter that the `events` have occurred.
+    ///
+    /// If the client is using an `SimpleWaiter`, they will be notified but they will not learn
+    /// which events occurred.
+    fn notify(&self, key: &WaitKey, events: WaitEvents) -> bool {
+        match &self.0 {
+            WaiterKind::Port(waiter) => {
+                if let Some(waiter) = waiter.upgrade() {
+                    waiter.queue_events(key, events);
+                    return true;
+                }
+            }
+            WaiterKind::Event(event) => {
+                if let Some(event) = event.upgrade() {
+                    event.notify();
+                    return true;
+                }
+            }
         }
+        false
     }
 }
 
 impl PartialEq<Waiter> for WaiterRef {
     fn eq(&self, other: &Waiter) -> bool {
-        self.0.as_ptr() == Arc::as_ptr(&other.inner)
+        match &self.0 {
+            WaiterKind::Port(waiter) => waiter.as_ptr() == Arc::as_ptr(&other.inner),
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq<Arc<InterruptibleEvent>> for WaiterRef {
+    fn eq(&self, other: &Arc<InterruptibleEvent>) -> bool {
+        match &self.0 {
+            WaiterKind::Event(event) => event.as_ptr() == Arc::as_ptr(other),
+            _ => false,
+        }
     }
 }
 
 impl PartialEq for WaiterRef {
     fn eq(&self, other: &WaiterRef) -> bool {
-        Weak::ptr_eq(&self.0, &other.0)
+        match (&self.0, &other.0) {
+            (WaiterKind::Port(lhs), WaiterKind::Port(rhs)) => Weak::ptr_eq(lhs, rhs),
+            (WaiterKind::Event(lhs), WaiterKind::Event(rhs)) => Weak::ptr_eq(lhs, rhs),
+            _ => false,
+        }
     }
 }
 
@@ -631,12 +717,22 @@ impl WaitQueue {
         self.wait_async_entry(waiter, waiter.create_wait_entry(WaitEvents::All))
     }
 
+    pub fn wait_async_simple(&self, waiter: &mut SimpleWaiter) {
+        let entry = WaitEntry {
+            waiter: WaiterRef::from_event(&waiter.event),
+            filter: WaitEvents::All,
+            key: Default::default(),
+        };
+        waiter.wait_queues.push(Arc::downgrade(&self.0));
+        self.0.waiters.lock().push(entry);
+    }
+
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
         Self::filter_waiters(&mut self.0.waiters.lock(), |entry| {
             if limit > 0 && entry.filter.intercept(&events) {
-                if entry.waiter.queue_events(&entry.key, events) {
+                if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;
                     woken += 1;
                 }

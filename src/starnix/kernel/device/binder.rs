@@ -24,7 +24,9 @@ use crate::{
     },
     mutable_state::Guard,
     syscalls::*,
-    task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
+    task::{
+        CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
+    },
     types::*,
 };
 use bitflags::bitflags;
@@ -33,6 +35,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
+use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
     ops::DerefMut,
@@ -335,11 +338,11 @@ impl CommandQueueWithWaitQueue {
         }
     }
 
-    fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
-        self.waiters.wait_async(waiter)
+    fn wait_async_simple(&self, waiter: &mut SimpleWaiter) {
+        self.waiters.wait_async_simple(waiter);
     }
 
-    fn wait_async_events(
+    fn wait_async_fd_events(
         &self,
         waiter: &Waiter,
         events: FdEvents,
@@ -3288,9 +3291,10 @@ impl BinderDriver {
             // the thread queue and the process queue, and loop back to check whether some work is
             // available.
             profile_duration!("ThreadReadWaitForCommand");
-            let waiter = Waiter::new();
-            proc_command_queue.wait_async(&waiter);
-            thread_state.command_queue.wait_async(&waiter);
+            let event = InterruptibleEvent::new();
+            let (mut waiter, guard) = SimpleWaiter::new(&event);
+            proc_command_queue.wait_async_simple(&mut waiter);
+            thread_state.command_queue.wait_async_simple(&mut waiter);
             drop(thread_state);
             drop(proc_command_queue);
 
@@ -3301,7 +3305,7 @@ impl BinderDriver {
             }
 
             // Put this thread to sleep.
-            waiter.wait(current_task)?;
+            current_task.block_until(guard, zx::Time::INFINITE)?;
         }
     }
 
@@ -3678,7 +3682,7 @@ impl BinderDriver {
         let handler = Box::new(move |e| {
             std::mem::replace(old_handler.lock().deref_mut(), Box::new(|_| {}))(e)
         });
-        let w1 = thread_state.command_queue.wait_async_events(waiter, events, handler.clone());
+        let w1 = thread_state.command_queue.wait_async_fd_events(waiter, events, handler.clone());
         let w2 = proc_command_queue.waiters.wait_async_fd_events(waiter, events, handler);
         WaitCanceler::new(move || {
             w1.cancel();
@@ -6628,7 +6632,7 @@ pub mod tests {
         {
             let mut client_state = client_thread.lock();
             client_state.registration = RegistrationState::MAIN;
-            client_state.command_queue.wait_async(&fake_waiter);
+            client_state.command_queue.waiters.wait_async(&fake_waiter);
         }
 
         // Now the owner process dies.
@@ -7202,7 +7206,7 @@ pub mod tests {
         {
             let mut thread_state = receiver_thread.lock();
             thread_state.registration = RegistrationState::MAIN;
-            thread_state.command_queue.wait_async(&fake_waiter);
+            thread_state.command_queue.waiters.wait_async(&fake_waiter);
         }
 
         // Submit the transaction.
