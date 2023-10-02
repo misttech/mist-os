@@ -5,7 +5,7 @@
 //! Bind rules instructions
 
 use crate::compiler::Symbol;
-use fidl_fuchsia_device_manager;
+use fidl_fuchsia_driver_legacy;
 use num_derive::FromPrimitive;
 use std::fmt;
 
@@ -21,8 +21,8 @@ impl fmt::Display for DeviceProperty {
     }
 }
 
-impl From<fidl_fuchsia_device_manager::DeviceProperty> for DeviceProperty {
-    fn from(property: fidl_fuchsia_device_manager::DeviceProperty) -> Self {
+impl From<fidl_fuchsia_driver_legacy::DeviceProperty> for DeviceProperty {
+    fn from(property: fidl_fuchsia_driver_legacy::DeviceProperty) -> Self {
         DeviceProperty { key: property.id as u32, value: property.value }
     }
 }

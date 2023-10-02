@@ -45,7 +45,7 @@ TEST_F(CompositeAssemblerTest, NoMatches) {
   fragment.name() = "child";
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_ABORT();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_ABORT();
 
   descriptor.fragments().push_back(std::move(fragment));
   manager.AddCompositeDevice("device-1", descriptor);
@@ -59,7 +59,7 @@ TEST_F(CompositeAssemblerTest, MatchButDontCreate) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
 
   // Create two fragments
   descriptor.fragments().push_back(fragment);
@@ -84,7 +84,7 @@ TEST_F(CompositeAssemblerTest, CreateSingleParentComposite) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   descriptor.props().emplace_back();
@@ -122,7 +122,7 @@ TEST_F(CompositeAssemblerTest, CreateTwoParentComposite) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   fragment.name() = kFragmentName2;
@@ -165,7 +165,7 @@ TEST_F(CompositeAssemblerTest, NodeRemovesCorrectly) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   fragment.name() = kFragmentName2;
@@ -209,7 +209,7 @@ TEST_F(CompositeAssemblerTest, TwoSingleParentComposite) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   descriptor.props().emplace_back();
@@ -260,7 +260,7 @@ TEST_F(CompositeAssemblerTest, InspectNodes) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   descriptor.props().emplace_back();
@@ -316,7 +316,7 @@ TEST_F(CompositeAssemblerTest, ConnectToDeviceController) {
   fragment.name() = kFragmentName;
   fragment.parts().emplace_back();
   fragment.parts()[0].match_program().emplace_back();
-  fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH();
+  fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH();
   descriptor.fragments().push_back(fragment);
 
   descriptor.props().emplace_back();

@@ -10,7 +10,6 @@
 #include "src/devices/bin/driver_manager/v1/driver_host.h"
 
 namespace fdd = fuchsia_driver_development;
-namespace fdm = fuchsia_device_manager;
 
 namespace {
 
@@ -31,10 +30,10 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
     fidl::AnyArena& allocator, const std::vector<fbl::RefPtr<const Device>>& devices) {
   std::vector<fdd::wire::DeviceInfo> device_info_vec;
   for (const auto& device : devices) {
-    if (device->props().size() > fdm::wire::kPropertiesMax) {
+    if (device->props().size() > fuchsia_driver_legacy::wire::kPropertiesMax) {
       return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
     }
-    if (device->str_props().size() > fdm::wire::kPropertiesMax) {
+    if (device->str_props().size() > fuchsia_driver_legacy::wire::kPropertiesMax) {
       return zx::error(ZX_ERR_BUFFER_TOO_SMALL);
     }
 
@@ -70,47 +69,49 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
 
     device_info.bound_driver_libname(fidl::StringView(allocator, device->parent_driver_url()));
 
-    fidl::VectorView<fdm::wire::DeviceProperty> props(allocator, device->props().size());
+    fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty> props(allocator,
+                                                                        device->props().size());
     for (size_t i = 0; i < device->props().size(); i++) {
       const auto& prop = device->props()[i];
-      props[i] = fdm::wire::DeviceProperty{
+      props[i] = fuchsia_driver_legacy::wire::DeviceProperty{
           .id = prop.id,
           .reserved = prop.reserved,
           .value = prop.value,
       };
     }
 
-    fidl::VectorView<fdm::wire::DeviceStrProperty> str_props(allocator, device->str_props().size());
+    fidl::VectorView<fuchsia_driver_legacy::wire::DeviceStrProperty> str_props(
+        allocator, device->str_props().size());
     for (size_t i = 0; i < device->str_props().size(); i++) {
       const auto& str_prop = device->str_props()[i];
       if (str_prop.value.valueless_by_exception()) {
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
 
-      auto fidl_str_prop = fdm::wire::DeviceStrProperty{
+      auto fidl_str_prop = fuchsia_driver_legacy::wire::DeviceStrProperty{
           .key = fidl::StringView(allocator, str_prop.key),
       };
 
       switch (str_prop.value.index()) {
         case StrPropValueType::Integer: {
           const auto prop_val = std::get<StrPropValueType::Integer>(str_prop.value);
-          fidl_str_prop.value = fdm::wire::PropertyValue::WithIntValue(prop_val);
+          fidl_str_prop.value = fuchsia_driver_legacy::wire::PropertyValue::WithIntValue(prop_val);
           break;
         }
         case StrPropValueType::String: {
           const auto prop_val = std::get<StrPropValueType::String>(str_prop.value);
-          fidl_str_prop.value = fdm::wire::PropertyValue::WithStrValue(
+          fidl_str_prop.value = fuchsia_driver_legacy::wire::PropertyValue::WithStrValue(
               allocator, fidl::StringView(allocator, prop_val));
           break;
         }
         case StrPropValueType::Bool: {
           const auto prop_val = std::get<StrPropValueType::Bool>(str_prop.value);
-          fidl_str_prop.value = fdm::wire::PropertyValue::WithBoolValue(prop_val);
+          fidl_str_prop.value = fuchsia_driver_legacy::wire::PropertyValue::WithBoolValue(prop_val);
           break;
         }
         case StrPropValueType::Enum: {
           const auto prop_val = std::get<StrPropValueType::Enum>(str_prop.value);
-          fidl_str_prop.value = fdm::wire::PropertyValue::WithEnumValue(
+          fidl_str_prop.value = fuchsia_driver_legacy::wire::PropertyValue::WithEnumValue(
               allocator, fidl::StringView(allocator, prop_val));
           break;
         }
@@ -119,7 +120,7 @@ zx::result<std::vector<fdd::wire::DeviceInfo>> GetDeviceInfo(
       str_props[i] = fidl_str_prop;
     }
 
-    device_info.property_list(fdm::wire::DevicePropertyList{
+    device_info.property_list(fuchsia_driver_legacy::wire::DevicePropertyList{
         .props = props,
         .str_props = str_props,
     });

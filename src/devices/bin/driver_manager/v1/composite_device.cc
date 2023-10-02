@@ -23,7 +23,7 @@ using namespace fuchsia_driver_framework;
 namespace {
 
 fbl::Array<StrProperty> ConvertStringProperties(
-    fidl::VectorView<fdm::wire::DeviceStrProperty> str_props) {
+    fidl::VectorView<fuchsia_driver_legacy::wire::DeviceStrProperty> str_props) {
   fbl::Array<StrProperty> str_properties(new StrProperty[str_props.count()], str_props.count());
   for (size_t i = 0; i < str_props.count(); i++) {
     str_properties[i].key = str_props[i].key.get();

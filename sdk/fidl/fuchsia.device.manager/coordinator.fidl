@@ -6,44 +6,10 @@ library fuchsia.device.manager;
 // TODO(teisenbe): Move these interfaces to be internal to the devmgr codebase
 
 using fuchsia.driver.framework as fdf;
+using fuchsia.driver.legacy;
 using fuchsia.io;
 using fuchsia.device;
 using zx;
-
-/// This has the same structure as zx_device_prop_t.
-type DeviceProperty = struct {
-    id uint16;
-    reserved uint16;
-    value uint32;
-};
-
-type PropertyValue = strict union {
-    1: int_value uint32;
-    2: str_value string:STR_LENGTH_MAX;
-    3: bool_value bool;
-    4: enum_value string:STR_LENGTH_MAX;
-};
-
-type DeviceStrProperty = struct {
-    key string:STR_LENGTH_MAX;
-    value PropertyValue;
-};
-
-type DevicePropertyList = struct {
-    props vector<DeviceProperty>:PROPERTIES_MAX;
-    str_props vector<DeviceStrProperty>:STR_PROPERTIES_MAX;
-};
-
-// TODO(bwb): Make this descriptive of binding, not zx_bind_inst_t
-// currently a magic bitfield defined in binding.h
-type BindInstruction = struct {
-    /// bitfield that encodes the operation and execution conditions
-    op uint32;
-    /// bitfield that encodes the arguments
-    arg uint32;
-    /// bitfield that encodes debugging information
-    debug uint32;
-};
 
 // Identifier used to let the devcoordinator describe specific devices during
 // composite construction
@@ -51,10 +17,6 @@ alias LocalDeviceId = uint64;
 
 /// This definition must match `ZX_DEVICE_NAME_MAX` and is checked by a static assert.
 const DEVICE_NAME_MAX uint32 = 31;
-
-/// Maximum number of bytes in a path
-// The simple name PATH_MAX collides with a musl #define on c++ bindings.
-const DEVICE_PATH_MAX uint32 = 1024;
 
 /// Maximum number of bytes in a device arguments string.
 const DEVICE_ARGS_MAX uint32 = 1024;
@@ -65,15 +27,6 @@ const METADATA_BYTES_MAX uint32 = 8192;
 /// Maximum number of metadata that can be added to a device
 const METADATA_MAX uint32 = 32;
 
-/// Maximum number of properties that can be attached to a device
-const PROPERTIES_MAX uint32 = 256;
-
-/// Maximum number of string properties that can be attached to a device
-const STR_PROPERTIES_MAX uint32 = 256;
-
-/// Maximum length of a string property key and value.
-const STR_LENGTH_MAX uint32 = 255;
-
 /// Maximum number of fragments that a composite device can have
 const FRAGMENTS_MAX uint32 = 16;
 
@@ -82,9 +35,6 @@ const DEVICE_FRAGMENT_PARTS_MAX uint32 = 16;
 
 /// Maximum number of instructions in the match program of a device fragment part
 const DEVICE_FRAGMENT_PART_INSTRUCTIONS_MAX uint32 = 32;
-
-// Maximum number of instructions in a driver bind program
-const BIND_RULES_INSTRUCTIONS_MAX uint32 = 256;
 
 /// Maximum length of a dispatcher scheduler role.
 const MAX_SCHEDULER_ROLE_LENGTH uint32 = 2048;
@@ -101,7 +51,8 @@ type AddDeviceConfig = strict bits : uint32 {
 
 /// A part of a description of a DeviceFragment
 type DeviceFragmentPart = struct {
-    match_program vector<BindInstruction>:DEVICE_FRAGMENT_PART_INSTRUCTIONS_MAX;
+    match_program
+            vector<fuchsia.driver.legacy.BindInstruction>:DEVICE_FRAGMENT_PART_INSTRUCTIONS_MAX;
 };
 
 /// A piece of a composite device
@@ -118,8 +69,9 @@ type DeviceMetadata = struct {
 
 /// Composite device parts and properties
 type CompositeDeviceDescriptor = struct {
-    props vector<DeviceProperty>:PROPERTIES_MAX;
-    str_props vector<DeviceStrProperty>:STR_PROPERTIES_MAX;
+    props vector<fuchsia.driver.legacy.DeviceProperty>:fuchsia.driver.legacy.PROPERTIES_MAX;
+    str_props
+            vector<fuchsia.driver.legacy.DeviceStrProperty>:fuchsia.driver.legacy.STR_PROPERTIES_MAX;
     fragments vector<DeviceFragment>:FRAGMENTS_MAX;
     primary_fragment_index uint32;
     spawn_colocated bool;
@@ -171,7 +123,7 @@ closed protocol DeviceController {
     /// scheduler role is specified, the dispatcher will be serviced by the default
     /// thread pool, and this will not cause an error to be returned.
     strict BindDriver(resource struct {
-        driver_path string:DEVICE_PATH_MAX;
+        driver_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
         driver zx.Handle:VMO;
         default_dispatcher_scheduler_role string:MAX_SCHEDULER_ROLE_LENGTH;
     }) -> (resource struct {
@@ -229,7 +181,7 @@ type StubDevice = struct {
 };
 
 type ProxyDevice = resource struct {
-    driver_path string:DEVICE_PATH_MAX;
+    driver_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
     driver zx.Handle:VMO;
     parent_proxy zx.Handle:CHANNEL;
 };
@@ -295,9 +247,9 @@ type AddDeviceArgs = struct {
     /// The protocol id, used for binding.
     protocol_id uint32;
     /// The property list of the device, used for binding.
-    property_list DevicePropertyList;
+    property_list fuchsia.driver.legacy.DevicePropertyList;
     /// The driver path, used for debugging.
-    driver_path string:<DEVICE_PATH_MAX, optional>;
+    driver_path string:<fuchsia.driver.legacy.DEVICE_PATH_MAX, optional>;
     /// This should be used only for shadowed device. This will be forwarded to
     /// the shadowed device.
     args string:<DEVICE_ARGS_MAX, optional>;
@@ -345,18 +297,18 @@ closed protocol Coordinator {
     /// * error `ZX_ERR_ALREADY_BOUND` if the device is already bound.
     /// * error `ZX_ERR_NOT_FOUND` no drivers were found.
     strict BindDevice(struct {
-        driver_url_suffix string:<DEVICE_PATH_MAX, optional>;
+        driver_url_suffix string:<fuchsia.driver.legacy.DEVICE_PATH_MAX, optional>;
     }) -> () error zx.Status;
 
     /// Returns the topological path of this device.
     strict GetTopologicalPath() -> (struct {
-        path string:DEVICE_PATH_MAX;
+        path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
     }) error zx.Status;
 
     /// Requests that the firmware at the given path be loaded and returned.
     strict LoadFirmware(struct {
-        driver_path string:DEVICE_PATH_MAX;
-        fw_path string:DEVICE_PATH_MAX;
+        driver_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
+        fw_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
     }) -> (resource struct {
         vmo zx.Handle:VMO;
         size uint64;
@@ -417,8 +369,8 @@ closed protocol Coordinator {
     ///   a composite node
     strict ConnectFidlProtocol(resource struct {
         fragment_name string:<DEVICE_NAME_MAX, optional>;
-        service_name string:<STR_LENGTH_MAX, optional>;
-        protocol_name string:STR_LENGTH_MAX;
+        service_name string:<fuchsia.driver.legacy.STR_LENGTH_MAX, optional>;
+        protocol_name string:fuchsia.driver.legacy.STR_LENGTH_MAX;
         server zx.Handle:CHANNEL;
     }) -> () error zx.Status;
 };

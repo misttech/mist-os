@@ -71,9 +71,9 @@ fdd::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFragmentIn
     fragment_info.device() = bound_node->MakeTopologicalPath();
   }
 
-  std::vector<fdm::BindInstruction> bind_rules(bind_rules_.size());
+  std::vector<fuchsia_driver_legacy::BindInstruction> bind_rules(bind_rules_.size());
   for (size_t i = 0; i < bind_rules_.size(); i++) {
-    bind_rules[i] = fdm::BindInstruction{{
+    bind_rules[i] = fuchsia_driver_legacy::BindInstruction{{
         .op = bind_rules_[i].op,
         .arg = bind_rules_[i].arg,
         .debug = bind_rules_[i].debug,
@@ -168,22 +168,22 @@ zx::result<std::unique_ptr<CompositeDeviceAssembler>> CompositeDeviceAssembler::
   // Create the string properties.
   for (auto& prop : descriptor.str_props()) {
     switch (prop.value().Which()) {
-      case fuchsia_device_manager::PropertyValue::Tag::kBoolValue:
+      case fuchsia_driver_legacy::PropertyValue::Tag::kBoolValue:
         assembler->properties_.emplace_back(
             fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().bool_value().value()));
         break;
 
-      case fuchsia_device_manager::PropertyValue::Tag::kIntValue:
+      case fuchsia_driver_legacy::PropertyValue::Tag::kIntValue:
         assembler->properties_.emplace_back(
             fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().int_value().value()));
         break;
 
-      case fuchsia_device_manager::PropertyValue::Tag::kStrValue:
+      case fuchsia_driver_legacy::PropertyValue::Tag::kStrValue:
         assembler->properties_.emplace_back(
             fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().str_value().value()));
         break;
 
-      case fuchsia_device_manager::PropertyValue::Tag::kEnumValue:
+      case fuchsia_driver_legacy::PropertyValue::Tag::kEnumValue:
         assembler->properties_.emplace_back(
             fdf::MakeProperty(assembler->arena_, prop.key(), prop.value().enum_value().value()));
         break;

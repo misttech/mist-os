@@ -4,7 +4,7 @@
 
 #include "src/devices/bin/driver_manager/v1/composite_device_fragment.h"
 
-#include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.driver.legacy/cpp/wire.h>
 #include <zircon/status.h>
 
 #include "src/devices/bin/driver_manager/binding.h"
@@ -12,7 +12,6 @@
 #include "src/devices/lib/log/log.h"
 
 namespace fdd = fuchsia_driver_development;
-namespace fdm = fuchsia_device_manager;
 
 CompositeDeviceFragment::CompositeDeviceFragment(CompositeDevice* composite, std::string name,
                                                  uint32_t index,
@@ -30,9 +29,10 @@ fdd::wire::LegacyCompositeFragmentInfo CompositeDeviceFragment::GetCompositeFrag
     fragment_info.device(bound_device_->MakeTopologicalPath());
   }
 
-  fidl::VectorView<fdm::wire::BindInstruction> bind_rules(arena, bind_rules_.size());
+  fidl::VectorView<fuchsia_driver_legacy::wire::BindInstruction> bind_rules(arena,
+                                                                            bind_rules_.size());
   for (size_t i = 0; i < bind_rules_.size(); i++) {
-    bind_rules[i] = fdm::wire::BindInstruction{
+    bind_rules[i] = fuchsia_driver_legacy::wire::BindInstruction{
         .op = bind_rules_[i].op,
         .arg = bind_rules_[i].arg,
         .debug = bind_rules_[i].debug,

@@ -205,7 +205,7 @@ void BindCompositeDefineComposite(const fbl::RefPtr<Device>& platform_bus,
     fragment.name = ::fidl::StringView("unnamed-fragment");
     fragment.parts.Allocate(allocator, 1);
     fragment.parts[0].match_program.Allocate(allocator, 1);
-    fragment.parts[0].match_program[0] = fuchsia_device_manager::wire::BindInstruction{
+    fragment.parts[0].match_program[0] = fuchsia_driver_legacy::wire::BindInstruction{
         .op = protocol.op,
         .arg = protocol.arg,
         .debug = always.debug,
@@ -213,8 +213,8 @@ void BindCompositeDefineComposite(const fbl::RefPtr<Device>& platform_bus,
     fragments.push_back(fragment);
   }
 
-  std::vector<fuchsia_device_manager::wire::DeviceProperty> props_list = {
-      fuchsia_device_manager::wire::DeviceProperty{
+  std::vector<fuchsia_driver_legacy::wire::DeviceProperty> props_list = {
+      fuchsia_driver_legacy::wire::DeviceProperty{
           .id = BIND_PROTOCOL,
           .reserved = 0,
           .value = ZX_PROTOCOL_TEST,
@@ -230,8 +230,8 @@ void BindCompositeDefineComposite(const fbl::RefPtr<Device>& platform_bus,
   }
 
   fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_desc = {
-      .props = ::fidl::VectorView<fuchsia_device_manager::wire::DeviceProperty>::FromExternal(
-          props_list),
+      .props =
+          ::fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty>::FromExternal(props_list),
       .fragments =
           ::fidl::VectorView<fuchsia_device_manager::wire::DeviceFragment>::FromExternal(fragments),
       .primary_fragment_index = 0,

@@ -137,8 +137,8 @@ fn write_parent_nodes_info(
 #[cfg(test)]
 mod tests {
     use {
-        super::*, fidl_fuchsia_device_manager::BindInstruction,
-        fidl_fuchsia_driver_framework as fdf, fuchsia_async as fasync, std::io::Error,
+        super::*, fidl_fuchsia_driver_framework as fdf,
+        fidl_fuchsia_driver_legacy::BindInstruction, fuchsia_async as fasync, std::io::Error,
     };
 
     pub struct TestWriteBuffer {

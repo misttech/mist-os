@@ -74,15 +74,16 @@ bool property_value_type_valid(uint32_t value_type) {
          value_type <= ZX_DEVICE_PROPERTY_VALUE_ENUM;
 }
 
-fdm::wire::DeviceProperty convert_device_prop(const zx_device_prop_t& prop) {
-  return fdm::wire::DeviceProperty{
+fuchsia_driver_legacy::wire::DeviceProperty convert_device_prop(const zx_device_prop_t& prop) {
+  return fuchsia_driver_legacy::wire::DeviceProperty{
       .id = prop.id,
       .reserved = prop.reserved,
       .value = prop.value,
   };
 }
 
-std::optional<fdm::wire::DeviceProperty> fidl_offer_to_device_prop(const char* fidl_offer) {
+std::optional<fuchsia_driver_legacy::wire::DeviceProperty> fidl_offer_to_device_prop(
+    const char* fidl_offer) {
   static const std::unordered_map<std::string_view, uint32_t> kPropMap = {
 #define DDK_FIDL_PROTOCOL_DEF(tag, val, name) \
   {                                           \
@@ -97,39 +98,39 @@ std::optional<fdm::wire::DeviceProperty> fidl_offer_to_device_prop(const char* f
     return std::nullopt;
   }
   auto& [key, value] = *prop;
-  return fdm::wire::DeviceProperty{
+  return fuchsia_driver_legacy::wire::DeviceProperty{
       .id = BIND_FIDL_PROTOCOL,
       .reserved = 0,
       .value = value,
   };
 }
 
-fuchsia_device_manager::wire::DeviceStrProperty convert_device_str_prop(
+fuchsia_driver_legacy::wire::DeviceStrProperty convert_device_str_prop(
     const zx_device_str_prop_t& prop, fidl::AnyArena& allocator) {
   ZX_ASSERT(property_value_type_valid(prop.property_value.data_type));
 
-  auto str_property = fuchsia_device_manager::wire::DeviceStrProperty{
+  auto str_property = fuchsia_driver_legacy::wire::DeviceStrProperty{
       .key = fidl::StringView(allocator, prop.key),
   };
 
   switch (prop.property_value.data_type) {
     case ZX_DEVICE_PROPERTY_VALUE_INT: {
-      str_property.value = fuchsia_device_manager::wire::PropertyValue::WithIntValue(
+      str_property.value = fuchsia_driver_legacy::wire::PropertyValue::WithIntValue(
           prop.property_value.data.int_val);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_STRING: {
-      str_property.value = fuchsia_device_manager::wire::PropertyValue::WithStrValue(
+      str_property.value = fuchsia_driver_legacy::wire::PropertyValue::WithStrValue(
           allocator, allocator, prop.property_value.data.str_val);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_BOOL: {
-      str_property.value = fuchsia_device_manager::wire::PropertyValue::WithBoolValue(
+      str_property.value = fuchsia_driver_legacy::wire::PropertyValue::WithBoolValue(
           prop.property_value.data.bool_val);
       break;
     }
     case ZX_DEVICE_PROPERTY_VALUE_ENUM: {
-      str_property.value = fuchsia_device_manager::wire::PropertyValue::WithEnumValue(
+      str_property.value = fuchsia_driver_legacy::wire::PropertyValue::WithEnumValue(
           fidl::ObjectView<fidl::StringView>(allocator, allocator,
                                              prop.property_value.data.enum_val));
       break;
@@ -298,13 +299,13 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
       fidl::WireSharedClient(std::move(coordinator_endpoints->client), loop_.dispatcher());
   auto conn = DeviceControllerConnection::Create(this, child, std::move(coordinator));
 
-  std::vector<fuchsia_device_manager::wire::DeviceProperty> props_list = {};
+  std::vector<fuchsia_driver_legacy::wire::DeviceProperty> props_list = {};
   for (size_t i = 0; i < add_args->prop_count; i++) {
     props_list.push_back(convert_device_prop(add_args->props[i]));
   }
 
   fidl::Arena allocator;
-  std::vector<fuchsia_device_manager::wire::DeviceStrProperty> str_props_list = {};
+  std::vector<fuchsia_driver_legacy::wire::DeviceStrProperty> str_props_list = {};
   for (size_t i = 0; i < add_args->str_prop_count; i++) {
     if (!property_value_type_valid(add_args->str_props[i].property_value.data_type)) {
       return ZX_ERR_INVALID_ARGS;
@@ -312,9 +313,9 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
     str_props_list.push_back(convert_device_str_prop(add_args->str_props[i], allocator));
   }
   for (const auto& offer : child->fidl_service_offers()) {
-    auto str_property = fuchsia_device_manager::wire::DeviceStrProperty{
+    auto str_property = fuchsia_driver_legacy::wire::DeviceStrProperty{
         .key = fidl::StringView(allocator, offer),
-        .value = fuchsia_device_manager::wire::PropertyValue::WithEnumValue(
+        .value = fuchsia_driver_legacy::wire::PropertyValue::WithEnumValue(
             allocator, std::string(offer) + ".ZirconTransport"),
     };
     str_props_list.push_back(str_property);
@@ -326,9 +327,9 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
   }
 
   for (const auto& offer : child->runtime_service_offers()) {
-    auto str_property = fuchsia_device_manager::wire::DeviceStrProperty{
+    auto str_property = fuchsia_driver_legacy::wire::DeviceStrProperty{
         .key = fidl::StringView(allocator, offer),
-        .value = fuchsia_device_manager::wire::PropertyValue::WithEnumValue(
+        .value = fuchsia_driver_legacy::wire::PropertyValue::WithEnumValue(
             allocator, std::string(offer) + ".DriverTransport"),
     };
     str_props_list.push_back(str_property);
@@ -347,12 +348,11 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
   static_assert(sizeof(zx_device_prop_t) == sizeof(uint64_t));
   uint64_t device_id = 0;
 
-  ::fuchsia_device_manager::wire::DevicePropertyList property_list = {
-      .props = ::fidl::VectorView<fuchsia_device_manager::wire::DeviceProperty>::FromExternal(
-          props_list),
-      .str_props =
-          ::fidl::VectorView<fuchsia_device_manager::wire::DeviceStrProperty>::FromExternal(
-              str_props_list),
+  ::fuchsia_driver_legacy::wire::DevicePropertyList property_list = {
+      .props =
+          ::fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty>::FromExternal(props_list),
+      .str_props = ::fidl::VectorView<fuchsia_driver_legacy::wire::DeviceStrProperty>::FromExternal(
+          str_props_list),
   };
 
   fdm::wire::AddDeviceArgs add_device_args = {
@@ -1151,7 +1151,7 @@ zx_status_t DriverHostContext::DeviceAddComposite(const fbl::RefPtr<zx_device_t>
                                          comp_desc->fragments[i].parts[j].instruction_count);
 
       for (uint32_t k = 0; k < comp_desc->fragments[i].parts[j].instruction_count; k++) {
-        dc.parts[j].match_program[k] = fuchsia_device_manager::wire::BindInstruction{
+        dc.parts[j].match_program[k] = fuchsia_driver_legacy::wire::BindInstruction{
             .op = comp_desc->fragments[i].parts[j].match_program[k].op,
             .arg = comp_desc->fragments[i].parts[j].match_program[k].arg,
             .debug = comp_desc->fragments[i].parts[j].match_program[k].debug,
@@ -1171,12 +1171,12 @@ zx_status_t DriverHostContext::DeviceAddComposite(const fbl::RefPtr<zx_device_t>
     metadata.emplace_back(std::move(meta));
   }
 
-  std::vector<fuchsia_device_manager::wire::DeviceProperty> props = {};
+  std::vector<fuchsia_driver_legacy::wire::DeviceProperty> props = {};
   for (size_t i = 0; i < comp_desc->props_count; i++) {
     props.push_back(convert_device_prop(comp_desc->props[i]));
   }
 
-  std::vector<fuchsia_device_manager::wire::DeviceStrProperty> str_props = {};
+  std::vector<fuchsia_driver_legacy::wire::DeviceStrProperty> str_props = {};
   for (size_t i = 0; i < comp_desc->str_props_count; i++) {
     if (!property_value_type_valid(comp_desc->str_props[i].property_value.data_type)) {
       return ZX_ERR_INVALID_ARGS;
@@ -1196,11 +1196,9 @@ zx_status_t DriverHostContext::DeviceAddComposite(const fbl::RefPtr<zx_device_t>
   }
 
   fuchsia_device_manager::wire::CompositeDeviceDescriptor comp_dev = {
-      .props =
-          ::fidl::VectorView<fuchsia_device_manager::wire::DeviceProperty>::FromExternal(props),
-      .str_props =
-          ::fidl::VectorView<fuchsia_device_manager::wire::DeviceStrProperty>::FromExternal(
-              str_props),
+      .props = ::fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty>::FromExternal(props),
+      .str_props = ::fidl::VectorView<fuchsia_driver_legacy::wire::DeviceStrProperty>::FromExternal(
+          str_props),
       .fragments =
           ::fidl::VectorView<fuchsia_device_manager::wire::DeviceFragment>::FromExternal(compvec),
       .primary_fragment_index = primary_fragment_index,

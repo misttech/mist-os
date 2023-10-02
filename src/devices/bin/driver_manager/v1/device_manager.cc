@@ -18,15 +18,16 @@ DeviceManager::DeviceManager(Coordinator* coordinator, DriverHostCrashPolicy cra
 
 zx_status_t DeviceManager::AddDevice(
     const fbl::RefPtr<Device>& parent, fidl::ClientEnd<fdm::DeviceController> device_controller,
-    fidl::ServerEnd<fdm::Coordinator> coordinator, const fdm::wire::DeviceProperty* props_data,
-    size_t props_count, const fdm::wire::DeviceStrProperty* str_props_data, size_t str_props_count,
+    fidl::ServerEnd<fdm::Coordinator> coordinator,
+    const fuchsia_driver_legacy::wire::DeviceProperty* props_data, size_t props_count,
+    const fuchsia_driver_legacy::wire::DeviceStrProperty* str_props_data, size_t str_props_count,
     std::string_view name, uint32_t protocol_id, std::string_view driver_path,
     fuchsia_device_manager::wire::AddDeviceConfig add_device_config, bool has_init,
     bool always_init, zx::vmo inspect, fidl::ClientEnd<fio::Directory> outgoing_dir,
     fbl::RefPtr<Device>* new_device) {
   // If this is true, then |name_data|'s size is properly bounded.
   static_assert(fdm::wire::kDeviceNameMax == ZX_DEVICE_NAME_MAX);
-  static_assert(fdm::wire::kPropertiesMax <= UINT32_MAX);
+  static_assert(fuchsia_driver_legacy::wire::kPropertiesMax <= UINT32_MAX);
 
   if (coordinator_->suspend_resume_manager().InSuspend()) {
     LOGF(ERROR, "Add device '%.*s' forbidden in suspend", static_cast<int>(name.size()),

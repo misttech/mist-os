@@ -244,7 +244,7 @@ void BindManagerTestBase::AddLegacyComposite(std::string composite,
     fragment.name() = name;
     fragment.parts().emplace_back();
     fragment.parts()[0].match_program().emplace_back();
-    fragment.parts()[0].match_program()[0] = fuchsia_device_manager::BindInstruction BI_MATCH_IF(
+    fragment.parts()[0].match_program()[0] = fuchsia_driver_legacy::BindInstruction BI_MATCH_IF(
         EQ, BIND_PLATFORM_DEV_INSTANCE_ID, GetOrAddInstanceId(name));
     descriptor.fragments().push_back(fragment);
   }

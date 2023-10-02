@@ -4,9 +4,9 @@
 library fuchsia.driver.development;
 
 using fuchsia.component.decl;
-using fuchsia.device.manager;
 using fuchsia.driver.framework;
 using fuchsia.driver.index;
+using fuchsia.driver.legacy;
 using fuchsia.pkg;
 using fuchsia.url;
 using zx;
@@ -16,7 +16,7 @@ const BINDING_RESULT_MAX uint8 = 10;
 type BindRulesBytecode = strict union {
     /// Bind rules in the old bytecode format.
     1: bytecode_v1
-            vector<fuchsia.device.manager.BindInstruction>:fuchsia.device.manager.BIND_RULES_INSTRUCTIONS_MAX;
+            vector<fuchsia.driver.legacy.BindInstruction>:fuchsia.driver.legacy.BIND_RULES_INSTRUCTIONS_MAX;
 
     /// Bind rules in the new bytecode format.
     2: bytecode_v2 vector<uint8>:MAX;
@@ -24,7 +24,7 @@ type BindRulesBytecode = strict union {
 
 type DriverInfo = table {
     /// Path to the driver shared library.
-    1: libname string:fuchsia.device.manager.DEVICE_PATH_MAX;
+    1: libname string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
 
     /// Name of the driver, taken from the first field of the `ZIRCON_DRIVER`
     /// macro in the driver.
@@ -96,22 +96,22 @@ type DeviceInfo = table {
     4: driver_host_koid zx.Koid;
 
     /// (DFv1) The topological path of the driver.
-    5: topological_path string:fuchsia.device.manager.DEVICE_PATH_MAX;
+    5: topological_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
 
     /// (DFv1) Path to the driver shared library.
-    6: bound_driver_libname string:fuchsia.device.manager.DEVICE_PATH_MAX;
+    6: bound_driver_libname string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
 
     /// (DFv2) URL to the driver component manifest
     7: bound_driver_url string:fuchsia.url.MAX_URL_LENGTH;
 
     /// (DFv1) Properties of the device.
-    8: property_list fuchsia.device.manager.DevicePropertyList;
+    8: property_list fuchsia.driver.legacy.DevicePropertyList;
 
     /// (DFv1) Tracks the state of the device.
     9: flags DeviceFlags;
 
     /// (DFv2) The collection-relative moniker of the node.
-   10: moniker string:fuchsia.device.manager.DEVICE_PATH_MAX;
+   10: moniker string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
 
     /// (DFv2) Properties of the node.
    11: node_property_list
@@ -130,7 +130,7 @@ type DeviceInfo = table {
 /// Information about a node binding to either a driver or a composite.
 type NodeBindingInfo = table {
     /// Full topological name of the node.
-    1: node_name string:fuchsia.device.manager.DEVICE_PATH_MAX;
+    1: node_name string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
     /// This is the component url for the driver that bound to the node.
     /// If this is present, then |composite_specs| and |legacy_composites| must not be.
     2: driver_url string:fuchsia.url.MAX_URL_LENGTH;
@@ -153,7 +153,7 @@ closed protocol DriverInfoIterator {
 type LegacyCompositeFragmentInfo = table {
     1: name string:MAX;
     2: bind_rules
-            vector<fuchsia.device.manager.BindInstruction>:fuchsia.device.manager.BIND_RULES_INSTRUCTIONS_MAX;
+            vector<fuchsia.driver.legacy.BindInstruction>:fuchsia.driver.legacy.BIND_RULES_INSTRUCTIONS_MAX;
     3: device string:MAX;
 };
 
@@ -296,7 +296,7 @@ closed protocol DeviceInfoIterator {
 
 type TestNodeAddArgs = table {
     /// Name of the node.
-    1: name string:fuchsia.device.manager.DEVICE_PATH_MAX;
+    1: name string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
 
     /// Properties of the node.
     2: properties
@@ -329,7 +329,7 @@ open protocol DriverDevelopment {
     /// Restarts all driver hosts containing the driver specified by `driver path`, and returns the
     /// number of driver hosts that were restarted.
     flexible RestartDriverHosts(struct {
-        driver_path string:fuchsia.device.manager.DEVICE_PATH_MAX;
+        driver_path string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
         rematch_flags RematchFlags;
     }) -> (struct {
         count uint32;
@@ -383,6 +383,6 @@ open protocol DriverDevelopment {
     /// (DFv2) Removes the test node. The node is removed asynchronously and is
     /// not guaranteed to be removed by the time this returns.
     flexible RemoveTestNode(struct {
-        name string:fuchsia.device.manager.DEVICE_PATH_MAX;
+        name string:fuchsia.driver.legacy.DEVICE_PATH_MAX;
     }) -> () error zx.Status;
 };

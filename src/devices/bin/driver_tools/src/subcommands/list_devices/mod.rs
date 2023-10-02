@@ -8,8 +8,8 @@ use {
     crate::common::{node_property_key_to_string, node_property_value_to_string},
     anyhow::{anyhow, Result},
     args::ListDevicesCommand,
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_device_manager as fdm,
-    fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_driver_development as fdd,
+    fidl_fuchsia_driver_legacy,
     fuchsia_driver_dev::{self, DFv1Device, DFv2Node, Device},
 };
 
@@ -75,10 +75,14 @@ impl DevicePrinter for DFv1Device {
                     count,
                     prop.key,
                     match prop.value {
-                        fdm::PropertyValue::IntValue(value) => format!("{:#08x}", value),
-                        fdm::PropertyValue::StrValue(ref value) => format!("{}", value),
-                        fdm::PropertyValue::BoolValue(value) => value.to_string(),
-                        fdm::PropertyValue::EnumValue(ref value) => format!("Enum({})", value),
+                        fidl_fuchsia_driver_legacy::PropertyValue::IntValue(value) =>
+                            format!("{:#08x}", value),
+                        fidl_fuchsia_driver_legacy::PropertyValue::StrValue(ref value) =>
+                            format!("{}", value),
+                        fidl_fuchsia_driver_legacy::PropertyValue::BoolValue(value) =>
+                            value.to_string(),
+                        fidl_fuchsia_driver_legacy::PropertyValue::EnumValue(ref value) =>
+                            format!("Enum({})", value),
                     }
                 );
                 idx += 1;
