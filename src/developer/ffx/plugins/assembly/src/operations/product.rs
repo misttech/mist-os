@@ -66,22 +66,23 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         builder.add_domain_config(package, config)?;
     }
 
-    // Add the board's Board Input Bundles, if it has them.
-    for bundle_path in board_info.input_bundles {
-        let bundle_path = bundle_path.as_utf8_pathbuf().join("board_input_bundle.json");
-        let bundle: BoardInputBundle = util::read_config(&bundle_path)
-            .with_context(|| format!("Loading board input bundle: {bundle_path}"))?;
+    // Add the board's Board input Bundle, if it has one.
+    if let Some(main_bundle) = board_info.main_bundle {
+        let main_bundle = main_bundle.as_utf8_pathbuf().join("board_input_bundle.json");
+        let bundle: BoardInputBundle =
+            util::read_config(&main_bundle).context("Loading board's main board input bundle")?;
 
-        let bundle = bundle
-            .resolve_paths_from_file(&bundle_path)
-            .with_context(|| format!("resolving paths in board input bundle: {bundle_path}"))?;
-
+        let bundle = bundle.resolve_paths_from_file(&main_bundle).with_context(|| {
+            format!("resolving paths in main board input bundle: {main_bundle}")
+        })?;
         builder
             .add_board_input_bundle(
                 bundle,
                 config.platform.feature_set_level == FeatureSupportLevel::Bootstrap,
             )
-            .with_context(|| format!("Adding board input bundle from: {bundle_path}"))?;
+            .with_context(|| {
+                format!("Adding the board's main board input bundle from: {main_bundle}")
+            })?;
     }
 
     // Add the platform Assembly Input Bundles that were chosen by the configuration.

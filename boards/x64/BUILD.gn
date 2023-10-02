@@ -17,7 +17,7 @@ board_configuration("x64") {
     "fuchsia::paravirtualization",
   ]
 
-  input_bundles = [ ":main_bundle" ]
+  main_bundle = ":main_bundle"
 
   filesystems = {
     vbmeta = {

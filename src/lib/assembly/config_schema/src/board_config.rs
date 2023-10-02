@@ -28,13 +28,9 @@ pub struct BoardInformation {
     #[file_relative_paths]
     pub filesystems: BoardFilesystemConfig,
 
-    /// These are paths to the directories that contain board input bundles that
-    /// this board configuration includes.  Product assembly will always include
-    /// these into the images that it creates.
-    ///
-    /// These are the board-specific artifacts that the Fuchsia platform needs
-    /// added to the assembled system in order to be able to boot Fuchsia on
-    /// this board.
+    /// This is the path to the directory that contains the bundle of
+    /// board-specific artifacts that the Fuchsia platform needs added to the
+    /// assembled system in order to be able to boot Fuchsia on this board.
     ///
     /// Examples:
     ///  - the "board driver"
@@ -42,9 +38,8 @@ pub struct BoardInformation {
     ///
     /// If any of these artifacts are removed, even the 'bootstrap' feature set
     /// may be unable to boot.
-    #[serde(default)]
     #[file_relative_paths]
-    pub input_bundles: Vec<FileRelativePathBuf>,
+    pub main_bundle: Option<FileRelativePathBuf>,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board
@@ -90,10 +85,7 @@ mod test {
                 "feature_a",
                 "feature_b"
             ],
-            "input_bundles": [
-                "bundle_a",
-                "bundle_b"
-            ]
+            "main_bundle": "main_bundle",
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -102,10 +94,7 @@ mod test {
         let expected = BoardInformation {
             name: "sample board".to_owned(),
             provided_features: vec!["feature_a".into(), "feature_b".into()],
-            input_bundles: vec![
-                FileRelativePathBuf::Resolved("some/path/to/board/bundle_a".into()),
-                FileRelativePathBuf::Resolved("some/path/to/board/bundle_b".into()),
-            ],
+            main_bundle: Some("some/path/to/board/main_bundle".into()),
             ..Default::default()
         };
 
