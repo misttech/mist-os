@@ -68,7 +68,10 @@ struct ReadyObject {
 pub struct EpollFileObject {
     waiter: Waiter,
     /// Mutable state of this epoll object.
-    state: Arc<Mutex<EpollState>>,
+    state: Mutex<EpollState>,
+    /// trigger_list is a FIFO of events that have
+    /// happened, but have not yet been processed.
+    trigger_list: Arc<Mutex<VecDeque<ReadyObject>>>,
 }
 
 #[derive(Default)]
@@ -76,9 +79,14 @@ struct EpollState {
     /// Any file tracked by this epoll instance
     /// will exist as a key in `wait_objects`.
     wait_objects: HashMap<EpollKey, WaitObject>,
-    /// trigger_list is a FIFO of events that have
-    /// happened, but have not yet been processed.
-    trigger_list: VecDeque<ReadyObject>,
+    /// processing_list is a FIFO of events that are being
+    /// processed.
+    ///
+    /// Objects from the `EpollFileObject`'s `trigger_list` are moved into this
+    /// list so that we can handle triggered events without holding its lock
+    /// longer than we need to. This reduces contention with waited-on objects
+    /// that tries to notify this epoll object on subscribed events.
+    processing_list: VecDeque<ReadyObject>,
     /// rearm_list is the list of event that need to
     /// be waited upon prior to actually waiting in
     /// EpollFileObject::wait. They cannot be re-armed
@@ -94,13 +102,21 @@ struct EpollState {
 impl EpollFileObject {
     /// Allocate a new, empty epoll object.
     pub fn new_file(current_task: &CurrentTask) -> FileHandle {
-        Anon::new_file(current_task, Box::new(EpollFileObject::default()), OpenFlags::RDWR)
+        let epoll = Box::new(EpollFileObject::default());
+
+        #[cfg(any(test, debug_assertions))]
+        {
+            let _l1 = epoll.state.lock();
+            let _l2 = epoll.trigger_list.lock();
+        }
+
+        Anon::new_file(current_task, epoll, OpenFlags::RDWR)
     }
 
     fn new_wait_handler(&self, key: EpollKey) -> EventHandler {
-        let state = self.state.clone();
+        let trigger_list = self.trigger_list.clone();
         Box::new(move |observed: FdEvents| {
-            state.lock().trigger_list.push_back(ReadyObject { key, observed })
+            trigger_list.lock().push_back(ReadyObject { key, observed })
         })
     }
 
@@ -262,8 +278,13 @@ impl EpollFileObject {
         max_events: usize,
     ) -> Result<(), Errno> {
         let mut state = self.state.lock();
-        while pending_list.len() < max_events && !state.trigger_list.is_empty() {
-            if let Some(pending) = state.trigger_list.pop_front() {
+        // Move all the elements from `self.trigger_list` to this intermediary
+        // queue that we handle events from. This reduces the time spent holding
+        // `self.trigger_list`'s lock which reduces contention with objects that
+        // this epoll object has subscribed for notifications from.
+        state.processing_list.append(&mut *self.trigger_list.lock());
+        while pending_list.len() < max_events && !state.processing_list.is_empty() {
+            if let Some(pending) = state.processing_list.pop_front() {
                 if let Some(wait) = state.wait_objects.get_mut(&pending.key) {
                     // The weak pointer to the FileObject target can be gone if the file was closed
                     // out from under us. If this happens it is not an error: ignore it and
@@ -402,7 +423,7 @@ impl EpollFileObject {
         }
 
         // Notify waiters of unprocessed events.
-        if !state.trigger_list.is_empty() {
+        if !state.processing_list.is_empty() || !self.trigger_list.lock().is_empty() {
             state.waiters.notify_fd_events(FdEvents::POLLIN);
         }
 
@@ -452,7 +473,8 @@ impl FileOps for EpollFileObject {
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
-        if self.state.lock().trigger_list.is_empty() {
+        let state = self.state.lock();
+        if state.processing_list.is_empty() && self.trigger_list.lock().is_empty() {
             events |= FdEvents::POLLIN;
         }
         Ok(events)
