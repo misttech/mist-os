@@ -25,23 +25,6 @@ if (is_host) {
     library = ":clippy"
   }
 
-  go_library("codelinks") {
-    source_dir = "codelinks"
-    sources = [
-      "codelinks.go",
-      "codelinks_test.go",
-    ]
-
-    deps = [
-      "//third_party/golibs:github.com/google/go-cmp",
-      "//tools/staticanalysis",
-    ]
-  }
-
-  go_test("codelinks_tests") {
-    library = ":codelinks"
-  }
-
   go_library("rfcmeta") {
     source_dir = "rfcmeta"
     sources = [
@@ -65,7 +48,6 @@ group("tests") {
   testonly = true
   deps = [
     ":clippy_tests($host_toolchain)",
-    ":codelinks_tests($host_toolchain)",
     ":rfcmeta_tests($host_toolchain)",
   ]
 }
