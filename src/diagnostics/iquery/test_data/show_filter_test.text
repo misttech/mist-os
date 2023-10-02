@@ -1,7 +1,6 @@
-realm_builder:CHILD_NAME/basic:
+realm_builder:CHILD_NAME/inspect-sink:
   metadata:
-    filename = fuchsia.inspect.Tree
-    component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm
+    component_url = fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm
     timestamp = TIMESTAMP
   payload:
     root:

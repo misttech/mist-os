@@ -5,7 +5,6 @@
     include: [
         "//src/sys/test_runners/rust/default.shard.cml",
         "//src/sys/test_runners/tmp_storage.shard.cml",
-        "inspect/offer.shard.cml",
         "syslog/use.shard.cml",
     ],
     program: {
@@ -65,14 +64,15 @@
             to: "#archivist",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "#archivist",
-            to: [ "#realm_builder_server" ],
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "#archivist",
-            to: [ "#realm_builder" ],
+            to: [
+                "#realm_builder",
+                "#realm_builder_server",
+            ],
         },
     ],
     environments: [

@@ -2,18 +2,17 @@
     {
         "data_source": "Inspect",
         "metadata": {
-            "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/basic_component.cm",
-            "filename": "fuchsia.inspect.Tree",
+            "component_url": "fuchsia-pkg://fuchsia.com/iquery-tests#meta/inspect_sink_component.cm",
             "timestamp": "TIMESTAMP"
         },
-        "moniker": "realm_builder:CHILD_NAME/basic",
+        "moniker": "realm_builder:CHILD_NAME/inspect-sink",
         "payload": {
             "root": {
                 "fuchsia.inspect.Health": {
                     "start_timestamp_nanos": "TIMESTAMP",
                     "status": "OK"
                 },
-                "iquery": "rocks"
+                "iquery": "rules"
             }
         },
         "version": 1
