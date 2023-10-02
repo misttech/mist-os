@@ -96,12 +96,19 @@ template("clang_toolchain") {
 
     if (cxx_rbe_enable) {
       # Use reclient to remotely build C++.
-      _cxx_remote_wrapper_path = rebase_path(cxx_remote_wrapper, root_build_dir)
-      compiler_prefix_list = [
-        rebase_path(python_exe_src, root_build_dir),
-        "-S",
-        _cxx_remote_wrapper_path,
-      ]
+      if (cxx_rbe_minimalist_wrapper) {
+        _cxx_remote_wrapper_path =
+            rebase_path(cxx_remote_wrapper_minimalist, root_build_dir)
+        compiler_prefix_list = [ _cxx_remote_wrapper_path ]
+      } else {
+        _cxx_remote_wrapper_path =
+            rebase_path(cxx_remote_wrapper, root_build_dir)
+        compiler_prefix_list = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          _cxx_remote_wrapper_path,
+        ]
+      }
       assert(
           cxx_rbe_check == "none" || cxx_rbe_check == "consistency" ||
               cxx_rbe_check == "determinism",

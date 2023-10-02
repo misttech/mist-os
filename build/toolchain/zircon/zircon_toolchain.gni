@@ -168,11 +168,16 @@ template("zircon_toolchain") {
   }
   if (cxx_rbe_enable) {
     # Use reclient to remotely build C++.
-    compiler_prefix_list = [
-      rebase_path(python_exe_src, root_build_dir),
-      "-S",
-      rebase_path(cxx_remote_wrapper, root_build_dir),
-    ]
+    if (cxx_rbe_minimalist_wrapper) {
+      compiler_prefix_list =
+          [ rebase_path(cxx_remote_wrapper_minimalist, root_build_dir) ]
+    } else {
+      compiler_prefix_list = [
+        rebase_path(python_exe_src, root_build_dir),
+        "-S",
+        rebase_path(cxx_remote_wrapper, root_build_dir),
+      ]
+    }
     if (cxx_rbe_check == "consistency") {
       # Compare local vs. remote build.
       # Allow caching.
