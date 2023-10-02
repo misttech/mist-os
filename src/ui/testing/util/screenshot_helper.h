@@ -107,6 +107,12 @@ class Screenshot {
 
   uint64_t height() const { return height_; }
 
+  // Dumps the screenshot as a BGRA raw file to /custom_artifacts. Returns true if it is successful.
+  // Note that the custom_artifacts storage capability needs to be added to the test. See
+  // https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts
+  // for more details.
+  bool DumpToCustomArtifacts(const std::string& filename = "screenshot.bgra") const;
+
  private:
   // Populates |screenshot_| by converting the linear array of bytes in |screenshot_vmo| of size |4
   // * width_ * height_| to a 2D vector of |Pixel|s of size |height_ * width_|.

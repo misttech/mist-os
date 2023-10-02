@@ -7,6 +7,8 @@
 #include <lib/zx/vmar.h>
 #include <zircon/status.h>
 
+#include <fstream>
+#include <iostream>
 #include <memory>
 #include <unordered_map>
 
@@ -82,6 +84,25 @@ float Screenshot::ComputeSimilarity(const Screenshot& other) const {
     }
   }
   return 100.f * static_cast<float>(num_matching_pixels) / static_cast<float>((width() * height()));
+}
+
+bool Screenshot::DumpToCustomArtifacts(const std::string& filename) const {
+  const std::string file_path = "/custom_artifacts/" + filename;
+  std::ofstream file(file_path);
+  if (!file.is_open()) {
+    FX_LOGS(ERROR)
+        << "Artifact cannot be opened. Follow https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts.";
+  } else {
+    for (size_t y = 0; y < height(); ++y) {
+      for (size_t x = 0; x < width(); ++x) {
+        const auto pixel = GetPixelAt(x, y);
+        file << pixel.blue << pixel.green << pixel.red << pixel.alpha;
+      }
+    }
+    file.close();
+    FX_LOGS(INFO) << "Screenshot artifact dumped.";
+  }
+  return true;
 }
 
 void Screenshot::ExtractScreenshotFromVMO(uint8_t* screenshot_vmo) {
