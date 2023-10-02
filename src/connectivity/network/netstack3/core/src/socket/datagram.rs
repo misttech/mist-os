@@ -216,8 +216,8 @@ impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>> for UnboundSo
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
 pub(crate) struct ListenerState<I: IpExt, D: Hash + Eq + Debug, S: DatagramSocketSpec + ?Sized> {
-    ip_options: IpOptions<I, D, S>,
-    addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
+    pub(crate) ip_options: IpOptions<I, D, S>,
+    pub(crate) addr: ListenerAddr<S::ListenerIpAddr<I>, D>,
 }
 
 impl<I: IpExt, D: Debug + Hash + Eq, S: DatagramSocketSpec> AsRef<IpOptions<I, D, S>>
@@ -256,6 +256,12 @@ pub(crate) struct ConnState<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec + ?Siz
     /// TODO(http://fxbug.dev/110370): Implement this by changing socket
     /// addresses.
     pub(crate) clear_device_on_disconnect: bool,
+
+    /// The extra state for the connection.
+    ///
+    /// For UDP it should be [`()`], for ICMP it should be [`NonZeroU16`] to
+    /// remember the remote ID set by connect.
+    pub(crate) extra: S::ConnStateExtra,
 }
 
 impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsRef<O> for ConnState<I, D, S, O> {
@@ -272,7 +278,7 @@ impl<I: IpExt, D: Hash + Eq, S: DatagramSocketSpec, O> AsMut<O> for ConnState<I,
 
 impl<I: IpExt, D: Eq + Hash, S: DatagramSocketSpec, O> ConnState<I, D, S, O> {
     pub(crate) fn should_receive(&self) -> bool {
-        let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _ } = self;
+        let Self { shutdown, socket: _, clear_device_on_disconnect: _, addr: _, extra: _ } = self;
         let Shutdown { receive, send: _ } = shutdown;
         !*receive
     }
@@ -1259,7 +1265,8 @@ impl DualStackIpExt for Ipv4 {
     fn conn_addr_from_state<D: Clone + Debug + Eq + Hash, S: DatagramSocketSpec>(
         state: &Self::DualStackConnState<D, S>,
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D> {
-        let ConnState { socket: _, shutdown: _, addr, clear_device_on_disconnect: _ } = state;
+        let ConnState { socket: _, shutdown: _, addr, clear_device_on_disconnect: _, extra: _ } =
+            state;
         addr.clone()
     }
 }
@@ -1297,14 +1304,18 @@ impl DualStackIpExt for Ipv6 {
     ) -> ConnAddr<Self::DualStackConnIpAddr<S>, D> {
         match state {
             DualStackConnState::ThisStack(state) => {
-                let ConnState { socket: _, shutdown: _, addr, clear_device_on_disconnect: _ } =
-                    state;
+                let ConnState { addr, .. } = state;
                 let ConnAddr { ip, device } = addr.clone();
                 ConnAddr { ip: DualStackConnIpAddr::ThisStack(ip), device }
             }
             DualStackConnState::OtherStack(state) => {
-                let ConnState { socket: _, shutdown: _, addr, clear_device_on_disconnect: _ } =
-                    state;
+                let ConnState {
+                    socket: _,
+                    shutdown: _,
+                    addr,
+                    clear_device_on_disconnect: _,
+                    extra: _,
+                } = state;
                 let ConnAddr { ip, device } = addr.clone();
                 ConnAddr { ip: DualStackConnIpAddr::OtherStack(ip), device }
             }
@@ -1367,6 +1378,16 @@ pub(crate) trait DatagramSocketSpec {
     type ConnState<I: IpExt, D: Debug + Eq + Hash>: Debug
         + AsRef<IpOptions<I, D, Self>>
         + AsMut<IpOptions<I, D, Self>>;
+
+    /// The extra state that a connection state want to remember.
+    ///
+    /// For example: UDP sockets does not have any extra state to remember, so
+    /// it should just be `()`; ICMP sockets need to remember the remote ID the
+    /// socket is 'connected' to, the remote ID is not used when sending nor
+    /// participating in the demuxing decisions. So it will be stored in the
+    /// extra state so that it can be retrieved later, i.e, it should be
+    /// `NonZeroU16` for ICMP sockets.
+    type ConnStateExtra: Debug;
 
     /// The specification for the [`BoundSocketMap`] for a given IP version.
     ///
@@ -1580,24 +1601,29 @@ where
                 }
                 BoundSocketState::Connected { state, sharing: _ } => {
                     let maybe_dual_stack_conn_addr = S::conn_addr_from_state(&state);
-                    let ConnState { addr, socket, clear_device_on_disconnect: _, shutdown: _ } =
-                        match sync_ctx.dual_stack_context() {
-                            MaybeDualStack::DualStack(dual_stack) => {
-                                match dual_stack.converter().convert(state) {
-                                    DualStackConnState::ThisStack(state) => state,
-                                    DualStackConnState::OtherStack(state) => {
-                                        dual_stack.assert_dual_stack_enabled(&state);
-                                        todo!(
-                                            "https://fxbug.dev/21198: Support dual-stack remove \
+                    let ConnState {
+                        addr,
+                        socket,
+                        clear_device_on_disconnect: _,
+                        shutdown: _,
+                        extra: _,
+                    } = match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
+                            match dual_stack.converter().convert(state) {
+                                DualStackConnState::ThisStack(state) => state,
+                                DualStackConnState::OtherStack(state) => {
+                                    dual_stack.assert_dual_stack_enabled(&state);
+                                    todo!(
+                                        "https://fxbug.dev/21198: Support dual-stack remove \
                                             connected"
-                                        );
-                                    }
+                                    );
                                 }
                             }
-                            MaybeDualStack::NotDualStack(not_dual_stack) => {
-                                not_dual_stack.converter().convert(state)
-                            }
-                        };
+                        }
+                        MaybeDualStack::NotDualStack(not_dual_stack) => {
+                            not_dual_stack.converter().convert(state)
+                        }
+                    };
 
                     DatagramBoundStateContext::<I, _, _>::with_bound_sockets_mut(
                         sync_ctx,
@@ -2319,6 +2345,7 @@ pub(crate) fn connect<
     id: S::SocketId<I>,
     remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+    extra: S::ConnStateExtra,
 ) -> Result<(), ConnectError>
 where
     <S::SocketMapSpec<I, SC::WeakDeviceId> as SocketMapStateSpec>::ListenerSharingState:
@@ -2395,6 +2422,7 @@ where
                                 ip: ConnIpAddr { local: (ip, identifier), remote: _ },
                                 device,
                             },
+                        extra: _,
                     } = match sync_ctx.dual_stack_context() {
                         MaybeDualStack::DualStack(dual_stack) => {
                             match dual_stack.converter().convert(state) {
@@ -2532,6 +2560,7 @@ where
             clear_device_on_disconnect,
             shutdown: Shutdown::default(),
             addr: bound_addr,
+            extra,
         };
         *entry.get_mut() = SocketState::Bound(BoundSocketState::Connected {
             state: match sync_ctx.dual_stack_context() {
@@ -2591,22 +2620,23 @@ where
             SocketState::Bound(BoundSocketState::Connected { state, sharing }) => (state, sharing),
         };
 
-        let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr } = match sync_ctx
-            .dual_stack_context()
-        {
-            MaybeDualStack::DualStack(dual_stack) => {
-                match dual_stack.converter().convert(conn_state) {
-                    DualStackConnState::ThisStack(conn_state) => conn_state,
-                    DualStackConnState::OtherStack(conn_state) => {
-                        dual_stack.assert_dual_stack_enabled(conn_state);
-                        todo!("https://fxbug.dev/21198: Support dual-stack disconnect connected");
+        let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr, extra: _ } =
+            match sync_ctx.dual_stack_context() {
+                MaybeDualStack::DualStack(dual_stack) => {
+                    match dual_stack.converter().convert(conn_state) {
+                        DualStackConnState::ThisStack(conn_state) => conn_state,
+                        DualStackConnState::OtherStack(conn_state) => {
+                            dual_stack.assert_dual_stack_enabled(conn_state);
+                            todo!(
+                                "https://fxbug.dev/21198: Support dual-stack disconnect connected"
+                            );
+                        }
                     }
                 }
-            }
-            MaybeDualStack::NotDualStack(not_dual_stack) => {
-                not_dual_stack.converter().convert(conn_state)
-            }
-        };
+                MaybeDualStack::NotDualStack(not_dual_stack) => {
+                    not_dual_stack.converter().convert(conn_state)
+                }
+            };
         let dual_stack_context = sync_ctx.dual_stack_context();
         let make_listener_ip = match dual_stack_context {
             MaybeDualStack::DualStack(dual_stack) => {
@@ -2701,7 +2731,7 @@ pub(crate) fn shutdown_connected<
             }
             SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
-        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _ } =
+        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
             match sync_ctx.dual_stack_context() {
                 MaybeDualStack::DualStack(dual_stack) => {
                     match dual_stack.converter().convert(state) {
@@ -2747,7 +2777,7 @@ pub(crate) fn get_shutdown_connected<
             SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
 
-        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _ } =
+        let ConnState { socket: _, clear_device_on_disconnect: _, shutdown, addr: _, extra: _ } =
             match sync_ctx.dual_stack_context() {
                 MaybeDualStack::DualStack(dual_stack) => {
                     match dual_stack.converter().convert(state) {
@@ -2814,6 +2844,7 @@ pub(crate) fn send_conn<
             clear_device_on_disconnect: _,
             shutdown: Shutdown { send: shutdown_send, receive: _ },
             addr,
+            extra: _,
         } = match sync_ctx.dual_stack_context() {
             MaybeDualStack::DualStack(dual_stack) => match dual_stack.converter().convert(state) {
                 DualStackConnState::ThisStack(state) => state,
@@ -2887,6 +2918,7 @@ where
                     clear_device_on_disconnect: _,
                     shutdown,
                     addr: ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
+                    extra: _,
                 } = match sync_ctx.dual_stack_context() {
                     MaybeDualStack::DualStack(dual_stack) => {
                         match dual_stack.converter().convert(state) {
@@ -3124,24 +3156,29 @@ pub(crate) fn set_device<
                     Ok(())
                 }
                 BoundSocketState::Connected { state, sharing: _ } => {
-                    let ConnState { socket, clear_device_on_disconnect, shutdown: _, addr } =
-                        match sync_ctx.dual_stack_context() {
-                            MaybeDualStack::DualStack(dual_stack) => {
-                                match dual_stack.converter().convert(state) {
-                                    DualStackConnState::ThisStack(state) => state,
-                                    DualStackConnState::OtherStack(state) => {
-                                        dual_stack.assert_dual_stack_enabled(state);
-                                        todo!(
-                                            "https://fxbug.dev/21198: Support dual-stack connected \
+                    let ConnState {
+                        socket,
+                        clear_device_on_disconnect,
+                        shutdown: _,
+                        addr,
+                        extra: _,
+                    } = match sync_ctx.dual_stack_context() {
+                        MaybeDualStack::DualStack(dual_stack) => {
+                            match dual_stack.converter().convert(state) {
+                                DualStackConnState::ThisStack(state) => state,
+                                DualStackConnState::OtherStack(state) => {
+                                    dual_stack.assert_dual_stack_enabled(state);
+                                    todo!(
+                                        "https://fxbug.dev/21198: Support dual-stack connected \
                                             set_device"
-                                        );
-                                    }
+                                    );
                                 }
                             }
-                            MaybeDualStack::NotDualStack(not_dual_stack) => {
-                                not_dual_stack.converter().convert(state)
-                            }
-                        };
+                        }
+                        MaybeDualStack::NotDualStack(not_dual_stack) => {
+                            not_dual_stack.converter().convert(state)
+                        }
+                    };
                     let ConnAddr { device: old_device, ip } = addr;
                     let ConnIpAddr { local: (local_ip, _), remote: (remote_ip, _) } = *ip;
                     if !socket::can_device_change(
@@ -3402,6 +3439,7 @@ fn get_options_device_from_conn_state<I: IpExt, D: Eq + Hash, S: DatagramSocketS
         clear_device_on_disconnect: _,
         shutdown: _,
         addr: ConnAddr { device, ip: _ },
+        extra: _,
     }: &ConnState<I, D, S, O>,
 ) -> (&O, &Option<D>) {
     (socket.options(), device)
@@ -3743,6 +3781,7 @@ mod test {
         type ListenerSharingState = Sharing;
         type ListenerIpAddr<I: IpExt> = ListenerIpAddr<I::Addr, u8>;
         type ConnIpAddr<I: IpExt> = ConnIpAddr<I::Addr, u8, char>;
+        type ConnStateExtra = ();
         type ConnState<I: IpExt, D: Debug + Eq + Hash> =
             ConnState<I, D, Self, IpOptions<I, D, Self>>;
 
@@ -3779,7 +3818,7 @@ mod test {
         fn conn_addr_from_state<I: IpExt, D: Clone + Debug + Eq + Hash>(
             state: &Self::ConnState<I, D>,
         ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-            let ConnState { shutdown: _, socket: _, addr, clear_device_on_disconnect: _ } = state;
+            let ConnState { addr, .. } = state;
             addr.clone()
         }
     }

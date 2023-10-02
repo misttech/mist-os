@@ -886,12 +886,15 @@ impl DatagramSocketSpec for Icmp {
 
     type ConnState<I: datagram::IpExt, D: Debug + Eq + core::hash::Hash> =
         datagram::ConnState<I, D, Self, datagram::IpOptions<I, D, Self>>;
+    // Store the remote port/id set by `connect`. This does not participate in
+    // demuxing, so not part of the socketmap, but we need to store it so that
+    // it can be reported later.
+    type ConnStateExtra = NonZeroU16;
 
     fn conn_addr_from_state<I: datagram::IpExt, D: Clone + Debug + Eq + core::hash::Hash>(
         state: &Self::ConnState<I, D>,
     ) -> ConnAddr<Self::ConnIpAddr<I>, D> {
-        let datagram::ConnState { shutdown: _, socket: _, addr, clear_device_on_disconnect: _ } =
-            state;
+        let datagram::ConnState { addr, .. } = state;
         addr.clone()
     }
 }
@@ -3292,6 +3295,7 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
         ctx: &mut C,
         id: SocketId<I>,
         remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError>;
 
     /// Binds an ICMP socket to a local IP address and a local ID to send/recv
@@ -3334,8 +3338,9 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         ctx: &mut C,
         id: SocketId<I>,
         remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError> {
-        datagram::connect(self, ctx, id, remote_ip, ())
+        datagram::connect(self, ctx, id, remote_ip, (), remote_id)
     }
 
     fn bind(
@@ -3350,10 +3355,49 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
 
     fn get_info(
         &mut self,
-        ctx: &mut C,
+        _ctx: &mut C,
         id: SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
-        datagram::get_info(self, ctx, id).into()
+        self.with_sockets_state(|_sync_ctx, state| {
+            match state.get(id.get_key_index()).expect("invalid socket ID") {
+                datagram::SocketState::Unbound(_) => SocketInfo::Unbound,
+                datagram::SocketState::Bound(datagram::BoundSocketState::Listener {
+                    state,
+                    sharing: _,
+                }) => {
+                    let datagram::ListenerState {
+                        addr: ListenerAddr { ip: ListenerIpAddr { addr, identifier }, device },
+                        ip_options: _,
+                    } = state;
+                    SocketInfo::Bound {
+                        local_ip: addr.map(Into::into),
+                        id: *identifier,
+                        device: device.clone(),
+                    }
+                }
+                datagram::SocketState::Bound(datagram::BoundSocketState::Connected {
+                    state,
+                    sharing: _,
+                }) => {
+                    let datagram::ConnState {
+                        addr:
+                            ConnAddr {
+                                ip: ConnIpAddr { local: (local_ip, id), remote: (remote_ip, ()) },
+                                device,
+                            },
+                        extra: remote_id,
+                        ..
+                    } = state;
+                    SocketInfo::Connected {
+                        remote_ip: (*remote_ip).into(),
+                        local_ip: (*local_ip).into(),
+                        id: *id,
+                        device: device.clone(),
+                        remote_id: *remote_id,
+                    }
+                }
+            }
+        })
     }
 }
 
@@ -3395,23 +3439,26 @@ pub fn connect<I: Ip, C: NonSyncContext>(
     ctx: &mut C,
     id: SocketId<I>,
     remote_ip: SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>,
+    remote_id: NonZeroU16,
 ) -> Result<(), datagram::ConnectError> {
     let IpInvariant(result) = I::map_ip(
-        (IpInvariant((sync_ctx, ctx)), id, remote_ip),
-        |(IpInvariant((sync_ctx, ctx)), id, remote_ip)| {
+        (IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip),
+        |(IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip)| {
             IpInvariant(SocketHandler::<Ipv4, C>::connect(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 id,
                 remote_ip,
+                remote_id,
             ))
         },
-        |(IpInvariant((sync_ctx, ctx)), id, remote_ip)| {
+        |(IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip)| {
             IpInvariant(SocketHandler::<Ipv6, C>::connect(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 id,
                 remote_ip,
+                remote_id,
             ))
         },
     );
@@ -3498,30 +3545,10 @@ pub enum SocketInfo<A: IpAddress, D> {
         id: NonZeroU16,
         /// An optional device that is bound.
         device: Option<D>,
+        /// Unused when sending/receiving packets, but will be reported back to
+        /// user.
+        remote_id: NonZeroU16,
     },
-}
-
-impl<I: datagram::DualStackIpExt, D> From<datagram::SocketInfo<I, D, Icmp>>
-    for SocketInfo<I::Addr, D>
-{
-    fn from(info: datagram::SocketInfo<I, D, Icmp>) -> Self {
-        match info {
-            datagram::SocketInfo::Unbound => Self::Unbound,
-            datagram::SocketInfo::Listener(ListenerAddr {
-                ip: ListenerIpAddr { addr, identifier },
-                device,
-            }) => Self::Bound { local_ip: addr.map(Into::into), id: identifier, device },
-            datagram::SocketInfo::Connected(ConnAddr {
-                ip: ConnIpAddr { local: (local_addr, id), remote: (remote_addr, ()) },
-                device,
-            }) => Self::Connected {
-                local_ip: local_addr.into(),
-                id,
-                remote_ip: remote_addr.into(),
-                device,
-            },
-        }
-    }
 }
 
 /// Gets the information about an ICMP socket.
@@ -4467,6 +4494,7 @@ mod tests {
                 non_sync_ctx,
                 conn,
                 SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
+                REMOTE_ID,
             )
             .unwrap();
 
@@ -4757,6 +4785,8 @@ mod tests {
         }
     }
 
+    const REMOTE_ID: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(1));
+
     #[test]
     fn test_receive_icmpv4_error() {
         // Chosen arbitrarily to be a) non-zero (it's easy to accidentally get
@@ -4808,6 +4838,7 @@ mod tests {
                 non_sync_ctx,
                 conn,
                 SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)),
+                REMOTE_ID,
             )
             .unwrap();
 
@@ -5115,6 +5146,7 @@ mod tests {
                 non_sync_ctx,
                 conn,
                 SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)),
+                REMOTE_ID,
             )
             .unwrap();
 
@@ -5627,6 +5659,7 @@ mod tests {
                 SocketZonedIpAddr::from(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
                 )),
+                REMOTE_ID,
             ),
             Err(datagram::ConnectError::Ip(IpSockCreationError::Route(
                 ResolveRouteError::Unreachable,
@@ -5644,6 +5677,7 @@ mod tests {
             non_sync_ctx,
             conn,
             SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+            REMOTE_ID,
         )
         .unwrap();
 
@@ -5688,6 +5722,7 @@ mod tests {
             non_sync_ctx,
             id,
             SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+            REMOTE_ID,
         )
         .unwrap();
         assert_eq!(
@@ -5697,6 +5732,7 @@ mod tests {
                 remote_ip: I::FAKE_CONFIG.remote_ip,
                 id: ICMP_ID,
                 device: None,
+                remote_id: REMOTE_ID,
             }
         );
     }

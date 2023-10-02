@@ -423,6 +423,7 @@ impl DatagramSocketSpec for Udp {
     type OtherStackIpOptions<I: IpExt> = I::OtherStackIpOptions<DualStackSocketState>;
     type ListenerIpAddr<I: IpExt> = I::DualStackListenerIpAddr<NonZeroU16>;
     type ConnIpAddr<I: IpExt> = I::DualStackConnIpAddr<Self>;
+    type ConnStateExtra = ();
     type ConnState<I: IpExt, D: Debug + Eq + Hash> = I::DualStackConnState<D, Self>;
     type UnboundSharingState<I: IpExt> = Sharing;
     type SocketMapSpec<I: IpExt, D: WeakId> = (Self, I, D);
@@ -1625,7 +1626,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<
         remote_ip: SocketZonedIpAddr<<I>::Addr, Self::DeviceId>,
         remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
-        datagram::connect(self, ctx, id, remote_ip, remote_port)
+        datagram::connect(self, ctx, id, remote_ip, remote_port, ())
     }
 
     fn set_device(
