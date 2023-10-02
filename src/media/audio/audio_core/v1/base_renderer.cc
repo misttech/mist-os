@@ -129,7 +129,12 @@ void BaseRenderer::RecomputeMinLeadTime() {
   }
 
   if (min_lead_time_ != cur_lead_time) {
-    reporter_->SetMinLeadTime(cur_lead_time);
+    if (!min_lead_time_reported_) {
+      reporter_->SetInitialMinLeadTime(cur_lead_time);
+      min_lead_time_reported_ = true;
+    } else {
+      reporter_->UpdateMinLeadTime(cur_lead_time, zx::clock::get_monotonic());
+    }
     min_lead_time_ = cur_lead_time;
     ReportNewMinLeadTime();
   }

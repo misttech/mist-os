@@ -112,8 +112,9 @@ class Reporter {
                                  fuchsia::media::audio::RampType ramp_type) = 0;
     virtual void SetCompleteGain(float complete_gain_db) = 0;
 
-    virtual void SetMinLeadTime(zx::duration min_lead_time) = 0;
-
+    virtual void SetInitialMinLeadTime(zx::duration initial_min_lead_time) = 0;
+    virtual void UpdateMinLeadTime(zx::duration new_min_lead_time,
+                                   zx::time time_of_min_lead_time_change) = 0;
     virtual void SetPtsContinuityThreshold(float threshold_seconds) = 0;
     virtual void SetPtsUnits(uint32_t numerator, uint32_t denominator) = 0;
 
@@ -142,8 +143,11 @@ class Reporter {
     virtual void SetMute(bool muted) = 0;
     virtual void SetGainWithRamp(float gain_db, zx::duration ramp_duration,
                                  fuchsia::media::audio::RampType ramp_type) = 0;
+    virtual void SetCompleteGain(float complete_gain_db) = 0;
 
-    virtual void SetPresentationDelay(zx::duration presentation_delay) = 0;
+    virtual void SetInitialPresentationDelay(zx::duration initial_presentation_delay) = 0;
+    virtual void UpdatePresentationDelay(zx::duration new_presentation_delay,
+                                         zx::time time_of_presentation_delay_change) = 0;
 
     virtual void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) = 0;
     virtual void SendPacket(const fuchsia::media::StreamPacket& packet) = 0;

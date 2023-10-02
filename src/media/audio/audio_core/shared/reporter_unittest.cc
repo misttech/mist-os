@@ -656,7 +656,7 @@ TEST_F(ReporterTest, AddRemoveClientPorts) {
               })));
 }
 
-// Test methods that change renderer metrics.
+// Tests methods that change renderer metrics, that aren't tested in other cases.
 TEST_F(ReporterTest, RendererMetrics) {
   auto renderer = under_test_.CreateRenderer();
 
@@ -665,21 +665,28 @@ TEST_F(ReporterTest, RendererMetrics) {
       ChildrenMatch(Contains(AllOf(
           NodeMatches(NameMatches("renderers")),
           ChildrenMatch(UnorderedElementsAre(AllOf(
-              NodeMatches(AllOf(
-                  NameMatches("1"),
-                  PropertyList(UnorderedElementsAre(
-                      DoubleIs("gain db", 0.0), BoolIs("muted", false),
-                      UintIs("calls to SetGainWithRamp", 0),
-                      DoubleIs("complete stream gain (post-volume) dbfs", 0),
-                      DoubleIs("pts continuity threshold (s)", 0.0),
-                      UintIs("pts units denominator", 1),
-                      UintIs("pts units numerator", 1'000'000'000), UintIs("min lead time (ns)", 0),
-                      StringIs("usage", "default"))))),
+              NodeMatches(AllOf(NameMatches("1"),
+                                PropertyList(UnorderedElementsAre(
+                                    UintIs("initial min lead time (ns)", 0),
+                                    UintIs("current min lead time (ns)", 0),
+                                    IntIs("time of latest min lead time change", 0),
+                                    StringIs("usage", "default"))))),
               ChildrenMatch(UnorderedElementsAre(
                   NodeMatches(AllOf(NameMatches("format"),
                                     PropertyList(UnorderedElementsAre(
                                         StringIs("sample format", "unknown"), UintIs("channels", 0),
                                         UintIs("frames per second", 0))))),
+                  NodeMatches(
+                      AllOf(NameMatches("gain"),
+                            PropertyList(UnorderedElementsAre(
+                                DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                                UintIs("calls to SetGainWithRamp", 0),
+                                DoubleIs("complete stream gain (post-volume) dbfs", 0.0))))),
+                  NodeMatches(AllOf(NameMatches("presentation timestamps"),
+                                    PropertyList(UnorderedElementsAre(
+                                        DoubleIs("pts continuity threshold (s)", 0.0),
+                                        UintIs("pts units denominator", 1),
+                                        UintIs("pts units numerator", 1'000'000'000))))),
                   AllOf(NodeMatches(NameMatches("payload buffers")), ChildrenMatch(IsEmpty())),
                   NodeMatches(AllOf(NameMatches("packet queue underflows"),
                                     PropertyList(UnorderedElementsAre(
@@ -718,8 +725,6 @@ TEST_F(ReporterTest, RendererMetrics) {
   renderer->SetPtsContinuityThreshold(5.0);
   renderer->SetPtsUnits(1234567, 3);
 
-  renderer->SetMinLeadTime(zx::nsec(1'000'000));
-
   renderer->StartSession(zx::time(0));
 
   renderer->PacketQueueUnderflow(zx::time(10), zx::time(15));
@@ -738,22 +743,29 @@ TEST_F(ReporterTest, RendererMetrics) {
       ChildrenMatch(Contains(AllOf(
           NodeMatches(NameMatches("renderers")),
           ChildrenMatch(UnorderedElementsAre(AllOf(
-              NodeMatches(AllOf(
-                  NameMatches("1"),
-                  PropertyList(UnorderedElementsAre(
-                      DoubleIs("gain db", -1.0), BoolIs("muted", true),
-                      UintIs("calls to SetGainWithRamp", 2),
-                      DoubleIs("complete stream gain (post-volume) dbfs", -6.0),
-                      DoubleIs("pts continuity threshold (s)", 5.0),
-                      UintIs("pts units denominator", 3), UintIs("pts units numerator", 1234567),
-                      UintIs("min lead time (ns)", 1'000'000),
-                      StringIs("usage", "RenderUsage::MEDIA"))))),
+              NodeMatches(AllOf(NameMatches("1"),
+                                PropertyList(UnorderedElementsAre(
+                                    UintIs("initial min lead time (ns)", 0),
+                                    UintIs("current min lead time (ns)", 0),
+                                    IntIs("time of latest min lead time change", 0),
+                                    StringIs("usage", "RenderUsage::MEDIA"))))),
               ChildrenMatch(UnorderedElementsAre(
                   NodeMatches(AllOf(
                       NameMatches("format"),
-                      PropertyList(UnorderedElementsAre(StringIs("sample format", "SIGNED_16"),
-                                                        UintIs("channels", 2),
-                                                        UintIs("frames per second", 48000))))),
+                      PropertyList(UnorderedElementsAre(
+                          StringIs("sample format", "SIGNED_16"), UintIs("channels", 2),
+                          UintIs("frames per second", 48000))))),
+                  NodeMatches(AllOf(
+                      NameMatches("gain"),
+                      PropertyList(UnorderedElementsAre(
+                          DoubleIs("gain db", -1.0), BoolIs("muted", true),
+                          UintIs("calls to SetGainWithRamp", 2),
+                          DoubleIs("complete stream gain (post-volume) dbfs", -6.0))))),
+                  NodeMatches(AllOf(NameMatches("presentation timestamps"),
+                                    PropertyList(UnorderedElementsAre(
+                                        DoubleIs("pts continuity threshold (s)", 5.0),
+                                        UintIs("pts units denominator", 3),
+                                        UintIs("pts units numerator", 1234567))))),
                   AllOf(NodeMatches(NameMatches("payload buffers")),
                         ChildrenMatch(UnorderedElementsAre(
                             NodeMatches(AllOf(NameMatches("0"),
@@ -776,7 +788,80 @@ TEST_F(ReporterTest, RendererMetrics) {
                                         UintIs("session count", 1))))))))))))));
 }
 
-// Test methods that change capturer metrics.
+// Tests methods that change renderer minimum lead time metrics.
+TEST_F(ReporterTest, RendererMinLeadTime) {
+  auto renderer = under_test_.CreateRenderer();
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(
+                  AllOf(NodeMatches(NameMatches("renderers")),
+                        ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                            NameMatches("1"), PropertyList(IsSupersetOf({
+                                                  UintIs("initial min lead time (ns)", 0),
+                                                  UintIs("current min lead time (ns)", 0),
+                                                  IntIs("time of latest min lead time change", 0),
+                                              }))))))))));
+
+  // SetInitialMinLeadTime is optional; UpdateMinLeadTime can be called immediately.
+  constexpr auto kCurrentMinLeadTime1 = 321ull;
+  constexpr auto kTimeOfMinLeadTimeChange1 = 123ll;
+  renderer->UpdateMinLeadTime(zx::nsec(kCurrentMinLeadTime1), zx::time(kTimeOfMinLeadTimeChange1));
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(AllOf(
+                  NodeMatches(NameMatches("renderers")),
+                  ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                      NameMatches("1"),
+                      PropertyList(IsSupersetOf({
+                          UintIs("initial min lead time (ns)", 0),  // Retains value from ctor
+                          UintIs("current min lead time (ns)", kCurrentMinLeadTime1),
+                          IntIs("time of latest min lead time change", kTimeOfMinLeadTimeChange1),
+                      }))))))))));
+
+  // We expect the initial and current values to change, and the time-of-update to be reset.
+  constexpr auto kInitialMinLeadTime2 = 1'000'000ull;
+  renderer->SetInitialMinLeadTime(zx::nsec(kInitialMinLeadTime2));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(AllOf(
+          NodeMatches(NameMatches("renderers")),
+          ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+              NameMatches("1"), PropertyList(IsSupersetOf({
+                                    UintIs("initial min lead time (ns)", kInitialMinLeadTime2),
+                                    UintIs("current min lead time (ns)", kInitialMinLeadTime2),
+                                    IntIs("time of latest min lead time change", 0),  // Was reset
+                                }))))))))));
+
+  // We expect the current value and time-of-update value to change.
+  constexpr auto kCurrentMinLeadTime3 = 12'345'678ull;
+  constexpr auto kTimeOfMinLeadTimeChange3 = 987'654'321ll;
+  renderer->UpdateMinLeadTime(zx::nsec(kCurrentMinLeadTime3), zx::time(kTimeOfMinLeadTimeChange3));
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(AllOf(
+                  NodeMatches(NameMatches("renderers")),
+                  ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                      NameMatches("1"),
+                      PropertyList(IsSupersetOf({
+                          UintIs("initial min lead time (ns)", kInitialMinLeadTime2),
+                          UintIs("current min lead time (ns)", kCurrentMinLeadTime3),
+                          IntIs("time of latest min lead time change", kTimeOfMinLeadTimeChange3),
+                      }))))))))));
+
+  // The time-of-update is before the previous one, so we expect no change.
+  constexpr auto kCurrentMinLeadTime4 = 1'234'567ull;
+  constexpr auto kTimeOfMinLeadTimeChange4 = 87'654'321ll;  // less than kTimeOfMinLeadTimeChange3
+  renderer->UpdateMinLeadTime(zx::nsec(kCurrentMinLeadTime4), zx::time(kTimeOfMinLeadTimeChange4));
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(AllOf(
+                  NodeMatches(NameMatches("renderers")),
+                  ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                      NameMatches("1"),
+                      PropertyList(IsSupersetOf({
+                          UintIs("initial min lead time (ns)", kInitialMinLeadTime2),
+                          UintIs("current min lead time (ns)", kCurrentMinLeadTime3),
+                          IntIs("time of latest min lead time change", kTimeOfMinLeadTimeChange3),
+                      }))))))))));
+}
+
+// Tests methods that change capturer metrics, that aren't tested in other cases.
 TEST_F(ReporterTest, CapturerMetrics) {
   auto capturer = under_test_.CreateCapturer("thread");
 
@@ -788,14 +873,21 @@ TEST_F(ReporterTest, CapturerMetrics) {
               NodeMatches(AllOf(
                   NameMatches("1"),
                   PropertyList(UnorderedElementsAre(
-                      DoubleIs("gain db", 0.0), BoolIs("muted", false),
-                      UintIs("calls to SetGainWithRamp", 0), UintIs("presentation delay (ns)", 0),
+                      UintIs("initial presentation delay (ns)", 0),
+                      UintIs("current presentation delay (ns)", 0),
+                      IntIs("time of latest presentation delay change", 0),
                       StringIs("usage", "default"), StringIs("mixer thread name", "thread"))))),
               ChildrenMatch(UnorderedElementsAre(
                   NodeMatches(AllOf(NameMatches("format"),
                                     PropertyList(UnorderedElementsAre(
                                         StringIs("sample format", "unknown"), UintIs("channels", 0),
                                         UintIs("frames per second", 0))))),
+                  NodeMatches(
+                      AllOf(NameMatches("gain"),
+                            PropertyList(UnorderedElementsAre(
+                                DoubleIs("gain db", 0.0), BoolIs("muted", false),
+                                UintIs("calls to SetGainWithRamp", 0),
+                                DoubleIs("complete stream gain (post-volume) dbfs", 0.0))))),
                   AllOf(NodeMatches(NameMatches("payload buffers")), ChildrenMatch(IsEmpty())),
                   NodeMatches(AllOf(NameMatches("overflows"),
                                     PropertyList(UnorderedElementsAre(
@@ -822,8 +914,6 @@ TEST_F(ReporterTest, CapturerMetrics) {
   capturer->SetGainWithRamp(-1.0, zx::sec(1), fuchsia::media::audio::RampType::SCALE_LINEAR);
   capturer->SetGainWithRamp(-1.0, zx::sec(1), fuchsia::media::audio::RampType::SCALE_LINEAR);
 
-  capturer->SetPresentationDelay(zx::nsec(2'000'000));
-
   capturer->StartSession(zx::time(0));
 
   capturer->Overflow(zx::time(60), zx::time(65));
@@ -837,9 +927,9 @@ TEST_F(ReporterTest, CapturerMetrics) {
           ChildrenMatch(UnorderedElementsAre(AllOf(
               NodeMatches(AllOf(NameMatches("1"),
                                 PropertyList(UnorderedElementsAre(
-                                    DoubleIs("gain db", -1.0), BoolIs("muted", true),
-                                    UintIs("calls to SetGainWithRamp", 2),
-                                    UintIs("presentation delay (ns)", 2'000'000),
+                                    UintIs("initial presentation delay (ns)", 0),
+                                    UintIs("current presentation delay (ns)", 0),
+                                    IntIs("time of latest presentation delay change", 0),
                                     StringIs("usage", "CaptureUsage::FOREGROUND"),
                                     StringIs("mixer thread name", "thread"))))),
               ChildrenMatch(UnorderedElementsAre(
@@ -848,6 +938,12 @@ TEST_F(ReporterTest, CapturerMetrics) {
                       PropertyList(UnorderedElementsAre(StringIs("sample format", "SIGNED_16"),
                                                         UintIs("channels", 2),
                                                         UintIs("frames per second", 48000))))),
+                  NodeMatches(
+                      AllOf(NameMatches("gain"),
+                            PropertyList(UnorderedElementsAre(
+                                DoubleIs("gain db", -1.0), BoolIs("muted", true),
+                                UintIs("calls to SetGainWithRamp", 2),
+                                DoubleIs("complete stream gain (post-volume) dbfs", 0.0))))),
                   AllOf(NodeMatches(NameMatches("payload buffers")),
                         ChildrenMatch(UnorderedElementsAre(
                             NodeMatches(AllOf(NameMatches("0"),
@@ -862,7 +958,86 @@ TEST_F(ReporterTest, CapturerMetrics) {
                                         UintIs("session count", 1))))))))))))));
 }
 
-// Test ThermalStateTracker methods.
+// Tests methods that change capturer presentation delay metrics.
+TEST_F(ReporterTest, CapturerPresentationDelay) {
+  auto capturer = under_test_.CreateCapturer("capture_thread");
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(AllOf(
+                  NodeMatches(NameMatches("capturers")),
+                  ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                      NameMatches("1"), PropertyList(IsSupersetOf({
+                                            UintIs("initial presentation delay (ns)", 0),
+                                            UintIs("current presentation delay (ns)", 0),
+                                            IntIs("time of latest presentation delay change", 0),
+                                        }))))))))));
+
+  // SetInitialPresentationDelay is optional; UpdatePresentationDelay can be called immediately.
+  constexpr auto kCurrentPresDelay1 = 432ull;
+  constexpr auto kTimeOfPresDelayChange1 = 234ll;
+  capturer->UpdatePresentationDelay(zx::nsec(kCurrentPresDelay1),
+                                    zx::time(kTimeOfPresDelayChange1));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(
+          AllOf(NodeMatches(NameMatches("capturers")),
+                ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                    NameMatches("1"),
+                    PropertyList(IsSupersetOf({
+                        UintIs("initial presentation delay (ns)", 0),  // Retains value from ctor.
+                        UintIs("current presentation delay (ns)", kCurrentPresDelay1),
+                        IntIs("time of latest presentation delay change", kTimeOfPresDelayChange1),
+                    }))))))))));
+
+  // We expect the initial and current values to change, and the time-of-update to be reset.
+  constexpr auto kInitialPresentationDelay2 = 2'000'000ull;
+  capturer->SetInitialPresentationDelay(zx::nsec(kInitialPresentationDelay2));
+  EXPECT_THAT(GetHierarchy(),
+              ChildrenMatch(Contains(AllOf(
+                  NodeMatches(NameMatches("capturers")),
+                  ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                      NameMatches("1"),
+                      PropertyList(IsSupersetOf({
+                          UintIs("initial presentation delay (ns)", kInitialPresentationDelay2),
+                          UintIs("current presentation delay (ns)", kInitialPresentationDelay2),
+                          IntIs("time of latest presentation delay change", 0),  // Was reset
+                      }))))))))));
+
+  // We expect the current value and time-of-update value to change.
+  constexpr auto kCurrentPresDelay3 = 23'456'789ull;
+  constexpr auto kTimeOfPresDelayChange3 = 876'543'210ll;
+  capturer->UpdatePresentationDelay(zx::nsec(kCurrentPresDelay3),
+                                    zx::time(kTimeOfPresDelayChange3));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(
+          AllOf(NodeMatches(NameMatches("capturers")),
+                ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                    NameMatches("1"),
+                    PropertyList(IsSupersetOf({
+                        UintIs("initial presentation delay (ns)", kInitialPresentationDelay2),
+                        UintIs("current presentation delay (ns)", kCurrentPresDelay3),
+                        IntIs("time of latest presentation delay change", kTimeOfPresDelayChange3),
+                    }))))))))));
+
+  // The time-of-update is before the previous one, so we expect no change.
+  constexpr auto kCurrentPresDelay4 = 2'345'678ull;
+  constexpr auto kTimeOfPresDelayChange4 = 76'543'210ll;  // Less than kTime...Change3
+  capturer->UpdatePresentationDelay(zx::nsec(kCurrentPresDelay4),
+                                    zx::time(kTimeOfPresDelayChange4));
+  EXPECT_THAT(
+      GetHierarchy(),
+      ChildrenMatch(Contains(
+          AllOf(NodeMatches(NameMatches("capturers")),
+                ChildrenMatch(UnorderedElementsAre(NodeMatches(AllOf(
+                    NameMatches("1"),
+                    PropertyList(IsSupersetOf({
+                        UintIs("initial presentation delay (ns)", kInitialPresentationDelay2),
+                        UintIs("current presentation delay (ns)", kCurrentPresDelay3),
+                        IntIs("time of latest presentation delay change", kTimeOfPresDelayChange3),
+                    }))))))))));
+}
+
+// Tests ThermalStateTracker methods.
 TEST_F(ReporterTest, SetThermalStateMetrics) {
   under_test_.SetNumThermalStates(3);
   under_test_.SetThermalState(0);

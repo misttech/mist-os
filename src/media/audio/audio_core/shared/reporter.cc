@@ -115,7 +115,9 @@ class RendererNop : public Reporter::Renderer {
                        fuchsia::media::audio::RampType ramp_type) override {}
   void SetCompleteGain(float complete_gain_db) override {}
 
-  void SetMinLeadTime(zx::duration min_lead_time) override {}
+  void SetInitialMinLeadTime(zx::duration initial_min_lead_time) override {}
+  void UpdateMinLeadTime(zx::duration new_min_lead_time,
+                         zx::time time_of_min_lead_time_change) override {}
 
   void SetPtsContinuityThreshold(float threshold_seconds) override {}
   void SetPtsUnits(uint32_t numerator, uint32_t denominator) override {}
@@ -143,8 +145,11 @@ class CapturerNop : public Reporter::Capturer {
   void SetMute(bool muted) override {}
   void SetGainWithRamp(float gain_db, zx::duration ramp_duration,
                        fuchsia::media::audio::RampType ramp_type) override {}
+  void SetCompleteGain(float complete_gain_db) override {}
 
-  void SetPresentationDelay(zx::duration presentation_delay) override {}
+  void SetInitialPresentationDelay(zx::duration initial_presentation_delay) override {}
+  void UpdatePresentationDelay(zx::duration new_presentation_delay,
+                               zx::time time_of_presentation_delay_change) override {}
 
   void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) override {}
   void SendPacket(const fuchsia::media::StreamPacket& packet) override {}
@@ -822,26 +827,91 @@ class Reporter::InputDeviceImpl : public Reporter::InputDevice {
   std::optional<zx::time> time_of_death_;
 };
 
-class Reporter::ClientPort {
+// This groups together stream-specific gain metrics, for all renderer and capturer instances.
+class ClientGainInfo {
  public:
-  ClientPort(inspect::Node& node, ObjectTracker&& object_tracker)
-      : object_tracker_(std::move(object_tracker)),
-        format_(node, "format"),
-        payload_buffers_node_(node.CreateChild("payload buffers")),
-        gain_db_(node.CreateDouble("gain db", 0.0)),
-        muted_(node.CreateBool("muted", false)),
-        calls_to_set_gain_with_ramp_(node.CreateUint("calls to SetGainWithRamp", 0)) {}
-
-  void SetFormat(const Format& format) {
-    object_tracker_.SetFormat(format);
-    format_.Set(format);
-  }
+  ClientGainInfo(inspect::Node& parent_node, const std::string& name)
+      : node_(parent_node.CreateChild(name)),
+        gain_db_(node_.CreateDouble("gain db", 0.0)),
+        muted_(node_.CreateBool("muted", false)),
+        calls_to_set_gain_with_ramp_(node_.CreateUint("calls to SetGainWithRamp", 0)),
+        complete_gain_db_(node_.CreateDouble("complete stream gain (post-volume) dbfs", 0.0)) {}
 
   void SetGain(float gain_db) { gain_db_.Set(gain_db); }
   void SetMute(bool muted) { muted_.Set(muted); }
   void SetGainWithRamp(float gain_db, zx::duration ramp_duration,
                        fuchsia::media::audio::RampType ramp_type) {
     calls_to_set_gain_with_ramp_.Add(1);
+  }
+  void SetCompleteGain(float complete_gain_db) { complete_gain_db_.Set(complete_gain_db); }
+
+ private:
+  inspect::Node node_;
+  inspect::DoubleProperty gain_db_;
+  inspect::BoolProperty muted_;
+  inspect::UintProperty calls_to_set_gain_with_ramp_;
+  inspect::DoubleProperty complete_gain_db_;
+};
+
+// This groups together metrics related to presentation timestamps on renderer packets.
+class ClientTimingInfo {
+ public:
+  ClientTimingInfo(inspect::Node& parent_node, const std::string& name)
+      : node_(parent_node.CreateChild(name)),
+        pts_continuity_threshold_seconds_(node_.CreateDouble("pts continuity threshold (s)", 0.0)),
+        pts_units_per_second_numerator_(node_.CreateUint("pts units numerator", 1'000'000'000)),
+        pts_units_per_second_denominator_(node_.CreateUint("pts units denominator", 1)) {}
+
+  void SetPtsContinuityThreshold(float threshold_seconds) {
+    pts_continuity_threshold_seconds_.Set(threshold_seconds);
+  }
+  void SetPtsUnits(uint32_t numerator, uint32_t denominator) {
+    pts_units_per_second_numerator_.Set(numerator);
+    pts_units_per_second_denominator_.Set(denominator);
+  }
+
+ private:
+  inspect::Node node_;
+  inspect::UintProperty initial_min_offset_time_ns_;
+  zx::time min_offset_time_change_time_;
+  inspect::DoubleProperty pts_continuity_threshold_seconds_;
+  inspect::UintProperty pts_units_per_second_numerator_;
+  inspect::UintProperty pts_units_per_second_denominator_;
+};
+
+// This is not a node grouping; it represents metrics that are directly set by client calls.
+class Reporter::ClientPort {
+ public:
+  ClientPort(inspect::Node& node, ObjectTracker&& object_tracker)
+      : node_(node),
+        object_tracker_(std::move(object_tracker)),
+        format_(node_, "format"),
+        payload_buffers_node_(node_.CreateChild("payload buffers")),
+        gain_info_(node_, "gain") {}
+
+  // This is only relevant for renderers, so we defer construction until called by RendererImpl.
+  void SetupPtsInfo() { timing_info_ = ClientTimingInfo(node_, "presentation timestamps"); }
+
+  void SetFormat(const Format& format) {
+    object_tracker_.SetFormat(format);
+    format_.Set(format);
+  }
+
+  void SetGain(float gain_db) { gain_info_.SetGain(gain_db); }
+  void SetMute(bool muted) { gain_info_.SetMute(muted); }
+  void SetGainWithRamp(float gain_db, zx::duration ramp_duration,
+                       fuchsia::media::audio::RampType ramp_type) {
+    gain_info_.SetGainWithRamp(gain_db, ramp_duration, ramp_type);
+  }
+  void SetCompleteGain(float complete_gain_db) { gain_info_.SetCompleteGain(complete_gain_db); }
+
+  void SetPtsContinuityThreshold(float threshold_seconds) {
+    FX_DCHECK(timing_info_.has_value());
+    timing_info_->SetPtsContinuityThreshold(threshold_seconds);
+  }
+  void SetPtsUnits(uint32_t numerator, uint32_t denominator) {
+    FX_DCHECK(timing_info_.has_value());
+    timing_info_->SetPtsUnits(numerator, denominator);
   }
 
   void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) {
@@ -868,6 +938,7 @@ class Reporter::ClientPort {
   }
 
  private:
+  inspect::Node& node_;
   ObjectTracker object_tracker_;
   FormatInfo format_;
   inspect::Node payload_buffers_node_;
@@ -885,9 +956,8 @@ class Reporter::ClientPort {
   std::mutex mutex_;
   std::unordered_map<uint32_t, PayloadBuffer> payload_buffers_ FXL_GUARDED_BY(mutex_);
 
-  inspect::DoubleProperty gain_db_;
-  inspect::BoolProperty muted_;
-  inspect::UintProperty calls_to_set_gain_with_ramp_;  // Just counting these for now.
+  ClientGainInfo gain_info_;
+  std::optional<ClientTimingInfo> timing_info_;
 };
 
 class Reporter::RendererImpl : public Reporter::Renderer {
@@ -897,12 +967,11 @@ class Reporter::RendererImpl : public Reporter::Renderer {
         client_port_(
             node_,
             ObjectTracker(impl, AudioObjectsCreatedMigratedMetricDimensionObjectType::Renderer)),
-        complete_stream_gain_db_(
-            node_.CreateDouble("complete stream gain (post-volume) dbfs", 0.0)),
-        min_lead_time_ns_(node_.CreateUint("min lead time (ns)", 0)),
-        pts_continuity_threshold_seconds_(node_.CreateDouble("pts continuity threshold (s)", 0.0)),
-        pts_units_per_second_numerator_(node_.CreateUint("pts units numerator", 1'000'000'000)),
-        pts_units_per_second_denominator_(node_.CreateUint("pts units denominator", 1)),
+        initial_min_lead_time_ns_(node_.CreateUint("initial min lead time (ns)", 0)),
+        current_min_lead_time_ns_(node_.CreateUint("current min lead time (ns)", 0)),
+        time_of_min_lead_time_change_(zx::time(0)),
+        time_of_min_lead_time_change_ns_(node_.CreateInt("time of latest min lead time change",
+                                                         time_of_min_lead_time_change_.get())),
         usage_(node_.CreateString("usage", "default")),
         packet_queue_underflows_(
             std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
@@ -931,6 +1000,8 @@ class Reporter::RendererImpl : public Reporter::Renderer {
                 .cobalt_component_id =
                     AudioSessionDurationMigratedMetricDimensionComponent::Renderer,
             })) {
+    client_port_.SetupPtsInfo();
+
     time_since_death_ = node_.CreateLazyValues("RendererTimeSinceDeath", [this] {
       inspect::Inspector i;
       i.GetRoot().CreateUint(
@@ -963,18 +1034,27 @@ class Reporter::RendererImpl : public Reporter::Renderer {
     client_port_.SetGainWithRamp(gain_db, ramp_duration, ramp_type);
   }
   void SetCompleteGain(float complete_gain_db) override {
-    complete_stream_gain_db_.Set(complete_gain_db);
+    client_port_.SetCompleteGain(complete_gain_db);
   }
 
-  void SetMinLeadTime(zx::duration min_lead_time) override {
-    min_lead_time_ns_.Set(min_lead_time.to_nsecs());
+  void SetInitialMinLeadTime(zx::duration initial_min_lead_time) override {
+    initial_min_lead_time_ns_.Set(initial_min_lead_time.to_nsecs());
+    current_min_lead_time_ns_.Set(initial_min_lead_time.to_nsecs());
+    SetTimeOfMinLeadTimeChange(zx::time(0));
   }
+  void UpdateMinLeadTime(zx::duration new_min_lead_time,
+                         zx::time time_of_min_lead_time_change) override {
+    if (time_of_min_lead_time_change > time_of_min_lead_time_change_) {
+      current_min_lead_time_ns_.Set(new_min_lead_time.to_nsecs());
+      SetTimeOfMinLeadTimeChange(time_of_min_lead_time_change);
+    }
+  }
+
   void SetPtsContinuityThreshold(float threshold_seconds) override {
-    pts_continuity_threshold_seconds_.Set(threshold_seconds);
+    client_port_.SetPtsContinuityThreshold(threshold_seconds);
   }
   void SetPtsUnits(uint32_t numerator, uint32_t denominator) override {
-    pts_units_per_second_numerator_.Set(numerator);
-    pts_units_per_second_denominator_.Set(denominator);
+    client_port_.SetPtsUnits(numerator, denominator);
   }
 
   void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) override {
@@ -998,14 +1078,19 @@ class Reporter::RendererImpl : public Reporter::Renderer {
   }
 
  private:
+  // Use a separate method to update these members, to ensure they stay in sync.
+  void SetTimeOfMinLeadTimeChange(zx::time time_of_min_lead_time_change) {
+    time_of_min_lead_time_change_ = time_of_min_lead_time_change;
+    time_of_min_lead_time_change_ns_.Set(time_of_min_lead_time_change_.get());
+  }
+
   inspect::Node node_;
   ClientPort client_port_;
   inspect::LazyNode time_since_death_;
-  inspect::DoubleProperty complete_stream_gain_db_;
-  inspect::UintProperty min_lead_time_ns_;
-  inspect::DoubleProperty pts_continuity_threshold_seconds_;
-  inspect::UintProperty pts_units_per_second_numerator_;
-  inspect::UintProperty pts_units_per_second_denominator_;
+  inspect::UintProperty initial_min_lead_time_ns_;
+  inspect::UintProperty current_min_lead_time_ns_;
+  zx::time time_of_min_lead_time_change_;  // Needed because we cannot compare based on the prop.
+  inspect::IntProperty time_of_min_lead_time_change_ns_;
   inspect::StringProperty usage_;
   std::unique_ptr<OverflowUnderflowTracker> packet_queue_underflows_;
   std::unique_ptr<OverflowUnderflowTracker> continuity_underflows_;
@@ -1020,7 +1105,11 @@ class Reporter::CapturerImpl : public Reporter::Capturer {
         client_port_(
             node_,
             ObjectTracker(impl, AudioObjectsCreatedMigratedMetricDimensionObjectType::Capturer)),
-        presentation_delay_ns_(node_.CreateUint("presentation delay (ns)", 0)),
+        initial_presentation_delay_ns_(node_.CreateUint("initial presentation delay (ns)", 0)),
+        current_presentation_delay_ns_(node_.CreateUint("current presentation delay (ns)", 0)),
+        time_of_presentation_delay_change_(zx::time(0)),
+        time_of_presentation_delay_change_ns_(
+            node_.CreateInt("time of latest presentation delay change", 0)),
         usage_(node_.CreateString("usage", "default")),
         thread_name_(node_.CreateString("mixer thread name", thread_name)),
         overflows_(std::make_unique<OverflowUnderflowTracker>(OverflowUnderflowTracker::Args{
@@ -1053,9 +1142,21 @@ class Reporter::CapturerImpl : public Reporter::Capturer {
                        fuchsia::media::audio::RampType ramp_type) override {
     client_port_.SetGainWithRamp(gain_db, ramp_duration, ramp_type);
   }
+  void SetCompleteGain(float complete_gain_db) override {
+    client_port_.SetCompleteGain(complete_gain_db);
+  }
 
-  void SetPresentationDelay(zx::duration presentation_delay) override {
-    presentation_delay_ns_.Set(presentation_delay.to_nsecs());
+  void SetInitialPresentationDelay(zx::duration initial_presentation_delay) override {
+    initial_presentation_delay_ns_.Set(initial_presentation_delay.to_nsecs());
+    current_presentation_delay_ns_.Set(initial_presentation_delay.to_nsecs());
+    SetTimeOfPresentationDelayChange(zx::time(0));
+  }
+  void UpdatePresentationDelay(zx::duration new_presentation_delay,
+                               zx::time time_of_presentation_delay_change) override {
+    if (time_of_presentation_delay_change > time_of_presentation_delay_change_) {
+      current_presentation_delay_ns_.Set(new_presentation_delay.to_nsecs());
+      SetTimeOfPresentationDelayChange(time_of_presentation_delay_change);
+    }
   }
 
   void AddPayloadBuffer(uint32_t buffer_id, uint64_t size) override {
@@ -1069,10 +1170,19 @@ class Reporter::CapturerImpl : public Reporter::Capturer {
   }
 
  private:
+  // Use a separate method to update these members, to ensure they stay in sync.
+  void SetTimeOfPresentationDelayChange(zx::time time_of_presentation_delay_change) {
+    time_of_presentation_delay_change_ = time_of_presentation_delay_change;
+    time_of_presentation_delay_change_ns_.Set(time_of_presentation_delay_change_.get());
+  }
+
   inspect::Node node_;
   ClientPort client_port_;
   inspect::LazyNode time_since_death_;
-  inspect::UintProperty presentation_delay_ns_;
+  inspect::UintProperty initial_presentation_delay_ns_;
+  inspect::UintProperty current_presentation_delay_ns_;
+  zx::time time_of_presentation_delay_change_;  // Needed: we cannot compare based on the prop.
+  inspect::IntProperty time_of_presentation_delay_change_ns_;
   inspect::StringProperty usage_;
   inspect::StringProperty thread_name_;
   std::unique_ptr<OverflowUnderflowTracker> overflows_;

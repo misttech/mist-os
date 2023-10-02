@@ -277,6 +277,7 @@ class BaseCapturer : public AudioObject,
 
   std::shared_ptr<MixStage> mix_stage_;
   Reporter::Container<Reporter::Capturer, Reporter::kObjectsToCache>::Ptr reporter_;
+  bool min_fence_time_reported_ = false;
 
   std::shared_ptr<Clock> audio_clock_;
 };

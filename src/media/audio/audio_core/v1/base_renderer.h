@@ -163,6 +163,7 @@ class BaseRenderer : public AudioObject,
 
   // Minimum Clock Lead Time state
   bool min_lead_time_events_enabled_ = false;
+  bool min_lead_time_reported_ = false;
 
   fbl::RefPtr<VersionedTimelineFunction> reference_clock_to_fractional_frames_;
 

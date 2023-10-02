@@ -496,7 +496,12 @@ void BaseCapturer::RecomputePresentationDelay() {
     FX_LOGS(TRACE) << "Changing presentation_delay_ (ns) from " << presentation_delay_.get()
                    << " to " << cur_max.get();
 
-    reporter_->SetPresentationDelay(cur_max);
+    if (!min_fence_time_reported_) {
+      reporter_->SetInitialPresentationDelay(cur_max);
+      min_fence_time_reported_ = true;
+    } else {
+      reporter_->UpdatePresentationDelay(cur_max, zx::clock::get_monotonic());
+    }
     presentation_delay_ = cur_max;
   }
 }
