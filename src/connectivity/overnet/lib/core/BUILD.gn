@@ -21,7 +21,6 @@ CORE_DEPS = [
   "//third_party/rust_crates:crc",
   "//third_party/rust_crates:event-listener",
   "//third_party/rust_crates:futures",
-  "//third_party/rust_crates:libc",
   "//third_party/rust_crates:tracing",
   "//third_party/rust_crates:rand",
 ]
@@ -49,7 +48,6 @@ CORE_SOURCES = [
   "src/proxy/handle/event_pair.rs",
   "src/proxy/handle/signals.rs",
   "src/proxy/handle/socket.rs",
-  "src/router/diagnostics_service.rs",
   "src/router/mod.rs",
   "src/router/security_context.rs",
   "src/router/service_map.rs",

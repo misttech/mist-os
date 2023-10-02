@@ -264,7 +264,6 @@ async fn run_ascendd(
     link: Vec<PathBuf>,
 ) -> Result<(), Error> {
     let node = hoist.node();
-    node.set_implementation(fidl_fuchsia_overnet_protocol::Implementation::Ascendd);
     node.set_client_routing(client_routing);
 
     tracing::debug!("ascendd listening to socket {}", sockpath.display());

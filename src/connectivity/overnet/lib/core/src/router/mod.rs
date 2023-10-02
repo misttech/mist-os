@@ -18,13 +18,9 @@
 // that node (said link may be a third node that will be requested to forward datagrams
 // on our behalf).
 
-mod diagnostics_service;
 mod service_map;
 
-use self::{
-    diagnostics_service::run_diagostic_service_request_handler,
-    service_map::{ListablePeer, ServiceMap},
-};
+use self::service_map::{ListablePeer, ServiceMap};
 use crate::{
     future_help::{log_errors, Observer},
     handle_info::{handle_info, HandleKey, HandleType},
@@ -37,8 +33,8 @@ use async_utils::mutex_ticket::MutexTicket;
 use fidl::{endpoints::ClientEnd, AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket};
 use fidl_fuchsia_overnet::{ConnectionInfo, ServiceProviderMarker, ServiceProviderProxyInterface};
 use fidl_fuchsia_overnet_protocol::{
-    ChannelHandle, EventPairHandle, EventPairRights, Implementation, LinkDiagnosticInfo,
-    PeerConnectionDiagnosticInfo, SocketHandle, SocketType, StreamId, StreamRef, ZirconHandle,
+    ChannelHandle, EventPairHandle, EventPairRights, SocketHandle, SocketType, StreamId, StreamRef,
+    ZirconHandle,
 };
 use fuchsia_async::Task;
 use futures::channel::oneshot;
@@ -46,7 +42,7 @@ use futures::{future::poll_fn, lock::Mutex, prelude::*, ready};
 use rand::Rng;
 use std::{
     collections::{BTreeMap, HashMap},
-    sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     sync::{Arc, Weak},
     task::{Context, Poll, Waker},
     time::Duration,
@@ -55,25 +51,18 @@ use std::{
 /// Configuration object for creating a router.
 pub struct RouterOptions {
     node_id: Option<NodeId>,
-    diagnostics: Option<Implementation>,
     circuit_router_interval: Option<Duration>,
 }
 
 impl RouterOptions {
     /// Create with defaults.
     pub fn new() -> Self {
-        RouterOptions { diagnostics: None, node_id: None, circuit_router_interval: None }
+        RouterOptions { node_id: None, circuit_router_interval: None }
     }
 
     /// Request a specific node id (if unset, one will be generated).
     pub fn set_node_id(mut self, node_id: NodeId) -> Self {
         self.node_id = Some(node_id);
-        self
-    }
-
-    /// Enable diagnostics with a selected `implementation`.
-    pub fn export_diagnostics(mut self, implementation: Implementation) -> Self {
-        self.diagnostics = Some(implementation);
         self
     }
 
@@ -175,7 +164,6 @@ pub struct Router {
     proxied_streams: Mutex<HashMap<HandleKey, ProxiedHandle>>,
     pending_transfers: Mutex<PendingTransferMap>,
     task: Mutex<Option<Task<()>>>,
-    implementation: AtomicU32,
     /// Hack to prevent the n^2 scaling of a fully-connected graph of ffxs
     ascendd_client_routing: AtomicBool,
     circuit_node: circuit::ConnectionNode,
@@ -240,9 +228,6 @@ impl Router {
             proxied_streams: Mutex::new(HashMap::new()),
             pending_transfers: Mutex::new(PendingTransferMap::new()),
             task: Mutex::new(None),
-            implementation: AtomicU32::new(
-                options.diagnostics.unwrap_or(Implementation::Unknown).into_primitive(),
-            ),
             // Default is to route all clients to each other. Ffx daemon disabled client routing.
             ascendd_client_routing: AtomicBool::new(true),
             circuit_node,
@@ -250,18 +235,7 @@ impl Router {
 
         let weak_router = Arc::downgrade(&router);
         *router.task.lock().now_or_never().unwrap() = Some(Task::spawn(log_errors(
-            async move {
-                let router = &weak_router;
-                futures::future::try_join(
-                    run_circuits(router.clone(), circuit_connections, new_peer_receiver),
-                    async move {
-                        run_diagostic_service_request_handler(router).await?;
-                        Ok(())
-                    },
-                )
-                .await
-                .map(drop)
-            },
+            run_circuits(weak_router, circuit_connections, new_peer_receiver),
             format!("router {:?} support loop failed", node_id),
         )));
 
@@ -277,19 +251,6 @@ impl Router {
     /// Accessor for the node id of this router.
     pub fn node_id(&self) -> NodeId {
         self.node_id
-    }
-
-    /// Accessor for the Implementation of this router.
-    pub fn implementation(&self) -> Implementation {
-        Implementation::from_primitive(
-            self.implementation.load(std::sync::atomic::Ordering::SeqCst),
-        )
-        .unwrap_or(Implementation::Unknown)
-    }
-
-    /// Setter for the Implementation of this router.
-    pub fn set_implementation(&self, imp: Implementation) {
-        self.implementation.store(imp.into_primitive(), std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Accessor for whether to route ascendd clients to each other
@@ -373,16 +334,6 @@ impl Router {
     /// Create a new list_peers context
     pub async fn new_list_peers_context(&self) -> ListPeersContext {
         ListPeersContext(Mutex::new(Some(self.service_map.new_list_peers_observer().await)))
-    }
-
-    /// Diagnostic information for links
-    pub(crate) async fn link_diagnostics(&self) -> Vec<LinkDiagnosticInfo> {
-        Vec::new()
-    }
-
-    /// Diagnostic information for peer connections
-    pub(crate) async fn peer_diagnostics(&self) -> Vec<PeerConnectionDiagnosticInfo> {
-        Vec::new()
     }
 
     async fn client_peer(self: &Arc<Self>, peer_node_id: NodeId) -> Result<Arc<Peer>, Error> {

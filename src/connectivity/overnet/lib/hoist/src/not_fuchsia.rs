@@ -35,9 +35,7 @@ impl Hoist {
     pub fn new(router_update_interval: Option<std::time::Duration>) -> Result<Self, Error> {
         let node_id = overnet_core::generate_node_id();
         tracing::trace!(hoist_node_id = node_id.0);
-        let router_options = RouterOptions::new()
-            .export_diagnostics(fidl_fuchsia_overnet_protocol::Implementation::HoistRustCrate)
-            .set_node_id(node_id);
+        let router_options = RouterOptions::new().set_node_id(node_id);
         let router_options = if let Some(router_update_interval) = router_update_interval {
             router_options.set_router_interval(router_update_interval)
         } else {

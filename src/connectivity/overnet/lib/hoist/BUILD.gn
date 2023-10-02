@@ -11,7 +11,6 @@ rustc_library("hoist") {
   with_unit_tests = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
     "//src/connectivity/overnet/lib/circuit",
     "//src/connectivity/overnet/lib/core",
     "//src/lib/fuchsia-async",
