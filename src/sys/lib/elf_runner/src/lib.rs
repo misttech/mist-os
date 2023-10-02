@@ -208,10 +208,8 @@ impl ElfRunner {
         start_info: fcrunner::ComponentStartInfo,
         checker: &ScopedPolicyChecker,
     ) -> Result<ElfComponent, StartComponentError> {
-        let start_info: StartInfo = start_info
-            .try_into()
-            .map_err(StartInfoError::StartInfoError)
-            .map_err(StartComponentError::StartInfoError)?;
+        let start_info: StartInfo =
+            start_info.try_into().map_err(StartInfoError::StartInfoError)?;
 
         let resolved_url = start_info.resolved_url.clone();
 
@@ -251,7 +249,7 @@ impl ElfRunner {
             .map_err(|err| StartComponentError::ProcessLauncherConnectError(err.into()))?;
 
         // Create a job for this component that will contain its process.
-        let job = ElfRunner::create_job(&program_config).map_err(StartComponentError::JobError)?;
+        let job = ElfRunner::create_job(&program_config)?;
 
         crash_handler::run_exceptions_server(
             &job,
@@ -265,18 +263,10 @@ impl ElfRunner {
         let ns = namespace::Namespace::try_from(start_info.namespace)
             .map_err(StartComponentError::NamespaceError)?;
 
-        let config_vmo = start_info
-            .encoded_config
-            .take()
-            .map(ElfRunner::encoded_config_into_vmo)
-            .transpose()
-            .map_err(StartComponentError::ConfigDataError)?;
+        let config_vmo =
+            start_info.encoded_config.take().map(ElfRunner::encoded_config_into_vmo).transpose()?;
 
-        let next_vdso = program_config
-            .use_next_vdso
-            .then(get_next_vdso_vmo)
-            .transpose()
-            .map_err(StartComponentError::VdsoError)?;
+        let next_vdso = program_config.use_next_vdso.then(get_next_vdso_vmo).transpose()?;
 
         let (lifecycle_client, lifecycle_server) = if program_config.notify_lifecycle_stop {
             // Creating a channel is not expected to fail.
@@ -364,8 +354,7 @@ impl ElfRunner {
                 loader_proxy_chan: None,
                 executable_vmo: None,
             })
-            .await
-            .map_err(StartComponentError::ConfigureLauncherError)?;
+            .await?;
 
         // Wait on break_on_start with a timeout and don't fail.
         if let Some(break_on_start) = start_info.break_on_start {
@@ -492,16 +481,16 @@ async fn start(
     });
 
     let Some(proc_copy) = elf_component.copy_process() else {
-            runner::component::report_start_error(
-                zx::Status::from_raw(
-                    i32::try_from(fcomp::Error::InstanceCannotStart.into_primitive()).unwrap(),
-                ),
-                "Component unexpectedly had no process".to_string(),
-                &resolved_url,
-                server_end,
-            );
-            return;
-        };
+        runner::component::report_start_error(
+            zx::Status::from_raw(
+                i32::try_from(fcomp::Error::InstanceCannotStart.into_primitive()).unwrap(),
+            ),
+            "Component unexpectedly had no process".to_string(),
+            &resolved_url,
+            server_end,
+        );
+        return;
+    };
 
     let component_diagnostics = elf_component
         .copy_job_for_diagnostics()
