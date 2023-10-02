@@ -157,7 +157,7 @@ async fn inspect_devices(name: &str) {
                 AdminEnabled: true,
                 MTU: 65536u64,
                 Loopback: true,
-                IpAddresses: Vec::<String>::new(),
+                IpAddresses: vec!["127.0.0.1".to_string(), "::1".to_string()],
             },
             "2": {
                 Name: NETDEV_NAME,
@@ -165,7 +165,7 @@ async fn inspect_devices(name: &str) {
                 AdminEnabled: true,
                 MTU: u64::from(netemul::DEFAULT_MTU),
                 Loopback: false,
-                IpAddresses: vec!["192.168.0.1".to_string()],
+                IpAddresses: vec!["192.168.0.1".to_string(), "fe80::ff:fe00:1".to_string()],
                 NetworkDevice: {
                     MacAddress: "2:0:0:0:0:1",
                     PhyUp: true,

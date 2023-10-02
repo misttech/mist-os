@@ -7,13 +7,20 @@
 //! This module provides utilities for publishing netstack3 diagnostics data to
 //! Inspect.
 
-use super::{devices::DeviceSpecificInfo, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt, StackTime};
+use super::{
+    devices::{DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo},
+    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt, StackTime, StaticCommonInfo,
+};
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
     ip::{Ip, IpVersion, Ipv4, Ipv6},
     Witness as _,
 };
-use netstack3_core::{device::DeviceId, ip, transport::tcp};
+use netstack3_core::{
+    device::{self, DeviceId},
+    ip,
+    transport::tcp,
+};
 use std::{fmt, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
@@ -125,46 +132,76 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
 }
 
 pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
-    let inspector = fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default());
-    ctx.non_sync_ctx().devices.with_devices(|devices| {
-        for ref device in devices {
-            let id = device.external_state().static_common_info().binding_id;
-            inspector.root().record_child(format!("{id}"), |node| {
-                node.record_string("Name", &device.external_state().static_common_info().name);
-                node.record_uint("InterfaceId", id.into());
-                device.external_state().with_common_info(|info| {
-                    node.record_bool("AdminEnabled", info.admin_enabled);
-                    node.record_uint("MTU", info.mtu.get().into());
-                    let ip_addresses =
-                        node.create_string_array("IpAddresses", info.addresses.len());
-                    for (j, address) in info.addresses.keys().enumerate() {
-                        ip_addresses.set(j, address.get().to_string());
+    struct Visitor(fuchsia_inspect::Inspector);
+    impl device::DevicesVisitor<BindingsNonSyncCtxImpl> for Visitor {
+        fn visit_devices(
+            &self,
+            devices: impl Iterator<Item = device::InspectDeviceState<BindingsNonSyncCtxImpl>>,
+        ) {
+            use crate::bindings::DeviceIdExt as _;
+            let Self(inspector) = self;
+            for device::InspectDeviceState { device_id, addresses } in devices {
+                let external_state = device_id.external_state();
+                let StaticCommonInfo { binding_id, name, tx_notifier: _ } =
+                    external_state.static_common_info();
+                inspector.root().record_child(format!("{binding_id}"), |node| {
+                    node.record_string("Name", &name);
+                    node.record_uint("InterfaceId", (*binding_id).into());
+                    let ip_addresses = node.create_string_array("IpAddresses", addresses.len());
+                    for (j, address) in addresses.iter().enumerate() {
+                        ip_addresses.set(j, address.to_string());
                     }
                     node.record(ip_addresses);
-                });
-                match device.external_state() {
-                    DeviceSpecificInfo::Netdevice(info) => {
-                        node.record_bool("Loopback", false);
-                        node.record_child("NetworkDevice", |node| {
-                            node.record_string("MacAddress", info.mac.get().to_string());
-                            info.with_dynamic_info(|dyn_info| {
-                                node.record_bool("PhyUp", dyn_info.phy_up);
+                    external_state.with_common_info(
+                        |DynamicCommonInfo {
+                             admin_enabled,
+                             mtu,
+                             addresses: _,
+                             control_hook: _,
+                             events: _,
+                         }| {
+                            node.record_bool("AdminEnabled", *admin_enabled);
+                            node.record_uint("MTU", mtu.get().into());
+                        },
+                    );
+                    match external_state {
+                        DeviceSpecificInfo::Netdevice(
+                            info @ NetdeviceInfo {
+                                mac,
+                                dynamic: _,
+                                handler: _,
+                                static_common_info: _,
+                            },
+                        ) => {
+                            node.record_bool("Loopback", false);
+                            node.record_child("NetworkDevice", |node| {
+                                node.record_string("MacAddress", mac.get().to_string());
+                                info.with_dynamic_info(
+                                    |DynamicNetdeviceInfo { phy_up, common_info: _ }| {
+                                        node.record_bool("PhyUp", *phy_up);
+                                    },
+                                );
                             });
-                        });
+                        }
+                        DeviceSpecificInfo::Loopback(_info) => {
+                            node.record_bool("Loopback", true);
+                        }
                     }
-                    DeviceSpecificInfo::Loopback(_info) => {
-                        node.record_bool("Loopback", true);
-                    }
-                }
-            })
+                })
+            }
         }
-    });
+    }
+    let sync_ctx = ctx.sync_ctx();
+    let visitor =
+        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    device::inspect_devices::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
+    let Visitor(inspector) = visitor;
     inspector
 }
 
 pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     struct Visitor(fuchsia_inspect::Inspector);
-    impl netstack3_core::device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
+    impl device::NeighborVisitor<BindingsNonSyncCtxImpl, StackTime> for Visitor {
         fn visit_neighbors<LinkAddress: fmt::Debug>(
             &self,
             device: DeviceId<BindingsNonSyncCtxImpl>,
@@ -201,7 +238,7 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
     let sync_ctx = ctx.sync_ctx();
     let visitor =
         Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
-    netstack3_core::device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
+    device::inspect_neighbors::<BindingsNonSyncCtxImpl, _>(sync_ctx, &visitor);
     let Visitor(inspector) = visitor;
     inspector
 }

@@ -586,6 +586,47 @@ where
     }
 }
 
+/// Visitor for Device state.
+pub trait DevicesVisitor<C: NonSyncContext> {
+    /// Performs a user-defined operation over an iterator of device state.
+    fn visit_devices(&self, devices: impl Iterator<Item = InspectDeviceState<C>>);
+}
+
+/// The state of a Device, for exporting to Inspect.
+pub struct InspectDeviceState<C: NonSyncContext> {
+    /// A strong ID identifying a Device.
+    pub device_id: DeviceId<C>,
+
+    /// The IP addresses assigned to a Device by core.
+    pub addresses: SmallVec<[IpAddr; 32]>,
+}
+
+/// Provides access to Device state via a `visitor`.
+pub fn inspect_devices<C: NonSyncContext, V: DevicesVisitor<C>>(
+    sync_ctx: &SyncCtx<C>,
+    visitor: &V,
+) {
+    let devices = snapshot_device_ids(sync_ctx, Some).into_iter().map(|device| {
+        let device_id = device.clone();
+        let ip = match &device {
+            DeviceId::Ethernet(EthernetDeviceId(rc)) => &rc.ip,
+            DeviceId::Loopback(LoopbackDeviceId(rc)) => &rc.ip,
+        };
+        let ipv4 =
+            lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>::read_lock(
+                ip,
+            );
+        let ipv4_addresses = ipv4.iter().map(|a| IpAddr::from(a.addr().into_addr()));
+        let ipv6 =
+            lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>::read_lock(
+                ip,
+            );
+        let ipv6_addresses = ipv6.iter().map(|a| IpAddr::from(a.addr().into_addr()));
+        InspectDeviceState { device_id, addresses: ipv4_addresses.chain(ipv6_addresses).collect() }
+    });
+    visitor.visit_devices(devices)
+}
+
 impl<NonSyncCtx: NonSyncContext, L> IpDeviceAddressIdContext<Ipv4>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
