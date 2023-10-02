@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![allow(unused_imports, unused_variables, dead_code)]
-use anyhow::{anyhow, bail, Context as _, Result};
+// #![allow(unused_imports, unused_variables, dead_code)]
+use crate::common::fastboot::{InterfaceFactory, InterfaceFactoryBase};
+use anyhow::{ bail, Context as _, Result};
 use async_net::TcpStream;
 use async_trait::async_trait;
-use ffx_config::get;
 use futures::{
     prelude::*,
     task::{Context, Poll},
@@ -15,9 +15,51 @@ use std::fmt;
 use std::time::Duration;
 use std::{convert::TryInto, io::ErrorKind, net::SocketAddr, pin::Pin};
 use timeout::timeout;
-use tracing::debug;
 
 const FB_HANDSHAKE: [u8; 4] = *b"FB01";
+
+///////////////////////////////////////////////////////////////////////////////
+// TcpFactory
+//
+
+#[derive(Debug, Clone)]
+pub struct TcpFactory {
+    addr: SocketAddr,
+}
+
+impl TcpFactory {
+    pub fn new(addr: SocketAddr) -> Self {
+        Self { addr }
+    }
+}
+
+impl Drop for TcpFactory{
+    fn drop(&mut self) {
+        futures::executor::block_on(async move {
+            self.close().await;
+        });
+    }
+}
+
+#[async_trait(?Send)]
+impl InterfaceFactoryBase<TcpNetworkInterface> for TcpFactory {
+    async fn open(&mut self) -> Result<TcpNetworkInterface> {
+        let interface = open_once(&self.addr, Duration::from_secs(1))
+            .await
+            .with_context(|| format!("connecting via TCP to Fastboot address: {}", self.addr))?;
+        Ok(interface)
+    }
+
+    async fn close(&self) {
+        tracing::debug!("Closing Fastboot TCP Factory for: {}", self.addr);
+    }
+}
+
+impl InterfaceFactory<TcpNetworkInterface> for TcpFactory {}
+
+///////////////////////////////////////////////////////////////////////////////
+// TcpNetworkInterface
+//
 
 pub struct TcpNetworkInterface {
     stream: TcpStream,
@@ -45,7 +87,7 @@ impl AsyncRead for TcpNetworkInterface {
         if self.read_task.is_none() {
             let mut stream = self.stream.clone();
             let avail_bytes = self.read_avail_bytes;
-            let length = buf.len();
+            let _length = buf.len();
             self.read_task.replace(Box::pin(async move {
                 let mut avail_bytes = match avail_bytes {
                     Some(value) => value,

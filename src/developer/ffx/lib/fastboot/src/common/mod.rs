@@ -363,6 +363,7 @@ pub async fn verify_variable_value(
     value: &str,
     fastboot_interface: &mut impl FastbootInterface,
 ) -> Result<bool> {
+    tracing::debug!("Verifying value for variable {} equals {}", var, value);
     fastboot_interface
         .get_var(var)
         .await

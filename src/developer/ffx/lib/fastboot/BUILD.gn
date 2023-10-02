@@ -86,6 +86,7 @@ if (is_host) {
       "src/transport/mod.rs",
       "src/transport/tcp.rs",
       "src/transport/udp.rs",
+      "src/transport/usb.rs",
       "src/unlock/mod.rs",
       "src/usb_discovery/mod.rs",
     ]
