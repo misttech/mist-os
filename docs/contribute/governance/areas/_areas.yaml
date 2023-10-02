@@ -411,7 +411,7 @@
     - description: 'View/scene connection signals in fuchsia.ui.gfx.Event'
 
 - name: 'Virtualization'
-  api_primary: 'tjdetwiler@google.com'
+  api_primary: ''
   api_secondary: ''
   description: |
     <p>Virtualization is the combination of:</p>

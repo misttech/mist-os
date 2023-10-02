@@ -27,9 +27,5 @@ neelsa@google.com
 qsr@google.com
 quiche@google.com
 silberst@google.com
-tjdetwiler@google.com
 wez@google.com
 ypomortsev@google.com
-
-# TODO(fxbug.dev/63462): Remove once Rust SDK work is complete.
-computerdruid@google.com
