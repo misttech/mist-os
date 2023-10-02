@@ -20,7 +20,7 @@ use {
     fuchsia_url::{boot_url::BootUrl, AbsoluteComponentUrl},
     moniker::Moniker,
     once_cell::sync::Lazy,
-    routing::{component_id_index::ComponentIdIndex, environment::RunnerRegistry},
+    routing::environment::RunnerRegistry,
     scrutiny::model::{collector::DataCollector, model::DataModel},
     serde::{Deserialize, Serialize},
     serde_json5::from_reader,
@@ -146,7 +146,7 @@ impl V2ComponentModelDataCollector {
         &self,
         index_path: Option<&str>,
         zbi: &Zbi,
-    ) -> Result<ComponentIdIndex> {
+    ) -> Result<component_id_index::Index> {
         match index_path {
             Some(path) => {
                 let split: Vec<&str> = path.split_inclusive("/").collect();
@@ -159,12 +159,10 @@ impl V2ComponentModelDataCollector {
                                     .context(
                                         "Unable to decode component ID index from persistent FIDL",
                                     )?;
-                            let index = component_id_index::Index::from_fidl(fidl_index).context(
+                            let index: component_id_index::Index = fidl_index.try_into().context(
                                 "Unable to create internal index for component ID index from FIDL",
                             )?;
-                            Ok(ComponentIdIndex::new_from_index(index).context(
-                                "Unable to create component ID index from internal index",
-                            )?)
+                            Ok(index)
                         }
                         None => Err(anyhow!("file {} not found in bootfs", remainder)),
                     }
@@ -172,7 +170,7 @@ impl V2ComponentModelDataCollector {
                     Err(anyhow!("Unable to parse component ID index file path {}", path))
                 }
             }
-            None => Ok(ComponentIdIndex::default()),
+            None => Ok(component_id_index::Index::default()),
         }
     }
 
@@ -230,8 +228,10 @@ impl DataCollector for V2ComponentModelDataCollector {
         let runtime_config = self.get_runtime_config(DEFAULT_CONFIG_PATH, &zbi).context(
             format!("Unable to get the runtime config at path {:?}", DEFAULT_CONFIG_PATH),
         )?;
-        let component_id_index =
-            self.get_component_id_index(runtime_config.component_id_index_path.as_deref(), &zbi)?;
+        let component_id_index = self.get_component_id_index(
+            runtime_config.component_id_index_path.as_ref().map(|path| path.as_str()),
+            &zbi,
+        )?;
 
         info!(
             total = decls_by_url.len(),

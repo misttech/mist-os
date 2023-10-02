@@ -45,9 +45,9 @@ The schema for an index file is described in the following example:
     // An entry, mapping an instance ID to a moniker.
     {
       // Instance IDs are randomly generated, 256-bits of base-16 encoded
-      // strings (in lower case). To generate a new instance ID, omit this
-      // field and run the build; the build will fail and suggest a new
-      // instance ID which you can copy-paste here.
+      // strings (in lower case). To generate a new instance ID, set this to
+      // an empty string (or other invalid value) and run the build; the build
+      // will fail and suggest a new instance ID which you can copy-paste here.
       instance_id: "2bd6cc2bd10243354b873a4ddb8a188b1d29171e26eebac06567bcdc36614af6",
       // The `instance_id` above is associated to the following moniker:
       moniker: "/core/account/credential_manager",
@@ -96,8 +96,8 @@ The first step is to determine the component instance's moniker. You can find th
 moniker of a component on a particular product's eng build by running `ffx component show`.
 
 Then, append an entry to the `instances` list with the component's moniker.
-Omit the `instance_id` field to have the build fail and suggest a new one you
-can use.
+Set the `instance_id` field to an invalid value (e.g. empty string) to have the
+build fail and suggest a new one you can use.
 
 #### Example
 
@@ -118,30 +118,27 @@ The above output shows us that the moniker of this instance is `/core/my_other_c
 
 Add `/core/my_other_component` to the index by appending this entry to
 [core_component_id_index.json5](/src/sys/core/core_component_id_index.json5)'s
-`instances` list:
+`instances` list with an invalid, empty `instance_id`:
 
 ```json5
   {
+    instance_id: "",
     moniker: "/core/my_other_component"
   }
 ```
 
-Now run the build.  The build should fail, suggesting a new instance ID:
+Now run the build.  The build will fail, suggesting a new instance ID:
 
 ```bash
 $ fx build
 .
 .
-Error: Could not merge index file ../../src/sys/core/core_component_id_index.json5
+Product Assembly Failed
+    ...
+    4.  parsing obj/bundles/assembly/resources/core_component_id_index.json5
+    5.  Invalid instance ID: invalid length; must be 64 characters
 
-Caused by:
-    Some entries are missing `instance_id` fields. Here are some generated IDs for you:
-[
-  {
-    instance_id: "47c3bf08f3e560c4dee659c28fa8d863dbdc0b1dbb74065e6cb1f38441ac759c",
-    moniker: "/core/my_other_component"
-  }
-]
+Here is a valid, randomly generated ID: 4251833a8d2e47b473732a23de84437e0b346a151ec1e7bdfd43b91e02f894a7
 ```
 
 Update the entry you've added by copying the suggested `instance_id` field. The

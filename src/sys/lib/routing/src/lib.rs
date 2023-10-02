@@ -5,7 +5,6 @@
 pub mod availability;
 pub mod capability_source;
 pub mod collection;
-pub mod component_id_index;
 pub mod component_instance;
 pub mod environment;
 pub mod error;
@@ -891,7 +890,7 @@ where
     };
 
     if storage_decl.storage_id == fdecl::StorageId::StaticInstanceId
-        && instance.component_id_index().look_up_moniker(instance.moniker()) == None
+        && instance.component_id_index().id_for_moniker(instance.moniker()).is_none()
     {
         return Err(RoutingError::ComponentNotInIdIndex {
             source_moniker: source_component.moniker.clone(),

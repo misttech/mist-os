@@ -5,7 +5,6 @@
 use {
     crate::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        component_id_index::ComponentIdIndex,
         environment::EnvironmentInterface,
         error::ComponentInstanceError,
         policy::GlobalPolicyChecker,
@@ -55,8 +54,8 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
     /// Returns the `GlobalPolicyChecker` for this component instance.
     fn policy_checker(&self) -> &GlobalPolicyChecker;
 
-    /// Returns the `ComponentIdIndex` available to this component instance, if it is still available.
-    fn component_id_index(&self) -> Arc<ComponentIdIndex>;
+    /// Returns the component ID index for this component instance.
+    fn component_id_index(&self) -> &component_id_index::Index;
 
     /// Gets the parent, if it still exists, or returns an `InstanceNotFound` error.
     fn try_get_parent(&self) -> Result<ExtendedInstanceInterface<Self>, ComponentInstanceError>;

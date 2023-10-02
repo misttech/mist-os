@@ -16,6 +16,7 @@ use {
             },
         },
     },
+    camino::Utf8PathBuf,
     cm_config::RuntimeConfig,
     cm_rust::{
         Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
@@ -251,7 +252,7 @@ pub struct TestEnvironmentBuilder {
     components: Vec<(&'static str, ComponentDecl)>,
     config_values: Vec<(&'static str, ConfigValuesData)>,
     runtime_config: RuntimeConfig,
-    component_id_index_path: Option<String>,
+    component_id_index_path: Option<Utf8PathBuf>,
     realm_moniker: Option<Moniker>,
     hooks: Vec<HooksRegistration>,
 }
@@ -287,8 +288,8 @@ impl TestEnvironmentBuilder {
         self
     }
 
-    pub fn set_component_id_index_path(mut self, index: Option<String>) -> Self {
-        self.component_id_index_path = index;
+    pub fn set_component_id_index_path(mut self, path: Utf8PathBuf) -> Self {
+        self.component_id_index_path = Some(path);
         self
     }
 

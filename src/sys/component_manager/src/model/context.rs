@@ -4,7 +4,7 @@
 
 use {
     crate::model::error::ModelError,
-    ::routing::{component_id_index::ComponentIdIndex, policy::GlobalPolicyChecker},
+    ::routing::policy::GlobalPolicyChecker,
     cm_config::{AbiRevisionPolicy, RuntimeConfig},
     std::sync::Arc,
 };
@@ -13,10 +13,9 @@ use {
 /// defines what parts of the Model or authoritative state about the tree we
 /// want to share with Realms.
 pub struct ModelContext {
+    component_id_index: component_id_index::Index,
     policy_checker: GlobalPolicyChecker,
-    component_id_index: Arc<ComponentIdIndex>,
     runtime_config: Arc<RuntimeConfig>,
-    abi_revision_policy: AbiRevisionPolicy,
 }
 
 impl ModelContext {
@@ -24,12 +23,11 @@ impl ModelContext {
     pub fn new(runtime_config: Arc<RuntimeConfig>) -> Result<Self, ModelError> {
         Ok(Self {
             component_id_index: match &runtime_config.component_id_index_path {
-                Some(path) => Arc::new(ComponentIdIndex::new(&path)?),
-                None => Arc::new(ComponentIdIndex::default()),
+                Some(path) => component_id_index::Index::from_fidl_file(&path)?,
+                None => component_id_index::Index::default(),
             },
-            abi_revision_policy: runtime_config.abi_revision_policy.clone(),
-            runtime_config: runtime_config.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
+            runtime_config,
         })
     }
 
@@ -48,11 +46,11 @@ impl ModelContext {
         &self.runtime_config
     }
 
-    pub fn component_id_index(&self) -> Arc<ComponentIdIndex> {
-        self.component_id_index.clone()
+    pub fn component_id_index(&self) -> &component_id_index::Index {
+        &self.component_id_index
     }
 
     pub fn abi_revision_policy(&self) -> &AbiRevisionPolicy {
-        &self.abi_revision_policy
+        &self.runtime_config.abi_revision_policy
     }
 }

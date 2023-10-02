@@ -11,41 +11,56 @@ rustc_library("component_id_index") {
 
   deps = [
     "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
+    "//src/lib/error/clonable_error",
+    "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:hex",
     "//third_party/rust_crates:rand",
-    "//third_party/rust_crates:serde",
     "//third_party/rust_crates:thiserror",
   ]
 
-  # Some host tools use serde to serialize/deserialize component_id_index
-  # error types. This dependency is guarded in code via #[cfg(feature = "serde")] and
+  test_deps = [
+    "//third_party/rust_crates:proptest",
+    "//third_party/rust_crates:test-case",
+  ]
+
+  # Some host tools use serde to serialize/deserialize component_id_index types.
+  # This dependency is guarded in code via #[cfg(feature = "serde")] and
   # #[cfg_attr(feature = "serde", ...)] to avoid deriving serde traits for error
   # types for non-host builds.
   features = []
   if (is_host) {
+    deps += [
+      "//third_party/rust_crates:serde",
+      "//third_party/rust_crates:serde_json5",
+    ]
+    test_deps += [ "//third_party/rust_crates:tempfile" ]
     features += [ "serde" ]
   }
 
-  test_deps = [
-    "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:serde_json",
-  ]
-
   sources = [
     "src/fidl_convert.rs",
+    "src/instance_id.rs",
     "src/lib.rs",
   ]
 }
 
 fuchsia_unittest_package("component-id-index-tests") {
   deps = [ ":component_id_index_test" ]
-  test_specs = {
-  }
+}
+
+group("host-component-id-index-tests") {
+  testonly = true
+  public_deps = [ ":component_id_index_test($host_toolchain)" ]
 }
 
 group("tests") {
   testonly = true
 
-  deps = [ ":component-id-index-tests" ]
+  deps = [
+    ":component-id-index-tests",
+    ":host-component-id-index-tests",
+  ]
 }

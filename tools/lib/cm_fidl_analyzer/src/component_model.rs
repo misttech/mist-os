@@ -26,7 +26,6 @@ use {
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::{
         capability_source::{CapabilitySource, ComponentCapability},
-        component_id_index::ComponentIdIndex,
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
         },
@@ -186,7 +185,7 @@ impl ModelBuilderForAnalyzer {
         self,
         decls_by_url: HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
         runtime_config: Arc<RuntimeConfig>,
-        component_id_index: Arc<ComponentIdIndex>,
+        component_id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> BuildModelResult {
         self.build_with_dynamic_components(
@@ -203,7 +202,7 @@ impl ModelBuilderForAnalyzer {
         dynamic_components: HashMap<Moniker, (AbsoluteComponentUrl, Option<String>)>,
         decls_by_url: HashMap<Url, (ComponentDecl, Option<ConfigFields>)>,
         runtime_config: Arc<RuntimeConfig>,
-        component_id_index: Arc<ComponentIdIndex>,
+        component_id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> BuildModelResult {
         let mut result = BuildModelResult::new();
@@ -501,7 +500,7 @@ pub struct ComponentModelForAnalyzer {
     top_instance: Arc<TopInstanceForAnalyzer>,
     instances: HashMap<Moniker, Arc<ComponentInstanceForAnalyzer>>,
     policy_checker: GlobalPolicyChecker,
-    component_id_index: Arc<ComponentIdIndex>,
+    component_id_index: Arc<component_id_index::Index>,
 }
 
 impl ComponentModelForAnalyzer {
@@ -1222,7 +1221,6 @@ mod tests {
         maplit::hashmap,
         moniker::{ChildName, Moniker, MonikerBase},
         routing::{
-            component_id_index::ComponentIdIndex,
             component_instance::{
                 ComponentInstanceInterface, ExtendedInstanceInterface,
                 WeakExtendedInstanceInterface,
@@ -1263,7 +1261,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(url).build(
             make_decl_map(components),
             config,
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert_eq!(build_model_result.errors.len(), 0);
@@ -1361,7 +1359,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(root_url).build(
             decls_by_url,
             config,
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert_eq!(build_model_result.errors.len(), 0);
@@ -1388,7 +1386,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(url).build(
             make_decl_map(components),
             config,
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert_eq!(build_model_result.errors.len(), 0);
@@ -1427,7 +1425,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(url).build(
             make_decl_map(components),
             config,
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert_eq!(build_model_result.errors.len(), 0);
@@ -1504,7 +1502,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(url).build(
             make_decl_map(components),
             Arc::new(config),
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::from_decl(&vec![builtin_runner_registration]),
         );
         assert_eq!(build_model_result.errors.len(), 0);

@@ -635,9 +635,7 @@ mod tests {
         fuchsia_merkle::{Hash, HASH_SIZE},
         maplit::{hashmap, hashset},
         moniker::{Moniker, MonikerBase},
-        routing::{
-            component_id_index::ComponentIdIndex, environment::RunnerRegistry, mapper::RouteSegment,
-        },
+        routing::{environment::RunnerRegistry, mapper::RouteSegment},
         scrutiny::prelude::{DataController, DataModel},
         scrutiny_testing::fake::fake_data_model,
         serde_json::json,
@@ -891,7 +889,7 @@ mod tests {
         let build_component_model = ModelBuilderForAnalyzer::new(root_url.clone()).build(
             components,
             Arc::new(RuntimeConfig::default()),
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         let deps = hashset! {};

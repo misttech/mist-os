@@ -155,7 +155,7 @@ impl<'a> OpenRequest<'a> {
             &source,
             target.persistent_storage,
             moniker.clone(),
-            target.instance_id().as_ref(),
+            target.instance_id(),
         )
         .await
         .map_err(|e| ModelError::from(e))?;

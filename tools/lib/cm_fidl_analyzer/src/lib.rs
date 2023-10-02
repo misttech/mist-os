@@ -240,7 +240,7 @@ mod tests {
         cm_rust::ComponentDecl,
         cm_rust_testing::ComponentDeclBuilder,
         fuchsia_url::AbsoluteComponentUrl,
-        routing::{component_id_index::ComponentIdIndex, environment::RunnerRegistry},
+        routing::environment::RunnerRegistry,
         std::{collections::HashMap, iter::FromIterator, sync::Arc},
         url::Url,
     };
@@ -386,7 +386,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(a_url.clone()).build(
             make_decl_map(components),
             config,
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert_eq!(build_model_result.errors.len(), 0);

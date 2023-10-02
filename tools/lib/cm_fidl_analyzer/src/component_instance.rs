@@ -16,7 +16,6 @@ use {
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
     routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        component_id_index::ComponentIdIndex,
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             TopInstanceInterface, WeakExtendedInstanceInterface,
@@ -44,7 +43,7 @@ pub struct ComponentInstanceForAnalyzer {
     children: RwLock<HashMap<ChildName, Arc<Self>>>,
     pub(crate) environment: Arc<EnvironmentForAnalyzer>,
     policy_checker: GlobalPolicyChecker,
-    component_id_index: Arc<ComponentIdIndex>,
+    component_id_index: Arc<component_id_index::Index>,
 }
 
 impl ComponentInstanceForAnalyzer {
@@ -61,7 +60,7 @@ impl ComponentInstanceForAnalyzer {
         top_instance: Arc<TopInstanceForAnalyzer>,
         runtime_config: Arc<RuntimeConfig>,
         policy_checker: GlobalPolicyChecker,
-        component_id_index: Arc<ComponentIdIndex>,
+        component_id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> Arc<Self> {
         let environment =
@@ -92,7 +91,7 @@ impl ComponentInstanceForAnalyzer {
         config: Option<ConfigFields>,
         parent: Arc<Self>,
         policy_checker: GlobalPolicyChecker,
-        component_id_index: Arc<ComponentIdIndex>,
+        component_id_index: Arc<component_id_index::Index>,
     ) -> Result<Arc<Self>, BuildAnalyzerModelError> {
         let environment = EnvironmentForAnalyzer::new_for_child(&parent, child)?;
         let instanced_moniker = parent.instanced_moniker.child(
@@ -190,8 +189,8 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         None
     }
 
-    fn component_id_index(&self) -> Arc<ComponentIdIndex> {
-        Arc::clone(&self.component_id_index)
+    fn component_id_index(&self) -> &component_id_index::Index {
+        &self.component_id_index
     }
 
     // The trait definition requires this function to be async, but `ComponentInstanceForAnalyzer`'s
@@ -299,7 +298,7 @@ mod tests {
             TopInstanceForAnalyzer::new(vec![], vec![]),
             Arc::new(RuntimeConfig::default()),
             GlobalPolicyChecker::default(),
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
 

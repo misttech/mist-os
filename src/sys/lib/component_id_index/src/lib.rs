@@ -5,252 +5,300 @@
 // This library must remain platform-agnostic because it used by a host tool and within Fuchsia.
 
 use {
-    anyhow::{anyhow, Context, Result},
+    anyhow::Context,
+    camino::{Utf8Path, Utf8PathBuf},
+    clonable_error::ClonableError,
     fidl_fuchsia_component_internal as fcomponent_internal,
-    moniker::{Moniker, MonikerBase},
-    serde::{Deserialize, Deserializer, Serialize, Serializer},
-    std::collections::HashMap,
+    moniker::Moniker,
+    std::collections::{HashMap, HashSet},
     std::convert::TryFrom,
-    std::fs,
-    std::str,
     thiserror::Error,
 };
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 pub mod fidl_convert;
+mod instance_id;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
-pub struct InstanceIdEntry {
-    pub instance_id: Option<String>,
-    #[serde(default, deserialize_with = "str_to_moniker", serialize_with = "moniker_to_str")]
-    pub moniker: Option<Moniker>,
+pub use instance_id::{InstanceId, InstanceIdError};
+
+/// Component ID index entry, only used for persistence to JSON5 and FIDL..
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub(crate) struct PersistedIndexEntry {
+    pub instance_id: InstanceId,
+    pub moniker: Moniker,
 }
 
-fn str_to_moniker<'de, D>(deserializer: D) -> Result<Option<Moniker>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let moniker: Option<String> = Option::deserialize(deserializer)?;
-    match &moniker {
-        Some(m) => Ok(Some(Moniker::parse_str(m).map_err(serde::de::Error::custom)?)),
-        None => Ok(None),
-    }
+/// Component ID index, only used for persistence to JSON5 and FIDL.
+///
+/// Unlike [Index], this type is not validated, so may contain duplicate monikers
+/// and instance IDs.
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub(crate) struct PersistedIndex {
+    instances: Vec<PersistedIndexEntry>,
 }
 
-fn moniker_to_str<S>(moniker: &Option<Moniker>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    if let Some(moniker) = moniker {
-        serializer.serialize_str(&moniker.to_string())
-    } else {
-        serializer.serialize_none()
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Eq, Clone)]
+/// An index that maps component monikers to instance IDs.
+///
+/// Unlike [PersistedIndex], this type is validated to only contain unique instance IDs.
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(try_from = "PersistedIndex", into = "PersistedIndex")
+)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Index {
-    pub instances: Vec<InstanceIdEntry>,
+    /// Map of a moniker from the index to its instance ID.
+    moniker_to_instance_id: HashMap<Moniker, InstanceId>,
+
+    /// All instance IDs, equivalent to the values of `moniker_to_instance_id`.
+    instance_ids: HashSet<InstanceId>,
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, Error, PartialEq)]
+#[derive(Error, Clone, Debug)]
 pub enum IndexError {
+    #[error("failed to read index file '{path}'")]
+    ReadFile {
+        #[source]
+        err: ClonableError,
+        path: Utf8PathBuf,
+    },
     #[error("invalid index")]
     ValidationError(#[from] ValidationError),
+    #[error("could not merge indices")]
+    MergeError(#[from] MergeError),
     #[error("could not convert FIDL index")]
     FidlConversionError(#[from] fidl_convert::FidlConversionError),
 }
 
 impl Index {
-    // Construct an Index by merging index source files.
-    //
-    // - `index_file_paths` is a list of component ID index file paths to be validated and merged.
-    // - `decoder` is a function which decodes (without schema-validating) an index file content into an Index.
-    //
-    // See `ValidationError` for possible errors.
-    pub fn from_files_with_decoder(
-        index_file_paths: &[String],
-        decoder: impl Fn(&[u8]) -> anyhow::Result<Index>,
-    ) -> anyhow::Result<Index> {
-        let mut ctx = MergeContext::new();
-        for input_file_path in index_file_paths {
-            let contents = fs::read_to_string(&input_file_path)
-                .with_context(|| anyhow!("Could not read index file {}", &input_file_path))?;
-            let index = decoder(contents.as_str().as_bytes())
-                .with_context(|| anyhow!("Could not parse index file {}", &input_file_path))?;
-            ctx.merge(&input_file_path, &index)
-                .with_context(|| anyhow!("Could not merge index file {}", &input_file_path))?;
+    /// Return an Index parsed from the FIDL file at `path`.
+    pub fn from_fidl_file(path: &Utf8Path) -> Result<Self, IndexError> {
+        fn fidl_index_from_file(
+            path: &Utf8Path,
+        ) -> Result<fcomponent_internal::ComponentIdIndex, anyhow::Error> {
+            let raw_content = std::fs::read(path).context("failed to read file")?;
+            let fidl_index = fidl::unpersist::<fcomponent_internal::ComponentIdIndex>(&raw_content)
+                .context("failed to unpersist FIDL")?;
+            Ok(fidl_index)
+        }
+        let fidl_index = fidl_index_from_file(path)
+            .map_err(|err| IndexError::ReadFile { err: err.into(), path: path.to_owned() })?;
+        let index = Index::try_from(fidl_index)?;
+        Ok(index)
+    }
+
+    /// Construct an Index by merging JSON5 source files.
+    #[cfg(feature = "serde")]
+    pub fn merged_from_json5_files(paths: &[Utf8PathBuf]) -> Result<Self, IndexError> {
+        fn index_from_json5_file(path: &Utf8Path) -> Result<Index, anyhow::Error> {
+            let mut file = std::fs::File::open(&path).context("failed to open")?;
+            let index: Index = serde_json5::from_reader(&mut file).context("failed to parse")?;
+            Ok(index)
+        }
+        let mut ctx = MergeContext::default();
+        for path in paths {
+            let index = index_from_json5_file(path)
+                .map_err(|err| IndexError::ReadFile { err: err.into(), path: path.to_owned() })?;
+            ctx.merge(path, &index)?;
         }
         Ok(ctx.output())
     }
 
-    // Construct an Index from the given FIDL-schema'd index.
-    //
-    // The given fidl_index is validated.
-    pub fn from_fidl(
-        fidl_index: fcomponent_internal::ComponentIdIndex,
-    ) -> Result<Index, IndexError> {
-        let native_index = Index::try_from(fidl_index)?;
-        let mut ctx = MergeContext::new();
-        ctx.merge("", &native_index)?;
-        Ok(ctx.output())
+    /// Insert an entry into the index.
+    pub fn insert(
+        &mut self,
+        moniker: Moniker,
+        instance_id: InstanceId,
+    ) -> Result<(), ValidationError> {
+        if !self.instance_ids.insert(instance_id.clone()) {
+            return Err(ValidationError::DuplicateId(instance_id.clone()));
+        }
+        if self.moniker_to_instance_id.insert(moniker.clone(), instance_id).is_some() {
+            return Err(ValidationError::DuplicateMoniker(moniker));
+        }
+        Ok(())
+    }
+
+    /// Returns the instance ID for the moniker, if the index contains the moniker.
+    pub fn id_for_moniker(&self, moniker: &Moniker) -> Option<&InstanceId> {
+        self.moniker_to_instance_id.get(&moniker)
+    }
+
+    /// Returns true if the index contains the instance ID.
+    pub fn contains_id(&self, id: &InstanceId) -> bool {
+        self.instance_ids.contains(id)
     }
 }
 
 impl Default for Index {
     fn default() -> Self {
-        Index { instances: vec![] }
+        Index { moniker_to_instance_id: HashMap::new(), instance_ids: HashSet::new() }
     }
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Error, Debug, Clone, PartialEq)]
-pub enum ValidationError {
-    #[error("Instance ID '{}' must be unique but exists in following index files:\n {}\n {}", .instance_id, .source1, .source2)]
-    DuplicateIds { instance_id: String, source1: String, source2: String },
-    #[error("Some entries do not specify an instance ID.")]
-    MissingInstanceIds { entries: Vec<InstanceIdEntry> },
-    #[error("The following entry must contain a moniker: {:?}", .entry)]
-    MissingMoniker { entry: InstanceIdEntry },
-    #[error("The following entry's instance_id is invalid (must be 64 lower-cased hex chars): {:?}", .entry)]
-    InvalidInstanceId { entry: InstanceIdEntry },
+impl TryFrom<PersistedIndex> for Index {
+    type Error = ValidationError;
+
+    fn try_from(value: PersistedIndex) -> Result<Self, Self::Error> {
+        let mut index = Index::default();
+        for entry in value.instances.into_iter() {
+            index.insert(entry.moniker, entry.instance_id)?;
+        }
+        Ok(index)
+    }
 }
 
-// MergeContext maintains a single merged index, along with some state for error checking, as indicies are merged together using MergeContext::merge().
-//
-// Usage:
-// - Use MergeContext::new() to create a MergeContext.
-// - Call MergeContext::merge() to merge an index. Can be called multiple times.
-// - Call MergeContext::output() to access the merged index.
+impl From<Index> for PersistedIndex {
+    fn from(value: Index) -> Self {
+        let mut instances = value
+            .moniker_to_instance_id
+            .into_iter()
+            .map(|(moniker, instance_id)| PersistedIndexEntry { instance_id, moniker })
+            .collect::<Vec<_>>();
+        instances.sort_by(|a, b| a.moniker.cmp(&b.moniker));
+        Self { instances }
+    }
+}
+
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum ValidationError {
+    #[error("duplicate moniker: {}", .0)]
+    DuplicateMoniker(Moniker),
+    #[error("duplicate instance ID: {}", .0)]
+    DuplicateId(InstanceId),
+}
+
+#[derive(Error, Debug, Clone, PartialEq)]
+pub enum MergeError {
+    #[error("Moniker {}' must be unique but exists in following index files:\n {}\n {}", .moniker, .source1, .source2)]
+    DuplicateMoniker { moniker: Moniker, source1: Utf8PathBuf, source2: Utf8PathBuf },
+    #[error("Instance ID '{}' must be unique but exists in following index files:\n {}\n {}", .instance_id, .source1, .source2)]
+    DuplicateId { instance_id: InstanceId, source1: Utf8PathBuf, source2: Utf8PathBuf },
+}
+
+/// A builder that merges indices into a single accumulated index.
 pub struct MergeContext {
+    /// Index that contains entries accumulated from calls to [`merge()`].
     output_index: Index,
-    // MergeConetext::merge() will accumulate the instance IDs which have been merged so far, along with the index source file which they came from.
-    // This is used to validate that all instance IDs are unique and provide helpful error messages.
-    // instance id -> path of file defining instance ID.
-    accumulated_instance_ids: HashMap<String, String>,
+    // Path to the source index file that contains the moniker.
+    moniker_to_source_path: HashMap<Moniker, Utf8PathBuf>,
+    // Path to the source index file that contains the instance ID.
+    instance_id_to_source_path: HashMap<InstanceId, Utf8PathBuf>,
 }
 
 impl MergeContext {
-    pub fn new() -> MergeContext {
-        MergeContext {
-            output_index: Index { instances: vec![] },
-            accumulated_instance_ids: HashMap::new(),
+    // Merge `index` into the into the MergeContext.
+    //
+    // This method can be called multiple times to merge multiple indices.
+    // The resulting index can be accessed with output().
+    pub fn merge(&mut self, source_index_path: &Utf8Path, index: &Index) -> Result<(), MergeError> {
+        for (moniker, instance_id) in &index.moniker_to_instance_id {
+            self.output_index.insert(moniker.clone(), instance_id.clone()).map_err(
+                |err| match err {
+                    ValidationError::DuplicateMoniker(moniker) => {
+                        let previous_source_path =
+                            self.moniker_to_source_path.get(&moniker).cloned().unwrap_or_default();
+                        MergeError::DuplicateMoniker {
+                            moniker,
+                            source1: previous_source_path,
+                            source2: source_index_path.to_owned(),
+                        }
+                    }
+                    ValidationError::DuplicateId(instance_id) => {
+                        let previous_source_path = self
+                            .instance_id_to_source_path
+                            .get(&instance_id)
+                            .cloned()
+                            .unwrap_or_default();
+                        MergeError::DuplicateId {
+                            instance_id,
+                            source1: previous_source_path,
+                            source2: source_index_path.to_owned(),
+                        }
+                    }
+                },
+            )?;
+            self.instance_id_to_source_path
+                .insert(instance_id.clone(), source_index_path.to_owned());
+            self.moniker_to_source_path.insert(moniker.clone(), source_index_path.to_owned());
         }
+        Ok(())
     }
 
-    // merge() merges `index` into the MergeContext.
-    // This method can be called multiple times to merge multiple indicies.
-    // The accumulated index can be accessed with output().
-    pub fn merge(&mut self, source_index_path: &str, index: &Index) -> Result<(), ValidationError> {
-        let mut missing_instance_ids = vec![];
-        for entry in &index.instances {
-            match entry.instance_id.as_ref() {
-                None => {
-                    // Instead of failing right away, continue processing the other entries.
-                    missing_instance_ids.push(entry.clone());
-                    continue;
-                }
-                Some(instance_id) => {
-                    if !is_valid_instance_id(&instance_id) {
-                        return Err(ValidationError::InvalidInstanceId { entry: entry.clone() });
-                    }
-                    if let Some(previous_source_path) = self
-                        .accumulated_instance_ids
-                        .insert(instance_id.clone(), source_index_path.to_string())
-                    {
-                        return Err(ValidationError::DuplicateIds {
-                            instance_id: instance_id.clone(),
-                            source1: previous_source_path.clone(),
-                            source2: source_index_path.to_string(),
-                        });
-                    }
-                }
-            }
-            if entry.moniker.is_none() {
-                return Err(ValidationError::MissingMoniker { entry: entry.clone() });
-            }
-            self.output_index.instances.push(entry.clone());
-        }
-        if missing_instance_ids.len() > 0 {
-            Err(ValidationError::MissingInstanceIds { entries: missing_instance_ids })
-        } else {
-            Ok(())
-        }
-    }
-
-    // Access the accumulated index from calls to merge().
+    // Return the accumulated index from calls to merge().
     pub fn output(self) -> Index {
         self.output_index
     }
 }
 
-// Generate a random instance ID.
-pub fn gen_instance_id(rng: &mut impl rand::Rng) -> String {
-    // generate random 256bits into a byte array
-    let mut num: [u8; 256 / 8] = [0; 256 / 8];
-    rng.fill_bytes(&mut num);
-    // turn the byte array into a lower-cased hex string.
-    num.iter().map(|byte| format!("{:02x}", byte)).collect::<Vec<String>>().join("")
-}
-
-fn is_valid_instance_id(id: &str) -> bool {
-    // An instance ID is a lower-cased hex string of 256-bits.
-    // 256 bits in base16 = 64 chars (1 char to represent 4 bits)
-    id.len() == 64 && id.chars().all(|ch| (ch.is_numeric() || ch.is_lowercase()) && ch.is_digit(16))
+impl Default for MergeContext {
+    fn default() -> Self {
+        MergeContext {
+            output_index: Index::default(),
+            instance_id_to_source_path: HashMap::new(),
+            moniker_to_source_path: HashMap::new(),
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use anyhow::Result;
-    use proptest::prelude::*;
-    use rand::SeedableRng as _;
-
-    fn gen_index(num_instances: u32) -> Index {
-        Index {
-            instances: (0..num_instances)
-                .map(|i| InstanceIdEntry {
-                    instance_id: Some(gen_instance_id(&mut rand::thread_rng())),
-                    moniker: Some(vec![i.to_string().as_str()].try_into().unwrap()),
-                })
-                .collect(),
-        }
-    }
 
     #[test]
     fn merge_empty_index() {
-        let ctx = MergeContext::new();
-        assert_eq!(ctx.output(), gen_index(0));
+        let ctx = MergeContext::default();
+        assert_eq!(ctx.output(), Index::default());
     }
 
     #[test]
     fn merge_single_index() -> Result<()> {
-        let mut ctx = MergeContext::new();
-        let index = gen_index(0);
-        ctx.merge("/random/file/path", &index)?;
+        let mut ctx = MergeContext::default();
+
+        let mut index = Index::default();
+        let moniker = vec!["foo"].try_into().unwrap();
+        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        index.insert(moniker, instance_id).unwrap();
+
+        ctx.merge(Utf8Path::new("/random/file/path"), &index)?;
         assert_eq!(ctx.output(), index.clone());
         Ok(())
     }
 
     #[test]
-    fn merge_duplicate_ids() -> Result<()> {
-        let source1 = "/a/b/c";
-        let source2 = "/d/e/f";
+    fn merge_duplicate_id() -> Result<()> {
+        let source1 = Utf8Path::new("/a/b/c");
+        let source2 = Utf8Path::new("/d/e/f");
 
-        let index1 = gen_index(1);
-        let mut index2 = index1.clone();
-        index2.instances[0].instance_id = index1.instances[0].instance_id.clone();
+        let id = InstanceId::new_random(&mut rand::thread_rng());
+        let index1 = {
+            let mut index = Index::default();
+            let moniker = vec!["foo"].try_into().unwrap();
+            index.insert(moniker, id.clone()).unwrap();
+            index
+        };
+        let index2 = {
+            let mut index = Index::default();
+            let moniker = vec!["bar"].try_into().unwrap();
+            index.insert(moniker, id.clone()).unwrap();
+            index
+        };
 
-        let mut ctx = MergeContext::new();
+        let mut ctx = MergeContext::default();
         ctx.merge(source1, &index1)?;
 
         let err = ctx.merge(source2, &index2).unwrap_err();
         assert_eq!(
             err,
-            ValidationError::DuplicateIds {
-                instance_id: index1.instances[0].instance_id.as_ref().unwrap().clone(),
-                source1: source1.to_string(),
-                source2: source2.to_string()
+            MergeError::DuplicateId {
+                instance_id: id,
+                source1: source1.to_owned(),
+                source2: source2.to_owned()
             }
         );
 
@@ -258,91 +306,121 @@ mod tests {
     }
 
     #[test]
-    fn missing_instance_ids() -> Result<()> {
-        let mut index = gen_index(4);
-        index.instances[1].instance_id = None;
-        index.instances[3].instance_id = None;
+    fn merge_duplicate_moniker() -> Result<()> {
+        let source1 = Utf8Path::new("/a/b/c");
+        let source2 = Utf8Path::new("/d/e/f");
 
-        let mut ctx = MergeContext::new();
-        // this should be an error, since `index` has entries with a missing instance ID.
-        let merge_result: Result<(), ValidationError> = ctx.merge("/a/b/c", &index);
-        assert!(matches!(
-            merge_result.as_ref(),
-            Err(ValidationError::MissingInstanceIds { entries: _ })
-        ));
+        let moniker: Moniker = vec!["foo"].try_into().unwrap();
+        let index1 = {
+            let mut index = Index::default();
+            let id = InstanceId::new_random(&mut rand::thread_rng());
+            index.insert(moniker.clone(), id).unwrap();
+            index
+        };
+        let index2 = {
+            let mut index = Index::default();
+            let id = InstanceId::new_random(&mut rand::thread_rng());
+            index.insert(moniker.clone(), id).unwrap();
+            index
+        };
+
+        let mut ctx = MergeContext::default();
+        ctx.merge(source1, &index1)?;
+
+        let err = ctx.merge(source2, &index2).unwrap_err();
+        assert_eq!(
+            err,
+            MergeError::DuplicateMoniker {
+                moniker,
+                source1: source1.to_owned(),
+                source2: source2.to_owned()
+            }
+        );
 
         Ok(())
     }
 
+    #[cfg(feature = "serde")]
     #[test]
-    fn missing_moniker() {
-        let mut index = gen_index(1);
-        index.instances[0].moniker = None;
+    fn merged_from_json5_files() {
+        use std::io::Write;
 
-        let mut ctx = MergeContext::new();
-        // this should be an error, since `index` has an entry without any monikers.
-        let merge_result: Result<(), ValidationError> = ctx.merge("/a/b/c", &index);
-        assert!(matches!(merge_result.as_ref(), Err(ValidationError::MissingMoniker { entry: _ })));
+        let mut index_file_1 = tempfile::NamedTempFile::new().unwrap();
+        index_file_1
+            .write_all(
+                r#"{
+            // Here is a comment.
+            instances: [
+                {
+                    instance_id: "fb94044d62278b37c221c7fdeebdcf1304262f3e11416f68befa5ef88b7a2163",
+                    moniker: "/a/b"
+                }
+            ]
+        }"#
+                .as_bytes(),
+            )
+            .unwrap();
+
+        let mut index_file_2 = tempfile::NamedTempFile::new().unwrap();
+        index_file_2
+            .write_all(
+                r#"{
+            // Here is a comment.
+            instances: [
+                {
+                    instance_id: "4f915af6c4b682867ab7ad2dc9cbca18342ddd9eec61724f19d231cf6d07f122",
+                    moniker: "/c/d"
+                }
+            ]
+        }"#
+                .as_bytes(),
+            )
+            .unwrap();
+
+        let expected_index = {
+            let mut index = Index::default();
+            index
+                .insert(
+                    "/a/b".parse::<Moniker>().unwrap(),
+                    "fb94044d62278b37c221c7fdeebdcf1304262f3e11416f68befa5ef88b7a2163"
+                        .parse::<InstanceId>()
+                        .unwrap(),
+                )
+                .unwrap();
+            index
+                .insert(
+                    "/c/d".parse::<Moniker>().unwrap(),
+                    "4f915af6c4b682867ab7ad2dc9cbca18342ddd9eec61724f19d231cf6d07f122"
+                        .parse::<InstanceId>()
+                        .unwrap(),
+                )
+                .unwrap();
+            index
+        };
+
+        // only checking that we parsed successfully.
+        let files = [
+            Utf8PathBuf::from_path_buf(index_file_1.path().to_path_buf()).unwrap(),
+            Utf8PathBuf::from_path_buf(index_file_2.path().to_path_buf()).unwrap(),
+        ];
+        assert_eq!(expected_index, Index::merged_from_json5_files(&files).unwrap());
     }
 
+    #[cfg(feature = "serde")]
     #[test]
-    fn unique_gen_instance_id() {
-        let seed = rand::thread_rng().next_u64();
-        println!("using seed {}", seed);
-        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-        let mut prev_id = gen_instance_id(&mut rng);
-        for _i in 0..40 {
-            let id = gen_instance_id(&mut rng);
-            assert!(prev_id != id);
-            prev_id = id;
-        }
-    }
+    fn serialize_deserialize() -> Result<()> {
+        let expected_index = {
+            let mut index = Index::default();
+            for i in 0..5 {
+                let moniker: Moniker = vec![i.to_string().as_str()].try_into().unwrap();
+                let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+                index.insert(moniker, instance_id).unwrap();
+            }
+            index
+        };
 
-    #[test]
-    fn valid_gen_instance_id() {
-        let seed = rand::thread_rng().next_u64();
-        println!("using seed {}", seed);
-        let mut rng = rand::rngs::StdRng::seed_from_u64(seed);
-        for _i in 0..40 {
-            assert!(is_valid_instance_id(&gen_instance_id(&mut rng)));
-        }
-    }
-
-    proptest! {
-        #[test]
-        fn valid_instance_id(id in "[a-f0-9]{64}") {
-            prop_assert_eq!(true, is_valid_instance_id(&id));
-        }
-    }
-
-    #[test]
-    fn invalid_instance_id() {
-        // Invalid lengths
-        assert!(!is_valid_instance_id("8c90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77"));
-        assert!(!is_valid_instance_id("8c90d44863ff67586cf6961081feba4f760decab8bbbee376a"));
-        assert!(!is_valid_instance_id("8c90d44863ff67586cf6961081"));
-        // upper case chars are invalid
-        assert!(!is_valid_instance_id(
-            "8C90D44863FF67586CF6961081FEBA4F760DECAB8BBBEE376A3BFBC77B351280"
-        ));
-        // hex chars only
-        assert!(!is_valid_instance_id(
-            "8x90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77b351280"
-        ));
-        assert!(!is_valid_instance_id(
-            "8;90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77b351280"
-        ));
-    }
-
-    #[test]
-    fn serialize_deserialize_valid_moniker() -> Result<()> {
-        let mut expected_index = gen_index(3);
-        expected_index.instances[0].moniker = Some(Moniker::parse_str("/a/b/c").unwrap());
-        expected_index.instances[1].moniker = Some(Moniker::parse_str("/a/b:b/c/b:b").unwrap());
-        expected_index.instances[2].moniker = Some(Moniker::parse_str("/").unwrap());
-
-        let json_index = serde_json::to_string(&expected_index)?;
-        let actual_index = serde_json::from_str(&json_index)?;
+        let json_index = serde_json5::to_string(&expected_index)?;
+        let actual_index = serde_json5::from_str(&json_index)?;
         assert_eq!(expected_index, actual_index);
 
         Ok(())

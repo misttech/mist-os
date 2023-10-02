@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{component_id_index::ComponentIdIndexError, policy::PolicyError, rights::Rights},
+    crate::{policy::PolicyError, rights::Rights},
     clonable_error::ClonableError,
     cm_rust::CapabilityTypeName,
     cm_types::Name,
@@ -293,9 +293,6 @@ pub enum RoutingError {
 
     #[error(transparent)]
     PolicyError(#[from] PolicyError),
-
-    #[error(transparent)]
-    ComponentIdIndexError(#[from] ComponentIdIndexError),
 
     #[error(transparent)]
     MonikerError(#[from] MonikerError),

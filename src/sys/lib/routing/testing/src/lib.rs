@@ -10,8 +10,10 @@ pub mod storage;
 pub mod storage_admin;
 
 use {
+    ::component_id_index::InstanceId,
     assert_matches::assert_matches,
     async_trait::async_trait,
+    camino::Utf8PathBuf,
     cm_config::{
         AllowlistEntry, AllowlistEntryBuilder, CapabilityAllowlistKey, CapabilityAllowlistSource,
         DebugCapabilityAllowlistEntry, DebugCapabilityKey,
@@ -40,7 +42,6 @@ use {
             AggregateCapability, CapabilitySource, ComponentCapability,
             FilteredAggregateCapabilityRouteData, InternalCapability,
         },
-        component_id_index::ComponentInstanceId,
         component_instance::ComponentInstanceInterface,
         error::RoutingError,
         mapper::NoopRouteMapper,
@@ -184,10 +185,10 @@ impl CheckUse {
 pub fn generate_storage_path(
     subdir: Option<String>,
     moniker: &InstancedMoniker,
-    instance_id: Option<&ComponentInstanceId>,
+    instance_id: Option<&InstanceId>,
 ) -> PathBuf {
     if let Some(id) = instance_id {
-        return id.into();
+        return id.to_string().into();
     }
     let mut path = moniker.path().iter();
     let mut dir_path = vec![];
@@ -288,7 +289,7 @@ pub trait RoutingTestModelBuilder {
     );
 
     /// Sets the path to the component ID index for the test model.
-    fn set_component_id_index_path(&mut self, index_path: String);
+    fn set_component_id_index_path(&mut self, path: Utf8PathBuf);
 
     async fn build(self) -> Self::Model;
 }

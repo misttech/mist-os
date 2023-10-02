@@ -207,7 +207,7 @@ pub(super) async fn route_and_delete_storage(
         backing_dir_info,
         target.persistent_storage,
         moniker,
-        target.instance_id().as_ref(),
+        target.instance_id(),
     )
     .await
 }

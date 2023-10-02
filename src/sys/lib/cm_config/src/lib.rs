@@ -4,6 +4,7 @@
 
 use {
     anyhow::{format_err, Context, Error},
+    camino::Utf8PathBuf,
     cm_rust::{CapabilityTypeName, FidlIntoNative},
     cm_types::{symmetrical_enums, Name, ParseError, Url},
     fidl::unpersist,
@@ -79,7 +80,7 @@ pub struct RuntimeConfig {
 
     /// Path to the component ID index, parsed from
     /// `fuchsia.component.internal.RuntimeConfig.component_id_index_path`.
-    pub component_id_index_path: Option<String>,
+    pub component_id_index_path: Option<Utf8PathBuf>,
 
     /// Where to log to.
     pub log_destination: LogDestination,
@@ -631,7 +632,7 @@ impl TryFrom<component_internal::Config> for RuntimeConfig {
             maintain_utc_clock: config.maintain_utc_clock.unwrap_or(default.maintain_utc_clock),
             num_threads,
             root_component_url,
-            component_id_index_path: config.component_id_index_path,
+            component_id_index_path: config.component_id_index_path.map(Into::into),
             log_destination: config.log_destination.unwrap_or(default.log_destination),
             log_all_events: config.log_all_events.unwrap_or(default.log_all_events),
             builtin_boot_resolver: config
@@ -1119,7 +1120,7 @@ mod tests {
                     }),
                 ],
                 root_component_url: Some(Url::new(FOO_PKG_URL.to_string()).unwrap()),
-                component_id_index_path: Some("/boot/config/component_id_index".to_string()),
+                component_id_index_path: Some("/boot/config/component_id_index".into()),
                 log_destination: LogDestination::Klog,
                 log_all_events: true,
                 builtin_boot_resolver: BuiltinBootResolver::None,

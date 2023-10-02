@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
-
-use component_id_index::*;
+use anyhow::{Context, Result};
+use camino::Utf8PathBuf;
+use component_id_index::Index;
 use fidl::persist;
 use fidl_fuchsia_component_internal as fcomponent_internal;
 use serde_json;
-use serde_json5;
-use std::convert::TryInto;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
@@ -38,63 +36,39 @@ struct CommandLineOpts {
     depfile: PathBuf,
 }
 
-// Make an Index using a set of JSON5-encoded index files.
-fn merge_index_from_json5_files(index_files: &[String]) -> anyhow::Result<Index> {
-    Index::from_files_with_decoder(index_files, |json5| {
-        let json5_str = std::str::from_utf8(json5).context("Unable to parse as UTF-8")?;
-        serde_json5::from_str(json5_str).context("Unable to parse JSON5")
-    }).map_err(|e|{
-        match e.downcast_ref::<ValidationError>() {
-            Some(ValidationError::MissingInstanceIds{entries}) => {
-                let corrected_entries = generate_instance_ids(&entries);
-                anyhow!("Some entries are missing `instance_id` fields. Here are some generated IDs for you:\n{}\n\nSee https://fuchsia.dev/fuchsia-src/development/components/component_id_index#defining_an_index for more details.",
-                            serde_json::to_string_pretty(&corrected_entries).unwrap())
-            },
-            _ => e
-        }
-    })
-}
-
-fn generate_instance_ids(entries: &Vec<InstanceIdEntry>) -> Vec<InstanceIdEntry> {
-    let rng = &mut rand::thread_rng();
-    (0..entries.len())
-        .map(|i| {
-            let mut with_id = entries[i].clone();
-            with_id.instance_id = Some(gen_instance_id(rng));
-            with_id
-        })
-        .collect::<Vec<InstanceIdEntry>>()
-}
-
 fn run(opts: CommandLineOpts) -> anyhow::Result<()> {
     let input_manifest =
         fs::File::open(opts.input_manifest).context("Could not open input manifest")?;
     let input_files = BufReader::new(input_manifest)
         .lines()
-        .collect::<Result<Vec<String>, _>>()
+        .map(|result| result.map(Into::into))
+        .collect::<Result<Vec<Utf8PathBuf>, _>>()
         .context("Could not read input manifest")?;
-    let merged_index = merge_index_from_json5_files(input_files.as_slice())?;
+    let merged_index = Index::merged_from_json5_files(input_files.as_slice())
+        .context("Could not merge index files")?;
 
     let serialized_output_json =
         serde_json::to_string(&merged_index).context("Could not json-encode merged index")?;
     fs::write(&opts.output_index_json, serialized_output_json.as_bytes())
         .context("Could not write merged JSON-encoded index to file")?;
 
-    let merged_index_fidl: fcomponent_internal::ComponentIdIndex = merged_index.try_into()?;
+    let merged_index_fidl: fcomponent_internal::ComponentIdIndex = merged_index.into();
     let serialized_output_fidl =
         persist(&merged_index_fidl).context("Could not fidl-encode merged index")?;
     fs::write(&opts.output_index_fidl, serialized_output_fidl)
         .context("Could not write merged FIDL-encoded index to file")?;
 
     // write out the depfile
+    let input_files_str =
+        input_files.iter().map(|path| path.as_str()).collect::<Vec<_>>().join(" ");
     fs::write(
         &opts.depfile,
         format!(
             "{}: {}\n{}: {}\n",
             opts.output_index_json.to_str().unwrap(),
-            input_files.join(" "),
+            input_files_str,
             opts.output_index_fidl.to_str().unwrap(),
-            input_files.join(" ")
+            input_files_str,
         ),
     )
     .context("Could not write to depfile")
@@ -108,77 +82,23 @@ fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use component_id_index::{Index, InstanceId};
     use moniker::{Moniker, MonikerBase};
     use pretty_assertions::assert_eq;
-    use regex;
     use std::io::Write;
     use tempfile;
 
-    fn gen_index(num_instances: u32) -> Index {
-        Index {
-            instances: (0..num_instances)
-                .map(|_i| InstanceIdEntry {
-                    instance_id: Some(gen_instance_id(&mut rand::thread_rng())),
-                    moniker: Some(Moniker::parse_str("/a/b/c").unwrap()),
-                })
-                .collect(),
+    fn gen_index(start: u32, end: u32) -> Index {
+        let mut index = Index::default();
+        for i in start..end {
+            let moniker = Moniker::parse_str(&format!("/a/b/c/{i}")).unwrap();
+            let instance_id =
+                format!("00000000000000000000000000000000000000000000000000000000000000{:02x}", i)
+                    .parse::<InstanceId>()
+                    .unwrap();
+            index.insert(moniker, instance_id).unwrap();
         }
-    }
-
-    fn make_index_file(index: &Index) -> anyhow::Result<tempfile::NamedTempFile> {
-        let mut index_file = tempfile::NamedTempFile::new()?;
-        index_file.write_all(serde_json::to_string(index).unwrap().as_bytes())?;
-        Ok(index_file)
-    }
-
-    #[test]
-    fn error_missing_instance_ids() {
-        let mut index = gen_index(4);
-        index.instances[1].instance_id = None;
-        index.instances[3].instance_id = None;
-
-        let index_file = make_index_file(&index).unwrap();
-        let index_files = [String::from(index_file.path().to_str().unwrap())];
-
-        // this should be an error, since `index` has entries with a missing instance ID.
-        // check the error output's message as well.
-        let merge_result = merge_index_from_json5_files(&index_files);
-        let actual_output = merge_result.err().unwrap().to_string();
-        let expected_output = r#"Some entries are missing `instance_id` fields. Here are some generated IDs for you:
-[
-  {
-    "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "moniker": "a/b/c"
-  },
-  {
-    "instance_id": "RANDOM_GENERATED_INSTANCE_ID",
-    "moniker": "a/b/c"
-  }
-]
-
-See https://fuchsia.dev/fuchsia-src/development/components/component_id_index#defining_an_index for more details."#;
-
-        let re = regex::Regex::new("[0-9a-f]{64}").unwrap();
-        let actual_output_modified = re.replace_all(&actual_output, "RANDOM_GENERATED_INSTANCE_ID");
-        assert_eq!(actual_output_modified, expected_output);
-    }
-
-    #[test]
-    fn index_from_json5() {
-        let mut index_file = tempfile::NamedTempFile::new().unwrap();
-        index_file
-            .write_all(
-                r#"{
-            // Here is a comment.
-            instances: []
-        }"#
-                .as_bytes(),
-            )
-            .unwrap();
-
-        // only checking that we parsed successfully.
-        let files = [String::from(index_file.path().to_str().unwrap())];
-        assert!(merge_index_from_json5_files(&files).is_ok());
+        index
     }
 
     #[test]
@@ -200,11 +120,11 @@ See https://fuchsia.dev/fuchsia-src/development/components/component_id_index#de
         .unwrap();
 
         // write the first index file
-        let index1 = gen_index(2);
+        let index1 = gen_index(0, 2);
         tmp_input_index1.write_all(serde_json5::to_string(&index1).unwrap().as_bytes()).unwrap();
 
         // write the second index file
-        let index2 = gen_index(2);
+        let index2 = gen_index(2, 4);
         tmp_input_index2.write_all(serde_json5::to_string(&index2).unwrap().as_bytes()).unwrap();
 
         assert!(matches!(
@@ -218,10 +138,15 @@ See https://fuchsia.dev/fuchsia-src/development/components/component_id_index#de
         ));
 
         // assert that the output index file contains the merged index.
-        let mut merged_index = index1.clone();
-        merged_index.instances.extend_from_slice(&index2.instances);
-        let index_files = [String::from(tmp_output_index_json.path().to_str().unwrap())];
-        assert_eq!(merged_index, merge_index_from_json5_files(&index_files).unwrap());
+        let index_files = [Utf8PathBuf::from(tmp_output_index_json.path().to_str().unwrap())];
+        let merged_index = Index::merged_from_json5_files(&index_files).unwrap();
+        for i in 0..4 {
+            let instance_id =
+                format!("00000000000000000000000000000000000000000000000000000000000000{:02x}", i)
+                    .parse::<InstanceId>()
+                    .unwrap();
+            assert!(merged_index.contains_id(&instance_id));
+        }
 
         // assert the structure of the dependency file:
         //  <merged_output_index>: <input index 1> <input index 2>\n

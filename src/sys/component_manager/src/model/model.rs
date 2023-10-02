@@ -13,7 +13,6 @@ use {
         },
         sandbox_util::Sandbox,
     },
-    ::routing::component_id_index::ComponentIdIndex,
     cm_config::RuntimeConfig,
     moniker::{Moniker, MonikerBase},
     std::sync::Arc,
@@ -75,7 +74,7 @@ impl Model {
         &self.root
     }
 
-    pub fn component_id_index(&self) -> Arc<ComponentIdIndex> {
+    pub fn component_id_index(&self) -> &component_id_index::Index {
         self.context.component_id_index()
     }
 

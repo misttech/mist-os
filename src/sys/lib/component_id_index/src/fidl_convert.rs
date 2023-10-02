@@ -2,60 +2,82 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Index, InstanceIdEntry};
+use crate::{
+    Index, InstanceId, InstanceIdError, PersistedIndex, PersistedIndexEntry, ValidationError,
+};
 use fidl_fuchsia_component_internal as fcomponent_internal;
 use moniker::{Moniker, MonikerBase, MonikerError};
 use std::convert::TryFrom;
 use thiserror::Error;
 
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Error, Clone, Debug, PartialEq)]
 pub enum FidlConversionError {
     #[error("Missing instances")]
     MissingInstances,
-    #[error("Moniker error")]
+    #[error("Missing instance_id")]
+    MissingInstanceId,
+    #[error("Missing moniker")]
+    MissingMoniker,
+    #[error("Invalid instance ID")]
+    InstanceIdError(#[from] InstanceIdError),
+    #[error("Invalid moniker")]
     MonikerError(#[from] MonikerError),
+    #[error("invalid index")]
+    ValidationError(#[from] ValidationError),
 }
 
-// This converter translates between different encodings but does not do any semantic validation.
-// To construct a validated Index, use a Index::from_*() constructor along with this converter.
+impl TryFrom<fcomponent_internal::ComponentIdIndex> for PersistedIndex {
+    type Error = FidlConversionError;
+
+    fn try_from(index: fcomponent_internal::ComponentIdIndex) -> Result<Self, Self::Error> {
+        let mut instances: Vec<PersistedIndexEntry> = vec![];
+        for entry in index.instances.ok_or_else(|| FidlConversionError::MissingInstances)? {
+            instances.push(PersistedIndexEntry {
+                instance_id: entry
+                    .instance_id
+                    .ok_or_else(|| FidlConversionError::MissingInstanceId)?
+                    .parse::<InstanceId>()?,
+                moniker: Moniker::parse_str(
+                    &entry.moniker.ok_or_else(|| FidlConversionError::MissingMoniker)?,
+                )?,
+            });
+        }
+        Ok(PersistedIndex { instances })
+    }
+}
+
 impl TryFrom<fcomponent_internal::ComponentIdIndex> for Index {
     type Error = FidlConversionError;
 
     fn try_from(index: fcomponent_internal::ComponentIdIndex) -> Result<Self, Self::Error> {
-        let mut instances: Vec<InstanceIdEntry> = vec![];
-        for entry in index.instances.ok_or_else(|| FidlConversionError::MissingInstances)? {
-            instances.push(InstanceIdEntry {
-                instance_id: entry.instance_id,
-                moniker: entry
-                    .moniker
-                    .map(|moniker_str| Moniker::parse_str(&moniker_str))
-                    .transpose()?,
-            });
-        }
-        Ok(Index { instances })
+        let persisted_index: PersistedIndex = index.try_into()?;
+        persisted_index.try_into().map_err(FidlConversionError::ValidationError)
     }
 }
 
-impl From<Index> for fcomponent_internal::ComponentIdIndex {
-    fn from(index: Index) -> Self {
+impl From<PersistedIndex> for fcomponent_internal::ComponentIdIndex {
+    fn from(index: PersistedIndex) -> Self {
         fcomponent_internal::ComponentIdIndex {
             instances: Some(
                 index
                     .instances
                     .into_iter()
                     .map(|entry| fcomponent_internal::InstanceIdEntry {
-                        instance_id: entry.instance_id,
-                        moniker: entry.moniker.map(|moniker| moniker.to_string()),
+                        instance_id: Some(entry.instance_id.to_string()),
+                        moniker: Some(entry.moniker.to_string()),
                         ..Default::default()
                     })
                     .collect(),
             ),
             ..Default::default()
         }
+    }
+}
+
+impl From<Index> for fcomponent_internal::ComponentIdIndex {
+    fn from(index: Index) -> Self {
+        let persisted_index: PersistedIndex = index.into();
+        persisted_index.into()
     }
 }
 
@@ -67,21 +89,25 @@ mod tests {
     fn fidl_native_translation() {
         let fidl_index = fcomponent_internal::ComponentIdIndex {
             instances: Some(vec![fcomponent_internal::InstanceIdEntry {
-                instance_id: Some("abc".to_string()),
+                instance_id: Some(
+                    "8c90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77b351280".to_string(),
+                ),
                 moniker: Some("a/b/c".to_string()),
                 ..Default::default()
             }]),
             ..Default::default()
         };
 
-        let native_index = Index {
-            instances: vec![InstanceIdEntry {
-                instance_id: Some("abc".to_string()),
-                moniker: Some(Moniker::parse_str("a/b/c").unwrap()),
+        let native_index = PersistedIndex {
+            instances: vec![PersistedIndexEntry {
+                instance_id: "8c90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77b351280"
+                    .parse::<InstanceId>()
+                    .unwrap(),
+                moniker: Moniker::parse_str("a/b/c").unwrap(),
             }],
         };
 
-        assert_eq!(native_index, Index::try_from(fidl_index.clone()).unwrap());
+        assert_eq!(native_index, PersistedIndex::try_from(fidl_index.clone()).unwrap());
         assert_eq!(fidl_index, fcomponent_internal::ComponentIdIndex::from(native_index));
     }
 
@@ -89,7 +115,45 @@ mod tests {
     fn missing_instances() {
         assert_eq!(
             Some(FidlConversionError::MissingInstances),
-            Index::try_from(fcomponent_internal::ComponentIdIndex { ..Default::default() }).err()
+            PersistedIndex::try_from(fcomponent_internal::ComponentIdIndex {
+                ..Default::default()
+            })
+            .err()
+        );
+    }
+
+    #[test]
+    fn missing_instance_id() {
+        assert_eq!(
+            Some(FidlConversionError::MissingInstanceId),
+            PersistedIndex::try_from(fcomponent_internal::ComponentIdIndex {
+                instances: Some(vec![fcomponent_internal::InstanceIdEntry {
+                    instance_id: None,
+                    moniker: Some("a/b/c".to_string()),
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            })
+            .err()
+        );
+    }
+
+    #[test]
+    fn missing_moniker() {
+        assert_eq!(
+            Some(FidlConversionError::MissingMoniker),
+            PersistedIndex::try_from(fcomponent_internal::ComponentIdIndex {
+                instances: Some(vec![fcomponent_internal::InstanceIdEntry {
+                    instance_id: Some(
+                        "8c90d44863ff67586cf6961081feba4f760decab8bbbee376a3bfbc77b351280"
+                            .to_string()
+                    ),
+                    moniker: None,
+                    ..Default::default()
+                }]),
+                ..Default::default()
+            })
+            .err()
         );
     }
 }

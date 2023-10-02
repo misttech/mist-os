@@ -30,6 +30,7 @@ use {
     cm_types::Name,
     cm_util::channel,
     cm_util::TaskGroup,
+    component_id_index::InstanceId,
     fidl::{endpoints::ServerEnd, prelude::*},
     fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_io::{self as fio, DirectoryProxy, DirentType},
@@ -42,14 +43,10 @@ use {
     },
     lazy_static::lazy_static,
     moniker::{Moniker, MonikerBase},
-    routing::{
-        component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
-        RouteRequest,
-    },
+    routing::{component_instance::ComponentInstanceInterface, RouteRequest},
     std::{
         convert::{From, TryFrom},
         path::PathBuf,
-        str::FromStr,
         sync::{Arc, Weak},
     },
     tracing::{debug, error, warn},
@@ -332,7 +329,7 @@ impl StorageAdmin {
                     let moniker =
                         component.moniker().concat(&instanced_moniker.without_instance_ids());
                     let instance_id =
-                        component.component_id_index().look_up_moniker(&moniker).cloned();
+                        component.component_id_index().id_for_moniker(&moniker).cloned();
 
                     let dir_proxy = storage::open_isolated_storage(
                         &backing_dir_source_info,
@@ -381,20 +378,17 @@ impl StorageAdmin {
                 }
                 fsys::StorageAdminRequest::OpenComponentStorageById { id, object, responder } => {
                     let instance_id_index = component.component_id_index();
-                    let component_id = match ComponentInstanceId::from_str(&id) {
-                        Ok(id) => id,
-                        Err(_) => {
-                            responder.send(Err(fcomponent::Error::InvalidArguments))?;
-                            continue;
-                        }
+                    let Ok(instance_id) = id.parse::<InstanceId>() else {
+                        responder.send(Err(fcomponent::Error::InvalidArguments))?;
+                        continue;
                     };
-                    if !instance_id_index.look_up_instance_id(&component_id) {
+                    if !instance_id_index.contains_id(&instance_id) {
                         responder.send(Err(fcomponent::Error::ResourceNotFound))?;
                         continue;
                     }
                     match storage::open_isolated_storage_by_id(
                         &backing_dir_source_info,
-                        component_id,
+                        &instance_id,
                     )
                     .await
                     {
@@ -432,7 +426,7 @@ impl StorageAdmin {
                                 .moniker()
                                 .concat(&instanced_moniker.without_instance_ids());
                             let instance_id =
-                                component.component_id_index().look_up_moniker(&moniker).cloned();
+                                component.component_id_index().id_for_moniker(&moniker).cloned();
                             let res = storage::delete_isolated_storage(
                                 backing_dir_source_info.clone(),
                                 component.persistent_storage,

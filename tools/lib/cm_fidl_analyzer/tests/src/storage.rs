@@ -11,7 +11,7 @@ mod tests {
             StorageDirectorySource, UseDecl, UseStorageDecl,
         },
         cm_rust_testing::{ComponentDeclBuilder, DirectoryDeclBuilder},
-        component_id_index::gen_instance_id,
+        component_id_index::InstanceId,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
         fuchsia_zircon_status as zx_status,
         moniker::{Moniker, MonikerBase},
@@ -154,15 +154,18 @@ mod tests {
     /// storage and is not in the component ID index.
     #[fuchsia::test]
     async fn use_restricted_storage_failure() {
-        let parent_consumer_instance_id = Some(gen_instance_id(&mut rand::thread_rng()));
-        let component_id_index_path = make_index_file(component_id_index::Index {
-            instances: vec![component_id_index::InstanceIdEntry {
-                instance_id: parent_consumer_instance_id.clone(),
-                moniker: Some(Moniker::parse_str("parent_consumer").unwrap()),
-            }],
-            ..component_id_index::Index::default()
-        })
-        .unwrap();
+        let parent_consumer_instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let index = {
+            let mut index = component_id_index::Index::default();
+            index
+                .insert(
+                    Moniker::parse_str("parent_consumer").unwrap(),
+                    parent_consumer_instance_id.clone(),
+                )
+                .unwrap();
+            index
+        };
+        let component_id_index_path = make_index_file(index).unwrap();
         let components = vec![
             (
                 "provider",
@@ -203,7 +206,7 @@ mod tests {
         ];
         let mut builder = RoutingTestBuilderForAnalyzer::new("provider", components);
         builder.set_component_id_index_path(
-            component_id_index_path.path().to_str().unwrap().to_string(),
+            component_id_index_path.path().to_owned().try_into().unwrap(),
         );
         let model = builder.build().await;
 

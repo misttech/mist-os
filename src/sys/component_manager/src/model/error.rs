@@ -8,7 +8,6 @@ use {
         model::{events::error::EventsError, routing::RouteRequest, storage::StorageError},
     },
     ::routing::{
-        component_id_index::ComponentIdIndexError,
         error::{ComponentInstanceError, RoutingError},
         policy::PolicyError,
         resolving::ResolverError,
@@ -90,7 +89,7 @@ pub enum ModelError {
     #[error("component id index error: {}", err)]
     ComponentIdIndexError {
         #[from]
-        err: ComponentIdIndexError,
+        err: component_id_index::IndexError,
     },
     #[error("error with resolve action: {err}")]
     ResolveActionError {

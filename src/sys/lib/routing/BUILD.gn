@@ -28,7 +28,6 @@ rustc_library("routing") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal_rust",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/error/clonable_error",
@@ -57,7 +56,6 @@ rustc_library("routing") {
     "src/availability.rs",
     "src/capability_source.rs",
     "src/collection.rs",
-    "src/component_id_index.rs",
     "src/component_instance.rs",
     "src/environment.rs",
     "src/error.rs",
@@ -73,8 +71,6 @@ rustc_library("routing") {
   ]
 
   test_deps = [
-    "testing:routing_test_helpers",
-    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]

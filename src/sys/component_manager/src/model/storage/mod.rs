@@ -13,12 +13,13 @@ use {
         },
     },
     ::routing::{
-        capability_source::ComponentCapability, component_id_index::ComponentInstanceId,
-        component_instance::ComponentInstanceInterface, error::RoutingError, RouteRequest,
+        capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
+        error::RoutingError, RouteRequest,
     },
     anyhow::Error,
     clonable_error::ClonableError,
     cm_moniker::InstancedMoniker,
+    component_id_index::InstanceId,
     derivative::Derivative,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
@@ -96,7 +97,7 @@ pub enum StorageError {
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
         moniker: InstancedMoniker,
-        instance_id: Option<ComponentInstanceId>,
+        instance_id: Option<InstanceId>,
         #[source]
         err: ClonableError,
     },
@@ -110,7 +111,7 @@ pub enum StorageError {
     OpenById {
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
-        instance_id: ComponentInstanceId,
+        instance_id: InstanceId,
         #[source]
         err: ClonableError,
     },
@@ -126,12 +127,12 @@ pub enum StorageError {
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
         moniker: InstancedMoniker,
-        instance_id: Option<ComponentInstanceId>,
+        instance_id: Option<InstanceId>,
         #[source]
         err: ClonableError,
     },
     #[error("storage path for moniker={}, instance_id={:?} is invalid", moniker, instance_id)]
-    InvalidStoragePath { moniker: InstancedMoniker, instance_id: Option<ComponentInstanceId> },
+    InvalidStoragePath { moniker: InstancedMoniker, instance_id: Option<InstanceId> },
 }
 
 impl StorageError {
@@ -147,7 +148,7 @@ impl StorageError {
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
         moniker: InstancedMoniker,
-        instance_id: Option<ComponentInstanceId>,
+        instance_id: Option<InstanceId>,
         err: impl Into<Error>,
     ) -> Self {
         Self::Open {
@@ -162,7 +163,7 @@ impl StorageError {
     pub fn open_by_id(
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
-        instance_id: ComponentInstanceId,
+        instance_id: InstanceId,
         err: impl Into<Error>,
     ) -> Self {
         Self::OpenById { dir_source_moniker, dir_source_path, instance_id, err: err.into().into() }
@@ -172,7 +173,7 @@ impl StorageError {
         dir_source_moniker: Option<InstancedMoniker>,
         dir_source_path: cm_types::Path,
         moniker: InstancedMoniker,
-        instance_id: Option<ComponentInstanceId>,
+        instance_id: Option<InstanceId>,
         err: impl Into<Error>,
     ) -> Self {
         Self::Remove {
@@ -186,7 +187,7 @@ impl StorageError {
 
     pub fn invalid_storage_path(
         moniker: InstancedMoniker,
-        instance_id: Option<ComponentInstanceId>,
+        instance_id: Option<InstanceId>,
     ) -> Self {
         Self::InvalidStoragePath { moniker, instance_id }
     }
@@ -308,7 +309,7 @@ pub async fn open_isolated_storage(
     storage_source_info: &BackingDirectoryInfo,
     persistent_storage: bool,
     moniker: InstancedMoniker,
-    instance_id: Option<&ComponentInstanceId>,
+    instance_id: Option<&InstanceId>,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let root_dir = open_storage_root(storage_source_info).await?;
     let storage_path = match instance_id {
@@ -345,10 +346,10 @@ pub async fn open_isolated_storage(
 /// if necessary. The storage sub-directory is based on provided instance ID.
 pub async fn open_isolated_storage_by_id(
     storage_source_info: &BackingDirectoryInfo,
-    instance_id: ComponentInstanceId,
+    instance_id: &InstanceId,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let root_dir = open_storage_root(storage_source_info).await?;
-    let storage_path = generate_instance_id_based_storage_path(&instance_id);
+    let storage_path = generate_instance_id_based_storage_path(instance_id);
 
     fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
@@ -360,7 +361,7 @@ pub async fn open_isolated_storage_by_id(
         ModelError::from(StorageError::open_by_id(
             storage_source_info.storage_provider.as_ref().map(|r| r.instanced_moniker().clone()),
             storage_source_info.backing_directory_path.clone(),
-            instance_id,
+            instance_id.clone(),
             e,
         ))
     })
@@ -374,7 +375,7 @@ pub async fn delete_isolated_storage(
     storage_source_info: BackingDirectoryInfo,
     persistent_storage: bool,
     moniker: InstancedMoniker,
-    instance_id: Option<&ComponentInstanceId>,
+    instance_id: Option<&InstanceId>,
 ) -> Result<(), ModelError> {
     let root_dir = open_storage_root(&storage_source_info).await?;
 
@@ -525,8 +526,8 @@ fn generate_moniker_based_storage_path(moniker: &InstancedMoniker) -> PathBuf {
 /// Generates the component storage directory path for the provided component instance.
 ///
 /// Components which do not have an instance ID use a generate moniker-based storage path instead.
-fn generate_instance_id_based_storage_path(instance_id: &ComponentInstanceId) -> PathBuf {
-    instance_id.into()
+fn generate_instance_id_based_storage_path(instance_id: &InstanceId) -> PathBuf {
+    instance_id.to_string().into()
 }
 
 #[cfg(test)]
@@ -541,12 +542,12 @@ mod tests {
         cm_moniker::InstancedMoniker,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
-        component_id_index, fidl_fuchsia_io as fio,
+        component_id_index::InstanceId,
+        fidl_fuchsia_io as fio,
         moniker::{Moniker, MonikerBase},
         rand::{self, distributions::Alphanumeric, Rng},
         std::{
             convert::{TryFrom, TryInto},
-            str::FromStr,
             sync::Arc,
         },
     };
@@ -675,10 +676,7 @@ mod tests {
         let moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
 
         // open the storage directory using instance ID.
-        let instance_id: ComponentInstanceId = ComponentInstanceId::from_str(
-            &component_id_index::gen_instance_id(&mut rand::thread_rng()),
-        )
-        .expect("generated instance ID could not be parsed into ComponentInstanceId");
+        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
         let mut dir = open_isolated_storage(
             &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
@@ -933,10 +931,7 @@ mod tests {
         let dir_source_path: cm_types::Path = "/data".parse().unwrap();
         let parent_moniker = InstancedMoniker::try_from(vec!["c:0"]).unwrap();
         let child_moniker = InstancedMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
-        let instance_id = ComponentInstanceId::from_str(&component_id_index::gen_instance_id(
-            &mut rand::thread_rng(),
-        ))
-        .expect("generated ID could not be parsed into component instance ID");
+        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
             &BackingDirectoryInfo {

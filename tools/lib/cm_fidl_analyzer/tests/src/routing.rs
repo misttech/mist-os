@@ -6,6 +6,7 @@ use {
     anyhow::anyhow,
     assert_matches::assert_matches,
     async_trait::async_trait,
+    camino::Utf8PathBuf,
     cm_config::{
         AllowlistEntry, CapabilityAllowlistKey, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
         RuntimeConfig, SecurityPolicy,
@@ -35,9 +36,8 @@ use {
     fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fuchsia_zircon_status as zx_status,
     moniker::{ChildNameBase, Moniker, MonikerBase},
     routing::{
-        component_id_index::ComponentIdIndex, component_instance::ComponentInstanceInterface,
-        environment::RunnerRegistry, error::RoutingError, mapper::RouteSegment, RegistrationDecl,
-        RouteInfo,
+        component_instance::ComponentInstanceInterface, environment::RunnerRegistry,
+        error::RoutingError, mapper::RouteSegment, RegistrationDecl, RouteInfo,
     },
     routing_test_helpers::{
         CheckUse, ComponentEventRoute, ExpectedResult, RoutingTestModel, RoutingTestModelBuilder,
@@ -74,7 +74,7 @@ pub struct RoutingTestBuilderForAnalyzer {
     builtin_runner_registrations: Vec<RunnerRegistration>,
     capability_policy: HashMap<CapabilityAllowlistKey, HashSet<AllowlistEntry>>,
     debug_capability_policy: HashMap<DebugCapabilityKey, HashSet<DebugCapabilityAllowlistEntry>>,
-    component_id_index_path: Option<String>,
+    component_id_index_path: Option<Utf8PathBuf>,
     builtin_boot_resolver: component_internal::BuiltinBootResolver,
 }
 
@@ -165,7 +165,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
         self.debug_capability_policy.insert(key, allowlist);
     }
 
-    fn set_component_id_index_path(&mut self, index_path: String) {
+    fn set_component_id_index_path(&mut self, index_path: Utf8PathBuf) {
         self.component_id_index_path = Some(index_path);
     }
 
@@ -183,10 +183,11 @@ impl RoutingTestModelBuilder for RoutingTestBuilderForAnalyzer {
 
         config.component_id_index_path = self.component_id_index_path;
         let component_id_index = match config.component_id_index_path {
-            Some(ref index_path) => ComponentIdIndex::new(index_path).unwrap_or_else(|e| {
-                panic!("failed to create component ID index with path {}: {:?}", index_path, e)
-            }),
-            None => ComponentIdIndex::default(),
+            Some(ref index_path) => component_id_index::Index::from_fidl_file(index_path)
+                .unwrap_or_else(|e| {
+                    panic!("failed to create component ID index with path {}: {:?}", index_path, e)
+                }),
+            None => Default::default(),
         };
         config.builtin_boot_resolver = self.builtin_boot_resolver;
 

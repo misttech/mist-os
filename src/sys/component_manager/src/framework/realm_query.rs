@@ -282,7 +282,7 @@ pub async fn get_instance(
 
     // TODO(https://fxbug.dev/108532): Close the connection if the scope root cannot be found.
     let instance = model.find(&moniker).await.ok_or(fsys::GetInstanceError::InstanceNotFound)?;
-    let instance_id = model.component_id_index().look_up_moniker(&instance.moniker).cloned();
+    let instance_id = model.component_id_index().id_for_moniker(&instance.moniker).cloned();
 
     let resolved_info = {
         let state = instance.lock_state().await;
@@ -671,7 +671,7 @@ async fn get_fidl_instance_and_children(
         .moniker
         .strip_prefix(scope_moniker)
         .expect("instance must have been a child of scope root");
-    let instance_id = model.component_id_index().look_up_moniker(&instance.moniker).cloned();
+    let instance_id = model.component_id_index().id_for_moniker(&instance.moniker).cloned();
 
     let (resolved_info, children) = {
         let state = instance.lock_state().await;
@@ -789,6 +789,7 @@ mod tests {
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
+        component_id_index::InstanceId,
         fidl::endpoints::{create_endpoints, create_proxy, create_proxy_and_stream},
         fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         routing_test_helpers::component_id_index::make_index_file,
@@ -801,21 +802,19 @@ mod tests {
     #[fuchsia::test]
     async fn get_instance_test() {
         // Create index.
-        let iid = format!("1234{}", "5".repeat(60));
-        let index_file = make_index_file(component_id_index::Index {
-            instances: vec![component_id_index::InstanceIdEntry {
-                instance_id: Some(iid.clone()),
-                moniker: Some(Moniker::parse_str("/").unwrap()),
-            }],
-            ..component_id_index::Index::default()
-        })
-        .unwrap();
+        let iid = format!("1234{}", "5".repeat(60)).parse::<InstanceId>().unwrap();
+        let index = {
+            let mut index = component_id_index::Index::default();
+            index.insert(Moniker::parse_str("/").unwrap(), iid.clone()).unwrap();
+            index
+        };
+        let index_file = make_index_file(index).unwrap();
 
         let components = vec![("root", ComponentDeclBuilder::new().build())];
 
         let TestModelResult { model, builtin_environment, .. } = TestEnvironmentBuilder::new()
             .set_components(components)
-            .set_component_id_index_path(index_file.path().to_str().map(str::to_string))
+            .set_component_id_index_path(index_file.path().to_owned().try_into().unwrap())
             .build()
             .await;
 
@@ -837,7 +836,7 @@ mod tests {
 
         assert_eq!(instance.moniker.unwrap(), ".");
         assert_eq!(instance.url.unwrap(), "test:///root");
-        assert_eq!(instance.instance_id.unwrap(), iid);
+        assert_eq!(instance.instance_id.unwrap().parse::<InstanceId>().unwrap(), iid);
 
         let resolved = instance.resolved_info.unwrap();
         assert_eq!(resolved.resolved_url.unwrap(), "test:///root");

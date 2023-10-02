@@ -19,7 +19,7 @@ impl Serialize for ChildName {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(&self)
     }
 }
 
@@ -57,7 +57,7 @@ impl Serialize for Moniker {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(&self)
     }
 }
 

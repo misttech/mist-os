@@ -196,19 +196,16 @@ mod tests {
             OfferSource, OfferTarget, ProgramDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl,
             UseSource,
         },
+        component_id_index::InstanceId,
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl,
         fidl_fuchsia_component_internal as component_internal, fidl_fuchsia_io as fio,
         maplit::hashset,
         moniker::{Moniker, MonikerBase},
-        routing::{
-            component_id_index::{ComponentIdIndex, ComponentInstanceId},
-            component_instance::ComponentInstanceInterface,
-            environment::RunnerRegistry,
-        },
+        routing::{component_instance::ComponentInstanceInterface, environment::RunnerRegistry},
         scrutiny_testing::fake::*,
         serde_json::json,
-        std::{collections::HashMap, convert::TryFrom, str::FromStr},
+        std::{collections::HashMap, convert::TryFrom},
         url::Url,
     };
 
@@ -520,7 +517,7 @@ mod tests {
         let build_model_result = ModelBuilderForAnalyzer::new(root_url.clone()).build(
             decls,
             Arc::new(RuntimeConfig::default()),
-            Arc::new(ComponentIdIndex::default()),
+            Arc::new(component_id_index::Index::default()),
             RunnerRegistry::default(),
         );
         assert!(build_model_result.errors.is_empty());
@@ -588,17 +585,16 @@ mod tests {
     // contains the expected entry.
     #[test]
     fn collect_component_model_with_id_index() -> Result<()> {
-        let iid = "0".repeat(64);
+        let iid = "0".repeat(64).parse::<InstanceId>().unwrap();
+        let component_id_index = {
+            let mut index = component_id_index::Index::default();
+            index.insert(Moniker::parse_str("a/b/c").unwrap(), iid.clone()).unwrap();
+            index
+        };
         let model = single_v2_component_model(
             None,
             Some("/boot/index_path".to_string()),
-            component_id_index::Index {
-                instances: vec![component_id_index::InstanceIdEntry {
-                    instance_id: Some(iid.clone()),
-                    moniker: Some(Moniker::parse_str("a/b/c").unwrap()),
-                }],
-                ..component_id_index::Index::default()
-            },
+            component_id_index,
         )?;
         V2ComponentModelDataCollector::new().collect(model.clone())?;
 
@@ -609,10 +605,10 @@ mod tests {
         let root_instance = collection.component_model.get_root_instance()?;
 
         assert_eq!(
-            Some(&ComponentInstanceId::from_str(&iid).unwrap()),
+            Some(&iid),
             root_instance
                 .component_id_index()
-                .look_up_moniker(&Moniker::parse_str("a/b/c").unwrap())
+                .id_for_moniker(&Moniker::parse_str("a/b/c").unwrap())
         );
         Ok(())
     }

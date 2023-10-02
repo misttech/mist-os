@@ -33,7 +33,6 @@ use {
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, NamespaceCapabilities},
-        component_id_index::{ComponentIdIndex, ComponentInstanceId},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
             ResolvedInstanceInterfaceExt, TopInstanceInterface, WeakComponentInstanceInterface,
@@ -57,6 +56,7 @@ use {
     cm_types::Name,
     cm_util::channel,
     cm_util::TaskGroup,
+    component_id_index::InstanceId,
     config_encoder::ConfigFields,
     fidl::endpoints::{self, ServerEnd},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
@@ -1009,8 +1009,8 @@ impl ComponentInstance {
         }
     }
 
-    pub fn instance_id(self: &Arc<Self>) -> Option<ComponentInstanceId> {
-        self.context.component_id_index().look_up_moniker(&self.moniker).cloned()
+    pub fn instance_id(&self) -> Option<&InstanceId> {
+        self.context.component_id_index().id_for_moniker(&self.moniker)
     }
 
     /// Runs the provided closure with this component's logger (if any) set as the default
@@ -1108,7 +1108,7 @@ impl ComponentInstanceInterface for ComponentInstance {
         &self.context.policy()
     }
 
-    fn component_id_index(&self) -> Arc<ComponentIdIndex> {
+    fn component_id_index(&self) -> &component_id_index::Index {
         self.context.component_id_index()
     }
 
@@ -2006,7 +2006,6 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
-        ::routing::component_id_index::ComponentInstanceId,
         assert_matches::assert_matches,
         cm_rust::{
             Availability, CapabilityDecl, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl,
@@ -2018,7 +2017,7 @@ pub mod tests {
             ChildDeclBuilder, CollectionDeclBuilder, ComponentDeclBuilder, EnvironmentDeclBuilder,
             ProtocolDeclBuilder,
         },
-        component_id_index::gen_instance_id,
+        component_id_index::InstanceId,
         fidl::endpoints::DiscoverableProtocolMarker,
         fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, Koid},
@@ -2027,7 +2026,7 @@ pub mod tests {
         moniker::Moniker,
         routing_test_helpers::component_id_index::make_index_file,
         std::panic,
-        std::{boxed::Box, collections::HashMap, str::FromStr, sync::Arc, task::Poll},
+        std::{boxed::Box, collections::HashMap, sync::Arc, task::Poll},
         tracing::info,
         vfs::service::host,
     };
@@ -2627,29 +2626,23 @@ pub mod tests {
             ("b", component_decl_with_test_runner()),
         ];
 
-        let instance_id = Some(gen_instance_id(&mut rand::thread_rng()));
-        let component_id_index_path = make_index_file(component_id_index::Index {
-            instances: vec![component_id_index::InstanceIdEntry {
-                instance_id: instance_id.clone(),
-                moniker: Some(Moniker::root()),
-            }],
-            ..component_id_index::Index::default()
-        })
-        .unwrap();
+        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        let index = {
+            let mut index = component_id_index::Index::default();
+            index.insert(Moniker::root(), instance_id.clone()).unwrap();
+            index
+        };
+        let component_id_index_path = make_index_file(index).unwrap();
         let test = RoutingTestBuilder::new("root", components)
             .set_component_id_index_path(
-                component_id_index_path.path().to_str().unwrap().to_string(),
+                component_id_index_path.path().to_owned().try_into().unwrap(),
             )
             .build()
             .await;
 
         let root_realm =
             test.model.start_instance(&Moniker::root(), &StartReason::Root).await.unwrap();
-        assert_eq!(
-            instance_id.map(|id| ComponentInstanceId::from_str(&id)
-                .expect("generated instance ID could not be parsed into ComponentInstanceId")),
-            root_realm.instance_id()
-        );
+        assert_eq!(instance_id, *root_realm.instance_id().unwrap());
 
         let a_realm = test
             .model

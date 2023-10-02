@@ -13,16 +13,15 @@ rustc_binary("component_id_index") {
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/component_id_index",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:structopt",
   ]
 
   test_deps = [
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:pretty_assertions",
-    "//third_party/rust_crates:regex",
+    "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:tempfile",
   ]
 
