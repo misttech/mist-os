@@ -9,12 +9,10 @@
 
 # Avoid invoking any subprocesses, use shell built-in equivalents where possible.
 
-# Requires:
-#   reproxy is already running
-
 readonly script="$0"
-readonly script_dir="${script%/*}"
-readonly script_basename="${script##*/}"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"  # dirname
+readonly script_basename="${script##*/}"  # basename
 
 # not normalized
 readonly exec_root="$script_dir/../.."

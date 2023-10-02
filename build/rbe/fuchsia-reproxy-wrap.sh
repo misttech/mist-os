@@ -7,10 +7,12 @@
 
 set -e
 
-script="$0"
-script_dir="$(dirname "$script")"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"  # dirname
 
 source "$script_dir"/common-setup.sh
+
 readonly PREBUILT_OS="$_FUCHSIA_RBE_CACHE_VAR_host_os"
 readonly PREBUILT_ARCH="$_FUCHSIA_RBE_CACHE_VAR_host_arch"
 
@@ -89,14 +91,13 @@ do
 done
 test -z "$prev_out" || { echo "Option is missing argument to set $prev_opt." ; exit 1;}
 
-reproxy_cfg="$config"
-
-bootstrap="$reclient_bindir"/bootstrap
-reproxy="$reclient_bindir"/reproxy
+readonly reproxy_cfg="$config"
+readonly bootstrap="$reclient_bindir"/bootstrap
+readonly reproxy="$reclient_bindir"/reproxy
 
 # Establish a single log dir per reproxy instance so that statistics are
 # accumulated per build invocation.
-date="$(date +%Y%m%d-%H%M%S)"
+readonly date="$(date +%Y%m%d-%H%M%S)"
 readonly build_dir_file="$project_root_rel/.fx-build-dir"
 build_subdir=out/unknown
 if test -f "$build_dir_file"
@@ -112,9 +113,10 @@ mkdir -p "$logs_root"
 # 'mktemp -p' still yields to TMPDIR in the environment (bug?),
 # so override TMPDIR instead.
 readonly reproxy_logdir="$(env TMPDIR="$logs_root" mktemp -d -t "reproxy.$date.XXXX")"
-readonly log_base="$(basename "$reproxy_logdir")"
+readonly log_base="${reproxy_logdir##*/}"  # basename
 
-readonly _tmpdir="$(dirname "$(mktemp -u)")"
+readonly _fake_tmpdir="$(mktemp -u)"
+readonly _tmpdir="${_fake_tmpdir%/*}"  # dirname
 # Symlink to the old location, where users may be accustomed to looking.
 ln -s -f "$reproxy_logdir" "$_tmpdir"/
 

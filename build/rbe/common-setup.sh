@@ -24,12 +24,16 @@
 #   _FUCHSIA_RBE_CACHE_VAR_host_os
 #   _FUCHSIA_RBE_CACHE_VAR_host_arch
 
-script="$0"  # This is the name of the invoking script, not this one.
-script_basename="$(basename "$script")"
-script_dir="$(dirname "$script")"
+readonly _invoking_script="$0"  # This is the name of the invoking script, not this one.
+[[ "$_invoking_script" == */* ]] || {
+  echo >&2 "$0 must be invoked with a path prefix."
+  exit 2
+}
+readonly _invoking_script_dir="${_invoking_script%/*}"  # dirname
+readonly _invoking_script_basename="${_invoking_script##*/}"  # basename
 
 function msg() {
-  echo "[$script_basename]: $@"
+  echo "[$_invoking_script_basename]: $@"
 }
 
 function timetrace() {
@@ -63,7 +67,7 @@ function normalize_path() {
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.
 # The value is an absolute path.
-readonly default_project_root="$(normalize_path "$script_dir"/../..)"
+readonly default_project_root="$(normalize_path "$_invoking_script_dir"/../..)"
 test -n "$default_project_root" || {
   msg "Error: Unable to infer project root."
   exit 1
@@ -101,7 +105,7 @@ function _check_realpath_works_for_relative_paths() {
   then
     # GNU coreutils' realpath is different from BSD utils' realpath.
     # Test if it is usable for calculating relative paths.
-    realpath -s --relative-to=.. "$script" 2>&1 > /dev/null || return 1
+    realpath -s --relative-to=.. "$_invoking_script" 2>&1 > /dev/null || return 1
     return 0  # success
   else
     # realpath doesn't even exist

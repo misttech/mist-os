@@ -9,11 +9,17 @@
 # those are wrapped in a .sh script that adjusts
 # PYTHONPATH accordingly.
 
-rbe_dir="$(dirname $0)"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"  # dirname
+readonly script_basename="${script##*/}"  # basename
+
+readonly rbe_dir="$script_dir"
 
 for t in "$rbe_dir"/*_test.py
 do
-  base="$(basename "$t" .py)"
+  stem="${t##*/}"
+  base="${stem%.py}"
   sh_test="$rbe_dir/$base.sh"
   if test -f "$sh_test"
   then

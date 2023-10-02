@@ -8,10 +8,13 @@
 # To use this script, symlink a .sh to this script, using the python script's
 # basename.
 
-script="$0"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"
+readonly script_basename="${script##*/}"
+
 # 'stem' is any executable python binary or test
-stem="$(basename "$script" .sh)"
-script_dir="$(dirname "$script")"
+stem="${script_basename%.sh}"
 
 source "$script_dir"/common-setup.sh
 # 'python' is defined

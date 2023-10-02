@@ -9,9 +9,11 @@
 
 set -uo pipefail
 
-script="$0"
-stem="$(basename "$script" .sh)"
-script_dir="$(dirname "$script")"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"  # dirname
+readonly script_basename="${script##*/}"  # basename
+readonly stem="${script_basename%.sh}"
 
 source "$script_dir"/common-setup.sh
 # 'python' is defined

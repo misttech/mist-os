@@ -28,9 +28,10 @@ Example: Compare two clean builds with same output dir:
 EOF
 }
 
-script="$0"  # This is the name of the invoking script, not this one.
-script_basename="$(basename "$script")"
-script_dir="$(dirname "$script")"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"  # dirname
+readonly script_basename="${script##*/}"  # basename
 
 source "$script_dir"/../../build/rbe/common-setup.sh
 

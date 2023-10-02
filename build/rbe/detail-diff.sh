@@ -9,8 +9,9 @@
 
 set -o pipefail
 
-script="$0"
-script_dir="$(dirname "$script")"
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"
 
 source "$script_dir"/common-setup.sh
 
