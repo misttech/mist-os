@@ -3,11 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{AnyCast, Capability, Remote, Sender},
-    fidl::{
-        endpoints::{create_proxy, ProtocolMarker, Proxy, RequestStream},
-        AsyncChannel,
-    },
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl::endpoints::{create_proxy, Proxy},
+    fidl_fuchsia_component_sandbox as fsandbox,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::mpsc,
@@ -16,37 +13,17 @@ use {
         stream::Peekable,
         FutureExt, StreamExt,
     },
-    moniker::Moniker,
     std::fmt::Debug,
     std::pin::pin,
     std::sync::Arc,
 };
 
-#[derive(Debug)]
-pub struct Message {
-    pub handle: zx::Handle,
-    pub flags: fio::OpenFlags,
-    pub target_moniker: Moniker,
-}
-
-impl Message {
-    pub fn new(handle: zx::Handle, flags: fio::OpenFlags, target_moniker: Moniker) -> Self {
-        Self { handle, flags, target_moniker }
-    }
-
-    pub fn take_handle_as_stream<P: ProtocolMarker>(self) -> P::RequestStream {
-        let channel = AsyncChannel::from_channel(zx::Channel::from(self.handle))
-            .expect("failed to convert handle into async channel");
-        P::RequestStream::from_channel(channel)
-    }
-}
-
-/// A capability that represents a Zircon handle.
+/// A capability that represents the receiving end of a channel that transfers Zircon handles.
 #[derive(Capability, Debug, Clone)]
 #[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Receiver {
-    inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<Message>>>>,
-    sender: mpsc::UnboundedSender<Message>,
+    inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<zx::Handle>>>>,
+    sender: mpsc::UnboundedSender<zx::Handle>,
 }
 
 impl Receiver {
@@ -59,13 +36,14 @@ impl Receiver {
         Sender { inner: self.sender.clone() }
     }
 
-    pub async fn receive(&self) -> Message {
+    pub async fn receive(&self) -> zx::Handle {
         // Panic here instead of blocking, if this happens then we have a bug
         let mut receiver_guard = self
             .inner
             .try_lock()
             .expect("multiple places wanted to read a receiver at the same time");
-        receiver_guard.next().await.expect("this is infallible, we're also holding a sender")
+        // The following unwrap is infallible because we're also holding a sender
+        receiver_guard.next().await.unwrap()
     }
 }
 
@@ -84,9 +62,9 @@ impl Receiver {
         let mut on_closed = receiver_proxy.on_closed();
         loop {
             match future::select(pin!(self.receive()), on_closed).await {
-                Either::Left((message, fut)) => {
+                Either::Left((handle, fut)) => {
                     on_closed = fut;
-                    if let Err(_) = receiver_proxy.receive(message.handle) {
+                    if let Err(_) = receiver_proxy.receive(handle) {
                         return;
                     }
                 }

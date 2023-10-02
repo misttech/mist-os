@@ -25,7 +25,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{Message, Open},
+    sandbox::Open,
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -293,8 +293,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                         // only contain the receiver we declared.
                         if cap_sandbox.get_sender().is_some() {
                             let handle = server_end.into_handle();
-                            let msg = Message::new(handle, flags, target.moniker.clone());
-                            cap_sandbox.send(msg).unwrap();
+                            cap_sandbox.send(handle).unwrap();
                             return;
                         }
                     }

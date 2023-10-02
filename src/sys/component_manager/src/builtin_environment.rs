@@ -385,7 +385,12 @@ impl BuiltinSandboxBuilder {
             self.task_group.as_weak(),
             name,
             receiver,
-            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
+            Box::new(move |handle| {
+                let channel = fidl::AsyncChannel::from_channel(zx::Channel::from(handle))
+                    .expect("failed to convert handle into async channel");
+                let stream = P::RequestStream::from_channel(channel);
+                task_to_launch(stream).boxed()
+            }),
         ));
     }
 
@@ -1191,7 +1196,12 @@ impl BuiltinEnvironment {
             self.model.top_instance().task_group().as_weak(),
             name,
             receiver,
-            Box::new(move |message| task_to_launch(message.take_handle_as_stream::<P>()).boxed()),
+            Box::new(move |handle| {
+                let channel = fidl::AsyncChannel::from_channel(zx::Channel::from(handle))
+                    .expect("failed to convert handle into async channel");
+                let stream = P::RequestStream::from_channel(channel);
+                task_to_launch(stream).boxed()
+            }),
         );
 
         self._builtin_receivers_task_group.spawn(launch_task_on_receive.run());

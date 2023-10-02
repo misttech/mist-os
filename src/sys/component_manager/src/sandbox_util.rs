@@ -5,9 +5,10 @@
 use {
     cm_types::Name,
     cm_util::WeakTaskGroup,
+    fuchsia_zircon as zx,
     futures::future::BoxFuture,
     lazy_static::lazy_static,
-    sandbox::{Dict, Message, Receiver, Sender, TryClone},
+    sandbox::{Dict, Receiver, Sender, TryClone},
     tracing::warn,
 };
 
@@ -109,24 +110,23 @@ impl<'a> CapabilityDictMut<'a> {
         self.inner.entries.insert(RECEIVER.as_str().to_string(), Box::new(receiver));
     }
 
-    /// Sends the message to the sender in this capability dict. If that fails, returns the
-    /// message.
-    pub fn send(&mut self, message: Message) -> Result<(), Message> {
+    /// Sends the handle to the sender in this capability dict. If that fails, returns the handle.
+    pub fn send(&mut self, handle: zx::Handle) -> Result<(), zx::Handle> {
         if let Some(sender) = self.get_sender() {
-            sender.send(message);
+            sender.send(handle);
             Ok(())
         } else {
-            Err(message)
+            Err(handle)
         }
     }
 }
 
-/// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
-/// handle each new message from the receiver.
+/// Waits for a new handle on a receiver, and launches a new async task on a `WeakTaskGroup` to
+/// handle each new handle from the receiver.
 pub struct LaunchTaskOnReceive {
     receiver: Receiver,
     task_to_launch: Box<
-        dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>> + Sync + Send + 'static,
+        dyn Fn(zx::Handle) -> BoxFuture<'static, Result<(), anyhow::Error>> + Sync + Send + 'static,
     >,
     // Note that we explicitly need a `WeakTaskGroup` because if our `run` call is scheduled on the
     // same task group as we'll be launching tasks on then if we held a strong reference we would
@@ -141,7 +141,7 @@ impl LaunchTaskOnReceive {
         task_name: impl Into<String>,
         receiver: Receiver,
         task_to_launch: Box<
-            dyn Fn(Message) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            dyn Fn(zx::Handle) -> BoxFuture<'static, Result<(), anyhow::Error>>
                 + Sync
                 + Send
                 + 'static,
@@ -152,9 +152,9 @@ impl LaunchTaskOnReceive {
 
     pub async fn run(self) {
         loop {
-            let message = self.receiver.receive().await;
+            let handle = self.receiver.receive().await;
             let task_name = self.task_name.clone();
-            let fut = (self.task_to_launch)(message);
+            let fut = (self.task_to_launch)(handle);
             self.task_group.spawn(async move {
                 if let Err(error) = fut.await {
                     warn!(%error, "{} failed", task_name);
