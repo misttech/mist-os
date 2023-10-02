@@ -29,9 +29,6 @@ _excluded_bazel_inputs = [
   # Remove a potential circular dependency on the spdx bazel_input_resource itself.
   "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
 
-  # TODO(fxb/130784): Remove once not used downstream.
-  "//build/bazel/licenses:all_bazel_inputs_licenses_spdx",
-
   # See fxb/126949#c15. Zedboot is only used in eng builds and is testonly, so can't
   # be used in license calculations.
   "//build/images/zedboot:zedboot.bazel_legacy_aib",
@@ -77,27 +74,6 @@ license_data("licenses_data") {
     "//vendor/third_party/eigen3",
     "//vendor/third_party/eigen3/",
   ]
-}
-
-# Note: To make this target on the Bazel side, this target needs be added:
-# (1) To `extra_deps` in the relevant `bazel_build_action` rule.
-# (2) To the `extra_gn_labels_for_bazel_inputs` GN arg.
-#
-# Warnings:
-# (1) license_data dependency above is VERY SLOW.
-# (2) When developing locally, since license_data may produce inaccurate
-#     results if you didn't 'fx clean'. If you want to avoid 'fx clean' do:
-#     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
-#       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
-#     * fxbug.dev/117694 workaround: Manually delete cached depenedncy calculation:
-#       `rm out/default/project.json`
-#
-# Deprecated: Use `:legacy_ninja_build_outputs_licenses` instead.
-# TODO(fxb/130784): Remove once not used downstream.
-bazel_input_resource("all_bazel_inputs_licenses_spdx") {
-  deps = [ ":licenses_data" ]
-  sources = get_target_outputs(":licenses_data_spdx_copy")
-  outputs = [ "licenses_data/results.spdx.json" ]
 }
 
 if (generate_legacy_ninja_build_outputs_licenses_spdx) {
