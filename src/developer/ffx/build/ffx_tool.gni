@@ -109,7 +109,11 @@ template("ffx_tool") {
   ffx_apply_version(target_versioned_bin) {
     output_name = output_versioned
     ffx_unversioned_binary_path = "${root_out_dir}/${output_unversioned}"
-    deps = [ ":$target_unversioned" ]
+    runtime_files = [ "$root_out_dir/$output_metadata" ]
+    deps = [
+      ":$target_metadata",
+      ":$target_unversioned",
+    ]
   }
 
   # Create the metadata file for in-tree discovery

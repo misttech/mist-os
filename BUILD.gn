@@ -993,6 +993,10 @@ build_api_module("test_durations") {
 #       which this tool is intended.
 #     - Type: string
 #
+#   * runtime_files
+#     - Optional: Path to files that are also required for the tool to function
+#       (must also be built by `label`).
+#     - Type: path relative to $root_build_dir
 build_api_module("tool_paths") {
   testonly = true
   data_keys = [ "tool_paths" ]

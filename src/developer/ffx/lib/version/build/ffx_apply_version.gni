@@ -44,6 +44,12 @@ if (is_mac) {
 #     [GN file path] This is the GN file path to the ffx binary that is to have
 #     the version applied to it.
 #
+#   runtime_files (optional)
+#     Files that should be listed in the `runtime_files` part of the
+#     tools_path.json entry for this binary, if any, as being files that
+#     are required to run it successfully. These files should be properly
+#     depended on by one or more of the labels listed in `deps`.
+#
 template("ffx_apply_version") {
   main_target = target_name
 
@@ -63,8 +69,6 @@ template("ffx_apply_version") {
                              "output_name",
                              "output_extension",
                            ])
-
-    assert([ deps[0] ] == deps, "The deps list must only have one item in it.")
 
     assert(defined(ffx_unversioned_binary_path),
            "'ffx_unversioned_binary_path' is a required parameter")
@@ -119,6 +123,12 @@ template("ffx_apply_version") {
     main_root_out_dir =
         get_label_info(":$target_name(${toolchain_variant.base})",
                        "root_out_dir")
+    all_runtime_files = []
+    if (defined(invoker.runtime_files)) {
+      foreach(file, invoker.runtime_files) {
+        all_runtime_files += [ rebase_path(file, root_build_dir) ]
+      }
+    }
 
     # Note: binaries metadata is not produced, as the build-id is not updated, and will match with the unversioned build.
     metadata = {
@@ -134,6 +144,7 @@ template("ffx_apply_version") {
           os = current_os
           path =
               rebase_path("${main_root_out_dir}/${output_file}", root_build_dir)
+          runtime_files = all_runtime_files
         },
       ]
     }
