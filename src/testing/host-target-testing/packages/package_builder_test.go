@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"testing"
 
@@ -210,7 +209,7 @@ func TestPublish(t *testing.T) {
 	}
 
 	deliveryBlobType := 1
-	_, err = pkgRepo.BlobStore.OpenBlob(ctx, &deliveryBlobType, actualPkg.Merkle())
+	_, err = pkgRepo.blobStore.OpenBlob(ctx, &deliveryBlobType, actualPkg.Merkle())
 	if err != nil {
 		t.Fatalf("Delivery blob does not exist '%s'. %s", actualPkg.Merkle(), err)
 	}
@@ -219,7 +218,7 @@ func TestPublish(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create FFXTool: %s", err)
 	}
-	pkgRepo, err = NewRepository(ctx, path.Dir(pkgRepo.Dir), pkgRepo.BlobStore, ffx, nil)
+	pkgRepo, err = NewRepository(ctx, pkgRepo.rootDir, pkgRepo.blobStore, ffx, nil)
 
 	// Confirm that the package is published and updated.
 	pkg, err = pkgRepo.OpenPackage(ctx, fullPkgName)

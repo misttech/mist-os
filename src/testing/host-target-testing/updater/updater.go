@@ -86,18 +86,83 @@ func SyslogForUnknownFirmwareIgnoreDisconnect(ctx context.Context, c client) err
 // SystemUpdateChecker uses `update check-now` to install a package.
 type SystemUpdateChecker struct {
 	repo                   *packages.Repository
+	updatePackageUrl       string
 	checkForUnkownFirmware bool
 }
 
-func NewSystemUpdateChecker(repo *packages.Repository, checkForUnkownFirmware bool) *SystemUpdateChecker {
-	return &SystemUpdateChecker{repo: repo, checkForUnkownFirmware: checkForUnkownFirmware}
+func NewSystemUpdateChecker(
+	repo *packages.Repository,
+	updatePackageUrl string,
+	checkForUnkownFirmware bool,
+) *SystemUpdateChecker {
+	return &SystemUpdateChecker{
+		repo:                   repo,
+		updatePackageUrl:       updatePackageUrl,
+		checkForUnkownFirmware: checkForUnkownFirmware,
+	}
 }
+
+const (
+	// The default fuchsia update package URL.
+	defaultUpdatePackageURL = "fuchsia-pkg://fuchsia.com/update/0"
+)
 
 func (u *SystemUpdateChecker) Update(ctx context.Context, c client) error {
-	return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware)
+	// If we're using the default update package url, we can directly update
+	// with it.
+	if u.updatePackageUrl == defaultUpdatePackageURL {
+		return updateCheckNow(ctx, c, u.repo, true, u.checkForUnkownFirmware)
+	}
+
+	// Otherwise, copy the repository into a temporary directory, and publish
+	// the update package to `fuchsia-pkg://fuchsia.com/update/0`, then update
+	// with the temp repository.
+
+	logger.Infof(
+		ctx,
+		"update package %s isn't default, cloning the repository so it can be made %s",
+		u.updatePackageUrl,
+		defaultUpdatePackageURL,
+	)
+
+	url, err := url.Parse(u.updatePackageUrl)
+	if err != nil {
+		return fmt.Errorf("invalid update package URL %q: %w", u.updatePackageUrl, err)
+	}
+	srcUpdatePath := url.Path[1:]
+
+	tempDir, err := os.MkdirTemp("", "")
+	if err != nil {
+		return fmt.Errorf("failed to create a temp directory: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	repo, err := u.repo.CloneIntoDir(ctx, tempDir)
+	if err != nil {
+		return fmt.Errorf("failed to copy %s into %s: %w", u.repo, tempDir, err)
+	}
+
+	srcUpdate, err := repo.OpenUpdatePackage(ctx, srcUpdatePath)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", srcUpdatePath, err)
+	}
+
+	dstUpdatePath := "update/0"
+	_, err = srcUpdate.EditUpdatePackage(ctx, dstUpdatePath, func(tempDir string) error { return nil })
+	if err != nil {
+		return fmt.Errorf("failed to publish %s: %w", dstUpdatePath, err)
+	}
+
+	return updateCheckNow(ctx, c, repo, true, u.checkForUnkownFirmware)
 }
 
-func updateCheckNow(ctx context.Context, c client, repo *packages.Repository, createRewriteRule bool, checkForUnkownFirmware bool) error {
+func updateCheckNow(
+	ctx context.Context,
+	c client,
+	repo *packages.Repository,
+	createRewriteRule bool,
+	checkForUnkownFirmware bool,
+) error {
 	logger.Infof(ctx, "Triggering OTA")
 
 	startTime := time.Now()

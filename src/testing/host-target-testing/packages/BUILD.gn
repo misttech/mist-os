@@ -20,6 +20,7 @@ if (is_host) {
       "//src/sys/pkg/lib/repo",
       "//third_party/golibs:github.com/theupdateframework/go-tuf",
       "//tools/lib/logger",
+      "//tools/lib/osmisc",
     ]
     sources = [
       "package.go",

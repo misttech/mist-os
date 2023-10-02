@@ -17,6 +17,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 )
 
 type BlobStore interface {
@@ -50,9 +51,9 @@ func (fs *DirBlobStore) Dir() string {
 }
 
 type Repository struct {
-	Dir string
-	// BlobsDir should be a directory called `blobs` where all the blobs are.
-	BlobStore        BlobStore
+	rootDir          string
+	metadataDir      string
+	blobStore        BlobStore
 	ffx              *ffx.FFXTool
 	deliveryBlobType *int
 }
@@ -85,8 +86,9 @@ func NewRepository(ctx context.Context, dir string, blobStore BlobStore, ffx *ff
 	}
 
 	return &Repository{
-		Dir:              filepath.Join(dir, "repository"),
-		BlobStore:        blobStore,
+		rootDir:          dir,
+		metadataDir:      filepath.Join(dir, "repository"),
+		blobStore:        blobStore,
 		ffx:              ffx,
 		deliveryBlobType: deliveryBlobType,
 	}, nil
@@ -109,10 +111,22 @@ func NewRepositoryFromTar(ctx context.Context, dst string, src string, ffx *ffx.
 	)
 }
 
+// This clones this repository, copying the repository metadata into this
+// directory.
+func (r *Repository) CloneIntoDir(ctx context.Context, path string) (*Repository, error) {
+	logger.Infof(ctx, "Cloning repository %s into %s", r.metadataDir, path)
+
+	if err := osmisc.CopyDir(r.rootDir, path); err != nil {
+		return nil, err
+	}
+
+	return NewRepository(ctx, path, r.blobStore, r.ffx, r.deliveryBlobType)
+}
+
 // OpenPackage opens a package from the repository.
 func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, error) {
 	// Parse the targets file so we can access packages locally.
-	f, err := os.Open(filepath.Join(r.Dir, "targets.json"))
+	f, err := os.Open(filepath.Join(r.metadataDir, "targets.json"))
 	if err != nil {
 		return Package{}, err
 	}
@@ -142,7 +156,7 @@ func (r *Repository) OpenPackage(ctx context.Context, path string) (Package, err
 }
 
 func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
-	return r.BlobStore.OpenBlob(ctx, nil, merkle)
+	return r.blobStore.OpenBlob(ctx, nil, merkle)
 }
 
 func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*UpdatePackage, error) {
@@ -155,11 +169,11 @@ func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*Updat
 }
 
 func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
-	return r.BlobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
+	return r.blobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
 }
 
 func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string, repoPort int) (*Server, error) {
-	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName, repoPort)
+	return newServer(ctx, r.metadataDir, r.blobStore, localHostname, repoName, repoPort)
 }
 
 func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle build.MerkleRoot) error {
@@ -268,12 +282,10 @@ func (r *Repository) EditPackage(
 }
 
 func (r *Repository) Publish(ctx context.Context, packageManifestPath string) error {
-	repoDir := filepath.Dir(r.Dir)
-
-	extraArgs := []string{"--blob-repo-dir", r.BlobStore.Dir()}
+	extraArgs := []string{"--blob-repo-dir", r.blobStore.Dir()}
 	if r.deliveryBlobType != nil {
 		extraArgs = append(extraArgs, "--delivery-blob-type", fmt.Sprint(*r.deliveryBlobType))
 	}
 
-	return r.ffx.RepositoryPublish(ctx, repoDir, []string{packageManifestPath}, extraArgs...)
+	return r.ffx.RepositoryPublish(ctx, r.rootDir, []string{packageManifestPath}, extraArgs...)
 }

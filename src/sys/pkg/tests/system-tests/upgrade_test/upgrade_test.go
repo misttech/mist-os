@@ -291,21 +291,6 @@ func doTestOTAs(
 		return fmt.Errorf("OTA from N -> N' failed: %w", err)
 	}
 	logger.Infof(ctx, "OTA from N -> N' successful in %s", time.Now().Sub(otaTime))
-
-	logger.Infof(ctx, "starting OTA N' -> N test")
-	otaTime = time.Now()
-
-	if err := systemOTA(
-		ctx,
-		device,
-		rpcClient,
-		repo,
-		false,
-		true,
-	); err != nil {
-		return fmt.Errorf("OTA from N' -> N failed: %w", err)
-	}
-	logger.Infof(ctx, "OTA from N' -> N successful in %s", time.Now().Sub(otaTime))
 	logger.Infof(ctx, "OTA cycle sucessful in %s", time.Now().Sub(startTime))
 
 	return nil

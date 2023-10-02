@@ -197,14 +197,7 @@ func (c *InstallerConfig) Updater(repo *packages.Repository, updatePackageURL st
 		return updater.NewOmahaUpdater(repo, updatePackageURL, c.omahaTool, avbTool, zbiTool, c.workaroundOtaNoRewriteRules, checkForUnkownFirmware)
 
 	case SystemUpdateChecker:
-		// TODO: The e2e tests only support using the system-update-checker
-		// with the standard update package URL. Otherwise we need to
-		// fall back to manually triggering the system-updater.
-		if updatePackageURL == defaultUpdatePackageURL {
-			return updater.NewSystemUpdateChecker(repo, checkForUnkownFirmware), nil
-		}
-
-		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
+		return updater.NewSystemUpdateChecker(repo, updatePackageURL, checkForUnkownFirmware), nil
 
 	case SystemUpdater:
 		return updater.NewSystemUpdater(repo, updatePackageURL, checkForUnkownFirmware), nil
