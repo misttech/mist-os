@@ -43,8 +43,8 @@ class DLog {
 
   void StartThreads() TA_EXCL(lock_);
 
-  // Mark this DLog as being shutdown, then shutdown all threads.  Once called,
-  // subsequent |write| operations will fail.
+  // Mark this DLog as shutting down, then shutdown all threads.  Once called, subsequent |write|
+  // operations will fail, but already-queued messages will continue to be processed/emitted.
   zx_status_t Shutdown(zx_time_t deadline) TA_EXCL(lock_);
 
   // See |dlog_panic_start|.
@@ -239,9 +239,18 @@ class DLog {
   // A counter incremented for each log message that enters the debuglog.
   uint64_t sequence_count_ TA_GUARDED(lock_) = 0;
 
-  // Indicates that this |DLog| object is being shutdown.  When true, |write| will immediately
-  // return an error.
-  bool shutdown_requested_ TA_GUARDED(lock_) = false;
+  // The lifecycle state of this |DLog| object.
+  enum class Lifecycle : uint32_t {
+    Running,
+    ShutdownStarted,   // Shutdown has been called, but has not yet completed.  No new messages can
+                       // be be queued.  Calls to |Write| will fail.  Already-queued messages may
+                       // continue to be processed/emitted.
+    ShutdownFinished,  // Shutdown has completed.
+  };
+  ktl::atomic<Lifecycle> lifecycle_{Lifecycle::Running};
+
+  // Signaled when shutdown has completed.
+  Event shutdown_finished_;
 
   // This array contains dlog_header_t object so make sure it's properly aligned.
   alignas(kDLogHeaderFifoAlignment) uint8_t data_[DLOG_SIZE]{0};

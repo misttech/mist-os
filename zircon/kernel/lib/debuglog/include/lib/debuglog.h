@@ -107,6 +107,7 @@ struct dlog_record {
 
 static_assert(sizeof(dlog_record_t) == DLOG_MAX_RECORD, "");
 
+// Returns ZX_ERR_BAD_STATE if the dlog has already started shutting down.
 zx_status_t dlog_write(uint32_t severity, uint32_t flags, ktl::string_view str);
 
 // used by sys_debug_write()
@@ -134,7 +135,9 @@ void dlog_init_early();
 
 // Shutdown the debuglog subsystem.
 //
-// Blocks, waiting up to |deadline|, for dlog threads to terminate.
+// Blocks, waiting up to |deadline|, for dlog threads to terminate.  It is safe
+// for Shutdown to be called concurrently by multiple threads.  Only one thread
+// will "win" and all others will simply wait for it to complete.
 //
 // On failure, the debuglog subsystem is left in an undefined state.
 //

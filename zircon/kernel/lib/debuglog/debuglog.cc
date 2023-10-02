@@ -108,28 +108,26 @@ void DLog::StartThreads() {
 zx_status_t DLog::Shutdown(zx_time_t deadline) {
   dprintf(INFO, "Shutting down debuglog\n");
 
-  // It is critical to set the shutdown flag first, to prevent new records from
-  // being inserted because the dumper thread will continue to read records
-  // and drain the queue even after shutdown is requested.  If we don't stop the
-  // flow up stream, then a sufficiently speedy write could prevent the
-  // dumper thread from terminating.
-  {
-    Guard<MonitoredSpinLock, IrqSave> guard{&lock_, SOURCE_TAG};
-    this->shutdown_requested_ = true;
+  // Are we the first to try to shutdown this instance?  Try to claim the honor.
+  Lifecycle expected = Lifecycle::Running;
+  if (!lifecycle_.compare_exchange_strong(expected, Lifecycle::ShutdownStarted,
+                                          ktl::memory_order_acq_rel, ktl::memory_order_relaxed)) {
+    // Nope.  Either some other thread is shutting it down or it's already shutdown.  Wait for them
+    // to do the work on our behalf and just return whatever status they signal us with.
+    return shutdown_finished_.WaitDeadline(deadline, Interruptible::No);
   }
 
+  // By changing the lifecycle state we have successfully claimed the responsibility of shutting
+  // down this instance and have also stopped new records from being inserted into the queue.  The
+  // dumper thread will continue to read records and drain the queue even after shutdown has
+  // started.  If we don't stop the flow up stream, then a sufficiently speedy write could prevent
+  // the dumper thread from terminating.
+
+  // This lambda will signal and join the thread referenced by |state|.
   auto ShutdownThread = [deadline](ThreadState& state, const char* name) -> zx_status_t {
-    const bool already_shutdown = state.shutdown_requested.exchange(true);
-    if (already_shutdown) {
-      // If shutdown has already been requested then either a full debuglog shutdown has already
-      // happened, or we are currently racing with one. In the former case we could immediately
-      // return, but in the latter we need to wait until they have finished shutdown. Given how
-      // unlikely this whole scenario is, and the comparative difficulty of synchronizing the second
-      // scenario we just wait till the deadline. Most likely whoever was already shutting down the
-      // debuglog will have performed halt/reboot before this sleep completes.
-      Thread::Current::Sleep(deadline);
-      return ZX_OK;
-    }
+    // Tell the thread that it's time to terminate.
+    const bool already_requested = state.shutdown_requested.exchange(true);
+    DEBUG_ASSERT(!already_requested);
 
     state.event.Signal();
     if (state.thread != nullptr) {
@@ -145,15 +143,23 @@ zx_status_t DLog::Shutdown(zx_time_t deadline) {
 
   // Shutdown the notifier thread first. Ordering is important because the
   // notifier thread is responsible for passing log records to the dumper.
-  zx_status_t notifier_status = ShutdownThread(notifier_state_, kDlogNotifierThreadName);
-  zx_status_t dumper_status = ShutdownThread(dumper_state_, kDlogDumperThreadName);
+  const zx_status_t notifier_status = ShutdownThread(notifier_state_, kDlogNotifierThreadName);
+  const zx_status_t dumper_status = ShutdownThread(dumper_state_, kDlogDumperThreadName);
 
-  // If one of them failed, return the status corresponding to the first
-  // failure.
+  // If one of them fails, just use the first failing status we find.
+  zx_status_t result;
   if (notifier_status != ZX_OK) {
-    return notifier_status;
+    result = notifier_status;
+  } else if (dumper_status != ZX_OK) {
+    result = dumper_status;
+  } else {
+    result = ZX_OK;
+    dprintf(INFO, "debuglog shutdown complete\n");
   }
-  return dumper_status;
+
+  // Be sure to pass the status to any other threads that may be waiting here in Shutdown.
+  shutdown_finished_.Signal(result);
+  return result;
 }
 
 void DLog::PanicStart() {
@@ -217,7 +223,7 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
 
     hdr.sequence = sequence_count_;
 
-    if (shutdown_requested_) {
+    if (lifecycle_.load(ktl::memory_order_acquire) != Lifecycle::Running) {
       return ZX_ERR_BAD_STATE;
     }
 
