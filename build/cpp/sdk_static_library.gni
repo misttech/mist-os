@@ -275,7 +275,10 @@ template("sdk_static_library") {
       ]
     }
 
-    verify_public_headers(target_name) {
+    verify_public_headers_target = "$target_name.verify_public_headers"
+    verify_public_headers(verify_public_headers_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+      target_label = ":${target_name}"
       headers = all_headers
     }
   }
@@ -428,6 +431,9 @@ template("sdk_static_library") {
   sdk_atom_alias(sdk_target_name) {
     atom = ":${manifest_target_name}"
     non_sdk_deps = [ ":${verify_runtime_deps_target}" ]
+    if (!no_headers) {
+      non_sdk_deps += [ ":${verify_public_headers_target}" ]
+    }
     if (generate_plasa_artifacts) {
       non_sdk_deps += [ ":$_plasa_artifacts_target_name" ]
     }

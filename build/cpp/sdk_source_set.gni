@@ -254,7 +254,10 @@ template("sdk_source_set") {
     }
   }
 
-  verify_public_headers(target_name) {
+  verify_public_headers_target = "${target_name}_verify_public_headers"
+  verify_public_headers(verify_public_headers_target) {
+    forward_variables_from(invoker, [ "testonly" ])
+    target_label = ":${target_name}"
     headers = all_headers
   }
 
@@ -330,6 +333,7 @@ template("sdk_source_set") {
     deps = sdk_deps
 
     non_sdk_deps = [ ":$metadata_target_name" ]
+    non_sdk_deps += [ ":${verify_public_headers_target}" ]
     if (should_verify_pragma) {
       non_sdk_deps += [ ":$verify_pragma_target_name" ]
     }
