@@ -29,8 +29,8 @@ impl HeaderSet {
         Ok(set)
     }
 
-    pub fn from_header(header: Header) -> Result<Self, Error> {
-        Self::from_headers(vec![header])
+    pub fn from_header(header: Header) -> Self {
+        Self::from_headers(vec![header]).expect("single header always valid")
     }
 
     /// Returns true if the provided `id` must be encoded in a particular order in the OBEX packet.
@@ -106,7 +106,8 @@ impl HeaderSet {
     /// Returns Error if the expected Header is not present in the collection.
     pub fn remove_body(&mut self, final_: bool) -> Result<Vec<u8>, Error> {
         if final_ {
-            let Some(Header::EndOfBody(end_of_body)) = self.remove(&HeaderIdentifier::EndOfBody) else {
+            let Some(Header::EndOfBody(end_of_body)) = self.remove(&HeaderIdentifier::EndOfBody)
+            else {
                 return Err(PacketError::data("missing end of body header").into());
             };
             Ok(end_of_body)
@@ -246,8 +247,8 @@ mod tests {
 
     #[fuchsia::test]
     fn try_append_success() {
-        let mut headers1 = HeaderSet::from_header(Header::name("foo")).unwrap();
-        let headers2 = HeaderSet::from_header(Header::Description("bar".into())).unwrap();
+        let mut headers1 = HeaderSet::from_header(Header::name("foo"));
+        let headers2 = HeaderSet::from_header(Header::Description("bar".into()));
         let () = headers1.try_append(headers2).expect("valid headers");
         assert!(headers1.contains_header(&HeaderIdentifier::Name));
         assert!(headers1.contains_header(&HeaderIdentifier::Description));
@@ -255,27 +256,26 @@ mod tests {
 
     #[fuchsia::test]
     fn try_append_error() {
-        let mut headers1 = HeaderSet::from_header(Header::name("foo")).unwrap();
-        let headers2 = HeaderSet::from_header(Header::name("bar")).unwrap();
+        let mut headers1 = HeaderSet::from_header(Header::name("foo"));
+        let headers2 = HeaderSet::from_header(Header::name("bar"));
         assert_matches!(headers1.try_append(headers2), Err(Error::Duplicate(_)));
     }
 
     #[fuchsia::test]
     fn add_incompatible_header_is_error() {
         // Target cannot be added when ConnectionId exists.
-        let mut headers =
-            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(2))).unwrap();
+        let mut headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(2)));
         assert_matches!(
             headers.add(Header::Target("123".into())),
             Err(Error::IncompatibleHeaders(..))
         );
 
         // Body cannot be added when EndOfBody exists.
-        let mut headers = HeaderSet::from_header(Header::EndOfBody(vec![1])).unwrap();
+        let mut headers = HeaderSet::from_header(Header::EndOfBody(vec![1]));
         assert_matches!(headers.add(Header::Body(vec![2])), Err(Error::IncompatibleHeaders(..)));
 
         // EndOfBody cannot be added when Body exists.
-        let mut headers = HeaderSet::from_header(Header::Body(vec![1])).unwrap();
+        let mut headers = HeaderSet::from_header(Header::Body(vec![1]));
         assert_matches!(
             headers.add(Header::EndOfBody(vec![2])),
             Err(Error::IncompatibleHeaders(..))
@@ -297,9 +297,8 @@ mod tests {
 
     #[fuchsia::test]
     fn remove_body_headers() {
-        let mut body_header = HeaderSet::from_header(Header::Body(vec![1, 2])).unwrap();
-        let mut end_of_body_header =
-            HeaderSet::from_header(Header::EndOfBody(vec![7, 8, 9])).unwrap();
+        let mut body_header = HeaderSet::from_header(Header::Body(vec![1, 2]));
+        let mut end_of_body_header = HeaderSet::from_header(Header::EndOfBody(vec![7, 8, 9]));
 
         let eob = end_of_body_header.remove_body(true).expect("end of body exists");
         assert_eq!(eob, vec![7, 8, 9]);
@@ -342,7 +341,7 @@ mod tests {
         assert_matches!(headers.get(&HeaderIdentifier::SingleResponseMode), None);
         // Trying to add SRM when it is already enabled in the collection and is supported locally
         // should be a no-op.
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         let result = headers.try_add_srm(SingleResponseMode::Enable).expect("can add SRM");
         assert_eq!(result, SingleResponseMode::Enable);
         assert_matches!(
@@ -351,7 +350,7 @@ mod tests {
         );
         // Trying to add SRM when it already disabled in the collection and isn't supported locally
         // should be a no-op.
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         let result = headers.try_add_srm(SingleResponseMode::Disable).expect("can add SRM");
         assert_eq!(result, SingleResponseMode::Disable);
         assert_matches!(
@@ -360,7 +359,7 @@ mod tests {
         );
         // Trying to add SRM when it already disabled in the collection and is supported locally
         // should default to disabled.
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         let result = headers.try_add_srm(SingleResponseMode::Enable).expect("can add SRM");
         assert_eq!(result, SingleResponseMode::Disable);
         assert_matches!(
@@ -373,7 +372,7 @@ mod tests {
     fn try_add_srm_error() {
         // Trying to add SRM when it already enabled in the collection and isn't supported locally
         // is an Error. The collection itself is not modified.
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         let result = headers.try_add_srm(SingleResponseMode::Disable);
         assert_matches!(result, Err(Error::SrmNotSupported));
         assert_matches!(
@@ -397,15 +396,14 @@ mod tests {
     #[fuchsia::test]
     fn try_add_connection_id_error() {
         // Trying to add the ID to a set that already contains one is an error.
-        let mut headers =
-            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10))).unwrap();
+        let mut headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10)));
         assert_matches!(
             headers.try_add_connection_id(&Some(ConnectionIdentifier(11))),
             Err(Error::Duplicate(_))
         );
 
         // Trying to add the ID to a set with a Target header is an error.
-        let mut headers = HeaderSet::from_header(Header::Target("foo".into())).unwrap();
+        let mut headers = HeaderSet::from_header(Header::Target("foo".into()));
         assert_matches!(
             headers.try_add_connection_id(&Some(ConnectionIdentifier(1))),
             Err(Error::IncompatibleHeaders(..))

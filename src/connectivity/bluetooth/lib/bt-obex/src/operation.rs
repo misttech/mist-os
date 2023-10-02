@@ -540,7 +540,7 @@ mod tests {
     #[fuchsia::test]
     fn construct_setpath() {
         // A request with all flags enabled & Name header is valid.
-        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo"));
         let _request = RequestPacket::new_set_path(SetPathFlags::all(), headers.clone())
             .expect("valid set path args");
 

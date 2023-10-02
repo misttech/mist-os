@@ -188,9 +188,7 @@ impl GetOperation {
     }
 
     fn check_complete_and_update_state(&mut self) {
-        let State::Response { ref staged_data } = &self.state else {
-            return
-        };
+        let State::Response { ref staged_data } = &self.state else { return };
 
         if staged_data.is_complete() {
             self.state = State::Complete;
@@ -221,7 +219,7 @@ impl ServerOperation for GetOperation {
             }
             State::Response { ref mut staged_data } if code == OpCode::GetFinal => {
                 let (code, body_header) = staged_data.next_response()?;
-                let response = ResponsePacket::new_get(code, HeaderSet::from_header(body_header)?);
+                let response = ResponsePacket::new_get(code, HeaderSet::from_header(body_header));
                 self.check_complete_and_update_state();
                 Ok(OperationRequest::SendPacket(response))
             }
@@ -313,7 +311,7 @@ mod tests {
         assert!(!operation.is_complete());
 
         // First (and final) request with informational headers.
-        let headers = HeaderSet::from_header(Header::name("default")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("default"));
         let request = RequestPacket::new_get_final(headers);
         let response1 = operation.handle_peer_request(request).expect("valid request");
         assert_matches!(response1,
@@ -341,7 +339,7 @@ mod tests {
         assert!(!operation.is_complete());
 
         // First request provides informational headers. Expect a positive ack to the request.
-        let headers1 = HeaderSet::from_header(Header::name("foo".into())).unwrap();
+        let headers1 = HeaderSet::from_header(Header::name("foo".into()));
         let request1 = RequestPacket::new_get(headers1);
         let response1 = operation.handle_peer_request(request1).expect("valid request");
         assert_matches!(response1, OperationRequest::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
@@ -349,7 +347,7 @@ mod tests {
         // Second and final request provides informational headers. Expect to ask the profile
         // application for the user data payload. The received informational headers should be
         // relayed.
-        let headers2 = HeaderSet::from_header(Header::Type("text/x-vCard".into())).unwrap();
+        let headers2 = HeaderSet::from_header(Header::Type("text/x-vCard".into()));
         let request2 = RequestPacket::new_get_final(headers2);
         let response2 = operation.handle_peer_request(request2).expect("valid request");
         assert_matches!(response2,
@@ -364,8 +362,7 @@ mod tests {
         // The `response_headers` has an encoded size of 33 bytes. This leaves 17 bytes for the
         // first chunk of user data, of which 6 bytes are allocated to the prefix.
         let payload = bytes(0, 200);
-        let response_headers =
-            HeaderSet::from_header(Header::Description("random payload".into())).unwrap();
+        let response_headers = HeaderSet::from_header(Header::Description("random payload".into()));
         let response_packet3 = operation
             .handle_application_response(ApplicationResponse::accept_get(payload, response_headers))
             .expect("valid request");
@@ -400,8 +397,7 @@ mod tests {
     #[fuchsia::test]
     fn application_rejects_request_success() {
         let mut operation = GetOperation::new_at_state(10, State::RequestPhaseComplete);
-        let headers =
-            HeaderSet::from_header(Header::Description("not allowed today".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("not allowed today".into()));
         let response_packet = operation
             .handle_application_response(Err((ResponseCode::Forbidden, headers)))
             .expect("rejection is ok");
@@ -443,7 +439,7 @@ mod tests {
 
     #[fuchsia::test]
     fn get_request_invalid_state_is_error() {
-        let random_headers = HeaderSet::from_header(Header::name("foo".into())).unwrap();
+        let random_headers = HeaderSet::from_header(Header::name("foo".into()));
 
         // Receiving another GET request while we are waiting for the application to accept is an
         // Error.
@@ -477,7 +473,7 @@ mod tests {
         assert_eq!(result, expected);
 
         // A data payload that can fit in a single packet.
-        let headers = HeaderSet::from_header(Header::name("foo".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo".into()));
         let data = vec![1, 2, 3];
         let result =
             StagedData::from_data(data, 50, headers.encoded_len()).expect("can divide data");
@@ -486,7 +482,7 @@ mod tests {
 
         // A data payload with headers that is split into multiple packets. The first chunk is
         // smaller since there must be room for the provided headers.
-        let headers = HeaderSet::from_header(Header::Http(vec![5, 5, 5])).unwrap();
+        let headers = HeaderSet::from_header(Header::Http(vec![5, 5, 5]));
         let max = 10;
         let large_data = (0..50).collect::<Vec<u8>>();
         let result =

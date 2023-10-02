@@ -352,13 +352,13 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        let headers = HeaderSet::from_header(Header::Target(vec![5, 6])).unwrap();
+        let headers = HeaderSet::from_header(Header::Target(vec![5, 6]));
         let connect_request = RequestPacket::new_connect(500, headers);
         send_packet(&mut remote, connect_request);
 
         // Expect the ObexServer to receive the request, parse it, ask the application, and reply.
         // Simulate application accepting the request.
-        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo"));
         test_app.set_response(Ok(headers));
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
@@ -421,14 +421,14 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        let headers = HeaderSet::from_header(Header::Description("done".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("done".into()));
         let disconnect_request = RequestPacket::new_disconnect(headers);
         send_packet(&mut remote, disconnect_request);
 
         // Expect the ObexServer to receive the request, parse it, get response headers from the
         // application, and reply. Because this is a Disconnect request, the server run loop
         // should finish.
-        let headers = HeaderSet::from_header(Header::Description("disconnecting".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("disconnecting".into()));
         test_app.set_response(Ok(headers));
         let result =
             exec.run_until_stalled(&mut server_fut).expect("server terminated from disconnect");
@@ -453,7 +453,7 @@ mod tests {
         pin_mut!(server_fut);
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
-        let headers = HeaderSet::from_header(Header::name("folder1")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("folder1"));
         let setpath_request =
             RequestPacket::new_set_path(SetPathFlags::all(), headers).expect("valid request");
         send_packet(&mut remote, setpath_request);
@@ -526,14 +526,14 @@ mod tests {
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // Send an example GET_FINAL request with a header describing the name of the object.
-        let headers = HeaderSet::from_header(Header::name("random object")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("random object"));
         let get_request = RequestPacket::new_get_final(headers);
         send_packet(&mut remote, get_request);
 
         // The ObexServer should receive the request and hand it to the profile. Set the profile
         // handler to return a static buffer.
         let application_response_buf = vec![1, 2, 3, 4, 5, 6];
-        let response_headers = HeaderSet::from_header(Header::Description("foo".into())).unwrap();
+        let response_headers = HeaderSet::from_header(Header::Description("foo".into()));
         test_app.set_get_response((application_response_buf.clone(), response_headers));
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
@@ -557,7 +557,7 @@ mod tests {
         let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         // Send an example GET_FINAL request with a header describing the name of the object.
-        let headers = HeaderSet::from_header(Header::name("random object123")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("random object123"));
         let get_request = RequestPacket::new_get_final(headers);
         send_packet(&mut remote, get_request);
 

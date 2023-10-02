@@ -145,7 +145,7 @@ mod tests {
 
         // First request to provide informational headers describing the PUT payload. We will ack
         // with an empty Continue packet.
-        let headers1 = HeaderSet::from_header(Header::name("random file".into())).unwrap();
+        let headers1 = HeaderSet::from_header(Header::name("random file".into()));
         let request1 = RequestPacket::new_put(headers1);
         let response1 = operation.handle_peer_request(request1).expect("valid request");
         assert_matches!(response1, OperationRequest::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
@@ -154,7 +154,7 @@ mod tests {
         // Second request just contains a part of the payload. We will ack with an empty Continue
         // packet.
         let body2 = (0..50).collect::<Vec<u8>>();
-        let headers2 = HeaderSet::from_header(Header::Body(body2)).unwrap();
+        let headers2 = HeaderSet::from_header(Header::Body(body2));
         let request2 = RequestPacket::new_put(headers2);
         let response2 = operation.handle_peer_request(request2).expect("valid request");
         assert_matches!(response2, OperationRequest::SendPacket(packet) if *packet.code() == ResponseCode::Continue);
@@ -163,7 +163,7 @@ mod tests {
         // Third and final request contains the remaining payload. We will ask the application to
         // accept or reject with the complete reassembled data payload.
         let body3 = (50..100).collect::<Vec<u8>>();
-        let headers3 = HeaderSet::from_header(Header::EndOfBody(body3)).unwrap();
+        let headers3 = HeaderSet::from_header(Header::EndOfBody(body3));
         let request3 = RequestPacket::new_put_final(headers3);
         let response3 = operation.handle_peer_request(request3).expect("valid request");
         let expected_payload = (0..100).collect::<Vec<u8>>();
@@ -186,7 +186,7 @@ mod tests {
     fn application_reject_is_ok() {
         let mut operation = PutOperation::new_at_state(State::RequestPhaseComplete);
 
-        let headers = HeaderSet::from_header(Header::Description("not allowed".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("not allowed".into()));
         let reject = Err((ResponseCode::Forbidden, headers));
         let response_packet =
             operation.handle_application_response(reject).expect("valid response");

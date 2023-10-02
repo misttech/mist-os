@@ -351,14 +351,13 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (client, mut remote) = new_obex_client(true);
 
-        let headers = HeaderSet::from_header(Header::Description("finished".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("finished".into()));
         let disconnect_fut = client.disconnect(headers);
         pin_mut!(disconnect_fut);
         exec.run_until_stalled(&mut disconnect_fut).expect_pending("waiting for response");
 
         // Expect the Disconnect request on the remote. The typical response is a positive `Ok`.
-        let response_headers =
-            HeaderSet::from_header(Header::Description("accepted".into())).unwrap();
+        let response_headers = HeaderSet::from_header(Header::Description("accepted".into()));
         let response = ResponsePacket::new(ResponseCode::Ok, vec![], response_headers.clone());
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Disconnect), response);
 
@@ -373,7 +372,7 @@ mod tests {
     async fn disconnect_before_connect_error() {
         let (client, _remote) = new_obex_client(false);
 
-        let headers = HeaderSet::from_header(Header::Description("finished".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("finished".into()));
         let disconnect_result = client.disconnect(headers).await;
         assert_matches!(disconnect_result, Err(Error::OperationError { .. }))
     }
@@ -389,8 +388,7 @@ mod tests {
 
         // Expect the Disconnect request on the remote. An Error response still results in
         // disconnection.
-        let response_headers =
-            HeaderSet::from_header(Header::Description("accepted".into())).unwrap();
+        let response_headers = HeaderSet::from_header(Header::Description("accepted".into()));
         let response = ResponsePacket::new(
             ResponseCode::InternalServerError,
             vec![],
@@ -408,14 +406,14 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let (mut client, mut remote) = new_obex_client(true);
 
-        let headers = HeaderSet::from_header(Header::name("myfolder")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("myfolder"));
         let setpath_fut = client.set_path(SetPathFlags::empty(), headers);
         pin_mut!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
 
         // Expect the SetPath request on the remote. The typical response is a positive `Ok`.
         let response_headers =
-            HeaderSet::from_header(Header::Description("updated current folder".into())).unwrap();
+            HeaderSet::from_header(Header::Description("updated current folder".into()));
         let response = ResponsePacket::new(ResponseCode::Ok, vec![], response_headers.clone());
         let expectation = |request: RequestPacket| {
             assert_eq!(*request.code(), OpCode::SetPath);
@@ -443,7 +441,7 @@ mod tests {
 
             // Expect the SetPath request on the remote - peer doesn't support SetPath.
             let response_headers =
-                HeaderSet::from_header(Header::Description("not implemented".into())).unwrap();
+                HeaderSet::from_header(Header::Description("not implemented".into()));
             let response = ResponsePacket::new(ResponseCode::BadRequest, vec![], response_headers);
             expect_request_and_reply(
                 &mut exec,
@@ -458,14 +456,14 @@ mod tests {
         }
 
         // Peer rejects SetPath.
-        let headers = HeaderSet::from_header(Header::name("file")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("file"));
         let setpath_fut = client.set_path(SetPathFlags::DONT_CREATE, headers);
         pin_mut!(setpath_fut);
         exec.run_until_stalled(&mut setpath_fut).expect_pending("waiting for response");
 
         // Expect the SetPath request on the remote - peer responds with error.
         let response_headers =
-            HeaderSet::from_header(Header::Description("not implemented".into())).unwrap();
+            HeaderSet::from_header(Header::Description("not implemented".into()));
         let response =
             ResponsePacket::new(ResponseCode::InternalServerError, vec![], response_headers);
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::SetPath), response);

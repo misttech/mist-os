@@ -380,8 +380,7 @@ mod tests {
         let operation = setup_put_operation(&manager);
 
         // Trying to terminate early doesn't work as the operation has not started.
-        let headers =
-            HeaderSet::from_header(Header::Description("terminating test".into())).unwrap();
+        let headers = HeaderSet::from_header(Header::Description("terminating test".into()));
         let terminate_result = operation.terminate(headers).await;
         assert_matches!(terminate_result, Err(Error::OperationError { .. }));
     }
@@ -407,8 +406,7 @@ mod tests {
                 assert!(headers.contains_header(&HeaderIdentifier::Body));
                 assert!(headers.contains_header(&HeaderIdentifier::SingleResponseMode));
             };
-            let response_headers =
-                HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+            let response_headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
             expect_request_and_reply(&mut exec, &mut remote, expectation, response);
             let _received_headers = exec
@@ -464,7 +462,7 @@ mod tests {
 
         // Client tries to disable SRM in a subsequent write attempt. Ignored.
         {
-            let headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+            let headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
             let put_fut = operation.write(&[], headers);
             pin_mut!(put_fut);
             let _ = exec
@@ -487,7 +485,7 @@ mod tests {
         let mut operation = setup_put_operation(&manager);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
         // The application requesting to disable SRM when it isn't supported is OK.
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Ok(()));
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
@@ -495,7 +493,7 @@ mod tests {
         let (manager, _remote) = new_manager(/* srm_supported */ true);
         let mut operation = setup_put_operation(&manager);
         assert_eq!(operation.srm, SingleResponseMode::Enable);
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Ok(()));
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
@@ -503,7 +501,7 @@ mod tests {
         let (manager, _remote) = new_manager(/* srm_supported */ true);
         let mut operation = setup_put_operation(&manager);
         assert_eq!(operation.srm, SingleResponseMode::Enable);
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Ok(()));
         assert_eq!(operation.srm, SingleResponseMode::Enable);
     }
@@ -514,7 +512,7 @@ mod tests {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
         let mut operation = setup_put_operation(&manager);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
-        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let mut headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         assert_matches!(operation.try_enable_srm(&mut headers), Err(Error::SrmNotSupported));
         assert_eq!(operation.srm, SingleResponseMode::Disable);
     }
@@ -525,22 +523,22 @@ mod tests {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
         let mut operation = setup_put_operation(&manager);
         // An enable response from the peer when SRM is disabled locally should not enable SRM.
-        let headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         operation.check_response_for_srm(&headers);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
         // A disable response from the peer when SRM is disabled locally is a no-op.
-        let headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         operation.check_response_for_srm(&headers);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
         let (manager, _remote) = new_manager(/* srm_supported */ true);
         let mut operation = setup_put_operation(&manager);
         // An enable response from the peer when SRM is enable is a no-op.
-        let headers = HeaderSet::from_header(SingleResponseMode::Enable.into()).unwrap();
+        let headers = HeaderSet::from_header(SingleResponseMode::Enable.into());
         operation.check_response_for_srm(&headers);
         assert_eq!(operation.srm, SingleResponseMode::Enable);
         // A disable response from the peer when SRM is enabled should disable SRM.
-        let headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+        let headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
         operation.check_response_for_srm(&headers);
         assert_eq!(operation.srm, SingleResponseMode::Disable);
 
@@ -557,12 +555,10 @@ mod tests {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
         // The initial operation contains a ConnectionId header which was negotiated during CONNECT.
         let mut operation = setup_put_operation(&manager);
-        operation.set_headers(
-            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(5))).unwrap(),
-        );
+        operation
+            .set_headers(HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(5))));
 
-        let write_headers =
-            HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10))).unwrap();
+        let write_headers = HeaderSet::from_header(Header::ConnectionId(ConnectionIdentifier(10)));
         let write_fut = operation.write(&[1, 2, 3], write_headers);
         pin_mut!(write_fut);
         let result = exec.run_until_stalled(&mut write_fut).expect("finished with error");

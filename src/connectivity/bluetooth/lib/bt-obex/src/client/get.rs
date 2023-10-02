@@ -234,11 +234,11 @@ mod tests {
         // The initial GET request should succeed and return the set of Headers specified by the
         // peer.
         {
-            let info_headers = HeaderSet::from_header(Header::name("text")).unwrap();
+            let info_headers = HeaderSet::from_header(Header::name("text"));
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
-            let response_headers = HeaderSet::from_header(Header::name("bar")).unwrap();
+            let response_headers = HeaderSet::from_header(Header::name("bar"));
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
             let expectation = |request: RequestPacket| {
                 assert_eq!(*request.code(), OpCode::Get);
@@ -257,12 +257,11 @@ mod tests {
         // A subsequent request for more information should return the set of additional Headers
         // specified by the peer.
         {
-            let info_headers = HeaderSet::from_header(Header::Type("file".into())).unwrap();
+            let info_headers = HeaderSet::from_header(Header::Type("file".into()));
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
-            let response_headers =
-                HeaderSet::from_header(Header::Description("big file".into())).unwrap();
+            let response_headers = HeaderSet::from_header(Header::Description("big file".into()));
             let response = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers);
             expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::Get), response);
             let received_headers = exec
@@ -278,13 +277,13 @@ mod tests {
         let data_fut = operation.get_data(HeaderSet::new());
         pin_mut!(data_fut);
         exec.run_until_stalled(&mut data_fut).expect_pending("waiting for peer response");
-        let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3])).unwrap();
+        let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers1);
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::GetFinal), response1);
         exec.run_until_stalled(&mut data_fut)
             .expect_pending("waiting for additional peer responses");
         // The OK response code indicates the last user data packet.
-        let response_headers2 = HeaderSet::from_header(Header::EndOfBody(vec![4, 5, 6])).unwrap();
+        let response_headers2 = HeaderSet::from_header(Header::EndOfBody(vec![4, 5, 6]));
         let response2 = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers2);
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::GetFinal), response2);
         // All user data packets are received and the concatenated data object is returned.
@@ -299,14 +298,14 @@ mod tests {
     fn get_operation_terminate_success() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo"));
         let mut operation = setup_get_operation(&manager, initial);
 
         // Start the GET operation.
         operation.set_started();
 
         // Terminating early is OK. It should consume the operation and be considered complete.
-        let headers = HeaderSet::from_header(Header::name("terminated")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("terminated"));
         let terminate_fut = operation.terminate(headers);
         pin_mut!(terminate_fut);
         let _ =
@@ -324,7 +323,7 @@ mod tests {
         // Making the initial GET request should automatically try to include SRM. Peer responds
         // positively to SRM, so it is enabled hereafter.
         {
-            let info_headers = HeaderSet::from_header(Header::name("foo")).unwrap();
+            let info_headers = HeaderSet::from_header(Header::name("foo"));
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             exec.run_until_stalled(&mut info_fut).expect_pending("waiting for peer response");
@@ -353,7 +352,7 @@ mod tests {
         // enabled.
         // Any peer response headers will only be returned after the GetFinal request.
         {
-            let info_headers = HeaderSet::from_header(Header::Type("file".into())).unwrap();
+            let info_headers = HeaderSet::from_header(Header::Type("file".into()));
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             let received_headers = exec
@@ -375,18 +374,18 @@ mod tests {
         let data_fut = operation.get_data(HeaderSet::new());
         pin_mut!(data_fut);
         exec.run_until_stalled(&mut data_fut).expect_pending("waiting for peer response");
-        let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3])).unwrap();
+        let response_headers1 = HeaderSet::from_header(Header::Body(vec![1, 2, 3]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers1);
         expect_request_and_reply(&mut exec, &mut remote, expect_code(OpCode::GetFinal), response1);
         exec.run_until_stalled(&mut data_fut)
             .expect_pending("waiting for additional peer responses");
         // The peer will keep sending responses until the user payload has been completely sent.
-        let response_headers2 = HeaderSet::from_header(Header::Body(vec![4, 5, 6])).unwrap();
+        let response_headers2 = HeaderSet::from_header(Header::Body(vec![4, 5, 6]));
         let response2 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers2);
         expect_stream_pending(&mut exec, &mut remote);
         reply(&mut remote, response2);
         // Final user data packet.
-        let response_headers3 = HeaderSet::from_header(Header::EndOfBody(vec![7, 8, 9])).unwrap();
+        let response_headers3 = HeaderSet::from_header(Header::EndOfBody(vec![7, 8, 9]));
         let response3 = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers3);
         expect_stream_pending(&mut exec, &mut remote);
         reply(&mut remote, response3);
@@ -411,7 +410,7 @@ mod tests {
         // A subsequent request with additional headers disabling SRM should not result in SRM
         // being disabled.
         {
-            let info_headers = HeaderSet::from_header(SingleResponseMode::Disable.into()).unwrap();
+            let info_headers = HeaderSet::from_header(SingleResponseMode::Disable.into());
             let info_fut = operation.get_information(info_headers);
             pin_mut!(info_fut);
             let received_headers = exec
@@ -428,7 +427,7 @@ mod tests {
     fn get_operation_information_error() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo"));
         let mut operation = setup_get_operation(&manager, initial);
 
         // Set started.
@@ -446,14 +445,14 @@ mod tests {
     fn get_operation_data_before_start_is_ok() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, mut remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo"));
         let operation = setup_get_operation(&manager, initial);
 
         // Trying to get the user data directly is OK.
         let get_data_fut = operation.get_data(HeaderSet::new());
         pin_mut!(get_data_fut);
         exec.run_until_stalled(&mut get_data_fut).expect_pending("waiting for peer response");
-        let response_headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2, 3])).unwrap();
+        let response_headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2, 3]));
         let response = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers);
         let expectation = |request: RequestPacket| {
             assert_eq!(*request.code(), OpCode::GetFinal);
@@ -494,13 +493,13 @@ mod tests {
             .expect_pending("waiting for additional peer responses");
 
         // The peer will keep sending responses until the user payload has been completely sent.
-        let response_headers2 = HeaderSet::from_header(Header::Body(vec![2, 2])).unwrap();
+        let response_headers2 = HeaderSet::from_header(Header::Body(vec![2, 2]));
         let response2 = ResponsePacket::new_no_data(ResponseCode::Continue, response_headers2);
         expect_stream_pending(&mut exec, &mut remote);
         reply(&mut remote, response2);
 
         // Final user data packet.
-        let response_headers3 = HeaderSet::from_header(Header::EndOfBody(vec![3, 3])).unwrap();
+        let response_headers3 = HeaderSet::from_header(Header::EndOfBody(vec![3, 3]));
         let response3 = ResponsePacket::new_no_data(ResponseCode::Ok, response_headers3);
         expect_stream_pending(&mut exec, &mut remote);
         reply(&mut remote, response3);
@@ -516,7 +515,7 @@ mod tests {
     fn get_operation_data_peer_disconnect_is_error() {
         let mut exec = fasync::TestExecutor::new();
         let (manager, remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let initial = HeaderSet::from_header(Header::name("foo"));
         let mut operation = setup_get_operation(&manager, initial);
         // Bypass initial SRM setup by marking this operation as started.
         operation.set_started();
@@ -533,7 +532,7 @@ mod tests {
     #[fuchsia::test]
     async fn get_operation_terminate_before_start_error() {
         let (manager, _remote) = new_manager(/* srm_supported */ false);
-        let initial = HeaderSet::from_header(Header::name("bar")).unwrap();
+        let initial = HeaderSet::from_header(Header::name("bar"));
         let operation = setup_get_operation(&manager, initial);
 
         // The GET operation is not in progress yet so trying to terminate will fail.
@@ -543,7 +542,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_get_response_success() {
-        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo"));
         let response = ResponsePacket::new_no_data(ResponseCode::Continue, headers.clone());
         let result = GetOperation::handle_get_response(response).expect("valid response");
         assert_eq!(result, headers);
@@ -551,7 +550,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_get_response_error() {
-        let headers = HeaderSet::from_header(Header::name("foo")).unwrap();
+        let headers = HeaderSet::from_header(Header::name("foo"));
         // Expect the Continue, not Ok.
         let response1 = ResponsePacket::new_no_data(ResponseCode::Ok, headers.clone());
         assert_matches!(
@@ -569,12 +568,12 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_get_final_response_success() {
-        let headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2])).unwrap();
+        let headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Ok, headers);
         let result1 = GetOperation::handle_get_final_response(response1).expect("valid response");
         assert_eq!(result1, (true, HeaderSet::new(), vec![1, 2]));
 
-        let headers = HeaderSet::from_header(Header::Body(vec![1, 3, 5])).unwrap();
+        let headers = HeaderSet::from_header(Header::Body(vec![1, 3, 5]));
         let response2 = ResponsePacket::new_no_data(ResponseCode::Continue, headers);
         let result2 = GetOperation::handle_get_final_response(response2).expect("valid response");
         assert_eq!(result2, (false, HeaderSet::new(), vec![1, 3, 5]));
@@ -583,7 +582,7 @@ mod tests {
     #[fuchsia::test]
     fn get_final_response_error() {
         // A non-success error code is an Error.
-        let headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2])).unwrap();
+        let headers = HeaderSet::from_header(Header::EndOfBody(vec![1, 2]));
         let response1 = ResponsePacket::new_no_data(ResponseCode::Forbidden, headers);
         assert_matches!(
             GetOperation::handle_get_final_response(response1),
