@@ -265,7 +265,7 @@ void TouchSystem::RegisterTouchSource(
 void TouchSystem::InjectTouchEventExclusive(const InternalTouchEvent& event, StreamId stream_id) {
   if (view_tree_snapshot_->view_tree.count(event.target) == 0 &&
       view_tree_snapshot_->unconnected_views.count(event.target) == 0) {
-    FX_DCHECK(contenders_.count(event.target) == 0);
+    FX_DCHECK(contenders_.count(static_cast<int>(event.target)) == 0);
     return;
   }
   FX_DCHECK(event.phase == Phase::kCancel ||

@@ -866,7 +866,6 @@ config("Wno-conversion") {
     "//src/ui/lib/escher/test/common:*",
     "//src/ui/lib/yuv:*",
     "//src/ui/scenic/bin:*",
-    "//src/ui/scenic/lib/gfx:*",
     "//src/ui/scenic/lib/gfx/tests:*",
     "//src/virtualization/third_party/fdt:*",
     "//third_party/acpica/*",

@@ -40,9 +40,10 @@ ScreenReaderContext::SemanticLevel NextSemanticLevelInDirection(
     }
     ++index;
   }
-  FX_DCHECK(index < static_cast<int>(semantic_level_list_for_node->size()));
 
-  int n = semantic_level_list_for_node->size();
+  int n = static_cast<int>(semantic_level_list_for_node->size());
+  FX_DCHECK(index < n);
+
   switch (direction) {
     case ChangeSemanticLevelAction::Direction::kForward:
       index = (index + 1) % n;

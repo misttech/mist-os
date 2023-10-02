@@ -31,8 +31,6 @@ using fuchsia::accessibility::semantics::Node;
 using fuchsia::accessibility::semantics::Role;
 using ::testing::ElementsAre;
 
-const int kMaxLogBufferSize = 1024;
-
 class MockSemanticTree : public ::a11y::SemanticTree {
  public:
   bool Update(TreeUpdates updates) override {

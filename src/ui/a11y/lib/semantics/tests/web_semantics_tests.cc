@@ -98,7 +98,6 @@ static constexpr auto kScrollingHtml = R"(
 class WebSemanticsTest : public SemanticsIntegrationTestV2 {
  public:
   static constexpr auto kWebView = "web_view";
-  static constexpr auto kWebViewRef = ChildRef{kWebView};
   static constexpr auto kWebViewUrl = "#meta/semantics-test-web-client.cm";
 
   static constexpr auto kFontsProvider = "fonts_provider";

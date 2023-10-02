@@ -22,10 +22,7 @@ namespace {
 
 using fuchsia::accessibility::semantics::Node;
 
-// Max file size of semantic tree log file is 1MB.
-constexpr size_t kMaxDebugFileSize = 1024 * 1024;
 const std::string kNewLine = "\n";
-constexpr std::string::size_type kIndentSize = 4;
 
 }  // namespace
 
