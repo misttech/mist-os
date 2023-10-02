@@ -16,6 +16,11 @@ license("license_2") {
   license_files = [ "text2.txt" ]
 }
 
+license("license_3") {
+  public_package_name = "License 3"
+  license_files = [ "text3.txt" ]
+}
+
 group("foo") {
   applicable_licenses = [ ":license_1" ]
   deps = []
@@ -26,8 +31,9 @@ group("bar") {
   deps = [ ":foo" ]
 }
 
+applicable_licenses = [ ":license_3" ]
+
 group("baz") {
-  applicable_licenses = []
   deps = [ ":bar" ]
 }
 

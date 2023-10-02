@@ -25,7 +25,7 @@ class SpdxWriter:
 
     # Once _init_json is called, the following collections, are referenced
     # within the json_document, and further changes to them will be reflected
-    # in the json outputed by the save* methods.
+    # in the json outputted by the save* methods.
 
     document_describes: List["str"] = dataclasses.field(default_factory=list)
     packages: List[Dict[str, Any]] = dataclasses.field(default_factory=list)

@@ -27,6 +27,26 @@ import("//build/group_with_inputs.gni")
 #   }
 # ```
 #
+# Alternatively, `applicable_licenses = [...]` can be set
+# at the global scope in which case it will apply to all targets
+# in the scope. For example:
+# ```
+#   license("license") {
+#     public_package_name = "foo",
+#     license_files = ["src/LICENSE"],
+#   }
+#
+#   applicable_licenses = [":license"]
+#
+#   source_set("libfoo") {
+#     ...
+#   }
+#
+#   source_set("libfoo_helper") {
+#     ...
+#   }
+# ```
+#
 # Internally, the target will have a 'license' metadata
 # scope with the following schema:
 # {
@@ -35,8 +55,8 @@ import("//build/group_with_inputs.gni")
 #   license_files: List if source files.
 # }
 #
-# TODO(fxb/133985): Document how license metadata gets collected
-# once collection is implemented.
+# The metadata is collected `generated_licenses_spdx` targets
+# (see //build/licenses/generated_licenses_spdx.gni).
 #
 # Parameters:
 #

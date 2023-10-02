@@ -12,6 +12,7 @@
     "documentDescribes": [
         "SPDXRef-Package-3c15dcecfa4d293d236bdf07d11c34fa",
         "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
+        "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
         "SPDXRef-Package-Root"
     ],
     "packages": [
@@ -28,6 +29,11 @@
             "SPDXID": "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
             "name": "License 2",
             "licenseConcluded": "LicenseRef-424806e005c0c4b3c66f0eafab89c7b6"
+        },
+        {
+            "SPDXID": "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
+            "name": "License 3",
+            "licenseConcluded": "LicenseRef-86d25b6b25bbac5045cbd9edc08917fe"
         }
     ],
     "relationships": [
@@ -39,6 +45,11 @@
         {
             "spdxElementId": "SPDXRef-Package-Root",
             "relatedSpdxElement": "SPDXRef-Package-424806e005c0c4b3c66f0eafab89c7b6",
+            "relationshipType": "CONTAINS"
+        },
+        {
+            "spdxElementId": "SPDXRef-Package-Root",
+            "relatedSpdxElement": "SPDXRef-Package-86d25b6b25bbac5045cbd9edc08917fe",
             "relationshipType": "CONTAINS"
         }
     ],
@@ -60,6 +71,16 @@
             "crossRefs": [
                 {
                     "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text2.txt"
+                }
+            ]
+        },
+        {
+            "name": "License 3",
+            "licenseId": "LicenseRef-86d25b6b25bbac5045cbd9edc08917fe",
+            "extractedText": "3rd sample license text",
+            "crossRefs": [
+                {
+                    "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:build/licenses/tests/text3.txt"
                 }
             ]
         }

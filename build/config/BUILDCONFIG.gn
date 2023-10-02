@@ -648,14 +648,11 @@ set_defaults("rustc_staticlib") {
   configs = default_common_binary_configs + default_rust_configs
 }
 
-#
-# Wrap all built-in target types and add the `applicable_licenses` parameter.
-#
-# For each built-in target type `foo`, creates a wrapping template `_foo_interal_wrapper`.
+# For each built-in target type `foo`, create a wrapping template `_foo_interal_wrapper`.
 # Throughout the rest of BUILDCONFIG.gn, all other templates should call `_foo_interal_wrapper`
 # until a public `foo` template is declared. That is because templates can only invoke other
 # templates declared before them.
-
+#
 # All built-in target types:
 _built_in_target_types_with_internal_wrapper = [
   "action",
@@ -684,7 +681,7 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
   # Additional parameters:
   #
   #   applicable_licenses (optional):
-  #     A list of 1 or more license targets (see //build/licenses/license.gni) that
+  #     A list of 1 or more `license` targets (see //build/licenses/license.gni) that
   #     define licensing information for this target.
   #
   #     Results with the declaration of target metadata named 'applicable_licenses'
@@ -696,8 +693,8 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
   #             to this target.
   #       }
   #
-  #     TODO(fxb/133985): Document how license metadata is processed once collection is
-  #     implemented.
+  #     The metadata is processed by `generated_licenses_spdx` targets
+  #     (see //build/licenses/generated_licenses_spdx.gni).
   #
   template("_${_target_type}_internal_wrapper") {
     target(_target_type, target_name) {
@@ -758,11 +755,13 @@ foreach(_target_type,
       forward_variables_from(invoker,
                              "*",
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
@@ -801,11 +800,13 @@ foreach(_target_type,
       forward_variables_from(invoker,
                              "*",
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
@@ -995,6 +996,7 @@ foreach(_target_type,
                _hermetic_inputs_target_name) {
           forward_variables_from(invoker,
                                  [
+                                   "applicable_licenses",
                                    "deps",
                                    "public_deps",
                                    "inputs",
@@ -1048,6 +1050,7 @@ foreach(_target_type,
       forward_variables_from(invoker,
                              "*",
                              [
+                               "applicable_licenses",
                                "args",
                                "hermetic_action_ignored_prefixes",
                                "hermetic_deps",
@@ -1066,6 +1069,7 @@ foreach(_target_type,
 
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "hermetic_action_ignored_prefixes",
                                "testonly",
                                "visibility",
@@ -2288,12 +2292,14 @@ template("_fuchsia_binary") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "target_type",
                              "testonly",
                              "visibility",
                            ])
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -2456,12 +2462,18 @@ template("variant_target") {
   target_type = target_name
   target_name = invoker.target_name
   target_invoker = {
-    # Explicitly forward visibility, implicitly forward everything else.
+    # Explicitly forward applicable_licenses and visibility, implicitly
+    # forward everything else.
     # See comment in template("shared_library") above for details.
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "exclude_toolchain_tags",
                              "target_name",
                              "target_type",
@@ -2938,12 +2950,14 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
           forward_variables_from(invoker,
                                  "*",
                                  [
+                                   "applicable_licenses",
+                                   "metadata",
                                    "testonly",
                                    "visibility",
-                                   "metadata",
                                  ])
           forward_variables_from(invoker,
                                  [
+                                   "applicable_licenses",
                                    "testonly",
                                    "visibility",
                                  ])
@@ -2969,6 +2983,7 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
           public_deps = [ ":$target_name(${current_toolchain}-shared)" ]
           forward_variables_from(invoker,
                                  [
+                                   "applicable_licenses",
                                    "testonly",
                                    "visibility",
                                  ])
@@ -2989,18 +3004,24 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
         # to forward_variables_from below.
         original_target_name = target_name
 
-        # Explicitly forward visibility, implicitly forward everything
-        # else.  Forwarding "*" doesn't recurse into nested scopes (to
+        # Explicitly forward applicable_licenses and visibility, implicitly
+        # forward everything else.
+        # Forwarding "*" doesn't recurse into nested scopes (to
         # avoid copying all globals into each template invocation), so
         # won't pick up file-scoped variables.  Normally this isn't too
         # bad, but visibility is commonly defined at the file scope.
         # Explicitly forwarding visibility and then excluding it from the
         # "*" set works around this problem.  See http://crbug.com/594610
         # for rationale on why this GN behavior is not considered a bug.
-        forward_variables_from(invoker, [ "visibility" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "visibility",
+                               ])
         forward_variables_from(invoker,
                                "*",
                                [
+                                 "applicable_licenses",
                                  "metadata",
                                  "visibility",
                                ])
@@ -3152,11 +3173,13 @@ if (toolchain_variant.with_shared || toolchain_variant.is_pic_default) {
       forward_variables_from(invoker,
                              "*",
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
       forward_variables_from(invoker,
                              [
+                               "applicable_licenses",
                                "testonly",
                                "visibility",
                              ])
@@ -3224,17 +3247,20 @@ template("executable") {
       disable_syslog_backend = true
     }
 
-    # Explicitly forward visibility, implicitly forward everything else
+    # Explicitly forward applicable_licenses and visibility,
+    # implicitly forward everything else
     # (except metadata, handled below).
     # See comment in template("shared_library") above for details.
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "visibility",
                              "pool",
                            ])
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "metadata",
                              "pool",
                              "target_name",
@@ -3441,13 +3467,18 @@ template("loadable_module") {
   variant_target("loadable_module") {
     target_name = _module_name
 
-    # Explicitly forward visibility, implicitly forward everything else
-    # (except metadata, handled below).
+    # Explicitly forward applicable_licenses and visibility,
+    # implicitly forward everything else (except metadata, handled below).
     # See comment in template("shared_library") above for details.
-    forward_variables_from(invoker, [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "metadata",
                              "visibility",
                              "target_name",
@@ -3547,10 +3578,20 @@ template("component") {
   }
 
   target(_component_mode, target_name) {
-    # Explicitly forward visibility, implicitly forward everything else.
+    # Explicitly forward applicable_licenses and visibility,
+    # implicitly forward everything else.
     # See comment in template("shared_library") above for details.
-    forward_variables_from(invoker, [ "visibility" ])
-    forward_variables_from(invoker, "*", [ "visibility" ])
+    forward_variables_from(invoker,
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "applicable_licenses",
+                             "visibility",
+                           ])
   }
 }
 
@@ -3563,11 +3604,13 @@ template("source_set") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -3590,12 +3633,14 @@ template("static_library") {
     forward_variables_from(invoker,
                            "*",
                            [
+                             "applicable_licenses",
+                             "metadata",
                              "testonly",
                              "visibility",
-                             "metadata",
                            ])
     forward_variables_from(invoker,
                            [
+                             "applicable_licenses",
                              "testonly",
                              "visibility",
                            ])
@@ -3638,7 +3683,13 @@ _built_in_target_types_without_public_wrapper -= [ "static_library" ]
 #
 template("rust_library") {
   _rust_library_internal_wrapper(target_name) {
-    forward_variables_from(invoker, "*", [ "metadata" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "applicable_licenses",
+                             "metadata",
+                           ])
+    forward_variables_from(invoker, [ "applicable_licenses" ])
     if (!defined(inputs)) {
       inputs = []
     }
@@ -3685,10 +3736,15 @@ template("rust_proc_macro") {
       forward_variables_from(invoker,
                              "*",
                              [
+                               "applicable_licenses",
                                "crate_name",
                                "metadata",
                              ])
-      forward_variables_from(invoker, [ "crate_name" ])
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "crate_name",
+                             ])
       if (!defined(inputs)) {
         inputs = []
       }
