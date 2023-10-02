@@ -11,9 +11,9 @@ use ffx_daemon_core::events;
 use ffx_daemon_events::{HostPipeErr, TargetEvent};
 use ffx_ssh::ssh::build_ssh_command_with_ssh_path;
 use fuchsia_async::{unblock, Task, TimeoutExt, Timer};
-use futures::io::{copy_buf, AsyncBufRead, BufReader};
+use futures::io::{copy_buf, AsyncBufRead, AsyncRead, BufReader};
 use futures::{AsyncReadExt, FutureExt};
-use futures_lite::{io::AsyncBufReadExt, stream::StreamExt};
+use futures_lite::stream::StreamExt;
 use shared_child::SharedChild;
 use std::{
     cell::RefCell,
@@ -216,7 +216,7 @@ async fn write_ssh_log(prefix: &str, line: &String) {
     };
     const TIME_FORMAT: &str = "%b %d %H:%M:%S%.3f";
     let timestamp = chrono::Local::now().format(TIME_FORMAT);
-    writeln!(&mut f, "{timestamp}: {prefix} {line}")
+    write!(&mut f, "{timestamp}: {prefix} {line}")
         .unwrap_or_else(|e| tracing::warn!("Couldn't write ssh log: {e:?}"));
 }
 
@@ -363,7 +363,7 @@ impl HostPipeChild {
                 .ok_or(PipeError::Error("unable to get stdin from target pipe".into()))?,
         )?;
 
-        let stderr = Async::new(
+        let mut stderr = Async::new(
             ssh.take_stderr()
                 .ok_or(PipeError::Error("unable to stderr from target pipe".into()))?,
         )?;
@@ -389,10 +389,10 @@ impl HostPipeChild {
                     (None, None)
                 }
             };
-        let mut stderr_lines = futures_lite::io::BufReader::new(stderr).lines();
         // Check for early exit.
         if ssh_host_address.is_none() {
-            while let Some(Ok(l)) = stderr_lines.next().await {
+            let mut lb = LineBuffer::new();
+            while let Ok(l) = read_ssh_line(&mut lb, &mut stderr).await {
                 write_ssh_log("E", &l).await;
                 // If we are running with "ssh -v", the stderr will also contain the initial
                 // "OpenSSH" line; then any additional debugging messages will begin with "debug1".
@@ -409,7 +409,7 @@ impl HostPipeChild {
                     // It is an older image, so use the legacy command.
                     tracing::info!("Target does not support abi compatibility check, reverting to legacy connection");
                     ssh.kill()?;
-                    while let Some(Ok(line)) = stderr_lines.next().await {
+                    while let Ok(line) = read_ssh_line(&mut lb, &mut stderr).await {
                         tracing::error!("SSH stderr: {line}");
                     }
 
@@ -442,7 +442,9 @@ impl HostPipeChild {
         };
 
         let log_stderr = async move {
-            while let Some(result) = stderr_lines.next().await {
+            let mut lb = LineBuffer::new();
+            loop {
+                let result = read_ssh_line(&mut lb, &mut stderr).await;
                 match result {
                     Ok(line) => {
                         // TODO(slgrady) -- either remove this once we stop having
@@ -460,6 +462,12 @@ impl HostPipeChild {
                                     tracing::warn!("queueing host pipe err event: {:?}", e)
                                 });
                         }
+                    }
+                    Err(ParseSshConnectionError::UnexpectedEOF(s)) => {
+                        if !s.is_empty() {
+                            tracing::error!("Got unexpected EOF -- buffer so far: {s:?}");
+                        }
+                        break;
                     }
                     Err(e) => tracing::error!("SSH stderr read failure: {:?}", e),
                 }
@@ -498,6 +506,8 @@ enum ParseSshConnectionError {
     Io(#[from] std::io::Error),
     #[error("Parse error: {:?}", .0)]
     Parse(String),
+    #[error("Unexpected EOF: {:?}", .0)]
+    UnexpectedEOF(String),
     #[error("Read-line timeout")]
     Timeout,
 }
@@ -526,17 +536,19 @@ impl ToString for LineBuffer {
 }
 
 #[tracing::instrument(skip(lb, rdr))]
-async fn read_ssh_line<R: AsyncBufRead + Unpin>(
+async fn read_ssh_line<R: AsyncRead + Unpin>(
     lb: &mut LineBuffer,
     rdr: &mut R,
 ) -> std::result::Result<String, ParseSshConnectionError> {
     loop {
-        // rdr is buffered, so it's not terrible to read a byte at a time, for just one line
+        // We're reading a byte at a time, which would be bad if we were doing it a lot,
+        // but it's only used for stderr (which should normally not produce much data),
+        // and the first line of stdout.
         let mut b = [0u8];
         let n = rdr.read(&mut b[..]).await.map_err(ParseSshConnectionError::Io)?;
         let b = b[0];
         if n == 0 {
-            return Err(ParseSshConnectionError::Parse(format!("No newline: {:?}", lb.line())));
+            return Err(ParseSshConnectionError::UnexpectedEOF(lb.to_string()));
         }
         lb.buffer[lb.pos] = b;
         lb.pos += 1;
@@ -547,7 +559,10 @@ async fn read_ssh_line<R: AsyncBufRead + Unpin>(
             )));
         }
         if b == b'\n' {
-            return Ok(lb.to_string());
+            let s = lb.to_string();
+            // Clear for next read
+            lb.pos = 0;
+            return Ok(s);
         }
     }
 }
@@ -1166,6 +1181,11 @@ mod test {
             &"++ 192.168.1.1 1234 10.0.0.1 22++\n"[..],
             &"++ ++\n"[..],
             &"## 192.168.1.1 1234 10.0.0.1 22 ##\n"[..],
+        ] {
+            let res = parse_ssh_connection(&mut line.as_bytes(), None).await;
+            assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
+        }
+        for line in [
             // Truncation
             &"++"[..],
             &"++ 192.168.1.1"[..],
@@ -1177,7 +1197,7 @@ mod test {
             &"++ 192.168.1.1 1234 10.0.0.1 22 ++"[..],
         ] {
             let res = parse_ssh_connection(&mut line.as_bytes(), None).await;
-            assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
+            assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
         }
     }
 
@@ -1226,7 +1246,7 @@ mod test {
         let mut lb = LineBuffer::new();
         let input = &"no newline"[..];
         let res = read_ssh_line(&mut lb, &mut input.as_bytes()).await;
-        assert_matches!(res, Err(ParseSshConnectionError::Parse(_)));
+        assert_matches!(res, Err(ParseSshConnectionError::UnexpectedEOF(_)));
 
         let mut lb = LineBuffer::new();
         let input = [b'A'; 1024];
