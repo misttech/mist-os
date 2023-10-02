@@ -30,6 +30,12 @@ impl Errno {
         }
     }
 
+    /// Returns a new `Result` that is an `Err` with an `Errno` with the given `code`. This error
+    /// has no context, and as such, is cheap to built.
+    pub fn fail<A>(code: ErrnoCode) -> Result<A, Errno> {
+        Err(Errno { code, anyhow: None })
+    }
+
     pub fn return_value(&self) -> u64 {
         self.code.return_value()
     }

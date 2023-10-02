@@ -431,6 +431,17 @@ impl FallocMode {
 }
 
 pub trait FsNodeOps: Send + Sync + AsAny + 'static {
+    /// Delegate the access check to the node. Returns `Err(ENOSYS)` if the kernel must handle the
+    /// access check by itself.
+    fn check_access(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _access: Access,
+    ) -> Result<(), Errno> {
+        Errno::fail(ENOSYS)
+    }
+
     /// Build the `FileOps` for the file associated to this node.
     ///
     /// The returned FileOps will be used to create a FileObject, which might
@@ -1309,14 +1320,6 @@ impl FsNode {
         mount: &MountInfo,
         access: Access,
     ) -> Result<(), Errno> {
-        // HACK: while the access() fuse operation is not wired up, disable all access checks on
-        // any fuse filesystem that doesn't opt in to the default access checks.
-        if crate::fs::fuse::is_fuse_filesystem_without_default_permissions(&self.fs())
-            && current_task.kernel().features.contains("hack_no_fuse_access_checks")
-        {
-            return Ok(());
-        }
-
         if access.contains(Access::WRITE) {
             mount.check_readonly_filesystem()?;
         }
@@ -1326,6 +1329,21 @@ impl FsNode {
             (info.uid, info.gid, info.mode.bits())
         };
         let creds = current_task.creds();
+
+        if access.contains(Access::NOATIME)
+            && node_uid != creds.fsuid
+            && !creds.has_capability(CAP_FOWNER)
+        {
+            return error!(EPERM);
+        }
+
+        match self.ops.check_access(self, current_task, access) {
+            // Use the default access checks.
+            Err(e) if e == ENOSYS => {}
+            // The node implementation handled the access check.
+            result @ _ => return result,
+        }
+
         let mode_flags = if creds.has_capability(CAP_DAC_OVERRIDE) {
             if self.is_dir() {
                 0o7
@@ -1342,13 +1360,6 @@ impl FsNode {
         };
         if (mode_flags & access.rwx_bits()) != access.rwx_bits() {
             return error!(EACCES);
-        }
-
-        if access.contains(Access::NOATIME)
-            && node_uid != creds.fsuid
-            && !creds.has_capability(CAP_FOWNER)
-        {
-            return error!(EPERM);
         }
 
         Ok(())

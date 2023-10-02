@@ -20,7 +20,7 @@ use crate::{
     types::{
         errno,
         errno::{EINTR, EINVAL, ENOSYS},
-        errno_from_code, error, off_t, statfs, time_from_timespec, uapi, DeviceType, Errno,
+        errno_from_code, error, off_t, statfs, time_from_timespec, uapi, Access, DeviceType, Errno,
         FileMode, OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
@@ -119,15 +119,16 @@ pub fn new_fuse_fs(
     Ok(fs)
 }
 
-pub fn is_fuse_filesystem_without_default_permissions(fs: &FileSystem) -> bool {
-    let Some(fs) = fs.downcast_ops::<FuseFs>() else { return false };
-    !fs.default_permissions
-}
-
 #[derive(Debug)]
 struct FuseFs {
     connection: Arc<FuseConnection>,
     default_permissions: bool,
+}
+
+impl FuseFs {
+    fn from_fs(fs: &FileSystem) -> Result<&FuseFs, Errno> {
+        fs.downcast_ops::<FuseFs>().ok_or_else(|| errno!(ENOENT))
+    }
 }
 
 impl FileSystemOps for FuseFs {
@@ -563,6 +564,23 @@ impl FileOps for FuseFileObject {
 }
 
 impl FsNodeOps for Arc<FuseNode> {
+    fn check_access(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        _access: Access,
+    ) -> Result<(), Errno> {
+        if FuseFs::from_fs(&node.fs())?.default_permissions {
+            return Errno::fail(ENOSYS);
+        }
+        // HACK: while the access() fuse operation is not wired up, disable all access checks on
+        // any fuse filesystem that doesn't opt in to the default access checks.
+        if current_task.kernel().features.contains("hack_no_fuse_access_checks") {
+            return Ok(());
+        }
+        Errno::fail(ENOSYS)
+    }
+
     fn create_file_ops(
         &self,
         node: &FsNode,
