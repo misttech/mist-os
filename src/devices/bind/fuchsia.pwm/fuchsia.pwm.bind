@@ -13,7 +13,6 @@ extend uint fuchsia.BIND_FIDL_PROTOCOL {
 };
 
 extend uint fuchsia.BIND_INIT_STEP {
-  GPIO = 0x4F495047,
   PWM = 0x004D5750,
 };
 

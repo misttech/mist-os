@@ -12,7 +12,7 @@
 
 #include <memory>
 
-#include <bind/fuchsia/pwm/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <ddk/metadata/gpio.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
@@ -193,7 +193,7 @@ void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClie
   }
 
   zx_device_prop_t props[] = {
-      {BIND_INIT_STEP, 0, bind_fuchsia_pwm::BIND_INIT_STEP_GPIO},
+      {BIND_INIT_STEP, 0, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO},
   };
 
   zx_status_t status = device->DdkAdd(
