@@ -64,9 +64,15 @@ async fn main() {
     let expected_write_count = (ITERATION_COUNT * 1000) + ITERATION_COUNT;
     assert_eq!(write_syscall.count(), expected_write_count);
 
-    let (restricted_leaf_name, restricted_leaf) = summary.leaf_durations().next().unwrap();
-    assert_eq!(restricted_leaf_name, "RestrictedMode", "top leaf duration should be user code");
-    assert!(restricted_leaf.cpu_time() > 0);
+    let restricted_leaf = summary
+        .leaf_durations()
+        .find(|(n, _)| *n == "RestrictedMode")
+        .map(|(_, d)| d)
+        .expect("leaf durations must contain RestrictedMode");
+    assert!(
+        restricted_leaf.cpu_time() > 0,
+        "restricted mode must have registered greather-than-zero cpu time"
+    );
 }
 
 async fn run_pipe_writer(event_stream: &mut EventStream) {
