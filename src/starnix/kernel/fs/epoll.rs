@@ -305,16 +305,29 @@ impl EpollFileObject {
     fn wait_until_pending_event(
         &self,
         current_task: &CurrentTask,
-        pending_list: &mut Vec<ReadyObject>,
         max_events: usize,
-        input_wait_deadline: zx::Time,
-    ) -> Result<(), Errno> {
-        // Avoid nonzero deadlines if there are already extracted events (see EINTR handling below).
-        debug_assert!(input_wait_deadline.into_nanos() == 0 || pending_list.is_empty());
-
-        let mut wait_deadline = input_wait_deadline;
+        mut wait_deadline: zx::Time,
+    ) -> Result<Vec<ReadyObject>, Errno> {
+        let mut pending_list = Vec::new();
 
         loop {
+            self.process_triggered_events(current_task, &mut pending_list, max_events)?;
+
+            if pending_list.len() == max_events {
+                break; // No input events or output list full, nothing more we can do.
+            }
+
+            if !pending_list.is_empty() {
+                // We now know we have at least one event to return. We shouldn't return
+                // immediately, in case there are more events available, but the next loop should
+                // wait with a 0 timeout to prevent further blocking.
+                wait_deadline = zx::Time::ZERO;
+            }
+
+            // Loop back to check if there are more items in the Waiter's queue. Every wait_until()
+            // call will process a single event. In order to drain as many events as we can that
+            // are synchronously available, keep trying until it reports empty.
+            //
             // The handlers in the waits cause items to be appended to trigger_list. See the closure
             // in `wait_on_file` to see how this happens.
             //
@@ -342,26 +355,9 @@ impl EpollFileObject {
                 // TODO check if this is supposed to actually fail!
                 result => result?,
             }
-
-            self.process_triggered_events(current_task, pending_list, max_events)?;
-
-            if pending_list.len() == max_events {
-                break; // No input events or output list full, nothing more we can do.
-            }
-
-            if !pending_list.is_empty() {
-                // We now know we have at least one event to return. We shouldn't return
-                // immediately, in case there are more events available, but the next loop should
-                // wait with a 0 timeout to prevent further blocking.
-                wait_deadline = zx::Time::ZERO;
-            }
-
-            // Loop back to check if there are more items in the Waiter's queue. Every wait_until()
-            // call will process a single event. In order to drain as many events as we can that
-            // are synchronously available, keep trying until it reports empty.
         }
 
-        Ok(())
+        Ok(pending_list)
     }
 
     /// Blocking wait on all waited upon events with a timeout.
@@ -369,7 +365,7 @@ impl EpollFileObject {
         &self,
         current_task: &CurrentTask,
         max_events: usize,
-        mut deadline: zx::Time,
+        deadline: zx::Time,
     ) -> Result<Vec<epoll_event>, Errno> {
         // First we start waiting again on wait objects that have
         // previously been triggered.
@@ -383,24 +379,7 @@ impl EpollFileObject {
             }
         }
 
-        // Process any events that are already available in the triggered queue.
-        // TODO(tbodt) fold this into the wait_until_pending_event loop
-        let mut pending_list = vec![];
-        self.process_triggered_events(current_task, &mut pending_list, max_events)?;
-        if !pending_list.is_empty() {
-            // TODO(tbodt) delete this block
-            // If there are events synchronously available, don't actually wait for any more.
-            // We still need to call wait_until_pending_event() (this time with a 0 deadline) to
-            // process any events currently pending in the Waiter that haven't been added to our
-            // triggered queue yet.
-            deadline = zx::Time::ZERO;
-        }
-
-        // Note: wait_until_pending_event() can be interrupted with EINTR. We must be careful not to
-        // lose state if that happens. The only state that can be lost are items already in the
-        // pending list, and the code above sets the deadline to 0 in that case which will remove
-        // the wait and avoid EINTR.
-        self.wait_until_pending_event(current_task, &mut pending_list, max_events, deadline)?;
+        let pending_list = self.wait_until_pending_event(current_task, max_events, deadline)?;
 
         // Process the pending list and add processed ReadyObject
         // entries to the rearm_list for the next wait.
