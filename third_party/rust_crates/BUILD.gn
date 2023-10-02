@@ -691,7 +691,7 @@ group("regex-syntax") {
 }
 
 group("ring") {
-  public_deps = [ ":ring-v0_16_15" ]
+  public_deps = [ ":ring-v0_16_16" ]
 }
 
 import("//build/icu/icu_rust_crates.gni")
@@ -9116,22 +9116,24 @@ rust_library("rfc6979-v0_3_1") {
   visibility = [ ":*" ]
 }
 
-rust_library("ring-v0_16_15") {
+rust_library("ring-v0_16_16") {
   crate_name = "ring"
-  crate_root = "//third_party/rust_crates/vendor/ring-0.16.15/src/lib.rs"
-  output_name = "ring-88ca499cf3a587eb"
+  crate_root = "//third_party/rust_crates/vendor/ring-0.16.16/src/lib.rs"
+  output_name = "ring-b5f97fae0b1918bd"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":untrusted-v0_7_1" ]
-  if ((current_cpu == "arm64" || false || false || current_cpu == "x64") &&
-      !false) {
-    deps += [ ":spin-v0_5_2" ]
-  }
   if (current_cpu == "wasm32" && false && current_os == "unknown" && false) {
     deps += [ ":web-sys-v0_3_40" ]
   }
-  if (false || false || current_os == "linux" || false || false || false) {
+  if (false || current_cpu == "x64" ||
+      ((current_cpu == "arm64" || false) &&
+       (false || current_os == "fuchsia" || current_os == "linux"))) {
+    deps += [ ":spin-v0_5_2" ]
+  }
+  if (false || false || current_os == "linux" || false || false || false ||
+      false) {
     deps += [ ":once_cell-v1_17_1" ]
   }
   if (false || current_os == "linux") {
@@ -9146,8 +9148,8 @@ rust_library("ring-v0_16_15") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=88ca499cf3a587eb",
-    "-Cextra-filename=-88ca499cf3a587eb",
+    "-Cmetadata=b5f97fae0b1918bd",
+    "-Cextra-filename=-b5f97fae0b1918bd",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"dev_urandom_fallback\"",
@@ -9509,7 +9511,7 @@ rust_library("rustls-v0_19_1") {
   deps = []
   deps += [ ":base64-v0_13_0" ]
   deps += [ ":log-v0_4_20" ]
-  deps += [ ":ring-v0_16_15" ]
+  deps += [ ":ring-v0_16_16" ]
   deps += [ ":sct-v0_6_0" ]
   deps += [ ":webpki-v0_21_0" ]
 
@@ -9868,7 +9870,7 @@ rust_library("sct-v0_6_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_15" ]
+  deps += [ ":ring-v0_16_16" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []
@@ -11910,7 +11912,7 @@ rust_library("tuf-v0_3_0-beta11") {
   deps += [ ":itoa-v0_4_3" ]
   deps += [ ":log-v0_4_20" ]
   deps += [ ":percent-encoding-v2_2_0" ]
-  deps += [ ":ring-v0_16_15" ]
+  deps += [ ":ring-v0_16_16" ]
   deps += [ ":serde-v1_0_147" ]
   deps += [ ":serde_derive-v1_0_147($host_toolchain)" ]
   deps += [ ":serde_json-v1_0_87" ]
@@ -12980,7 +12982,7 @@ rust_library("webpki-v0_21_0") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":ring-v0_16_15" ]
+  deps += [ ":ring-v0_16_16" ]
   deps += [ ":untrusted-v0_7_1" ]
 
   rustenv = []

@@ -2,12 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# C and Assembly parts of ring 0.16.15
+# C and Assembly parts of ring 0.16.16
 #
 # More advanced usages of might require more sophisticated
 # build rules
 
-ring_crate = "../../vendor/ring-0.16.15"
+ring_crate = "../../vendor/ring-0.16.16"
 
 config("ring-config") {
   if (current_cpu == "riscv64") {
@@ -45,13 +45,13 @@ static_library("ring-core") {
     ":ring-mem",
     ":ring-montgomery",
     ":ring-montgomery-inv",
+    ":ring-poly1305",
 
     # asm
     ":ring-aesni-gcm",
     ":ring-chacha",
     ":ring-ghash",
     ":ring-mont-elf",
-    ":ring-poly1305",
     ":ring-sha256",
     ":ring-sha512",
     ":ring-vpaes",
@@ -211,14 +211,14 @@ static_library("ring-poly1305") {
   include_dirs = [ "$ring_crate/include" ]
   configs += [ ":ring-config" ]
 
-  if (current_cpu == "x64" && !is_mac) {
-    sources = [ "$ring_crate/pregenerated/poly1305-x86_64-elf.S" ]
-  } else if (current_cpu == "x64" && is_mac) {
-    sources = [ "$ring_crate/pregenerated/poly1305-x86_64-macosx.S" ]
-  } else if (current_cpu == "arm64" && !is_mac) {
-    sources = [ "$ring_crate/pregenerated/poly1305-armv8-linux64.S" ]
-  } else if (current_cpu == "arm64" && is_mac) {
-    sources = [ "$ring_crate/pregenerated/poly1305-armv8-ios64.S" ]
+  sources = [ "$ring_crate/crypto/poly1305/poly1305.c" ]
+  if (current_cpu == "x64") {
+    sources += [ "$ring_crate/crypto/poly1305/poly1305_vec.c" ]
+  } else if (current_cpu == "arm64") {
+    sources += [
+      "$ring_crate/crypto/poly1305/poly1305_arm.c",
+      "$ring_crate/crypto/poly1305/poly1305_arm_asm.S",
+    ]
   }
 }
 
