@@ -82,7 +82,7 @@ func GenerateConformanceTests(gidl ir.All, fidl fidlgen.Root, config config.Gene
 func marshalerContext(wireFormat ir.WireFormat) string {
 	switch wireFormat {
 	case ir.V2WireFormat:
-		return `fidl.MarshalerContext{UseV2WireFormat: true}`
+		return `fidl.MarshalerContext{}`
 	default:
 		panic(fmt.Sprintf("unexpected wire format %v", wireFormat))
 	}

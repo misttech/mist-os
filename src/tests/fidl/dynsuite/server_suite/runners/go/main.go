@@ -26,9 +26,6 @@ import (
 var disabledTests = map[serversuite.Test]struct{}{
 	// This is for testing the test disabling functionality itself.
 	serversuite.TestIgnoreDisabled: {},
-	// TODO(fxbug.dev/99738): Go bindings should reject V1 wire format.
-	serversuite.TestV1TwoWayNoPayload:     {},
-	serversuite.TestV1TwoWayStructPayload: {},
 	// TODO(fxbug.dev/113160): Peer-closed errors should be hidden from one-way calls.
 	serversuite.TestEventSendingDoNotReportPeerClosed: {},
 	serversuite.TestReplySendingDoNotReportPeerClosed: {},
@@ -62,7 +59,7 @@ func getTeardownReason(err error) serversuite.TeardownReason {
 		panic(fmt.Sprintf("getTeardownReason: expected a FIDL error, got %T: %s", err, err))
 	}
 	switch fidlError {
-	case fidl.ErrUnknownMagic:
+	case fidl.ErrUnknownMagic, fidl.ErrUnsupportedWireFormatVersion:
 		return serversuite.TeardownReasonIncompatibleFormat
 	case fidl.ErrUnknownOrdinal:
 		return serversuite.TeardownReasonUnexpectedMessage
