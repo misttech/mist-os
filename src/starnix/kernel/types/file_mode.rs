@@ -152,6 +152,10 @@ bitflags::bitflags! {
         const WRITE = 2;
         const READ = 4;
         const NOATIME = 8;
+
+        // Access mask is the part of access related to the file access mode. It is
+        // exec/write/read.
+        const ACCESS_MASK = 1 | 2 | 4;
     }
 }
 impl Access {

@@ -568,17 +568,22 @@ impl FsNodeOps for Arc<FuseNode> {
         &self,
         node: &FsNode,
         current_task: &CurrentTask,
-        _access: Access,
+        access: Access,
     ) -> Result<(), Errno> {
         if FuseFs::from_fs(&node.fs())?.default_permissions {
             return Errno::fail(ENOSYS);
         }
-        // HACK: while the access() fuse operation is not wired up, disable all access checks on
-        // any fuse filesystem that doesn't opt in to the default access checks.
-        if current_task.kernel().features.contains("hack_no_fuse_access_checks") {
-            return Ok(());
+
+        let response = self.connection.execute_operation(
+            current_task,
+            self,
+            FuseOperation::Access { mask: (access & Access::ACCESS_MASK).bits() },
+        )?;
+        if let FuseResponse::Access(result) = response {
+            result
+        } else {
+            error!(EINVAL)
         }
-        Errno::fail(ENOSYS)
     }
 
     fn create_file_ops(
@@ -1329,6 +1334,9 @@ bitflags::bitflags! {
 
 #[derive(Debug)]
 enum FuseOperation {
+    Access {
+        mask: u32,
+    },
     Flush(uapi::fuse_open_out),
     Forget(uapi::fuse_forget_in),
     GetAttr,
@@ -1412,6 +1420,7 @@ enum FuseOperation {
 
 #[derive(Clone, Debug)]
 enum FuseResponse {
+    Access(Result<(), Errno>),
     Attr(uapi::fuse_attr_out),
     Entry(uapi::fuse_entry_out),
     GetXAttr(ValueOrSize<FsString>),
@@ -1436,6 +1445,10 @@ impl FuseOperation {
         configuration: &FuseConfiguration,
     ) -> Result<usize, Errno> {
         match self {
+            Self::Access { mask } => {
+                let message = uapi::fuse_access_in { mask: *mask, padding: 0 };
+                data.write_all(message.as_bytes())
+            }
             Self::Flush(open_in) => {
                 let message =
                     uapi::fuse_flush_in { fh: open_in.fh, unused: 0, padding: 0, lock_owner: 0 };
@@ -1534,6 +1547,7 @@ impl FuseOperation {
 
     fn opcode(&self) -> u32 {
         match self {
+            Self::Access { .. } => uapi::fuse_opcode_FUSE_ACCESS,
             Self::Flush(_) => uapi::fuse_opcode_FUSE_FLUSH,
             Self::Forget(_) => uapi::fuse_opcode_FUSE_FORGET,
             Self::GetAttr => uapi::fuse_opcode_FUSE_GETATTR,
@@ -1636,6 +1650,7 @@ impl FuseOperation {
     fn parse_response(&self, buffer: Vec<u8>) -> Result<FuseResponse, Errno> {
         debug_assert!(self.has_response());
         match self {
+            Self::Access { .. } => Ok(FuseResponse::Access(Ok(()))),
             Self::GetAttr | Self::SetAttr(_) => {
                 Ok(FuseResponse::Attr(Self::to_response::<uapi::fuse_attr_out>(&buffer)))
             }
@@ -1731,6 +1746,10 @@ impl FuseOperation {
         errno: Errno,
     ) -> Result<FuseResponse, Errno> {
         match self {
+            Self::Access { .. } if errno == ENOSYS => {
+                state.insert(self.opcode(), Ok(FuseResponse::Access(Errno::fail(ENOSYS))));
+                Ok(FuseResponse::Access(Errno::fail(ENOSYS)))
+            }
             Self::Flush(_) if errno == ENOSYS => {
                 state.insert(self.opcode(), Ok(FuseResponse::None));
                 Ok(FuseResponse::None)
