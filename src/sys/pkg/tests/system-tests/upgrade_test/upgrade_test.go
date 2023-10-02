@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"testing"
@@ -28,6 +29,10 @@ import (
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+)
+
+const (
+	blobBlockSize = 4096
 )
 
 var c *config
@@ -234,6 +239,9 @@ func doTestOTAs(
 		*device = *newClient
 	}
 
+	// Use a seeded random source so the OTA test is consistent across runs.
+	rand := rand.New(rand.NewSource(99))
+
 	if !upToDate {
 		// Attempt an N-1 -> N OTA, up to downgradeOTAAttempts times.
 		// We optionally retry this OTA because some downgrade builds contain bugs which make them
@@ -242,7 +250,15 @@ func doTestOTAs(
 		for attempt := uint(1); attempt <= c.downgradeOTAAttempts; attempt++ {
 			logger.Infof(ctx, "starting OTA from N-1 -> N test, attempt %d of %d", attempt, c.downgradeOTAAttempts)
 			otaTime := time.Now()
-			if lastError = systemOTA(ctx, device, rpcClient, repo, true, !c.buildExpectUnknownFirmware); lastError == nil {
+			if lastError = systemOTA(
+				ctx,
+				rand,
+				device,
+				rpcClient,
+				repo,
+				true,
+				!c.buildExpectUnknownFirmware,
+			); lastError == nil {
 				logger.Infof(ctx, "OTA from N-1 -> N successful in %s", time.Now().Sub(otaTime))
 				break
 			}
@@ -287,7 +303,7 @@ func doTestOTAs(
 
 	logger.Infof(ctx, "starting OTA N -> N' test")
 	otaTime := time.Now()
-	if err := systemPrimeOTA(ctx, device, rpcClient, repo, false); err != nil {
+	if err := systemPrimeOTA(ctx, rand, device, rpcClient, repo, false); err != nil {
 		return fmt.Errorf("OTA from N -> N' failed: %w", err)
 	}
 	logger.Infof(ctx, "OTA from N -> N' successful in %s", time.Now().Sub(otaTime))
@@ -403,6 +419,7 @@ func initializeDevice(
 
 func systemOTA(
 	ctx context.Context,
+	rand *rand.Rand,
 	device *device.Client,
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
@@ -414,18 +431,15 @@ func systemOTA(
 		return fmt.Errorf("error opening update/0 package: %w", err)
 	}
 
-	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
-	if err != nil {
-		return fmt.Errorf("error extracting expected system image: %w", err)
-	}
-
 	return otaToPackage(
 		ctx,
+		rand,
 		device,
 		rpcClient,
 		repo,
-		expectedSystemImage,
-		"fuchsia-pkg://fuchsia.com/update/0",
+		updatePackage,
+		"ota-test-system_image/0",
+		"ota-test-update/0",
 		checkABR,
 		checkForUnknownFirmware,
 	)
@@ -433,22 +447,7 @@ func systemOTA(
 
 func systemPrimeOTA(
 	ctx context.Context,
-	device *device.Client,
-	rpcClient **sl4f.Client,
-	repo *packages.Repository,
-	checkABR bool,
-) error {
-	return buildAndOtaToPackage(
-		ctx,
-		device,
-		rpcClient,
-		repo,
-		checkABR,
-	)
-}
-
-func buildAndOtaToPackage(
-	ctx context.Context,
+	rand *rand.Rand,
 	device *device.Client,
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
@@ -509,11 +508,11 @@ func buildAndOtaToPackage(
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create the %q package: %w", dstSystemImagePath, err)
+		return fmt.Errorf("failed to create the %q package: %w", dstSystemImage.Path(), err)
 	}
 
-	dstUpdatePath := "update_prime/0"
-	_, err = srcUpdate.EditUpdatePackageWithNewSystemImage(
+	dstUpdatePath := "ota-test-update_prime/0"
+	dstUpdate, err := srcUpdate.EditUpdatePackageWithNewSystemImage(
 		ctx,
 		avbTool,
 		zbiTool,
@@ -531,11 +530,13 @@ func buildAndOtaToPackage(
 
 	return otaToPackage(
 		ctx,
+		rand,
 		device,
 		rpcClient,
 		repo,
-		dstSystemImage,
-		fmt.Sprintf("fuchsia-pkg://fuchsia.com/%s", dstUpdatePath),
+		dstUpdate,
+		"ota-test-system_image_prime2/0",
+		"ota-test-update_prime2/0",
 		checkABR,
 		true,
 	)
@@ -543,14 +544,35 @@ func buildAndOtaToPackage(
 
 func otaToPackage(
 	ctx context.Context,
+	rand *rand.Rand,
 	device *device.Client,
 	rpcClient **sl4f.Client,
 	repo *packages.Repository,
-	dstSystemImage packages.Package,
-	updatePackageURL string,
+	srcUpdate *packages.UpdatePackage,
+	dstSystemImagePath string,
+	dstUpdatePath string,
 	checkABR bool,
 	checkForUnknownFirmware bool,
 ) error {
+	dstUpdate, dstSystemImage, err := AddRandomFilesToUpdate(
+		ctx,
+		rand,
+		repo,
+		srcUpdate,
+		dstSystemImagePath,
+		dstUpdatePath,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create update package %s: %w", dstUpdatePath, err)
+	}
+
+	dstUpdatePackageUrl := fmt.Sprintf(
+		"fuchsia-pkg://fuchsia.com/%s?hash=%s",
+		dstUpdatePath,
+		dstUpdate.Merkle(),
+	)
+	logger.Infof(ctx, "Generated update package %s", dstUpdatePackageUrl)
+
 	expectedConfig, err := check.DetermineTargetABRConfig(ctx, *rpcClient)
 	if err != nil {
 		return fmt.Errorf("error determining target config: %w", err)
@@ -567,7 +589,7 @@ func otaToPackage(
 		)
 	}
 
-	u, err := c.installerConfig.Updater(repo, updatePackageURL, checkForUnknownFirmware)
+	u, err := c.installerConfig.Updater(repo, dstUpdatePackageUrl, checkForUnknownFirmware)
 	if err != nil {
 		return fmt.Errorf("failed to create updater: %w", err)
 	}
@@ -605,6 +627,243 @@ func otaToPackage(
 
 	if err := script.RunScript(ctx, device, repo, rpcClient, c.afterTestScript); err != nil {
 		return fmt.Errorf("failed to run test script after OTA: %w", err)
+	}
+
+	return nil
+}
+
+// AddRandomFilesToUpdate creates a new update package with a system image that
+// contains a number of extra files filled with random bytes, which should be
+// incompressible. It will loop until it has created an update package that is
+// smaller than `-max-ota-size`.
+func AddRandomFilesToUpdate(
+	ctx context.Context,
+	rand *rand.Rand,
+	repo *packages.Repository,
+	srcUpdate *packages.UpdatePackage,
+	dstSystemImagePath string,
+	dstUpdatePath string,
+) (*packages.UpdatePackage, packages.Package, error) {
+	srcSystemImage, err := srcUpdate.OpenPackage(ctx, "system_image/0")
+	if err != nil {
+		return nil, packages.Package{}, fmt.Errorf("error extracting expected system image merkle: %w", err)
+	}
+
+	otaSize, err := srcUpdate.OtaSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, fmt.Errorf("failed to compute size of the OTA: %w", err)
+	}
+	logger.Infof(ctx, "OTA size of %s: %d", srcUpdate.Path(), otaSize)
+
+	if c.maxOtaSize == 0 {
+		// We just want to add a random file or so to the update package so
+		// it's unique.
+		dstUpdate, dstSystemImage, _, err := GenerateUpdatePackageWithRandomFiles(
+			ctx,
+			rand,
+			repo,
+			srcSystemImage,
+			srcUpdate,
+			dstSystemImagePath,
+			dstUpdatePath,
+			otaSize+blobBlockSize,
+		)
+
+		return dstUpdate, dstSystemImage, err
+	} else {
+		// Otherwise, we want to fill out the update package until it's
+		// approximately full.
+
+		if c.maxOtaSize < otaSize {
+			return nil, packages.Package{}, fmt.Errorf(
+				"max OTA size %d is smaller than the size of the OTA %d",
+				c.maxOtaSize,
+				otaSize,
+			)
+		}
+
+		// We'll keep generating update packages with random files until we get
+		// one that's approximately the same size as the max OTA size.
+		bytesToAdd := c.maxOtaSize - otaSize
+		for bytesToAdd > 0 {
+			dstUpdate, dstSystemImage, otaSize, err := GenerateUpdatePackageWithRandomFiles(
+				ctx,
+				rand,
+				repo,
+				srcSystemImage,
+				srcUpdate,
+				dstSystemImagePath,
+				dstUpdatePath,
+				bytesToAdd,
+			)
+			if err != nil {
+				return nil, packages.Package{}, fmt.Errorf(
+					"failed to generate update package %s of size %d: %w",
+					dstUpdatePath,
+					bytesToAdd,
+					err,
+				)
+			}
+
+			if c.maxOtaSize < otaSize {
+				logger.Warningf(
+					ctx,
+					"OTA size %d is bigger than %d, trying again",
+					otaSize,
+					c.maxOtaSize,
+				)
+
+				// Shrink the OTA size by the amount we overshot by.
+				bytesToAdd -= otaSize - c.maxOtaSize
+			} else {
+				logger.Infof(
+					ctx,
+					"Accepting update package %s, OTA size %d is smaller than %d",
+					dstUpdate.Path(),
+					otaSize,
+					c.maxOtaSize,
+				)
+				return dstUpdate, dstSystemImage, nil
+			}
+		}
+
+		return nil, packages.Package{}, fmt.Errorf(
+			"failed to generate update package less than %d",
+			c.maxOtaSize,
+		)
+	}
+}
+
+// GenerateRandomFiles will create a number of files that sum up to
+// `bytesToAdd` random bytes, each which will be less than 10MiB.
+func GenerateUpdatePackageWithRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	repo *packages.Repository,
+	srcSystemImage packages.Package,
+	srcUpdate *packages.UpdatePackage,
+	dstSystemImagePath string,
+	dstUpdatePath string,
+	bytesToAdd int64,
+) (*packages.UpdatePackage, packages.Package, int64, error) {
+	logger.Infof(
+		ctx,
+		"Trying to insert random files up to %d bytes into the system image %s as %s",
+		bytesToAdd,
+		srcSystemImage.Path(),
+		dstSystemImagePath,
+	)
+
+	avbTool, err := c.installerConfig.AVBTool()
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf("failed to intialize AVBTool: %w", err)
+	}
+
+	zbiTool, err := c.installerConfig.ZBITool()
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf("failed to initialize ZBITool: %w", err)
+	}
+
+	dstSystemImage, err := repo.EditPackage(
+		ctx,
+		srcSystemImage,
+		dstSystemImagePath,
+		func(tempDir string) error {
+			return GenerateRandomFiles(ctx, rand, tempDir, bytesToAdd)
+		},
+	)
+	if err != nil {
+		return nil, packages.Package{}, 0, err
+	}
+
+	dstUpdate, err := srcUpdate.EditUpdatePackageWithNewSystemImage(
+		ctx,
+		avbTool,
+		zbiTool,
+		"fuchsia.com",
+		dstSystemImage,
+		dstUpdatePath,
+		c.bootfsCompression,
+		func(path string) error {
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf(
+			"failed to create the %q package: %w",
+			dstUpdatePath,
+			err,
+		)
+	}
+
+	otaSize, err := dstUpdate.OtaSize(ctx)
+	if err != nil {
+		return nil, packages.Package{}, 0, fmt.Errorf("failed to compute size of the OTA: %w", err)
+	}
+	logger.Infof(
+		ctx,
+		"Created update package %s with OTA size %d",
+		dstUpdate.Path(),
+		otaSize,
+	)
+
+	return dstUpdate, dstSystemImage, otaSize, nil
+}
+
+// GenerateRandomFiles will create a number of files that sum up to
+// `bytesToAdd` random bytes, each which will be less than 10MiB.
+func GenerateRandomFiles(
+	ctx context.Context,
+	rand *rand.Rand,
+	tempDir string,
+	bytesToAdd int64,
+) error {
+	otaTestDir := filepath.Join(tempDir, "ota-test")
+	if err := os.Mkdir(otaTestDir, 0700); err != nil {
+		return fmt.Errorf("failed to create %s: %w", otaTestDir, err)
+	}
+
+	index := 0
+	bytes := [blobBlockSize]byte{}
+
+	const maxBlobSize = blobBlockSize * 1000
+
+	for bytesToAdd > 0 {
+		// Create blobs up to 4MiB.
+		var blobSize int64
+		if maxBlobSize < bytesToAdd {
+			blobSize = maxBlobSize
+		} else {
+			blobSize = bytesToAdd
+		}
+		bytesToAdd -= blobSize
+
+		blobPath := filepath.Join(otaTestDir, fmt.Sprintf("ota-test-file-%06d", index))
+		f, err := os.Create(blobPath)
+		if err != nil {
+			return fmt.Errorf("failed to create %s: %w", blobPath, err)
+		}
+		defer f.Close()
+
+		for blobSize > 0 {
+			var n int64
+			if blobSize < blobBlockSize {
+				n = blobSize
+			} else {
+				n = blobBlockSize
+			}
+			blobSize -= n
+
+			if _, err := rand.Read(bytes[:n]); err != nil {
+				return fmt.Errorf("failed to read %d random bytes: %w", n, err)
+			}
+
+			if _, err := f.Write(bytes[:n]); err != nil {
+				return fmt.Errorf("failed to write random bytes to %s: %w", blobPath, err)
+			}
+		}
+
+		index += 1
 	}
 
 	return nil

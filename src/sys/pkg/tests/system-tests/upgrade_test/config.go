@@ -30,6 +30,7 @@ type config struct {
 	downgradeOTAAttempts       uint
 	bootfsCompression          string
 	buildExpectUnknownFirmware bool
+	maxOtaSize                 int64
 }
 
 func newConfig(fs *flag.FlagSet) (*config, error) {
@@ -59,12 +60,17 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
 	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd", "compress storage images, default is zstd")
 	fs.BoolVar(&c.buildExpectUnknownFirmware, "build-expect-unknown-firmware", false, "Ignore 'Unknown Firmware' during OTAs")
+	fs.Int64Var(&c.maxOtaSize, "max-ota-size", 0, "Maximum size of all the blobs in the update package")
 	return c, nil
 }
 
 func (c *config) validate() error {
 	if c.cycleCount < 1 {
 		return fmt.Errorf("-cycle-count must be >= 1")
+	}
+
+	if c.maxOtaSize < 0 {
+		return fmt.Errorf("-max-ota-size must be > 0")
 	}
 
 	if err := c.deviceConfig.Validate(); err != nil {

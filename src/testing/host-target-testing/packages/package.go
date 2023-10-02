@@ -7,6 +7,7 @@ package packages
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -19,10 +20,11 @@ import (
 type FileData []byte
 
 type Package struct {
-	merkle   build.MerkleRoot
-	repo     *Repository
-	path     string
-	contents build.MetaContents
+	merkle      build.MerkleRoot
+	repo        *Repository
+	path        string
+	contents    build.MetaContents
+	subpackages map[string]build.MerkleRoot
 }
 
 // newPackage extracts out a package from the repository.
@@ -55,11 +57,29 @@ func newPackage(
 		return Package{}, err
 	}
 
+	subpackages := make(map[string]build.MerkleRoot)
+	if b, err := f.ReadFile("meta/fuchsia.pkg/subpackages"); err == nil {
+		var metaSubpackages *build.MetaSubpackages
+		if err := json.Unmarshal(b, &metaSubpackages); err != nil {
+			return Package{}, fmt.Errorf("Unable to parse subpackage for package %s: %w", merkle, err)
+		}
+
+		for path, merkleString := range metaSubpackages.Subpackages {
+			merkle, err := build.DecodeMerkleRoot([]byte(merkleString))
+			if err != nil {
+				return Package{}, err
+			}
+
+			subpackages[path] = merkle
+		}
+	}
+
 	return Package{
-		merkle:   merkle,
-		repo:     repo,
-		path:     path,
-		contents: contents,
+		merkle:      merkle,
+		repo:        repo,
+		path:        path,
+		contents:    contents,
+		subpackages: subpackages,
 	}, nil
 }
 
@@ -71,6 +91,28 @@ func (p *Package) Path() string {
 // Merkle returns the meta.far merkle.
 func (p *Package) Merkle() build.MerkleRoot {
 	return p.merkle
+}
+
+// Returns the package's blobs.
+func (p *Package) Blobs() map[build.MerkleRoot]struct{} {
+	blobs := make(map[build.MerkleRoot]struct{})
+	blobs[p.merkle] = struct{}{}
+
+	for _, merkle := range p.contents {
+		blobs[merkle] = struct{}{}
+	}
+
+	return blobs
+}
+
+// Returns the package's subpackages.
+func (p *Package) Subpackages() map[string]build.MerkleRoot {
+	subpackages := make(map[string]build.MerkleRoot)
+	for path, merkle := range p.subpackages {
+		subpackages[path] = merkle
+	}
+
+	return subpackages
 }
 
 // Open opens a file in the package.

@@ -594,15 +594,6 @@ func (c *Client) StartRpcSession(ctx context.Context, repo *packages.Repository)
 	logger.Infof(ctx, "connecting to sl4f")
 	startTime := time.Now()
 
-	// Ensure this client is running system_image or system_image_prime from repo.
-	currentSystemImageMerkle, err := c.GetSystemImageMerkle(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get system image merkle: %w", err)
-	}
-	if err := repo.VerifyMatchesAnyUpdateSystemImageMerkle(ctx, currentSystemImageMerkle); err != nil {
-		return nil, fmt.Errorf("repo does not match system version: %w", err)
-	}
-
 	// Configure the target to use this repository as "fuchsia-pkg://host_target_testing_sl4f".
 	repoName := "host-target-testing-sl4f"
 	repoServer, err := c.ServePackageRepository(ctx, repo, repoName, true, []string{"sl4f", "start_sl4f"})

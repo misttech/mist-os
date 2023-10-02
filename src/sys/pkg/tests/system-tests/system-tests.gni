@@ -130,6 +130,11 @@ _environment_service_account =
 #   - Optional: whether or not to use ffx flash instead of paving when
 #     installing the downgrade build.
 #   - Type: boolean, default false
+#
+#   max_ota_size
+#   - Optional: the maximum size of the OTA test. The update packages will
+#     be artificially extended to this size or less.
+#   - Type: integer greater than or equal to 0
 template("system_test_upgrade_suite") {
   assert(is_linux || is_mac, "system_tests are for linux/mac only")
 
@@ -323,6 +328,15 @@ template("system_test_upgrade_suite") {
     if (defined(invoker.build_expect_unknown_firmware) &&
         invoker.build_expect_unknown_firmware) {
       _args += [ "-build-expect-unknown-firmware" ]
+    }
+
+    if (defined(invoker.max_ota_size)) {
+      assert(invoker.max_ota_size != "",
+             "'${_host_test_target_name}' cannot have an empty max_ota_size")
+      _args += [
+        "-max-ota-test",
+        invoker.max_ota_size,
+      ]
     }
 
     host_test(_host_test_target_name) {

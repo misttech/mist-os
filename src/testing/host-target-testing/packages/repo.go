@@ -23,6 +23,7 @@ import (
 type BlobStore interface {
 	Dir() string
 	OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error)
+	BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error)
 }
 
 type DirBlobStore struct {
@@ -44,6 +45,16 @@ func (fs *DirBlobStore) blobPath(deliveryBlobType *int, merkle build.MerkleRoot)
 func (fs *DirBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (*os.File, error) {
 	path := fs.blobPath(deliveryBlobType, merkle)
 	return os.Open(path)
+}
+
+func (fs *DirBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle build.MerkleRoot) (int64, error) {
+	path := fs.blobPath(deliveryBlobType, merkle)
+	s, err := os.Stat(path)
+	if err != nil {
+		return 0, err
+	}
+
+	return s.Size(), nil
 }
 
 func (fs *DirBlobStore) Dir() string {
@@ -170,6 +181,10 @@ func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*Updat
 
 func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
 	return r.blobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
+}
+
+func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (int64, error) {
+	return r.blobStore.BlobSize(ctx, r.deliveryBlobType, merkle)
 }
 
 func (r *Repository) Serve(ctx context.Context, localHostname string, repoName string, repoPort int) (*Server, error) {

@@ -234,6 +234,20 @@ func (fs *proxyBlobStore) OpenBlob(ctx context.Context, deliveryBlobType *int, m
 	return os.Open(path)
 }
 
+func (fs *proxyBlobStore) BlobSize(ctx context.Context, deliveryBlobType *int, merkle pmBuild.MerkleRoot) (int64, error) {
+	f, err := fs.OpenBlob(ctx, deliveryBlobType, merkle)
+	if err != nil {
+		return 0, err
+	}
+	defer f.Close()
+
+	if s, err := f.Stat(); err == nil {
+		return s.Size(), nil
+	} else {
+		return 0, err
+	}
+}
+
 func (fs *proxyBlobStore) Dir() string {
 	return fs.dir
 }

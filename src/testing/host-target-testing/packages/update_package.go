@@ -207,3 +207,60 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 		},
 	)
 }
+
+func (u *UpdatePackage) OtaSize(ctx context.Context) (int64, error) {
+	blobs := u.p.Blobs()
+
+	// Next, find all the packages in the update package.
+	packageMerkles := []build.MerkleRoot{}
+	for _, merkle := range u.packages {
+		packageMerkles = append(packageMerkles, merkle)
+	}
+
+	// Walk through all the packages and subpackages and gather up all the blobs.
+	visitedPackages := make(map[build.MerkleRoot]struct{})
+	for {
+		if len(packageMerkles) == 0 {
+			break
+		}
+
+		// Pop a merkle from the list.
+		index := len(packageMerkles) - 1
+		merkle := packageMerkles[index]
+		packageMerkles = packageMerkles[:index]
+
+		// Skip if we've already processed this merkle.
+		if _, ok := visitedPackages[merkle]; ok {
+			continue
+		}
+		visitedPackages[merkle] = struct{}{}
+
+		// Open up each package and add its blobs to our set.
+		p, err := newPackage(ctx, u.r, "", merkle)
+		if err != nil {
+			return 0, err
+		}
+
+		for blob := range p.Blobs() {
+			blobs[blob] = struct{}{}
+		}
+
+		// Push any subpackages onto our stack.
+		for _, subpackageMerkle := range p.Subpackages() {
+			packageMerkles = append(packageMerkles, subpackageMerkle)
+		}
+	}
+
+	// Finally sum up all the blob sizes from the blob store.
+	totalSize := int64(0)
+	for blob := range blobs {
+		size, err := u.r.BlobSize(ctx, blob)
+		if err != nil {
+			return 0, nil
+		}
+
+		totalSize += size
+	}
+
+	return totalSize, nil
+}
