@@ -23,7 +23,7 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
     isolate.start_daemon().await.unwrap();
 
-    let emu = Emu::start(&ctx);
+    let mut emu = Emu::start(&ctx);
 
     {
         let serial = emu.serial().await;
@@ -34,6 +34,8 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
     }
 
     std::thread::sleep(Duration::from_secs(5));
+
+    emu.check_is_running().expect("Emulator exited unexpectedly");
 
     let product_bundle_json = Emu::product_bundle_dir();
 
@@ -50,7 +52,10 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
         .await
         .expect("flash target");
     assert!(output.status.success(), "Failed to run command: {}\n{}", output.stdout, output.stderr);
+
     std::thread::sleep(Duration::from_secs(4));
+
+    emu.check_is_running().expect("Emulator exited unexpectedly");
 
     // Retry ffx target show as it may take the device up to 30 seconds to initialize SSH.
     let mut times = 2;
@@ -70,6 +75,7 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
         assert!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
         break;
     }
+    emu.check_is_running().expect("Emulator exited unexpectedly");
 }
 
 #[fixture(base_fixture)]
@@ -80,7 +86,7 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     let isolate = ctx.isolate();
     isolate.start_daemon().await.unwrap();
 
-    let emu = Emu::start(&ctx);
+    let mut emu = Emu::start(&ctx);
 
     {
         let serial = emu.serial().await;
@@ -92,6 +98,8 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
 
     std::thread::sleep(Duration::from_secs(5));
 
+    emu.check_is_running().expect("Emulator exited unexpectedly");
+
     let output = isolate
         .ffx(&["--target", emu.nodename(), "target", "reboot", "-b"])
         .await
@@ -99,6 +107,7 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     assert!(output.status.success(), "Failed to run command: {}\n{}", output.stdout, output.stderr);
 
     // ffx waits for the bootloader to re-enter fastboot before returning.
+    emu.check_is_running().expect("Emulator exited unexpectedly");
 
     let out = isolate
         .ffx(&["--target", emu.nodename(), "target", "list", emu.nodename()])
@@ -108,6 +117,7 @@ async fn test_target_reboot_to_bootloader_gigaboot(ctx: TestContext) {
     assert!(out.status.success(), "status is unexpected: {:?}", out);
     assert!(out.stdout.contains("Fastboot"), "stdout is unexpected: {:?}", out);
     assert!(out.stderr.lines().count() == 0, "stderr is unexpected: {:?}", out);
+    emu.check_is_running().expect("Emulator exited unexpectedly");
 }
 
 async fn serial_lines(

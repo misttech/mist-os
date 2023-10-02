@@ -10,6 +10,7 @@ use std::{
     process::{Child, Command},
 };
 
+use anyhow::anyhow;
 use async_io::Async;
 use once_cell::sync::Lazy;
 use tempfile::TempDir;
@@ -24,6 +25,14 @@ impl Emu {
         static PRODUCT_BUNDLE_DIR: Lazy<PathBuf> =
             Lazy::new(|| crate::ROOT_BUILD_DIR.join(env!("PRODUCT_BUNDLE")));
         &*PRODUCT_BUNDLE_DIR
+    }
+
+    pub fn check_is_running(&mut self) -> anyhow::Result<()> {
+        match self.child.try_wait() {
+            Ok(Some(status)) => Err(anyhow!("Emulator exited with status: {}", status)),
+            Ok(None) => Ok(()),
+            Err(e) => Err(anyhow!("Error getting emulator running satus: {}", e)),
+        }
     }
 
     // Partially inlined from `make-fuchsia-vol`.
