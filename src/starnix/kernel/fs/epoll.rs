@@ -15,7 +15,7 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         *,
     },
-    lock::RwLock,
+    lock::Mutex,
     logging::*,
     task::*,
     types::*,
@@ -64,12 +64,14 @@ struct ReadyObject {
 
 /// EpollFileObject represents the FileObject used to
 /// implement epoll_create1/epoll_ctl/epoll_pwait.
+#[derive(Default)]
 pub struct EpollFileObject {
     waiter: Waiter,
     /// Mutable state of this epoll object.
-    state: Arc<RwLock<EpollState>>,
+    state: Arc<Mutex<EpollState>>,
 }
 
+#[derive(Default)]
 struct EpollState {
     /// Any file tracked by this epoll instance
     /// will exist as a key in `wait_objects`.
@@ -92,25 +94,13 @@ struct EpollState {
 impl EpollFileObject {
     /// Allocate a new, empty epoll object.
     pub fn new_file(current_task: &CurrentTask) -> FileHandle {
-        Anon::new_file(
-            current_task,
-            Box::new(EpollFileObject {
-                waiter: Waiter::new(),
-                state: Arc::new(RwLock::new(EpollState {
-                    wait_objects: HashMap::default(),
-                    trigger_list: VecDeque::new(),
-                    rearm_list: Vec::new(),
-                    waiters: WaitQueue::default(),
-                })),
-            }),
-            OpenFlags::RDWR,
-        )
+        Anon::new_file(current_task, Box::new(EpollFileObject::default()), OpenFlags::RDWR)
     }
 
     fn new_wait_handler(&self, key: EpollKey) -> EventHandler {
         let state = self.state.clone();
         Box::new(move |observed: FdEvents| {
-            state.write().trigger_list.push_back(ReadyObject { key, observed })
+            state.lock().trigger_list.push_back(ReadyObject { key, observed })
         })
     }
 
@@ -166,7 +156,7 @@ impl EpollFileObject {
             return error!(EINVAL);
         }
 
-        let state = self.state.read();
+        let state = self.state.lock();
         for nested_object in state.wait_objects.values() {
             match nested_object.target()?.downcast_file::<EpollFileObject>() {
                 None => continue,
@@ -200,7 +190,7 @@ impl EpollFileObject {
             epoll_to_add.check_monitors(epoll_file_handle, MAX_NESTED_DEPTH - 1)?;
         }
 
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         let key = as_epoll_key(file);
         match state.wait_objects.entry(key) {
             Entry::Occupied(_) => error!(EEXIST),
@@ -226,7 +216,7 @@ impl EpollFileObject {
         epoll_event.events |= FdEvents::POLLHUP.bits();
         epoll_event.events |= FdEvents::POLLERR.bits();
 
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         let key = as_epoll_key(file);
         state.rearm_list.retain(|x| x.key != key);
         match state.wait_objects.entry(key) {
@@ -245,7 +235,7 @@ impl EpollFileObject {
     /// Cancel an asynchronous wait on an object. Events triggered before
     /// calling this will still be delivered.
     pub fn delete(&self, file: &FileHandle) -> Result<(), Errno> {
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         let key = as_epoll_key(file);
         if let Some(mut wait_object) = state.wait_objects.remove(&key) {
             if let Some(wait_canceler) = wait_object.wait_canceler.take() {
@@ -271,7 +261,7 @@ impl EpollFileObject {
         pending_list: &mut Vec<ReadyObject>,
         max_events: usize,
     ) -> Result<(), Errno> {
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         while pending_list.len() < max_events && !state.trigger_list.is_empty() {
             if let Some(pending) = state.trigger_list.pop_front() {
                 if let Some(wait) = state.wait_objects.get_mut(&pending.key) {
@@ -370,7 +360,7 @@ impl EpollFileObject {
         // First we start waiting again on wait objects that have
         // previously been triggered.
         {
-            let mut state = self.state.write();
+            let mut state = self.state.lock();
             let rearm_list = std::mem::take(&mut state.rearm_list);
             for to_wait in rearm_list.iter() {
                 // TODO handle interrupts here
@@ -384,7 +374,7 @@ impl EpollFileObject {
         // Process the pending list and add processed ReadyObject
         // entries to the rearm_list for the next wait.
         let mut result = vec![];
-        let mut state = self.state.write();
+        let mut state = self.state.lock();
         for pending_event in pending_list.iter().unique_by(|e| e.key) {
             // The wait could have been deleted by here,
             // so ignore the None case.
@@ -453,7 +443,7 @@ impl FileOps for EpollFileObject {
         events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        Some(self.state.read().waiters.wait_async_fd_events(waiter, events, handler))
+        Some(self.state.lock().waiters.wait_async_fd_events(waiter, events, handler))
     }
 
     fn query_events(
@@ -462,7 +452,7 @@ impl FileOps for EpollFileObject {
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         let mut events = FdEvents::empty();
-        if self.state.read().trigger_list.is_empty() {
+        if self.state.lock().trigger_list.is_empty() {
             events |= FdEvents::POLLIN;
         }
         Ok(events)
