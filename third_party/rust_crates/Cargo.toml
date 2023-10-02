@@ -690,7 +690,6 @@ deps = [
   ":memchr-v2_4_0",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
-  ":once_cell-v1_17_1",
   ":signal-hook-registry-v1_3_0",
   ":socket2-v0_4_4",
 ]
@@ -700,7 +699,6 @@ rustflags = [
   "--cfg=feature=\\\"mio\\\"",
   "--cfg=feature=\\\"net\\\"",
   "--cfg=feature=\\\"num_cpus\\\"",
-  "--cfg=feature=\\\"once_cell\\\"",
   "--cfg=feature=\\\"rt\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
   "--cfg=feature=\\\"socket2\\\"",

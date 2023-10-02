@@ -11426,7 +11426,6 @@ rust_library("tokio-v1_20_5") {
     deps += [ ":memchr-v2_4_0" ]
     deps += [ ":mio-v0_8_5" ]
     deps += [ ":num_cpus-v1_13_0" ]
-    deps += [ ":once_cell-v1_17_1" ]
     deps += [ ":signal-hook-registry-v1_3_0" ]
     deps += [ ":socket2-v0_4_4" ]
   }
@@ -11449,7 +11448,6 @@ rust_library("tokio-v1_20_5") {
       "--cfg=feature=\"mio\"",
       "--cfg=feature=\"net\"",
       "--cfg=feature=\"num_cpus\"",
-      "--cfg=feature=\"once_cell\"",
       "--cfg=feature=\"rt\"",
       "--cfg=feature=\"rt-multi-thread\"",
       "--cfg=feature=\"socket2\"",
