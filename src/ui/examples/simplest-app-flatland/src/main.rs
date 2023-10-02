@@ -276,7 +276,7 @@ fn setup_handle_flatland_events(
 async fn main() {
     // TODO(fxb/81740): remove args once the view_provider refactoring is done.
     let args: Vec<String> = env::args().collect();
-    if args.len() != 1 || !(args[1] == "view_provider" || args[1] == "graphical_presenter") {
+    if args.len() != 2 || !(args[1] == "view_provider" || args[1] == "graphical_presenter") {
         error!("Param must be 'view_provider' or 'graphical_presenter', got {:?}", args);
     }
     let use_view_provider = if args[1] == "view_provider" { true } else { false };
