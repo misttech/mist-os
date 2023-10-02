@@ -145,17 +145,19 @@ zx_status_t DLog::Shutdown(zx_time_t deadline) {
   // notifier thread is responsible for passing log records to the dumper.
   const zx_status_t notifier_status = ShutdownThread(notifier_state_, kDlogNotifierThreadName);
   const zx_status_t dumper_status = ShutdownThread(dumper_state_, kDlogDumperThreadName);
+  DEBUG_ASSERT_MSG(const Lifecycle prev = lifecycle_.load(ktl::memory_order_relaxed);
+                   prev == Lifecycle::ShutdownStarted, "unexpected lifecycle state: %u\n",
+                   static_cast<uint32_t>(prev));
+  lifecycle_.store(Lifecycle::ShutdownFinished, ktl::memory_order_release);
 
-  // If one of them fails, just use the first failing status we find.
+  // If one of them failed, report the first failing status we find.
   zx_status_t result;
   if (notifier_status != ZX_OK) {
     result = notifier_status;
-  } else if (dumper_status != ZX_OK) {
-    result = dumper_status;
   } else {
-    result = ZX_OK;
-    dprintf(INFO, "debuglog shutdown complete\n");
+    result = dumper_status;
   }
+  dprintf(INFO, "debuglog shutdown completed with status %d\n", result);
 
   // Be sure to pass the status to any other threads that may be waiting here in Shutdown.
   shutdown_finished_.Signal(result);
@@ -591,16 +593,21 @@ DECLARE_SINGLETON_MUTEX(DlogSerialWriteLock);
 }  // namespace
 
 void dlog_serial_write(ktl::string_view str) {
-  if (dlog_bypass_ == true) {
+  if (dlog_bypass_) {
     // If LL DEBUG is enabled we take this path which uses a spinlock
     // and prevents the direct writes from the kernel from interleaving
-    // with our output
+    // with our output.
     serial_write(str);
-  } else {
-    // Otherwise we can use a mutex and avoid time under spinlock
-    Guard<Mutex> guard{DlogSerialWriteLock::Get()};
-    platform_dputs_thread(str.data(), str.size());
+    return;
   }
+
+  // If dlog has finished shutting down, just drop this message.  See fxbug.dev/134287.
+  if (DLOG->ShutdownFinished()) {
+    return;
+  }
+
+  Guard<Mutex> guard{DlogSerialWriteLock::Get()};
+  platform_dputs_thread(str.data(), str.size());
 }
 
 void dlog_bluescreen_init() { DLOG->BluescreenInit(); }

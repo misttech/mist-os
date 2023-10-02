@@ -110,7 +110,12 @@ static_assert(sizeof(dlog_record_t) == DLOG_MAX_RECORD, "");
 // Returns ZX_ERR_BAD_STATE if the dlog has already started shutting down.
 zx_status_t dlog_write(uint32_t severity, uint32_t flags, ktl::string_view str);
 
-// used by sys_debug_write()
+// Writes |str| out the serial (debug) port.
+//
+// This function is a no-op if the dlog has already been shutdown
+// (i.e. |dlog_shutdown| has completed).
+//
+// Used by sys_debug_write().
 void dlog_serial_write(ktl::string_view str);
 
 // Allow FILE*-based APIs, like fprintf, to use the same output
@@ -138,6 +143,10 @@ void dlog_init_early();
 // Blocks, waiting up to |deadline|, for dlog threads to terminate.  It is safe
 // for Shutdown to be called concurrently by multiple threads.  Only one thread
 // will "win" and all others will simply wait for it to complete.
+//
+// Once shutdown has begun, |dlog_write| will fail.  However, calls to
+// |dlog_serial_write| will continue to work until shutdown has completed.  At
+// which point, they will become no-ops.
 //
 // On failure, the debuglog subsystem is left in an undefined state.
 //

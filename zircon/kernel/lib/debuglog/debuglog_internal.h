@@ -47,6 +47,11 @@ class DLog {
   // operations will fail, but already-queued messages will continue to be processed/emitted.
   zx_status_t Shutdown(zx_time_t deadline) TA_EXCL(lock_);
 
+  // Returns true iff we have finished shutting down this instance.
+  bool ShutdownFinished() const {
+    return lifecycle_.load(ktl::memory_order_acquire) == Lifecycle::ShutdownFinished;
+  }
+
   // See |dlog_panic_start|.
   void PanicStart() TA_EXCL(lock_);
 
@@ -245,7 +250,7 @@ class DLog {
     ShutdownStarted,   // Shutdown has been called, but has not yet completed.  No new messages can
                        // be be queued.  Calls to |Write| will fail.  Already-queued messages may
                        // continue to be processed/emitted.
-    ShutdownFinished,  // Shutdown has completed.
+    ShutdownFinished,  // Shutdown has completed.  |dlog_serial_write| will drop data.
   };
   ktl::atomic<Lifecycle> lifecycle_{Lifecycle::Running};
 
