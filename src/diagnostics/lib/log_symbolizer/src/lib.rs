@@ -57,7 +57,10 @@ const BARRIER: &str = "<ffx symbolizer>\n";
 
 /// Returns true if the given string is a context marker.
 pub fn is_symbolizer_context_marker(s: &str) -> bool {
-    return s.starts_with("{{{reset")
+    // In some cases, log producers add additional text at the beginning
+    // of a stacktrace log, so we use contains instead of starts_with
+    // to check for the beginning of a stacktrace.
+    return s.contains("{{{reset")
         || s.starts_with("{{{bt")
         || s.starts_with("{{{mmap")
         || s.starts_with("{{{dumpfile")
@@ -267,6 +270,10 @@ mod test {
         in_tx.send("{{{reset}}}\n".to_string()).await.unwrap();
         let out = out_rx.next().await.unwrap();
         assert_eq!(out, "prefix{{{reset}}}\n");
+
+        in_tx.send("something{{{reset}}}\n".to_string()).await.unwrap();
+        let out = out_rx.next().await.unwrap();
+        assert_eq!(out, "prefixsomething{{{reset}}}\n");
 
         in_tx.send("{{{mmap:something}}\n".to_string()).await.unwrap();
         let out = out_rx.next().await.unwrap();
