@@ -2957,3 +2957,16 @@
   reviewers: ['adanis@google.com', 'cpu@google.com', 'csuter@google.com']
   submitted: '2023-04-13'
   reviewed: '2023-09-19'
+
+- name: 'RFC-0227'
+  title: 'Fuchsia Release Process'
+  short_description: "Describes Fuchsia's SDK and OS release process"
+  authors: ['hjfreyer@google.com', 'atyfto@google.com']
+  file: '0227_fuchsia_release_process.md'
+  area: ['Developer', 'Software Assembly']
+  issue: []
+  gerrit_change_id: ['901198']
+  status: 'Accepted'
+  reviewers: ['billstevenson@google.com', 'abarth@google.com', 'atyfto@google.com']
+  submitted: '2023-08-14'
+  reviewed: '2023-10-02'
