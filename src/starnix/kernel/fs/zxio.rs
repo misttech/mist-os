@@ -75,7 +75,7 @@ pub fn zxio_wait_async(
         let observed_zxio_signals = zxio.wait_end(zx::Signals::empty());
         let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
         waiter.wake_immediately(observed_events, handler);
-        return WaitCanceler::new(move || false);
+        return WaitCanceler::new(move || {});
     }
 
     let zxio_clone = zxio.clone();
@@ -93,11 +93,8 @@ pub fn zxio_wait_async(
         if let Some(zxio) = zxio.upgrade() {
             let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
             assert!(!handle.is_invalid());
-            let did_cancel = canceler.cancel(handle);
+            canceler.cancel(handle);
             zxio.wait_end(signals);
-            did_cancel
-        } else {
-            false
         }
     })
 }

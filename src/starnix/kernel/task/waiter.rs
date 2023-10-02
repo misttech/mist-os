@@ -30,42 +30,40 @@ pub enum WaitCallback {
 
 /// Return values for wait_async methods. Calling `cancel` will cancel any running wait.
 pub struct WaitCanceler {
-    canceler: Box<dyn Fn() -> bool + Send + Sync>,
+    canceler: Box<dyn Fn() + Send + Sync>,
 }
 
 impl WaitCanceler {
     pub fn new<F>(canceler: F) -> Self
     where
-        F: Fn() -> bool + Send + Sync + 'static,
+        F: Fn() + Send + Sync + 'static,
     {
         Self { canceler: Box::new(canceler) }
     }
 
-    /// Cancel the pending wait. Returns `true` if a wait has been cancelled. It is valid to call
-    /// this function multiple times.
-    pub fn cancel(&self) -> bool {
-        (self.canceler)()
+    /// Cancel the pending wait. It is valid to call this function multiple times.
+    pub fn cancel(&self) {
+        (self.canceler)();
     }
 }
 
 /// Return values for wait_async methods that monitor the state of a handle. Calling `cancel` will
 /// cancel any running wait.
 pub struct HandleWaitCanceler {
-    canceler: Box<dyn Fn(zx::HandleRef<'_>) -> bool + Send + Sync>,
+    canceler: Box<dyn Fn(zx::HandleRef<'_>) + Send + Sync>,
 }
 
 impl HandleWaitCanceler {
     pub fn new<F>(canceler: F) -> Self
     where
-        F: Fn(zx::HandleRef<'_>) -> bool + Send + Sync + 'static,
+        F: Fn(zx::HandleRef<'_>) + Send + Sync + 'static,
     {
         Self { canceler: Box::new(canceler) }
     }
 
-    /// Cancel the pending wait. Returns `true` if a wait has been cancelled. It is valid to call
-    /// this function multiple times.
-    pub fn cancel(&self, handle: zx::HandleRef<'_>) -> bool {
-        (self.canceler)(handle)
+    /// Cancel the pending wait. It is valid to call this function multiple times.
+    pub fn cancel(&self, handle: zx::HandleRef<'_>) {
+        (self.canceler)(handle);
     }
 }
 
@@ -325,11 +323,8 @@ impl PortWaiter {
         let weak_self = Arc::downgrade(self);
         Ok(HandleWaitCanceler::new(move |handle_ref| {
             if let Some(waiter) = weak_self.upgrade() {
-                let cancelled = waiter.port.cancel(&handle_ref, key.raw).is_ok();
+                let _ = waiter.port.cancel(&handle_ref, key.raw);
                 waiter.remove_callback(&key);
-                cancelled
-            } else {
-                false
             }
         }))
     }
@@ -441,16 +436,7 @@ impl Waiter {
     /// implementations that should block forever even though a real implementation would wake up
     /// eventually.
     pub fn fake_wait(&self) -> WaitCanceler {
-        let has_run = Mutex::new(false);
-        WaitCanceler::new(move || {
-            let mut has_run = has_run.lock();
-            if !*has_run {
-                *has_run = true;
-                true
-            } else {
-                false
-            }
-        })
+        WaitCanceler::new(move || {})
     }
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
@@ -586,20 +572,17 @@ impl WaitQueue {
         waiter.inner.wait_queues.lock().insert(key, weak_self.clone());
         let waiter = waiter.weak();
         WaitCanceler::new(move || {
-            let mut cancelled = false;
             if let Some(wait_queue) = weak_self.upgrade() {
                 waiter.remove_callback(&key);
                 // TODO(steveaustin) Maybe make waiters a map to avoid linear search
                 Self::filter_waiters(&mut wait_queue.waiters.lock(), |entry| {
                     if entry.key == key && entry.waiter == waiter {
-                        cancelled = true;
                         Retention::Drop
                     } else {
                         Retention::Keep
                     }
                 });
             }
-            cancelled
         })
     }
 
@@ -812,7 +795,7 @@ mod tests {
         let waiter = Waiter::new();
         let wk1 = wait_queue.wait_async(&waiter);
         let _wk2 = wait_queue.wait_async(&waiter);
-        assert!(wk1.cancel());
+        wk1.cancel();
         wait_queue.notify_all();
         assert!(waiter.wait_until(&current_task, zx::Time::ZERO).is_ok());
     }
@@ -825,7 +808,7 @@ mod tests {
         let waiter2 = Waiter::new();
         let wk1 = wait_queue.wait_async(&waiter1);
         let _wk2 = wait_queue.wait_async(&waiter2);
-        assert!(wk1.cancel());
+        wk1.cancel();
         wait_queue.notify_all();
         assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
         assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_ok());

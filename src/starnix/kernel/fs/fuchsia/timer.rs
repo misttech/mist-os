@@ -250,9 +250,7 @@ impl FileOps for TimerFile {
         let timer = Arc::downgrade(&self.timer);
         Some(WaitCanceler::new(move || {
             if let Some(timer) = timer.upgrade() {
-                canceler.cancel(timer.as_handle_ref())
-            } else {
-                false
+                canceler.cancel(timer.as_handle_ref());
             }
         }))
     }
