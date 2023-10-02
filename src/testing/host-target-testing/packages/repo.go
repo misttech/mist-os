@@ -5,7 +5,6 @@
 package packages
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,10 +14,8 @@ import (
 	"strings"
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/ffx"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
@@ -148,6 +145,15 @@ func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.Merk
 	return r.BlobStore.OpenBlob(ctx, nil, merkle)
 }
 
+func (r *Repository) OpenUpdatePackage(ctx context.Context, path string) (*UpdatePackage, error) {
+	p, err := r.OpenPackage(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+
+	return newUpdatePackage(ctx, r, p)
+}
+
 func (r *Repository) OpenBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
 	return r.BlobStore.OpenBlob(ctx, r.deliveryBlobType, merkle)
 }
@@ -156,16 +162,13 @@ func (r *Repository) Serve(ctx context.Context, localHostname string, repoName s
 	return newServer(ctx, r.Dir, r.BlobStore, localHostname, repoName, repoPort)
 }
 
-func (r *Repository) LookupUpdateSystemImage(ctx context.Context) (Package, error) {
-	return r.lookupUpdateContentPackage(ctx, "update/0", "system_image/0")
-}
-
-func (r *Repository) LookupUpdatePrimeSystemImage(ctx context.Context) (Package, error) {
-	return r.lookupUpdateContentPackage(ctx, "update_prime/0", "system_image/0")
-}
-
 func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context, merkle build.MerkleRoot) error {
-	systemImage, err := r.LookupUpdateSystemImage(ctx)
+	update, err := r.OpenUpdatePackage(ctx, "update/0")
+	if err != nil {
+		return err
+	}
+
+	systemImage, err := update.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return err
 	}
@@ -173,60 +176,21 @@ func (r *Repository) VerifyMatchesAnyUpdateSystemImageMerkle(ctx context.Context
 		return nil
 	}
 
-	systemPrimeImage, err := r.LookupUpdatePrimeSystemImage(ctx)
+	updatePrime, err := r.OpenUpdatePackage(ctx, "update_prime/0")
 	if err != nil {
 		return err
 	}
-	if merkle == systemPrimeImage.Merkle() {
+
+	systemImagePrime, err := updatePrime.OpenPackage(ctx, "system_image/0")
+	if err != nil {
+		return err
+	}
+	if merkle == systemImagePrime.Merkle() {
 		return nil
 	}
 
 	return fmt.Errorf("expected device to be running a system image of %s or %s, got %s",
-		systemImage.Merkle(), systemPrimeImage.Merkle(), merkle)
-}
-
-func (r *Repository) lookupUpdateContentPackage(
-	ctx context.Context,
-	updatePackageName string,
-	contentPackageName string,
-) (Package, error) {
-	// Extract the "packages" file from the "update" package.
-	p, err := r.OpenPackage(ctx, updatePackageName)
-	if err != nil {
-		return Package{}, fmt.Errorf(
-			"failed to open package %s: %w",
-			updatePackageName,
-			err,
-		)
-	}
-	f, err := p.Open(ctx, "packages.json")
-	if err != nil {
-		return Package{}, fmt.Errorf(
-			"failed to open packages.json in %s: %w",
-			updatePackageName,
-			err,
-		)
-	}
-
-	packages, err := util.ParsePackagesJSON(f)
-	if err != nil {
-		return Package{}, fmt.Errorf(
-			"failed to parse packages.json from %s: %w",
-			updatePackageName,
-			err,
-		)
-	}
-
-	merkleRoot, ok := packages[contentPackageName]
-	if !ok {
-		return Package{}, fmt.Errorf(
-			"could not find merkle for %s in %s",
-			contentPackageName,
-			updatePackageName,
-		)
-	}
-
-	return newPackage(ctx, r, contentPackageName, merkleRoot)
+		systemImage.Merkle(), systemImagePrime.Merkle(), merkle)
 }
 
 // CreatePackage creates a package in this repository named `packagePath` by:
@@ -301,152 +265,6 @@ func (r *Repository) EditPackage(
 	}
 
 	return pkg, nil
-}
-
-// Extracts the update package into a temporary directory, and injects the
-// specified vbmeta property files into the vbmeta.
-func (r *Repository) EditUpdatePackageWithVBMetaProperties(
-	ctx context.Context,
-	avbTool *avb.AVBTool,
-	srcUpdatePackage Package,
-	dstUpdatePackagePath string,
-	repoName string,
-	vbmetaPropertyFiles map[string]string,
-	editFunc func(path string) error) (Package, error) {
-	return r.EditPackage(ctx, srcUpdatePackage, dstUpdatePackagePath, func(tempDir string) error {
-		if err := editFunc(tempDir); err != nil {
-			return err
-		}
-
-		packagesJsonPath := filepath.Join(tempDir, "packages.json")
-		logger.Infof(ctx, "setting host name in %q to %q", packagesJsonPath, repoName)
-
-		err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-			src, err := os.Open(packagesJsonPath)
-			if err != nil {
-				return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
-			}
-
-			if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
-				return fmt.Errorf("failed to rehost package.json: %w", err)
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
-		}
-
-		srcVbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
-		if _, err := os.Stat(srcVbmetaPath); err != nil {
-			return fmt.Errorf("vbmeta %q does not exist in repo: %w", srcVbmetaPath, err)
-		}
-
-		logger.Infof(ctx, "updating vbmeta %q", srcVbmetaPath)
-
-		err = util.AtomicallyWriteFile(srcVbmetaPath, 0600, func(f *os.File) error {
-			if err := avbTool.MakeVBMetaImage(ctx, f.Name(), srcVbmetaPath, vbmetaPropertyFiles); err != nil {
-				return fmt.Errorf("failed to update vbmeta: %w", err)
-			}
-			return nil
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", srcVbmetaPath, err)
-		}
-
-		return nil
-	})
-}
-
-// Extract the update package `srcUpdatePackage` into a temporary directory,
-// then build and publish it to the repository as the `dstUpdatePackage` name.
-// It will automatically rewrite the `packages.json` file to use `repoName`
-// path, to avoid collisions with the `fuchsia.com` repository name.
-func (r *Repository) EditUpdatePackage(
-	ctx context.Context,
-	avbTool *avb.AVBTool,
-	zbiTool *zbi.ZBITool,
-	srcUpdatePackage Package,
-	dstUpdatePackagePath string,
-	repoName string,
-	editFunc func(path string) error,
-) (Package, error) {
-	vbmetaPropertyFiles := map[string]string{}
-
-	return r.EditUpdatePackageWithVBMetaProperties(
-		ctx,
-		avbTool,
-		srcUpdatePackage,
-		dstUpdatePackagePath,
-		repoName,
-		vbmetaPropertyFiles,
-		func(path string) error {
-			return editFunc(path)
-		})
-}
-
-func (r *Repository) EditUpdatePackageWithNewSystemImageMerkle(
-	ctx context.Context,
-	avbTool *avb.AVBTool,
-	zbiTool *zbi.ZBITool,
-	systemImageMerkle build.MerkleRoot,
-	srcUpdatePackage Package,
-	dstUpdatePackagePath string,
-	bootfsCompression string,
-	editFunc func(path string) error,
-) (Package, error) {
-	repoName := "fuchsia.com"
-
-	return r.EditUpdatePackage(
-		ctx,
-		avbTool,
-		zbiTool,
-		srcUpdatePackage,
-		dstUpdatePackagePath,
-		repoName,
-		func(tempDir string) error {
-			if err := zbiTool.UpdateZBIWithNewSystemImageMerkle(ctx,
-				systemImageMerkle,
-				tempDir,
-				bootfsCompression,
-			); err != nil {
-				return err
-			}
-
-			pathToZbi := filepath.Join(tempDir, "zbi")
-			vbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
-			if err := avbTool.MakeVBMetaImageWithZbi(ctx, vbmetaPath, vbmetaPath, pathToZbi); err != nil {
-				return err
-			}
-
-			packagesJsonPath := filepath.Join(tempDir, "packages.json")
-			err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-				src, err := os.Open(packagesJsonPath)
-				if err != nil {
-					return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
-				}
-
-				if err := util.UpdateHashValuePackagesJSON(
-					bufio.NewReader(src),
-					bufio.NewWriter(f),
-					repoName,
-					"system_image/0",
-					systemImageMerkle,
-				); err != nil {
-					return fmt.Errorf("failed to update system_image_merkle in package.json: %w", err)
-				}
-
-				return nil
-			})
-
-			if err != nil {
-				return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
-			}
-
-			return editFunc(tempDir)
-		})
 }
 
 func (r *Repository) Publish(ctx context.Context, packageManifestPath string) error {

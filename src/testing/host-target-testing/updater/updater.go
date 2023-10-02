@@ -206,34 +206,21 @@ func NewSystemUpdater(repo *packages.Repository, updatePackageUrl string, checkF
 func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 	startTime := time.Now()
 
-	repoName := "download-ota"
-	tempDir, err := os.MkdirTemp("", "update-pkg-expand")
-	if err != nil {
-		return fmt.Errorf("unable to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
 	url, err := url.Parse(u.updatePackageUrl)
 	if err != nil {
 		return fmt.Errorf("invalid update package URL %q: %w", u.updatePackageUrl, err)
 	}
+	pkgPath := url.Path[1:]
 
-	if err := rehostPackageRepository(ctx, u.repo, url, repoName, tempDir); err != nil {
-		return fmt.Errorf("failed to rehost the package repository: %q", err)
-	}
-
-	pkgBuilder, err := packages.NewPackageBuilderFromDir(tempDir, "system_update", "0", "testrepository.com")
+	srcUpdate, err := u.repo.OpenUpdatePackage(ctx, pkgPath)
 	if err != nil {
-		return fmt.Errorf("Failed to parse package from %q: %w", tempDir, err)
-	}
-	defer pkgBuilder.Close()
-
-	pkg, err := pkgBuilder.Publish(ctx, u.repo)
-	if err != nil {
-		return fmt.Errorf("Failed to publish update package: %w", err)
+		return err
 	}
 
-	logger.Infof(ctx, "published %q as %q to %q", pkg.Path(), pkg.Merkle(), u.repo)
+	repoName := "download-ota"
+	dstUpdate, err := srcUpdate.RehostUpdatePackage(ctx, pkgPath, repoName)
+
+	logger.Infof(ctx, "published %q as %q to %q", pkgPath, dstUpdate.Merkle(), u.repo)
 
 	server, err := c.ServePackageRepository(ctx, u.repo, repoName, true, nil)
 	if err != nil {
@@ -322,22 +309,12 @@ func NewOmahaUpdater(
 func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	logger.Infof(ctx, "injecting omaha_url into %q", u.updatePackageURL)
 
-	pkg, err := u.repo.OpenPackage(ctx, u.updatePackageURL.Path[1:])
+	srcUpdate, err := u.repo.OpenUpdatePackage(ctx, u.updatePackageURL.Path[1:])
 	if err != nil {
-		return fmt.Errorf("failed to open url %q: %w", u.updatePackageURL, err)
+		return err
 	}
 
-	logger.Infof(ctx, "source update package merkle for %q is %q", u.updatePackageURL, pkg.Merkle())
-
-	tempDir, err := os.MkdirTemp("", "update-pkg-expand")
-	if err != nil {
-		return fmt.Errorf("unable to create temp directory: %w", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	if err := rehostPackageRepository(ctx, u.repo, u.updatePackageURL, "trigger-ota", tempDir); err != nil {
-		return fmt.Errorf("failed to rehost the package repository: %q", err)
-	}
+	logger.Infof(ctx, "source update package merkle for %q is %q", u.updatePackageURL, srcUpdate.Merkle())
 
 	// Create a ZBI with the omaha_url argument.
 	destZbi, err := os.CreateTemp("", "omaha_argument.zbi")
@@ -351,6 +328,8 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 		"omaha_app_id": u.omahaTool.Args.AppId,
 	}
 
+	logger.Infof(ctx, "Omaha Server URL set in vbmeta to %q", u.omahaTool.URL())
+
 	if err := u.zbiTool.MakeImageArgsZbi(ctx, destZbi.Name(), imageArguments); err != nil {
 		return fmt.Errorf("failed to create ZBI: %w", err)
 	}
@@ -360,41 +339,46 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 		"zbi": destZbi.Name(),
 	}
 
-	// Update vbmeta in this package.
-	srcVbmetaPath := filepath.Join(tempDir, "fuchsia.vbmeta")
+	repoName := "trigger-ota"
 
-	if _, err := os.Stat(srcVbmetaPath); err != nil {
-		return fmt.Errorf("vbmeta %q does not exist in repo: %w", srcVbmetaPath, err)
-	}
+	dstUpdate, err := srcUpdate.EditUpdatePackageWithVBMetaProperties(
+		ctx,
+		u.avbTool,
+		"update_omaha/0",
+		propFiles,
+		func(tempDir string) error {
+			// Update packages.json in this package.
+			packagesJsonPath := filepath.Join(tempDir, "packages.json")
+			err = util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
+				src, err := os.Open(packagesJsonPath)
+				if err != nil {
+					return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
+				}
+				if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
+					return fmt.Errorf("Failed to rehost packages.json: %w", err)
+				}
 
-	// Swap the the updated vbmeta into place.
-	err = util.AtomicallyWriteFile(srcVbmetaPath, 0600, func(f *os.File) error {
-		if err := u.avbTool.MakeVBMetaImage(ctx, f.Name(), srcVbmetaPath, propFiles); err != nil {
-			return fmt.Errorf("Failed to update vbmeta: %w", err)
-		}
+				return nil
+			})
+			if err != nil {
+				return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
+			}
 
-		return nil
-	})
+			return nil
+		},
+	)
 	if err != nil {
-		return fmt.Errorf("failed to atomically overwrite %q: %w", srcVbmetaPath, err)
+		return fmt.Errorf("failed to inject vbmeta properties into update package: %w", err)
 	}
 
-	logger.Infof(ctx, "Omaha Server URL set in vbmeta to %q", u.omahaTool.URL())
+	logger.Infof(ctx, "Published %q as %q to %q", dstUpdate.Path(), dstUpdate.Merkle(), u.repo)
 
-	pkgBuilder, err := packages.NewPackageBuilderFromDir(tempDir, "update_omaha", "0", "testrepository.com")
-	if err != nil {
-		return fmt.Errorf("Failed to parse package from %q: %w", tempDir, err)
-	}
-	defer pkgBuilder.Close()
-
-	pkg, err = pkgBuilder.Publish(ctx, u.repo)
-	if err != nil {
-		return fmt.Errorf("Failed to publish update package: %w", err)
-	}
-
-	logger.Infof(ctx, "published %q as %q to %q", pkg.Path(), pkg.Merkle(), u.repo)
-
-	omahaPackageURL := fmt.Sprintf("fuchsia-pkg://trigger-ota/%s?hash=%s", pkg.Path(), pkg.Merkle())
+	omahaPackageURL := fmt.Sprintf(
+		"fuchsia-pkg://%s/%s?hash=%s",
+		repoName,
+		dstUpdate.Path(),
+		dstUpdate.Merkle(),
+	)
 
 	// Configure the Omaha server with the new omaha package URL.
 	if err := u.omahaTool.SetPkgURL(ctx, omahaPackageURL); err != nil {
@@ -403,38 +387,4 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 
 	// Trigger an update
 	return updateCheckNow(ctx, c, u.repo, !u.workaroundOtaNoRewriteRules, u.checkForUnkownFirmware)
-}
-
-func rehostPackageRepository(ctx context.Context, repo *packages.Repository, updatePackageUrl *url.URL, repoName string, tempDir string) error {
-	pkg, err := repo.OpenPackage(ctx, updatePackageUrl.Path[1:])
-	if err != nil {
-		return fmt.Errorf("failed to open url %q: %w", updatePackageUrl.String(), err)
-	}
-
-	logger.Infof(ctx, "source update package merkle for %q is %q", updatePackageUrl.String(), pkg.Merkle())
-
-	if err := pkg.Expand(ctx, tempDir); err != nil {
-		return fmt.Errorf("failed to expand pkg to %s: %w", tempDir, err)
-	}
-
-	// Update packages.json in this package.
-	packagesJsonPath := filepath.Join(tempDir, "packages.json")
-	err = util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-		src, err := os.Open(packagesJsonPath)
-		if err != nil {
-			return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
-		}
-		if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
-			return fmt.Errorf("Failed to rehost packages.json: %w", err)
-		}
-
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
-	}
-
-	logger.Infof(ctx, "host names in packages.json set to %w", repoName)
-
-	return nil
 }

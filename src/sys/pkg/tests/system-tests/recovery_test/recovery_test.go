@@ -151,8 +151,13 @@ func doTestRecovery(
 		return fmt.Errorf("unable to get repository: %w", err)
 	}
 
+	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
+	if err != nil {
+		return fmt.Errorf("error opening update/0: %w", err)
+	}
+
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -226,7 +231,13 @@ func initializeDevice(
 		return nil, fmt.Errorf("failed to run before-init-script: %w", err)
 	}
 
-	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
+	if err != nil {
+		return nil, fmt.Errorf("error opening update/0: %w", err)
+	}
+
+	// Install version N on the device if it is not already on that version.
+	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}

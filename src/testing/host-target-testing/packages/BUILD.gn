@@ -29,6 +29,7 @@ if (is_host) {
       "repo.go",
       "repo_test.go",
       "server.go",
+      "update_package.go",
     ]
   }
 

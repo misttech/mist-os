@@ -186,8 +186,13 @@ func doTestOTAs(
 		return fmt.Errorf("error getting repository: %w", err)
 	}
 
+	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
+	if err != nil {
+		return err
+	}
+
 	// Install version N on the device if it is not already on that version.
-	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image merkle: %w", err)
 	}
@@ -331,7 +336,12 @@ func initializeDevice(
 			return nil, fmt.Errorf("error getting downgrade repository: %w", err)
 		}
 
-		systemImage, err := repo.LookupUpdateSystemImage(ctx)
+		updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
+		if err != nil {
+			return nil, err
+		}
+
+		systemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
 		if err != nil {
 			return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
 		}
@@ -414,7 +424,12 @@ func systemOTA(
 	checkABR bool,
 	checkForUnknownFirmware bool,
 ) error {
-	expectedSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	updatePackage, err := repo.OpenUpdatePackage(ctx, "update/0")
+	if err != nil {
+		return fmt.Errorf("error opening update/0 package: %w", err)
+	}
+
+	expectedSystemImage, err := updatePackage.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return fmt.Errorf("error extracting expected system image: %w", err)
 	}
@@ -456,20 +471,20 @@ func buildAndOtaToPackage(
 ) error {
 	avbTool, err := c.installerConfig.AVBTool()
 	if err != nil {
-		return fmt.Errorf("failed to intialize AVBTool: %q", err)
+		return fmt.Errorf("failed to intialize AVBTool: %w", err)
 	}
 
 	zbiTool, err := c.installerConfig.ZBITool()
 	if err != nil {
-		return fmt.Errorf("failed to intialize ZBITool: %q", err)
+		return fmt.Errorf("failed to intialize ZBITool: %w", err)
 	}
 
-	srcUpdate, err := repo.OpenPackage(ctx, "update/0")
+	srcUpdate, err := repo.OpenUpdatePackage(ctx, "update/0")
 	if err != nil {
 		return fmt.Errorf("failed to open update/0 package: %w", err)
 	}
 
-	srcSystemImage, err := repo.LookupUpdateSystemImage(ctx)
+	srcSystemImage, err := srcUpdate.OpenPackage(ctx, "system_image/0")
 	if err != nil {
 		return fmt.Errorf(
 			"failed to open system_image/0 from %s update package: %w",
@@ -513,12 +528,12 @@ func buildAndOtaToPackage(
 	}
 
 	dstUpdatePath := "update_prime/0"
-	_, err = repo.EditUpdatePackageWithNewSystemImageMerkle(
+	_, err = srcUpdate.EditUpdatePackageWithNewSystemImage(
 		ctx,
 		avbTool,
 		zbiTool,
-		dstSystemImage.Merkle(),
-		srcUpdate,
+		"fuchsia.com",
+		dstSystemImage,
 		dstUpdatePath,
 		c.bootfsCompression,
 		func(path string) error {
