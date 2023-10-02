@@ -72,6 +72,13 @@ struct WaitKey {
     raw: u64,
 }
 
+impl WaitKey {
+    /// an empty key means no associated handler
+    fn empty() -> WaitKey {
+        WaitKey { raw: 0 }
+    }
+}
+
 /// The different type of event that can be waited on / triggered.
 #[derive(Clone, Copy, Debug)]
 enum WaitEvents {
@@ -85,6 +92,16 @@ enum WaitEvents {
 }
 
 impl WaitEvents {
+    /// Build a WaitEvents from the given `ordinal` and `value`.
+    fn from_data(ordinal: u8, value: u64) -> Self {
+        match ordinal {
+            0 => Self::All,
+            1 => Self::Fd(FdEvents::from_u64(value)),
+            2 => Self::Value(value),
+            _ => panic!("Unknown ordinal"),
+        }
+    }
+
     /// Returns whether a wait on `self` should be woken up by `other`.
     fn intercept(self: &WaitEvents, other: &WaitEvents) -> bool {
         match (self, other) {
@@ -94,18 +111,39 @@ impl WaitEvents {
             _ => false,
         }
     }
+
+    /// Returns the data to serialize `self`.
+    fn data(&self) -> (u8, u64) {
+        match self {
+            Self::All => (0, 0),
+            Self::Fd(events) => (1, events.bits() as u64),
+            Self::Value(value) => (2, *value),
+        }
+    }
+}
+
+impl From<WaitEvents> for zx::UserPacket {
+    fn from(events: WaitEvents) -> Self {
+        let (ordinal, value) = events.data();
+        let mut packet_data = [0u8; 32];
+        packet_data[0] = ordinal;
+        packet_data[8..16].copy_from_slice(&value.to_ne_bytes());
+        zx::UserPacket::from_u8_array(packet_data)
+    }
+}
+
+impl From<zx::UserPacket> for WaitEvents {
+    fn from(packet: zx::UserPacket) -> Self {
+        let mut value_bytes = [0u8; 8];
+        value_bytes[..8].copy_from_slice(&packet.as_u8_array()[8..16]);
+        Self::from_data(packet.as_u8_array()[0], u64::from_ne_bytes(value_bytes))
+    }
 }
 
 impl WaitCallback {
     pub fn none() -> EventHandler {
         Box::new(|_| {})
     }
-}
-
-#[derive(Debug)]
-struct UserEvent {
-    key: WaitKey,
-    events: WaitEvents,
 }
 
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
@@ -123,11 +161,6 @@ struct PortWaiter {
     ///
     /// This lock is nested inside the WaitQueue.waiters lock.
     wait_queues: Mutex<HashMap<WaitKey, Weak<WaitQueueImpl>>>,
-    /// A queue of events triggered within starnix.
-    ///
-    /// Events triggered by the Fuchsia platform (e.g. network sockets, filesystem)
-    /// are only made available through non-user packets on the port.
-    user_events: Mutex<Vec<UserEvent>>,
 }
 
 impl PortWaiter {
@@ -140,7 +173,6 @@ impl PortWaiter {
             next_key: AtomicU64::new(1),
             ignore_signals,
             wait_queues: Default::default(),
-            user_events: Default::default(),
         })
     }
 
@@ -154,14 +186,13 @@ impl PortWaiter {
         // current thread should not own any local ref that might delay the release of a resource
         // while doing so.
         debug_assert_no_local_temp_ref();
-
         match self.port.wait(deadline) {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
+                    let key = WaitKey { raw: packet.key() };
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
-                            let key = WaitKey { raw: packet.key() };
                             if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
                                     WaitCallback::SignalHandler(handler) => {
@@ -173,21 +204,9 @@ impl PortWaiter {
                                 }
                             }
                         }
-                        zx::PacketContents::User(_) => {
-                            // User packet w/ OK status is only used to wake up
-                            // the waiter and have it process enqueued user events.
-
-                            // `take` the queue of user events so that we do not
-                            // contend with threads trying to add to the queue
-                            // while handling what is currently available.
-                            let user_events = std::mem::take(&mut *self.user_events.lock());
-                            assert!(!user_events.is_empty(), "OK user packet should only be enqueued when there is a pending user event");
-
-                            for UserEvent { key, events } in user_events {
-                                let Some(callback) = self.remove_callback(&key) else {
-                                    continue;
-                                };
-
+                        zx::PacketContents::User(usrpkt) => {
+                            let events: WaitEvents = usrpkt.into();
+                            if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
                                     WaitCallback::EventHandler(handler) => {
                                         let fd_events = match events {
@@ -311,35 +330,13 @@ impl PortWaiter {
     }
 
     fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
-        let key = key.clone();
-
-        // Putting these events into their own queue breaks any ordering
-        // expectations on Linux by batching all starnix events with the first
-        // starnix event even if other events occur on the Fuchsia platform (and
-        // are enqueued to the `zx::Port`) between them. This ordering does not
-        // seem to be load-bearing for applications running on starnix so we
-        // take the divergence in ordering in favour of improved performance (by
-        // minimizing syscalls) when operating on FDs backed by starnix.
-        //
-        // TODO(https://fxbug.dev/134622): If we can read a batch of packets
-        // from the `zx::Port`, maybe we can keep the ordering?
-        let enqueue_packet = {
-            let mut user_events = self.user_events.lock();
-            let was_empty = user_events.is_empty();
-            user_events.push(UserEvent { key, events });
-            // Only enqueue a user packet on the first enqueued user event.
-            was_empty
-        };
-
-        if enqueue_packet {
-            self.queue_user_packet_data(zx::sys::ZX_OK)
-        }
+        self.queue_user_packet_data(key, zx::sys::ZX_OK, events)
     }
 
     /// Queue a packet to the underlying Zircon port, which will cause the
     /// waiter to wake up.
-    fn queue_user_packet_data(&self, status: i32) {
-        let packet = zx::Packet::from_user_packet(0, status, zx::UserPacket::default());
+    fn queue_user_packet_data(&self, key: &WaitKey, status: i32, events: WaitEvents) {
+        let packet = zx::Packet::from_user_packet(key.raw, status, events.into());
         self.port.queue(&packet).map_err(impossible_error).unwrap();
     }
 
@@ -347,7 +344,7 @@ impl PortWaiter {
         if self.ignore_signals {
             return;
         }
-        self.queue_user_packet_data(zx::sys::ZX_ERR_CANCELED);
+        self.queue_user_packet_data(&WaitKey::empty(), zx::sys::ZX_ERR_CANCELED, WaitEvents::All);
     }
 }
 
