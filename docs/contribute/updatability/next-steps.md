@@ -6,9 +6,7 @@ that will promote Fuchsia’s ability to change and update.
 
 ## Versioning and compatibility metadata throughout the surface
 
-- [FIDL availability annotations][rfc-0083] are
-  [not yet implemented][fxb-67858]. Once this is implemented, the next step is
-  to apply these annotations to FIDL files.
+- FIDL supports [availability annotations][fidl-versioning].
 - Availability annotations are
   [not yet implemented for C/C++ headers][fxb-60532] in the Fuchsia IDK. Once
   this is implemented, the next step is to apply these annotations to SDK header
@@ -188,6 +186,7 @@ even if CTS coverage never reaches 100% of the platform surface.
 [ffx]: /docs/development/tools/ffx/overview.md
 [ffx-reference]: https://fuchsia.dev/reference/tools/sdk/ffx.md
 [ffx-component]: https://fuchsia.dev/reference/tools/sdk/ffx.md#component
+[fidl-versioning]: /docs/reference/fidl/language/versioning.md
 [fssh]: https://fuchsia.dev/reference/tools/sdk/fssh.md
 [fx-mem]: https://fuchsia.dev/reference/tools/fx/cmd/mem
 [fx-snapshot]: https://fuchsia.dev/reference/tools/fx/cmd/snapshot
@@ -205,7 +204,6 @@ even if CTS coverage never reaches 100% of the platform surface.
 [oot-system-testing]: /docs/contribute/roadmap/2021/oot_system_testing.md
 [package-url]: /docs/concepts/packages/package_url.md
 [procargs]: /docs/concepts/process/program_loading.md#the_processargs_protocol
-[rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
 [sdk-tools]: https://fuchsia.dev/reference/tools/sdk/README.md
 [selectors]: /docs/reference/diagnostics/selectors.md
 [sl4a]: https://android.googlesource.com/platform/external/sl4a/

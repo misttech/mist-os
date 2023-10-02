@@ -1,7 +1,6 @@
 # FIDL versioning
 
-This document describes FIDL's API versioning features. For a more technical
-specification, see [RFC-0083: FIDL versioning][rfc-0083]. For guidance on how to
+This document describes FIDL's API versioning features. For guidance on how to
 evolve Fuchsia APIs, see [Fuchsia API evolution guidelines][api-evolution].
 
 ## Motivation
@@ -151,9 +150,6 @@ For example:
 Here, `LegacyMethod` does not appear in bindings at version 6 or higher nor at
 `HEAD`, but it gets added back in the `LEGACY` version.
 
-For more information on legacy support, see [RFC-0083: FIDL
-versioning][rfc-0083-legacy].
-
 ## References
 
 There are a variety of ways one FIDL element can reference another. For example:
@@ -216,8 +212,6 @@ We can decompose it by swapping the protocol at every version:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning_decomposed.test.fidl" region_tag="decomposed" %}
 ```
 
-[rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
-[rfc-0083-legacy]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md#legacy
 [element]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md#terminology
 [overview]: /docs/development/languages/fidl/guides/style.md#library-overview
 [deprecation-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=7692

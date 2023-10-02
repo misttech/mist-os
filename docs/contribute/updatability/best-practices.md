@@ -4,7 +4,7 @@
 to define interfaces between any two things that may update separately. Leverage
 the [FIDL rubric][fidl-rubric] where applicable.
 
-- FIDL has [versioning annotations][rfc-0083].
+- FIDL has [versioning annotations][fidl-versioning].
 - FIDL offers [API and ABI compatibility guarantees][fidl-compatibility].
 - FIDL enables soft transitions by supporting
   [changing type definitions][rfc-0061],
@@ -43,5 +43,5 @@ and [diagnostics selectors][selectors].
 [rfc-0021]: /docs/contribute/governance/rfcs/0021_soft_transitions_methods_add_remove.md
 [rfc-0048]: /docs/contribute/governance/rfcs/0048_explicit_union_ordinals.md
 [rfc-0061]: /docs/contribute/governance/rfcs/0061_extensible_unions.md
-[rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
+[fidl-versioning]: /docs/reference/fidl/language/versioning.md
 [selectors]: /docs/reference/diagnostics/selectors.md

@@ -46,7 +46,7 @@ protocol, reserved, resource, service, strict, struct, table, type, union,
 using.
 ```
 
-### Identifiers
+### Identifiers {#identifiers}
 
 FIDL _identifiers_ label declarations and their members. FIDL identifiers must
 match the regex `[a-zA-Z]([a-zA-Z0-9_]*[a-zA-Z0-9])?`. In words: identifiers

@@ -101,8 +101,8 @@ Different elements of an interface may be annotated differently. For instance
 different methods in a protocol or fields in an union may have been added,
 deprecated, or removed at different versions.
 
-FIDL being the common language for interface definition on Fuchsia
-[supports versioning annotations][rfc-0083]. To help developers who are making
+FIDL being the common language for interface definition on Fuchsia [supports
+versioning annotations][fidl-versioning]. To help developers who are making
 changes to platform FIDL files detect that their changes introduce
 potentially-incompatible revisions to the API, [API summaries][rfc-0076] are
 generated from FIDL files. Summaries can be compared against saved references
@@ -208,6 +208,7 @@ platform interfaces are observed and respected.
 [fidl]: /docs/concepts/fidl/overview.md
 [fidl-compatibility]: /docs/development/languages/fidl/guides/compatibility/README.md
 [fidl-reference]: https://fuchsia.dev/reference/fidl/
+[fidl-versioning]: /docs/reference/fidl/language/versioning.md
 [font-provider-fidl]: https://fuchsia.dev/reference/fidl/fuchsia.fonts#Provider
 [fsi-abi-surface]: /docs/concepts/packages/system.md#abi_surfaces
 [fsi-job-policy]: /docs/concepts/packages/system.md#job_policy
@@ -246,7 +247,6 @@ platform interfaces are observed and respected.
 [rfc-0048]: /docs/contribute/governance/rfcs/0048_explicit_union_ordinals.md
 [rfc-0061]: /docs/contribute/governance/rfcs/0061_extensible_unions.md
 [rfc-0076]: /docs/contribute/governance/rfcs/0076_fidl_api_summaries.md
-[rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
 [rfc-0097]: /docs/contribute/governance/rfcs/0097_fidl_toolchain.md
 [roadmap-netstack3]: /docs/contribute/roadmap/2021/netstack3.md
 [sandbox]: /docs/concepts/components/v2/introduction.md#what_is_sandboxing

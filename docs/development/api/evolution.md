@@ -4,7 +4,7 @@ This section contains guidelines for Fuchsia contributors making changes to
 Fuchsia Platform APIs. Before you begin, you should be familiarized with the
 following concepts:
 
-- [FIDL Versioning RFC](/docs/contribute/governance/rfcs/0083_fidl_versioning.md)
+- [FIDL versioning](/docs/reference/fidl/language/versioning.md)
 
 ## The lifecycle of a platform API {#lifecycle}
 
