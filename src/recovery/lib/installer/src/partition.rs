@@ -15,7 +15,7 @@ use {
     futures::future::try_join,
     futures::TryFutureExt,
     payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer},
-    recovery_util::block::BlockDevice,
+    recovery_util_block::BlockDevice,
     regex,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
     std::{cmp::min, fmt, sync::Mutex},

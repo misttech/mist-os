@@ -22,7 +22,7 @@ use {
     fuchsia_component::client,
     fuchsia_zircon as zx,
     partition::Partition,
-    recovery_util::block::BlockDevice,
+    recovery_util_block::BlockDevice,
     std::sync::Mutex,
 };
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use recovery_util::block::BlockDevice;
+use recovery_util_block::BlockDevice;
 
 const CONST_SELECT_INSTALL_HEADLINE: &str = "Select Installation Method";
 const CONST_BUTTON_USB_INSTALL: &str = "Install from USB";

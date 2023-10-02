@@ -39,7 +39,7 @@ use installer::{
     do_install, find_install_source, get_bootloader_type, restart, BootloaderType,
     InstallationPaths,
 };
-use recovery_util::block::{get_block_device, get_block_devices, BlockDevice};
+use recovery_util_block::{get_block_device, get_block_devices, BlockDevice};
 
 const INSTALLER_HEADLINE: &'static str = "Fuchsia Workstation Installer";
 

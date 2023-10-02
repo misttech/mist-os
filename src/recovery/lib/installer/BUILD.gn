@@ -20,7 +20,7 @@ rustc_library("installer") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/recovery/lib/recovery-util",
+    "//src/recovery/lib/recovery-util-block",
     "//src/storage/lib/block_client/rust:remote-block-device",
     "//src/sys/lib/payload_streamer",
     "//third_party/rust_crates:anyhow",

@@ -23,9 +23,7 @@ rustc_library("recovery-util") {
   deps = [
     ":recovery_metrics_registry_rustlib",
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_rust",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
@@ -56,7 +54,6 @@ rustc_library("recovery-util") {
     "//third_party/rust_crates:lazy_static",
   ]
   sources = [
-    "src/block.rs",
     "src/cobalt.rs",
     "src/crash.rs",
     "src/lib.rs",

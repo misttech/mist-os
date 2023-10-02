@@ -12,7 +12,7 @@ use anyhow::Error;
 use fuchsia_async::LocalExecutor;
 use fuchsia_zircon::Status;
 use installer::{BootloaderType, InstallationPaths};
-use recovery_util::block::BlockDevice;
+use recovery_util_block::BlockDevice;
 
 // Converts a raw c-string into a Rust String, or None if the c-string was NULL.
 //
@@ -131,9 +131,7 @@ impl Dependencies {
             find_install_source: Box::new(move |a, b| {
                 Box::pin(installer::find_install_source(a, b))
             }),
-            get_block_devices: Box::new(
-                move || Box::pin(recovery_util::block::get_block_devices()),
-            ),
+            get_block_devices: Box::new(move || Box::pin(recovery_util_block::get_block_devices())),
         }
     }
 }
