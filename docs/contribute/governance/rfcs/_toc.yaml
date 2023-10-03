@@ -469,4 +469,4 @@ toc:
   - title: "RFC-0226: Zircon Pager Writeback"
     path: /docs/contribute/governance/rfcs/0226_zircon_pager_writeback.md
   - title: "RFC-0227: Fuchsia Release Process"
-    path: /docs/contribute/governance/rfcs/0227_fuchsia_release_process.md  # TODO: DO NOT SUBMIT, update.
+    path: /docs/contribute/governance/rfcs/0227_fuchsia_release_process.md
