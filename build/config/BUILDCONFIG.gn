@@ -734,6 +734,7 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
           {
             target_label =
                 get_label_info(":${target_name}", "label_with_toolchain")
+            target_type = _target_type
             license_labels = _applicable_licenses
           },
         ]
