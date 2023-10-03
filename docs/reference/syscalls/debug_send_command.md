@@ -35,7 +35,8 @@ TODO(fxbug.dev/32938)
 
 ## Rights
 
-*resource* must have resource kind **ZX_RSRC_KIND_ROOT**.
+*resource* must have resource kind **ZX_RSRC_KIND_SYSTEM** with base
+**ZX_RSRC_SYSTEM_DEBUG_BASE**.
 
 ## Return value
 
