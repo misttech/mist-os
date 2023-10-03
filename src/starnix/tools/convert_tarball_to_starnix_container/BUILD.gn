@@ -5,13 +5,13 @@
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 
-group("convert_docker_to_starnix") {
+group("convert_tarball_to_starnix_container") {
   deps = [ ":host" ]
 }
 
 install_host_tools("host") {
-  deps = [ ":convert_docker_to_starnix_bin" ]
-  outputs = [ "convert_docker_to_starnix" ]
+  deps = [ ":convert_tarball_to_starnix_container_bin" ]
+  outputs = [ "convert_tarball_to_starnix_container" ]
 }
 
 if (is_host) {
@@ -27,8 +27,8 @@ if (is_host) {
       get_label_info(_default_init_x64_target, "root_out_dir") + "/" +
       get_label_info(_default_init_x64_target, "name")
 
-  rustc_binary("convert_docker_to_starnix_bin") {
-    name = "convert_docker_to_starnix"
+  rustc_binary("convert_tarball_to_starnix_container_bin") {
+    name = "convert_tarball_to_starnix_container"
     edition = "2021"
 
     deps = [
@@ -70,9 +70,9 @@ if (is_host) {
   group("tests") {
     testonly = true
     deps = [
-      # NOTE: convert_docker_to_starnix does not have any test yet. By listing it here, we can at least
+      # NOTE: convert_tarball_to_starnix_container does not have any test yet. By listing it here, we can at least
       # verify that it compiles in CQ.
-      ":convert_docker_to_starnix_bin",
+      ":convert_tarball_to_starnix_container_bin",
     ]
   }
 }

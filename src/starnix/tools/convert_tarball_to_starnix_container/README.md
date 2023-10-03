@@ -1,4 +1,4 @@
-# convert_docker_to_starnix
+# convert_tarball_to_starnix_container
 
 This directory contains a tool to convert images of Linux containers (tar files) into Fuchsia
 packages that can be run in Starnix.
@@ -9,7 +9,7 @@ packages that can be run in Starnix.
 
 Given a tar file with the contents of the root filesystem:
 ```
-$ fx host-tool convert_docker_to_starnix --input-format tarball \
+$ fx host-tool convert_tarball_to_starnix_container --input-format tarball \
     ~/rootfs.tar ~/example.far
 ```
 
@@ -23,7 +23,7 @@ $ docker build -t example .
 Save it with `docker save`:
 ```
 $ docker save example -o ~/example.tar
-$ fx host-tool convert_docker_to_starnix --input-format docker-archive \
+$ fx host-tool convert_tarball_to_starnix_container --input-format docker-archive \
     ~/example.tar ~/example.far
 ```
 
