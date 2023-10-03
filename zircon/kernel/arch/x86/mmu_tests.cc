@@ -186,8 +186,35 @@ static bool x86_test_physmap_nx() {
   END_TEST;
 }
 
+// Ensure that Destroy works on unified aspaces without triggering lockdep.
+// TODO(https://fxbug.dev/132980): Move this to the arch-agnostic tests in
+// zircon/kernel/tests/mmu_tests.cc once unified aspaces are supported on all architectures.
+static bool x86_test_destroy_unified() {
+  BEGIN_TEST;
+
+  // Create a shared and restricted aspace.
+  constexpr uint64_t kTestAspaceSize = 4ull * PAGE_SIZE;
+  constexpr uint64_t kTestSharedAspaceBase = kTestAspaceSize + PAGE_SIZE;
+  X86ArchVmAspace restricted(0, kTestAspaceSize, /*mmu_flags=*/0);
+  EXPECT_EQ(ZX_OK, restricted.Init());
+  X86ArchVmAspace shared(kTestSharedAspaceBase, kTestAspaceSize, /*mmu_flags=*/0);
+  EXPECT_EQ(ZX_OK, shared.InitPrepopulated());
+
+  // Create a unified aspace consisting of the above aspaces.
+  X86ArchVmAspace unified(0, kTestAspaceSize, /*mmu_flags=*/0);
+  EXPECT_EQ(ZX_OK, unified.InitUnified(shared, restricted));
+
+  // Destroy all 3 and make sure it succeeds.
+  EXPECT_OK(unified.Destroy());
+  EXPECT_OK(restricted.Destroy());
+  EXPECT_OK(shared.Destroy());
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(x86_mmu_tests)
 UNITTEST("user-aspace page table tests", x86_arch_vmaspace_usermmu_tests)
 UNITTEST("l1tf test", x86_test_l1tf_invariant)
 UNITTEST("physmap nx", x86_test_physmap_nx)
+UNITTEST("destroy unified", x86_test_destroy_unified)
 UNITTEST_END_TESTCASE(x86_mmu_tests, "x86_mmu", "x86 mmu tests")

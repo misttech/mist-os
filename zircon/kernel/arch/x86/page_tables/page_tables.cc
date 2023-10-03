@@ -1465,8 +1465,71 @@ zx_status_t X86PageTableBase::HarvestAccessed(vaddr_t vaddr, size_t count,
   return ZX_OK;
 }
 
+void X86PageTableBase::FreeTopLevelPage() {
+  if (phys_) {
+    pmm_free_page(paddr_to_vm_page(phys_));
+    phys_ = 0;
+  }
+
+  // Clear virt_ to indicate we are now destroyed, and prevent any misuses of the ArchVmAspace API
+  // from performing use-after-free on the PT.
+  virt_ = nullptr;
+}
+
 void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
   canary_.Assert();
+  if (IsUnified()) {
+    return DestroyUnified();
+  }
+  return DestroyIndependent(base, size);
+}
+
+void X86PageTableBase::DestroyUnified() {
+  DEBUG_ASSERT(IsUnified());
+
+  X86PageTableBase* restricted = nullptr;
+  X86PageTableBase* shared = nullptr;
+  {
+    // This lock should be uncontended since Destroy is not supposed to be called in parallel with
+    // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any
+    // bugs. We limit the scope in which we hold this lock when destroying unified page tables
+    // because holding it prior to acquiring the shared and restricted page table locks would
+    // violate the lock's ordering rules. We do not destroy the unified page table here, as the
+    // restricted page table may still reference it.
+    Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+    // We can copy these pointers to local variables and use them outside of this critical section
+    // because they are notionally const for unified page tables.
+    restricted = referenced_pt_;
+    shared = shared_pt_;
+    shared_pt_ = nullptr;
+    referenced_pt_ = nullptr;
+  }
+  {
+    Guard<Mutex> a{AssertOrderedLock, &shared->lock_, shared->LockOrder()};
+    // The shared page table should be referenced by at least this page table, and could be
+    // referenced by many other unified page tables.
+    DEBUG_ASSERT(shared->num_references_ > 0);
+    shared->num_references_--;
+    if (shared->num_references_ == 0) {
+      shared->is_shared_ = false;
+    }
+  }
+  {
+    Guard<Mutex> a{AssertOrderedLock, &restricted->lock_, restricted->LockOrder()};
+    // The restricted page table can only be referenced by a singular unified page table.
+    DEBUG_ASSERT(restricted->num_references_ == 1);
+
+    restricted->num_references_--;
+    restricted->referenced_pt_ = nullptr;
+    restricted->is_restricted_ = false;
+  }
+
+  Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
+  FreeTopLevelPage();
+}
+
+void X86PageTableBase::DestroyIndependent(vaddr_t base, size_t size) {
+  DEBUG_ASSERT(!IsUnified());
 
   // This lock should be uncontended since Destroy is not supposed to be called in parallel with
   // any other operation, but hold it anyway so we can clear virt_ and attempt to surface any bugs.
@@ -1498,31 +1561,6 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
     }
   }
 
-  if (IsUnified()) {
-    {
-      Guard<Mutex> b{AssertOrderedLock, &shared_pt_->lock_, shared_pt_->LockOrder()};
-      // The shared page table should be referenced by at least this page table, and could be
-      // referenced by many other unified page tables.
-      DEBUG_ASSERT(shared_pt_->num_references_ > 0);
-      shared_pt_->num_references_--;
-      if (shared_pt_->num_references_ == 0) {
-        shared_pt_->is_shared_ = false;
-      }
-    }
-    {
-      Guard<Mutex> b{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
-      // The referenced_pt_ is the restricted page table, which can only be referenced by a singular
-      // unified page table.
-      DEBUG_ASSERT(referenced_pt_->num_references_ == 1);
-
-      referenced_pt_->num_references_--;
-      referenced_pt_->referenced_pt_ = nullptr;
-      referenced_pt_->is_restricted_ = false;
-    }
-    shared_pt_ = nullptr;
-    referenced_pt_ = nullptr;
-  }
-
   if constexpr (DEBUG_ASSERT_IMPLEMENTED) {
     PageTableLevel top = top_level();
     if (virt_) {
@@ -1540,12 +1578,5 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
       }
     }
   }
-
-  if (phys_) {
-    pmm_free_page(paddr_to_vm_page(phys_));
-    phys_ = 0;
-  }
-  // Clear virt_ to indicate we are now destroyed, and prevent any misuses of the ArchVmAspace API
-  // from performing use-after-free on the PT.
-  virt_ = nullptr;
+  FreeTopLevelPage();
 }

@@ -140,8 +140,7 @@ class X86PageTableBase {
                           size_t shared_size, X86PageTableBase* restricted, vaddr_t restricted_base,
                           size_t restricted_size, page_alloc_fn_t test_paf = nullptr);
 
-  // Release the resources associated with this page table.  |base| and |size|
-  // are only used for debug checks that the page tables have no more mappings.
+  // Calls DestroyUnified if this is a unified page table and DestroyIndependent if it is not.
   void Destroy(vaddr_t base, size_t size);
 
   // Returns the highest level of the page tables
@@ -231,6 +230,17 @@ class X86PageTableBase {
                   volatile pt_entry_t* pte, bool was_terminal) TA_REQ(lock_);
 
   pt_entry_t* AllocatePageTable();
+
+  // Release the resources associated with this page table.  |base| and |size|
+  // are only used for debug checks that the page tables have no more mappings.
+  void DestroyIndependent(vaddr_t base, size_t size);
+
+  // Releases the resources exclusively owned by this unified page table, and update the relevant
+  // metadata on the associated restricted and shared page tables.
+  void DestroyUnified();
+
+  // Frees the top level page in this page table.
+  void FreeTopLevelPage() TA_REQ(lock_);
 
   // Checks that the given page table entries are equal but ignores the accessed and dirty flags.
   bool check_equal_ignore_flags(pt_entry_t left, pt_entry_t right);
