@@ -54,7 +54,12 @@ async fn get_single_package_with_no_content_blobs(env: TestEnv, blob_type: fpkg:
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -167,7 +172,12 @@ async fn get_and_hold_directory() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
@@ -197,7 +207,12 @@ async fn unavailable_when_client_drops_needed_blobs_channel() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     drop(needed_blobs);
@@ -243,7 +258,8 @@ async fn handles_partially_written_pkg() {
             delivery_blob::Type1Blob::generate(data, delivery_blob::CompressionMode::Always);
 
         let pkg_cache = env.client();
-        let mut get = pkg_cache.get(meta_blob_info.into()).unwrap();
+        let mut get =
+            pkg_cache.get(meta_blob_info.into(), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
         assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
         let missing = get.get_missing_blobs().try_concat().await.unwrap();
@@ -295,7 +311,12 @@ async fn get_package_already_present_on_fs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // `OpenMetaBlob()` for already cached package closes the channel with with a `ZX_OK` epitaph.
@@ -339,7 +360,12 @@ async fn get_package_already_present_on_fs_with_pre_closed_needed_blobs() {
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(pkgdir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(pkgdir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let () = get_fut.await.unwrap().unwrap();
@@ -572,7 +598,12 @@ async fn get_with_specific_blobfs_implementation(
     let get_fut = env
         .proxies
         .package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -628,4 +659,87 @@ async fn cpp_blobfs() {
         },
     )
     .await;
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn get_with_retained_protection_refetches_blobs() {
+    let blob_content = &b"unique blob contents"[..];
+    let pkg = PackageBuilder::new("some-package")
+        .add_resource_at("blob-to-refetch", blob_content)
+        .build()
+        .await
+        .unwrap();
+    let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;
+    let env = TestEnv::builder()
+        .blobfs_from_system_image_and_extra_packages(&system_image_package, &[&pkg])
+        .await
+        .build()
+        .await;
+    let () = env.block_until_started().await;
+
+    // Delete the content blob.
+    let blob_hash = MerkleTree::from_reader(blob_content).unwrap().root();
+    let blobfs = env.blobfs.client();
+    let () = blobfs.delete_blob(&blob_hash).await.unwrap();
+    assert!(!blobfs.has_blob(&blob_hash).await);
+
+    // Get with OpenPackageTracking protection, package should *not* validate because the package
+    // was in the dynamic index which short-circuits the fetch, so the deleted content blob should
+    // still be missing.
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let get_fut = env
+        .proxies
+        .package_cache
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap().1,
+            Some(dir_server_end),
+        )
+        .map_ok(|res| res.map_err(Status::from_raw));
+    let () = get_fut.await.unwrap().unwrap();
+    assert_matches!(
+        pkg.verify_contents(&dir).await,
+        Err(fuchsia_pkg_testing::VerificationError::MissingFile{path}) if path == "blob-to-refetch"
+    );
+    assert!(!blobfs.has_blob(&blob_hash).await);
+
+    // Get with Retained protection, package *should* validate because Retained Gets always
+    // check all the blobs.
+    let meta_blob_info = BlobInfo { blob_id: BlobId::from(*pkg.hash()).into(), length: 0 };
+    let (needed_blobs, needed_blobs_server_end) =
+        fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
+    let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    let get_fut = env
+        .proxies
+        .package_cache
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::Retained,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
+        .map_ok(|res| res.map_err(Status::from_raw));
+    assert_matches!(
+        needed_blobs.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap().unwrap(),
+        None
+    );
+    assert_eq!(
+        get_missing_blobs(&needed_blobs).await,
+        vec![BlobInfo { blob_id: BlobId::from(blob_hash).into(), length: 0 }]
+    );
+    let blob_writer = needed_blobs
+        .open_blob(&BlobId::from(blob_hash).into(), fpkg::BlobType::Delivery)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let () = compress_and_write_blob(blob_content, *blob_writer).await.unwrap();
+    let () = blob_written(&needed_blobs, blob_hash).await;
+    let () = get_fut.await.unwrap().unwrap();
+    let () = pkg.verify_contents(&dir).await.unwrap();
+    assert!(blobfs.has_blob(&blob_hash).await);
+
+    let () = env.stop().await;
 }

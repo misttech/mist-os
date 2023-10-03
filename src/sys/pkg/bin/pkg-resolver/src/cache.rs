@@ -69,6 +69,7 @@ pub async fn cache_package<'a>(
     repo: Arc<AsyncMutex<Repository>>,
     config: &'a RepositoryConfig,
     url: &'a AbsolutePackageUrl,
+    gc_protection: fpkg::GcProtection,
     cache: &'a pkg::cache::Client,
     blob_fetcher: &'a BlobFetcher,
     cobalt_sender: ProtocolSender<MetricEvent>,
@@ -93,7 +94,7 @@ pub async fn cache_package<'a>(
 
     let meta_far_blob = BlobInfo { blob_id: merkle, length: 0 };
 
-    let mut get = cache.get(meta_far_blob)?;
+    let mut get = cache.get(meta_far_blob, gc_protection)?;
 
     let blob_fetch_res = async {
         let mirrors = config.mirrors().to_vec().into();

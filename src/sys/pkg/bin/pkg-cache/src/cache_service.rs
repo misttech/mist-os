@@ -23,9 +23,9 @@ use {
         serve_fidl_iterator_from_slice, serve_fidl_iterator_from_stream, BlobId, BlobInfo,
     },
     fuchsia_async::Task,
-    fuchsia_cobalt_builders::MetricEventExt,
+    fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_hash::Hash,
-    fuchsia_inspect::{self as finspect, NumericProperty, Property, StringProperty},
+    fuchsia_inspect::{self as finspect, NumericProperty as _, Property as _, StringProperty},
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     fuchsia_zircon::Status,
     futures::{FutureExt as _, TryFutureExt as _, TryStreamExt as _},
@@ -63,7 +63,13 @@ pub(crate) async fn serve(
         .try_for_each_concurrent(None, |event| async {
             let cobalt_sender = cobalt_sender.clone();
             match event {
-                PackageCacheRequest::Get { meta_far_blob, needed_blobs, dir, responder } => {
+                PackageCacheRequest::Get {
+                    meta_far_blob,
+                    gc_protection,
+                    needed_blobs,
+                    dir,
+                    responder,
+                } => {
                     let id = serve_id.fetch_add(1, Ordering::SeqCst);
                     let meta_far_blob: BlobInfo = meta_far_blob.into();
                     let node = get_node.create_child(id.to_string());
@@ -73,6 +79,7 @@ pub(crate) async fn serve(
                         "app",
                         "cache_get",
                         "meta_far_blob_id" => meta_far_blob.blob_id.to_string().as_str(),
+                        "gc_protection" => format!("{gc_protection:?}").as_str(),
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the id as metadata to manually determine the
                         // relationship.
@@ -84,6 +91,7 @@ pub(crate) async fn serve(
                         executability_restrictions,
                         &blobfs,
                         meta_far_blob,
+                        gc_protection,
                         needed_blobs,
                         dir.map(|dir| (dir, scope.clone())),
                         cobalt_sender,
@@ -175,62 +183,45 @@ fn make_pkgdir_flags(executability_status: ExecutabilityStatus) -> fio::OpenFlag
 }
 
 #[allow(clippy::too_many_arguments)]
-/// Fetch a package, and optionally open it.
+/// Fetch a package and optionally open it.
 async fn get(
     package_index: &async_lock::RwLock<PackageIndex>,
     base_packages: &BasePackages,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     blobfs: &blobfs::Client,
     meta_far_blob: BlobInfo,
+    gc_protection: fpkg::GcProtection,
     needed_blobs: ServerEnd<NeededBlobsMarker>,
     dir_and_scope: Option<(ServerEnd<fio::DirectoryMarker>, package_directory::ExecutionScope)>,
     mut cobalt_sender: ProtocolSender<MetricEvent>,
     node: &finspect::Node,
 ) -> Result<(), Status> {
-    let _time_prop = node.create_int("started-time", zx::Time::get_monotonic().into_nanos());
-    let _id_prop = node.create_string("meta-far-id", meta_far_blob.blob_id.to_string());
-    let _length_prop = node.create_uint("meta-far-length", meta_far_blob.length);
+    let () = node.record_int("started-time", zx::Time::get_monotonic().into_nanos());
+    let () = node.record_string("meta-far-id", meta_far_blob.blob_id.to_string());
+    let () = node.record_uint("meta-far-length", meta_far_blob.length);
+    let () = node.record_string("gc-protection", format!("{gc_protection:?}"));
 
     let needed_blobs = needed_blobs.into_stream().map_err(|_| Status::INTERNAL)?;
+    let pkg: Hash = meta_far_blob.blob_id.into();
 
     let (root_dir, package_status) =
-        match get_package_status(base_packages, package_index, &meta_far_blob.blob_id.into()).await
-        {
-            ps @ PackageStatus::Base | ps @ PackageStatus::Active => {
-                let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
-                (None, ps)
-            }
-            PackageStatus::Other => {
-                let (root_dir, package_status) =
-                    serve_needed_blobs(needed_blobs, meta_far_blob, package_index, blobfs, node)
-                        .await
-                        .map_err(|e| {
-                            error!(
-                                "error while caching package {}: {:#}",
-                                meta_far_blob.blob_id,
-                                anyhow!(e)
-                            );
-                            cobalt_sender.send(
-                                MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
-                                    .with_event_codes(
-                                        metrics::PkgCacheOpenMigratedMetricDimensionResult::Io,
-                                    )
-                                    .as_occurrence(1),
-                            );
-                            Status::UNAVAILABLE
-                        })?;
-                (Some(root_dir), package_status)
-            }
-        };
-
-    if let Some((dir, scope)) = dir_and_scope {
-        let root_dir = if let Some(root_dir) = root_dir {
-            root_dir
-        } else {
-            package_directory::RootDir::new(blobfs.clone(), meta_far_blob.blob_id.into())
+        match (gc_protection, get_package_status(base_packages, package_index, &pkg).await) {
+            // During OTA (which is the only client of Retained protection) do not short-circuit
+            // fetches of packages expected to be resident, so that the system can recover from
+            // unexpectedly absent blobs.
+            (fpkg::GcProtection::Retained, _)
+            | (fpkg::GcProtection::OpenPackageTracking, PackageStatus::Other) => {
+                let (root_dir, package_status) = serve_needed_blobs(
+                    needed_blobs,
+                    meta_far_blob,
+                    gc_protection,
+                    package_index,
+                    blobfs,
+                    node,
+                )
                 .await
                 .map_err(|e| {
-                    error!("get: creating RootDir {}: {:#}", meta_far_blob.blob_id, anyhow!(e));
+                    error!("error while caching package {}: {:#}", pkg, anyhow!(e));
                     cobalt_sender.send(
                         MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
                             .with_event_codes(
@@ -238,8 +229,32 @@ async fn get(
                             )
                             .as_occurrence(1),
                     );
-                    Status::INTERNAL
-                })?
+                    Status::UNAVAILABLE
+                })?;
+                (Some(root_dir), package_status)
+            }
+            (
+                fpkg::GcProtection::OpenPackageTracking,
+                ps @ PackageStatus::Base | ps @ PackageStatus::Active,
+            ) => {
+                let () = needed_blobs.control_handle().shutdown_with_epitaph(Status::OK);
+                (None, ps)
+            }
+        };
+
+    if let Some((dir, scope)) = dir_and_scope {
+        let root_dir = if let Some(root_dir) = root_dir {
+            root_dir
+        } else {
+            package_directory::RootDir::new(blobfs.clone(), pkg).await.map_err(|e| {
+                error!("get: creating RootDir {}: {:#}", pkg, anyhow!(e));
+                cobalt_sender.send(
+                    MetricEvent::builder(metrics::PKG_CACHE_OPEN_MIGRATED_METRIC_ID)
+                        .with_event_codes(metrics::PkgCacheOpenMigratedMetricDimensionResult::Io)
+                        .as_occurrence(1),
+                );
+                Status::INTERNAL
+            })?
         };
         let () = Arc::new(root_dir).open(
             scope,
@@ -328,6 +343,7 @@ enum ServeNeededBlobsError {
 struct IndexBlobRecorder<'a> {
     package_index: &'a async_lock::RwLock<PackageIndex>,
     meta_far: Hash,
+    gc_protection: fpkg::GcProtection,
 }
 
 impl<'a> missing_blobs::BlobRecorder for IndexBlobRecorder<'a> {
@@ -335,7 +351,14 @@ impl<'a> missing_blobs::BlobRecorder for IndexBlobRecorder<'a> {
         &self,
         blobs: HashSet<Hash>,
     ) -> futures::future::BoxFuture<'_, Result<(), anyhow::Error>> {
-        async move { Ok(self.package_index.write().await.add_blobs(self.meta_far, blobs)?) }.boxed()
+        async move {
+            Ok(self.package_index.write().await.add_blobs(
+                self.meta_far,
+                blobs,
+                self.gc_protection,
+            )?)
+        }
+        .boxed()
     }
 }
 
@@ -355,6 +378,7 @@ impl<'a> missing_blobs::BlobRecorder for IndexBlobRecorder<'a> {
 async fn serve_needed_blobs(
     mut stream: NeededBlobsRequestStream,
     meta_far_info: BlobInfo,
+    gc_protection: fpkg::GcProtection,
     package_index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     node: &finspect::Node,
@@ -362,14 +386,24 @@ async fn serve_needed_blobs(
     let state = node.create_string("state", "need-meta-far");
     let res = async {
         // Step 1: Open and write the meta.far, or determine it is not needed.
-        let root_dir =
-            handle_open_meta_blob(&mut stream, meta_far_info, blobfs, package_index, &state)
-                .await?;
+        let root_dir = handle_open_meta_blob(
+            &mut stream,
+            meta_far_info,
+            gc_protection,
+            blobfs,
+            package_index,
+            &state,
+        )
+        .await?;
 
         let (missing_blobs, missing_blobs_recv) = missing_blobs::MissingBlobs::new(
             blobfs.clone(),
             &root_dir,
-            Box::new(IndexBlobRecorder { package_index, meta_far: meta_far_info.blob_id.into() }),
+            Box::new(IndexBlobRecorder {
+                package_index,
+                meta_far: meta_far_info.blob_id.into(),
+                gc_protection,
+            }),
         )
         .await?;
 
@@ -389,10 +423,16 @@ async fn serve_needed_blobs(
     let res = match res {
         Ok(root_dir) => Ok((
             root_dir,
-            package_index.write().await.complete_install(meta_far_info.blob_id.into())?,
+            package_index
+                .write()
+                .await
+                .complete_install(meta_far_info.blob_id.into(), gc_protection)?,
         )),
         Err(e) => {
-            package_index.write().await.cancel_install(&meta_far_info.blob_id.into());
+            package_index
+                .write()
+                .await
+                .cancel_install(&meta_far_info.blob_id.into(), gc_protection);
             Err(e)
         }
     };
@@ -413,12 +453,13 @@ async fn serve_needed_blobs(
 async fn handle_open_meta_blob(
     stream: &mut NeededBlobsRequestStream,
     meta_far_info: BlobInfo,
+    gc_protection: fpkg::GcProtection,
     blobfs: &blobfs::Client,
     package_index: &async_lock::RwLock<PackageIndex>,
     state: &StringProperty,
 ) -> Result<package_directory::RootDir<blobfs::Client>, ServeNeededBlobsError> {
     let hash = meta_far_info.blob_id.into();
-    package_index.write().await.start_install(hash);
+    package_index.write().await.start_install(hash, gc_protection);
     let mut opened = false;
 
     loop {
@@ -468,7 +509,7 @@ async fn handle_open_meta_blob(
 
     state.set("enumerate-missing-blobs");
 
-    Ok(fulfill_meta_far_blob(package_index, blobfs, hash).await?)
+    Ok(fulfill_meta_far_blob(package_index, blobfs, hash, gc_protection).await?)
 }
 
 async fn handle_get_missing_blobs(
@@ -711,10 +752,13 @@ mod serve_needed_blobs_tests {
         fuchsia_hash::HashRangeFull,
         fuchsia_inspect as finspect,
         futures::{future, stream, stream::StreamExt as _},
+        test_case::test_case,
     };
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn start_stop() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn start_stop(gc_protection: fpkg::GcProtection) {
         let (_, stream) = fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
 
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
@@ -729,6 +773,7 @@ mod serve_needed_blobs_tests {
             serve_needed_blobs(
                 stream,
                 meta_blob_info,
+                gc_protection,
                 &package_index,
                 &blobfs,
                 &inspector.root().create_child("test-node-name"),
@@ -740,6 +785,7 @@ mod serve_needed_blobs_tests {
 
     fn spawn_serve_needed_blobs_with_mocks(
         meta_blob_info: BlobInfo,
+        gc_protection: fpkg::GcProtection,
     ) -> (Task<Result<(), ServeNeededBlobsError>>, NeededBlobsProxy, blobfs::Mock) {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<NeededBlobsMarker>().unwrap();
@@ -755,6 +801,7 @@ mod serve_needed_blobs_tests {
                 serve_needed_blobs(
                     stream,
                     meta_blob_info,
+                    gc_protection,
                     &package_index,
                     &blobfs,
                     &inspector.root().create_child("test-node-name"),
@@ -807,7 +854,7 @@ mod serve_needed_blobs_tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn open_blob_handles_io_open_error() {
         // Provide open_write_blob a closed blobfs and file stream to trigger a PEER_CLOSED IO
         // error.
@@ -824,11 +871,14 @@ mod serve_needed_blobs_tests {
         assert_matches!(response.take(), Err(fpkg::OpenBlobError::UnspecifiedIo));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn expects_open_meta_blob() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn expects_open_meta_blob(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
 
-        let (task, proxy, blobfs) = spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+        let (task, proxy, blobfs) =
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let (iter, iter_server_end) =
             fidl::endpoints::create_proxy::<BlobInfoIteratorMarker>().unwrap();
@@ -848,10 +898,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn expects_open_meta_blob_before_blob_written() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn expects_open_meta_blob_before_blob_written(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
-        let (task, proxy, blobfs) = spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+        let (task, proxy, blobfs) =
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         assert_matches!(
             proxy.blob_written(&BlobId::from([0; 32]).into()).await.unwrap(),
@@ -865,11 +918,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn expects_open_meta_blob_once() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn expects_open_meta_blob_once(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 4 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         // Open a needed meta FAR blob and write it.
         let (serve_meta_task, ()) = future::join(
@@ -939,11 +994,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn meta_far_blob_written_wrong_hash() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn meta_far_blob_written_wrong_hash(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 4 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let ((), ()) = future::join(
             async {
@@ -1006,11 +1063,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn meta_far_blob_written_but_not_in_blobfs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn meta_far_blob_written_but_not_in_blobfs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 4 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let ((), ()) = future::join(
             async {
@@ -1050,11 +1109,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn handles_present_meta_blob() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn handles_present_meta_blob(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         // Try to open the meta FAR blob, but report it is no longer needed.
         let (serve_meta_task, ()) = future::join(
@@ -1103,11 +1164,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn allows_retrying_nonfatal_open_meta_blob_errors() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn allows_retrying_nonfatal_open_meta_blob_errors(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 1 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         // Try to open the meta FAR blob, but report it is already being written concurrently.
         let ((), ()) = future::join(
@@ -1313,11 +1376,13 @@ mod serve_needed_blobs_tests {
         res
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn discovers_and_reports_missing_blobs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn discovers_and_reports_missing_blobs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let expected = HashRangeFull::default().skip(1).take(2000).collect::<Vec<_>>();
 
@@ -1357,11 +1422,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn handles_no_missing_blobs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn handles_no_missing_blobs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task = write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![]).await;
 
@@ -1380,10 +1447,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn fails_on_invalid_meta_far() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn fails_on_invalid_meta_far(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
-        let (task, proxy, mut blobfs) = spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+        let (task, proxy, mut blobfs) =
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let bogus_far_data = b"this is not a far file";
 
@@ -1427,11 +1497,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn dropping_needed_blobs_stops_missing_blob_iterator() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn dropping_needed_blobs_stops_missing_blob_iterator(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let missing = HashRangeFull::default().take(10).collect::<Vec<_>>();
         let serve_meta_task =
@@ -1467,11 +1539,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn expects_get_missing_blobs_once() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn expects_get_missing_blobs_once(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let missing = HashRangeFull::default().take(10).collect::<Vec<_>>();
         let serve_meta_task =
@@ -1545,11 +1619,13 @@ mod serve_needed_blobs_tests {
         .await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn single_need() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn single_need(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [1; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task =
             write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![[2; 32].into()]).await;
@@ -1616,11 +1692,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn open_blob_blob_present_on_second_call() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn open_blob_blob_present_on_second_call(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [1; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task =
             write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![[2; 32].into()]).await;
@@ -1671,11 +1749,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn handles_many_content_blobs_that_need_written() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn handles_many_content_blobs_that_need_written(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let content_blobs = || HashRangeFull::default().skip(1).take(100);
 
@@ -1756,11 +1836,15 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn handles_many_content_blobs_that_are_already_present() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn handles_many_content_blobs_that_are_already_present(
+        gc_protection: fpkg::GcProtection,
+    ) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let content_blobs = || HashRangeFull::default().skip(1).take(100);
 
@@ -1800,11 +1884,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn content_blob_written_but_not_in_blobfs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn content_blob_written_but_not_in_blobfs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [1; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task =
             write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![[2; 32].into()]).await;
@@ -1852,11 +1938,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn content_blob_written_before_open_blob() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn content_blob_written_before_open_blob(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task =
             write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![[2; 32].into()]).await;
@@ -1885,11 +1973,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn allows_retrying_nonfatal_open_blob_errors() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn allows_retrying_nonfatal_open_blob_errors(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let content_blob = Hash::from([1; 32]);
 
@@ -2025,10 +2115,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn abort_aborts_while_waiting_for_open_meta_blob() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn abort_aborts_while_waiting_for_open_meta_blob(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
-        let (task, proxy, blobfs) = spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+        let (task, proxy, blobfs) =
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let abort_fut = proxy.abort();
 
@@ -2040,11 +2133,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn abort_aborts_while_waiting_for_get_missing_blobs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn abort_aborts_while_waiting_for_get_missing_blobs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task = write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![]).await;
 
@@ -2059,11 +2154,13 @@ mod serve_needed_blobs_tests {
         blobfs.expect_done().await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn abort_aborts_while_waiting_for_open_blobs() {
+    #[test_case(fpkg::GcProtection::OpenPackageTracking; "open-package-tracking")]
+    #[test_case(fpkg::GcProtection::Retained; "retained")]
+    #[fuchsia::test]
+    async fn abort_aborts_while_waiting_for_open_blobs(gc_protection: fpkg::GcProtection) {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (serve_needed_task, proxy, mut blobfs) =
-            spawn_serve_needed_blobs_with_mocks(meta_blob_info);
+            spawn_serve_needed_blobs_with_mocks(meta_blob_info, gc_protection);
 
         let serve_meta_task =
             write_meta_blob(&proxy, &mut blobfs, meta_blob_info, vec![[2; 32].into()]).await;
@@ -2095,7 +2192,7 @@ mod get_handler_tests {
         std::collections::HashSet,
     };
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn everything_closed() {
         let (_, stream) = fidl::endpoints::create_proxy::<NeededBlobsMarker>().unwrap();
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
@@ -2112,6 +2209,7 @@ mod get_handler_tests {
                 system_image::ExecutabilityRestrictions::DoNotEnforce,
                 &blobfs,
                 meta_blob_info,
+                fpkg::GcProtection::OpenPackageTracking,
                 stream,
                 None,
                 ProtocolConnector::new_with_buffer_size(
@@ -2132,7 +2230,7 @@ mod get_handler_tests {
 mod serve_base_package_index_tests {
     use {super::*, fidl_fuchsia_pkg::PackageIndexIteratorMarker, std::collections::HashSet};
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn base_packages_entries_converted_correctly() {
         let base_packages = BasePackages::new_test_only(
             HashSet::new(),
@@ -2196,7 +2294,7 @@ mod serve_cache_package_index_tests {
         fuchsia_url::PinnedAbsolutePackageUrl,
     };
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn cache_packages_entries_converted_correctly() {
         let cache_packages = system_image::CachePackages::from_entries(vec![
             PinnedAbsolutePackageUrl::new(

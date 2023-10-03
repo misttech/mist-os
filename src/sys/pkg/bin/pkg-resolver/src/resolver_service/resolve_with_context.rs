@@ -14,6 +14,7 @@ use {
 pub(super) async fn resolve_with_context(
     package_url: String,
     context: fpkg::ResolutionContext,
+    gc_protection: fpkg::GcProtection,
     dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
     package_resolver: &QueuedResolver,
     pkg_cache: &pkg::cache::Client,
@@ -33,6 +34,7 @@ pub(super) async fn resolve_with_context(
             }
             super::resolve_absolute_url_and_send_cobalt_metrics(
                 url,
+                gc_protection,
                 dir,
                 package_resolver,
                 eager_package_manager,

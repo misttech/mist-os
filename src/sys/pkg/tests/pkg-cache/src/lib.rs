@@ -139,6 +139,7 @@ async fn get_missing_blobs(proxy: &fpkg::NeededBlobsProxy) -> Vec<fpkg::BlobInfo
 // Verifies that:
 //   1. all requested blobs are actually needed by the package
 //   2. no blob is requested more than once
+// Uses OpenPackageTracking protection.
 async fn get_and_verify_package(
     package_cache: &fpkg::PackageCacheProxy,
     pkg: &Package,
@@ -150,7 +151,12 @@ async fn get_and_verify_package(
         fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>().unwrap();
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     let get_fut = package_cache
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     let (meta_far, _) = pkg.contents();
@@ -243,7 +249,12 @@ async fn verify_package_cached(
     let (dir, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
     let get_fut = proxy
-        .get(&meta_blob_info, needed_blobs_server_end, Some(dir_server_end))
+        .get(
+            &meta_blob_info,
+            fpkg::GcProtection::OpenPackageTracking,
+            needed_blobs_server_end,
+            Some(dir_server_end),
+        )
         .map_ok(|res| res.map_err(Status::from_raw));
 
     // If the package is active in the dynamic index, the server will send a `ZX_OK` epitaph then
@@ -828,6 +839,7 @@ impl<B: Blobfs> TestEnv<B> {
             .package_cache
             .get(
                 &fpkg::BlobInfo { blob_id: fpkg::BlobId { merkle_root: [0; 32] }, length: 0 },
+                fpkg::GcProtection::OpenPackageTracking,
                 needed_blobs,
                 None,
             )

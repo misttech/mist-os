@@ -40,13 +40,18 @@ impl Client {
 
     /// Opens the package specified by `meta_far_blob` with the intent to fetch any missing blobs
     /// using the returned [`Get`] type if needed.
-    pub fn get(&self, meta_far_blob: BlobInfo) -> Result<Get, fidl::Error> {
+    pub fn get(
+        &self,
+        meta_far_blob: BlobInfo,
+        gc_protection: fpkg::GcProtection,
+    ) -> Result<Get, fidl::Error> {
         let (needed_blobs, needed_blobs_server_end) =
             fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>()?;
         let (pkg_dir, pkg_dir_server_end) = PackageDirectory::create_request()?;
 
         let get_fut = self.proxy.get(
             &meta_far_blob.into(),
+            gc_protection,
             needed_blobs_server_end,
             Some(pkg_dir_server_end),
         );
@@ -63,12 +68,17 @@ impl Client {
     /// Uses PackageCache.Get to obtain the package directory of a package that is already cached
     /// (all blobs are already in blobfs).
     /// Errors if the package is not already cached.
+    /// Always uses open package tracking GC protection, because OTA (the only client of Retained
+    /// GC protection), should never need to get an already cached package.
     pub async fn get_already_cached(
         &self,
         meta_far_blob: BlobId,
     ) -> Result<PackageDirectory, GetAlreadyCachedError> {
         let mut get = self
-            .get(BlobInfo { blob_id: meta_far_blob, length: 0 })
+            .get(
+                BlobInfo { blob_id: meta_far_blob, length: 0 },
+                fpkg::GcProtection::OpenPackageTracking,
+            )
             .map_err(GetAlreadyCachedError::Get)?;
         if let Some(_) = get
             // Both c++blobfs and fxblob support Delivery, only c++blobfs supports Uncompressed.
@@ -666,15 +676,21 @@ mod tests {
             (Client::from_proxy(proxy), Self { stream })
         }
 
-        async fn expect_get(&mut self, blob_info: BlobInfo) -> PendingGet {
+        async fn expect_get(
+            &mut self,
+            blob_info: BlobInfo,
+            expected_gc_protection: fpkg::GcProtection,
+        ) -> PendingGet {
             match self.stream.next().await {
                 Some(Ok(PackageCacheRequest::Get {
                     meta_far_blob,
+                    gc_protection,
                     needed_blobs,
                     dir,
                     responder,
                 })) => {
                     assert_eq!(BlobInfo::from(meta_far_blob), blob_info);
+                    assert_eq!(gc_protection, expected_gc_protection);
                     let needed_blobs = needed_blobs.into_stream().unwrap();
                     let dir = dir.unwrap().into_stream().unwrap();
 
@@ -699,8 +715,9 @@ mod tests {
         async fn new() -> (Get, PendingGet) {
             let (client, mut server) = MockPackageCache::new();
 
-            let get = client.get(blob_info(42)).unwrap();
-            let pending_get = server.expect_get(blob_info(42)).await;
+            let get = client.get(blob_info(42), fpkg::GcProtection::OpenPackageTracking).unwrap();
+            let pending_get =
+                server.expect_get(blob_info(42), fpkg::GcProtection::OpenPackageTracking).await;
             (get, pending_get)
         }
 
@@ -871,11 +888,16 @@ mod tests {
 
         let ((), ()) = future::join(
             async {
-                server.expect_get(blob_info(2)).await.finish().close_pkg_dir();
+                server
+                    .expect_get(blob_info(2), fpkg::GcProtection::OpenPackageTracking)
+                    .await
+                    .finish()
+                    .close_pkg_dir();
                 server.expect_closed().await;
             },
             async move {
-                let mut get = client.get(blob_info(2)).unwrap();
+                let mut get =
+                    client.get(blob_info(2), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
                 assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
                 assert_eq!(get.get_missing_blobs().try_concat().await.unwrap(), vec![]);
@@ -898,8 +920,10 @@ mod tests {
 
         let ((), ()) = future::join(
             async {
-                let (needed_blobs_stream, pkg_dir) =
-                    server.expect_get(blob_info(2)).await.finish_hold_stream_open();
+                let (needed_blobs_stream, pkg_dir) = server
+                    .expect_get(blob_info(2), fpkg::GcProtection::OpenPackageTracking)
+                    .await
+                    .finish_hold_stream_open();
                 pkg_dir.close_pkg_dir();
 
                 // wait until `send` is dropped to drop the request stream.
@@ -907,7 +931,8 @@ mod tests {
                 drop(needed_blobs_stream);
             },
             async move {
-                let mut get = client.get(blob_info(2)).unwrap();
+                let mut get =
+                    client.get(blob_info(2), fpkg::GcProtection::OpenPackageTracking).unwrap();
 
                 assert_matches!(get.open_meta_blob(fpkg::BlobType::Delivery).await.unwrap(), None);
 
@@ -1425,7 +1450,11 @@ mod tests {
 
         let ((), ()) = future::join(
             async {
-                server.expect_get(blob_info(2)).await.finish().close_pkg_dir();
+                server
+                    .expect_get(blob_info(2), fpkg::GcProtection::OpenPackageTracking)
+                    .await
+                    .finish()
+                    .close_pkg_dir();
                 server.expect_closed().await;
             },
             async move {
@@ -1447,7 +1476,7 @@ mod tests {
         let ((), ()) = future::join(
             async {
                 server
-                    .expect_get(blob_info(2))
+                    .expect_get(blob_info(2), fpkg::GcProtection::OpenPackageTracking)
                     .await
                     .expect_open_meta_blob(Ok(Some(fidl::endpoints::create_endpoints().0)))
                     .await;
@@ -1469,7 +1498,7 @@ mod tests {
         let ((), ()) = future::join(
             async {
                 server
-                    .expect_get(blob_info(2))
+                    .expect_get(blob_info(2), fpkg::GcProtection::OpenPackageTracking)
                     .await
                     .expect_open_meta_blob(Ok(None))
                     .await

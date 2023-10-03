@@ -11,17 +11,15 @@ use {
     async_lock::RwLock as AsyncRwLock,
     cobalt_sw_delivery_registry as metrics,
     fdio::Namespace,
+    fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_contrib::{protocol_connector::ProtocolSender, ProtocolConnector},
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_metrics::MetricEvent,
-    fidl_fuchsia_pkg::{self as fpkg, PackageCacheMarker},
+    fidl_fuchsia_io as fio, fidl_fuchsia_metrics as fmetrics, fidl_fuchsia_pkg as fpkg,
     fuchsia_async as fasync,
     fuchsia_cobalt_builders::MetricEventExt as _,
     fuchsia_component::server::ServiceFs,
     fuchsia_inspect as inspect, fuchsia_trace as ftrace,
     futures::{prelude::*, stream::FuturesUnordered},
     std::{
-        io,
         sync::Arc,
         time::{Duration, Instant},
     },
@@ -107,8 +105,9 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     let config = Config::load_from_config_data_or_default();
     let structured_config = pkg_resolver_config::Config::take_from_startup_handle();
 
-    let pkg_cache_proxy = fuchsia_component::client::connect_to_protocol::<PackageCacheMarker>()
-        .context("error connecting to package cache")?;
+    let pkg_cache_proxy =
+        fuchsia_component::client::connect_to_protocol::<fpkg::PackageCacheMarker>()
+            .context("error connecting to package cache")?;
     let pkg_cache = fidl_fuchsia_pkg_ext::cache::Client::from_proxy(pkg_cache_proxy);
 
     let base_package_index = Arc::new(
@@ -241,32 +240,44 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         .map(AsyncRwLock::new),
     );
 
-    let resolver_cb = {
+    let make_resolver_cb = {
         let repo_manager = Arc::clone(&repo_manager);
         let rewrite_manager = Arc::clone(&rewrite_manager);
         let package_resolver = package_resolver.clone();
         let base_package_index = Arc::clone(&base_package_index);
         let system_cache_list = Arc::clone(&system_cache_list);
         let cobalt_sender = cobalt_sender.clone();
-        let resolver_service_inspect = Arc::clone(&resolver_service_inspect_state);
+        let resolver_service_inspect_state = Arc::clone(&resolver_service_inspect_state);
         let eager_package_manager = Arc::clone(&eager_package_manager);
-        move |stream| {
-            fasync::Task::local(
-                resolver_service::run_resolver_service(
-                    Arc::clone(&repo_manager),
-                    Arc::clone(&rewrite_manager),
-                    package_resolver.clone(),
-                    pkg_cache.clone(),
-                    Arc::clone(&base_package_index),
-                    Arc::clone(&system_cache_list),
-                    stream,
-                    cobalt_sender.clone(),
-                    Arc::clone(&resolver_service_inspect),
-                    Arc::clone(&eager_package_manager),
+        move |gc_protection| {
+            let repo_manager = Arc::clone(&repo_manager);
+            let rewrite_manager = Arc::clone(&rewrite_manager);
+            let package_resolver = package_resolver.clone();
+            let pkg_cache = pkg_cache.clone();
+            let base_package_index = Arc::clone(&base_package_index);
+            let system_cache_list = Arc::clone(&system_cache_list);
+            let cobalt_sender = cobalt_sender.clone();
+            let resolver_service_inspect_state = Arc::clone(&resolver_service_inspect_state);
+            let eager_package_manager = Arc::clone(&eager_package_manager);
+            move |stream| {
+                fasync::Task::local(
+                    resolver_service::run_resolver_service(
+                        Arc::clone(&repo_manager),
+                        Arc::clone(&rewrite_manager),
+                        package_resolver.clone(),
+                        pkg_cache.clone(),
+                        Arc::clone(&base_package_index),
+                        Arc::clone(&system_cache_list),
+                        stream,
+                        gc_protection,
+                        cobalt_sender.clone(),
+                        Arc::clone(&resolver_service_inspect_state),
+                        Arc::clone(&eager_package_manager),
+                    )
+                    .unwrap_or_else(|e| error!("run_resolver_service failed: {:#}", anyhow!(e))),
                 )
-                .unwrap_or_else(|e| error!("run_resolver_service failed: {:#}", anyhow!(e))),
-            )
-            .detach()
+                .detach()
+            }
         }
     };
 
@@ -310,7 +321,11 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
 
     let mut fs = ServiceFs::new();
     fs.dir("svc")
-        .add_fidl_service(resolver_cb)
+        .add_fidl_service(make_resolver_cb(fpkg::GcProtection::OpenPackageTracking))
+        .add_fidl_service_at(
+            format!("{}-ota", fpkg::PackageResolverMarker::PROTOCOL_NAME),
+            make_resolver_cb(fpkg::GcProtection::Retained),
+        )
         .add_fidl_service(repo_cb)
         .add_fidl_service(rewrite_cb)
         .add_fidl_service(cup_cb);
@@ -320,7 +335,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     futures.push(fs.collect().boxed_local());
 
     cobalt_sender.send(
-        MetricEvent::builder(metrics::PKG_RESOLVER_STARTUP_DURATION_MIGRATED_METRIC_ID)
+        fmetrics::MetricEvent::builder(metrics::PKG_RESOLVER_STARTUP_DURATION_MIGRATED_METRIC_ID)
             .as_integer(Instant::now().duration_since(startup_time).as_micros() as i64),
     );
 
@@ -337,7 +352,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
 async fn load_repo_manager(
     node: inspect::Node,
     config: &Config,
-    mut cobalt_sender: ProtocolSender<MetricEvent>,
+    mut cobalt_sender: ProtocolSender<fmetrics::MetricEvent>,
     tuf_metadata_timeout: Duration,
     data_proxy: Option<fio::DirectoryProxy>,
 ) -> RepositoryManager {
@@ -360,7 +375,7 @@ async fn load_repo_manager(
     {
         Ok(builder) => {
             cobalt_sender.send(
-                MetricEvent::builder(
+                fmetrics::MetricEvent::builder(
                     metrics::REPOSITORY_MANAGER_LOAD_STATIC_CONFIGS_MIGRATED_METRIC_ID,
                 )
                 .with_event_codes(
@@ -375,7 +390,7 @@ async fn load_repo_manager(
                 let dimension_result: metrics::RepositoryManagerLoadStaticConfigsMigratedMetricDimensionResult
                     = (&err).into();
                 cobalt_sender.send(
-                    MetricEvent::builder(
+                    fmetrics::MetricEvent::builder(
                         metrics::REPOSITORY_MANAGER_LOAD_STATIC_CONFIGS_MIGRATED_METRIC_ID,
                     )
                     .with_event_codes(dimension_result)
@@ -383,7 +398,7 @@ async fn load_repo_manager(
                 );
                 match &err {
                     crate::repository_manager::LoadError::Io { path: _, error }
-                        if error.kind() == io::ErrorKind::NotFound =>
+                        if error.kind() == std::io::ErrorKind::NotFound =>
                     {
                         info!("no statically configured repositories present");
                     }

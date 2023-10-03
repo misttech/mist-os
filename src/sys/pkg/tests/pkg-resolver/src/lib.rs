@@ -25,14 +25,15 @@ use {
     fidl_fuchsia_pkg_internal::{PersistentEagerPackage, PersistentEagerPackages},
     fidl_fuchsia_pkg_rewrite as fpkg_rewrite,
     fidl_fuchsia_pkg_rewrite_ext::{Rule, RuleConfig},
-    fidl_fuchsia_sys2 as fsys2, fuchsia_async as fasync,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_update as fupdate,
+    fuchsia_async as fasync,
     fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, ScopedInstance,
     },
     fuchsia_merkle::{Hash, MerkleTree},
     fuchsia_pkg_testing::{serve::ServedRepository, Package, PackageBuilder},
     fuchsia_url::{PinnedAbsolutePackageUrl, RepositoryUrl},
-    fuchsia_zircon as zx,
+    fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
     futures::prelude::*,
     mock_boot_arguments::MockBootArgumentsService,
     mock_metrics::MockMetricEventLoggerFactory,
@@ -513,6 +514,16 @@ where
             )
             .unwrap();
 
+        let commit_status_provider_service = Arc::new(MockCommitStatusProviderService::new());
+        local_child_svc_dir
+            .add_entry(
+                fupdate::CommitStatusProviderMarker::PROTOCOL_NAME,
+                vfs::service::host(move |stream| {
+                    Arc::clone(&commit_status_provider_service).handle_request_stream(stream)
+                }),
+            )
+            .unwrap();
+
         let local_child_out_dir = vfs::pseudo_directory! {
             "blob" => vfs::remote::remote_dir(
                 blobfs.root_dir_handle().into_proxy().unwrap()
@@ -726,11 +737,23 @@ where
             )
             .await
             .unwrap();
-
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::protocol::<fspace::ManagerMarker>())
+                    .from(&pkg_cache)
+                    .to(Ref::parent()),
+            )
+            .await
+            .unwrap();
         builder
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<fpkg::PackageResolverMarker>())
+                    .capability(Capability::protocol_by_name(format!(
+                        "{}-ota",
+                        fpkg::PackageResolverMarker::PROTOCOL_NAME
+                    )))
                     .capability(Capability::protocol::<fpkg::RepositoryManagerMarker>())
                     .capability(Capability::protocol::<fpkg_rewrite::EngineMarker>())
                     .capability(Capability::protocol::<fpkg::CupMarker>())
@@ -759,6 +782,7 @@ where
                             .rights(fio::RW_STAR_DIR | fio::Operations::EXECUTE),
                     )
                     .capability(Capability::protocol::<fboot::ArgumentsMarker>())
+                    .capability(Capability::protocol::<fupdate::CommitStatusProviderMarker>())
                     .from(&service_reflector)
                     .to(&pkg_cache),
             )
@@ -824,9 +848,11 @@ where
 
 pub struct Proxies {
     pub resolver: PackageResolverProxy,
+    pub resolver_ota: PackageResolverProxy,
     pub repo_manager: RepositoryManagerProxy,
     pub rewrite_engine: fpkg_rewrite::EngineProxy,
     pub cup: CupProxy,
+    pub space_manager: fspace::ManagerProxy,
 }
 
 impl Proxies {
@@ -835,6 +861,12 @@ impl Proxies {
             resolver: realm
                 .connect_to_protocol_at_exposed_dir::<PackageResolverMarker>()
                 .expect("connect to package resolver"),
+            resolver_ota: realm
+                .connect_to_named_protocol_at_exposed_dir::<PackageResolverMarker>(&format!(
+                    "{}-ota",
+                    fpkg::PackageResolverMarker::PROTOCOL_NAME
+                ))
+                .expect("connect to package resolver"),
             repo_manager: realm
                 .connect_to_protocol_at_exposed_dir::<RepositoryManagerMarker>()
                 .expect("connect to repository manager"),
@@ -842,6 +874,9 @@ impl Proxies {
                 .connect_to_protocol_at_exposed_dir::<fpkg_rewrite::EngineMarker>()
                 .expect("connect to rewrite engine"),
             cup: realm.connect_to_protocol_at_exposed_dir::<CupMarker>().expect("connect to cup"),
+            space_manager: realm
+                .connect_to_protocol_at_exposed_dir::<fspace::ManagerMarker>()
+                .expect("connect to space manager"),
         }
     }
 }
@@ -1192,4 +1227,35 @@ pub fn get_cup_response_with_name(package_url: &PinnedAbsolutePackageUrl) -> Vec
       }],
     }});
     serde_json::to_vec(&response).unwrap()
+}
+
+/// Always says the system is committed so that pkg-cache can run GC.
+struct MockCommitStatusProviderService {
+    _local: zx::EventPair,
+    remote: zx::EventPair,
+}
+
+impl MockCommitStatusProviderService {
+    fn new() -> Self {
+        let (_local, remote) = zx::EventPair::create();
+        let () = remote.signal_handle(zx::Signals::NONE, zx::Signals::USER_0).unwrap();
+        Self { _local, remote }
+    }
+
+    async fn handle_request_stream(
+        self: Arc<Self>,
+        mut stream: fupdate::CommitStatusProviderRequestStream,
+    ) {
+        while let Some(event) =
+            stream.try_next().await.expect("received fuchsia.update/CommitStatusProvider request")
+        {
+            match event {
+                fupdate::CommitStatusProviderRequest::IsCurrentSystemCommitted { responder } => {
+                    let () = responder
+                        .send(self.remote.duplicate_handle(zx::Rights::BASIC).unwrap())
+                        .unwrap();
+                }
+            }
+        }
+    }
 }

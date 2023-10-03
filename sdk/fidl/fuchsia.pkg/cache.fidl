@@ -33,6 +33,7 @@ closed protocol PackageCache {
     ///       all the missing blobs were downloaded to the system.
     strict Get(resource struct {
         meta_far_blob BlobInfo;
+        gc_protection GcProtection;
         needed_blobs server_end:NeededBlobs;
         dir server_end:<fuchsia.io.Directory, optional>;
     }) -> () error zx.Status;
@@ -58,6 +59,17 @@ closed protocol PackageCache {
     /// * error a zx_status value indicating failure. One of the following:
     ///     * `ZX_ERR_INTERNAL` if the sync fails.
     strict Sync() -> () error zx.Status;
+};
+
+/// How the package served by [`PackageCache.Get`] should be protected from GC.
+type GcProtection = strict enum {
+    /// Package will be protected from GC as long as there is an open connection to the directory.
+    OPEN_PACKAGE_TRACKING = 1;
+
+    /// Package will be protected from GC as long as it is in the Retained index, which is
+    /// controlled by the [`RetainedPackages`] protocol. Client is responsible for ensuring
+    /// the package is in the Retained index.
+    RETAINED = 2;
 };
 
 /// Error type for [`NeededBlobs.OpenMetaBlob`] and [`NeededBlobs.OpenBlob`].

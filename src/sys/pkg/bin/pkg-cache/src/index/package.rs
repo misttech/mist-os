@@ -8,9 +8,9 @@ use {
         dynamic::{DynamicIndex, FulfillNotNeededBlobError},
         retained::RetainedIndex,
     },
+    fidl_fuchsia_pkg as fpkg,
     fuchsia_hash::Hash,
     fuchsia_inspect as finspect,
-    fuchsia_pkg::PackagePath,
     std::{collections::HashSet, sync::Arc},
 };
 
@@ -53,33 +53,49 @@ impl PackageIndex {
 
     /// Notifies the appropriate indices that the package with the given hash is going to be
     /// installed, ensuring the meta far blob is protected by the index.
-    pub fn start_install(&mut self, package_hash: Hash) {
-        if self.retained.contains_package(&package_hash) {
-            // The retained index intends to track this package, but the first event it wants to
-            // take action on is when the meta far is readable. Nothing to do now.
+    pub fn start_install(&mut self, package_hash: Hash, gc_protection: fpkg::GcProtection) {
+        match gc_protection {
+            // The purpose of Retained protection Get's is to not automatically protect the package
+            // and instead to rely entirely on the client (the system-updater) to protect the
+            // package using the Retained index. This allows the system-updater to meet the GC
+            // requirements of the OTA process.
+            fpkg::GcProtection::Retained => return,
+            fpkg::GcProtection::OpenPackageTracking => {
+                if self.retained.contains_package(&package_hash) {
+                    // The retained index intends to track this package, but the first event it
+                    // wants to take action on is when the meta far is readable. Nothing to do now.
+                    // This package wasn't already in the dynamic index, so don't add it to it.
+                    return;
+                }
 
-            // This package wasn't already in the dynamic index, so don't add it to it.
-            return;
+                self.dynamic.start_install(package_hash);
+            }
         }
-
-        self.dynamic.start_install(package_hash);
     }
 
     fn fulfill_meta_far(
         &mut self,
         package_hash: Hash,
-        package_path: PackagePath,
+        package_path: fuchsia_pkg::PackagePath,
+        gc_protection: fpkg::GcProtection,
     ) -> Result<(), FulfillMetaFarError> {
-        let is_retained = self.retained.contains_package(&package_hash);
-        // Transition the dynamic index state if it is interested in this package.  Report an error
-        // if the package is not tracked by any index.
-        let () = match self.dynamic.fulfill_meta_far(package_hash, package_path) {
-            Err(crate::index::dynamic::FulfillNotNeededBlobError { .. }) if is_retained => Ok(()),
-            Err(e @ crate::index::dynamic::FulfillNotNeededBlobError { .. }) => Err(e),
-            Ok(()) => Ok(()),
-        }?;
-
-        Ok(())
+        match gc_protection {
+            // The content blobs will be added by a subsequent call to `add_blobs`.
+            fpkg::GcProtection::Retained => Ok(()),
+            fpkg::GcProtection::OpenPackageTracking => {
+                let is_retained = self.retained.contains_package(&package_hash);
+                // Transition the dynamic index state if it is interested in this package. Report
+                // an error if the package is not tracked by any index.
+                let () = match self.dynamic.fulfill_meta_far(package_hash, package_path) {
+                    Err(crate::index::dynamic::FulfillNotNeededBlobError { .. }) if is_retained => {
+                        Ok(())
+                    }
+                    Err(e @ crate::index::dynamic::FulfillNotNeededBlobError { .. }) => Err(e),
+                    Ok(()) => Ok(()),
+                }?;
+                Ok(())
+            }
+        }
     }
 
     /// Associate additional blobs (e.g. subpackage meta.fars and content blobs) with a package
@@ -88,15 +104,18 @@ impl PackageIndex {
         &mut self,
         package_hash: Hash,
         additional_blobs: HashSet<Hash>,
+        gc_protection: fpkg::GcProtection,
     ) -> Result<(), AddBlobsError> {
         // Notify the retained index if it is interested in this package.
         let is_retained = self.retained.add_blobs(&package_hash, &additional_blobs);
 
-        let () = match self.dynamic.add_blobs(package_hash, &additional_blobs) {
-            Ok(()) => (),
-            Err(crate::index::dynamic::AddBlobsError::UnknownPackage) if is_retained => (),
-            Err(e) => return Err(e),
-        };
+        if gc_protection == fpkg::GcProtection::OpenPackageTracking {
+            match self.dynamic.add_blobs(package_hash, &additional_blobs) {
+                Ok(()) => (),
+                Err(crate::index::dynamic::AddBlobsError::UnknownPackage) if is_retained => (),
+                Err(e) => return Err(e),
+            }
+        }
         Ok(())
     }
 
@@ -105,20 +124,28 @@ impl PackageIndex {
     pub(crate) fn complete_install(
         &mut self,
         package_hash: Hash,
+        gc_protection: fpkg::GcProtection,
     ) -> Result<crate::cache_service::PackageStatus, CompleteInstallError> {
         let is_retained = self.retained.contains_package(&package_hash);
 
-        match self.dynamic.complete_install(package_hash) {
-            Err(_) if is_retained => Ok(crate::cache_service::PackageStatus::Other),
-            Err(e) => Err(e),
-            Ok(()) => Ok(crate::cache_service::PackageStatus::Active),
+        match gc_protection {
+            fpkg::GcProtection::OpenPackageTracking => {
+                match self.dynamic.complete_install(package_hash) {
+                    Err(_) if is_retained => Ok(crate::cache_service::PackageStatus::Other),
+                    Err(e) => Err(e),
+                    Ok(()) => Ok(crate::cache_service::PackageStatus::Active),
+                }
+            }
+            fpkg::GcProtection::Retained => Ok(crate::cache_service::PackageStatus::Other),
         }
     }
 
     /// Notifies the appropriate indices that the installation for the package with the given hash
     /// has been cancelled.
-    pub fn cancel_install(&mut self, package_hash: &Hash) {
-        self.dynamic.cancel_install(package_hash)
+    pub fn cancel_install(&mut self, package_hash: &Hash, gc_protection: fpkg::GcProtection) {
+        if gc_protection == fpkg::GcProtection::OpenPackageTracking {
+            self.dynamic.cancel_install(package_hash)
+        }
     }
 
     fn set_retained_index(&mut self, mut index: RetainedIndex) {
@@ -165,9 +192,11 @@ pub async fn fulfill_meta_far_blob(
     index: &async_lock::RwLock<PackageIndex>,
     blobfs: &blobfs::Client,
     meta_hash: Hash,
+    gc_protection: fpkg::GcProtection,
 ) -> Result<package_directory::RootDir<blobfs::Client>, FulfillMetaFarError> {
     let root_dir = package_directory::RootDir::new(blobfs.clone(), meta_hash).await?;
-    let () = index.write().await.fulfill_meta_far(meta_hash, root_dir.path().await?)?;
+    let () =
+        index.write().await.fulfill_meta_far(meta_hash, root_dir.path().await?, gc_protection)?;
     Ok(root_dir)
 }
 
@@ -195,29 +224,36 @@ mod tests {
             test_utils::add_meta_far_to_blobfs,
         },
         assert_matches::assert_matches,
-        maplit::{hashmap, hashset},
+        maplit::hashmap,
     };
 
     fn hash(n: u8) -> Hash {
         Hash::from([n; 32])
     }
-    fn path(s: &str) -> PackagePath {
-        PackagePath::from_name_and_variant(s.parse().unwrap(), "0".parse().unwrap())
+    fn path(s: &str) -> fuchsia_pkg::PackagePath {
+        fuchsia_pkg::PackagePath::from_name_and_variant(s.parse().unwrap(), "0".parse().unwrap())
     }
 
     #[test]
     fn set_retained_index_with_dynamic_package_in_pending_state_puts_package_in_both() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(0));
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => None,
         }));
 
-        index.fulfill_meta_far(hash(0), path("pending")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(1)])).unwrap();
-        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
+        index
+            .fulfill_meta_far(hash(0), path("pending"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(0), HashSet::from([hash(1)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        assert_eq!(
+            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
 
         assert_eq!(
             index.retained.packages(),
@@ -246,13 +282,29 @@ mod tests {
     fn set_retained_index_with_dynamic_package_in_withmetafar_state_puts_package_in_both() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(0));
-        index.start_install(hash(1));
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
+        index.start_install(hash(1), fpkg::GcProtection::OpenPackageTracking);
 
-        index.fulfill_meta_far(hash(0), path("withmetafar1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("withmetafar2")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11)])).unwrap();
+        index
+            .fulfill_meta_far(
+                hash(0),
+                path("withmetafar1"),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
+        index
+            .add_blobs(hash(0), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .fulfill_meta_far(
+                hash(1),
+                path("withmetafar2"),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
+        index
+            .add_blobs(hash(1), HashSet::from([hash(11)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         // Constructing a new RetainedIndex may race with a package install to the dynamic index.
         // Ensure index.set_retained_index handles both cases.
@@ -261,8 +313,14 @@ mod tests {
             hash(1) => None,
         }));
 
-        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
-        assert_eq!(index.complete_install(hash(1)).unwrap(), PackageStatus::Active);
+        assert_eq!(
+            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
+        assert_eq!(
+            index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
 
         assert_eq!(
             index.retained.packages(),
@@ -296,9 +354,21 @@ mod tests {
     #[test]
     fn set_retained_index_hashes_are_extended_with_dynamic_index_hashes() {
         let mut index = PackageIndex::new_test();
-        index.start_install(hash(0));
-        index.fulfill_meta_far(hash(0), path("withmetafar1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(1), hash(2)])).unwrap();
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(
+                hash(0),
+                path("withmetafar1"),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
+        index
+            .add_blobs(
+                hash(0),
+                HashSet::from([hash(1), hash(2)]),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => Some(HashSet::from_iter([hash(1)])),
@@ -320,10 +390,21 @@ mod tests {
             hash(0) => None,
         }));
 
-        index.start_install(hash(0));
-        index.fulfill_meta_far(hash(0), path("retaiendonly")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(123)])).unwrap();
-        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Other);
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(
+                hash(0),
+                path("retaiendonly"),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
+        index
+            .add_blobs(hash(0), HashSet::from([hash(123)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        assert_eq!(
+            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Other
+        );
 
         assert_eq!(
             index.retained.packages(),
@@ -345,10 +426,21 @@ mod tests {
         }));
 
         // install a package not tracked by the retained index
-        index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("dynamic-only")).unwrap();
-        index.add_blobs(hash(2), HashSet::from([hash(10)])).unwrap();
-        assert_eq!(index.complete_install(hash(2)).unwrap(), PackageStatus::Active);
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(
+                hash(2),
+                path("dynamic-only"),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
+        index
+            .add_blobs(hash(2), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        assert_eq!(
+            index.complete_install(hash(2), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
 
         assert_eq!(
             index.retained.packages(),
@@ -378,10 +470,14 @@ mod tests {
     fn set_retained_index_to_self_is_nop() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(2));
-        index.start_install(hash(3));
-        index.fulfill_meta_far(hash(3), path("before")).unwrap();
-        index.add_blobs(hash(3), HashSet::from([hash(10)])).unwrap();
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        index.start_install(hash(3), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(hash(3), path("before"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(3), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => Some(HashSet::from_iter([hash(11)])),
@@ -392,10 +488,14 @@ mod tests {
             hash(5) => None,
         }));
 
-        index.start_install(hash(4));
-        index.start_install(hash(5));
-        index.fulfill_meta_far(hash(5), path("after")).unwrap();
-        index.add_blobs(hash(5), HashSet::from([hash(12)])).unwrap();
+        index.start_install(hash(4), fpkg::GcProtection::OpenPackageTracking);
+        index.start_install(hash(5), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(hash(5), path("after"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(5), HashSet::from([hash(12)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         let retained_index = index.retained.clone();
 
@@ -404,17 +504,23 @@ mod tests {
     }
 
     #[test]
-    fn add_blobs_adds_to_dynamic_and_retained() {
+    fn add_blobs_with_open_package_tracking_protection_adds_to_dynamic_and_retained() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("some-path")).unwrap();
-        index.add_blobs(hash(2), HashSet::from([hash(10)])).unwrap();
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(hash(2), path("some-path"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(2), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(2) => Some(HashSet::from_iter([hash(10)])),
         }));
 
-        index.add_blobs(hash(2), HashSet::from([hash(11)])).unwrap();
+        index
+            .add_blobs(hash(2), HashSet::from([hash(11)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         assert_eq!(
             index.retained.packages(),
@@ -434,16 +540,51 @@ mod tests {
     }
 
     #[test]
+    fn add_blobs_with_retained_protection_adds_to_retained_index_only() {
+        let mut index = PackageIndex::new_test();
+
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(hash(2), path("some-path"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index.set_retained_index(RetainedIndex::from_packages(hashmap! {
+            hash(2) => None
+        }));
+
+        index.add_blobs(hash(2), HashSet::from([hash(11)]), fpkg::GcProtection::Retained).unwrap();
+
+        assert_eq!(
+            index.retained.packages(),
+            hashmap! {
+                hash(2) => Some(HashSet::from([hash(11)]))
+            }
+        );
+        assert_eq!(
+            index.dynamic.packages(),
+            hashmap! {
+                hash(2) => Package::WithMetaFar {
+                    path: path("some-path"),
+                    required_blobs: HashSet::new(),
+                }
+            }
+        );
+    }
+
+    #[test]
     fn add_blobs_ignores_missing_dynamic_if_retained() {
         let mut index = PackageIndex::new_test();
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(2) => Some(HashSet::from_iter([hash(10)])),
         }));
-        index.start_install(hash(2));
-        index.fulfill_meta_far(hash(2), path("some-path")).unwrap();
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
+        index
+            .fulfill_meta_far(hash(2), path("some-path"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
-        index.add_blobs(hash(2), HashSet::from([hash(11)])).unwrap();
+        index
+            .add_blobs(hash(2), HashSet::from([hash(11)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         assert_eq!(
             index.retained.packages(),
@@ -458,10 +599,14 @@ mod tests {
     fn add_blobs_errors_if_dynamic_index_in_wrong_state() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(2));
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
 
         assert_matches!(
-            index.add_blobs(hash(2), hashset! {hash(11)}),
+            index.add_blobs(
+                hash(2),
+                HashSet::from([hash(11)]),
+                fpkg::GcProtection::OpenPackageTracking
+            ),
             Err(AddBlobsError::WrongState("Pending"))
         );
     }
@@ -474,16 +619,24 @@ mod tests {
             hash(0) => None,
         }));
 
-        index.start_install(hash(0));
-        index.start_install(hash(1));
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
+        index.start_install(hash(1), fpkg::GcProtection::OpenPackageTracking);
 
-        index.fulfill_meta_far(hash(0), path("a")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("b")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11)])).unwrap();
+        index
+            .fulfill_meta_far(hash(0), path("a"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(0), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .fulfill_meta_far(hash(1), path("b"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(1), HashSet::from([hash(11)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
-        index.cancel_install(&hash(0));
-        index.cancel_install(&hash(1));
+        index.cancel_install(&hash(0), fpkg::GcProtection::OpenPackageTracking);
+        index.cancel_install(&hash(1), fpkg::GcProtection::OpenPackageTracking);
 
         assert_eq!(
             index.retained.packages(),
@@ -499,7 +652,7 @@ mod tests {
     fn all_blobs_produces_union_of_dynamic_and_retained_all_blobs() {
         let mut index = PackageIndex::new_test();
 
-        index.start_install(hash(0));
+        index.start_install(hash(0), fpkg::GcProtection::OpenPackageTracking);
 
         index.set_retained_index(RetainedIndex::from_packages(hashmap! {
             hash(0) => None,
@@ -507,31 +660,58 @@ mod tests {
             hash(6) => Some(HashSet::from_iter([hash(60), hash(61)])),
         }));
 
-        index.start_install(hash(1));
+        index.start_install(hash(1), fpkg::GcProtection::OpenPackageTracking);
 
-        index.fulfill_meta_far(hash(0), path("pkg1")).unwrap();
-        index.add_blobs(hash(0), HashSet::from([hash(10)])).unwrap();
-        index.fulfill_meta_far(hash(1), path("pkg2")).unwrap();
-        index.add_blobs(hash(1), HashSet::from([hash(11), hash(61)])).unwrap();
+        index
+            .fulfill_meta_far(hash(0), path("pkg1"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(hash(0), HashSet::from([hash(10)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .fulfill_meta_far(hash(1), path("pkg2"), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
+        index
+            .add_blobs(
+                hash(1),
+                HashSet::from([hash(11), hash(61)]),
+                fpkg::GcProtection::OpenPackageTracking,
+            )
+            .unwrap();
 
-        assert_eq!(index.complete_install(hash(0)).unwrap(), PackageStatus::Active);
-        assert_eq!(index.complete_install(hash(1)).unwrap(), PackageStatus::Active);
+        assert_eq!(
+            index.complete_install(hash(0), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
+        assert_eq!(
+            index.complete_install(hash(1), fpkg::GcProtection::OpenPackageTracking).unwrap(),
+            PackageStatus::Active
+        );
 
         assert_eq!(
             index.all_blobs(),
-            hashset! {hash(0), hash(1), hash(5), hash(6), hash(10), hash(11), hash(60), hash(61)}
+            HashSet::from([
+                hash(0),
+                hash(1),
+                hash(5),
+                hash(6),
+                hash(10),
+                hash(11),
+                hash(60),
+                hash(61)
+            ])
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn fulfill_meta_far_blob_with_missing_blobs() {
         let mut index = PackageIndex::new_test();
 
-        let path = PackagePath::from_name_and_variant(
+        let path = fuchsia_pkg::PackagePath::from_name_and_variant(
             "fake-package".parse().unwrap(),
             "0".parse().unwrap(),
         );
-        index.start_install(hash(2));
+        index.start_install(hash(2), fpkg::GcProtection::OpenPackageTracking);
 
         let index = Arc::new(async_lock::RwLock::new(index));
 
@@ -539,8 +719,14 @@ mod tests {
 
         add_meta_far_to_blobfs(&blobfs_fake, hash(2), "fake-package", [hash(3)], []);
 
-        fulfill_meta_far_blob(&index, &blobfs, hash(2)).await.unwrap();
-        index.write().await.add_blobs(hash(2), HashSet::from([hash(3)])).unwrap();
+        fulfill_meta_far_blob(&index, &blobfs, hash(2), fpkg::GcProtection::OpenPackageTracking)
+            .await
+            .unwrap();
+        index
+            .write()
+            .await
+            .add_blobs(hash(2), HashSet::from([hash(3)]), fpkg::GcProtection::OpenPackageTracking)
+            .unwrap();
 
         let index = index.read().await;
         assert_eq!(
@@ -555,7 +741,7 @@ mod tests {
         assert_eq!(index.dynamic.active_packages(), hashmap! {});
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn fulfill_meta_far_blob_not_needed() {
         let index = PackageIndex::new_test();
         let index = Arc::new(async_lock::RwLock::new(index));
@@ -566,24 +752,30 @@ mod tests {
         add_meta_far_to_blobfs(&blobfs_fake, hash, "fake-package", [], []);
 
         assert_matches!(
-            fulfill_meta_far_blob(&index, &blobfs, hash).await,
+            fulfill_meta_far_blob(&index, &blobfs, hash, fpkg::GcProtection::OpenPackageTracking).await,
             Err(FulfillMetaFarError::FulfillNotNeededBlob(FulfillNotNeededBlobError{hash, state})) if hash == Hash::from([2; 32]) && state == "missing"
         );
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn fulfill_meta_far_blob_not_found() {
         let mut index = PackageIndex::new_test();
 
         let meta_far_hash = Hash::from([2; 32]);
-        index.start_install(meta_far_hash);
+        index.start_install(meta_far_hash, fpkg::GcProtection::OpenPackageTracking);
 
         let index = Arc::new(async_lock::RwLock::new(index));
 
         let (_blobfs_fake, blobfs) = fuchsia_pkg_testing::blobfs::Fake::new();
 
         assert_matches!(
-            fulfill_meta_far_blob(&index, &blobfs, meta_far_hash).await,
+            fulfill_meta_far_blob(
+                &index,
+                &blobfs,
+                meta_far_hash,
+                fpkg::GcProtection::OpenPackageTracking
+            )
+            .await,
             Err(FulfillMetaFarError::CreateRootDir(package_directory::Error::MissingMetaFar))
         );
     }

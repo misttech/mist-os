@@ -281,6 +281,7 @@ async fn package_and_blob_queues() {
                     "fuchsia-pkg://original.example.com/just_meta_far": {
                         resolve_ts: AnyProperty,
                         rewritten_url: "fuchsia-pkg://rewritten.example.com/just_meta_far",
+                        gc_protection: "OpenPackageTracking",
                     }
                 }
             }

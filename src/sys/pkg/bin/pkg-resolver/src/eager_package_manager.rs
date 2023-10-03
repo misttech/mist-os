@@ -340,7 +340,9 @@ impl<T: Resolver> EagerPackageManager<T> {
         url: PinnedAbsolutePackageUrl,
     ) -> Result<(PackageDirectory, ResolutionContext), ResolvePinnedError> {
         let expected_hash = url.hash();
-        let (pkg_dir, resolution_context) = package_resolver.resolve(url.into(), None).await?;
+        let (pkg_dir, resolution_context) = package_resolver
+            .resolve(url.into(), fpkg::GcProtection::OpenPackageTracking, None)
+            .await?;
         let hash = pkg_dir.merkle_root().await?;
         if hash != expected_hash {
             return Err(ResolvePinnedError::HashMismatch(hash));
@@ -721,7 +723,8 @@ mod tests {
 
     fn get_test_package_resolver() -> MockResolver {
         let pkg_dir = PackageDirectory::open_from_namespace().unwrap();
-        MockResolver::new(move |_url| {
+        MockResolver::new(move |_url, gc_protection| {
+            assert_eq!(gc_protection, fpkg::GcProtection::OpenPackageTracking);
             let pkg_dir = pkg_dir.clone();
             async move { Ok((pkg_dir, ResolutionContext::new())) }
         })
@@ -736,13 +739,20 @@ mod tests {
     async fn handle_pkg_cache(mut stream: PackageCacheRequestStream) {
         while let Some(request) = stream.try_next().await.unwrap() {
             match request {
-                PackageCacheRequest::Get { meta_far_blob, needed_blobs, dir: _, responder } => {
+                PackageCacheRequest::Get {
+                    meta_far_blob,
+                    gc_protection,
+                    needed_blobs,
+                    dir: _,
+                    responder,
+                } => {
                     if meta_far_blob.blob_id.merkle_root
                         != TEST_HASH.parse::<Hash>().unwrap().as_bytes()
                     {
                         responder.send(Err(zx::Status::NOT_FOUND.into_raw())).unwrap();
                         continue;
                     }
+                    assert_eq!(gc_protection, fpkg::GcProtection::OpenPackageTracking);
                     let mut needed_blobs = needed_blobs.into_stream().unwrap();
                     while let Some(request) = needed_blobs.try_next().await.unwrap() {
                         match request {
@@ -774,7 +784,8 @@ mod tests {
         )
         .unwrap();
         let pkg_dir = PackageDirectory::from_proxy(proxy);
-        let package_resolver = MockResolver::new(move |_url| {
+        let package_resolver = MockResolver::new(move |_url, gc_protection| {
+            assert_eq!(gc_protection, fpkg::GcProtection::OpenPackageTracking);
             let pkg_dir = pkg_dir.clone();
             async move { Ok((pkg_dir, ResolutionContext::new())) }
         });

@@ -443,7 +443,14 @@ impl MockPackageCacheService {
     ) -> Result<(), Error> {
         while let Some(req) = stream.try_next().await? {
             match req {
-                PackageCacheRequest::Get { meta_far_blob, needed_blobs, dir, responder } => {
+                PackageCacheRequest::Get {
+                    meta_far_blob,
+                    gc_protection,
+                    needed_blobs,
+                    dir,
+                    responder,
+                } => {
+                    assert_eq!(gc_protection, fpkg::GcProtection::OpenPackageTracking);
                     self.captured_args
                         .lock()
                         .push(CapturedPackageCacheRequest::Get { meta_far_blob_id: meta_far_blob });
@@ -479,10 +486,9 @@ impl MockPackageCacheService {
             GetBehavior::NotCached => {
                 let mut stream = needed_blobs.into_stream().unwrap();
                 let req = stream.next().await.unwrap().unwrap();
-                let fpkg::NeededBlobsRequest::OpenMetaBlob{responder, .. } = req
-                     else {
-                        panic!("unexpected NeededBlobsRequest: {req:?}");
-                    };
+                let fpkg::NeededBlobsRequest::OpenMetaBlob { responder, .. } = req else {
+                    panic!("unexpected NeededBlobsRequest: {req:?}");
+                };
                 let () = responder
                     .send(Ok(Some(fpkg::BlobWriter::File(fidl::endpoints::create_endpoints().0))))
                     .unwrap();

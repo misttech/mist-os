@@ -995,3 +995,39 @@ async fn fxblob() {
 
     env.stop().await;
 }
+
+#[fuchsia::test]
+async fn ota_resolver_does_not_protect_blobs_from_gc() {
+    let env = TestEnvBuilder::new().build().await;
+    let pkg = PackageBuilder::new("unprotected-package")
+        .add_resource_at("unprotected-blob", &b"unprotected-blob-contents"[..])
+        .build()
+        .await
+        .unwrap();
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&pkg)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let served_repository = Arc::clone(&repo).server().start().unwrap();
+    let repo_url = "fuchsia-pkg://test".parse().unwrap();
+    let repo_config = served_repository.make_repo_config(repo_url);
+    let () = env.proxies.repo_manager.add(&repo_config.into()).await.unwrap().unwrap();
+
+    let (resolved_pkg, _resolved_context) =
+        lib::resolve_package(&env.proxies.resolver_ota, "fuchsia-pkg://test/unprotected-package")
+            .await
+            .unwrap();
+    pkg.verify_contents(&resolved_pkg).await.unwrap();
+
+    let () = env.proxies.space_manager.gc().await.unwrap().unwrap();
+
+    assert_matches!(
+        pkg.verify_contents(&resolved_pkg).await,
+        Err(fuchsia_pkg_testing::VerificationError::MissingFile{path}) if path == "unprotected-blob"
+    );
+
+    env.stop().await;
+}

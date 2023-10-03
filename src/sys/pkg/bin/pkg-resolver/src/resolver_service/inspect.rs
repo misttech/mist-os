@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use {
-    crate::inspect_util, fuchsia_inspect::Node, fuchsia_url::AbsolutePackageUrl,
-    fuchsia_zircon as zx,
+    crate::inspect_util, fidl_fuchsia_pkg as fpkg, fuchsia_inspect::Node,
+    fuchsia_url::AbsolutePackageUrl, fuchsia_zircon as zx,
 };
 
 fn now_monotonic_nanos() -> i64 {
@@ -43,9 +43,14 @@ impl ResolverService {
     }
 
     /// Add a package to the list of active resolves.
-    pub fn resolve(&self, original_url: &AbsolutePackageUrl) -> Package {
+    pub fn resolve(
+        &self,
+        original_url: &AbsolutePackageUrl,
+        gc_protection: fpkg::GcProtection,
+    ) -> Package {
         let node = self.active_package_resolves.create_child(original_url.to_string());
         node.record_int("resolve_ts", now_monotonic_nanos());
+        node.record_string("gc_protection", format!("{gc_protection:?}"));
         Package { node }
     }
 }
@@ -91,7 +96,10 @@ mod tests {
             }
         );
 
-        let package = resolver_service.resolve(&"fuchsia-pkg://example.org/name".parse().unwrap());
+        let package = resolver_service.resolve(
+            &"fuchsia-pkg://example.org/name".parse().unwrap(),
+            fpkg::GcProtection::Retained,
+        );
         assert_data_tree!(
             inspector,
             root: {
@@ -99,6 +107,7 @@ mod tests {
                     active_package_resolves: {
                         "fuchsia-pkg://example.org/name": {
                             resolve_ts: AnyProperty,
+                            gc_protection: "Retained",
                         }
                     }
                 }
@@ -114,6 +123,7 @@ mod tests {
                     active_package_resolves: {
                         "fuchsia-pkg://example.org/name": {
                             resolve_ts: AnyProperty,
+                            gc_protection: "Retained",
                             rewritten_url: "fuchsia-pkg://rewritten.example.org/name",
                         }
                     }
@@ -128,17 +138,25 @@ mod tests {
         let resolver_service =
             ResolverService::from_node(inspector.root().create_child("resolver_service"));
 
-        let _package0 =
-            resolver_service.resolve(&"fuchsia-pkg://example.org/name".parse().unwrap());
-        let _package1 =
-            resolver_service.resolve(&"fuchsia-pkg://example.org/other".parse().unwrap());
+        let _package0 = resolver_service.resolve(
+            &"fuchsia-pkg://example.org/name".parse().unwrap(),
+            fpkg::GcProtection::Retained,
+        );
+        let _package1 = resolver_service.resolve(
+            &"fuchsia-pkg://example.org/other".parse().unwrap(),
+            fpkg::GcProtection::OpenPackageTracking,
+        );
         assert_data_tree!(
             inspector,
             root: {
                 resolver_service: contains {
                     active_package_resolves: {
-                        "fuchsia-pkg://example.org/name": contains {},
-                        "fuchsia-pkg://example.org/other": contains {}
+                        "fuchsia-pkg://example.org/name": contains {
+                            gc_protection: "Retained",
+                        },
+                        "fuchsia-pkg://example.org/other": contains {
+                            gc_protection: "OpenPackageTracking",
+                        }
                     }
                 }
             }
