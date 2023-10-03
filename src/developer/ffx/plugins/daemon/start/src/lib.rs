@@ -44,6 +44,6 @@ impl FfxMain for DaemonStartTool {
         })?;
         tracing::debug!("creating daemon");
         let mut daemon = ffx_daemon_server::Daemon::new(ascendd_path);
-        daemon.start(hoist).await.bug()
+        daemon.start(hoist.node()).await.bug()
     }
 }

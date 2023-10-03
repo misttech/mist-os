@@ -39,6 +39,10 @@ impl Hoist {
         Ok(Self { node })
     }
 
+    pub fn from_node(node: Arc<Router>) -> Self {
+        Self { node }
+    }
+
     pub fn node(&self) -> Arc<Router> {
         self.node.clone()
     }

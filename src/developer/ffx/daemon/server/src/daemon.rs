@@ -36,7 +36,6 @@ use futures::{
     executor::block_on,
     prelude::*,
 };
-use hoist::Hoist;
 use notify::{RecursiveMode, Watcher};
 use protocols::{DaemonProtocolProvider, ProtocolError, ProtocolRegister};
 use rcs::RcsConnection;
@@ -97,19 +96,19 @@ impl ConfigReader for DefaultConfigReader {
 }
 
 pub struct DaemonEventHandler {
-    hoist: Hoist,
+    node: Arc<overnet_core::Router>,
     target_collection: Rc<TargetCollection>,
 }
 
 impl DaemonEventHandler {
-    fn new(hoist: Hoist, target_collection: Rc<TargetCollection>) -> Self {
-        Self { hoist, target_collection }
+    fn new(node: Arc<overnet_core::Router>, target_collection: Rc<TargetCollection>) -> Self {
+        Self { node, target_collection }
     }
 
     #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
         tracing::debug!("Got overnet peer {node_id}");
-        let rcs = match RcsConnection::new(self.hoist.node(), &mut NodeId { id: node_id }) {
+        let rcs = match RcsConnection::new(Arc::clone(&self.node), &mut NodeId { id: node_id }) {
             Ok(rcs) => rcs,
             Err(e) => {
                 tracing::error!(
@@ -369,28 +368,28 @@ impl Daemon {
         }
     }
 
-    pub async fn start(&mut self, hoist: &Hoist) -> Result<()> {
+    pub async fn start(&mut self, node: Arc<overnet_core::Router>) -> Result<()> {
         tracing::debug!("starting daemon");
-        self.overnet_node = Some(hoist.node());
+        self.overnet_node = Some(Arc::clone(&node));
         let context =
             ffx_config::global_env_context().context("Discovering ffx environment context")?;
 
-        let ascendd = self.prime_ascendd(hoist).await?;
+        let ascendd = self.prime_ascendd(Arc::clone(&node)).await?;
 
         let (quit_tx, quit_rx) = mpsc::channel(1);
         self.log_startup_info(&context).await.context("Logging startup info")?;
 
         self.start_protocols().await?;
-        self.start_discovery(hoist).await?;
+        self.start_discovery(Arc::clone(&node)).await?;
         self.start_ascendd(ascendd);
         let _socket_file_watcher =
             self.start_socket_watch(quit_tx.clone()).await.context("Starting socket watcher")?;
         self.start_signal_monitoring(quit_tx.clone());
         let should_start_expiry = context.get(DISCOVERY_EXPIRE_TARGETS).await.unwrap_or(true);
         if should_start_expiry == true {
-            self.start_target_expiry(Duration::from_secs(1), hoist.node());
+            self.start_target_expiry(Duration::from_secs(1), Arc::clone(&node));
         }
-        self.serve(&context, hoist, quit_tx, quit_rx).await.context("Serving clients")
+        self.serve(&context, node, quit_tx, quit_rx).await.context("Serving clients")
     }
 
     #[tracing::instrument(skip(self))]
@@ -451,14 +450,14 @@ impl Daemon {
     }
 
     /// Start all discovery tasks
-    async fn start_discovery(&mut self, hoist: &Hoist) -> Result<()> {
+    async fn start_discovery(&mut self, node: Arc<overnet_core::Router>) -> Result<()> {
         let daemon_event_handler =
-            DaemonEventHandler::new(hoist.clone(), self.target_collection.clone());
+            DaemonEventHandler::new(Arc::clone(&node), self.target_collection.clone());
         self.event_queue.add_handler(daemon_event_handler).await;
 
         // TODO: these tasks could and probably should be managed by the daemon
         // instead of being detached.
-        Daemon::spawn_onet_discovery(hoist, self.event_queue.clone());
+        Daemon::spawn_onet_discovery(node, self.event_queue.clone());
         let discovery = zedboot_discovery(self.event_queue.clone()).await?;
         self.tasks.push(Rc::new(discovery));
         Ok(())
@@ -467,7 +466,7 @@ impl Daemon {
     #[tracing::instrument(skip(self))]
     async fn prime_ascendd(
         &self,
-        hoist: &Hoist,
+        node: Arc<overnet_core::Router>,
     ) -> Result<impl FnOnce() -> Ascendd, errors::FfxError> {
         // Bind the ascendd socket but delay accepting connections until protocols are registered.
         tracing::debug!("Priming ascendd");
@@ -480,7 +479,7 @@ impl Daemon {
                 usb: ffx_config::get(OVERNET_ENABLE_USB).await.unwrap_or(false),
                 ..Default::default()
             },
-            &hoist,
+            node,
         )
         .await
         .map_err(|e| ffx_error!("Error trying to start daemon socket: {e}"))
@@ -654,13 +653,12 @@ impl Daemon {
             .await
     }
 
-    fn spawn_onet_discovery(hoist: &Hoist, queue: events::Queue<DaemonEvent>) {
-        let hoist = hoist.clone();
+    fn spawn_onet_discovery(node: Arc<overnet_core::Router>, queue: events::Queue<DaemonEvent>) {
         fuchsia_async::Task::local(async move {
             let mut known_peers: HashSet<PeerSetElement> = Default::default();
 
             loop {
-                let lpc = hoist.node().new_list_peers_context().await;
+                let lpc = node.new_list_peers_context().await;
                 loop {
                     match lpc.list_peers().await {
                         Ok(new_peers) => {
@@ -792,7 +790,7 @@ impl Daemon {
     async fn serve(
         &self,
         context: &EnvironmentContext,
-        hoist: &Hoist,
+        node: Arc<overnet_core::Router>,
         quit_tx: mpsc::Sender<()>,
         mut quit_rx: mpsc::Receiver<()>,
     ) -> Result<()> {
@@ -803,10 +801,7 @@ impl Daemon {
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
         tracing::debug!("Starting daemon overnet server");
-        hoist
-            .node()
-            .register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p))
-            .await?;
+        node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p)).await?;
 
         tracing::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();
@@ -1020,7 +1015,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_expiry() {
-        let local_hoist = hoist::Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
         let mut daemon = Daemon::new(socket_path);
@@ -1031,7 +1026,7 @@ mod test {
 
         assert_eq!(TargetConnectionState::Mdns(then), target.get_connection_state());
 
-        daemon.start_target_expiry(Duration::from_millis(1), local_hoist.node());
+        daemon.start_target_expiry(Duration::from_millis(1), local_node);
 
         while target.get_connection_state() == TargetConnectionState::Mdns(then) {
             futures_lite::future::yield_now().await
@@ -1042,7 +1037,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_ephemeral_target_expiry() {
-        let local_hoist = hoist::Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let tempdir = tempfile::tempdir().expect("Creating tempdir");
         let socket_path = tempdir.path().join("ascendd.sock");
         let mut daemon = Daemon::new(socket_path);
@@ -1080,7 +1075,7 @@ mod test {
         assert_eq!(TargetConnectionState::Mdns(then), expiring_target.get_connection_state());
         assert_eq!(TargetConnectionState::Mdns(then), persistent_target.get_connection_state());
 
-        daemon.start_target_expiry(Duration::from_millis(1), local_hoist.node());
+        daemon.start_target_expiry(Duration::from_millis(1), local_node);
 
         while expiring_target.get_connection_state() == TargetConnectionState::Mdns(then) {
             futures_lite::future::yield_now().await

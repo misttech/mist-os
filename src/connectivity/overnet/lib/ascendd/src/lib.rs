@@ -69,18 +69,21 @@ pub struct Ascendd {
 
 impl Ascendd {
     // Initializes and binds ascendd socket, but does not accept connections yet.
-    pub async fn prime(mut opt: Opt, hoist: &Hoist) -> Result<impl FnOnce() -> Self, Error> {
+    pub async fn prime(
+        mut opt: Opt,
+        node: Arc<overnet_core::Router>,
+    ) -> Result<impl FnOnce() -> Self, Error> {
+        let hoist = Hoist::from_node(node);
         let usb = opt.usb;
         let link = std::mem::replace(&mut opt.link, vec![]);
-        let (sockpath, client_routing, incoming) = bind_listener(opt, hoist).await?;
-        let hoist = hoist.clone();
+        let (sockpath, client_routing, incoming) = bind_listener(opt, &hoist).await?;
         Ok(move || Self {
             task: Task::spawn(run_ascendd(hoist, sockpath, incoming, client_routing, usb, link)),
         })
     }
 
     pub async fn new(opt: Opt, hoist: &Hoist) -> Result<Self, Error> {
-        Self::prime(opt, hoist).await.map(|f| f())
+        Self::prime(opt, hoist.node()).await.map(|f| f())
     }
 }
 
