@@ -836,7 +836,7 @@ pub fn start_flatland_presentation_loop(
                         None => {}
                     }
                 }
-                flatland_event = flatland_event_stream.next() => {
+                flatland_event = flatland_event_stream.next().fuse() => {
                     match flatland_event {
                         Some(Ok(ui_comp::FlatlandEvent::OnNextFrameBegin{ values })) => {
                             trace::duration!("scene_manager", "SceneManager::OnNextFrameBegin",
