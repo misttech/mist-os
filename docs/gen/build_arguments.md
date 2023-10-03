@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2042
+From //build/config/BUILDCONFIG.gn:2036
 
 ### allowed_test_device_types
 
@@ -217,7 +217,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:106
+From //boards/common/x64-common.gni:105
 
 **Overridden from the default:** `""`
 
@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:104
+From //boards/common/x64-common.gni:103
 
 **Overridden from the default:** `""`
 
@@ -386,7 +386,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:108
+From //boards/common/x64-common.gni:107
 
 **Overridden from the default:** `false`
 
@@ -632,7 +632,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:29
 
-**Current value for `target_cpu = "x64"`:** `["//src/graphics/bin/vulkan_loader", "//src/hwinfo:default_board_config", "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt", "//src/factory/factory_store_providers/config/qemu"]`
+**Current value for `target_cpu = "x64"`:** `["//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt", "//src/factory/factory_store_providers/config/qemu", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/hwinfo:default_board_config"]`
 
 From //boards/common/x64-common.gni:83
 
@@ -921,7 +921,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:112
+From //boards/common/x64-common.gni:111
 
 **Overridden from the default:** `false`
 
@@ -3097,7 +3097,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1777
+From //build/config/BUILDCONFIG.gn:1771
 
 ### extra_vbmeta_descriptors
 
@@ -4310,7 +4310,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1582
+From //build/config/BUILDCONFIG.gn:1576
 
 ### legacy_base_driver_package_labels
 
@@ -4529,7 +4529,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:110
+From //boards/common/x64-common.gni:109
 
 **Overridden from the default:** `false`
 
@@ -5321,7 +5321,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:100
+From //boards/common/x64-common.gni:99
 
 **Overridden from the default:** `[]`
 
@@ -5342,7 +5342,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:99
+From //boards/common/x64-common.gni:98
 
 **Overridden from the default:** `false`
 
@@ -7390,7 +7390,7 @@ Set to true to make C++ compiles preserve timestamps of unchanged outputs.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/restat.gni:22
+From //build/toolchain/restat.gni:18
 
 ### restat_rust
 
@@ -7398,7 +7398,7 @@ Set to true to make Rust compiles preserve timestamps of unchanged outputs.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/restat.gni:19
+From //build/toolchain/restat.gni:15
 
 ### roboto_font_path
 
@@ -7798,7 +7798,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2032
+From //build/config/BUILDCONFIG.gn:2026
 
 ### select_variant_canonical
 
@@ -7808,7 +7808,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2037
+From //build/config/BUILDCONFIG.gn:2031
 
 ### select_variant_shortcuts
 
@@ -7866,7 +7866,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1823
+From //build/config/BUILDCONFIG.gn:1817
 
 ### size_checker_input
 
@@ -8295,7 +8295,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:114
+From //build/config/BUILDCONFIG.gn:108
 
 ### tsan_default_options
 
@@ -8348,7 +8348,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1807
+From //build/config/BUILDCONFIG.gn:1801
 
 ### universe_package_labels
 
@@ -8521,7 +8521,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:113
+From //boards/common/x64-common.gni:112
 
 **Overridden from the default:** `false`
 
@@ -8700,7 +8700,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:102
+From //boards/common/x64-common.gni:101
 
 **Overridden from the default:** `false`
 
@@ -9056,7 +9056,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:131
+From //build/config/BUILDCONFIG.gn:125
 
 ### zircon_tracelog
 
@@ -9136,5 +9136,5 @@ From //third_party/mesa/src/intel/vulkan/BUILD.gn:31
 
 **Current value (from the default):** `"//third_party/android/device/generic/goldfish-opengl:libvulkan_goldfish"`
 
-From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:11
+From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:13
 
