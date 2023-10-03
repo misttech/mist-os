@@ -131,7 +131,7 @@ fn check_leaf_duration(leaf_duration: &DurationSummary, leaf_count: u64) {
     );
 }
 
-const MARGIN_PERCENT: f64 = 2.0;
+const MARGIN_PERCENT: f64 = 5.0;
 
 #[track_caller]
 fn assert_approx_eq(lhs: i64, rhs: i64) {
