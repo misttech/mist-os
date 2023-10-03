@@ -9,7 +9,7 @@ use fuchsia_async::TimeoutExt;
 use fuchsia_async::{Task, Timer};
 use futures::channel::mpsc::unbounded;
 use futures::prelude::*;
-use overnet_core::{Router, RouterOptions};
+use overnet_core::Router;
 use std::io::ErrorKind::{self, TimedOut};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -33,15 +33,8 @@ pub struct Hoist {
 
 impl Hoist {
     pub fn new(router_update_interval: Option<std::time::Duration>) -> Result<Self, Error> {
-        let node_id = overnet_core::generate_node_id();
-        tracing::trace!(hoist_node_id = node_id.0);
-        let router_options = RouterOptions::new().set_node_id(node_id);
-        let router_options = if let Some(router_update_interval) = router_update_interval {
-            router_options.set_router_interval(router_update_interval)
-        } else {
-            router_options
-        };
-        let node = Router::new(router_options)?;
+        let node = Router::new(router_update_interval)?;
+        tracing::trace!(hoist_node_id = ?node.node_id());
 
         Ok(Self { node })
     }

@@ -25,7 +25,7 @@ mod usb;
 async fn exec_server() -> Result<(), Error> {
     diagnostics_log::initialize(PublishOptions::default().tags(&["remote-control"]))?;
 
-    let router = overnet_core::Router::new(overnet_core::RouterOptions::new())?;
+    let router = overnet_core::Router::new(None)?;
 
     let connector = {
         let router = Arc::clone(&router);

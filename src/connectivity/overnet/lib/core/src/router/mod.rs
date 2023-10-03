@@ -48,32 +48,6 @@ use std::{
     time::Duration,
 };
 
-/// Configuration object for creating a router.
-pub struct RouterOptions {
-    node_id: Option<NodeId>,
-    circuit_router_interval: Option<Duration>,
-}
-
-impl RouterOptions {
-    /// Create with defaults.
-    pub fn new() -> Self {
-        RouterOptions { node_id: None, circuit_router_interval: None }
-    }
-
-    /// Request a specific node id (if unset, one will be generated).
-    pub fn set_node_id(mut self, node_id: NodeId) -> Self {
-        self.node_id = Some(node_id);
-        self
-    }
-
-    /// Set the maximum frequency of router updates sent to the circuit network by this node. Leave
-    /// unset to create a node that does not forward routing updates.
-    pub fn set_router_interval(mut self, interval: Duration) -> Self {
-        self.circuit_router_interval = Some(interval);
-        self
-    }
-}
-
 #[derive(Debug)]
 enum PendingTransfer {
     Complete(FoundTransfer),
@@ -176,7 +150,7 @@ struct ProxiedHandle {
 }
 
 /// Generate a new random node id
-pub fn generate_node_id() -> NodeId {
+fn generate_node_id() -> NodeId {
     rand::thread_rng().gen::<u64>().into()
 }
 
@@ -196,28 +170,35 @@ impl std::fmt::Debug for Router {
 const OVERNET_CIRCUIT_PROTOCOL: &'static str = "Overnet:0";
 
 impl Router {
-    /// New with some set of options
-    pub fn new(options: RouterOptions) -> Result<Arc<Self>, Error> {
-        let node_id = options.node_id.unwrap_or_else(generate_node_id);
+    /// Create a new router. If `router_interval` is given, this router will
+    /// behave like an interior node and tell its neighbors about each other.
+    pub fn new(router_interval: Option<Duration>) -> Result<Arc<Self>, Error> {
+        Router::with_node_id(generate_node_id(), router_interval)
+    }
+
+    /// Make a router with a specific node ID.
+    pub fn with_node_id(
+        node_id: NodeId,
+        router_interval: Option<Duration>,
+    ) -> Result<Arc<Self>, Error> {
         let service_map = ServiceMap::new(node_id);
         let (new_peer_sender, new_peer_receiver) = futures::channel::mpsc::unbounded();
-        let (circuit_node, circuit_connections) =
-            if let Some(interval) = options.circuit_router_interval {
-                let (a, b) = circuit::ConnectionNode::new_with_router(
-                    &node_id.circuit_string(),
-                    OVERNET_CIRCUIT_PROTOCOL,
-                    interval,
-                    new_peer_sender,
-                )?;
-                (a, b.boxed())
-            } else {
-                let (a, b) = circuit::ConnectionNode::new(
-                    &node_id.circuit_string(),
-                    OVERNET_CIRCUIT_PROTOCOL,
-                    new_peer_sender,
-                )?;
-                (a, b.boxed())
-            };
+        let (circuit_node, circuit_connections) = if let Some(interval) = router_interval {
+            let (a, b) = circuit::ConnectionNode::new_with_router(
+                &node_id.circuit_string(),
+                OVERNET_CIRCUIT_PROTOCOL,
+                interval,
+                new_peer_sender,
+            )?;
+            (a, b.boxed())
+        } else {
+            let (a, b) = circuit::ConnectionNode::new(
+                &node_id.circuit_string(),
+                OVERNET_CIRCUIT_PROTOCOL,
+                new_peer_sender,
+            )?;
+            (a, b.boxed())
+        };
         let router = Arc::new(Router {
             node_id,
             service_map,
@@ -802,7 +783,7 @@ mod tests {
         let mut node_id_gen = NodeIdGenerator::new("router::no_op", run);
         node_id_gen.new_router().unwrap();
         let id = node_id_gen.next().unwrap();
-        assert_eq!(Router::new(RouterOptions::new().set_node_id(id)).unwrap().node_id, id);
+        assert_eq!(Router::with_node_id(id, None).unwrap().node_id, id);
     }
 
     async fn register_test_service(
