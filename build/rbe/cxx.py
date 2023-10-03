@@ -395,6 +395,8 @@ class CxxAction(object):
         # for remote actions (but it does not hurt).
         for s in self.sources:
             yield s.file
+
+        # Support for -fprofile-list was added to re-client in b/220028444.
         if self.profile_list:
             yield self.profile_list
 
@@ -405,12 +407,14 @@ class CxxAction(object):
         if self.output_file:
             yield self.output_file  # This should be first, for naming purposes
 
+            # TODO(b/302613832): remove this once upstream supports it
             if self.save_temps:
                 stem = self.save_temps_output_stem
                 for suffix in (self.preprocessed_suffix, ".bc", ".s"):
                     yield stem.with_suffix(suffix)
 
     def output_dirs(self) -> Iterable[Path]:
+        # TODO(b/272865494): remove this once upstream supports it
         if self.crash_diagnostics_dir:
             yield self.crash_diagnostics_dir
 

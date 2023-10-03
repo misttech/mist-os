@@ -99,7 +99,11 @@ template("clang_toolchain") {
       if (cxx_rbe_minimalist_wrapper) {
         _cxx_remote_wrapper_path =
             rebase_path(cxx_remote_wrapper_minimalist, root_build_dir)
-        compiler_prefix_list = [ _cxx_remote_wrapper_path ]
+        _working_subdir = rebase_path(root_build_dir, "//")
+        compiler_prefix_list = [
+          _cxx_remote_wrapper_path,
+          "--working-subdir=" + _working_subdir,
+        ]
       } else {
         _cxx_remote_wrapper_path =
             rebase_path(cxx_remote_wrapper, root_build_dir)

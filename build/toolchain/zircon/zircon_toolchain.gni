@@ -169,8 +169,11 @@ template("zircon_toolchain") {
   if (cxx_rbe_enable) {
     # Use reclient to remotely build C++.
     if (cxx_rbe_minimalist_wrapper) {
-      compiler_prefix_list =
-          [ rebase_path(cxx_remote_wrapper_minimalist, root_build_dir) ]
+      _working_subdir = rebase_path(root_build_dir, "//")
+      compiler_prefix_list = [
+        rebase_path(cxx_remote_wrapper_minimalist, root_build_dir),
+        "--working-subdir=" + _working_subdir,
+      ]
     } else {
       compiler_prefix_list = [
         rebase_path(python_exe_src, root_build_dir),
