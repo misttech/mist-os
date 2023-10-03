@@ -2,46 +2,45 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package clippy
-
-import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
-
-	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-	"go.fuchsia.dev/fuchsia/tools/staticanalysis"
-)
-
-type analyzer struct {
-	buildDir      string
-	checkoutDir   string
-	clippyTargets []build.ClippyTarget
-}
-
-// New returns an analyzer implementing the Analyzer interface for Clippy, a
-// Rust linter.
+// Package main implements a parser for clippy JSON files generated
+// by the build system that determines which clippy findings to report based on
+// a list of affected files. It integrates with shac (see //scripts/shac).
 //
 // Clippy runs within the build system because it needs access to each Rust
 // library's full dependency tree, and it outputs files within the build
 // directory containing Clippy findings, so this checker reads findings from
 // those files (and assumes they've already been built) rather than running
 // Clippy itself.
-func New(checkoutDir string, modules *build.Modules) (staticanalysis.Analyzer, error) {
-	return &analyzer{
-		buildDir:      modules.BuildDir(),
-		checkoutDir:   checkoutDir,
-		clippyTargets: modules.ClippyTargets(),
-	}, nil
+//
+// TODO(olivernewman): Consider deleting this tool and having shac into the same
+// Python code used by `fx clippy` instead.
+package main
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
+	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/staticanalysis"
+)
+
+type clippyReporter struct {
+	buildDir      string
+	checkoutDir   string
+	clippyTargets []build.ClippyTarget
 }
 
-func (a *analyzer) Analyze(ctx context.Context, path string) ([]*staticanalysis.Finding, error) {
+func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanalysis.Finding, error) {
 	buildRelPath, err := filepath.Rel(a.buildDir, filepath.Join(a.checkoutDir, path))
 	if err != nil {
 		return nil, err
@@ -184,7 +183,7 @@ func (a *analyzer) Analyze(ctx context.Context, path string) ([]*staticanalysis.
 // clippyTargetForFile returns the Clippy output target for the library that a
 // given source file is included in. If the file is not associated with any
 // Clippy target, returns false.
-func (a *analyzer) clippyTargetForFile(buildRelPath string) (target build.ClippyTarget, ok bool) {
+func (a *clippyReporter) clippyTargetForFile(buildRelPath string) (target build.ClippyTarget, ok bool) {
 	for _, target := range a.clippyTargets {
 		for _, source := range target.Sources {
 			// Assumes each file only feeds into a single clippy target.
@@ -249,4 +248,48 @@ type clippySpan struct {
 
 	ColumnStart int `json:"column_start"`
 	ColumnEnd   int `json:"column_end"`
+}
+
+func mainImpl() error {
+	var filesJSON string
+	var checkoutDir string
+	var buildDir string
+	flag.StringVar(&filesJSON, "files-json", "", "JSON manifest of files to analyze")
+	flag.StringVar(&checkoutDir, "checkout-dir", "", "Path to the Fuchsia checkout root")
+	flag.StringVar(&buildDir, "build-dir", "", "Path to the Fuchsia build directory")
+	flag.Parse()
+
+	mod, err := build.NewModules(buildDir)
+	if err != nil {
+		return err
+	}
+
+	var paths []string
+	if err := jsonutil.ReadFromFile(filesJSON, &paths); err != nil {
+		return fmt.Errorf("failed to read -files-json: %w", err)
+	}
+	a := clippyReporter{
+		checkoutDir:   checkoutDir,
+		buildDir:      buildDir,
+		clippyTargets: mod.ClippyTargets(),
+	}
+
+	findings := []*staticanalysis.Finding{}
+	for _, path := range paths {
+		f, err := a.report(context.Background(), path)
+		if err != nil {
+			return err
+		}
+		findings = append(findings, f...)
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(findings)
+}
+
+func main() {
+	if err := mainImpl(); err != nil {
+		log.Fatal(err)
+	}
 }

@@ -12,16 +12,12 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
-	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 	"go.fuchsia.dev/fuchsia/tools/staticanalysis"
-	"go.fuchsia.dev/fuchsia/tools/staticanalysis/analyzers/clippy"
 )
 
 // fileToAnalyze is the expected schema of each element in the file specified by
@@ -32,19 +28,7 @@ type fileToAnalyze struct {
 }
 
 func getAnalyzers(checkoutDir, buildDir string) ([]staticanalysis.Analyzer, error) {
-	modules, err := build.NewModules(buildDir)
-	if err != nil {
-		return nil, err
-	}
-
 	var res []staticanalysis.Analyzer
-
-	clippy, err := clippy.New(checkoutDir, modules)
-	if err != nil {
-		return nil, err
-	}
-	res = append(res, clippy)
-
 	return res, nil
 }
 
@@ -82,9 +66,6 @@ func runAnalyzers(ctx context.Context, analyzers []staticanalysis.Analyzer, file
 }
 
 func mainImpl(ctx context.Context) error {
-	ctx, cancel := signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)
-	defer cancel()
-
 	var flags struct {
 		checkoutDir string
 		buildDir    string

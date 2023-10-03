@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package clippy
+package main
 
 import (
 	"context"
@@ -19,7 +19,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/staticanalysis"
 )
 
-func TestAnalyzer(t *testing.T) {
+func TestClippyReporter(t *testing.T) {
 	tests := []struct {
 		name          string
 		path          string
@@ -212,7 +212,7 @@ func TestAnalyzer(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			analyzer := analyzer{
+			analyzer := clippyReporter{
 				checkoutDir:   checkoutDir,
 				buildDir:      buildDir,
 				clippyTargets: test.clippyTargets,
@@ -233,7 +233,7 @@ func TestAnalyzer(t *testing.T) {
 				}
 			}
 
-			findings, err := analyzer.Analyze(context.Background(), test.path)
+			findings, err := analyzer.report(context.Background(), test.path)
 			if err != nil {
 				t.Fatal(err)
 			}

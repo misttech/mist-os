@@ -20,7 +20,6 @@ if (is_host) {
       "//tools/lib/logger",
       "//tools/lib/streams",
       "//tools/staticanalysis",
-      "//tools/staticanalysis/analyzers:clippy",
     ]
   }
 

@@ -24,7 +24,7 @@ group("tests") {
   testonly = true
   deps = [
     ":staticanalysis_tests($host_toolchain)",
-    "analyzers:tests",
+    "clippy-reporter:tests",
     "cmd/staticlints:tests",
     "rfcmeta:tests",
   ]
