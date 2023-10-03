@@ -1,0 +1,3 @@
+per-file inspect.golden = file: /src/developer/ffx/plugins/inspect/OWNERS
+per-file log.golden = file: /src/developer/ffx/plugins/log/OWNERS
+per-file triage.golden = file: /src/developer/ffx/tools/triage/OWNERS
