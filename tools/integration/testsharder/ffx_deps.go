@@ -6,8 +6,7 @@ package testsharder
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"runtime"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
@@ -50,24 +49,12 @@ func AddFFXDeps(s *Shard, buildDir string, images []build.Image, tools build.Too
 }
 
 func getSubtoolDeps(s *Shard, tools build.Tools, buildDir string, subtools []string) []string {
-	platform := hostplatform.MakeName("linux", s.HostCPU())
+	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU())
 	var deps []string
 	for _, s := range subtools {
-		if subtoolPath, err := tools.LookupPath(platform, fmt.Sprintf("ffx-%s", s)); err == nil {
-			// LookupPath only errs if the tool can't be found, which will be the case
-			// if the ffx tool has not been separated yet, so only add the dep if it exists.
-			// Both the subtool and a json file at subtoolPath.json, which contains
-			// the metadata ffx needs to decide how to interact with and run the subtool,
-			// need to exist in order to use the subtool, so do not add if either are
-			// missing.
-			if _, err := os.Stat(filepath.Join(buildDir, subtoolPath)); err != nil {
-				continue
-			}
-			subtoolJsonPath := fmt.Sprintf("%s.json", subtoolPath)
-			if _, err := os.Stat(filepath.Join(buildDir, subtoolJsonPath)); err != nil {
-				continue
-			}
-			deps = append(deps, subtoolPath, subtoolJsonPath)
+		if subtool, err := tools.LookupTool(platform, fmt.Sprintf("ffx-%s", s)); err == nil {
+			deps = append(deps, subtool.Path)
+			deps = append(deps, subtool.RuntimeFiles...)
 		}
 	}
 	return deps

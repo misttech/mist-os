@@ -565,11 +565,11 @@ func constructNinjaTargets(
 	// needed for other platforms can be included in the build indirectly
 	// via higher-level targets.
 	for _, tool := range staticSpec.Tools {
-		path, err := modules.Tools().LookupPath(platform, tool)
+		t, err := modules.Tools().LookupTool(platform, tool)
 		if err != nil {
 			return nil, nil, err
 		}
-		targets = append(targets, path)
+		targets = append(targets, t.Path)
 	}
 
 	targets = append(targets, staticSpec.NinjaTargets...)
@@ -667,11 +667,11 @@ func chooseLintTargets(
 // the build directory prior to `fint build` running because only a subset of
 // them are prebuilts, and the rest are built from source.
 func toolAbsPath(modules buildModules, buildDir, platform, tool string) (string, error) {
-	path, err := modules.Tools().LookupPath(platform, tool)
+	t, err := modules.Tools().LookupTool(platform, tool)
 	if err != nil {
 		return "", err
 	}
-	return filepath.Abs(filepath.Join(buildDir, path))
+	return filepath.Abs(filepath.Join(buildDir, t.Path))
 }
 
 // toStructPB converts a Go struct to a Struct protobuf. Unfortunately, short of

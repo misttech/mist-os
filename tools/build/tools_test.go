@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestLookupPath(t *testing.T) {
+func TestLookupTool(t *testing.T) {
 	tools := Tools{
 		{Name: "foo", OS: "linux", CPU: "x64", Path: "linux_x64/foo"},
 		{Name: "foo", OS: "linux", CPU: "arm64", Path: "linux_arm64/foo"},
@@ -62,7 +62,7 @@ func TestLookupPath(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			gotPath, err := tools.LookupPath(tc.platform, tc.tool)
+			gotTool, err := tools.LookupTool(tc.platform, tc.tool)
 			if err != nil {
 				if !tc.wantErr {
 					t.Fatalf("Got unexpected error: %s", err)
@@ -71,8 +71,8 @@ func TestLookupPath(t *testing.T) {
 				t.Fatal("Expected error but got nil")
 			}
 
-			if gotPath != tc.wantPath {
-				t.Errorf("Wanted path %q, got %q", tc.wantPath, gotPath)
+			if gotTool != nil && gotTool.Path != tc.wantPath {
+				t.Errorf("Wanted path %q, got %q", tc.wantPath, gotTool.Path)
 			}
 		})
 	}

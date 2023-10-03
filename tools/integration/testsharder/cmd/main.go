@@ -307,11 +307,11 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 					if err != nil {
 						return err
 					}
-					ffxPath, err = m.Tools().LookupPath(platform, "ffx")
+					ffxTool, err := m.Tools().LookupTool(platform, "ffx")
 					if err != nil {
 						return err
 					}
-					ffxPath = filepath.Join(flags.buildDir, ffxPath)
+					ffxPath = filepath.Join(flags.buildDir, ffxTool.Path)
 				}
 			}
 			if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), flags.pave, pbPath, ffxPath); err != nil {
