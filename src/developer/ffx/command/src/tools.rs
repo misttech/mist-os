@@ -2,11 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::HashSet, fmt::Write, path::PathBuf, process::ExitStatus};
-
-use crate::{Error, FfxCommandLine, MetricsSession, Result};
+use crate::{args_info::CliArgsInfo, Error, FfxCommandLine, MetricsSession, Result};
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
+use std::{collections::HashSet, fmt::Write, path::PathBuf, process::ExitStatus};
 
 /// Where the command was discovered
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -123,6 +122,9 @@ pub trait ToolSuite: Sized {
             err => err,
         }
     }
+
+    /// Gets the command line argument information.
+    async fn get_args_info(&self) -> Result<CliArgsInfo, Error>;
 }
 
 fn print_command_list(w: &mut impl Write, commands: &[FfxToolInfo]) -> Result<(), std::fmt::Error> {

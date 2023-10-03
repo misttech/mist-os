@@ -1,11 +1,17 @@
-# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
 group("tests") {
   deps = [
     "connection:tests",
+    "help-json:tests",
     "target:tests",
   ]
   testonly = true
+}
+
+group("e2e_tests") {
+  testonly = true
+  deps = [ "e2e/cli-goldens:e2e_tests" ]
 }

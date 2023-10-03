@@ -58,17 +58,26 @@ impl<'a> TestCommandLineInfo<'a> {
     async fn run_command_with_checks(&self, isolate: &Isolate) -> Result<String, TestingError> {
         let output = isolate.ffx(&self.args).await.map_err(|e| TestingError::ExecutionError(e))?;
 
-        let actual_code = output.status.code().unwrap();
-        if actual_code != self.expected_exit_code {
-            return Err(TestingError::UnexpectedExitCode(self.expected_exit_code, actual_code));
+        let actual_exit_code = output.status.code().expect("exit code");
+        if actual_exit_code != self.expected_exit_code {
+            return Err(TestingError::UnexpectedExitCode(
+                self.expected_exit_code,
+                actual_exit_code,
+            ));
         }
 
         if !(self.stdout_check)(&output.stdout) {
-            return Err(TestingError::MatchingError(output.stdout));
+            return Err(TestingError::MatchingError(format!(
+                "stdout check failed for {:?}",
+                self.args
+            )));
         }
 
         if !(self.stderr_check)(&output.stderr) {
-            return Err(TestingError::MatchingError(output.stderr));
+            return Err(TestingError::MatchingError(format!(
+                "stderr check failed for {:?}",
+                self.args
+            )));
         }
 
         Ok(output.stdout)

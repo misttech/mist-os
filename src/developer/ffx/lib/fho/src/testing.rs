@@ -189,7 +189,7 @@ pub fn fake_proxy<T: fidl::endpoints::Proxy>(
 mod internal {
     use super::*;
     use crate::{self as fho, CheckEnv, FfxMain, FhoEnvironment, Result, ToolIO, TryFromEnv};
-    use argh::FromArgs;
+    use argh::{ArgsInfo, FromArgs};
     use std::cell::RefCell;
 
     #[derive(Debug)]
@@ -202,7 +202,7 @@ mod internal {
         }
     }
 
-    #[derive(Debug, FromArgs)]
+    #[derive(Debug, ArgsInfo, FromArgs)]
     #[argh(subcommand, name = "fake", description = "fake command")]
     pub struct FakeCommand {
         #[argh(positional)]

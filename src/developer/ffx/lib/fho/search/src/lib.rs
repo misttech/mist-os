@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use ffx_command::{
-    FfxCommandLine, FfxContext, FfxToolInfo, FfxToolSource, MetricsSession, Result, ToolRunner,
-    ToolSuite,
+    CliArgsInfo, FfxCommandLine, FfxContext, FfxToolInfo, FfxToolSource, MetricsSession, Result,
+    ToolRunner, ToolSuite,
 };
 use ffx_config::{EnvironmentContext, Sdk, SelectMode};
 use fho_metadata::FhoToolMetadata;
@@ -104,7 +104,9 @@ impl ExternalSubToolSuite {
             &ffx_tool.executable,
             &ffx_tool.metadata,
         )?;
-        let Some(FfxToolInfo { path: Some(path), .. }) = location.validate_tool() else { return None };
+        let Some(FfxToolInfo { path: Some(path), .. }) = location.validate_tool() else {
+            return None;
+        };
         let context = self.context.clone();
         let cmd_line = ffx_cmd.clone();
         Some(ExternalSubTool { cmd_line, context, path })
@@ -125,6 +127,38 @@ impl ToolSuite for ExternalSubToolSuite {
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
         &[]
+    }
+
+    async fn get_args_info(&self) -> Result<ffx_command::CliArgsInfo> {
+        let mut external_args_info: ffx_command::CliArgsInfo = Default::default();
+
+        for tool in &self.command_list().await {
+            // construct a FfxCommandline to get the args_info for the subcommand
+            let argv = Vec::from_iter(std::env::args());
+
+            let cmdline =
+                FfxCommandLine::from_args_for_help(&argv).bug_context("cmd line for help")?;
+            let mut c = std::process::Command::new(
+                &tool.path.clone().ok_or(ffx_command::bug!("could not get tool path"))?,
+            );
+            let help_cmd = c
+                .env(
+                    EnvironmentContext::FFX_BIN_ENV,
+                    self.context.rerun_bin().await.bug_context("rerun bin")?,
+                )
+                .args(cmdline.ffx_args_iter().chain(cmdline.subcmd_iter()));
+
+            let output = help_cmd.output().bug_context("sub tool help")?;
+            let outval = String::from_utf8_lossy(&output.stdout);
+            let subcmd_args_info: CliArgsInfo = serde_json::from_slice(&output.stdout)
+                .bug_context(format!("json parsing:{outval}"))?;
+
+            external_args_info.commands.push(ffx_command::SubCommandInfo {
+                name: subcmd_args_info.name.clone(),
+                command: subcmd_args_info.clone(),
+            });
+        }
+        Ok(external_args_info)
     }
 
     async fn command_list(&self) -> Vec<FfxToolInfo> {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use argh::{CommandInfo, FromArgs, SubCommand, SubCommands};
+use argh::{ArgsInfo, CommandInfo, FromArgs, SubCommand, SubCommands};
 use async_trait::async_trait;
 use ffx_command::{
     Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner, ToolSuite,
@@ -21,7 +21,7 @@ use crate::{FhoEnvironment, FhoToolMetadata, TryFromEnv};
 /// by the user, but instead derived via `#[derive(FfxTool)]`.
 #[async_trait(?Send)]
 pub trait FfxTool: FfxMain + Sized {
-    type Command: FromArgs + SubCommand;
+    type Command: FromArgs + SubCommand + ArgsInfo;
 
     fn forces_stdout_log(&self) -> bool;
     fn supports_machine_output(&self) -> bool;
@@ -168,6 +168,10 @@ impl<M: FfxTool> ToolSuite for FhoSuite<M> {
 
     fn global_command_list() -> &'static [&'static argh::CommandInfo] {
         FhoHandler::<M>::COMMANDS
+    }
+
+    async fn get_args_info(&self) -> Result<ffx_command::CliArgsInfo> {
+        Ok(M::Command::get_args_info().into())
     }
 
     async fn try_from_args(

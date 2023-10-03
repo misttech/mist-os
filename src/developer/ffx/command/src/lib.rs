@@ -3,17 +3,20 @@
 // found in the LICENSE file.
 
 use errors::IntoExitCode;
+pub use ffx_command_error::*;
 use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
-use std::{fs::File, io::Write, process::ExitStatus, time::Duration};
+use std::{
+    fs::File, io::Write, os::unix::process::ExitStatusExt, process::ExitStatus, time::Duration,
+};
 
-pub use ffx_command_error::*;
-
+mod args_info;
 mod describe;
 mod ffx;
 mod metrics;
 mod tools;
 
+pub use args_info::*;
 pub use ffx::*;
 pub use metrics::*;
 pub use tools::*;
@@ -50,7 +53,26 @@ pub async fn report_bug(err: &impl std::fmt::Display) {
 
 #[tracing::instrument]
 pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
-    let cmd = ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help)?;
+    let mut return_args_info = false;
+    let cmd = match ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help) {
+        Ok(c) => c,
+        Err(Error::Help { command, output, code }) => {
+            // Check for machine json output and  help
+            // This is a little bit messy since the command line is not returned
+            // when a help error is returned. So look for the `--machine json` flag
+            // and either `help` or `--help` or `-h`.
+            let argv = Vec::from_iter(std::env::args());
+            let c = ffx::FfxCommandLine::from_args_for_help(&argv)?;
+            if find_machine_and_help(&c).is_some() {
+                return_args_info = true;
+                c
+            } else {
+                return Err(Error::Help { command, output, code });
+            }
+        }
+
+        Err(e) => return Err(e),
+    };
     let app = &cmd.global;
 
     let context = app.load_context(exe_kind)?;
@@ -66,7 +88,56 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
     let tools = T::from_env(&context).await?;
 
-    let tool = tools.try_from_args(&cmd).await?;
+    if return_args_info {
+        // This handles the top level ffx command information and prints the information
+        // for all subcommands.
+        let args = tools.get_args_info().await?;
+        let output = match cmd.global.machine.unwrap() {
+            ffx_writer::Format::Json => serde_json::to_string(&args),
+            ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&args),
+        };
+        println!("{}", output.bug_context("Error serializing args")?);
+        return Ok(ExitStatus::from_raw(0));
+    }
+
+    let tool = match tools.try_from_args(&cmd).await {
+        Ok(t) => t,
+        Err(Error::Help { command, output, code }) => {
+            // TODO(b/303088345): Enhance argh to support custom help better.
+            // Check for machine json output and  help.
+            // This handles the sub command of ffx information.
+            if let Some(machine_format) = find_machine_and_help(&cmd) {
+                let all_info = tools.get_args_info().await?;
+                // Tools will return the top level args info, so
+                //iterate over the subcommands to get to the right level
+                let mut info: CliArgsInfo = all_info;
+                for c in cmd.subcmd_iter() {
+                    if c.starts_with("-") {
+                        continue;
+                    }
+                    if info.name == c {
+                        continue;
+                    }
+                    info = info
+                        .commands
+                        .iter()
+                        .find(|s| s.name == c)
+                        .map(|s| s.command.clone().into())
+                        .unwrap_or(info);
+                }
+                let output = match machine_format {
+                    ffx_writer::Format::Json => serde_json::to_string(&info),
+                    ffx_writer::Format::JsonPretty => serde_json::to_string_pretty(&info),
+                };
+                println!("{}", output.bug_context("Error serializing args")?);
+                return Ok(ExitStatus::from_raw(0));
+            } else {
+                return Err(Error::Help { command, output, code });
+            }
+        }
+
+        Err(e) => return Err(e),
+    };
 
     let log_to_stdio = tool.as_ref().map(|tool| tool.forces_stdout_log()).unwrap_or(false);
     ffx_config::logging::init(&context, log_to_stdio || app.verbose, !log_to_stdio).await?;
@@ -116,10 +187,21 @@ pub async fn exit(res: Result<ExitStatus>) -> ! {
     std::process::exit(exit_code);
 }
 
+/// look through the command line args for `--machine <format>`
+/// and --help or help or -h. This is used to indicate the
+/// JSON arg info should be returned.
+fn find_machine_and_help(cmd: &FfxCommandLine) -> Option<ffx_writer::Format> {
+    if cmd.subcmd_iter().any(|c| c == "help" || c == "--help" || c == "-h") {
+        cmd.global.machine
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use std::{io::BufWriter, os::unix::process::ExitStatusExt};
+    use std::io::BufWriter;
     use tempfile;
 
     #[fuchsia_async::run_singlethreaded(test)]
