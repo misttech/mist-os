@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2037
+From //build/config/BUILDCONFIG.gn:2042
 
 ### allowed_test_device_types
 
@@ -1175,7 +1175,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:180
+From //build/toolchain/rbe.gni:178
 
 ### compress_debuginfo
 
@@ -1348,7 +1348,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:175
+From //build/toolchain/rbe.gni:173
 
 ### cxx_rbe_enable
 
@@ -1361,7 +1361,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:133
+From //build/toolchain/rbe.gni:126
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1369,7 +1369,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:133
+From //build/toolchain/rbe.gni:126
 
 ### cxx_rbe_exec_strategy
 
@@ -1392,7 +1392,17 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:151
+From //build/toolchain/rbe.gni:149
+
+### cxx_rbe_minimalist_wrapper
+
+Set to true to use a fast, minimalist wrapper, that lacks features
+of the python-based wrapper.  Use with caution.
+This flag is only meaningful when `cxx_rbe_enable` is true.
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:131
 
 ### data_filesystem_format
 
@@ -3087,7 +3097,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1772
+From //build/config/BUILDCONFIG.gn:1777
 
 ### extra_vbmeta_descriptors
 
@@ -4300,7 +4310,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1577
+From //build/config/BUILDCONFIG.gn:1582
 
 ### legacy_base_driver_package_labels
 
@@ -4373,7 +4383,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:227
+From //build/toolchain/rbe.gni:225
 
 ### link_rbe_enable
 
@@ -4383,7 +4393,7 @@ linkers like `lld`.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:189
+From //build/toolchain/rbe.gni:187
 
 ### link_rbe_exec_strategy
 
@@ -4406,7 +4416,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:207
+From //build/toolchain/rbe.gni:205
 
 ### llvm_prefix
 
@@ -7460,7 +7470,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:118
+From //build/toolchain/rbe.gni:111
 
 ### rust_rbe_download_unstripped_binaries
 
@@ -7472,7 +7482,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:125
+From //build/toolchain/rbe.gni:118
 
 ### rust_rbe_enable
 
@@ -7484,7 +7494,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:74
+From //build/toolchain/rbe.gni:67
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7492,7 +7502,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:74
+From //build/toolchain/rbe.gni:67
 
 ### rust_rbe_exec_strategy
 
@@ -7515,7 +7525,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:92
+From //build/toolchain/rbe.gni:85
 
 ### rust_toolchain_triple_suffix
 
@@ -7574,14 +7584,6 @@ prebuilt is used.
 **Current value (from the default):** `"6hOG9IliBe9tck9z4wS8HwOIO25tksm_zrNM-GzEaLwC"`
 
 From //build/rust/config.gni:38
-
-### scenic_display_frame_number
-
-Draws the current frame number in the top-left corner.
-
-**Current value (from the default):** `false`
-
-From //src/ui/scenic/lib/gfx/BUILD.gn:7
 
 ### scenic_enable_vulkan_validation
 
@@ -7796,7 +7798,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2027
+From //build/config/BUILDCONFIG.gn:2032
 
 ### select_variant_canonical
 
@@ -7806,7 +7808,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2032
+From //build/config/BUILDCONFIG.gn:2037
 
 ### select_variant_shortcuts
 
@@ -7864,7 +7866,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1818
+From //build/config/BUILDCONFIG.gn:1823
 
 ### size_checker_input
 
@@ -8346,7 +8348,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1802
+From //build/config/BUILDCONFIG.gn:1807
 
 ### universe_package_labels
 
