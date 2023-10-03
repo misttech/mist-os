@@ -48,5 +48,9 @@ board_input_bundle("main_bundle") {
     },
   ]
 
-  base_packages = [ "//src/graphics/bin/vulkan_loader" ]
+  base_packages = [
+    "//src/graphics/bin/vulkan_loader",
+    "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish",
+    "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen",
+  ]
 }
