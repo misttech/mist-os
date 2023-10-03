@@ -666,7 +666,7 @@ func AddRandomFilesToUpdate(
 			srcUpdate,
 			dstSystemImagePath,
 			dstUpdatePath,
-			otaSize+blobBlockSize,
+			blobBlockSize,
 		)
 
 		return dstUpdate, dstSystemImage, err
