@@ -344,9 +344,8 @@ void BufferCollection::V2::CheckAllBuffersAllocated(
   if (!parent_.CommonCheckAllBuffersAllocatedStage1(completer, &result)) {
     return;
   }
-  fuchsia_sysmem2::BufferCollectionCheckAllBuffersAllocatedResponse response;
   if (result == ZX_OK) {
-    completer.Reply(fit::ok(response));
+    completer.Reply(fit::ok());
   } else {
     completer.Reply(fit::error(result));
   }

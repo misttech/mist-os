@@ -591,9 +591,7 @@ closed protocol BufferCollection {
     /// If the buffer collection hasn't attempted allocation yet, returns
     /// `ZX_ERR_UNAVAILABLE`.  This means that WaitForAllBuffersAllocated
     /// would block (not respond quickly).
-    strict CheckAllBuffersAllocated() -> (table {
-            // nothing here yet
-            }) error zx.Status;
+    strict CheckAllBuffersAllocated() -> () error zx.Status;
 
     /// Create a new token, for trying to add a new participant to an existing
     /// logical buffer collection, if the existing collection's buffer counts,
