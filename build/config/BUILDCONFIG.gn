@@ -98,12 +98,6 @@ restat_wrapper_inputs = [
 restat_rust_wrapper_inputs = []
 if (restat_rust) {
   restat_rust_wrapper_inputs += restat_wrapper_inputs
-  if (rust_rbe_enable) {
-    # reclient supports a single-token --local_wrapper prefix
-    # for the local execution case (local-fallback or racing strategies).
-    # Used in build/toolchain/clang_toolchain.gni.
-    restat_rust_wrapper_inputs += [ restat_wrapper_local_wrapper ]
-  }
 }
 
 declare_args() {

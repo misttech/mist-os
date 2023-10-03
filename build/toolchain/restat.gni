@@ -10,10 +10,6 @@
 # unchanged files), so this script is only needed for non-RBE build actions.
 restat_wrapper = "//build/tracer/restat_cacher.py"
 
-# The following script helps pack the restat_wrapper invocation
-# into a single token that rewrapper --local_wrapper can accept.
-restat_wrapper_local_wrapper = "//build/tracer/output_cacher_local_wrapper.sh"
-
 declare_args() {
   # Set to true to make Rust compiles preserve timestamps of unchanged outputs.
   restat_rust = true

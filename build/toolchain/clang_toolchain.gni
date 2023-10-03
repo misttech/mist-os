@@ -188,32 +188,27 @@ template("clang_toolchain") {
     # unchanged outputs, for both local and remote builds.
     _restat_rustc_prefix_list = []
     if (restat_rust) {
-      _restat_rust_wrapper = [
-        rebase_path(python_exe_src, root_build_dir),
-        "-S",
-        rebase_path(restat_wrapper, root_build_dir),
-      ]
-      _restat_cmd_args = _restat_rust_wrapper + [
-                           "--outputs",
-                           "{{output}}",
-                           "{{DEPFILE}}",
-                           "--",
-                         ]
-      if (rust_rbe_enable) {
-        # To make sure local and remote execution consistently preserve
-        # output timestamps, we need to stage local execution outputs to
-        # temporaries.  This makes --exec_strategy=racing mode safe.
-        # The --local_wrapper argument must be a single shell token,
-        # and restat_wrapper_local_wrapper writes to a temporary file.
-        # By hiding shell-syntax inside the temporary wrapper, this form also
-        # composes cleanly with the action-tracer.
-        _restat_rustc_prefix_list =
-            [ rebase_path(restat_wrapper_local_wrapper, root_build_dir) ] +
-            _restat_cmd_args
-      } else {
-        # Local-only execution may use the wrapper script directly.
-        _restat_rustc_prefix_list = _restat_cmd_args
+      if (!rust_rbe_enable) {
+        # Local-only execution may use this wrapper script directly.
+        _restat_rust_wrapper = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          rebase_path(restat_wrapper, root_build_dir),
+        ]
+        _restat_rustc_prefix_list = _restat_rust_wrapper + [
+                                      "--outputs",
+                                      "{{output}}",
+                                      "{{DEPFILE}}",
+                                      "--",
+                                    ]
       }
+      # For remote-building, --preserve_unchanged_output_mtime is sufficient
+      # to preserve timestamps of unchanged outputs, and provide restat benefit.
+      # However, in modes that also (conditionally) use local execution
+      # (i.e. --exec_strategy={racing,remote_local_fallback}),
+      # the local execution could unconditionally overwrite outputs.
+      # While this may be suboptimal as a missed opportunity to prune
+      # the action graph, it does not violate correctness.
     }
     _restat_rustc_prefix = string_join(" ", _restat_rustc_prefix_list) + " "
 
