@@ -5,7 +5,7 @@
 use fuchsia_zircon as zx;
 use starnix_sync::{EventWaitGuard, InterruptibleEvent};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
@@ -13,7 +13,7 @@ use std::{
 };
 
 use crate::{
-    fs::FdEvents,
+    fs::{FdEvents, FdNumber},
     lock::Mutex,
     logging::*,
     signals::RunState,
@@ -21,8 +21,78 @@ use crate::{
     types::{Errno, *},
 };
 
+#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
+pub enum ReadyItemKey {
+    FdNumber(FdNumber),
+    Usize(usize),
+}
+
+impl From<FdNumber> for ReadyItemKey {
+    fn from(v: FdNumber) -> Self {
+        Self::FdNumber(v)
+    }
+}
+
+impl From<usize> for ReadyItemKey {
+    fn from(v: usize) -> Self {
+        Self::Usize(v)
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ReadyItem {
+    pub key: ReadyItemKey,
+    pub events: FdEvents,
+}
+
+#[derive(Clone)]
+pub struct EnqueueEventHandler {
+    pub key: ReadyItemKey,
+    pub queue: Arc<Mutex<VecDeque<ReadyItem>>>,
+    pub sought_events: FdEvents,
+    pub mappings: Option<fn(FdEvents) -> FdEvents>,
+}
+
+#[derive(Clone)]
+pub enum EventHandler {
+    None,
+    Enqueue(EnqueueEventHandler),
+    EnqueueOnce(Arc<Mutex<Option<EnqueueEventHandler>>>),
+}
+
+impl EventHandler {
+    pub fn add_mapping(&mut self, f: fn(FdEvents) -> FdEvents) {
+        let Some(prev) = (match self {
+            Self::None => None,
+            Self::Enqueue(e) => Some(e.mappings.replace(f)),
+            Self::EnqueueOnce(e) => e.lock().as_mut().map(|e| e.mappings.replace(f)),
+        }) else {
+            return;
+        };
+
+        // If this panic is hit, then we need to change `mappings` from
+        // an `Option` to a `Vec`.
+        assert!(prev.is_none() || prev == Some(f), "only a single mapping is supported");
+    }
+
+    pub fn handle(self, events: FdEvents) {
+        let Some(EnqueueEventHandler { key, queue, sought_events, mappings }) = (match self {
+            Self::None => None,
+            Self::Enqueue(e) => Some(e),
+            Self::EnqueueOnce(e) => e.lock().take(),
+        }) else {
+            return;
+        };
+
+        let mut events = events & sought_events;
+        for f in mappings.into_iter() {
+            events = f(events)
+        }
+        queue.lock().push_back(ReadyItem { key, events });
+    }
+}
+
 pub type SignalHandler = Box<dyn FnOnce(zx::Signals) + Send + Sync>;
-pub type EventHandler = Box<dyn FnOnce(FdEvents) + Send + Sync>;
 
 pub enum WaitCallback {
     SignalHandler(SignalHandler),
@@ -99,7 +169,7 @@ impl WaitEvents {
 
 impl WaitCallback {
     pub fn none() -> EventHandler {
-        Box::new(|_| {})
+        EventHandler::None
     }
 }
 
@@ -187,14 +257,14 @@ impl PortWaiter {
 
                                 match callback {
                                     WaitCallback::EventHandler(handler) => {
-                                        let fd_events = match events {
+                                        let events = match events {
                                             // If the event is All, signal on all possible fd
                                             // events.
                                             WaitEvents::All => FdEvents::all(),
                                             WaitEvents::Fd(events) => events,
                                             _ => panic!("wrong type of handler called: {events:?}"),
                                         };
-                                        handler(fd_events)
+                                        handler.handle(events)
                                     }
                                     WaitCallback::SignalHandler(_) => {
                                         panic!("wrong type of handler called")
@@ -804,14 +874,10 @@ mod tests {
     };
     use std::sync::atomic::AtomicU64;
 
-    static INIT_VAL: u64 = 0;
-    static FINAL_VAL: u64 = 42;
+    const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
 
     #[::fuchsia::test]
     async fn test_async_wait_exec() {
-        static COUNTER: AtomicU64 = AtomicU64::new(INIT_VAL);
-        static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
-
         let (_kernel, current_task) = create_kernel_and_task();
         let (local_socket, remote_socket) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, remote_socket, OpenFlags::RDWR).unwrap();
@@ -820,31 +886,37 @@ mod tests {
         let mut output_buffer = VecOutputBuffer::new(MEM_SIZE);
 
         let test_string = "hello startnix".to_string();
-        let report_packet: EventHandler = Box::new(|observed: FdEvents| {
-            assert!(observed.contains(FdEvents::POLLIN));
-            COUNTER.store(FINAL_VAL, Ordering::Relaxed);
+        let queue: Arc<Mutex<VecDeque<ReadyItem>>> = Default::default();
+        let handler = EventHandler::Enqueue(EnqueueEventHandler {
+            key: KEY,
+            queue: queue.clone(),
+            sought_events: FdEvents::all(),
+            mappings: Default::default(),
         });
         let waiter = Waiter::new();
-        pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, report_packet)
-            .expect("wait_async");
+        pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, handler).expect("wait_async");
         let test_string_clone = test_string.clone();
 
-        let thread = std::thread::spawn(move || {
-            let test_data = test_string_clone.as_bytes();
-            let no_written = local_socket.write(test_data).unwrap();
-            assert_eq!(0, WRITE_COUNT.fetch_add(no_written as u64, Ordering::Relaxed));
-            assert_eq!(no_written, test_data.len());
-        });
+        let write_count = AtomicU64::default();
+        std::thread::scope(|s| {
+            let thread = s.spawn(|| {
+                let test_data = test_string_clone.as_bytes();
+                let no_written = local_socket.write(test_data).unwrap();
+                assert_eq!(0, write_count.fetch_add(no_written as u64, Ordering::Relaxed));
+                assert_eq!(no_written, test_data.len());
+            });
 
-        // this code would block on failure
-        assert_eq!(INIT_VAL, COUNTER.load(Ordering::Relaxed));
-        waiter.wait(&current_task).unwrap();
-        let _ = thread.join();
-        assert_eq!(FINAL_VAL, COUNTER.load(Ordering::Relaxed));
+            // this code would block on failure
+
+            assert!(queue.lock().is_empty());
+            waiter.wait(&current_task).unwrap();
+            thread.join().expect("join thread")
+        });
+        queue.lock().iter().for_each(|item| assert!(item.events.contains(FdEvents::POLLIN)));
 
         let read_size = pipe.read(&current_task, &mut output_buffer).unwrap();
 
-        let no_written = WRITE_COUNT.load(Ordering::Relaxed);
+        let no_written = write_count.load(Ordering::Relaxed);
         assert_eq!(no_written, read_size as u64);
 
         assert_eq!(output_buffer.data(), test_string.as_bytes());
@@ -856,13 +928,15 @@ mod tests {
             let (_kernel, current_task) = create_kernel_and_task();
             let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
-            let callback_count = Arc::new(AtomicU64::new(0));
-            let callback_count_clone = callback_count.clone();
-            let handler = move |_observed: FdEvents| {
-                callback_count_clone.fetch_add(1, Ordering::Relaxed);
-            };
+            let queue: Arc<Mutex<VecDeque<ReadyItem>>> = Default::default();
+            let handler = EventHandler::Enqueue(EnqueueEventHandler {
+                key: KEY,
+                queue: queue.clone(),
+                sought_events: FdEvents::all(),
+                mappings: Default::default(),
+            });
             let wait_canceler = event
-                .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
+                .wait_async(&current_task, &waiter, FdEvents::POLLIN, handler)
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();
@@ -876,7 +950,7 @@ mod tests {
             );
 
             let wait_result = waiter.wait_until(&current_task, zx::Time::ZERO);
-            let final_count = callback_count.load(Ordering::Relaxed);
+            let final_count = queue.lock().len();
             if do_cancel {
                 assert_eq!(wait_result, error!(ETIMEDOUT));
                 assert_eq!(0, final_count);

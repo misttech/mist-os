@@ -238,7 +238,7 @@ impl FileOps for TimerFile {
     ) -> Option<WaitCanceler> {
         let signal_handler = move |signals: zx::Signals| {
             let events = TimerFile::get_events_from_signals(signals);
-            handler(events);
+            handler.handle(events);
         };
         let canceler = waiter
             .wake_on_zircon_signals(

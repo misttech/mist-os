@@ -899,7 +899,7 @@ impl FileOps for SeccompNotifierFileObject {
                         notifier.waiters.wait_async_fd_events(
                             &waiter,
                             FdEvents::POLLIN | FdEvents::POLLHUP,
-                            Box::new(|_: FdEvents| {}),
+                            EventHandler::None,
                         );
                     }
                     waiter.wait(current_task)?;

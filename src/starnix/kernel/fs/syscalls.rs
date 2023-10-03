@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{cmp::Ordering, convert::TryInto, sync::Arc, usize};
+use std::{
+    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
+};
 
 use crate::{
     arch::uapi::epoll_event,
@@ -1705,13 +1707,18 @@ fn select(
         (except_events, &mut exceptfds),
     ];
 
-    let ready_items = waiter.ready_items.lock();
-    for ready_item in ready_items.iter() {
+    let mut ready_items = waiter.ready_items.lock();
+    for ReadyItem { key: ready_key, events: ready_events } in ready_items.drain(..) {
+        let ready_key = assert_matches::assert_matches!(
+            ready_key,
+            ReadyItemKey::FdNumber(v) => v
+        );
+
         sets.iter_mut().for_each(|entry| {
             let events = FdEvents::from_bits_truncate(entry.0);
             let fds: &mut __kernel_fd_set = entry.1;
-            if events.intersects(ready_item.events) {
-                add_fd_to_set(fds, ready_item.key.raw() as usize);
+            if events.intersects(ready_events) {
+                add_fd_to_set(fds, ready_key.raw() as usize);
                 num_fds += 1;
             }
         });
@@ -1915,26 +1922,19 @@ pub fn sys_epoll_pwait2(
     do_epoll_pwait(current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
-trait ReadItemKey: Copy + Send + Sync + 'static {}
-impl<T> ReadItemKey for T where T: Copy + Send + Sync + 'static {}
-
-struct ReadyItem<Key: ReadItemKey> {
-    key: Key,
-    events: FdEvents,
-}
-
-struct FileWaiter<Key: ReadItemKey> {
+struct FileWaiter<Key: Into<ReadyItemKey>> {
     waiter: Waiter,
-    ready_items: Arc<Mutex<Vec<ReadyItem<Key>>>>,
+    ready_items: Arc<Mutex<VecDeque<ReadyItem>>>,
+    _marker: PhantomData<Key>,
 }
 
-impl<Key: ReadItemKey> Default for FileWaiter<Key> {
+impl<Key: Into<ReadyItemKey>> Default for FileWaiter<Key> {
     fn default() -> Self {
-        Self { waiter: Waiter::new(), ready_items: Default::default() }
+        Self { waiter: Waiter::new(), ready_items: Default::default(), _marker: PhantomData }
     }
 }
 
-impl<Key: ReadItemKey> FileWaiter<Key> {
+impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
     fn add(
         &self,
         current_task: &CurrentTask,
@@ -1942,21 +1942,24 @@ impl<Key: ReadItemKey> FileWaiter<Key> {
         file: Option<&FileHandle>,
         requested_events: FdEvents,
     ) -> Result<(), Errno> {
+        let key = key.into();
+
         if let Some(file) = file {
             let sought_events = requested_events | FdEvents::POLLERR | FdEvents::POLLHUP;
 
-            let ready_items = self.ready_items.clone();
-            let handler = Box::new(move |observed: FdEvents| {
-                ready_items.lock().push(ReadyItem::<Key> { key, events: observed & sought_events });
+            let handler = EventHandler::Enqueue(EnqueueEventHandler {
+                key,
+                queue: self.ready_items.clone(),
+                sought_events,
+                mappings: Default::default(),
             });
-
             file.wait_async(current_task, &self.waiter, sought_events, handler);
             let current_events = file.query_events(current_task)? & sought_events;
             if !current_events.is_empty() {
-                self.ready_items.lock().push(ReadyItem::<Key> { key, events: current_events });
+                self.ready_items.lock().push_back(ReadyItem { key, events: current_events });
             }
         } else {
-            self.ready_items.lock().push(ReadyItem::<Key> { key, events: FdEvents::POLLNVAL });
+            self.ready_items.lock().push_back(ReadyItem { key, events: FdEvents::POLLNVAL });
         }
         Ok(())
     }
@@ -2011,21 +2014,26 @@ pub fn poll(
 
     waiter.wait(current_task, mask, deadline)?;
 
-    let ready_items = waiter.ready_items.lock();
-    for ready_item in ready_items.iter() {
-        let interested_events = FdEvents::from_bits_truncate(pollfds[ready_item.key].events as u32)
+    let mut ready_items = waiter.ready_items.lock();
+    let ready_items_count = ready_items.len();
+    for ReadyItem { key: ready_key, events: ready_events } in ready_items.drain(..) {
+        let ready_key = assert_matches::assert_matches!(
+            ready_key,
+            ReadyItemKey::Usize(v) => v
+        );
+        let interested_events = FdEvents::from_bits_truncate(pollfds[ready_key].events as u32)
             | FdEvents::POLLERR
             | FdEvents::POLLHUP
             | FdEvents::POLLNVAL;
-        let return_events = (interested_events & ready_item.events).bits();
-        pollfds[ready_item.key].revents = return_events as i16;
+        let return_events = (interested_events & ready_events).bits();
+        pollfds[ready_key].revents = return_events as i16;
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {
         current_task.write_object(user_pollfds.at(index), poll_descriptor)?;
     }
 
-    Ok(ready_items.len())
+    Ok(ready_items_count)
 }
 
 pub fn sys_ppoll(

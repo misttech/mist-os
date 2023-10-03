@@ -1333,15 +1333,10 @@ impl FileObject {
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
-        handler: EventHandler,
+        mut handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        self.ops().wait_async(
-            self,
-            current_task,
-            waiter,
-            events,
-            Box::new(|observed| handler(add_equivalent_fd_events(observed))),
-        )
+        handler.add_mapping(add_equivalent_fd_events);
+        self.ops().wait_async(self, current_task, waiter, events, handler)
     }
 
     /// The events currently active on this file.

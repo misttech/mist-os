@@ -20,7 +20,7 @@ use crate::fs::socket::syscalls::*;
 use crate::fs::socket::{resolve_unix_socket_address, SocketPeer};
 use crate::fs::*;
 use crate::logging::log_error;
-use crate::task::{CurrentTask, Kernel, Task, Waiter};
+use crate::task::{CurrentTask, EventHandler, Kernel, Task, Waiter};
 use crate::types::*;
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
@@ -89,7 +89,7 @@ impl FrameReader {
             }
 
             let waiter = Waiter::new();
-            self.file.wait_async(current_task, &waiter, FdEvents::POLLIN, Box::new(|_| {}));
+            self.file.wait_async(current_task, &waiter, FdEvents::POLLIN, EventHandler::None);
             while self.file.query_events(current_task)? & FdEvents::POLLIN != FdEvents::POLLIN {
                 waiter.wait(current_task)?;
             }

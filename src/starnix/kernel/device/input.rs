@@ -1001,7 +1001,7 @@ mod test {
                 &current_task,
                 waiter,
                 FdEvents::POLLIN,
-                Box::new(|_| ()),
+                EventHandler::None,
             );
         });
         assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
@@ -1038,7 +1038,7 @@ mod test {
             &current_task,
             &waiter,
             FdEvents::POLLIN,
-            Box::new(|_| ()),
+            EventHandler::None,
         );
 
         let waiter_thread = std::thread::spawn(move || waiter.wait(&current_task));
@@ -1093,7 +1093,7 @@ mod test {
                         &current_task,
                         waiter,
                         FdEvents::POLLIN,
-                        Box::new(|_| ()),
+                        EventHandler::None,
                     )
                     .expect("wait_async")
             })

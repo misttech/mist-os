@@ -82,7 +82,7 @@ pub fn zxio_wait_async(
     let signal_handler = move |signals: zx::Signals| {
         let observed_zxio_signals = zxio_clone.wait_end(signals);
         let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
-        handler(observed_events);
+        handler.handle(observed_events);
     };
 
     // unwrap OK here as errors are only generated from misuse

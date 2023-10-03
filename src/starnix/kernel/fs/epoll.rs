@@ -55,13 +55,6 @@ fn as_epoll_key(file: &FileHandle) -> EpollKey {
     Arc::as_ptr(file) as EpollKey
 }
 
-/// ReadyObject represents an event on a waited upon object.
-#[derive(Clone, Debug)]
-struct ReadyObject {
-    key: EpollKey,
-    observed: FdEvents,
-}
-
 /// EpollFileObject represents the FileObject used to
 /// implement epoll_create1/epoll_ctl/epoll_pwait.
 #[derive(Default)]
@@ -71,14 +64,14 @@ pub struct EpollFileObject {
     state: Mutex<EpollState>,
     /// trigger_list is a FIFO of events that have
     /// happened, but have not yet been processed.
-    trigger_list: Arc<Mutex<VecDeque<ReadyObject>>>,
+    trigger_list: Arc<Mutex<VecDeque<ReadyItem>>>,
 }
 
 #[derive(Default)]
 struct EpollState {
     /// Any file tracked by this epoll instance
     /// will exist as a key in `wait_objects`.
-    wait_objects: HashMap<EpollKey, WaitObject>,
+    wait_objects: HashMap<ReadyItemKey, WaitObject>,
     /// processing_list is a FIFO of events that are being
     /// processed.
     ///
@@ -86,14 +79,14 @@ struct EpollState {
     /// list so that we can handle triggered events without holding its lock
     /// longer than we need to. This reduces contention with waited-on objects
     /// that tries to notify this epoll object on subscribed events.
-    processing_list: VecDeque<ReadyObject>,
+    processing_list: VecDeque<ReadyItem>,
     /// rearm_list is the list of event that need to
     /// be waited upon prior to actually waiting in
     /// EpollFileObject::wait. They cannot be re-armed
     /// before that, because, if the client process has
     /// not cleared the wait condition, they would just
     /// be immediately triggered.
-    rearm_list: Vec<ReadyObject>,
+    rearm_list: Vec<ReadyItem>,
     /// A list of waiters waiting for events from this
     /// epoll instance.
     waiters: WaitQueue,
@@ -113,17 +106,19 @@ impl EpollFileObject {
         Anon::new_file(current_task, epoll, OpenFlags::RDWR)
     }
 
-    fn new_wait_handler(&self, key: EpollKey) -> EventHandler {
-        let trigger_list = self.trigger_list.clone();
-        Box::new(move |observed: FdEvents| {
-            trigger_list.lock().push_back(ReadyObject { key, observed })
+    fn new_wait_handler(&self, key: ReadyItemKey) -> EventHandler {
+        EventHandler::Enqueue(EnqueueEventHandler {
+            key,
+            queue: self.trigger_list.clone(),
+            sought_events: FdEvents::all(),
+            mappings: Default::default(),
         })
     }
 
     fn wait_on_file(
         &self,
         current_task: &CurrentTask,
-        key: EpollKey,
+        key: ReadyItemKey,
         wait_object: &mut WaitObject,
     ) -> Result<(), Errno> {
         let target = wait_object.target()?;
@@ -151,7 +146,7 @@ impl EpollFileObject {
     fn wait_on_file_edge_triggered(
         &self,
         current_task: &CurrentTask,
-        key: EpollKey,
+        key: ReadyItemKey,
         wait_object: &mut WaitObject,
     ) -> Result<(), Errno> {
         wait_object.wait_canceler = wait_object.target()?.wait_async(
@@ -207,7 +202,7 @@ impl EpollFileObject {
         }
 
         let mut state = self.state.lock();
-        let key = as_epoll_key(file);
+        let key = as_epoll_key(file).into();
         match state.wait_objects.entry(key) {
             Entry::Occupied(_) => error!(EEXIST),
             Entry::Vacant(entry) => {
@@ -233,7 +228,7 @@ impl EpollFileObject {
         epoll_event.events |= FdEvents::POLLERR.bits();
 
         let mut state = self.state.lock();
-        let key = as_epoll_key(file);
+        let key = as_epoll_key(file).into();
         state.rearm_list.retain(|x| x.key != key);
         match state.wait_objects.entry(key) {
             Entry::Occupied(mut entry) => {
@@ -252,7 +247,7 @@ impl EpollFileObject {
     /// calling this will still be delivered.
     pub fn delete(&self, file: &FileHandle) -> Result<(), Errno> {
         let mut state = self.state.lock();
-        let key = as_epoll_key(file);
+        let key = as_epoll_key(file).into();
         if let Some(mut wait_object) = state.wait_objects.remove(&key) {
             if let Some(wait_canceler) = wait_object.wait_canceler.take() {
                 wait_canceler.cancel();
@@ -274,7 +269,7 @@ impl EpollFileObject {
     fn process_triggered_events(
         &self,
         current_task: &CurrentTask,
-        pending_list: &mut Vec<ReadyObject>,
+        pending_list: &mut Vec<ReadyItem>,
         max_events: usize,
     ) -> Result<(), Errno> {
         let mut state = self.state.lock();
@@ -290,9 +285,11 @@ impl EpollFileObject {
                     // out from under us. If this happens it is not an error: ignore it and
                     // continue.
                     if let Some(target) = wait.target.upgrade() {
-                        let observed = target.query_events(current_task)?;
-                        let ready = ReadyObject { key: pending.key, observed };
-                        if observed.intersects(wait.events) {
+                        let ready = ReadyItem {
+                            key: pending.key,
+                            events: target.query_events(current_task)?,
+                        };
+                        if ready.events.intersects(wait.events) {
                             pending_list.push(ready);
                         } else {
                             // Another thread already handled this event, wait for another one.
@@ -318,7 +315,7 @@ impl EpollFileObject {
         current_task: &CurrentTask,
         max_events: usize,
         mut wait_deadline: zx::Time,
-    ) -> Result<Vec<ReadyObject>, Errno> {
+    ) -> Result<Vec<ReadyItem>, Errno> {
         let mut pending_list = Vec::new();
 
         loop {
@@ -392,7 +389,7 @@ impl EpollFileObject {
 
         let pending_list = self.wait_until_pending_event(current_task, max_events, deadline)?;
 
-        // Process the pending list and add processed ReadyObject
+        // Process the pending list and add processed ReadyItem
         // entries to the rearm_list for the next wait.
         let mut result = vec![];
         let mut state = self.state.lock();
@@ -400,7 +397,7 @@ impl EpollFileObject {
             // The wait could have been deleted by here,
             // so ignore the None case.
             if let Some(wait) = state.wait_objects.get_mut(&pending_event.key) {
-                let reported_events = pending_event.observed.bits() & wait.events.bits();
+                let reported_events = pending_event.events.bits() & wait.events.bits();
                 result.push(epoll_event::new(reported_events, wait.data));
 
                 // Files marked with `EPOLLONESHOT` should only notify
@@ -609,13 +606,8 @@ mod tests {
                 epoll_file.delete(&event).unwrap();
             }
 
-            let callback_count = Arc::new(AtomicU64::new(0));
-            let callback_count_clone = callback_count.clone();
-            let handler = move |_observed: FdEvents| {
-                callback_count_clone.fetch_add(1, Ordering::Relaxed);
-            };
             let wait_canceler = event
-                .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
+                .wait_async(&current_task, &waiter, FdEvents::POLLIN, EventHandler::None)
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();

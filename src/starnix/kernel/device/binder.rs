@@ -38,7 +38,6 @@ use fuchsia_zircon as zx;
 use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
-    ops::DerefMut,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
@@ -182,7 +181,7 @@ impl FileOps for BinderConnection {
                 Some(self.driver.wait_async(&proc, &binder_thread, waiter, events, handler))
             }
             Err(_) => {
-                handler(FdEvents::POLLERR);
+                handler.handle(FdEvents::POLLERR);
                 Some(waiter.fake_wait())
             }
         }
@@ -3711,10 +3710,12 @@ impl BinderDriver {
         let thread_state = binder_thread.lock();
         let proc_command_queue = binder_proc.command_queue.lock();
 
-        let old_handler = Arc::new(Mutex::new(handler));
-        let handler = Box::new(move |e| {
-            std::mem::replace(old_handler.lock().deref_mut(), Box::new(|_| {}))(e)
-        });
+        let handler = match handler {
+            EventHandler::None => EventHandler::None,
+            EventHandler::Enqueue(e) => EventHandler::EnqueueOnce(Arc::new(Mutex::new(Some(e)))),
+            EventHandler::EnqueueOnce(e) => EventHandler::EnqueueOnce(e),
+        };
+
         let w1 = thread_state.command_queue.wait_async_fd_events(waiter, events, handler.clone());
         let w2 = proc_command_queue.waiters.wait_async_fd_events(waiter, events, handler);
         WaitCanceler::new(move || {
