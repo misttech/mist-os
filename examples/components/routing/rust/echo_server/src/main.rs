@@ -22,7 +22,10 @@ async fn main() -> Result<(), anyhow::Error> {
 
     // Initialize inspect
     component::health().set_starting_up();
-    inspect_runtime::serve(component::inspector(), &mut service_fs)?;
+    let _inspect_server_task = inspect_runtime::publish(
+        component::inspector(),
+        inspect_runtime::PublishOptions::default(),
+    );
 
     // Serve the Echo protocol
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Echo);

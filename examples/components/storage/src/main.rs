@@ -31,7 +31,8 @@ async fn main() -> Result<(), Error> {
     info!("Initializing and serving inspect on servicefs");
     let mut fs = ServiceFs::new();
     let mut inspect_nodes = Vec::new();
-    inspect_runtime::serve(&INSPECTOR, &mut fs)?;
+    let _inspect_server_task =
+        inspect_runtime::publish(&INSPECTOR, inspect_runtime::PublishOptions::default());
 
     for dirname in &*DIRECTORIES {
         let path = PathBuf::from(format!("/{}/{}", dirname, FILENAME));
@@ -42,7 +43,7 @@ async fn main() -> Result<(), Error> {
     }
 
     fs.take_and_serve_directory_handle()?;
-    Ok(fs.collect().await)
+    Ok(fs.collect::<()>().await)
 }
 
 /// Attempts to read a single u64 from the supplied path then write an incremented value back into
