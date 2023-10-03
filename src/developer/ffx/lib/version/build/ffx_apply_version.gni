@@ -113,16 +113,6 @@ template("ffx_apply_version") {
       "//src/developer/ffx/lib/version/build:version-info.bin($default_toolchain)",
     ]
 
-    # For ffx tools we really want tool_paths.json to point at the copies in
-    # the main toolchain (so they're arranged the way ffx needs them to be to find
-    # metadata and host tools), not the variant toolchain, so derive the target
-    # and root out dir that the copy will end up in to help build correct
-    # metadata
-    fully_qualified_label =
-        get_label_info(":$target_name", "label_no_toolchain")
-    main_root_out_dir =
-        get_label_info(":$target_name(${toolchain_variant.base})",
-                       "root_out_dir")
     all_runtime_files = []
     if (defined(invoker.runtime_files)) {
       foreach(file, invoker.runtime_files) {
@@ -139,11 +129,10 @@ template("ffx_apply_version") {
       tool_paths = [
         {
           cpu = current_cpu
-          label = "${fully_qualified_label}(${toolchain_variant.base})"
+          label = get_label_info(":$target_name", "label_with_toolchain")
           name = output_name
           os = current_os
-          path =
-              rebase_path("${main_root_out_dir}/${output_file}", root_build_dir)
+          path = rebase_path(outputs[0], root_build_dir)
           runtime_files = all_runtime_files
         },
       ]
