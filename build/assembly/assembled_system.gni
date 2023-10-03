@@ -5,6 +5,7 @@
 import("//build/assembly/hermetic_inputs_for_image_assembly.gni")
 import("//build/assembly/legacy_assembly_input_bundle.gni")
 import("//build/bazel/bazel_inputs.gni")
+import("//build/board.gni")
 import("//build/python/python_action.gni")
 import("//build/zircon/tools.gni")
 import("//bundles/assembly/platform_aibs.gni")

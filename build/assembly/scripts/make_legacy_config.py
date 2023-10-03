@@ -23,6 +23,7 @@ from assembly import (
     FilePath,
     ImageAssemblyConfig,
     PackageManifest,
+    KernelInfo,
 )
 from assembly.assembly_input_bundle import (
     CompiledPackageAdditionalShards,
@@ -45,7 +46,12 @@ DepSet = Set[FilePath]
 
 
 def copy_to_assembly_input_bundle(
-    legacy: ImageAssemblyConfig,
+    base: List[FilePath],
+    cache: List[FilePath],
+    system: List[FilePath],
+    bootfs_packages: List[FilePath],
+    kernel: KernelInfo,
+    boot_args: List[str],
     config_data_entries: FileEntryList,
     outdir: FilePath,
     base_driver_packages_list: List[str],
@@ -68,12 +74,12 @@ def copy_to_assembly_input_bundle(
         copying operation (ie. depfile contents)
     """
     aib_creator = AIBCreator(outdir)
-    aib_creator.base = legacy.base
-    aib_creator.cache = legacy.cache
-    aib_creator.system = legacy.system
-    aib_creator.bootfs_packages = legacy.bootfs_packages
-    aib_creator.kernel = legacy.kernel
-    aib_creator.boot_args = legacy.boot_args
+    aib_creator.base.update(base)
+    aib_creator.cache.update(cache)
+    aib_creator.system.update(system)
+    aib_creator.bootfs_packages.update(bootfs_packages)
+    aib_creator.kernel = kernel
+    aib_creator.boot_args.update(boot_args)
 
     aib_creator.base_drivers = set(base_driver_packages_list)
 
@@ -135,9 +141,28 @@ def main():
     parser = argparse.ArgumentParser(
         description="Create an image assembly configuration"
     )
+
+    parser.add_argument("--base-packages-list", type=argparse.FileType("r"))
+    parser.add_argument("--cache-packages-list", type=argparse.FileType("r"))
     parser.add_argument(
-        "--image-assembly-config", type=argparse.FileType("r"), required=True
+        "--extra-files-packages-list", type=argparse.FileType("r")
     )
+    parser.add_argument(
+        "--extra-deps-files-packages-list", type=argparse.FileType("r")
+    )
+    parser.add_argument(
+        "--kernel-cmdline", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument(
+        "--kernel-clock-backstop", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument(
+        "--kernel-image-metadata", type=argparse.FileType("r"), required=True
+    )
+    parser.add_argument("--kernel-image-name", required=True)
+    parser.add_argument("--boot-args", type=argparse.FileType("r"))
+    parser.add_argument("--bootfs-packages-list", type=argparse.FileType("r"))
+
     parser.add_argument("--config-data-entries", type=argparse.FileType("r"))
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"))
@@ -164,11 +189,6 @@ def main():
     parser.add_argument("--core-package-name", default="core")
     parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
-
-    # Read in the legacy config.
-    legacy: ImageAssemblyConfig = ImageAssemblyConfig.json_load(
-        args.image_assembly_config
-    )
 
     # Read in the config_data entries if available.
     if args.config_data_entries:
@@ -227,13 +247,71 @@ def main():
                 FileEntry(include["source"], include["destination"])
             )
 
+    base = []
+    if args.base_packages_list is not None:
+        base_packages_list = json.load(args.base_packages_list)
+        base = base_packages_list
+
+    cache = []
+    if args.cache_packages_list is not None:
+        cache_packages_list = json.load(args.cache_packages_list)
+
+        # Strip all base pkgs from the cache pkgs set, so there are no
+        # duplicates across the two sets.
+        if base:
+            cache_packages_set = set(cache_packages_list)
+            cache_packages_set.difference_update(base)
+            cache_packages_list = list(sorted(cache_packages_set))
+
+        cache = cache_packages_list
+
+    system = []
+    if args.extra_files_packages_list is not None:
+        extra_file_packages = json.load(args.extra_files_packages_list)
+        system.extend(extra_file_packages)
+    if args.extra_deps_files_packages_list is not None:
+        extra_deps_file_packages = json.load(
+            args.extra_deps_files_packages_list
+        )
+        for extra_dep in extra_deps_file_packages:
+            system.append(extra_dep["package_manifest"])
+
+    # ZBI Config
+    kernel_metadata = json.load(args.kernel_image_metadata)
+
+    # The build_api_module("images") entry with name "kernel" and type "zbi"
+    # is the kernel ZBI to include in the bootable ZBI.  There can be only one.
+    [kernel_path] = [
+        image["path"]
+        for image in kernel_metadata
+        if image["name"] == args.kernel_image_name and image["type"] == "zbi"
+    ]
+    kernel = KernelInfo()
+    kernel.path = kernel_path
+    kernel.args.update(json.load(args.kernel_cmdline))
+    kernel.clock_backstop = json.load(args.kernel_clock_backstop)
+
+    boot_args = []
+    if args.boot_args is not None:
+        boot_args = sorted(json.load(args.boot_args))
+
+    bootfs_packages = []
+    if args.bootfs_packages_list is not None:
+        bootfs_packages_list = json.load(args.bootfs_packages_list)
+        bootfs_packages = bootfs_packages_list
+
     # Create an Assembly Input Bundle from the remaining contents
     (
         assembly_input_bundle,
         assembly_config_manifest_path,
         deps,
     ) = copy_to_assembly_input_bundle(
-        legacy,
+        base,
+        cache,
+        system,
+        bootfs_packages,
+        kernel,
+        boot_args,
         config_data_entries,
         args.outdir,
         base_driver_packages_list,
