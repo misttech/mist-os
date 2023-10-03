@@ -327,7 +327,7 @@ template("system_test_upgrade_suite") {
       assert(invoker.max_ota_size != "",
              "'${_host_test_target_name}' cannot have an empty max_ota_size")
       _args += [
-        "-max-ota-test",
+        "-max-ota-size",
         invoker.max_ota_size,
       ]
     }
