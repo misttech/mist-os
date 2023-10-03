@@ -47,4 +47,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/iwlwifi.cm" ]
     },
   ]
+
+  base_packages = [ "//src/graphics/bin/vulkan_loader" ]
 }

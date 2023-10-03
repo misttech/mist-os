@@ -81,7 +81,6 @@ board_driver_package_labels += [
 ]
 
 board_package_labels += [
-  "//src/graphics/bin/vulkan_loader",
   "//src/hwinfo:default_board_config",
   "//src/graphics/drivers/intel-gen/icd:libvulkan_intel_gen",
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan",
