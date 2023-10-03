@@ -88,13 +88,15 @@ template("clang_toolchain") {
       }
     }
     if (defined(invoker.cxx_rbe_enable)) {
-      cxx_rbe_enable = invoker.cxx_rbe_enable
+      _cxx_rbe_enable = invoker.cxx_rbe_enable
+    } else {
+      _cxx_rbe_enable = cxx_rbe_enable
     }
     if (defined(invoker.use_goma)) {
       use_goma = invoker.use_goma
     }
 
-    if (cxx_rbe_enable) {
+    if (_cxx_rbe_enable) {
       # Use reclient to remotely build C++.
       if (cxx_rbe_minimalist_wrapper) {
         _cxx_remote_wrapper_path =
@@ -149,7 +151,7 @@ template("clang_toolchain") {
                    cxx_rbe_exec_strategy == "racing",
                "Unsupported RBE exec_strategy: \"$cxx_rbe_exec_strategy\".")
         if (cxx_rbe_exec_strategy == "remote") {
-          compiler_prefix_list += [ " --exec_strategy=remote" ]
+          compiler_prefix_list += [ "--exec_strategy=remote" ]
         } else if (cxx_rbe_exec_strategy == "remote_local_fallback") {
           compiler_prefix_list += [ "--exec_strategy=remote_local_fallback" ]
         } else if (cxx_rbe_exec_strategy == "local") {
@@ -161,6 +163,10 @@ template("clang_toolchain") {
           compiler_prefix_list += [ "--exec_strategy=racing" ]
         }
         _cxx_concurrent_jobs = concurrent_jobs.remote
+      }
+      if (restat_cc) {
+        # re-client has built-in support for write-if-changed behavior
+        compiler_prefix_list += [ "--preserve_unchanged_output_mtime" ]
       }
       compiler_prefix_list += [ "--" ]
       not_needed([ "use_goma" ])
@@ -214,17 +220,27 @@ template("clang_toolchain") {
 
     _restat_cc_prefix_list = []
     if (restat_cc) {
-      _restat_cc_wrapper = [
-        rebase_path(python_exe_src, root_build_dir),
-        "-S",
-        rebase_path(restat_wrapper, root_build_dir),
-      ]
-      _restat_cc_prefix_list = _restat_cc_wrapper + [
-                                 "--outputs",
-                                 "{{output}}",
-                                 "{{DEPFILE}}",
-                                 "--",
-                               ]
+      if (_cxx_rbe_enable) {
+        # Local-only execution may use this wrapper script directly.
+        _restat_cc_wrapper = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          rebase_path(restat_wrapper, root_build_dir),
+        ]
+        _restat_cc_prefix_list = _restat_cc_wrapper + [
+                                   "--outputs",
+                                   "{{output}}",
+                                   "{{DEPFILE}}",
+                                   "--",
+                                 ]
+      }
+      # For remote-building, --preserve_unchanged_output_mtime is sufficient
+      # to preserve timestamps of unchanged outputs, and provide restat benefit.
+      # However, in modes that also (conditionally) use local execution
+      # (i.e. --exec_strategy={racing,remote_local_fallback}),
+      # the local execution could unconditionally overwrite outputs.
+      # While this may be suboptimal as a missed opportunity to prune
+      # the action graph, it does not violate correctness.
     }
     _restat_cc_prefix = string_join(" ", _restat_cc_prefix_list) + " "
 
