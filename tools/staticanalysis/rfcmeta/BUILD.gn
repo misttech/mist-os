@@ -1,0 +1,35 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/go/go_binary.gni")
+import("//build/go/go_library.gni")
+import("//build/go/go_test.gni")
+
+if (is_host) {
+  go_library("rfcmeta_lib") {
+    sources = [
+      "rfcmeta.go",
+      "rfcmeta_test.go",
+    ]
+
+    deps = [
+      "//third_party/golibs:github.com/google/go-cmp",
+      "//third_party/golibs:gopkg.in/yaml.v2",
+      "//tools/staticanalysis",
+    ]
+  }
+
+  go_test("rfcmeta_tests") {
+    library = ":rfcmeta_lib"
+  }
+
+  go_binary("rfcmeta") {
+    library = ":rfcmeta_lib"
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":rfcmeta_tests($host_toolchain)" ]
+}

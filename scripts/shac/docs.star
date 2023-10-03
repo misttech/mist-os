@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load("./common.star", "FORMATTER_MSG", "cipd_platform_name", "compiled_tool_path", "get_fuchsia_dir", "os_exec")
+load("./common.star", "compiled_tool_path", "get_fuchsia_dir", "os_exec")
 
 def _doc_checker(ctx):
     """Runs the doc-checker tool."""
@@ -95,6 +95,36 @@ def _codelinks(ctx):
                     replacements = [repl],
                 )
 
+def _rfcmeta(ctx):
+    """Validates RFC metadata."""
+    files = [
+        f
+        for f in ctx.scm.affected_files()
+        # Ignore files that aren't inside the RFC directory.
+        if f.startswith("docs/contribute/governance/rfcs/")
+    ]
+    if not files:
+        return
+    exe = compiled_tool_path(ctx, "rfcmeta")
+    res = os_exec(ctx, [
+        exe,
+        "-checkout-dir",
+        get_fuchsia_dir(ctx),
+    ] + files).wait()
+
+    for finding in json.decode(res.stdout):
+        col = finding.get("start_char")
+        end_col = finding.get("end_char")
+        ctx.emit.finding(
+            message = finding["message"],
+            level = "warning",
+            filepath = finding["path"],
+            line = finding.get("start_line"),
+            end_line = finding.get("end_line"),
+            col = col + 1 if col else None,
+            end_col = end_col + 1 if end_col else None,
+        )
+
 def register_doc_checks():
     shac.register_check(_codelinks)
     shac.register_check(shac.check(
@@ -106,3 +136,4 @@ def register_doc_checks():
         formatter = True,
     ))
     shac.register_check(_mdlint)
+    shac.register_check(_rfcmeta)

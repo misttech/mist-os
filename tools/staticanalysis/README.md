@@ -1,5 +1,8 @@
 # Static Analysis Tools
 
+NOTE: `staticlints` is deprecated. New analyzers should be written using shac
+instead (see `//scripts/shac`).
+
 `staticanalysis` contains Go wrappers around various static analysis tools
 (linters, auto-formatters, etc.) to transform their outputs into a consistent
 format.

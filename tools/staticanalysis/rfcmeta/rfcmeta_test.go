@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package rfcmeta
+package main
 
 import (
 	"context"
@@ -45,7 +45,7 @@ func TestAnalyzer(t *testing.T) {
 			expected: []*staticanalysis.Finding{
 				{
 					Category: "rfcmeta/toc/failed_to_parse",
-					Message:  "Failed to parse yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `asd'f` into rfcmeta.toc",
+					Message:  "Failed to parse yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `asd'f` into main.toc",
 					Path:     "docs/contribute/governance/rfcs/_toc.yaml",
 				},
 			},
@@ -60,7 +60,7 @@ func TestAnalyzer(t *testing.T) {
 			expected: []*staticanalysis.Finding{
 				{
 					Category: "rfcmeta/index/failed_to_parse",
-					Message:  "Failed to parse yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `asd'f` into []*rfcmeta.rfcIndexEntry",
+					Message:  "Failed to parse yaml: yaml: unmarshal errors:\n  line 1: cannot unmarshal !!str `asd'f` into []*main.rfcIndexEntry",
 					Path:     "docs/contribute/governance/rfcs/_rfcs.yaml",
 				},
 			},
@@ -68,17 +68,19 @@ func TestAnalyzer(t *testing.T) {
 		{
 			name: "rfc index won't parse, rfc file still works",
 			path: "docs/contribute/governance/rfcs/1234_my_rfc.md",
-			files: []file{{
-				path:    "docs/contribute/governance/rfcs/_rfcs.yaml",
-				content: "asd'f",
-			},
+			files: []file{
+				{
+					path:    "docs/contribute/governance/rfcs/_rfcs.yaml",
+					content: "asd'f",
+				},
 				{
 					path: "docs/contribute/governance/rfcs/1234_my_rfc.md",
 					content: `
 <!-- mdformat off(templates not supported) -->
 {% set rfcid = "RFC-1234" %}
 `,
-				}},
+				},
+			},
 			expected: []*staticanalysis.Finding{
 				{
 					Category: "rfcmeta/file/not_in_toc",
@@ -110,7 +112,8 @@ toc:
 <!-- mdformat off(templates not supported) -->
 {% set rfcid = "RFC-1234" %}
 `,
-				}},
+				},
+			},
 			expected: []*staticanalysis.Finding{
 				{
 					Category:  "rfcmeta/toc/unexpected_path",
@@ -311,6 +314,34 @@ toc:
 					Path:      "docs/contribute/governance/rfcs/_rfcs.yaml",
 					StartLine: 2,
 					EndLine:   2,
+				},
+			},
+		},
+		{
+			name: "placeholder filename",
+			path: "docs/contribute/governance/rfcs/NNNN_unfinished_rfc.md",
+			files: []file{
+				{
+					path:    "docs/contribute/governance/rfcs/NNNN_unfinished_rfc.md",
+					content: `{% set rfcid = "RFC-NNNN" %}`,
+				},
+				areasFile,
+			},
+			expected: []*staticanalysis.Finding{
+				{
+					Category: "rfcmeta/file/placeholder_id",
+					Message:  `RFC filename begins with "NNNN". Replace it with the RFC number before submitting.`,
+					Path:     "docs/contribute/governance/rfcs/NNNN_unfinished_rfc.md",
+				},
+				{
+					Category: "rfcmeta/file/not_in_toc",
+					Message:  "No matching entry in _toc.yaml",
+					Path:     "docs/contribute/governance/rfcs/NNNN_unfinished_rfc.md",
+				},
+				{
+					Category: "rfcmeta/file/not_in_index",
+					Message:  "RFC is not listed in _rfcs.yaml",
+					Path:     "docs/contribute/governance/rfcs/NNNN_unfinished_rfc.md",
 				},
 			},
 		},

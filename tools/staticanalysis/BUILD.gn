@@ -26,6 +26,7 @@ group("tests") {
     ":staticanalysis_tests($host_toolchain)",
     "analyzers:tests",
     "cmd/staticlints:tests",
+    "rfcmeta:tests",
   ]
 }
 

@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-package rfcmeta
+package main
 
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -30,19 +33,7 @@ type analyzer struct {
 	checkoutDir string
 }
 
-// New returns an analyzer that checks the filenames and metadata for RFCs.
-func New(checkoutDir string) staticanalysis.Analyzer {
-	return &analyzer{checkoutDir: checkoutDir}
-}
-
 func (a *analyzer) Analyze(_ context.Context, path string) ([]*staticanalysis.Finding, error) {
-	// Ignore files that aren't a direct child of the RFC directory.
-	if matched, err := filepath.Match(filepath.Join(rfcsDir, "*"), path); err != nil {
-		return nil, err
-	} else if !matched {
-		return nil, nil
-	}
-
 	if path == tocPath {
 		return a.analyzeToc()
 	}
@@ -58,21 +49,24 @@ func (a *analyzer) Analyze(_ context.Context, path string) ([]*staticanalysis.Fi
 	return nil, nil
 }
 
-var reRfcFilename = regexp.MustCompile(`^(....)_.*\.md$`)
+var reRfcFilename = regexp.MustCompile(`^(\d{4})_.*\.md$`)
 
 // parseRfcPath returns the RFC ID from a path that looks like an RFC, or the
 // empty string otherwise.
 func parseRfcPath(path string) string {
-	match := reRfcFilename.FindStringSubmatch(filepath.Base(path))
-	if match == nil {
-		return ""
+	base := filepath.Base(path)
+	match := reRfcFilename.FindStringSubmatch(base)
+	if match != nil {
+		return match[1]
 	}
-
-	// Special case for "best_practices.md".
-	if match[1] == "best" {
-		return ""
+	// RFC filenames will generally start with a placeholder prefix like "NNNN"
+	// until they are assigned a number. Files with such a prefix should still
+	// be analyzed.
+	placeholderPrefix := strings.Repeat(string(base[0]), 4)
+	if strings.HasPrefix(base, placeholderPrefix+"_") {
+		return placeholderPrefix
 	}
-	return match[1]
+	return ""
 }
 
 // toc represents a subset of the schema of _toc.yaml.
@@ -149,7 +143,6 @@ func (a *analyzer) analyzeToc() ([]*staticanalysis.Finding, error) {
 				StartLine: lineNo,
 				EndLine:   lineNo,
 			})
-
 		} else if err != nil {
 			return findings, err
 		}
@@ -283,7 +276,7 @@ func (a *analyzer) analyzeRfcFile(path string, rfcId string) ([]*staticanalysis.
 	// same character.
 	//
 	// If you're here because we got to RFC-1111, greetings from the past!
-	if rfcId[0] == rfcId[1] && rfcId[1] == rfcId[2] && rfcId[2] == rfcId[3] {
+	if rfcId == strings.Repeat(string(rfcId[0]), 4) {
 		finding := &staticanalysis.Finding{
 			Category: "rfcmeta/file/placeholder_id",
 			Message: fmt.Sprintf(
@@ -428,7 +421,9 @@ func analyzeSetRfcIdTag(path string, rfcId string, file []string) []*staticanaly
 							StartChar:   0,
 							EndChar:     len(line),
 						},
-					}}}}}
+					},
+				}},
+			}}
 		}
 	}
 
@@ -481,4 +476,31 @@ func flattenTocEntries(toc []*tocEntry) []*tocEntry {
 		}
 	}
 	return res
+}
+
+func mainImpl() error {
+	var checkoutDir string
+	flag.StringVar(&checkoutDir, "checkout-dir", "", "Path to the Fuchsia checkout root")
+	flag.Parse()
+
+	findings := []*staticanalysis.Finding{}
+	paths := flag.Args()
+	a := analyzer{checkoutDir: checkoutDir}
+	for _, path := range paths {
+		f, err := a.Analyze(context.Background(), path)
+		if err != nil {
+			return err
+		}
+		findings = append(findings, f...)
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	return enc.Encode(findings)
+}
+
+func main() {
+	if err := mainImpl(); err != nil {
+		log.Fatal(err)
+	}
 }

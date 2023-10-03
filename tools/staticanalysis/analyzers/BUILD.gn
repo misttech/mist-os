@@ -24,30 +24,9 @@ if (is_host) {
   go_test("clippy_tests") {
     library = ":clippy"
   }
-
-  go_library("rfcmeta") {
-    source_dir = "rfcmeta"
-    sources = [
-      "rfcmeta.go",
-      "rfcmeta_test.go",
-    ]
-
-    deps = [
-      "//third_party/golibs:github.com/google/go-cmp",
-      "//third_party/golibs:gopkg.in/yaml.v2",
-      "//tools/staticanalysis",
-    ]
-  }
-
-  go_test("rfcmeta_tests") {
-    library = ":rfcmeta"
-  }
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":clippy_tests($host_toolchain)",
-    ":rfcmeta_tests($host_toolchain)",
-  ]
+  deps = [ ":clippy_tests($host_toolchain)" ]
 }

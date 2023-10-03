@@ -13,5 +13,6 @@ group("shac_tools") {
     "//tools/fidl/fidlc:fidl-lint($host_toolchain)",
     "//tools/fidl/gidl-format:gidl-format($host_toolchain)",
     "//tools/mdlint:mdlint($host_toolchain)",
+    "//tools/staticanalysis/rfcmeta:rfcmeta($host_toolchain)",
   ]
 }
