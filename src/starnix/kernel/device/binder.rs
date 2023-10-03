@@ -131,6 +131,13 @@ impl BinderConnection {
             binder_process.close();
         }
     }
+
+    pub fn interrupt(&self) {
+        log_trace!("interrupting BinderConnection id={}", self.identifier);
+        if let Some(binder_process) = self.driver.procs.read().get(&self.identifier) {
+            binder_process.interrupt();
+        }
+    }
 }
 
 impl Drop for BinderConnection {
@@ -277,6 +284,10 @@ impl RemoteBinderConnection {
             .map(|_| ())
     }
 
+    pub fn interrupt(&self) {
+        self.binder_connection.interrupt();
+    }
+
     pub fn close(&self) {
         self.binder_connection.close();
     }
@@ -304,6 +315,10 @@ struct BinderProcessState {
     /// Whether the binder connection for this process is closed. Once closed, any blocking
     /// operation will be aborted and return an EBADF error.
     closed: bool,
+    /// Whether the binder connection for this process is interrupted. A process that is
+    /// interrupted either just before or while waiting must abort the operation and return a EINTR
+    /// error.
+    interrupted: bool,
 }
 
 #[derive(Default, Debug)]
@@ -598,6 +613,16 @@ impl BinderProcess {
         let mut state = self.lock();
         if !state.closed {
             state.closed = true;
+            state.thread_pool.notify_all();
+            self.command_queue.lock().notify_all();
+        }
+    }
+
+    fn interrupt(self: &Arc<Self>) {
+        log_trace!("interrupting BinderProcess id={}", self.identifier);
+        let mut state = self.lock();
+        if !state.interrupted {
+            state.interrupted = true;
             state.thread_pool.notify_all();
             self.command_queue.lock().notify_all();
         }
@@ -3298,10 +3323,18 @@ impl BinderDriver {
             drop(thread_state);
             drop(proc_command_queue);
 
-            // Ensure the file descriptor has not been closed, after registering for the waiters
-            // but before waiting.
-            if binder_proc.lock().closed {
-                return error!(EBADF);
+            {
+                let mut proc_state = binder_proc.lock();
+                // Ensure the file descriptor has not been closed or interrupted, after registering
+                // for the waiters but before waiting.
+                if proc_state.closed {
+                    return error!(EBADF);
+                }
+
+                if proc_state.interrupted {
+                    proc_state.interrupted = false;
+                    return error!(EINTR);
+                }
             }
 
             // Put this thread to sleep.

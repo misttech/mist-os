@@ -223,6 +223,18 @@ enum TaskRequest {
     Return { spawn_thread: bool },
 }
 
+impl TaskRequest {
+    fn remote_binder_connection(&self) -> Option<Arc<RemoteBinderConnection>> {
+        match self {
+            Self::SetVmo { remote_binder_connection, .. }
+            | Self::Ioctl { remote_binder_connection, .. } => {
+                Some(remote_binder_connection.clone())
+            }
+            Self::Open { .. } | Self::Return { .. } => None,
+        }
+    }
+}
+
 /// A `TaskRequest` that is associated with a given thread koid. Each thread koid must be
 /// associated 1 to 1 with a Starnix task and only that task must handle the request.
 #[derive(Debug)]
@@ -231,7 +243,14 @@ struct BoundTaskRequest {
     request: TaskRequest,
 }
 
-/// Returns the Errno in result if it is either EINTR or EAGAIN, None therwise.
+impl std::ops::Deref for BoundTaskRequest {
+    type Target = TaskRequest;
+    fn deref(&self) -> &Self::Target {
+        &self.request
+    }
+}
+
+/// Returns the Errno in result if it is either EINTR or EAGAIN, None otherwise.
 fn must_interrupt<R>(result: &Result<R, Errno>) -> Option<Errno> {
     match result {
         Err(e) if *e == EINTR => Some(errno!(EINTR)),
@@ -386,22 +405,27 @@ impl RemoteBinderHandleState {
             }
             self.waiters.notify_value(tid as u64);
         } else {
+            // Get the eventual RemoteBinderConnection.
+            let remote_binder_connection = request.remote_binder_connection();
             // And add the request to the unassigned queue.
             self.unassigned_requests.push_back(request);
             // Not unassigned task ready. Request userspace to spawn a new one.
-            self.enqueue_taskless_request(TaskRequest::Return { spawn_thread: true });
+            self.enqueue_taskless_request(
+                remote_binder_connection.as_deref(),
+                TaskRequest::Return { spawn_thread: true },
+            );
         }
     }
 
     /// Enqueue a request that can be run by any task.
-    fn enqueue_taskless_request(&mut self, request: TaskRequest) {
+    fn enqueue_taskless_request(
+        &mut self,
+        remote_binder_connection: Option<&RemoteBinderConnection>,
+        request: TaskRequest,
+    ) {
         self.taskless_requests.push_back(request);
-        // Interrupt at least one task in the thread group to ensure that the request will be
-        // handled.
-        if let Some(thread_group) = self.thread_group.upgrade() {
-            if let Ok(task) = thread_group.read().get_live_task() {
-                task.interrupt();
-            }
+        if let Some(remote_binder_connection) = remote_binder_connection {
+            remote_binder_connection.interrupt();
         }
         // Interrupt a single task to handle the request.
         self.waiters.notify_count(1);
@@ -524,12 +548,15 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                         }
                         Ok(())
                     });
-                self.lock().enqueue_taskless_request(TaskRequest::SetVmo {
-                    remote_binder_connection,
-                    vmo,
-                    mapped_address,
-                    responder,
-                });
+                self.lock().enqueue_taskless_request(
+                    Some(&remote_binder_connection),
+                    TaskRequest::SetVmo {
+                        remote_binder_connection: remote_binder_connection.clone(),
+                        vmo,
+                        mapped_address,
+                        responder,
+                    },
+                );
                 waiter.await;
             }
             fbinder::BinderRequest::Ioctl { tid, request, parameter, responder } => {
@@ -558,7 +585,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 self.lock().enqueue_task_request(BoundTaskRequest {
                     koid: tid,
                     request: TaskRequest::Ioctl {
-                        remote_binder_connection,
+                        remote_binder_connection: remote_binder_connection.clone(),
                         request,
                         parameter,
                         koid: tid,
@@ -662,12 +689,10 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     ) -> Result<(), Error> {
         // Open the device.
         let (sender, receiver) = oneshot::channel::<Result<Arc<RemoteBinderConnection>, Errno>>();
-        self.lock().enqueue_taskless_request(TaskRequest::Open {
-            path,
-            process_accessor,
-            process,
-            responder: sender,
-        });
+        self.lock().enqueue_taskless_request(
+            None,
+            TaskRequest::Open { path, process_accessor, process, responder: sender },
+        );
         let remote_binder_connection = receiver.await??;
 
         scopeguard::defer! {
