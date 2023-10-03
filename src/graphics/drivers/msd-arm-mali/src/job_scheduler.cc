@@ -343,20 +343,25 @@ void JobScheduler::PlatformPortSignaled(uint64_t key) {
   std::vector<std::shared_ptr<MsdArmSoftAtom>> unfinished_atoms;
   bool completed_atom = false;
   for (auto& atom : waiting_atoms_) {
-    bool wait_succeeded;
-    if (atom->soft_flags() == kAtomFlagSemaphoreWait) {
-      wait_succeeded = atom->platform_semaphore()->WaitNoReset(0).ok();
-    } else {
-      DASSERT(atom->soft_flags() == kAtomFlagSemaphoreWaitAndReset);
-      wait_succeeded = atom->platform_semaphore()->Wait(0).ok();
+    bool wait_succeeded = true;
+    for (auto& semaphore : atom->platform_semaphores()) {
+      if (!semaphore->WaitNoReset(0).ok()) {
+        if (semaphore->global_id() == key) {
+          semaphore->WaitAsync(owner_->GetPlatformPort(), key);
+        }
+        wait_succeeded = false;
+      }
     }
 
     if (wait_succeeded) {
+      if (atom->soft_flags() == kAtomFlagSemaphoreWaitAndReset) {
+        for (auto& semaphore : atom->platform_semaphores()) {
+          semaphore->Reset();
+        }
+      }
       completed_atom = true;
       owner_->AtomCompleted(atom.get(), kArmMaliResultSuccess);
     } else {
-      if (atom->platform_semaphore()->global_id() == key)
-        atom->platform_semaphore()->WaitAsync(owner_->GetPlatformPort(), key);
       unfinished_atoms.push_back(atom);
     }
   }
@@ -412,11 +417,14 @@ std::vector<msd::msd_client_id_t> JobScheduler::GetSignalingClients(uint64_t sem
       continue;
     if (soft_atom->soft_flags() != kAtomFlagSemaphoreSet)
       continue;
-    if (soft_atom->platform_semaphore()->id() != semaphore_koid)
-      continue;
-    auto connection = soft_atom->connection().lock();
-    uint64_t client_id = connection ? connection->client_id() : UINT64_MAX;
-    signaling_clients.push_back(client_id);
+    for (auto& semaphore : soft_atom->platform_semaphores()) {
+      if (semaphore->id() == semaphore_koid) {
+        auto connection = soft_atom->connection().lock();
+        uint64_t client_id = connection ? connection->client_id() : UINT64_MAX;
+        signaling_clients.push_back(client_id);
+        break;
+      }
+    }
   }
   return signaling_clients;
 }
@@ -477,13 +485,18 @@ void JobScheduler::HandleTimedOutAtoms() {
       uint64_t client_id = connection ? connection->client_id() : UINT64_MAX;
       auto soft_atom = MsdArmSoftAtom::cast(atom);
       DASSERT(soft_atom);
-      uint64_t semaphore_koid = soft_atom->platform_semaphore()->id();
-      MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, koid %ld", client_id,
-                semaphore_koid);
-      std::vector<msd::msd_client_id_t> clients = GetSignalingClients(semaphore_koid);
-      for (auto client_id : clients) {
-        MAGMA_LOG(WARNING, "Signaled by atom on client id %ld", client_id);
-        found_signaler_atoms_for_testing_++;
+      if (soft_atom->platform_semaphores().size() == 1) {
+        uint64_t semaphore_koid = soft_atom->platform_semaphores()[0]->id();
+        MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, koid %ld", client_id,
+                  semaphore_koid);
+        std::vector<msd::msd_client_id_t> clients = GetSignalingClients(semaphore_koid);
+        for (auto client_id : clients) {
+          MAGMA_LOG(WARNING, "Signaled by atom on client id %ld", client_id);
+          found_signaler_atoms_for_testing_++;
+        }
+      } else {
+        MAGMA_LOG(WARNING, "Timing out hung semaphore on client id %ld, %zd koids", client_id,
+                  soft_atom->platform_semaphores().size());
       }
       owner_->OutputHangMessage(/*hardware_hang*/ false);
       removed_waiting_atoms = true;
@@ -531,26 +544,35 @@ void JobScheduler::ProcessSoftAtom(std::shared_ptr<MsdArmSoftAtom> atom) {
     SoftJobCompleted(atom);
     ProcessJitAtoms();
   } else if (atom->soft_flags() == kAtomFlagSemaphoreSet) {
-    atom->platform_semaphore()->Signal();
+    for (auto& semaphore : atom->platform_semaphores()) {
+      semaphore->Signal();
+    }
     SoftJobCompleted(atom);
   } else if (atom->soft_flags() == kAtomFlagSemaphoreReset) {
-    atom->platform_semaphore()->Reset();
+    for (auto& semaphore : atom->platform_semaphores()) {
+      semaphore->Reset();
+    }
     SoftJobCompleted(atom);
   } else if ((atom->soft_flags() == kAtomFlagSemaphoreWait) ||
              (atom->soft_flags() == kAtomFlagSemaphoreWaitAndReset)) {
-    bool wait_succeeded;
-    if (atom->soft_flags() == kAtomFlagSemaphoreWait) {
-      wait_succeeded = atom->platform_semaphore()->WaitNoReset(0).ok();
-    } else {
-      wait_succeeded = atom->platform_semaphore()->Wait(0).ok();
+    bool wait_succeeded = true;
+    for (auto& semaphore : atom->platform_semaphores()) {
+      bool wait_result;
+      if (atom->soft_flags() == kAtomFlagSemaphoreWait) {
+        wait_result = semaphore->WaitNoReset(0).ok();
+      } else {
+        wait_result = semaphore->Wait(0).ok();
+      }
+      if (!wait_result) {
+        semaphore->WaitAsync(owner_->GetPlatformPort(), semaphore->global_id());
+        wait_succeeded = false;
+      }
     }
 
     if (wait_succeeded) {
       SoftJobCompleted(atom);
     } else {
       waiting_atoms_.push_back(atom);
-      atom->platform_semaphore()->WaitAsync(owner_->GetPlatformPort(),
-                                            atom->platform_semaphore()->global_id());
     }
   } else {
     DASSERT(false);

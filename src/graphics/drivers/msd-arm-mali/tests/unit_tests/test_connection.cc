@@ -576,7 +576,8 @@ class TestConnection {
     std::shared_ptr<MsdArmSoftAtom> soft_atom = MsdArmSoftAtom::cast(atom);
     EXPECT_TRUE(!!soft_atom);
     EXPECT_EQ(kAtomFlagSemaphoreWait, soft_atom->soft_flags());
-    EXPECT_EQ(semaphore, soft_atom->platform_semaphore());
+    EXPECT_EQ(1u, soft_atom->platform_semaphores().size());
+    EXPECT_EQ(semaphore, soft_atom->platform_semaphores()[0]);
   }
 
   void FlushRegion() {

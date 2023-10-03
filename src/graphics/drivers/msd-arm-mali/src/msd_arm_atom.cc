@@ -103,8 +103,8 @@ std::vector<std::string> MsdArmAtom::DumpInformation() {
 std::vector<std::string> MsdArmSoftAtom::DumpInformation() {
   std::vector<std::string> result = MsdArmAtom::DumpInformation();
 
-  if (platform_semaphore_) {
-    result.push_back(StringPrintf("  Semaphore koid %ld", platform_semaphore_->id()).c_str());
+  for (auto& semaphore : platform_semaphores_) {
+    result.push_back(StringPrintf("  Semaphore koid %ld", semaphore->id()).c_str());
   }
   return result;
 }

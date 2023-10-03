@@ -156,9 +156,10 @@ class TestJobScheduler {
     EXPECT_EQ(0u, owner.run_list().size());
     EXPECT_EQ(0u, scheduler.GetAtomListSize());
 
-    auto semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+    auto semaphores = std::vector<std::shared_ptr<magma::PlatformSemaphore>>(
+        {magma::PlatformSemaphore::Create()});
     auto waiting_atom = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait,
-                                                         semaphore, 0, magma_arm_mali_user_data());
+                                                         semaphores, 0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(waiting_atom);
 
     atom1 = std::make_shared<MsdArmAtom>(connection, 1, 0, 0, magma_arm_mali_user_data(), 0);
@@ -324,21 +325,25 @@ class TestJobScheduler {
     EXPECT_EQ(scheduler.GetCurrentTimeoutDuration(), JobScheduler::Clock::duration::max());
   }
 
-  void TestSemaphores() {
+  void TestSemaphores(uint32_t semaphore_count = 1) {
     TestOwner owner;
     TestConnectionOwner connection_owner;
     std::shared_ptr<MsdArmConnection> connection = MsdArmConnection::Create(0, &connection_owner);
     JobScheduler scheduler(&owner, 1);
 
-    auto semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+    auto semaphores = std::vector<std::shared_ptr<magma::PlatformSemaphore>>();
+    for (uint32_t i = 0; i < semaphore_count; i++) {
+      semaphores.push_back(magma::PlatformSemaphore::Create());
+    }
 
-    auto atom1 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphore, 0,
+    auto atom1 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphores, 0,
                                                   magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom1);
 
     scheduler.TryToSchedule();
     EXPECT_EQ(nullptr, scheduler.executing_atom());
-    auto atom2 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphore, 0,
+
+    auto atom2 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphores, 0,
                                                   magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom2);
 
@@ -347,10 +352,12 @@ class TestJobScheduler {
     EXPECT_EQ(nullptr, scheduler.executing_atom());
     EXPECT_EQ(0u, owner.completed_list().size());
 
-    uint64_t key;
-    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, owner.GetPlatformPort()->Wait(&key, 0).get());
+    {
+      uint64_t key;
+      EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, owner.GetPlatformPort()->Wait(&key, 0).get());
+    }
 
-    auto atom3 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreSet, semaphore, 0,
+    auto atom3 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreSet, semaphores, 0,
                                                   magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom3);
     scheduler.TryToSchedule();
@@ -359,71 +366,98 @@ class TestJobScheduler {
 
     // Port should currently be waiting on semaphore which was just
     // signaled.
-    EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
-    EXPECT_EQ(key, semaphore->id());
-    scheduler.PlatformPortSignaled(key);
+    for (auto& semaphore : semaphores) {
+      uint64_t key1, key2;
+      EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key1, 0).get());
+      EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key2, 0).get());
+      EXPECT_EQ(key1, key2);
+      EXPECT_EQ(key1, semaphore->id());
+      scheduler.PlatformPortSignaled(key1);
+    }
 
     EXPECT_EQ(0u, owner.run_list().size());
     EXPECT_EQ(3u, owner.completed_list().size());
-    EXPECT_TRUE(semaphore->WaitNoReset(0u).ok());
+    for (auto& semaphore : semaphores) {
+      EXPECT_TRUE(semaphore->WaitNoReset(0u).ok());
+    }
 
     // Semaphore was set, so atom should complete immediately.
     auto atom_already_set = std::make_shared<MsdArmSoftAtom>(
-        connection, kAtomFlagSemaphoreWait, semaphore, 0, magma_arm_mali_user_data());
+        connection, kAtomFlagSemaphoreWait, semaphores, 0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom_already_set);
     scheduler.TryToSchedule();
     EXPECT_EQ(4u, owner.completed_list().size());
 
-    auto atom4 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreReset, semaphore, 0,
-                                                  magma_arm_mali_user_data());
+    auto atom4 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreReset, semaphores,
+                                                  0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom4);
     scheduler.TryToSchedule();
 
-    EXPECT_EQ(semaphore->WaitNoReset(0u), MAGMA_STATUS_TIMED_OUT);
-    EXPECT_EQ(5u, owner.completed_list().size());
+    for (auto& semaphore : semaphores) {
+      EXPECT_EQ(semaphore->WaitNoReset(0u), MAGMA_STATUS_TIMED_OUT);
+      EXPECT_EQ(5u, owner.completed_list().size());
+    }
 
     auto atom5 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWaitAndReset,
-                                                  semaphore, 0, magma_arm_mali_user_data());
+                                                  semaphores, 0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom5);
     scheduler.TryToSchedule();
 
     EXPECT_EQ(5u, owner.completed_list().size());
-    semaphore->Signal();
-
-    EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
-    scheduler.PlatformPortSignaled(key);
+    for (auto& semaphore : semaphores) {
+      semaphore->Signal();
+      uint64_t key;
+      EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
+      scheduler.PlatformPortSignaled(key);
+    }
 
     EXPECT_EQ(6u, owner.completed_list().size());
-    EXPECT_EQ(semaphore->WaitNoReset(0u), MAGMA_STATUS_TIMED_OUT);
+    for (auto& semaphore : semaphores) {
+      EXPECT_EQ(semaphore->WaitNoReset(0u), MAGMA_STATUS_TIMED_OUT);
+    }
 
     auto atom6 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWaitAndReset,
-                                                  semaphore, 0, magma_arm_mali_user_data());
+                                                  semaphores, 0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom6);
     scheduler.TryToSchedule();
 
     EXPECT_EQ(6u, owner.completed_list().size());
 
-    while (MAGMA_STATUS_OK == owner.GetPlatformPort()->Wait(&key, 0).get())
-      ;
+    {
+      uint64_t key;
+      while (MAGMA_STATUS_OK == owner.GetPlatformPort()->Wait(&key, 0).get())
+        ;
+    }
 
-    semaphore->Signal();
-    EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
-    semaphore->Reset();
+    for (auto& semaphore : semaphores) {
+      semaphore->Signal();
+      uint64_t key;
+      EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
+      semaphore->Reset();
+      scheduler.PlatformPortSignaled(key);
+    }
 
-    scheduler.PlatformPortSignaled(key);
-
-    // Semaphore should still be reregistered with port in
-    // PlatformPortSignaled, because the Reset happened before
-    // WaitAndReset processed it.
-    semaphore->Signal();
-    EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
+    for (auto& semaphore : semaphores) {
+      // Semaphore should still be reregistered with port in
+      // PlatformPortSignaled, because the Reset happened before
+      // WaitAndReset processed it.
+      semaphore->Signal();
+      uint64_t key;
+      EXPECT_EQ(MAGMA_STATUS_OK, owner.GetPlatformPort()->Wait(&key, 0).get());
+    }
 
     EXPECT_EQ(6u, owner.completed_list().size());
 
-    semaphore->Signal();
-    // All atoms have completed, so port shouldn't be waiting on semaphore
-    // anymore.
-    EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, owner.GetPlatformPort()->Wait(&key, 0).get());
+    for (auto& semaphore : semaphores) {
+      semaphore->Signal();
+    }
+
+    {
+      // All atoms have completed, so port shouldn't be waiting on semaphore
+      // anymore.
+      uint64_t key;
+      EXPECT_EQ(MAGMA_STATUS_TIMED_OUT, owner.GetPlatformPort()->Wait(&key, 0).get());
+    }
 
     for (auto& completed : owner.completed_list()) {
       EXPECT_EQ(kArmMaliResultSuccess, completed.second);
@@ -438,9 +472,10 @@ class TestJobScheduler {
     JobScheduler scheduler(&owner, 1);
     scheduler.set_clock_callback([&current_time]() { return current_time; });
 
-    auto semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+    auto semaphores = std::vector<std::shared_ptr<magma::PlatformSemaphore>>(
+        {magma::PlatformSemaphore::Create()});
 
-    auto atom = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphore, 0,
+    auto atom = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphores, 0,
                                                  magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom);
     DASSERT(scheduler.GetCurrentTimeoutDuration() == JobScheduler::Clock::duration::max());
@@ -451,7 +486,7 @@ class TestJobScheduler {
     scheduler.EnqueueAtom(atom2);
 
     // This has a dependency on atom so it won't execute until after the timeout.
-    auto atom3 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreSet, semaphore, 0,
+    auto atom3 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreSet, semaphores, 0,
                                                   magma_arm_mali_user_data());
     atom3->set_dependencies({MsdArmAtom::Dependency{kArmMaliDependencyOrder, atom}});
     scheduler.EnqueueAtom(atom3);
@@ -483,9 +518,10 @@ class TestJobScheduler {
     std::shared_ptr<MsdArmConnection> connection = MsdArmConnection::Create(0, &connection_owner);
     JobScheduler scheduler(&owner, 1);
 
-    auto semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+    auto semaphores = std::vector<std::shared_ptr<magma::PlatformSemaphore>>(
+        {magma::PlatformSemaphore::Create()});
 
-    auto atom1 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphore, 0,
+    auto atom1 = std::make_shared<MsdArmSoftAtom>(connection, kAtomFlagSemaphoreWait, semaphores, 0,
                                                   magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom1);
     scheduler.TryToSchedule();
@@ -509,9 +545,10 @@ class TestJobScheduler {
     scheduler.EnqueueAtom(atom1);
     EXPECT_EQ(0u, owner.run_list().size());
 
-    auto semaphore = std::shared_ptr<magma::PlatformSemaphore>(magma::PlatformSemaphore::Create());
+    auto semaphores = std::vector<std::shared_ptr<magma::PlatformSemaphore>>(
+        {magma::PlatformSemaphore::Create()});
     auto atom_semaphore = std::make_shared<MsdArmSoftAtom>(
-        connection, kAtomFlagSemaphoreWait, semaphore, 0, magma_arm_mali_user_data());
+        connection, kAtomFlagSemaphoreWait, semaphores, 0, magma_arm_mali_user_data());
     scheduler.EnqueueAtom(atom_semaphore);
 
     auto atom_null =
@@ -530,7 +567,7 @@ class TestJobScheduler {
         MsdArmAtom::DependencyList{MsdArmAtom::Dependency{kArmMaliDependencyData, atom_null}});
     scheduler.EnqueueAtom(atom_slot1);
 
-    semaphore->Signal();
+    semaphores[0]->Signal();
 
     // atom_slot1 should be able to run, even though it depends on a
     // signaled semaphore and a null atom and is behind another atom on
@@ -854,6 +891,10 @@ TEST_F(JobSchedulerTest, DataDependency) { TestJobScheduler().TestDataDependency
 TEST_F(JobSchedulerTest, Timeout) { TestJobScheduler().TestTimeout(); }
 
 TEST_F(JobSchedulerTest, Semaphores) { TestJobScheduler().TestSemaphores(); }
+
+TEST_F(JobSchedulerTest, TwoSemaphores) { TestJobScheduler().TestSemaphores(2); }
+
+TEST_F(JobSchedulerTest, ThreeSemaphores) { TestJobScheduler().TestSemaphores(3); }
 
 TEST_F(JobSchedulerTest, SemaphoreTimeout) { TestJobScheduler().TestSemaphoreTimeout(); }
 

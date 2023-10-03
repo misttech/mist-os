@@ -156,10 +156,10 @@ class MsdArmSoftAtom : public MsdArmAtom {
   }
 
   MsdArmSoftAtom(std::weak_ptr<MsdArmConnection> connection, AtomFlags soft_flags,
-                 std::shared_ptr<magma::PlatformSemaphore> platform_semaphore, uint8_t atom_number,
-                 magma_arm_mali_user_data user_data)
+                 std::vector<std::shared_ptr<magma::PlatformSemaphore>> platform_semaphores,
+                 uint8_t atom_number, magma_arm_mali_user_data user_data)
       : MsdArmAtom(connection, kInvalidGpuAddress, 0, atom_number, user_data, 0, soft_flags),
-        platform_semaphore_(platform_semaphore) {}
+        platform_semaphores_(std::move(platform_semaphores)) {}
 
   MsdArmSoftAtom(std::weak_ptr<MsdArmConnection> connection, AtomFlags soft_flags,
                  uint8_t atom_number, magma_arm_mali_user_data user_data,
@@ -176,8 +176,8 @@ class MsdArmSoftAtom : public MsdArmAtom {
         jit_free_info_(std::move(jit_free_info)) {}
 
   AtomFlags soft_flags() const { return flags(); }
-  std::shared_ptr<magma::PlatformSemaphore> platform_semaphore() const {
-    return platform_semaphore_;
+  std::vector<std::shared_ptr<magma::PlatformSemaphore>> platform_semaphores() const {
+    return platform_semaphores_;
   }
   const std::vector<magma_arm_jit_memory_allocate_info>& jit_allocate_info() const {
     return jit_allocate_info_;
@@ -192,7 +192,7 @@ class MsdArmSoftAtom : public MsdArmAtom {
   // Immutable after construction.
   const std::vector<magma_arm_jit_memory_allocate_info> jit_allocate_info_;
   const std::vector<magma_arm_jit_memory_free_info> jit_free_info_;
-  const std::shared_ptr<magma::PlatformSemaphore> platform_semaphore_;
+  const std::vector<std::shared_ptr<magma::PlatformSemaphore>> platform_semaphores_;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_MSD_ARM_ATOM_H_

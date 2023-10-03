@@ -187,8 +187,10 @@ bool MsdArmConnection::ExecuteAtom(
         MAGMA_LOG(WARNING, "Client %" PRIu64 ": No remaining semaphores", client_id_);
         return false;
       }
-      msd_atom = std::make_shared<MsdArmSoftAtom>(shared_from_this(), static_cast<AtomFlags>(flags),
-                                                  semaphores->front(), atom_number, user_data);
+      std::vector<std::shared_ptr<magma::PlatformSemaphore>> atom_semaphores{semaphores->front()};
+      msd_atom =
+          std::make_shared<MsdArmSoftAtom>(shared_from_this(), static_cast<AtomFlags>(flags),
+                                           std::move(atom_semaphores), atom_number, user_data);
       semaphores->pop_front();
     }
   } else {
