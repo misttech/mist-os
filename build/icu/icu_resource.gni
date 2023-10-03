@@ -17,6 +17,7 @@ template("icu_resource") {
       forward_variables_from(invoker,
                              "*",
                              [
+                               "target_name",  # Workaround for fxb/133723.
                                "testonly",
                                "visibility",
                              ])
