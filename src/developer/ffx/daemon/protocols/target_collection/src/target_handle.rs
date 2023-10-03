@@ -195,12 +195,12 @@ mod tests {
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
     use fidl_fuchsia_io as fio;
     use fuchsia_async::Task;
-    use hoist::Hoist;
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
     use std::{
         net::{IpAddr, SocketAddr},
         str::FromStr,
+        sync::Arc,
     };
 
     #[test]
@@ -343,8 +343,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_open_rcs_valid() {
         const TEST_NODE_NAME: &'static str = "villete";
-        let local_hoist = Hoist::new(None).unwrap();
-        let hoist2 = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
+        let node2 = overnet_core::Router::new(None).unwrap();
         let (rx2, tx2) = fidl::Socket::create_stream();
         let (mut rx2, mut tx2) = (
             fidl::AsyncSocket::from_socket(rx2).unwrap(),
@@ -356,11 +356,11 @@ mod tests {
             fidl::AsyncSocket::from_socket(tx1).unwrap(),
         );
         let (error_sink, _) = futures::channel::mpsc::unbounded();
-        let h1_hoist = local_hoist.clone();
         let error_sink_clone = error_sink.clone();
+        let local_node_clone = Arc::clone(&local_node);
         let _h1_task = Task::local(async move {
             circuit::multi_stream::multi_stream_node_connection_to_async(
-                h1_hoist.node().circuit_node(),
+                local_node_clone.circuit_node(),
                 &mut rx1,
                 &mut tx2,
                 true,
@@ -370,10 +370,10 @@ mod tests {
             )
             .await
         });
-        let hoist2_node = hoist2.node();
+        let node2_clone = Arc::clone(&node2);
         let _h2_task = Task::local(async move {
             circuit::multi_stream::multi_stream_node_connection_to_async(
-                hoist2_node.circuit_node(),
+                node2_clone.circuit_node(),
                 &mut rx2,
                 &mut tx1,
                 false,
@@ -386,20 +386,18 @@ mod tests {
         let (client, server) =
             fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>();
         let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), server);
-        hoist2
-            .node()
+        node2
             .register_service(fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), client)
             .await
             .unwrap();
         let daemon = FakeDaemonBuilder::new().build();
         let cx = Context::new(daemon);
-        let lpc = local_hoist.node().new_list_peers_context().await;
+        let lpc = local_node.new_list_peers_context().await;
         while lpc.list_peers().await.unwrap().iter().all(|x| x.is_self) {}
         let (client, server) = fidl::Channel::create();
-        local_hoist
-            .node()
+        local_node
             .connect_to_service(
-                hoist2.node().node_id(),
+                node2.node_id(),
                 fidl_rcs::RemoteControlMarker::PROTOCOL_NAME,
                 server,
             )
@@ -408,9 +406,9 @@ mod tests {
         let rcs_proxy =
             fidl_rcs::RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client).unwrap());
         let target = Target::from_rcs_connection(RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             rcs_proxy.clone(),
-            &hoist2.node().node_id().into(),
+            &node2.node_id().into(),
         ))
         .await
         .unwrap();

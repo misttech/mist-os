@@ -643,7 +643,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_non_fastboot() {
-        let local_hoist = hoist::Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
         let tc = Rc::new(TargetCollection::new());
         tc.merge_insert(t.clone());
@@ -652,7 +652,7 @@ mod tests {
         handle_discovered_target(
             &tc,
             ffx::TargetInfo { nodename: Some(t.nodename().unwrap()), ..Default::default() },
-            &local_hoist.node(),
+            &local_node,
         );
         assert!(t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Mdns(t) if t > before_update);
@@ -660,7 +660,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_handle_mdns_fastboot() {
-        let local_hoist = hoist::Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let t = Target::new_named("this-is-a-thing");
         let tc = Rc::new(TargetCollection::new());
         tc.merge_insert(t.clone());
@@ -674,7 +674,7 @@ mod tests {
                 fastboot_interface: Some(ffx::FastbootInterface::Tcp),
                 ..Default::default()
             },
-            &local_hoist.node(),
+            &local_node,
         );
         assert!(!t.is_host_pipe_running());
         assert_matches!(t.get_connection_state(), TargetConnectionState::Fastboot(t) if t > before_update);
@@ -919,7 +919,7 @@ mod tests {
             Context::new(fake_daemon.clone()).get_target_collection().await.unwrap();
         tc_impl
             .borrow()
-            .load_manual_targets(&target_collection, &hoist::Hoist::new(None).unwrap().node())
+            .load_manual_targets(&target_collection, &overnet_core::Router::new(None).unwrap())
             .await;
         let proxy = fake_daemon.open_proxy::<ffx::TargetCollectionMarker>().await;
         let res = list_targets(None, &proxy).await;
@@ -1141,7 +1141,7 @@ mod tests {
         // network sockets in unit tests, thus not calling start.
         tc_impl
             .borrow()
-            .load_manual_targets(&target_collection, &hoist::Hoist::new(None).unwrap().node())
+            .load_manual_targets(&target_collection, &overnet_core::Router::new(None).unwrap())
             .await;
 
         let target = target_collection.get("127.0.0.1:8022".to_string()).unwrap();

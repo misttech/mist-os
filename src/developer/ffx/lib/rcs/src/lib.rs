@@ -12,9 +12,9 @@ use fidl_fuchsia_developer_remotecontrol::{
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
 use futures::{StreamExt, TryFutureExt};
-use hoist::Hoist;
 use std::{
     hash::{Hash, Hasher},
+    sync::Arc,
     time::Duration,
 };
 use timeout::{timeout, TimeoutError};
@@ -24,7 +24,7 @@ pub use fidl_fuchsia_sys2::OpenDirType;
 
 #[derive(Debug, Clone)]
 pub struct RcsConnection {
-    pub hoist: Hoist,
+    pub node: Arc<overnet_core::Router>,
     pub proxy: RemoteControlProxy,
     pub overnet_id: NodeId,
 }
@@ -47,26 +47,25 @@ impl PartialEq for RcsConnection {
 impl Eq for RcsConnection {}
 
 impl RcsConnection {
-    pub fn new(hoist: Hoist, id: &mut NodeId) -> Result<Self> {
+    pub fn new(node: Arc<overnet_core::Router>, id: &mut NodeId) -> Result<Self> {
         let (s, p) = fidl::Channel::create();
-        let _result = RcsConnection::connect_to_service(&hoist, id, s)?;
+        let _result = RcsConnection::connect_to_service(Arc::clone(&node), id, s)?;
         let proxy = RemoteControlProxy::new(
             fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?,
         );
 
-        Ok(Self { hoist, proxy, overnet_id: id.clone() })
+        Ok(Self { node, proxy, overnet_id: id.clone() })
     }
 
     pub fn copy_to_channel(&mut self, channel: fidl::Channel) -> Result<()> {
-        RcsConnection::connect_to_service(&self.hoist, &mut self.overnet_id, channel)
+        RcsConnection::connect_to_service(Arc::clone(&self.node), &mut self.overnet_id, channel)
     }
 
     fn connect_to_service(
-        hoist: &Hoist,
+        node: Arc<overnet_core::Router>,
         overnet_id: &mut NodeId,
         channel: fidl::Channel,
     ) -> Result<()> {
-        let node = hoist.node();
         let overnet_id = (*overnet_id).into();
         // TODO(b/302394849): If this method were async we could return the
         // error instead of just logging it. This task used to be managed by
@@ -85,8 +84,12 @@ impl RcsConnection {
     }
 
     // Primarily For testing.
-    pub fn new_with_proxy(hoist: &Hoist, proxy: RemoteControlProxy, id: &NodeId) -> Self {
-        Self { hoist: hoist.clone(), proxy, overnet_id: id.clone() }
+    pub fn new_with_proxy(
+        node: Arc<overnet_core::Router>,
+        proxy: RemoteControlProxy,
+        id: &NodeId,
+    ) -> Self {
+        Self { node, proxy, overnet_id: id.clone() }
     }
 }
 

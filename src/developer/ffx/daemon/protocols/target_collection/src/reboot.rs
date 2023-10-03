@@ -438,7 +438,7 @@ mod tests {
     }
 
     async fn setup() -> (Rc<Target>, TargetProxy) {
-        let overnet_node = hoist::Hoist::new(None).unwrap().node();
+        let overnet_node = overnet_core::Router::new(None).unwrap();
         let target = Target::new_named("scooby-dooby-doo");
         let fastboot_proxy = Once::new();
         let _ = fastboot_proxy.get_or_init(setup_fastboot()).await;

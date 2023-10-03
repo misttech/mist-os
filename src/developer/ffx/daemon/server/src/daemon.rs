@@ -109,7 +109,7 @@ impl DaemonEventHandler {
     #[tracing::instrument(skip(self))]
     async fn handle_overnet_peer(&self, node_id: u64) {
         tracing::debug!("Got overnet peer {node_id}");
-        let rcs = match RcsConnection::new(self.hoist.clone(), &mut NodeId { id: node_id }) {
+        let rcs = match RcsConnection::new(self.hoist.node(), &mut NodeId { id: node_id }) {
             Ok(rcs) => rcs,
             Err(e) => {
                 tracing::error!(

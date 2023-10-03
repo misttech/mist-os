@@ -1312,7 +1312,6 @@ mod test {
     use fidl_fuchsia_overnet_protocol::NodeId;
     use fuchsia_async::Timer;
     use futures::{channel, prelude::*};
-    use hoist::Hoist;
     use std::{
         borrow::Borrow,
         net::{Ipv4Addr, Ipv6Addr, SocketAddr, SocketAddrV4, SocketAddrV6},
@@ -1390,12 +1389,12 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_internal_err() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         // TODO(awdavies): Do some form of PartialEq implementation for
         // the RcsConnectionError enum to avoid the nested matches.
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(true, "foo".to_owned()),
             &NodeId { id: 123 },
         );
@@ -1413,10 +1412,10 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_nodename_none() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "".to_owned()),
             &NodeId { id: 123456 },
         );
@@ -1431,10 +1430,10 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_from_rcs_connection_no_err() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "foo".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -1459,7 +1458,7 @@ mod test {
     // Most of this is now handled in `task.rs`
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_disconnect_multiple_invocations() {
-        let node = Hoist::new(None).unwrap().node();
+        let node = overnet_core::Router::new(None).unwrap();
         let t = Rc::new(Target::new_named("flabbadoobiedoo"));
         {
             let addr: TargetAddr = TargetAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
@@ -1480,7 +1479,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_rcs_states() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         for test in vec![
             RcsStateTest {
@@ -1510,12 +1509,12 @@ mod test {
             ));
             t.addrs_insert(TargetAddr::new(a2, 2, 0));
             if test.loop_started {
-                t.run_host_pipe(&local_hoist.node());
+                t.run_host_pipe(&local_node);
             }
             {
                 *t.state.borrow_mut() = if test.rcs_is_some {
                     TargetConnectionState::Rcs(RcsConnection::new_with_proxy(
-                        &local_hoist,
+                        Arc::clone(&local_node),
                         setup_fake_remote_control_service(true, "foobiedoo".to_owned()),
                         &NodeId { id: 123 },
                     ))
@@ -1558,10 +1557,10 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_event_synthesis_wait() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "foo".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -1580,11 +1579,11 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_event_fire() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let t = Target::new_named("balaowihf");
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "balaowihf".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -1609,11 +1608,11 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_connection_state_will_not_drop_rcs_on_mdns_events() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let t = Target::new_named("hello-kitty");
         let rcs_state = TargetConnectionState::Rcs(
-            RcsConnection::new(local_hoist.clone(), &mut NodeId { id: 1234 }).unwrap(),
+            RcsConnection::new(local_node.clone(), &mut NodeId { id: 1234 }).unwrap(),
         );
         t.set_state(rcs_state.clone());
 
@@ -1626,11 +1625,11 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_connection_state_will_not_drop_rcs_on_manual_events() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let t = Target::new_named("hello-kitty");
         let rcs_state = TargetConnectionState::Rcs(
-            RcsConnection::new(local_hoist.clone(), &mut NodeId { id: 1234 }).unwrap(),
+            RcsConnection::new(local_node.clone(), &mut NodeId { id: 1234 }).unwrap(),
         );
         t.set_state(rcs_state.clone());
 
@@ -2099,7 +2098,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_manual_disconnect() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2115,7 +2114,7 @@ mod test {
         assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "abc".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -2130,7 +2129,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_expired_ephemeral_disconnect() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2146,7 +2145,7 @@ mod test {
         assert_matches!(target.get_connection_state(), TargetConnectionState::Disconnected);
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "abc".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -2161,7 +2160,7 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_update_connection_state_ephemeral_disconnect() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
 
         let target = Target::new();
         target.addrs_insert_entry(TargetAddrEntry::new(
@@ -2177,7 +2176,7 @@ mod test {
         assert_matches!(target.get_connection_state(), TargetConnectionState::Manual(_));
 
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            local_node,
             setup_fake_remote_control_service(false, "abc".to_owned()),
             &NodeId { id: 1234 },
         );
@@ -2192,12 +2191,12 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_disconnect() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let target = Target::new();
         target.set_state(TargetConnectionState::Mdns(Instant::now()));
         target.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(future::pending()),
-            overnet_node: local_hoist.node(),
+            overnet_node: local_node,
         });
 
         target.disconnect();
@@ -2208,19 +2207,19 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_host_pipe_state_borrow() {
-        let local_hoist = Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let (done_send, done_recv) = channel::oneshot::channel::<()>();
 
         let target = Target::new();
         // We want run_host_pipe() to reach the point of knock_rcs(), so we
         // need to set up an RCS first. But we'll set it up so it doesn't respond
         let conn = RcsConnection::new_with_proxy(
-            &local_hoist,
+            Arc::clone(&local_node),
             setup_fake_unresponsive_remote_control_service(done_recv),
             &NodeId { id: 1234 },
         );
         target.set_state(TargetConnectionState::Rcs(conn));
-        target.run_host_pipe(&local_hoist.node());
+        target.run_host_pipe(&local_node);
         // Let run_host_pipe()'s spawned task run
         Timer::new(Duration::from_millis(50)).await;
         target.update_connection_state(|_| TargetConnectionState::Disconnected);
