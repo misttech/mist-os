@@ -144,7 +144,7 @@ impl Default for FakeDaemon {
             register: Default::default(),
             target_collection: Default::default(),
             rcs_handler: Default::default(),
-            overnet_node: hoist::Hoist::new(None).unwrap().node(),
+            overnet_node: overnet_core::Router::new(None).unwrap(),
         }
     }
 }

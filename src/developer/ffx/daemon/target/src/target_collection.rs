@@ -1100,12 +1100,12 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_collection_removal_disconnects_target() {
         use crate::target::HostPipeState;
-        let local_hoist = hoist::Hoist::new(None).unwrap();
+        let local_node = overnet_core::Router::new(None).unwrap();
         let target = Target::new_named("soggy-falafel");
         target.set_state(TargetConnectionState::Mdns(Instant::now()));
         target.host_pipe.borrow_mut().replace(HostPipeState {
             task: Task::local(future::pending()),
-            overnet_node: local_hoist.node(),
+            overnet_node: local_node,
         });
 
         let collection = TargetCollection::new();

@@ -740,7 +740,7 @@ mod test {
         timeout_at_end: bool,
         init: impl FnOnce(&mut TestFactory),
     ) -> (Rc<Target>, FastbootProxy) {
-        let node = hoist::Hoist::new(None).unwrap().node();
+        let node = overnet_core::Router::new(None).unwrap();
         let target = Target::new_named("scooby-dooby-doo");
         let mut factory = TestFactory::new(replies, timeout_at_end);
         init(&mut factory);

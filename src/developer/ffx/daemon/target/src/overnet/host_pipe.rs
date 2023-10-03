@@ -1012,7 +1012,7 @@ mod test {
                             event_queue,
                             watchdogs,
                             ssh_timeout,
-                            hoist::Hoist::new(None).unwrap().node(),
+                            overnet_core::Router::new(None).unwrap(),
                         )
                         .await
                 }
