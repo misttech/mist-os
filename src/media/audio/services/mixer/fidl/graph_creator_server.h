@@ -15,6 +15,8 @@
 
 namespace media_audio {
 
+// TODO(fxbug.dev/98652): Once we move this to a separate process, call
+// `AcquireMemoryRole` from our main() to pin memory for all mixer graphs.
 class GraphCreatorServer : public BaseFidlServer<GraphCreatorServer, fidl::WireServer,
                                                  fuchsia_audio_mixer::GraphCreator> {
  public:

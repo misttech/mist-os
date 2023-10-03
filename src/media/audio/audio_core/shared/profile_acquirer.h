@@ -7,6 +7,7 @@
 
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
+#include <lib/zx/vmar.h>
 #include <stdint.h>
 
 #include <string>
@@ -14,6 +15,8 @@
 namespace media::audio {
 
 zx::result<> AcquireSchedulerRole(zx::unowned_thread thread, const std::string& role);
+
+zx::result<> AcquireMemoryRole(zx::unowned_vmar vmar, const std::string& role);
 
 }  // namespace media::audio
 

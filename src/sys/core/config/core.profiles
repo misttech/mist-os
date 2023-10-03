@@ -21,4 +21,7 @@
     "fuchsia.graphics.drivers.msd-vsi-vip.device": { "priority": 25 },
     "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt": { "priority": 25 },
   },
+  "memory": {
+    "fuchsia.media.audio.core": { "priority": 24 },
+  }
 }

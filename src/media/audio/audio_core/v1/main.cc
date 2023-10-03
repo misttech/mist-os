@@ -10,6 +10,7 @@
 #include "src/lib/fxl/command_line.h"
 #include "src/media/audio/audio_core/shared/pin_executable_memory.h"
 #include "src/media/audio/audio_core/shared/process_config_loader.h"
+#include "src/media/audio/audio_core/shared/profile_acquirer.h"
 #include "src/media/audio/audio_core/shared/profile_provider.h"
 #include "src/media/audio/audio_core/shared/reporter.h"
 #include "src/media/audio/audio_core/v1/audio_core_impl.h"
@@ -30,6 +31,11 @@ static int StartAudioCore(const fxl::CommandLine& cl) {
   FX_LOGS(INFO) << "AudioCore starting up";
 
   // Page in and pin our executable.
+  auto result = AcquireMemoryRole(zx::vmar::root_self(), "fuchsia.media.audio.core");
+  if (result.is_error()) {
+    FX_PLOGS(ERROR, result.status_value())
+        << "Unable to set memory role for the audio_core process";
+  }
   PinExecutableMemory::Singleton();
 
   auto process_config = ProcessConfigLoader::LoadProcessConfig(kProcessConfigPath);
