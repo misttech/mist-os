@@ -390,6 +390,16 @@ TokenServerEndCombinedV1AndV2 ConvertV2TokenRequestToCombinedTokenRequest(
 
 }  // namespace
 
+LogicalBuffer::LogicalBuffer(LogicalBufferCollection& logical_buffer_collection,
+                             uint32_t buffer_index)
+    : logical_buffer_collection_(logical_buffer_collection), buffer_index_(buffer_index) {}
+
+LogicalBufferCollection& LogicalBuffer::logical_buffer_collection() {
+  return logical_buffer_collection_;
+}
+
+uint32_t LogicalBuffer::buffer_index() { return buffer_index_; }
+
 // static
 fbl::RefPtr<LogicalBufferCollection> LogicalBufferCollection::CommonCreate(Device* parent_device) {
   fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection =
@@ -3695,8 +3705,9 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   //
   // The fbl::RefPtr(this) is fairly similar (in this usage) to shared_from_this().
   auto tracked_parent_vmo = std::unique_ptr<TrackedParentVmo>(new TrackedParentVmo(
-      fbl::RefPtr(this), std::move(raw_parent_vmo),
+      fbl::RefPtr(this), std::move(raw_parent_vmo), index,
       [this, allocator](TrackedParentVmo* tracked_parent_vmo) mutable {
+        parent_device_->RemoveVmoKoid(tracked_parent_vmo->child_koid());
         auto node_handle = parent_vmos_.extract(tracked_parent_vmo->vmo().get());
         ZX_DEBUG_ASSERT(!node_handle || node_handle.mapped().get() == tracked_parent_vmo);
         allocator->Delete(tracked_parent_vmo->TakeVmo());
@@ -3720,8 +3731,12 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   }
 
   zx_koid_t child_koid = fsl::GetKoid(local_child_vmo.get());
-  ZX_ASSERT(child_koid != ZX_KOID_INVALID);
+  if (child_koid == ZX_KOID_INVALID) {
+    LogError(FROM_HERE, "fsl::GetKoid failed");
+    return fpromise::error();
+  }
   tracked_parent_vmo->set_child_koid(child_koid);
+  parent_device_->AddVmoKoid(child_koid, false, tracked_parent_vmo->GetLogicalBuffer());
   TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", child_koid);
 
   // Now that we know at least one child of raw_parent_vmo exists, we can StartWait() and add to
@@ -3909,10 +3924,11 @@ int32_t LogicalBufferCollection::CompareImageFormatConstraintsByIndex(
 }
 
 LogicalBufferCollection::TrackedParentVmo::TrackedParentVmo(
-    fbl::RefPtr<LogicalBufferCollection> buffer_collection, zx::vmo vmo,
+    fbl::RefPtr<LogicalBufferCollection> buffer_collection, zx::vmo vmo, uint32_t buffer_index,
     LogicalBufferCollection::TrackedParentVmo::DoDelete do_delete)
     : buffer_collection_(std::move(buffer_collection)),
       vmo_(std::move(vmo)),
+      buffer_index_(buffer_index),
       do_delete_(std::move(do_delete)),
       zero_children_wait_(this, vmo_.get(), ZX_VMO_ZERO_CHILDREN) {
   ZX_DEBUG_ASSERT(buffer_collection_);
@@ -3956,6 +3972,13 @@ zx::vmo LogicalBufferCollection::TrackedParentVmo::TakeVmo() {
 const zx::vmo& LogicalBufferCollection::TrackedParentVmo::vmo() const {
   ZX_DEBUG_ASSERT(vmo_);
   return vmo_;
+}
+
+LogicalBuffer& LogicalBufferCollection::TrackedParentVmo::GetLogicalBuffer() {
+  if (!logical_buffer_.has_value()) {
+    logical_buffer_.emplace(*buffer_collection_, buffer_index_);
+  }
+  return *logical_buffer_;
 }
 
 void LogicalBufferCollection::TrackedParentVmo::OnZeroChildren(async_dispatcher_t* dispatcher,

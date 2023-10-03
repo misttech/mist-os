@@ -1137,6 +1137,14 @@ BufferCollectionToken* Device::FindTokenByServerChannelKoid(zx_koid_t token_serv
   return iter->second;
 }
 
+Device::FindLogicalBufferByVmoKoidResult Device::FindLogicalBufferByVmoKoid(zx_koid_t vmo_koid) {
+  auto iter = vmo_koids_.find(vmo_koid);
+  if (iter == vmo_koids_.end()) {
+    return {nullptr, false};
+  }
+  return iter->second;
+}
+
 MemoryAllocator* Device::GetAllocator(const fuchsia_sysmem2::BufferMemorySettings& settings) {
   std::lock_guard checker(*loop_checker_);
   if (*settings.heap() == fuchsia_sysmem2::HeapType::kSystemRam &&
@@ -1156,6 +1164,15 @@ const fuchsia_sysmem2::HeapProperties& Device::GetHeapProperties(
   std::lock_guard checker(*loop_checker_);
   ZX_DEBUG_ASSERT(allocators_.find(heap) != allocators_.end());
   return allocators_.at(heap)->heap_properties();
+}
+
+void Device::AddVmoKoid(zx_koid_t koid, bool is_weak, LogicalBuffer& logical_buffer) {
+  vmo_koids_.insert({koid, {&logical_buffer, is_weak}});
+}
+
+void Device::RemoveVmoKoid(zx_koid_t koid) {
+  // May not be present if ~TrackedParentVmo called in error path prior to being fully set up.
+  vmo_koids_.erase(koid);
 }
 
 Device::SecureMemConnection::SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,

@@ -35,6 +35,7 @@ namespace sysmem_driver {
 class BufferCollectionToken;
 class BufferCollectionTokenGroup;
 class BufferCollection;
+class LogicalBufferCollection;
 class MemoryAllocator;
 class Node;
 
@@ -42,6 +43,22 @@ class Node;
 // at a particular point in time.
 struct ConstraintInfoSnapshot {
   inspect::Node inspect_node;
+};
+
+// This class will likely be expanded to hold more things which are currently looked up by
+// buffer_index in members of LogicalBufferCollection. For now, this class is mainly here to avoid
+// needing larger changes to GetVmoInfo implementation when LogicalBuffer becomes more "real".
+class LogicalBuffer {
+ public:
+  LogicalBuffer(LogicalBufferCollection& logical_buffer_collection, uint32_t buffer_index);
+
+  LogicalBufferCollection& logical_buffer_collection();
+  uint32_t buffer_index();
+
+ private:
+  friend class LogicalBufferCollection;
+  LogicalBufferCollection& logical_buffer_collection_;
+  uint32_t buffer_index_;
 };
 
 // TODO(dustingreen): MaybeAllocate() should sweep all related incoming channels for ZX_PEER_CLOSED
@@ -653,7 +670,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     // code causing ~ParentVmo, or (B) ZX_VMO_ZERO_CHILDREN occurring async
     // after StartWait() is called.
     TrackedParentVmo(fbl::RefPtr<LogicalBufferCollection> buffer_collection, zx::vmo vmo,
-                     DoDelete do_delete);
+                     uint32_t buffer_index, DoDelete do_delete);
     ~TrackedParentVmo();
 
     // This should only be called after client code has created a child VMO, and
@@ -667,6 +684,11 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     [[nodiscard]] const zx::vmo& vmo() const;
 
     void set_child_koid(zx_koid_t koid) { child_koid_ = koid; }
+    [[nodiscard]] zx_koid_t child_koid() const { return child_koid_; }
+
+    uint32_t buffer_index() { return buffer_index_; }
+
+    LogicalBuffer& GetLogicalBuffer();
 
     TrackedParentVmo(const TrackedParentVmo&) = delete;
     TrackedParentVmo(TrackedParentVmo&&) = delete;
@@ -678,9 +700,15 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                         const zx_packet_signal_t* signal);
     fbl::RefPtr<LogicalBufferCollection> buffer_collection_;
     zx::vmo vmo_;
+    const uint32_t buffer_index_ = 0x80000000;
     zx_koid_t child_koid_{};
     DoDelete do_delete_;
     async::WaitMethod<TrackedParentVmo, &TrackedParentVmo::OnZeroChildren> zero_children_wait_;
+
+    // In a later CL we'll flip the relationship between TrackedParentVmo and LogicalBuffer. Only
+    // TrackedParentVmo(s) in parent_vmos_ have a value in this field.
+    std::optional<LogicalBuffer> logical_buffer_;
+
     // Only for asserts:
     bool waiting_ = {};
   };

@@ -5647,3 +5647,39 @@ TEST(Sysmem, GetBufferCollectionId) {
   auto& info = *wait_result->buffer_collection_info();
   ASSERT_EQ(token_buffer_collection_id, *info.buffer_collection_id());
 }
+
+TEST(Sysmem, GetVmoInfo_FromStrongVmo) {
+  constexpr uint32_t kBufferCount = 10;
+  auto token = create_initial_token_v2();
+  auto get_buffer_collection_id_result = token->GetBufferCollectionId();
+  ASSERT_TRUE(get_buffer_collection_id_result.is_ok());
+  uint64_t buffer_collection_id = *get_buffer_collection_id_result->buffer_collection_id();
+  auto collection = convert_token_to_collection_v2(std::move(token));
+  set_min_camping_constraints_v2(collection, kBufferCount);
+  auto wait_result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  auto collection_info = std::move(*wait_result->buffer_collection_info());
+  auto sysmem_result = connect_to_sysmem_service_v2();
+  ASSERT_TRUE(sysmem_result.is_ok());
+  auto sysmem = std::move(sysmem_result.value());
+  for (uint32_t buffer_index = 0; buffer_index < kBufferCount; ++buffer_index) {
+    zx::vmo dup_vmo;
+    ASSERT_OK(collection_info.buffers()
+                  ->at(buffer_index)
+                  .vmo()
+                  .value()
+                  .duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
+    fuchsia_sysmem2::AllocatorGetVmoInfoRequest get_vmo_info_request;
+    get_vmo_info_request.vmo() = std::move(dup_vmo);
+    auto get_vmo_info_result = sysmem->GetVmoInfo(std::move(get_vmo_info_request));
+    ASSERT_TRUE(get_vmo_info_result.is_ok());
+    auto vmo_info = std::move(get_vmo_info_result.value());
+    ASSERT_EQ(buffer_collection_id, vmo_info.buffer_collection_id());
+    ASSERT_EQ(buffer_index, vmo_info.buffer_index());
+    // TODO(b/284073556): Assert !close_weak_asap.has_value() when close_weak_asap exists
+  }
+}
+
+// TODO(b/284073556): Add GetVmoInfo_FromWeakVmo along with sysmem weak VMO CL; also assert that
+// close_weak_asap exists and that it also gets set when it should (preference not to just check
+// that koid matches since that's not guaranteed to remain matching in future).

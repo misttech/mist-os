@@ -275,4 +275,46 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
   allocator_->client_debug_info_->id = request.id().value();
 }
 
+void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) {
+  if (!request.vmo().has_value()) {
+    allocator_->LogError(FROM_HERE, "GetVmoInfo requires vmo handle (!has_value)");
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  if (!request.vmo()->is_valid()) {
+    allocator_->LogError(FROM_HERE, "GetVmoInfo requires vmo handle (!is_valid)");
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  auto& vmo = *request.vmo();
+  zx_info_handle_basic_t basic_info{};
+  zx_status_t status =
+      vmo.get_info(ZX_INFO_HANDLE_BASIC, &basic_info, sizeof(basic_info), nullptr, nullptr);
+  if (status != ZX_OK) {
+    allocator_->LogError(FROM_HERE, "GetVmoInfo couldn't vmo.get_info to get koid");
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  // Possibly redundant with FIDL generated code.
+  if (basic_info.type != ZX_OBJ_TYPE_VMO) {
+    allocator_->LogError(FROM_HERE, "GetVmoInfo requires VMO handle");
+    completer.Reply(fit::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  zx_koid_t vmo_koid = basic_info.koid;
+  auto logical_buffer_result = allocator_->parent_device_->FindLogicalBufferByVmoKoid(vmo_koid);
+  if (!logical_buffer_result.logical_buffer) {
+    // We don't log anything in this path because a client may just be checking if a VMO is a
+    // sysmem VMO, which could make a LogInfo() here noisy.
+    completer.Reply(fit::error(ZX_ERR_NOT_FOUND));
+    return;
+  }
+  auto& logical_buffer = *logical_buffer_result.logical_buffer;
+  fuchsia_sysmem2::AllocatorGetVmoInfoResponse response;
+  response.buffer_collection_id() =
+      logical_buffer.logical_buffer_collection().buffer_collection_id();
+  response.buffer_index() = logical_buffer.buffer_index();
+  completer.Reply(fit::ok(std::move(response)));
+}
+
 }  // namespace sysmem_driver

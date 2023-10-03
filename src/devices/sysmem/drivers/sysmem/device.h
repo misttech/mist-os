@@ -54,6 +54,7 @@ using DdkDeviceType =
 
 class Driver;
 class BufferCollectionToken;
+class LogicalBuffer;
 class LogicalBufferCollection;
 class Node;
 
@@ -147,6 +148,12 @@ class Device final : public DdkDeviceType,
   // its FIDL channel.
   [[nodiscard]] BufferCollectionToken* FindTokenByServerChannelKoid(zx_koid_t token_server_koid);
 
+  struct FindLogicalBufferByVmoKoidResult {
+    LogicalBuffer* logical_buffer;
+    bool is_koid_of_weak_vmo;
+  };
+  [[nodiscard]] FindLogicalBufferByVmoKoidResult FindLogicalBufferByVmoKoid(zx_koid_t vmo_koid);
+
   // Get allocator for |settings|. Returns NULL if allocator is not
   // registered for settings.
   [[nodiscard]] MemoryAllocator* GetAllocator(
@@ -178,6 +185,9 @@ class Device final : public DdkDeviceType,
     logical_buffer_collections_.erase(collection);
     CheckForUnbind();
   }
+
+  void AddVmoKoid(zx_koid_t koid, bool is_weak, LogicalBuffer& logical_buffer);
+  void RemoveVmoKoid(zx_koid_t koid);
 
   [[nodiscard]] inspect::Node& collections_node() { return collections_node_; }
 
@@ -337,6 +347,12 @@ class Device final : public DdkDeviceType,
 
   using LogicalBufferCollections = std::unordered_set<LogicalBufferCollection*>;
   LogicalBufferCollections logical_buffer_collections_ __TA_GUARDED(*loop_checker_);
+
+  // A single LogicalBuffer can be in this map multiple times, once per VMO koid that has been
+  // handed out by sysmem. Entries are removed when the TrackedParentVmo parent of the handed-out
+  // VMO sees ZX_VMO_ZERO_CHILDREN, which occurs before LogicalBuffer is deleted.
+  using VmoKoids = std::unordered_map<zx_koid_t, FindLogicalBufferByVmoKoidResult>;
+  VmoKoids vmo_koids_;
 
   Settings settings_;
 

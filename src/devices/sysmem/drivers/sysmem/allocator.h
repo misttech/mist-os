@@ -63,6 +63,7 @@ class Allocator : public LoggingMixin {
         ValidateBufferCollectionTokenCompleter::Sync& completer) override;
     void SetDebugClientInfo(SetDebugClientInfoRequest& request,
                             SetDebugClientInfoCompleter::Sync& completer) override;
+    void GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) override;
 
     std::unique_ptr<Allocator> allocator_;
   };

@@ -133,4 +133,117 @@ closed protocol Allocator {
         1: name string:64;
         2: id uint64;
     });
+
+    /// Given a handle to a sysmem-provided VMO, this returns additional info
+    /// about the corresponding sysmem logical buffer, if any.
+    ///
+    /// Most callers will want to keep their main handle to the VMO rather than
+    /// transferring it to sysmem via this call. Callers can duplicate their
+    /// main handle (ZX_RIGHT_SAME_RIGHTS) and send the duplicate.
+    ///
+    /// On any error from this call (or at FIDL transport layer), the client
+    /// should not retry.
+    ///
+    /// The client must check vmo_info.close_weak_asap and if that field is set,
+    /// the client must satisfy the rules specified in the comments on that
+    /// field. Failure to do so results in VMO leaks caused by the client and
+    /// loud complaints to the log by sysmem.
+    ///
+    /// The number of distinct close_weak_asap object koids from repeated calls
+    /// to GetVmoInfo on the same input sysmem VMO is limited to a low constant.
+    ///
+    /// If the client has created a child VMO of a sysmem-provided VMO, that
+    /// child VMO isn't considered a "sysmem VMO" for purposes of this call.
+    ///
+    /// Both strong and weak sysmem VMOs keep their info alive; the VMO handle
+    /// passed in to this call itself keeps the VMO's info alive for purposes of
+    /// responding to this call. Because of this, ZX_ERR_NOT_FOUND errors are
+    /// unambiguous (even if there are no other handles to the VMO when calling;
+    /// even if other handles are closed before the GetVmoInfo response arrives
+    /// at the client).
+    ///
+    /// Errors:
+    ///   * ZX_ERR_NOT_FOUND - the vmo isn't a sysmem VMO.
+    ///   * ZX_ERR_ACCESS_DENIED - the vmo isn't capable of being used with
+    ///     GetVmoInfo due to rights/capability attenuation.
+    ///   * ZX_ERR_INTERNAL - the request failed for an unspecified reason.
+    ///   * ZX_ERR_INVALID_ARGS
+    strict GetVmoInfo(resource table {
+        /// `vmo` is required to be set; ownership is transferred to the server
+        /// so in most cases a client will duplicate a handle and transfer the
+        /// duplicate via this field.
+        1: vmo zx.Handle:VMO;
+    }) -> (resource table {
+        /// The buffer_collection_id is the unique ID of the logical buffer
+        /// collection. This ID is unique across all logical buffer collections,
+        /// per boot.
+        1: buffer_collection_id uint64;
+
+        /// The vmo's buffer_index is the index within the logical buffer
+        /// collection of which the vmo is a part. The buffer_collection_id and
+        /// buffer_index will be the same for all sysmem-delivered VMOs
+        /// corresponding to the same logical sysmem buffer, even if sysmem has
+        /// delivered child slice VMOs with different koid values (typically to
+        /// different clients). The buffer_index is only unique across logical
+        /// buffers in a collection; for a given logical buffer, the combination
+        /// of buffer_collection_id and buffer_index is unique per boot.
+        2: buffer_index uint32;
+
+        /// The close_weak_asap eventpair will be present iff the vmo handle is
+        /// "weak" from sysmem's point of view. This "weak" concept is a sysmem
+        /// concept, not a zircon concept. A single sysmem logical buffer can
+        /// have some "strong" VMO handles and some "weak" VMO handles. The
+        /// "strong" handles represent ownership; these handles represent a
+        /// direct justification for the logical buffer to continue to exist for
+        /// as long as these handles exist. The "weak" handles just represent
+        /// usage; these handles don't represent justification for the logical
+        /// buffer to continue to exist, but we need the client's
+        /// cooperation/participation to close the weak handle asap shortly
+        /// after all strong handles are gone.
+        ///
+        /// All remaining handles to a weak sysmem VMO must be closed asap if
+        /// close_weak_asap signals ZX_EVENTPAIR_PEER_CLOSED, else the client
+        /// will likely be causing a VMO leak (the "weak"-ness only works with
+        /// the cooperation of all holders of weak sysmem VMO handles; we don't
+        /// remove the VMO's pages out from under the client's VMO handle(s)).
+        /// The ZX_EVENTPAIR_PEER_CLOSED will only be signaled when zero strong
+        /// sysmem VMO handles remain and zero strong BufferCollection
+        /// client_end(s) remain.
+        ///
+        /// Then, once zero weak sysmem VMO(s) remain, the underlying logical
+        /// buffer's memory will be freed. This mechanism applies per
+        /// buffer_index in a collection, meaning that a logical buffer can be
+        /// freed even if another buffer in the same collection can't be freed
+        /// yet due to outstanding handles to strong or weak sysmem VMOs of that
+        /// other buffer.
+        ///
+        /// Different close_weak_asap handles for the same logical buffer may
+        /// refer to different eventpair objects, but all will be signaled when
+        /// it's time for remaining VMO handles corresponding to the logical
+        /// buffer to be closed. The client is free to ignore/close any
+        /// extra/redundant close_weak_asap handles for the same logical buffer.
+        ///
+        /// The close_weak_asap eventpair may already have
+        /// ZX_EVENTPAIR_PEER_CLOSED signalled before VmoInfo arrives at the
+        /// client, in which case the client must close all of its remaining
+        /// handles to the same VMO object asap; the client may do so by
+        /// noticing ZX_EVENTPAIR_PEER_CLOSED via this handle, or via a
+        /// different close_weak_asap eventpair corresponding to the same
+        /// logical sysem buffer (matching buffer_collection_id and matching
+        /// buffer_index).
+        ///
+        /// If a client continues to hold (weak by definition) VMO handles of
+        /// the logical buffer after ZX_EVENTPAIR_PEER_CLOSED, after a while
+        /// sysmem will complain loudly to the log. There is intentionally no
+        /// way to disable that logging.
+        ///
+        /// A client can choose to notice that this field is set and just close
+        /// any remaining VMO handles corresponding to the logical buffer asap
+        /// immediately and never need to wait for ZX_EVENTPAIR_PEER_CLOSED.
+        /// This may be the easiest way to satisfy the rules here if the client
+        /// is not expecting to ever need to hold sysmem weak VMO handles, aside
+        /// from noticing a weak sysmem VMO and failing cleanly in that case.
+        /// See also BufferCollection.SetWeakOk.
+        3: close_weak_asap zx.Handle:EVENTPAIR;
+    }) error zx.Status;
 };
