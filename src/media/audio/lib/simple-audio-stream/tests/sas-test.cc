@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/simple-audio-stream/simple-audio-stream.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/clock.h>
@@ -13,7 +14,6 @@
 #include <set>
 
 #include <audio-proto-utils/format-utils.h>
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"

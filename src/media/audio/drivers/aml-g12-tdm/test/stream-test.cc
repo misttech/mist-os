@@ -9,6 +9,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/simple-codec/simple-codec-server.h>
 #include <lib/sync/completion.h>
 #include <zircon/errors.h>
@@ -17,7 +18,6 @@
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 

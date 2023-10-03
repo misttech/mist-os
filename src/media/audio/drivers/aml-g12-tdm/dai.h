@@ -13,6 +13,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/zx/bti.h>
 #include <lib/zx/vmo.h>
@@ -24,7 +25,6 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <ddktl/metadata/audio.h>
-#include <sdk/lib/fidl/cpp/binding.h>
 #include <soc/aml-common/aml-tdm-audio.h>
 
 #include "aml-tdm-config-device.h"

@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/audio/signalprocessing/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/binding.h>
 #include <lib/simple-codec/simple-codec-types.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
@@ -17,7 +18,6 @@
 
 #include <fbl/intrusive_double_list.h>
 #include <fbl/mutex.h>
-#include <sdk/lib/fidl/cpp/binding.h>
 
 namespace audio {
 
@@ -174,6 +174,7 @@ class SimpleCodecServerInstance
   fidl::Binding<fuchsia::hardware::audio::Codec> binding_;
   std::optional<fidl::Binding<fuchsia::hardware::audio::signalprocessing::SignalProcessing>>
       signal_processing_binding_;
+
   bool plug_state_updated_ = true;  // Return the current plug state on the first call.
 
   bool gain_updated_ = true;  // Return the current gain state on the first call.

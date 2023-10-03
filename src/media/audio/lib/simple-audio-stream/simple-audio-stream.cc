@@ -12,10 +12,10 @@
 #include <lib/zx/thread.h>
 #include <zircon/device/audio.h>
 
-#include <limits>
 #include <utility>
 
 #include <audio-proto-utils/format-utils.h>
+
 namespace audio {
 
 SimpleAudioStream::SimpleAudioStream(zx_device_t* parent, bool is_input)
@@ -406,7 +406,7 @@ void SimpleAudioStream::CreateRingBuffer(
 
   number_of_channels_.Set(pcm_format.number_of_channels);
   frame_rate_.Set(pcm_format.frame_rate);
-  bits_per_slot_.Set(pcm_format.bytes_per_sample * 8);
+  bits_per_slot_.Set(pcm_format.bytes_per_sample * 8ul);
   bits_per_sample_.Set(pcm_format.valid_bits_per_sample);
   using FidlSampleFormat = audio_fidl::wire::SampleFormat;
   // clang-format off
@@ -625,7 +625,7 @@ void SimpleAudioStream::GetSupportedFormats(
   fbl::Vector<FidlCompatibleFormats> fidl_compatible_formats;
   for (SupportedFormat& i : supported_formats_) {
     std::vector<utils::Format> formats = audio::utils::GetAllFormats(i.range.sample_formats);
-    ZX_ASSERT(formats.size() >= 1);
+    ZX_ASSERT(!formats.empty());
     for (utils::Format& j : formats) {
       fbl::Vector<uint32_t> rates;
       audio::utils::FrameRateEnumerator enumerator(i.range);
@@ -780,7 +780,7 @@ void SimpleAudioStream::Start(StartCompleter::Sync& completer) {
     state_.Set("started");
     start_time_.Set(zx::clock::get_monotonic().get());
   }
-  completer.Reply(start_time);
+  completer.Reply(static_cast<int64_t>(start_time));
 }
 
 void SimpleAudioStream::Stop(StopCompleter::Sync& completer) {

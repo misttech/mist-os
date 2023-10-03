@@ -345,8 +345,8 @@ void VirtualAudioComposite::GetVmo(GetVmoRequest& request, GetVmoCompleter::Sync
       min_frames, fbl::round_up<uint32_t, uint32_t>(num_ring_buffer_frames_, modulo_frames));
 
   zx_status_t status = ring_buffer_mapper_.CreateAndMap(
-      num_ring_buffer_frames_ * frame_size_, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr,
-      &ring_buffer_vmo_,
+      static_cast<uint64_t>(num_ring_buffer_frames_) * frame_size_,
+      ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, nullptr, &ring_buffer_vmo_,
       ZX_RIGHT_READ | ZX_RIGHT_WRITE | ZX_RIGHT_MAP | ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER);
 
   ZX_ASSERT_MSG(status == ZX_OK, "failed to create ring buffer VMO: %s",

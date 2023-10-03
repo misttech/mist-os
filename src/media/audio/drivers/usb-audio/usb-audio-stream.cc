@@ -30,8 +30,7 @@
 #include "usb-audio-stream-interface.h"
 #include "usb-audio.h"
 
-namespace audio {
-namespace usb {
+namespace audio::usb {
 
 namespace audio_fidl = fuchsia_hardware_audio;
 
@@ -90,7 +89,7 @@ UsbAudioStream::UsbAudioStream(UsbAudioDevice* parent, std::unique_ptr<UsbAudioS
     // Each UsbAudioStreamInterface formats() entry only reports one format.
     ZX_ASSERT(formats.size() == 1);
     utils::Format format = formats[0];
-    supported_bits_per_slot_.Set(count, format.bytes_per_sample * 8);
+    supported_bits_per_slot_.Set(count, format.bytes_per_sample * 8ul);
     supported_bits_per_sample_.Set(count, format.valid_bits_per_sample);
     switch (format.format) {
       case audio_fidl::wire::SampleFormat::kPcmSigned:
@@ -208,7 +207,7 @@ void UsbAudioStream::ComputePersistentUniqueId() {
   const fbl::Array<uint8_t>* desc_strings[] = {&parent_.mfr_name(), &parent_.prod_name(),
                                                &parent_.serial_num()};
   for (const auto str : desc_strings) {
-    if (str->size()) {
+    if (!str->empty()) {
       sha.Update(str->data(), str->size());
     }
   }
@@ -317,7 +316,7 @@ void UsbAudioStream::GetSupportedFormats(
   fbl::Vector<FidlCompatibleFormats> fidl_compatible_formats;
   for (const UsbAudioStreamInterface::FormatMapEntry& i : formats) {
     std::vector<utils::Format> formats = audio::utils::GetAllFormats(i.range_.sample_formats);
-    ZX_ASSERT(formats.size() >= 1);
+    ZX_ASSERT(!formats.empty());
     for (utils::Format& j : formats) {
       fbl::Vector<uint32_t> rates;
       audio::utils::FrameRateEnumerator enumerator(i.range_);
@@ -557,7 +556,7 @@ void UsbAudioStream::CreateRingBuffer(StreamChannel* channel, audio_fidl::wire::
 
   number_of_channels_.Set(req.number_of_channels);
   frame_rate_.Set(req.frame_rate);
-  bits_per_slot_.Set(req.bytes_per_sample * 8);
+  bits_per_slot_.Set(req.bytes_per_sample * 8ul);
   bits_per_sample_.Set(req.valid_bits_per_sample);
   // clang-format off
   switch (req.sample_format) {
@@ -902,7 +901,7 @@ void UsbAudioStream::RequestComplete(fuchsia_hardware_usb_endpoint::Completion c
 
   usb_requests_outstanding_.Subtract(1);
 
-  uint64_t complete_time = zx::clock::get_monotonic().get();
+  zx_time_t complete_time = zx::clock::get_monotonic().get();
   Action when_finished = Action::NONE;
 
   {
@@ -1256,5 +1255,4 @@ void UsbAudioStream::RingBufferCopy(::usb::FidlRequest& req, bool copy_to, uint3
   }
 }
 
-}  // namespace usb
-}  // namespace audio
+}  // namespace audio::usb

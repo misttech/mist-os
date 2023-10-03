@@ -9,10 +9,10 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/sync/completion.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 #include <zxtest/zxtest.h>
 
@@ -47,9 +47,7 @@ class FakeMmio {
   FakeMmio() : mmio_(sizeof(uint32_t), kRegCount) {}
 
   fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
-  ddk_fake::FakeMmioReg& reg(size_t ix) {
-    return mmio_[ix];
-  }
+  ddk_fake::FakeMmioReg& reg(size_t ix) { return mmio_[ix]; }
 
  private:
   static constexpr size_t kRegCount =

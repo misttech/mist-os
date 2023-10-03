@@ -7,6 +7,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/inspect/testing/cpp/zxtest/inspect.h>
 
 #include <iterator>
 #include <memory>
@@ -14,7 +15,6 @@
 #include <vector>
 
 #include <ddktl/device.h>
-#include <sdk/lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <usb/request-cpp.h>
 #include <zxtest/zxtest.h>
 
