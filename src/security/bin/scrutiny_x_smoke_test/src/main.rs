@@ -133,9 +133,11 @@ fn output_package(package: &dyn scrutiny::Package) {
 }
 
 fn output_package_components(package: &dyn scrutiny::Package) {
-    for (path, _component) in package.components().expect("package components") {
-        // TODO(111243): Exercise `Component` API once it is implemented.
+    for (path, component) in package.components().expect("package components") {
         debug!("  Component at {:?}", path);
+        for child_url in component.children() {
+            debug!("    Child URL: {:?}", child_url);
+        }
     }
 }
 

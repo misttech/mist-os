@@ -272,7 +272,7 @@ impl api::Package for Package {
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
                 let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest));
+                    Box::new(Component::new(package.clone(), manifest)?);
                 components.push((path, component));
             }
         }
@@ -284,7 +284,7 @@ impl api::Package for Package {
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
                 let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest));
+                    Box::new(Component::new(package.clone(), manifest).expect("component"));
                 components.push((path, component));
             }
         }
@@ -387,6 +387,8 @@ pub(crate) mod test {
     use super::super::api;
     use super::super::blob::test::VerifiedMemoryBlobSet;
     use super::super::blob::BlobSet as _;
+    use super::super::component::test::placeholder_component_cm;
+    use super::super::component::test::placeholder_component_path;
     use super::super::data_source as ds;
     use super::super::hash::Hash;
     use super::Package;
@@ -437,9 +439,12 @@ pub(crate) mod test {
         let mut meta_contents_bytes = vec![];
         meta_contents.serialize(&mut meta_contents_bytes).unwrap();
 
+        let (_test_cm_hash, test_cm_bytes) = placeholder_component_cm();
+
         let far_map = btreemap! {
             FuchsiaMetaPackage::PATH.to_string() => (meta_package_bytes.len() as u64, Box::new(meta_package_bytes.as_slice()) as Box<dyn io::Read>),
             FuchsiaMetaContents::PATH.to_string() => (meta_contents_bytes.len() as u64, Box::new(meta_contents_bytes.as_slice()) as Box<dyn io::Read>),
+            placeholder_component_path() => (test_cm_bytes.len() as u64, Box::new(test_cm_bytes.as_slice()) as Box<dyn io::Read>),
         };
         let mut far_bytes = vec![];
         fuchsia_archive::write(&mut far_bytes, far_map).unwrap();

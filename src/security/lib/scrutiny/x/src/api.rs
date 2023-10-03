@@ -7,6 +7,7 @@ use super::bootfs::AdditionalBootConfigurationError;
 use super::bootfs::BootfsPackageError;
 use super::bootfs::BootfsPackageIndexError;
 use super::bootfs::ComponentManagerConfigurationError;
+use super::component::Error as ComponentError;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use fuchsia_url as furl;
@@ -599,6 +600,8 @@ pub enum PackageComponentsError {
     Open(#[from] BlobError),
     #[error("failed read blob for parsing as component: {0}")]
     Read(#[from] std::io::Error),
+    #[error("failed read construct component from manifest: {0}")]
+    Component(#[from] ComponentError),
 }
 
 // TODO(fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaPackage.
@@ -681,6 +684,34 @@ pub enum PackageResolverUrl {
     Package(furl::PackageUrl),
 }
 
+impl PackageResolverUrl {
+    pub fn parse(url: &str) -> Result<Self, PackageResolverUrlParseError> {
+        match furl::PackageUrl::parse(url) {
+            Ok(package_url) => Ok(Self::Package(package_url)),
+            Err(package_error) => match furl::boot_url::BootUrl::parse(url) {
+                Ok(boot_url) => {
+                    if boot_url.resource().is_some() {
+                        Err(PackageResolverUrlParseError::BootWithResource)
+                    } else {
+                        Ok(Self::Boot(boot_url))
+                    }
+                }
+                Err(boot_error) => {
+                    Err(PackageResolverUrlParseError::InvalidFormat { package_error, boot_error })
+                }
+            },
+        }
+    }
+}
+
+#[derive(Debug, Error)]
+pub enum PackageResolverUrlParseError {
+    #[error("failed to parse as package url: {package_error}; failed to parse as boot url: {boot_error}")]
+    InvalidFormat { package_error: furl::errors::ParseError, boot_error: furl::errors::ParseError },
+    #[error("boot url that refers to package contains resource")]
+    BootWithResource,
+}
+
 /// Model for a Fuchsia component. Note that this model is of a component as described by a
 /// component manifest, not to be confused with a component _instance_, which is a component
 /// situated at a particular point in a runtime component tree. See
@@ -690,7 +721,7 @@ pub trait Component {
     fn package(&self) -> Box<dyn Package>;
 
     /// Iterate over known child component URLs.
-    fn children(&self) -> Box<dyn Iterator<Item = PackageResolverUrl>>;
+    fn children(&self) -> Box<dyn Iterator<Item = ComponentResolverUrl>>;
 
     /// Iterate over capability that the component uses.
     fn uses(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
@@ -720,10 +751,82 @@ pub trait ComponentResolver {
     fn aliases(&self, hash: Box<dyn Hash>) -> Box<dyn Iterator<Item = ComponentResolverUrl>>;
 }
 
-// TODO(fxbug.dev/112121): Define varieties of URL that ComponentResolver supports.
-
 /// The variety of URLs that [`ComponentResolver`] can resolve to component hashes.
-pub enum ComponentResolverUrl {}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ComponentResolverUrl {
+    Resource(ResourcePath),
+    // A URL identifying a component file in bootfs.
+    Boot(furl::boot_url::BootUrl),
+    // A URL identifying a component in a package.
+    Component(furl::ComponentUrl),
+}
+
+impl ComponentResolverUrl {
+    pub fn parse(url: &str) -> Result<Self, ComponentResolverUrlParseError> {
+        match furl::ComponentUrl::parse(url) {
+            Ok(component_url) => Ok(Self::Component(component_url)),
+            Err(component_error) => match furl::boot_url::BootUrl::parse(url) {
+                Ok(boot_url) => {
+                    if boot_url.resource().is_none() {
+                        Err(ComponentResolverUrlParseError::BootWithoutResource)
+                    } else {
+                        Ok(Self::Boot(boot_url))
+                    }
+                }
+                Err(boot_error) => {
+                    let mut chars = url.chars();
+                    if let Some(first_char) = chars.next() {
+                        if first_char == '#' {
+                            let resource_path_str = chars.as_str();
+                            match furl::validate_resource_path(resource_path_str) {
+                                Ok(()) => {
+                                    Ok(Self::Resource(ResourcePath(resource_path_str.to_string())))
+                                }
+                                Err(resource_error) => {
+                                    Err(ComponentResolverUrlParseError::ComponentBootAndResource {
+                                        component_error,
+                                        boot_error,
+                                        resource_error,
+                                    })
+                                }
+                            }
+                        } else {
+                            Err(ComponentResolverUrlParseError::ComponentAndBoot {
+                                component_error,
+                                boot_error,
+                            })
+                        }
+                    } else {
+                        Err(ComponentResolverUrlParseError::ComponentAndBoot {
+                            component_error,
+                            boot_error,
+                        })
+                    }
+                }
+            },
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ResourcePath(String);
+
+#[derive(Debug, Error)]
+pub enum ComponentResolverUrlParseError {
+    #[error("failed to parse as component url: {component_error}; failed to parse as boot url: {boot_error}; url is not a resource-only URL")]
+    ComponentAndBoot {
+        component_error: furl::errors::ParseError,
+        boot_error: furl::errors::ParseError,
+    },
+    #[error("failed to parse as component url: {component_error}; failed to parse as boot url: {boot_error}; failed to parse as resource path in resource-only URL: {resource_error}")]
+    ComponentBootAndResource {
+        component_error: furl::errors::ParseError,
+        boot_error: furl::errors::ParseError,
+        resource_error: furl::errors::ResourcePathError,
+    },
+    #[error("boot url that refers to component contains no resource")]
+    BootWithoutResource,
+}
 
 /// A capability named in a particular component manifest. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2/component_manifests and
@@ -900,9 +1003,11 @@ pub trait ComponentInstanceCapability {
 #[cfg(test)]
 mod tests {
     use super::super::data_source as ds;
+    use super::ComponentResolverUrl;
     use super::DataSource;
     use super::DataSourceKind;
     use super::DataSourceVersion;
+    use super::PackageResolverUrl;
     use super::Path;
 
     #[fuchsia::test]
@@ -1092,5 +1197,32 @@ mod tests {
             &almost_same_as_reference.path().expect("extra root child path")
         );
         expect(reference, almost_same_as_reference, false);
+    }
+
+    #[fuchsia::test]
+    fn test_parse_package_url() {
+        PackageResolverUrl::parse("fuchsia-pkg://test.fuchsia.com/some_pkg")
+            .expect("fully qualified package URL");
+        PackageResolverUrl::parse("/some_pkg").expect("relative package URL");
+        PackageResolverUrl::parse("fuchsia-boot:///some/pkg").expect("boot URL without resource");
+        PackageResolverUrl::parse("fuchsia-pkg://test.fuchsia.com/some_pkg#meta/resource")
+            .expect_err("package URL with resource");
+        PackageResolverUrl::parse("fuchsia-boot:///some/pkg#meta/resource")
+            .expect_err("boot URL with resource");
+        PackageResolverUrl::parse("#meta/resource").expect_err("resource-only URL");
+    }
+
+    #[fuchsia::test]
+    fn test_parse_component_url() {
+        ComponentResolverUrl::parse("fuchsia-pkg://test.fuchsia.com/some_pkg")
+            .expect_err("fully qualified package URL");
+        ComponentResolverUrl::parse("/some_pkg").expect_err("relative package URL");
+        ComponentResolverUrl::parse("fuchsia-boot:///some/pkg")
+            .expect_err("boot URL without resource");
+        ComponentResolverUrl::parse("fuchsia-pkg://test.fuchsia.com/some_pkg#meta/resource")
+            .expect("package URL with resource");
+        ComponentResolverUrl::parse("fuchsia-boot:///some/pkg#meta/resource")
+            .expect("boot URL with resource");
+        ComponentResolverUrl::parse("#meta/resource").expect("resource-only URL");
     }
 }
