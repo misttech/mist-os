@@ -93,6 +93,13 @@ TEST(ProfileConfig, Parse) {
   }
 
   {
+    const auto iter = result->memory.find("fuchsia.default");
+    ASSERT_TRUE(iter != result->memory.end());
+    EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Builtin);
+    EXPECT_EQ(iter->second.info.flags, ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY);
+    EXPECT_EQ(iter->second.info.priority, 16);
+  }
+  {
     const auto iter = result->memory.find("test.bringup.a");
     ASSERT_TRUE(iter != result->memory.end());
     EXPECT_EQ(iter->second.scope, zircon_profile::ProfileScope::Core);
@@ -135,10 +142,7 @@ TEST(ProfileConfig, Parse) {
   }
 
   const std::unordered_set<std::string> expected_memory_profiles{
-      "test.bringup.a",
-      "test.bringup.b",
-      "test.core.a",
-      "test.core.mem",
+      "test.bringup.a", "test.bringup.b", "test.core.a", "test.core.mem", "fuchsia.default",
   };
 
   for (const auto& [key, value] : result->memory) {

@@ -562,6 +562,14 @@ fit::result<std::string, ConfiguredProfiles> LoadConfigs(const std::string& conf
         profiles.thread.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
     ZX_DEBUG_ASSERT(added);
   }
+  {
+    zx_profile_info_t info{};
+    info.flags = ZX_PROFILE_INFO_FLAG_MEMORY_PRIORITY;
+    info.priority = ZX_PRIORITY_DEFAULT;
+    auto [iter, added] =
+        profiles.memory.emplace("fuchsia.default", Profile{ProfileScope::Builtin, info});
+    ZX_DEBUG_ASSERT(added);
+  }
 
   for (const auto& entry : dir_entries) {
     if (!files::IsFileAt(dir_fd.get(), entry) || !filename_predicate(entry)) {
