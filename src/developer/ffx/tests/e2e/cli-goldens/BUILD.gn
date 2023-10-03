@@ -6,6 +6,7 @@ import("//build/compiled_action.gni")
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/testing/golden_files.gni")
+import("ffx_command_golden_file_test.gni")
 
 if (is_host && has_board) {
   rustc_binary("ffx_cli_goldens") {
@@ -40,36 +41,64 @@ if (is_host && has_board) {
   }
 
   _golden_dir = "${target_out_dir}/goldens"
-  _comparisons_file = "${target_gen_dir}/ffx_cli_comparisions.json"
 
-  golden_files("ffx-golden-test") {
+  # This breaks up the comparisons of the command lines into a
+  # collection of comparisons per top level command. This avoids
+  # hitting ulimit when building the stamp file command line.
+  #
+  # First a list of top level commands is created, and kept up
+  # to date with a golden_files test.
+  #
+  # Then each top level command creates a list of comparisons
+  # and the list of output files used by golden tests.
+  _command_list = "${_golden_dir}/commandlist.txt"
+  _src_command_list = "goldens/commandlist.txt"
+
+  golden_files("ffx-golden-command-list") {
     testonly = true
-
-    comparisons = _comparisons_file
-
-    deps = [ ":invoke_ffx_cli_goldens($host_toolchain)" ]
+    comparisons = [
+      {
+        golden = _src_command_list
+        candidate = _command_list
+      },
+    ]
+    deps = [ ":generate_ffx_command_list" ]
   }
 
-  compiled_action("invoke_ffx_cli_goldens") {
+  compiled_action("generate_ffx_command_list") {
     testonly = true
     tool = ":ffx_cli_goldens"
-    depfile = "$target_out_dir/$target_name.d"
-    deps = []
 
-    outputs = [
-      "$_golden_dir/ffx.golden",
-      _comparisons_file,
-    ]
+    outputs = [ _command_list ]
     args = [
-      "--out-dir",
-      rebase_path(_golden_dir, root_build_dir),
-      "--base-golden-src-dir",
-      rebase_path("goldens", "//"),
-      "--gen-comparisons",
-      rebase_path(_comparisons_file, root_build_dir),
+      "--commandlist-only",
+      "--command-list",
+      rebase_path(_command_list, root_build_dir),
       "--sdk-root",
       rebase_path(_sdk_path, root_build_dir),
     ]
+  }
+
+  command_test_deps = []
+
+  ffx_command_golden_file_test("ffx_ffx_command_golden_file_test") {
+    golden_source_dir = "goldens"
+    command_name = "ffx"
+    golden_processor_tool = ":ffx_cli_goldens"
+    sdk_path = _sdk_path
+  }
+
+  command_test_deps += [ ":ffx_ffx_command_golden_file_test" ]
+
+  _command_name_list = read_file(_src_command_list, "list lines")
+  foreach(c, _command_name_list) {
+    ffx_command_golden_file_test("${c}_ffx_command_golden_file_test") {
+      golden_source_dir = "goldens"
+      command_name = c
+      golden_processor_tool = ":ffx_cli_goldens"
+      sdk_path = _sdk_path
+    }
+    command_test_deps += [ ":${c}_ffx_command_golden_file_test" ]
   }
 }
 
@@ -81,8 +110,6 @@ group("e2e_tests") {
   # Also check for has_board, since this test cannot run on a configuration without a
   # board.
   if (is_host && is_linux && has_board) {
-    # TODO(wilkinsonclay): In a stacked CL, enable this test. It will require adding all the
-    # golden files, so it will be a large CL.
-    # deps = [ ":ffx-golden-test" ]
+    deps = [ ":ffx-golden-command-list" ] + command_test_deps
   }
 }

@@ -1,0 +1,26 @@
+{
+  "name": "remove",
+  "description": "",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "name",
+      "description": "name of the repository to remove.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

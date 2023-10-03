@@ -1,0 +1,142 @@
+{
+  "name": "Ffx",
+  "description": "Fuchsia's developer tool",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "config"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--config",
+      "short": "c",
+      "description": "override configuration values (key=value or json)",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "env"
+        }
+      },
+      "optionality": "optional",
+      "long": "--env",
+      "short": "e",
+      "description": "override the path to the environment configuration file (file path)",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "env-root"
+        }
+      },
+      "optionality": "optional",
+      "long": "--env-root",
+      "short": null,
+      "description": "override the detection of the project root from which a config domain file is found (Warning: This is part of an experimental feature)",
+      "hidden": true
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "machine"
+        }
+      },
+      "optionality": "optional",
+      "long": "--machine",
+      "short": null,
+      "description": "produce output for a machine in the specified format; available formats: \"json\", \"json-pretty\"",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "stamp"
+        }
+      },
+      "optionality": "optional",
+      "long": "--stamp",
+      "short": null,
+      "description": "create a stamp file at the given path containing the exit code",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "target"
+        }
+      },
+      "optionality": "optional",
+      "long": "--target",
+      "short": "t",
+      "description": "apply operations across single or multiple targets",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "timeout"
+        }
+      },
+      "optionality": "optional",
+      "long": "--timeout",
+      "short": "T",
+      "description": "override default proxy timeout",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "log-level"
+        }
+      },
+      "optionality": "optional",
+      "long": "--log-level",
+      "short": "l",
+      "description": "sets the log level for ffx output (default = Info). Other possible values are Info, Error, Warn, and Trace. Can be persisted via log.level config setting.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "isolate-dir"
+        }
+      },
+      "optionality": "optional",
+      "long": "--isolate-dir",
+      "short": null,
+      "description": "turn on isolation mode using the given directory to isolate all config and socket files into the specified directory. This overrides the FFX_ISOLATE_DIR env variable, which can also put ffx into this mode.",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--verbose",
+      "short": "v",
+      "description": "logs ffx output to stdio according to log level",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "subcommand",
+      "description": "",
+      "optionality": "greedy",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

@@ -1,0 +1,58 @@
+{
+  "name": "add",
+  "description": "add config value the end of an array",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "level"
+        }
+      },
+      "optionality": "optional",
+      "long": "--level",
+      "short": "l",
+      "description": "config level. Possible values are \"user\", \"build\", \"global\". Defaults to \"user\".",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "build-dir"
+        }
+      },
+      "optionality": "optional",
+      "long": "--build-dir",
+      "short": "b",
+      "description": "an optional build directory to associate the build config provided - used for \"build\" configs. If not provided, it may attempt to autodiscover your active build directory.",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "This will always add to the end of an array.  Adding to a subtree is not supported. If the current value is not an array, it will convert the value to an array.  If you want to insert a value in a different position, consider editing the configuration file directly.  Configuration file locations can be found by running `ffx config env get` command."
+  ],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "name",
+      "description": "name of the property to set",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "value",
+      "description": "value to add to name",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

@@ -1,0 +1,56 @@
+{
+  "name": "test",
+  "description": "Run the test step",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "device-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--device-path",
+      "short": null,
+      "description": "optional block device path to run the test on. If no path is given the test will find an appropriate device.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "duration"
+        }
+      },
+      "optionality": "optional",
+      "long": "--duration",
+      "short": null,
+      "description": "optional duration for which the test should execute. If the duration is zero, this step will return when it's complete, which might be never. If a non-zero duration is provided the test command will exit after that amount of time. Note that the test itself executes asynchronously and may continue to run even after the test command returns. If no duration duration is provided the default is zero. In all cases, errors returned from the test during the duration (or at any time, if the duration is zero) cause the command to exit with a non-zero exit code. Information about the failure will be present in the syslog of the target device.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "device_label",
+      "description": "block device partition label the test is going to be run on.",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "seed",
+      "description": "seed to use for any random operations.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

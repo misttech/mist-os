@@ -1,0 +1,21 @@
+{
+  "name": "clear-preferred-ssh-address",
+  "description": "Clears a previously configured SSH address",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Clears a preferred SSH address that was set using the\nset-preferred-ssh-address command on the default target. Executing this command\nsevers any existing connection to the target and establishes a new connection.\nThe newly selected address is chosen using the standard address selection\nlogic."
+  ],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

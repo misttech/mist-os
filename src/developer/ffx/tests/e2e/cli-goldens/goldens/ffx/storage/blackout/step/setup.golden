@@ -1,0 +1,44 @@
+{
+  "name": "setup",
+  "description": "Run the setup step",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "device-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--device-path",
+      "short": null,
+      "description": "optional block device path to run the test on. If no path is given the test will find an appropriate device.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "device_label",
+      "description": "block device partition label the test is going to be run on. Setup will likely create this partition in fvm.",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "seed",
+      "description": "seed to use for any random operations.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

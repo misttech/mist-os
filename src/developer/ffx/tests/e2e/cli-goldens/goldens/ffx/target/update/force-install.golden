@@ -1,0 +1,42 @@
+{
+  "name": "force-install",
+  "description": "Trigger the system updater manually",
+  "examples": [
+    "With a known update package URL, trigger an update:\n\n    $ ffx target update force-install fuchsia-pkg://fuchsia.com/update\n\nAlso trigger a reboot after update:\n\n    $ ffx target update force-install\n    fuchsia-pkg://fuchsia.com/update\n    --reboot"
+  ],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "reboot"
+        }
+      },
+      "optionality": "optional",
+      "long": "--reboot",
+      "short": null,
+      "description": "automatically trigger a reboot into the new system",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Directly invoke the system updater to install the provided update,\nbypassing any update checks.\n\nInterfaces using the 'fuchsia.update.installer' protocol to update the\nsystem. Requires an <update_pkg_url> in the following format:\n\n`fuchsia-pkg://fuchsia.com/update`\n\nTakes an optional `--reboot <true|false>` to trigger a system reboot\nafter update has been successfully applied."
+  ],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "update_pkg_url",
+      "description": "the url of the update package describing the update to install",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

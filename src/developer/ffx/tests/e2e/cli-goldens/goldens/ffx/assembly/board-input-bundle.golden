@@ -1,0 +1,79 @@
+{
+  "name": "board-input-bundle",
+  "description": "Arguments for creating a Board Input Bundle for use by Assembly.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "outdir"
+        }
+      },
+      "optionality": "required",
+      "long": "--outdir",
+      "short": null,
+      "description": "the directory to write the board input bundle to.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "depfile"
+        }
+      },
+      "optionality": "optional",
+      "long": "--depfile",
+      "short": null,
+      "description": "the path to write a depfile to, which contains all the files read in the process of creating the bundle.  The output file listed in the depfile is '$outdir/board_input_bundle.json'.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "drivers"
+        }
+      },
+      "optionality": "optional",
+      "long": "--drivers",
+      "short": null,
+      "description": "the path to the file that describes all the drivers to add to the bundle. The format of this file is a json list of dictionaries that specify the following fields: 1) 'package': The path to the package manifest 2) 'set': The package set that it belongs to (\"bootfs\" or \"base\") 3) 'components': A list of the driver components in this pacakge.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "base-packages"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--base-packages",
+      "short": null,
+      "description": "the paths to package manifests for all packages to add to the base package set.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "bootfs-packages"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--bootfs-packages",
+      "short": null,
+      "description": "the paths to package manifests for all packages to add to the bootfs package set.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

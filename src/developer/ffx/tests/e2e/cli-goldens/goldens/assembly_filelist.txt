@@ -1,0 +1,8 @@
+ffx/assembly.golden
+ffx/assembly/board-input-bundle.golden
+ffx/assembly/create-system.golden
+ffx/assembly/create-update.golden
+ffx/assembly/product.golden
+ffx/assembly/size-check.golden
+ffx/assembly/size-check/package.golden
+ffx/assembly/size-check/product.golden

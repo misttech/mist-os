@@ -1,0 +1,30 @@
+{
+  "name": "set-preferred-ssh-address",
+  "description": "Sets the preferred SSH address",
+  "examples": [
+    "To set a preferred IPv4 SSH address:\n\n    $ ffx target set-preferred-ssh-address 127.0.0.1\n\nOr to set a preferred IPv6 SSH address:\n\n    $ ffx target set-preferred-ssh-addres fe80::32fd:38ff:fea8:a00a%qemu\n\nIf provided, the scope may either correspond to the numerical ID or the\ninterface name."
+  ],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Manually set the preferred SSH address on the default target. If\nsuccessful, then any existing connection to the target is severed and a new\nconnection is established. The specified address is not persisted across daemon\nversion changes or restarts."
+  ],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "addr",
+      "description": "the SSH IP address to use. This must correspond to a known address on the target.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

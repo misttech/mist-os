@@ -1,0 +1,62 @@
+{
+  "name": "show",
+  "description": "Prints the inspect hierarchies that match the given selectors.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "manifest"
+        }
+      },
+      "optionality": "optional",
+      "long": "--manifest",
+      "short": null,
+      "description": "the name of the manifest file that we are interested in. If this is provided, the output will only contain monikers for components whose url contains the provided name.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "file"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--file",
+      "short": null,
+      "description": "the filenames we are interested in. If any are provided, the output will only contain data from components which expose Inspect under the given file under their out/diagnostics directory. Supports shell globs expansions.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "accessor"
+        }
+      },
+      "optionality": "optional",
+      "long": "--accessor",
+      "short": null,
+      "description": "A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. The selector will be in the form of: <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName Typically this is the output of `iquery list-accessors`. For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor` means that the command will connect to the `FeedbackArchiveAccecssor` exposed by `bootstrap/archivist`.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "selectors",
+      "description": "selectors for which the selectors should be queried. If no selectors are provided, inspect data for the whole system will be returned. If `--manifest` is provided then the selectors should be tree selectors, otherwise component selectors or full selectors.",
+      "optionality": "repeating",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

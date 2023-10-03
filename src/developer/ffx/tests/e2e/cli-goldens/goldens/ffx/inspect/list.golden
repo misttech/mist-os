@@ -1,0 +1,51 @@
+{
+  "name": "list",
+  "description": "Lists all components (relative to the scope where the archivist receives events from) of components that expose inspect.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "manifest"
+        }
+      },
+      "optionality": "optional",
+      "long": "--manifest",
+      "short": null,
+      "description": "the name of the manifest file that we are interested in. If this is provided, the output will only contain monikers for components whose url contains the provided name.",
+      "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--with-url",
+      "short": null,
+      "description": "also print the URL of the component.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "accessor"
+        }
+      },
+      "optionality": "optional",
+      "long": "--accessor",
+      "short": null,
+      "description": "A selector specifying what `fuchsia.diagnostics.ArchiveAccessor` to connect to. The selector will be in the form of: <moniker>:<directory>:fuchsia.diagnostics.ArchiveAccessorName Typically this is the output of `iquery list-accessors`. For example: `bootstrap/archivist:expose:fuchsia.diagnostics.FeedbackArchiveAccessor` means that the command will connect to the `FeedbackArchiveAccecssor` exposed by `bootstrap/archivist`.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

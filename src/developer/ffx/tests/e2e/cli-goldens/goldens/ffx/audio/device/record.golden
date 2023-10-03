@@ -1,0 +1,43 @@
+{
+  "name": "record",
+  "description": "Capture audio data directly from ring buffer.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "duration"
+        }
+      },
+      "optionality": "optional",
+      "long": "--duration",
+      "short": null,
+      "description": "duration of output signal. Examples: 5ms or 3s. If not specified, press ENTER to stop recording.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "format"
+        }
+      },
+      "optionality": "required",
+      "long": "--format",
+      "short": null,
+      "description": "output format (see 'ffx audio help' for more information).",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

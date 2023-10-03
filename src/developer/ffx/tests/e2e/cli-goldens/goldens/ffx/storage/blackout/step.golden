@@ -1,0 +1,19 @@
+{
+  "name": "step",
+  "description": "Execute a specific test step. This assumes that a blackout target component is already running, named blackout-target, in core/ffx-laboratory, and that it serves the fuchsia.blackout.test.Controller protocol.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

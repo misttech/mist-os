@@ -1,0 +1,42 @@
+{
+  "name": "get-ssh-address",
+  "description": "Get the target's ssh address",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "timeout"
+        }
+      },
+      "optionality": "optional",
+      "long": "--timeout",
+      "short": "t",
+      "description": "the timeout in seconds [default = 1.0]",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Return the SSH address of the default target defined in the\n`target.default` key. By default this comes from the 'User Configuration'.\n\nThe command takes a <timeout> value in seconds with a default of `1.0`\nand overrides the value in the `target.interaction.timeout` key."
+  ],
+  "commands": [],
+  "positionals": [],
+  "error_codes": [
+    {
+      "code": 1,
+      "description": "Timeout while getting ssh address"
+    },
+    {
+      "code": 2,
+      "description": "Unable to get ssh address from target"
+    }
+  ]
+}

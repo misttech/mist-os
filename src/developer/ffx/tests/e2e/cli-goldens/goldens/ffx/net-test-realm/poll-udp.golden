@@ -1,0 +1,44 @@
+{
+  "name": "poll-udp",
+  "description": "Polls the specified socket address with UDP datagrams containing the specified payload. Waits for a single reply from the target address and prints it to stdout.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "target",
+      "description": "the socket to which to send datagrams",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "payload",
+      "description": "the datagram to send",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "timeout",
+      "description": "the timeout in nanos to wait for a reply, per retry.",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "num_retries",
+      "description": "the number of attempts to make",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

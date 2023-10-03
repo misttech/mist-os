@@ -1,0 +1,3 @@
+ffx/log.golden
+ffx/log/dump.golden
+ffx/log/watch.golden

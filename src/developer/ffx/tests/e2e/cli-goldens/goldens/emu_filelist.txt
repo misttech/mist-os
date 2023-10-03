@@ -1,0 +1,6 @@
+ffx/emu.golden
+ffx/emu/console.golden
+ffx/emu/list.golden
+ffx/emu/show.golden
+ffx/emu/start.golden
+ffx/emu/stop.golden

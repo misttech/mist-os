@@ -1,0 +1,32 @@
+{
+  "name": "join-multicast-group",
+  "description": "Joins a multicast group.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [
+    {
+      "name": "address",
+      "description": "the group address to join.",
+      "optionality": "required",
+      "hidden": false
+    },
+    {
+      "name": "interface_id",
+      "description": "the ID of the interface that should be used to join the group.",
+      "optionality": "required",
+      "hidden": false
+    }
+  ],
+  "error_codes": []
+}

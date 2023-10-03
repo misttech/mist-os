@@ -1,0 +1,16 @@
+ffx/net-test-realm.golden
+ffx/net-test-realm/add-interface.golden
+ffx/net-test-realm/dhcp-client.golden
+ffx/net-test-realm/dhcp-client/start.golden
+ffx/net-test-realm/dhcp-client/stop.golden
+ffx/net-test-realm/dhcpv6-client.golden
+ffx/net-test-realm/dhcpv6-client/start.golden
+ffx/net-test-realm/dhcpv6-client/stop.golden
+ffx/net-test-realm/join-multicast-group.golden
+ffx/net-test-realm/leave-multicast-group.golden
+ffx/net-test-realm/ping.golden
+ffx/net-test-realm/poll-udp.golden
+ffx/net-test-realm/start-hermetic-network-realm.golden
+ffx/net-test-realm/start-stub.golden
+ffx/net-test-realm/stop-hermetic-network-realm.golden
+ffx/net-test-realm/stop-stub.golden

@@ -1,0 +1,6 @@
+ffx/process.golden
+ffx/process/filter.golden
+ffx/process/generate-fuchsia-map.golden
+ffx/process/kill.golden
+ffx/process/list.golden
+ffx/process/stack_trace.golden

@@ -1,0 +1,3 @@
+ffx/test.golden
+ffx/test/list-cases.golden
+ffx/test/run.golden

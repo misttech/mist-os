@@ -1,0 +1,67 @@
+{
+  "name": "register",
+  "description": "Make the target aware of a specific repository",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "repository"
+        }
+      },
+      "optionality": "optional",
+      "long": "--repository",
+      "short": "r",
+      "description": "register this repository, rather than the default.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "storage-type"
+        }
+      },
+      "optionality": "optional",
+      "long": "--storage-type",
+      "short": null,
+      "description": "enable persisting this repository across reboots.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "alias"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--alias",
+      "short": null,
+      "description": "set up a rewrite rule mapping each `alias` host to to the repository identified by `name`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "alias-conflict-mode"
+        }
+      },
+      "optionality": "optional",
+      "long": "--alias-conflict-mode",
+      "short": null,
+      "description": "resolution mechanism when alias registrations conflict. Must be either `error-out` or `replace`. Default is `replace`.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

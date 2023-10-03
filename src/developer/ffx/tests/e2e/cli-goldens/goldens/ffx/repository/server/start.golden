@@ -1,0 +1,31 @@
+{
+  "name": "start",
+  "description": "Starts the repository server. Note that all repositories listed from `ffx repository list` will be started as subpaths.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "address"
+        }
+      },
+      "optionality": "optional",
+      "long": "--address",
+      "short": null,
+      "description": "address on which to start the repository. Note that this can be either IPV4 or IPV6. For example, [::]:8083 or 127.0.0.1:8083",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

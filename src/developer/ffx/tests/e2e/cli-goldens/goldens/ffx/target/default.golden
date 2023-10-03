@@ -1,0 +1,23 @@
+{
+  "name": "default",
+  "description": "Manage the default target",
+  "examples": [
+    "For one-off overrides for the default use `--target` option:\n\n    $ ffx --target <target name> <subcommand>\n\nOr use the `--config` option:\n\n    $ ffx --config target.default=<target name> <subcommand>"
+  ],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [
+    "Manages the default configured target for all operations. The default\ntarget is designated by a `*` next to the name. This is an alias for the\n`target.default` configuration key."
+  ],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

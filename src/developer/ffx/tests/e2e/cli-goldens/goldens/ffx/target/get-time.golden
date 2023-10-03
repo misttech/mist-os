@@ -1,0 +1,21 @@
+{
+  "name": "get-time",
+  "description": "Gets the monotonic time on the target device",
+  "examples": [
+    "To get the target time:\n\n    $ ffx target get-time\n"
+  ],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

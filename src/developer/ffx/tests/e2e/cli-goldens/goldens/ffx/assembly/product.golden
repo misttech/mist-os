@@ -1,0 +1,127 @@
+{
+  "name": "product",
+  "description": "Arguments for performing a high-level product assembly operation.",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "product"
+        }
+      },
+      "optionality": "required",
+      "long": "--product",
+      "short": null,
+      "description": "the configuration file that describes the product assembly to perform.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "board-info"
+        }
+      },
+      "optionality": "required",
+      "long": "--board-info",
+      "short": null,
+      "description": "the file containing information about the board that the product is being assembled to run on.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "outdir"
+        }
+      },
+      "optionality": "required",
+      "long": "--outdir",
+      "short": null,
+      "description": "the directory to write assembled outputs to.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "gendir"
+        }
+      },
+      "optionality": "optional",
+      "long": "--gendir",
+      "short": null,
+      "description": "the directory to write generated intermediate files to.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "input-bundles-dir"
+        }
+      },
+      "optionality": "required",
+      "long": "--input-bundles-dir",
+      "short": null,
+      "description": "the directory in which to find the platform assembly input bundles",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "legacy-bundle"
+        }
+      },
+      "optionality": "required",
+      "long": "--legacy-bundle",
+      "short": null,
+      "description": "the path to the legacy assembly input bundle directory",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "additional-packages-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--additional-packages-path",
+      "short": null,
+      "description": "a file containing a ProductPackageConfig with additional packages to include which are not in the assembly input bundle",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "package-validation"
+        }
+      },
+      "optionality": "optional",
+      "long": "--package-validation",
+      "short": null,
+      "description": "disable validation of the assembly's packages",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "mode"
+        }
+      },
+      "optionality": "optional",
+      "long": "--mode",
+      "short": null,
+      "description": "mode indicating where to place packages.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}

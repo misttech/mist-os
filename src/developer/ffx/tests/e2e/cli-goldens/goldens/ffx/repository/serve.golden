@@ -1,0 +1,103 @@
+{
+  "name": "serve",
+  "description": "(EXPERIMENTAL) serve the repository server, registering repositories to device",
+  "examples": [],
+  "flags": [
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--help",
+      "short": null,
+      "description": "display usage information",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "repository"
+        }
+      },
+      "optionality": "optional",
+      "long": "--repository",
+      "short": "r",
+      "description": "register this repository. Default is `devhost`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "address"
+        }
+      },
+      "optionality": "optional",
+      "long": "--address",
+      "short": null,
+      "description": "address on which to serve the repository. Note that this can be either IPV4 or IPV6. For example, [::]:8083 or 127.0.0.1:8083 Default is `[::]:8083`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "repo-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--repo-path",
+      "short": null,
+      "description": "location of pm-built repo. Default is \"FUCHSIA_BUILD_DIR/amber-files\"",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "alias"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--alias",
+      "short": null,
+      "description": "set up a rewrite rule mapping each `alias` host to the repository identified by `name`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "storage-type"
+        }
+      },
+      "optionality": "optional",
+      "long": "--storage-type",
+      "short": null,
+      "description": "enable persisting this repository across reboots. Default is `Ephemeral`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "alias-conflict-mode"
+        }
+      },
+      "optionality": "optional",
+      "long": "--alias-conflict-mode",
+      "short": null,
+      "description": "resolution mechanism when alias registrations conflict. Must be either `error-out` or `replace`. Default is `replace`.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "port-path"
+        }
+      },
+      "optionality": "optional",
+      "long": "--port-path",
+      "short": null,
+      "description": "location to write server port information to, in case port dynamically instantiated.",
+      "hidden": false
+    }
+  ],
+  "notes": [],
+  "commands": [],
+  "positionals": [],
+  "error_codes": []
+}
