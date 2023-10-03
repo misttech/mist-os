@@ -26,7 +26,7 @@ impl MmioResource {
         mut stream: fkernel::MmioResourceRequestStream,
     ) -> Result<(), Error> {
         if self.resource.info()?.kind != zx::sys::ZX_RSRC_KIND_MMIO {
-            return Err(format_err!("invalid handle kind, expected IRQ"));
+            return Err(format_err!("invalid handle kind, expected MMIO"));
         }
         while let Some(fkernel::MmioResourceRequest::Get { responder }) = stream.try_next().await? {
             responder.send(self.resource.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;
