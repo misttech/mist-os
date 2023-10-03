@@ -2015,7 +2015,8 @@ pub fn poll(
     waiter.wait(current_task, mask, deadline)?;
 
     let mut ready_items = waiter.ready_items.lock();
-    let ready_items_count = ready_items.len();
+    let mut unique_ready_items =
+        bit_vec::BitVec::from_elem(usize::try_from(num_fds).unwrap(), false);
     for ReadyItem { key: ready_key, events: ready_events } in ready_items.drain(..) {
         let ready_key = assert_matches::assert_matches!(
             ready_key,
@@ -2027,13 +2028,14 @@ pub fn poll(
             | FdEvents::POLLNVAL;
         let return_events = (interested_events & ready_events).bits();
         pollfds[ready_key].revents = return_events as i16;
+        unique_ready_items.set(ready_key, true);
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {
         current_task.write_object(user_pollfds.at(index), poll_descriptor)?;
     }
 
-    Ok(ready_items_count)
+    Ok(unique_ready_items.into_iter().filter(Clone::clone).count())
 }
 
 pub fn sys_ppoll(

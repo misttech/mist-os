@@ -7,7 +7,7 @@ use starnix_sync::{EventWaitGuard, InterruptibleEvent};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Weak,
     },
 };
@@ -202,12 +202,6 @@ impl WaitCallback {
     }
 }
 
-#[derive(Debug)]
-struct UserEvent {
-    key: WaitKey,
-    events: WaitEvents,
-}
-
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail and
 /// a Waiter should have a single owner. So the Arc is hidden inside Waiter.
@@ -223,11 +217,9 @@ struct PortWaiter {
     ///
     /// This lock is nested inside the WaitQueue.waiters lock.
     wait_queues: Mutex<HashMap<WaitKey, Weak<WaitQueueImpl>>>,
-    /// A queue of events triggered within starnix.
-    ///
-    /// Events triggered by the Fuchsia platform (e.g. network sockets, filesystem)
-    /// are only made available through non-user packets on the port.
-    user_events: Mutex<Vec<UserEvent>>,
+    /// Indicates whether a user packet is sitting in the `zx::Port` to wake up
+    /// waiter after handling user events.
+    has_pending_user_packet: AtomicBool,
 }
 
 impl PortWaiter {
@@ -240,7 +232,7 @@ impl PortWaiter {
             next_key: AtomicU64::new(1),
             ignore_signals,
             wait_queues: Default::default(),
-            user_events: Default::default(),
+            has_pending_user_packet: Default::default(),
         })
     }
 
@@ -271,35 +263,26 @@ impl PortWaiter {
                         }
                         zx::PacketContents::User(_) => {
                             // User packet w/ OK status is only used to wake up
-                            // the waiter and have it process enqueued user events.
+                            // the waiter after handling starnix-internal events.
+                            //
+                            // Note that we can be woken up even when we will
+                            // not handle any user events. This is because right
+                            // after we set `has_pending_user_packet` to `false`,
+                            // another thread can immediately queue a new user
+                            // event and set `has_pending_user_packet` to `true`.
+                            // However, that event will be handled by us (by the
+                            // caller when this method returns) as if the event
+                            // was enqueued before we received this user packet.
+                            // Once the caller handles all the current user events,
+                            // we end up with no remaining user events but a user
+                            // packet sitting in the `zx::Port`.
 
-                            // `take` the queue of user events so that we do not
-                            // contend with threads trying to add to the queue
-                            // while handling what is currently available.
-                            let user_events = std::mem::take(&mut *self.user_events.lock());
-                            assert!(!user_events.is_empty(), "OK user packet should only be enqueued when there is a pending user event");
-
-                            for UserEvent { key, events } in user_events {
-                                let Some(callback) = self.remove_callback(&key) else {
-                                    continue;
-                                };
-
-                                match callback {
-                                    WaitCallback::EventHandler(handler) => {
-                                        let events = match events {
-                                            // If the event is All, signal on all possible fd
-                                            // events.
-                                            WaitEvents::All => FdEvents::all(),
-                                            WaitEvents::Fd(events) => events,
-                                            _ => panic!("wrong type of handler called: {events:?}"),
-                                        };
-                                        handler.handle(events)
-                                    }
-                                    WaitCallback::SignalHandler(_) => {
-                                        panic!("wrong type of handler called")
-                                    }
-                                }
-                            }
+                            // We perform the `swap` with `Ordering::Acquire` so
+                            // that we synchronize ourselves with objects that
+                            // have an event ready that was enqueued with
+                            // `self.queue_events` which performs a `swap` with
+                            // `Ordering::Release` on `has_pending_user_packet`.
+                            assert!(self.has_pending_user_packet.swap(false, Ordering::Acquire));
                         }
                         _ => return error!(EBADMSG),
                     }
@@ -407,28 +390,50 @@ impl PortWaiter {
     }
 
     fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
-        let key = key.clone();
+        scopeguard::defer! {
+            // Perform the `swap` with `Ordering::Release` so that all memory
+            // writes before this point (the state of objects that are ready)
+            // are observed by the waiter when it is woken up by the received
+            // user packet.
+            //
+            // Note that we can't rely on the port write syscall since it is
+            // not performed all the time and we can't rely on the `EventHandler`
+            // either since we may not actually perform work for the event in
+            // some cases (e.g. with the `None` or `EnqueueOnce` variants).
+            if !self.has_pending_user_packet.swap(true, Ordering::Release) {
+                self.queue_user_packet_data(zx::sys::ZX_OK)
+            }
+        }
 
-        // Putting these events into their own queue breaks any ordering
-        // expectations on Linux by batching all starnix events with the first
-        // starnix event even if other events occur on the Fuchsia platform (and
-        // are enqueued to the `zx::Port`) between them. This ordering does not
-        // seem to be load-bearing for applications running on starnix so we
-        // take the divergence in ordering in favour of improved performance (by
-        // minimizing syscalls) when operating on FDs backed by starnix.
+        // Handling user events immediately when they are triggered breaks any
+        // ordering expectations on Linux by batching all starnix events with
+        // the first starnix event even if other events occur on the Fuchsia
+        // platform (and are enqueued to the `zx::Port`) between them. This
+        // ordering does not seem to be load-bearing for applications running on
+        // starnix so we take the divergence in ordering in favour of improved
+        // performance (by minimizing syscalls) when operating on FDs backed by
+        // starnix.
         //
         // TODO(https://fxbug.dev/134622): If we can read a batch of packets
         // from the `zx::Port`, maybe we can keep the ordering?
-        let enqueue_packet = {
-            let mut user_events = self.user_events.lock();
-            let was_empty = user_events.is_empty();
-            user_events.push(UserEvent { key, events });
-            // Only enqueue a user packet on the first enqueued user event.
-            was_empty
+        let Some(callback) = self.remove_callback(key) else {
+            return;
         };
 
-        if enqueue_packet {
-            self.queue_user_packet_data(zx::sys::ZX_OK)
+        match callback {
+            WaitCallback::EventHandler(handler) => {
+                let events = match events {
+                    // If the event is All, signal on all possible fd
+                    // events.
+                    WaitEvents::All => FdEvents::all(),
+                    WaitEvents::Fd(events) => events,
+                    _ => panic!("wrong type of handler called: {events:?}"),
+                };
+                handler.handle(events)
+            }
+            WaitCallback::SignalHandler(_) => {
+                panic!("wrong type of handler called")
+            }
         }
     }
 
@@ -456,6 +461,8 @@ impl std::fmt::Debug for PortWaiter {
 /// A type that can put a thread to sleep waiting for a condition.
 #[derive(Debug)]
 pub struct Waiter {
+    // TODO(https://g-issues.fuchsia.dev/issues/303068424): Avoid `PortWaiter`
+    // when operating purely over FDs backed by starnix.
     inner: Arc<PortWaiter>,
 }
 

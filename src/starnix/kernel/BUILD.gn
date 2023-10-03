@@ -129,6 +129,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:bit-vec",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:derivative",
