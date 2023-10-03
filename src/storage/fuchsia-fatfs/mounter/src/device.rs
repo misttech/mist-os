@@ -209,7 +209,7 @@ pub mod test {
             let server_end: ServerEnd<BlockMarker> =
                 ServerEnd::new(fidl::Channel::from(self.channel));
             let mut stream = server_end.into_stream().unwrap();
-            while let Ok(Some(_)) = stream.try_next().await {
+            if let Ok(Some(_)) = stream.try_next().await {
                 panic!("Did not expect to get any requests!");
             }
             // We expect Err(), because the client speaks the wrong protocol. The connection will

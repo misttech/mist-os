@@ -71,7 +71,7 @@ mod tests {
         }
 
         pub async fn handle_engine_stream(mut self, mut stream: EngineRequestStream) -> Self {
-            while let Some(request) = stream.try_next().await.unwrap() {
+            if let Some(request) = stream.try_next().await.unwrap() {
                 match request {
                     EngineRequest::StartEditTransaction { transaction, .. } => {
                         self.handle_edit_transaction_stream(transaction.into_stream().unwrap())

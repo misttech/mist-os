@@ -140,7 +140,7 @@ mod tests {
     }
 
     async fn wait_for_port_binds(proxy: &ffx::MdnsProxy) -> u16 {
-        while let Some(e) = proxy.get_next_event().await.unwrap() {
+        if let Some(e) = proxy.get_next_event().await.unwrap() {
             match *e {
                 ffx::MdnsEventType::SocketBound(ffx::MdnsBindEvent { port, .. }) => {
                     let p = port.unwrap();
