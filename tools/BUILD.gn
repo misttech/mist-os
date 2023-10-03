@@ -37,7 +37,6 @@ group("tools") {
     "//tools/rfc:install($host_toolchain)",
     "//tools/sdk-tools:tools($host_toolchain)",
     "//tools/shush:install($host_toolchain)",
-    "//tools/staticanalysis:tools($host_toolchain)",
     "//tools/symbolizer($host_toolchain)",
     "//tools/test_list_tool:install($host_toolchain)",
     "//tools/testgen:host($host_toolchain)",

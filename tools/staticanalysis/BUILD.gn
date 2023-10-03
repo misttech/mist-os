@@ -25,11 +25,6 @@ group("tests") {
   deps = [
     ":staticanalysis_tests($host_toolchain)",
     "clippy-reporter:tests",
-    "cmd/staticlints:tests",
     "rfcmeta:tests",
   ]
-}
-
-group("tools") {
-  deps = [ "cmd/staticlints($host_toolchain)" ]
 }
