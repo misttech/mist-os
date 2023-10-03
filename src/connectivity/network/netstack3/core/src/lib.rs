@@ -64,7 +64,7 @@ use crate::{
     },
     device::{
         ethernet::EthernetLinkDevice, DeviceId, DeviceLayerState, DeviceLayerTimerId,
-        DeviceLayerTypes, WeakDeviceId,
+        DeviceLayerTypes,
     },
     ip::{
         device::{
@@ -532,52 +532,39 @@ pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
     )
 }
 
+/// Gets the routing metric for the device.
+pub fn get_routing_metric<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    device: &DeviceId<NonSyncCtx>,
+) -> ip::types::RawMetric {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    device::get_routing_metric(&mut sync_ctx, device)
+}
+
 /// Set the routes in the routing table.
 ///
 /// While doing a full `set` of the routing table with each modification is
 /// suboptimal for performance, it simplifies the API exposed by core for route
 /// table modifications to allow for evolution of the routing table in the
 /// future.
-///
-/// Rather than passing a list of routing table Entries, callers pass a closure
-/// that produces such a list, given a closure that allows upgrading a
-/// `AddableEntry` holding a `WeakDeviceId` to an `Entry` holding a strong
-/// `DeviceId`.
-// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
-// hold strong DeviceIds instead and get rid of this complicated closure.
-pub fn set_routes<I: Ip, T, NonSyncCtx: NonSyncContext>(
+pub fn set_routes<I: Ip, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    entries: &mut dyn FnMut(
-        ip::types::EntryUpgrader<'_, I::Addr, DeviceId<NonSyncCtx>, WeakDeviceId<NonSyncCtx>>,
-    ) -> (
-        Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
-        T,
-    ),
-) -> T {
+    entries: Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
+) {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
-    struct Wrap<'a, I: Ip, NonSyncCtx: NonSyncContext, T>(
-        &'a mut dyn FnMut(
-            ip::types::EntryUpgrader<'_, I::Addr, DeviceId<NonSyncCtx>, WeakDeviceId<NonSyncCtx>>,
-        ) -> (
-            Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
-            T,
-        ),
+    struct Wrap<I: Ip, NonSyncCtx: NonSyncContext>(
+        Vec<ip::types::EntryAndGeneration<I::Addr, DeviceId<NonSyncCtx>>>,
     );
 
-    let IpInvariant(t) = I::map_ip(
-        (IpInvariant((sync_ctx, ctx)), Wrap(entries)),
-        |(IpInvariant((sync_ctx, ctx)), Wrap(entries))| {
-            let mut sync_ctx = Locked::new(sync_ctx);
-            IpInvariant(ip::forwarding::set_routes::<Ipv4, _, _, _>(&mut sync_ctx, ctx, entries))
-        },
-        |(IpInvariant((sync_ctx, ctx)), Wrap(entries))| {
-            let mut sync_ctx = Locked::new(sync_ctx);
-            IpInvariant(ip::forwarding::set_routes::<Ipv6, _, _, _>(&mut sync_ctx, ctx, entries))
-        },
-    );
-    t
+    let () = net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), Wrap(entries)), |(
+        IpInvariant((sync_ctx, ctx)),
+        Wrap(entries),
+    )| {
+        let mut sync_ctx = Locked::new(sync_ctx);
+        ip::forwarding::set_routes::<I, _, _>(&mut sync_ctx, ctx, entries)
+    },);
 }
 
 /// Requests that a route be added to the forwarding table.

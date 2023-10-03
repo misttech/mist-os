@@ -1281,13 +1281,6 @@ impl<I: Ip> From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>
             IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
                 IpLayerEvent::RemoveRoutes { subnet, device: device.downgrade(), gateway }
             }
-            IpLayerEvent::DeviceRemoved(device_id, removed) => IpLayerEvent::DeviceRemoved(
-                device_id.downgrade(),
-                removed
-                    .into_iter()
-                    .map(|entry| entry.map_device_id(|d| d.downgrade()))
-                    .collect::<Vec<_>>(),
-            ),
         }
     }
 }
@@ -1381,6 +1374,36 @@ pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
         >(&mut sync_ctx, ctx, subnet),
     }
     .map_err(From::from)
+}
+
+pub(crate) fn del_device_routes<NonSyncCtx: crate::NonSyncContext>(
+    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
+) {
+    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
+    crate::ip::forwarding::testutil::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, device);
+    crate::ip::forwarding::testutil::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, device);
+}
+
+/// Removes all of the routes through the device, then removes the device.
+pub fn clear_routes_and_remove_ethernet_device<NonSyncCtx: crate::NonSyncContext>(
+    sync_ctx: &crate::SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    ethernet_device: crate::device::EthernetDeviceId<NonSyncCtx>,
+) {
+    let device_id = crate::device::DeviceId::Ethernet(ethernet_device);
+    del_device_routes(sync_ctx, ctx, &device_id);
+    let ethernet_device = match device_id {
+        crate::device::DeviceId::Ethernet(ethernet_device) => ethernet_device,
+        crate::device::DeviceId::Loopback(_) => unreachable!(),
+    };
+    match crate::device::remove_ethernet_device(sync_ctx, ctx, ethernet_device) {
+        crate::device::RemoveDeviceResult::Removed(_external_state) => {}
+        crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
+            panic!("failed to remove ethernet device")
+        }
+    }
 }
 
 #[cfg(test)]

@@ -710,13 +710,23 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
         let weak_id = core_id.downgrade();
         match core_id {
             DeviceId::Ethernet(core_id) => {
+                // We want to remove the routes on the device _after_ we mark
+                // the device for deletion (by calling `remove_..._device`) so
+                // that we don't race with any new routes being added through
+                // that device.
                 let result =
                     netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, core_id);
+                non_sync_ctx.remove_routes_on_device(&weak_id).await;
                 wait_for_device_removal(id, result, weak_id).await
             }
             DeviceId::Loopback(core_id) => {
+                // We want to remove the routes on the device _after_ we mark
+                // the device for deletion (by calling `remove_..._device`) so
+                // that we don't race with any new routes being added through
+                // that device.
                 let result =
                     netstack3_core::device::remove_loopback_device(sync_ctx, non_sync_ctx, core_id);
+                non_sync_ctx.remove_routes_on_device(&weak_id).await;
                 let devices::LoopbackInfo {
                     static_common_info: _,
                     dynamic_common_info: _,
@@ -753,14 +763,16 @@ async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool
         let core_id =
             ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
-            i.addresses.get_mut(&specified_addr)
-            .map(|devices::AddressInfo {
-                    address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
-                    assignment_state_sender: _,
-                }| (worker.clone(), cancelation_sender.take()),
+            i.addresses.get_mut(&specified_addr).map(
+                |devices::AddressInfo {
+                     address_state_provider: devices::FidlWorkerInfo { worker, cancelation_sender },
+                     assignment_state_sender: _,
+                 }| (worker.clone(), cancelation_sender.take()),
             )
         })
-    }) else { return false };
+    }) else {
+        return false;
+    };
     let did_cancel_worker = match cancelation_sender {
         Some(cancelation_sender) => {
             cancelation_sender

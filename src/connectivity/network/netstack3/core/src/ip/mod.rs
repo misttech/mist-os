@@ -618,10 +618,6 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceStateContext<I, C>
 }
 
 /// Events observed at the IP layer.
-// TODO(https://fxbug.dev/132990): Once we can await device removal, we can
-// remove DeviceRemoved from this enum, which will leave NDP as the only user
-// of this event type. At that point, we can move this to NDP rather than leave
-// it at the IP layer.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum IpLayerEvent<DeviceId, I: Ip> {
     /// A route needs to be added.
@@ -635,8 +631,6 @@ pub enum IpLayerEvent<DeviceId, I: Ip> {
         /// Gateway/next-hop
         gateway: Option<SpecifiedAddr<I::Addr>>,
     },
-    /// Core removed a device and uninstalled associated routes.
-    DeviceRemoved(DeviceId, Vec<types::Entry<I::Addr, DeviceId>>),
 }
 
 /// The non-synchronized execution context for the IP layer.

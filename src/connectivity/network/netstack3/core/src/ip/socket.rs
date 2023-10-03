@@ -2348,6 +2348,9 @@ mod tests {
         .unwrap();
 
         let expected = if remove_device {
+            // Clear routes on the device before removing it.
+            crate::testutil::del_device_routes(&sync_ctx, &mut non_sync_ctx, &device_id);
+
             // Don't keep any strong device IDs to the device before removing.
             core::mem::drop(device_id);
             crate::device::remove_ethernet_device(&sync_ctx, &mut non_sync_ctx, eth_device_id)

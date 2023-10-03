@@ -4,7 +4,10 @@
 
 //! Common types for dealing with ip table entries.
 
-use core::fmt::{Debug, Display, Formatter};
+use core::{
+    fmt::{Debug, Display, Formatter},
+    hash::Hash,
+};
 
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
@@ -102,12 +105,17 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
 
     /// Maps the device ID held by this `AddableEntry`.
     pub fn map_device_id<D2>(self, f: impl FnOnce(D) -> D2) -> AddableEntry<A, D2> {
-        AddableEntry {
-            subnet: self.subnet,
-            device: f(self.device),
-            gateway: self.gateway,
-            metric: self.metric,
-        }
+        let Self { subnet, device, gateway, metric } = self;
+        AddableEntry { subnet, device: f(device), gateway, metric }
+    }
+
+    /// Fallibly maps the device ID held by this `AddableEntry`.
+    pub fn try_map_device_id<D2, E>(
+        self,
+        f: impl FnOnce(D) -> Result<D2, E>,
+    ) -> Result<AddableEntry<A, D2>, E> {
+        let Self { subnet, device, gateway, metric } = self;
+        Ok(AddableEntry { subnet, device: f(device)?, gateway, metric })
     }
 
     /// Sets the generation on an entry.
@@ -261,6 +269,11 @@ impl<A: IpAddress, D> Entry<A, D> {
         let Self { subnet, device, gateway, metric } = self;
         Entry { subnet, device: f(device), gateway, metric }
     }
+
+    /// Sets the generation on an entry.
+    pub fn with_generation(self, generation: Generation) -> EntryAndGeneration<A, D> {
+        EntryAndGeneration { entry: self, generation }
+    }
 }
 
 impl<A: IpAddress, D: Debug> Display for Entry<A, D> {
@@ -290,6 +303,61 @@ impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
         #[generic_over_ip(I, Ip)]
         struct EntryHolder<I: Ip, D>(Entry<I::Addr, D>);
         A::Version::map_ip(entry, EntryEither::V4, EntryEither::V6)
+    }
+}
+
+/// `OrderedLocality` provides an implementation of `core::cmp::PartialOrd` for
+/// a route's "locality".
+// Define an enum, so that `OnLink` routes are sorted before `OffLink` routes.
+// See https://doc.rust-lang.org/core/cmp/trait.PartialOrd.html#derivable for
+// more details.
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+pub(crate) enum OrderedLocality {
+    // The route does not have a gateway.
+    OnLink,
+    // The route does have a gateway.
+    OffLink,
+}
+
+// `OrderedRoute` provides an implementation of `core::cmp::PartialOrd`
+// for routes. Note that the fields are consulted in the order they are
+// declared. For more details, see
+// https://doc.rust-lang.org/core/cmp/trait.PartialOrd.html#derivable.
+#[derive(PartialEq, PartialOrd, Eq, Ord)]
+pub(crate) struct OrderedEntry<'a, A: IpAddress, D> {
+    // Order longer prefixes before shorter prefixes.
+    prefix_len: core::cmp::Reverse<u8>,
+    // Order lower metrics before larger metrics.
+    metric: u32,
+    // Order `OnLink` routes before `OffLink` routes.
+    locality: OrderedLocality,
+    // Earlier-added routes should come before later ones.
+    generation: Generation,
+    // To provide a consistent ordering, tiebreak using the remaining fields
+    // of the entry.
+    subnet_addr: A,
+    device: &'a D,
+    // Note that while this appears to duplicate the ordering provided by
+    // `locality`, it's important that we sort above on presence of the gateway
+    // and not on the actual address of the gateway. The latter is only used
+    // for tiebreaking at the end to provide a total order. Duplicating it this
+    // way allows us to avoid writing a manual `PartialOrd` impl.
+    gateway: Option<SpecifiedAddr<A>>,
+}
+
+impl<'a, A: IpAddress, D> From<&'a EntryAndGeneration<A, D>> for OrderedEntry<'a, A, D> {
+    fn from(entry: &'a EntryAndGeneration<A, D>) -> OrderedEntry<'a, A, D> {
+        let EntryAndGeneration { entry: Entry { subnet, device, gateway, metric }, generation } =
+            entry;
+        OrderedEntry {
+            prefix_len: core::cmp::Reverse(subnet.prefix()),
+            metric: metric.value().into(),
+            locality: gateway.map_or(OrderedLocality::OnLink, |_gateway| OrderedLocality::OffLink),
+            generation: *generation,
+            subnet_addr: subnet.network(),
+            device: &device,
+            gateway: *gateway,
+        }
     }
 }
 

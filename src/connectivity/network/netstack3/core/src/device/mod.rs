@@ -441,6 +441,16 @@ where
     }
 }
 
+pub(crate) fn get_routing_metric<NonSyncCtx: NonSyncContext, L>(
+    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+    device_id: &DeviceId<NonSyncCtx>,
+) -> RawMetric {
+    match device_id {
+        DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(sync_ctx, id),
+        DeviceId::Loopback(id) => self::loopback::get_routing_metric(sync_ctx, id),
+    }
+}
+
 impl<
         NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>,
@@ -2197,10 +2207,6 @@ fn remove_device<NonSyncCtx: NonSyncContext, D: RemovableDeviceId<NonSyncCtx>>(
 
         crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, ctx, &device);
         crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
-
-        // Uninstall all routes associated with the device.
-        crate::ip::forwarding::del_device_routes::<Ipv4, _, _>(&mut sync_ctx, ctx, &device);
-        crate::ip::forwarding::del_device_routes::<Ipv6, _, _>(&mut sync_ctx, ctx, &device);
     }
     let (primary, strong) = device.remove(sync_ctx);
     assert!(PrimaryRc::ptr_eq(&primary, &strong));

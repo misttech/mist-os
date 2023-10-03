@@ -45,7 +45,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{FutureExt as _, StreamExt as _};
+use futures::{pin_mut, select, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use tracing::{error, info};
@@ -636,12 +636,6 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
                     gateway,
                 })
             }
-            netstack3_core::ip::IpLayerEvent::DeviceRemoved(device, routes_removed) => {
-                self.routes.fire_change_and_forget(routes::Change::<I::Addr>::DeviceRemoved {
-                    device: device.downgrade(),
-                    routes_removed,
-                });
-            }
         };
     }
 }
@@ -740,6 +734,18 @@ impl BindingsNonSyncCtxImpl {
             routes::ChangeEither::V4(change) => self.apply_route_change::<Ipv4>(change).await,
             routes::ChangeEither::V6(change) => self.apply_route_change::<Ipv6>(change).await,
         }
+    }
+
+    pub(crate) async fn remove_routes_on_device(
+        &self,
+        device: &netstack3_core::device::WeakDeviceId<Self>,
+    ) {
+        self.apply_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(device.clone()))
+            .await
+            .expect("deleting routes on device during removal should succeed");
+        self.apply_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(device.clone()))
+            .await
+            .expect("deleting routes on device during removal should succeed");
     }
 }
 
@@ -1069,6 +1075,9 @@ impl NetstackSeed {
             async move { routes_change_runner.run(ctx).await }
         });
 
+        let routes_change_task_fut = routes_change_task.into_future().fuse();
+        pin_mut!(routes_change_task_fut);
+
         let (loopback_stopper, _, loopback_tasks): (
             futures::channel::oneshot::Sender<_>,
             BindingId,
@@ -1093,23 +1102,26 @@ impl NetstackSeed {
             info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
 
-        let no_finish_tasks = loopback_tasks.into_iter().chain([
-            interfaces_worker_task,
-            timers_task,
-            routes_change_task,
-        ]);
-        let no_finish_tasks = no_finish_tasks.map(NamedTask::into_future);
-        let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(no_finish_tasks);
-        let mut no_finish_tasks_fut = no_finish_tasks
-            .by_ref()
-            .into_future()
-            .map(|(name, _): (_, &mut futures::stream::FuturesUnordered<_>)| -> Never {
-                match name {
-                    Some(name) => panic!("task {name} ended unexpectedly"),
-                    None => panic!("unexpected end of infinite task stream"),
-                }
-            })
-            .fuse();
+        let no_finish_tasks =
+            loopback_tasks.into_iter().chain([interfaces_worker_task, timers_task]);
+        let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
+            no_finish_tasks.map(NamedTask::into_future),
+        );
+
+        let unexpected_early_finish_fut = async {
+            let no_finish_tasks_fut = no_finish_tasks.by_ref().next().fuse();
+            pin_mut!(no_finish_tasks_fut);
+
+            let name = select! {
+                name = no_finish_tasks_fut => name,
+                name = routes_change_task_fut => Some(name),
+            };
+            match name {
+                Some(name) => panic!("task {name} ended unexpectedly"),
+                None => panic!("unexpected end of infinite task stream"),
+            }
+        }
+        .fuse();
 
         let inspect_nodes = {
             let socket_ctx = netstack.ctx.clone();
@@ -1263,9 +1275,16 @@ impl NetstackSeed {
             // Pin services_fut to this block scope so it's dropped after the
             // select.
             futures::pin_mut!(services_fut);
+
+            // Do likewise for unexpected_early_finish_fut.
+            pin_mut!(unexpected_early_finish_fut);
+
             let () = futures::select! {
                 () = services_fut => (),
-                never = no_finish_tasks_fut => match never {}
+                never = unexpected_early_finish_fut => {
+                    let never: Never = never;
+                    match never {}
+                },
             };
         }
 
@@ -1279,11 +1298,13 @@ impl NetstackSeed {
         ctx.non_sync_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
-        // Stop the routes change runner.
-        ctx.non_sync_ctx().routes.close_senders();
 
         // We've signalled all long running tasks, now we can collect them.
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;
+
+        // Stop the routes change runner.
+        ctx.non_sync_ctx().routes.close_senders();
+        let _task_name: &str = routes_change_task_fut.await;
 
         // Drop all inspector data, it holds ctx clones.
         std::mem::drop(inspect_nodes);

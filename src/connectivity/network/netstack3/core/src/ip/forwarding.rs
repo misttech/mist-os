@@ -19,8 +19,7 @@ use crate::{
     device::DeviceLayerTypes,
     ip::{
         types::{
-            AddableEntry, AddableEntryAndGeneration, AddableMetric, Destination, Entry,
-            EntryAndGeneration, EntryUpgrader, Generation, Metric, NextHop, RawMetric,
+            AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
         },
         AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
         IpStateContext,
@@ -91,57 +90,23 @@ fn select_device_for_gateway_using_table<
 /// suboptimal for performance, it simplifies the API exposed by core for route
 /// table modifications to allow for evolution of the routing table in the
 /// future.
-///
-/// Rather than passing a list of routing table Entries, callers pass a closure
-/// that produces such a list, given a closure that allows upgrading a
-/// `AddableEntry` holding a `WeakDeviceId` to an `Entry` holding a strong
-/// `DeviceId`.
-// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
-// hold strong DeviceIds instead and get rid of this complicated closure.
 pub(crate) fn set_routes<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
     SC: IpStateContext<I, C>,
-    T,
 >(
     sync_ctx: &mut SC,
     _ctx: &mut C,
-    entries: impl FnOnce(
-        EntryUpgrader<'_, I::Addr, SC::DeviceId, SC::WeakDeviceId>,
-    ) -> (Vec<EntryAndGeneration<I::Addr, SC::DeviceId>>, T),
-) -> T
-where
+    mut entries: Vec<EntryAndGeneration<I::Addr, SC::DeviceId>>,
+) where
     SC::DeviceId: Ord,
 {
-    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
-        let (mut entries, result) =
-            entries(EntryUpgrader(&mut |AddableEntryAndGeneration {
-                                            entry: AddableEntry { subnet, device, gateway, metric },
-                                            generation,
-                                        }| {
-                let device = match sync_ctx.upgrade_weak_device_id(&device) {
-                    None => {
-                        tracing::warn!(
-                            "tried to set entry {subnet:?} {device:?} {gateway:?} {metric:?} \
-                             for no-longer-existent device"
-                        );
-                        None
-                    }
-                    Some(d) => Some(d),
-                }?;
-                let metric = observe_metric(sync_ctx, &device, metric);
-                Some(EntryAndGeneration {
-                    entry: Entry { subnet, device, gateway, metric },
-                    generation,
-                })
-            }));
-        // Sorting unstably is OK here because there's no meaningful preexisting
-        // order to preserve -- the table is being fully overwritten.
-        entries.sort_unstable_by(|a, b| {
-            OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
-        });
+    // Make sure to sort the entries _before_ taking the routing table lock.
+    entries.sort_unstable_by(|a, b| {
+        OrderedEntry::<'_, _, _>::from(a).cmp(&OrderedEntry::<'_, _, _>::from(b))
+    });
+    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
         table.table = entries;
-        result
     })
 }
 
@@ -154,26 +119,6 @@ pub(crate) fn request_context_add_route<
     entry: AddableEntry<I::Addr, DeviceId>,
 ) {
     ctx.on_event(IpLayerEvent::AddRoute(entry))
-}
-
-/// Delete all routes on a device.
-// TODO(https://fxbug.dev/132990): Once we can await device teardown, we can
-// hold strong DeviceIds instead and get rid of this.
-pub(crate) fn del_device_routes<
-    I: IpLayerIpExt,
-    SC: IpStateContext<I, C>,
-    C: IpLayerNonSyncContext<I, SC::DeviceId>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    del_device: &SC::DeviceId,
-) {
-    debug!("deleting routes on device: {del_device:?}");
-
-    let removed = sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        table.del_entries(|Entry { subnet: _, device, gateway: _, metric: _ }| device == del_device)
-    });
-    ctx.on_event(IpLayerEvent::DeviceRemoved(del_device.clone(), removed));
 }
 
 pub(crate) fn request_context_del_routes<
@@ -191,21 +136,6 @@ pub(crate) fn request_context_del_routes<
         device: del_device,
         gateway: del_gateway,
     })
-}
-
-// Converts the given [`AddableMetric`] into the corresponding [`Metric`],
-// observing the device's metric, if applicable.
-fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
-    sync_ctx: &mut SC,
-    device: &SC::DeviceId,
-    metric: AddableMetric,
-) -> Metric {
-    match metric {
-        AddableMetric::ExplicitMetric(value) => Metric::ExplicitMetric(value),
-        AddableMetric::MetricTracksInterface => {
-            Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
-        }
-    }
 }
 
 /// Visitor for route table state.
@@ -267,64 +197,7 @@ pub struct ForwardingTable<I: Ip, D> {
 
 impl<I: Ip, D> Default for ForwardingTable<I, D> {
     fn default() -> ForwardingTable<I, D> {
-        ForwardingTable { table: Vec::new() }
-    }
-}
-
-// `OrderedLocality` provides an implementation of
-// `core::cmp::PartialOrd` for a routes "locality". Define an enum, so
-// that `OnLink` routes are sorted before `OffLink` routes. See
-// https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable
-// for more details.
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
-enum OrderedLocality {
-    // The route does not have a gateway.
-    OnLink,
-    // The route does have a gateway.
-    OffLink,
-}
-
-// `OrderedRoute` provides an implementation of `std::cmp::PartialOrd`
-// for routes. Note that the fields are consulted in the order they are
-// declared. For more details, see
-// https://doc.rust-lang.org/std/cmp/trait.PartialOrd.html#derivable.
-#[derive(PartialEq, PartialOrd, Eq, Ord)]
-struct OrderedEntry<'a, A: net_types::ip::IpAddress, D> {
-    // Order longer prefixes before shorter prefixes.
-    prefix_len: core::cmp::Reverse<u8>,
-    // Order lower metrics before larger metrics.
-    metric: u32,
-    // Order `OnLink` routes before `OffLink` routes.
-    locality: OrderedLocality,
-    // Earlier-added routes should come before later ones.
-    generation: Generation,
-    // To provide a consistent ordering, tiebreak using the remaining fields
-    // of the entry.
-    subnet_addr: A,
-    device: &'a D,
-    // Note that while this appears to duplicate the ordering provided by
-    // `locality`, it's important that we sort above on presence of the gateway
-    // and not on the actual address of the gateway. The latter is only used
-    // for tiebreaking at the end to provide a total order. Duplicating it this
-    // way allows us to avoid writing a manual `PartialOrd` impl.
-    gateway: Option<SpecifiedAddr<A>>,
-}
-
-impl<'a, A: net_types::ip::IpAddress, D> From<&'a EntryAndGeneration<A, D>>
-    for OrderedEntry<'a, A, D>
-{
-    fn from(entry: &'a EntryAndGeneration<A, D>) -> OrderedEntry<'a, A, D> {
-        let EntryAndGeneration { entry: Entry { subnet, device, gateway, metric }, generation } =
-            entry;
-        OrderedEntry {
-            prefix_len: core::cmp::Reverse(subnet.prefix()),
-            metric: metric.value().into(),
-            locality: gateway.map_or(OrderedLocality::OnLink, |_gateway| OrderedLocality::OffLink),
-            generation: *generation,
-            subnet_addr: subnet.network(),
-            device: &device,
-            gateway: *gateway,
-        }
+        ForwardingTable { table: Vec::default() }
     }
 }
 
@@ -360,14 +233,15 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     // Applies the given predicate to the entries in the forwarding table,
     // removing (and returning) those that yield `true` while retaining those
     // that yield `false`.
+    #[cfg(any(test, feature = "testutils"))]
     fn del_entries<F: Fn(&Entry<I::Addr, D>) -> bool>(
         &mut self,
         predicate: F,
-    ) -> Vec<Entry<I::Addr, D>> {
+    ) -> alloc::vec::Vec<Entry<I::Addr, D>> {
         // TODO(https://github.com/rust-lang/rust/issues/43244): Use
         // drain_filter to avoid extra allocation.
         let Self { table } = self;
-        let owned_table = core::mem::replace(table, Vec::new());
+        let owned_table = core::mem::take(table);
         let (removed, owned_table) =
             owned_table.into_iter().partition(|entry| predicate(&entry.entry));
         *table = owned_table;
@@ -450,11 +324,26 @@ pub(crate) mod testutil {
     use net_types::ip::Subnet;
 
     use crate::ip::{
-        types::{Entry, EntryAndGeneration, Generation},
+        types::{AddableMetric, Entry, EntryAndGeneration, Generation, Metric},
         IpLayerIpExt, IpLayerNonSyncContext, IpStateContext,
     };
 
-    use super::{observe_metric, AddRouteError};
+    use super::*;
+
+    // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
+    // observing the device's metric, if applicable.
+    fn observe_metric<I: Ip, SC: IpForwardingDeviceContext<I>>(
+        sync_ctx: &mut SC,
+        device: &SC::DeviceId,
+        metric: AddableMetric,
+    ) -> Metric {
+        match metric {
+            AddableMetric::ExplicitMetric(value) => Metric::ExplicitMetric(value),
+            AddableMetric::MetricTracksInterface => {
+                Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
+            }
+        }
+    }
 
     /// Add a route directly to the forwarding table, instead of merely
     /// dispatching an event requesting that the route be added.
@@ -510,6 +399,24 @@ pub(crate) mod testutil {
             }
         })
     }
+
+    pub(crate) fn del_device_routes<
+        I: IpLayerIpExt,
+        SC: IpStateContext<I, C>,
+        C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    >(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        del_device: &SC::DeviceId,
+    ) {
+        debug!("deleting routes on device: {del_device:?}");
+
+        let _: Vec<_> = sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
+            table.del_entries(|Entry { subnet: _, device, gateway: _, metric: _ }| {
+                device == del_device
+            })
+        });
+    }
 }
 
 #[cfg(test)]
@@ -523,7 +430,7 @@ mod testutil_testonly {
 
     use crate::{
         context::testutil::FakeSyncCtx,
-        ip::{testutil::FakeIpDeviceIdCtx, StrongId},
+        ip::{testutil::FakeIpDeviceIdCtx, types::Metric, StrongId},
     };
 
     /// Adds an on-link forwarding entry for the specified address and device.
@@ -544,7 +451,10 @@ mod testutil_testonly {
         entry: Entry<I::Addr, D>,
     ) -> Result<&Entry<I::Addr, D>, crate::error::ExistsError> {
         table
-            .add_entry(EntryAndGeneration { entry, generation: Generation::initial() })
+            .add_entry(EntryAndGeneration {
+                entry,
+                generation: crate::ip::types::Generation::initial(),
+            })
             .map(|entry| &entry.entry)
     }
 
@@ -618,7 +528,7 @@ mod testutil_testonly {
 
 #[cfg(test)]
 mod tests {
-    use fakealloc::collections::HashSet;
+    use fakealloc::{collections::HashSet, vec::Vec};
     use ip_test_macro::ip_test;
     use itertools::Itertools;
     use net_declare::{net_ip_v4, net_ip_v6, net_subnet_v4, net_subnet_v6};

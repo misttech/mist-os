@@ -16,7 +16,10 @@
 //! about them, such as the reference-counted RouteSets specified in
 //! fuchsia.net.routes.admin.
 
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -29,8 +32,9 @@ use net_types::{
     },
     SpecifiedAddr,
 };
+use netstack3_core::SyncCtx;
 
-use crate::bindings::{util::TryIntoFidlWithContext, Ctx};
+use crate::bindings::{util::TryIntoFidlWithContext, BindingsNonSyncCtxImpl, Ctx};
 
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
@@ -40,18 +44,8 @@ type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyn
 pub(crate) enum Change<A: IpAddress> {
     Add(netstack3_core::ip::types::AddableEntry<A, WeakDeviceId>),
     RemoveToSubnet(Subnet<A>),
-    RemoveMatching {
-        subnet: Subnet<A>,
-        device: WeakDeviceId,
-        gateway: Option<SpecifiedAddr<A>>,
-    },
-    DeviceRemoved {
-        device: WeakDeviceId,
-        // TODO(https://fxbug.dev/132990): When we can properly wait for
-        // reference-y devices to be cleaned up, we can move this to
-        // bindings rather than needing to dispatch the routes with an event.
-        routes_removed: Vec<netstack3_core::ip::types::Entry<A, DeviceId>>,
-    },
+    RemoveMatching { subnet: Subnet<A>, device: WeakDeviceId, gateway: Option<SpecifiedAddr<A>> },
+    RemoveMatchingDevice(WeakDeviceId),
 }
 
 pub(crate) enum ChangeEither {
@@ -118,7 +112,7 @@ pub(crate) struct State<I: Ip> {
     receiver: mpsc::UnboundedReceiver<WorkItem<I::Addr>>,
     generation: netstack3_core::ip::types::Generation,
     table: HashMap<
-        netstack3_core::ip::types::AddableEntry<I::Addr, WeakDeviceId>,
+        netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::ip::types::Generation,
     >,
     update_dispatcher: crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
@@ -156,9 +150,17 @@ impl<I: Ip> State<I> {
     }
 }
 
+fn to_entry<I: Ip>(
+    sync_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
+    addable_entry: netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
+) -> netstack3_core::ip::types::Entry<I::Addr, DeviceId> {
+    let device_metric = netstack3_core::get_routing_metric(sync_ctx, &addable_entry.device);
+    addable_entry.resolve_metric(device_metric)
+}
+
 async fn handle_change<I: Ip>(
     table: &mut HashMap<
-        netstack3_core::ip::types::AddableEntry<I::Addr, WeakDeviceId>,
+        netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
         netstack3_core::ip::types::Generation,
     >,
     generation: &mut netstack3_core::ip::types::Generation,
@@ -169,38 +171,41 @@ async fn handle_change<I: Ip>(
     let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
     enum TableChange<I: Ip> {
-        Add(netstack3_core::ip::types::AddableEntryAndGeneration<I::Addr, WeakDeviceId>),
-        Remove(
-            HashMap<
-                netstack3_core::ip::types::AddableEntry<I::Addr, WeakDeviceId>,
-                netstack3_core::ip::types::Generation,
-            >,
-        ),
+        Add(netstack3_core::ip::types::Entry<I::Addr, DeviceId>),
+        Remove(Vec<netstack3_core::ip::types::Entry<I::Addr, DeviceId>>),
     }
 
-    let table_change = match change {
-        Change::Add(storable_entry) => {
+    let table_change: TableChange<I> = match change {
+        Change::Add(addable_entry) => {
             *generation = generation.next();
-            let newly_inserted = table.insert(storable_entry.clone(), *generation).is_none();
+            let addable_entry = addable_entry
+                .try_map_device_id(|device_id| device_id.upgrade().ok_or(Error::DeviceRemoved))?;
+            let newly_inserted = table.insert(addable_entry.clone(), *generation).is_none();
             if !newly_inserted {
                 return Err(Error::AlreadyExists);
             }
-            TableChange::<I>::Add(storable_entry.with_generation(*generation))
+            TableChange::Add(to_entry::<I>(sync_ctx, addable_entry))
         }
         Change::RemoveToSubnet(subnet) => {
             let (removed, kept) = std::mem::take(table).into_iter().partition::<HashMap<_, _>, _>(
                 |(entry, _generation): &(
                     netstack3_core::ip::types::AddableEntry<
                         I::Addr,
-                        netstack3_core::device::WeakDeviceId<
-                            crate::bindings::BindingsNonSyncCtxImpl,
-                        >,
+                        netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>,
                     >,
                     netstack3_core::ip::types::Generation,
                 )| &entry.subnet == &subnet,
             );
             *table = kept;
-            TableChange::<I>::Remove(removed)
+            if removed.is_empty() {
+                return Err(Error::NotFound);
+            }
+            TableChange::Remove(
+                removed
+                    .into_iter()
+                    .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry))
+                    .collect(),
+            )
         }
         Change::RemoveMatching { subnet, device, gateway } => {
             let (removed, kept) = std::mem::take(table).into_iter().partition::<HashMap<_, _>, _>(
@@ -209,59 +214,66 @@ async fn handle_change<I: Ip>(
                 },
             );
             *table = kept;
-            TableChange::<I>::Remove(removed)
+            if removed.is_empty() {
+                return Err(Error::NotFound);
+            }
+            TableChange::Remove(
+                removed
+                    .into_iter()
+                    .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry))
+                    .collect(),
+            )
         }
-        Change::DeviceRemoved { device, routes_removed } => {
-            let (_removed, kept) = std::mem::take(table)
+        Change::RemoveMatchingDevice(device) => {
+            let (removed, kept) = std::mem::take(table)
                 .into_iter()
                 .partition::<HashMap<_, _>, _>(|(entry, _generation)| &entry.device == &device);
             *table = kept;
-
-            // This is simply keeping the bindings route table up to date with
-            // routes that were removed by core as a result of removing a
-            // device, so we do no additional work to commit the changes to core
-            // here. We only notify the update dispatcher that the routes have
-            // been removed.
-            //
-            // TODO(https://fxbug.dev/132990): Allowing core to unilaterally
-            // remove routes on device removal (as opposed to going through
-            // bindings) is confusing; this should be removed once we can await
-            // strong device ID cleanup.
-            notify_removed_routes(non_sync_ctx, route_update_dispatcher, routes_removed).await;
-            return Ok(());
+            if removed.is_empty() {
+                return Err(Error::NotFound);
+            }
+            TableChange::Remove(
+                removed
+                    .into_iter()
+                    .map(|(entry, _generation)| to_entry::<I>(sync_ctx, entry))
+                    .collect(),
+            )
         }
     };
 
-    // TODO(https://fxbug.dev/132990): The two `set_routes` commit paths here
-    // can be greatly simplified / deduplicated once we can await strong device
-    // ID cleanup and disallow core from removing routes.
+    netstack3_core::set_routes::<I, _>(
+        sync_ctx,
+        non_sync_ctx,
+        table
+            .iter()
+            .map(|(entry, generation)| {
+                let device_metric = netstack3_core::get_routing_metric(sync_ctx, &entry.device);
+                entry.clone().resolve_metric(device_metric).with_generation(*generation)
+            })
+            .collect::<Vec<_>>(),
+    );
+
     match table_change {
-        TableChange::Add(storable_entry) => {
-            let netstack3_core::ip::types::EntryAndGeneration { entry, generation: _ } =
-                netstack3_core::set_routes::<I, _, _>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    &mut |netstack3_core::ip::types::EntryUpgrader(upgrade_entry)| {
-                        (
-                            table
-                                .iter()
-                                .flat_map(|(entry, generation)| {
-                                    upgrade_entry(entry.clone().with_generation(*generation))
-                                })
-                                .collect(),
-                            upgrade_entry(storable_entry.clone()),
-                        )
-                    },
-                )
-                .ok_or(Error::DeviceRemoved)?;
+        TableChange::Add(entry) => {
             if entry.subnet.prefix() == 0 {
-                non_sync_ctx.notify_interface_update(
-                    &entry.device,
-                    crate::bindings::InterfaceUpdate::DefaultRouteChanged {
-                        version: I::VERSION,
-                        has_default_route: true,
-                    },
-                )
+                // Only notify that we newly have a default route if this is the
+                // only default route on this device.
+                if table
+                    .iter()
+                    .filter(|(table_entry, _)| {
+                        table_entry.subnet.prefix() == 0 && &table_entry.device == &entry.device
+                    })
+                    .count()
+                    == 1
+                {
+                    non_sync_ctx.notify_interface_update(
+                        &entry.device,
+                        crate::bindings::InterfaceUpdate::DefaultRouteChanged {
+                            version: I::VERSION,
+                            has_default_route: true,
+                        },
+                    )
+                }
             }
             let installed_route = entry
                 .try_into_fidl_with_ctx(non_sync_ctx)
@@ -274,41 +286,7 @@ async fn handle_change<I: Ip>(
                 .expect("failed to notify route update dispatcher");
         }
         TableChange::Remove(removed) => {
-            let removed = netstack3_core::set_routes::<I, _, _>(
-                sync_ctx,
-                non_sync_ctx,
-                &mut |netstack3_core::ip::types::EntryUpgrader(upgrade_entry)| {
-                    (
-                        table
-                            .iter()
-                            .flat_map(|(entry, generation)| {
-                                upgrade_entry(entry.clone().with_generation(*generation))
-                            })
-                            .collect(),
-                        removed
-                            .clone()
-                            .into_iter()
-                            .flat_map(|(entry, generation)| {
-                                upgrade_entry(entry.with_generation(generation))
-                            })
-                            .collect::<Vec<_>>(),
-                    )
-                },
-            );
-            if removed.is_empty() {
-                return Err(Error::NotFound);
-            } else {
-                notify_removed_routes::<I>(
-                    non_sync_ctx,
-                    route_update_dispatcher,
-                    removed.into_iter().map(
-                        |netstack3_core::ip::types::EntryAndGeneration { entry, generation: _ }| {
-                            entry
-                        },
-                    ),
-                )
-                .await;
-            }
+            notify_removed_routes::<I>(non_sync_ctx, route_update_dispatcher, removed, table).await;
         }
     };
 
@@ -319,21 +297,38 @@ async fn notify_removed_routes<I: Ip>(
     non_sync_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
     dispatcher: &crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::ip::types::Entry<I::Addr, DeviceId>>,
+    table: &HashMap<
+        netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
+        netstack3_core::ip::types::Generation,
+    >,
 ) {
+    let mut devices_with_default_routes: Option<HashSet<_>> = None;
+    let mut already_notified_devices = HashSet::new();
+
     for entry in removed_routes {
         if entry.subnet.prefix() == 0 {
-            // TODO(https://fxbug.dev/132990): This is not strictly correct, as
-            // you could have two default routes on the same device with
-            // different metrics. Once we can hold strong IDs in bindings, it
-            // should be easy to do a proper before/after check of whether the
-            // routing table has a default route.
-            non_sync_ctx.notify_interface_update(
-                &entry.device,
-                crate::bindings::InterfaceUpdate::DefaultRouteChanged {
-                    version: I::VERSION,
-                    has_default_route: false,
-                },
-            )
+            // Check if there are now no default routes on this device.
+            let devices_with_default_routes = (&mut devices_with_default_routes)
+                .get_or_insert_with(|| {
+                    table
+                        .iter()
+                        .filter_map(|(table_entry, _)| {
+                            (table_entry.subnet.prefix() == 0).then(|| table_entry.device.clone())
+                        })
+                        .collect()
+                });
+
+            if !devices_with_default_routes.contains(&entry.device)
+                && already_notified_devices.insert(entry.device.clone())
+            {
+                non_sync_ctx.notify_interface_update(
+                    &entry.device,
+                    crate::bindings::InterfaceUpdate::DefaultRouteChanged {
+                        version: I::VERSION,
+                        has_default_route: false,
+                    },
+                )
+            }
         }
         let installed_route =
             entry.try_into_fidl_with_ctx(non_sync_ctx).expect("failed to convert route to FIDL");
