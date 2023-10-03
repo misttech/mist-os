@@ -94,6 +94,8 @@ const (
 	RouteInvalidDestinationSubnet
 	RouteInvalidNextHop
 	RouteInvalidUnknownAction
+	RouteInvalidMissingRouteProperties
+	RouteInvalidMissingMetric
 )
 
 func (result *RouteValidationResult) ToError() error {
@@ -106,6 +108,10 @@ func (result *RouteValidationResult) ToError() error {
 		return errors.New("invalid next hop")
 	case RouteInvalidUnknownAction:
 		return errors.New("unknown route action")
+	case RouteInvalidMissingRouteProperties:
+		return errors.New("missing route properties")
+	case RouteInvalidMissingMetric:
+		return errors.New("missing metric")
 	default:
 		panic(fmt.Sprintf("Unknown validation result variant: %d", *result))
 	}
@@ -124,6 +130,14 @@ func FromFidlRouteV4(route fidlRoutes.RouteV4) (Route[fuchsianet.Ipv4Address], R
 	case fidlRoutes.RouteActionV4Forward:
 	default:
 		return Route[fuchsianet.Ipv4Address]{}, RouteInvalidUnknownAction
+	}
+
+	if !route.Properties.SpecifiedPropertiesPresent {
+		return Route[fuchsianet.Ipv4Address]{}, RouteInvalidMissingRouteProperties
+	}
+
+	if !route.Properties.SpecifiedProperties.MetricPresent {
+		return Route[fuchsianet.Ipv4Address]{}, RouteInvalidMissingMetric
 	}
 
 	r := Route[fuchsianet.Ipv4Address]{
@@ -172,7 +186,7 @@ func ToFidlRouteV4(route Route[fuchsianet.Ipv4Address]) (fidlRoutes.RouteV4, err
 	result.Properties.SetSpecifiedProperties(
 		fidlRoutes.SpecifiedRouteProperties{
 			Metric:        route.Properties.Metric,
-			MetricPresent: route.Properties.MetricPresent,
+			MetricPresent: true,
 		},
 	)
 	return result, nil
@@ -204,7 +218,7 @@ func ToFidlRouteV6(route Route[fuchsianet.Ipv6Address]) (fidlRoutes.RouteV6, err
 	result.Properties.SetSpecifiedProperties(
 		fidlRoutes.SpecifiedRouteProperties{
 			Metric:        route.Properties.Metric,
-			MetricPresent: route.Properties.MetricPresent,
+			MetricPresent: true,
 		},
 	)
 	return result, nil
@@ -215,6 +229,14 @@ func FromFidlRouteV6(route fidlRoutes.RouteV6) (Route[fuchsianet.Ipv6Address], R
 	case fidlRoutes.RouteActionV4Forward:
 	default:
 		return Route[fuchsianet.Ipv6Address]{}, RouteInvalidUnknownAction
+	}
+
+	if !route.Properties.SpecifiedPropertiesPresent {
+		return Route[fuchsianet.Ipv6Address]{}, RouteInvalidMissingRouteProperties
+	}
+
+	if !route.Properties.SpecifiedProperties.MetricPresent {
+		return Route[fuchsianet.Ipv6Address]{}, RouteInvalidMissingMetric
 	}
 
 	r := Route[fuchsianet.Ipv6Address]{
@@ -307,13 +329,11 @@ type RouteTarget[A IpAddress] struct {
 // containing it (such as Route) can be used as map keys with the expected
 // semantics (no pointers).
 type SpecifiedRouteProperties struct {
-	Metric        fidlRoutes.SpecifiedMetric
-	MetricPresent bool
+	Metric fidlRoutes.SpecifiedMetric
 }
 
 func fromFidlSpecifiedRouteProperties(props fidlRoutes.SpecifiedRouteProperties) SpecifiedRouteProperties {
 	return SpecifiedRouteProperties{
-		Metric:        props.Metric,
-		MetricPresent: props.MetricPresent,
+		Metric: props.Metric,
 	}
 }

@@ -180,19 +180,37 @@ async fn add_remove_route<
     }
 }
 
+fn specified_properties(
+    metric: Option<fnet_routes::SpecifiedMetric>,
+) -> Option<fnet_routes::SpecifiedRouteProperties> {
+    Some(fnet_routes::SpecifiedRouteProperties { metric, ..Default::default() })
+}
+
 #[netstack_test]
 #[test_case(
-    fidl_ip_v4_with_prefix!("192.0.2.0/24"), None
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Ok(());
     "accepts with no nexthop"
 )]
 #[test_case(
-    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("192.0.2.1"))
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    Some(fidl_ip_v4!("192.0.2.1")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Ok(());
     "accepts with valid nexthop"
 )]
 #[test_case(
-    fidl_ip_v4_with_prefix!("192.0.2.1/24"), None
+    fidl_ip_v4_with_prefix!("192.0.2.1/24"),
+    None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
     "rejects destination subnet with set host bits"
 )]
@@ -200,57 +218,95 @@ async fn add_remove_route<
     fnet::Ipv4AddressWithPrefix {
         addr: fidl_ip_v4!("192.0.2.0"),
         prefix_len: 33,
-    }, None
+    },
+    None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
     "rejects destination subnet with invalid prefix length"
 )]
 #[test_case(
-    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("255.255.255.255")) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    Some(fidl_ip_v4!("255.255.255.255")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    ))) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
     "rejects broadcast next hop"
 )]
 #[test_case(
-    fidl_ip_v4_with_prefix!("192.0.2.0/24"), Some(fidl_ip_v4!("0.0.0.0")) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    Some(fidl_ip_v4!("0.0.0.0")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    ))) => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
     "rejects next hop set to unspecified address"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    None,
+    None
+    => Err(fnet_routes_admin::RouteSetError::MissingRouteProperties);
+    "rejects missing specified properties"
+)]
+#[test_case(
+    fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+    None,
+    specified_properties(None)
+    => Err(fnet_routes_admin::RouteSetError::MissingMetric);
+    "rejects missing metric"
 )]
 async fn validates_route_v4<N: Netstack>(
     name: &str,
     destination: fnet::Ipv4AddressWithPrefix,
     next_hop: Option<fnet::Ipv4Address>,
+    specified_properties: Option<fnet_routes::SpecifiedRouteProperties>,
 ) -> Result<(), fnet_routes_admin::RouteSetError> {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
         TestSetup::<Ipv4>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv4>(&set_provider).expect("new route set");
-    fnet_routes_ext::admin::add_route::<Ipv4>(
-        &proxy,
-        &fnet_routes::RouteV4 {
-            destination,
-            action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
-                outbound_interface: interface.id(),
-                next_hop: next_hop.map(Box::new),
-            }),
-            properties: fnet_routes::RoutePropertiesV4::default(),
-        },
-    )
-    .await
-    .expect("no FIDL error")
-    .map(|_: bool| ())
+    let route = fnet_routes::RouteV4 {
+        destination,
+        action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+            outbound_interface: interface.id(),
+            next_hop: next_hop.map(Box::new),
+        }),
+        properties: fnet_routes::RoutePropertiesV4 { specified_properties, ..Default::default() },
+    };
+    let add_result =
+        fnet_routes_ext::admin::add_route::<Ipv4>(&proxy, &route).await.expect("no FIDL error");
+
+    let remove_result =
+        fnet_routes_ext::admin::remove_route::<Ipv4>(&proxy, &route).await.expect("no FIDL error");
+
+    assert_eq!(add_result, remove_result);
+    add_result.map(|_: bool| ())
 }
 
 #[netstack_test]
 #[test_case(
-    fidl_ip_v6_with_prefix!("2001:DB8::/64"), None
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Ok(());
     "accepts with no nexthop"
 )]
 #[test_case(
-    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("2001:DB8::1"))
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("2001:DB8::1")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Ok(());
     "accepts with valid nexthop"
 )]
 #[test_case(
-    fidl_ip_v6_with_prefix!("2001:DB8::1/64"), None
+    fidl_ip_v6_with_prefix!("2001:DB8::1/64"), None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
     "rejects destination subnet with set host bits"
 )]
@@ -258,44 +314,68 @@ async fn validates_route_v4<N: Netstack>(
     fnet::Ipv6AddressWithPrefix {
         addr: fidl_ip_v6!("2001:DB8::"),
         prefix_len: 129,
-    }, None
+    }, None,
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidDestinationSubnet);
     "rejects destination subnet with invalid prefix length"
 )]
 #[test_case(
-    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("ff0e:0:0:0:0:DB8::1"))
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("ff0e:0:0:0:0:DB8::1")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
     "rejects multicast next hop"
 )]
 #[test_case(
-    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("::"))
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"), Some(fidl_ip_v6!("::")),
+    specified_properties(Some(fnet_routes::SpecifiedMetric::InheritedFromInterface(
+        fnet_routes::Empty,
+    )))
     => Err(fnet_routes_admin::RouteSetError::InvalidNextHop);
     "rejects next hop set to unspecified address"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"),
+    None,
+    None
+    => Err(fnet_routes_admin::RouteSetError::MissingRouteProperties);
+    "rejects missing specified properties"
+)]
+#[test_case(
+    fidl_ip_v6_with_prefix!("2001:DB8::/64"),
+    None,
+    specified_properties(None)
+    => Err(fnet_routes_admin::RouteSetError::MissingMetric);
+    "rejects missing metric"
 )]
 async fn validates_route_v6<N: Netstack>(
     name: &str,
     destination: fnet::Ipv6AddressWithPrefix,
     next_hop: Option<fnet::Ipv6Address>,
+    specified_properties: Option<fnet_routes::SpecifiedRouteProperties>,
 ) -> Result<(), fnet_routes_admin::RouteSetError> {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let TestSetup { realm: _realm, network: _network, interface, set_provider, state: _ } =
         TestSetup::<Ipv6>::new::<N>(&sandbox, name).await;
     let proxy =
         fnet_routes_ext::admin::new_route_set::<Ipv6>(&set_provider).expect("new route set");
-    fnet_routes_ext::admin::add_route::<Ipv6>(
-        &proxy,
-        &fnet_routes::RouteV6 {
-            destination,
-            action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
-                outbound_interface: interface.id(),
-                next_hop: next_hop.map(Box::new),
-            }),
-            properties: fnet_routes::RoutePropertiesV6::default(),
-        },
-    )
-    .await
-    .expect("no FIDL error")
-    .map(|_: bool| ())
+    let route = fnet_routes::RouteV6 {
+        destination,
+        action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
+            outbound_interface: interface.id(),
+            next_hop: next_hop.map(Box::new),
+        }),
+        properties: fnet_routes::RoutePropertiesV6 { specified_properties, ..Default::default() },
+    };
+    let add_result =
+        fnet_routes_ext::admin::add_route::<Ipv6>(&proxy, &route).await.expect("no FIDL error");
+    let remove_result =
+        fnet_routes_ext::admin::remove_route::<Ipv6>(&proxy, &route).await.expect("no FIDL error");
+    assert_eq!(add_result, remove_result);
+    add_result.map(|_: bool| ())
 }
 
 #[netstack_test]

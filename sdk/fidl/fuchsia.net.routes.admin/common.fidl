@@ -37,4 +37,10 @@ type RouteSetError = flexible enum {
     /// The route set attempted to add/remove a route that uses an interface
     /// that was previously authenticated, but no longer exists.
     PREVIOUSLY_AUTHENTICATED_INTERFACE_NO_LONGER_EXISTS = 5;
+    /// The route set attempted to add/remove a route that was missing required
+    /// specified properties.
+    MISSING_ROUTE_PROPERTIES = 6;
+    /// The route set attempted to add/remove a route that was missing a
+    /// metric.
+    MISSING_METRIC = 7;
 };

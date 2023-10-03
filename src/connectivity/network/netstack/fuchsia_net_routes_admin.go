@@ -199,6 +199,10 @@ func (r *routeSetV4Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 		result.SetErr(routesAdmin.RouteSetErrorInvalidNextHop)
 	case fidlconv.RouteInvalidUnknownAction:
 		result.SetErr(routesAdmin.RouteSetErrorUnsupportedAction)
+	case fidlconv.RouteInvalidMissingRouteProperties:
+		result.SetErr(routesAdmin.RouteSetErrorMissingRouteProperties)
+	case fidlconv.RouteInvalidMissingMetric:
+		result.SetErr(routesAdmin.RouteSetErrorMissingMetric)
 	default:
 		panic(fmt.Sprintf("unrecognized RouteValidationResult: %d", validationResult))
 	}
@@ -237,6 +241,10 @@ func (r *routeSetV4Impl) RemoveRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.Rou
 		result.SetErr(routesAdmin.RouteSetErrorInvalidNextHop)
 	case fidlconv.RouteInvalidUnknownAction:
 		result.SetErr(routesAdmin.RouteSetErrorUnsupportedAction)
+	case fidlconv.RouteInvalidMissingRouteProperties:
+		result.SetErr(routesAdmin.RouteSetErrorMissingRouteProperties)
+	case fidlconv.RouteInvalidMissingMetric:
+		result.SetErr(routesAdmin.RouteSetErrorMissingMetric)
 	default:
 		panic(fmt.Sprintf("unrecognized RouteValidationResult: %d", validationResult))
 	}
@@ -276,6 +284,10 @@ func (r *routeSetV6Impl) AddRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.RouteV
 		result.SetErr(routesAdmin.RouteSetErrorInvalidNextHop)
 	case fidlconv.RouteInvalidUnknownAction:
 		result.SetErr(routesAdmin.RouteSetErrorUnsupportedAction)
+	case fidlconv.RouteInvalidMissingRouteProperties:
+		result.SetErr(routesAdmin.RouteSetErrorMissingRouteProperties)
+	case fidlconv.RouteInvalidMissingMetric:
+		result.SetErr(routesAdmin.RouteSetErrorMissingMetric)
 	default:
 		panic(fmt.Sprintf("unrecognized RouteValidationResult: %d", validationResult))
 	}
@@ -314,6 +326,10 @@ func (r *routeSetV6Impl) RemoveRoute(ctx_ fidl.Context, fidlRoute fnetRoutes.Rou
 		result.SetErr(routesAdmin.RouteSetErrorInvalidNextHop)
 	case fidlconv.RouteInvalidUnknownAction:
 		result.SetErr(routesAdmin.RouteSetErrorUnsupportedAction)
+	case fidlconv.RouteInvalidMissingRouteProperties:
+		result.SetErr(routesAdmin.RouteSetErrorMissingRouteProperties)
+	case fidlconv.RouteInvalidMissingMetric:
+		result.SetErr(routesAdmin.RouteSetErrorMissingMetric)
 	default:
 		panic(fmt.Sprintf("unrecognized RouteValidationResult: %d", validationResult))
 	}
