@@ -1258,12 +1258,12 @@ void FidlDevice::ConnectServer(ConnectServerRequest& request,
 
 void FidlDevice::ConnectServerV2(ConnectServerV2Request& request,
                                  ConnectServerV2Completer::Sync& completer) {
-  if (!request.allocator_request().has_value()) {
+  if (!request.allocator_request().is_valid()) {
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
   }
   zx_status_t status =
-      sysmem_device_->CommonSysmemConnectV2(request.allocator_request()->TakeChannel());
+      sysmem_device_->CommonSysmemConnectV2(request.allocator_request().TakeChannel());
   if (status != ZX_OK) {
     completer.Close(status);
     return;

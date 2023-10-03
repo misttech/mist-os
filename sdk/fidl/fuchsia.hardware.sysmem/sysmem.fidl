@@ -23,8 +23,8 @@ closed protocol Sysmem {
 
     // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
     //@transitional("Switch to requesting Allocator instead of serving this method.")
-    strict ConnectServerV2(resource table {
-        1: allocator_request server_end:fuchsia.sysmem2.Allocator;
+    strict ConnectServerV2(resource struct {
+        allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
 
     /// Takes the client end of a FIDL connection that'll serve
