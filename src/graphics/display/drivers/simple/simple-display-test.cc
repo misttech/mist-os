@@ -6,8 +6,8 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
-#include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/zx/object.h>
@@ -29,46 +29,40 @@ namespace {
 
 // TODO(fxbug.dev/121924): Consider creating and using a unified set of sysmem
 // testing doubles instead of writing mocks for each display driver test.
-class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::BufferCollection> {
+class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2::BufferCollection> {
  public:
   explicit FakeBufferCollection(zx::unowned_vmo framebuffer_vmo)
       : framebuffer_vmo_(std::move(framebuffer_vmo)) {}
 
-  void SetConstraints(::fuchsia_sysmem::wire::BufferCollectionSetConstraintsRequest* request,
+  void SetConstraints(::fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest* request,
                       SetConstraintsCompleter::Sync& completer) override {}
-  void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override {
-    completer.Reply(ZX_OK);
+  void CheckAllBuffersAllocated(CheckAllBuffersAllocatedCompleter::Sync& completer) override {
+    completer.ReplySuccess();
   }
-  void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override {
+  void WaitForAllBuffersAllocated(WaitForAllBuffersAllocatedCompleter::Sync& completer) override {
     zx::vmo vmo;
     EXPECT_OK(framebuffer_vmo_->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo));
 
-    completer.Reply(ZX_OK,
-                    {
-                        .buffer_count = 1,
-                        .settings =
-                            {
-                                .buffer_settings =
-                                    {
-                                        .heap = fuchsia_sysmem::HeapType::kFramebuffer,
-                                    },
-                                .has_image_format_constraints = true,
-                                .image_format_constraints =
-                                    {
-                                        .pixel_format =
-                                            {
-                                                .type = fuchsia_sysmem::PixelFormatType::kBgra32,
-                                                .has_format_modifier = true,
-                                                .format_modifier =
-                                                    {fuchsia_sysmem::wire::kFormatModifierLinear},
-                                            },
-                                    },
-                            },
-                        .buffers =
-                            {
-                                fuchsia_sysmem::wire::VmoBuffer{std::move(vmo), 0},
-                            },
-                    });
+    fidl::Arena arena;
+    auto response =
+        fuchsia_sysmem2::wire::BufferCollectionWaitForAllBuffersAllocatedResponse::Builder(arena);
+    auto collection_info = fuchsia_sysmem2::wire::BufferCollectionInfo::Builder(arena);
+    auto single_buffer_settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
+    auto buffer_memory_settings = fuchsia_sysmem2::wire::BufferMemorySettings::Builder(arena);
+    buffer_memory_settings.heap(fuchsia_sysmem2::HeapType::kFramebuffer);
+    single_buffer_settings.buffer_settings(buffer_memory_settings.Build());
+    auto image_format_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
+    image_format_constraints.pixel_format(fuchsia_images2::wire::PixelFormat::kBgra32);
+    image_format_constraints.pixel_format_modifier(fuchsia_images2::wire::kFormatModifierLinear);
+    single_buffer_settings.image_format_constraints(image_format_constraints.Build());
+    collection_info.settings(single_buffer_settings.Build());
+    auto vmo_buffer = fuchsia_sysmem2::wire::VmoBuffer::Builder(arena);
+    vmo_buffer.vmo(std::move(vmo));
+    vmo_buffer.vmo_usable_start(0);
+    collection_info.buffers(std::array{vmo_buffer.Build()});
+    response.buffer_collection_info(collection_info.Build());
+
+    completer.ReplySuccess(response.Build());
   }
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {}
@@ -77,7 +71,7 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::
   zx::unowned_vmo framebuffer_vmo_;
 };
 
-class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
+class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
   explicit MockAllocator(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
       : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
@@ -90,29 +84,29 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
     active_buffer_collections_.emplace(
         buffer_collection_id,
         BufferCollection{
-            .token_client = std::move(request->token),
-            .unowned_collection_server = request->buffer_collection_request,
+            .token_client = std::move(request->token()),
+            .unowned_collection_server = request->buffer_collection_request(),
             .fake_buffer_collection = FakeBufferCollection(framebuffer_vmo_->borrow())});
     fidl::BindServer(
-        dispatcher_, std::move(request->buffer_collection_request),
+        dispatcher_, std::move(request->buffer_collection_request()),
         &active_buffer_collections_.at(buffer_collection_id).fake_buffer_collection,
         [this, buffer_collection_id](FakeBufferCollection*, fidl::UnbindInfo,
-                                     fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
+                                     fidl::ServerEnd<fuchsia_sysmem2::BufferCollection>) {
           inactive_buffer_collection_tokens_.push_back(
               std::move(active_buffer_collections_.at(buffer_collection_id).token_client));
           active_buffer_collections_.erase(buffer_collection_id);
         });
   }
 
-  std::vector<std::pair<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>,
-                        fidl::UnownedServerEnd<fuchsia_sysmem::BufferCollection>>>
+  std::vector<std::pair<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>,
+                        fidl::UnownedServerEnd<fuchsia_sysmem2::BufferCollection>>>
   GetBufferCollectionConnections() {
     if (active_buffer_collections_.empty()) {
       return {};
     }
 
-    std::vector<std::pair<fidl::UnownedClientEnd<fuchsia_sysmem::BufferCollectionToken>,
-                          fidl::UnownedServerEnd<fuchsia_sysmem::BufferCollection>>>
+    std::vector<std::pair<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>,
+                          fidl::UnownedServerEnd<fuchsia_sysmem2::BufferCollection>>>
         result;
     for (const auto& kv : active_buffer_collections_) {
       result.emplace_back(kv.second.token_client, kv.second.unowned_collection_server);
@@ -122,7 +116,7 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   void SetDebugClientInfo(SetDebugClientInfoRequestView request,
                           SetDebugClientInfoCompleter::Sync& completer) override {
-    EXPECT_EQ(request->name.get().find("simple-display"), 0u);
+    EXPECT_EQ(request->name().get().find("simple-display"), 0u);
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
@@ -132,15 +126,15 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
  private:
   struct BufferCollection {
-    fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
-    fidl::UnownedServerEnd<fuchsia_sysmem::BufferCollection> unowned_collection_server;
+    fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token_client;
+    fidl::UnownedServerEnd<fuchsia_sysmem2::BufferCollection> unowned_collection_server;
     FakeBufferCollection fake_buffer_collection;
   };
 
   using BufferCollectionId = int;
 
   std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
-  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
+  std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
   BufferCollectionId next_buffer_collection_id_ = 0;
@@ -155,8 +149,8 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     EXPECT_TRUE(dispatcher_);
   }
 
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {
+  void ConnectServerV2(ConnectServerV2RequestView request,
+                       ConnectServerV2Completer::Sync& completer) override {
     mock_allocators_.emplace_front(dispatcher_, framebuffer_vmo_->borrow());
     auto it = mock_allocators_.begin();
     fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
@@ -227,9 +221,9 @@ TEST(SimpleDisplay, ImportBufferCollection) {
   SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(sysmem_client)),
                         fake_mmio.MmioBuffer(), kWidth, kHeight, kStride, kPixelFormat);
 
-  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
-  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token2_endpoints.is_ok());
 
   // Test ImportBufferCollection().
@@ -310,7 +304,7 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   SimpleDisplay display(nullptr, fidl::WireSyncClient(std::move(sysmem_client)),
                         fake_mmio.MmioBuffer(), kWidth, kHeight, kStride, kPixelFormat);
 
-  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
+  zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
 
   // Import BufferCollection.

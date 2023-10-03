@@ -113,16 +113,19 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportBufferCollection(
 
   ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollection>();
   if (!endpoints.is_ok()) {
     zxlogf(ERROR, "Cannot create sysmem BufferCollection endpoints: %s", endpoints.status_string());
     return ZX_ERR_INTERNAL;
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
-  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
-      std::move(collection_server_endpoint));
+  fidl::Arena arena;
+  fuchsia_sysmem2::wire::AllocatorBindSharedCollectionRequest bind_request(arena);
+  bind_request.set_token(
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(collection_token)));
+  bind_request.set_buffer_collection_request(std::move(collection_server_endpoint));
+  auto bind_result = sysmem_allocator_client_->BindSharedCollection(std::move(bind_request));
   if (!bind_result.ok()) {
     zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
            bind_result.status_string());
@@ -160,9 +163,9 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
+  const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  fidl::WireResult check_result = collection->CheckBuffersAllocated();
+  fidl::WireResult check_result = collection->CheckAllBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -172,14 +175,14 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return check_result.status();
   }
   const auto& check_response = check_result.value();
-  if (check_response.status == ZX_ERR_UNAVAILABLE) {
-    return ZX_ERR_SHOULD_WAIT;
-  }
-  if (check_response.status != ZX_OK) {
-    return check_response.status;
+  if (check_response.is_error()) {
+    if (check_response.error_value() == ZX_ERR_UNAVAILABLE) {
+      return ZX_ERR_SHOULD_WAIT;
+    }
+    return check_response.error_value();
   }
 
-  fidl::WireResult wait_result = collection->WaitForBuffersAllocated();
+  fidl::WireResult wait_result = collection->WaitForAllBuffersAllocated();
   // TODO(fxbug.dev/121691): The sysmem FIDL error logging patterns are
   // inconsistent across drivers. The FIDL error handling and logging should be
   // unified.
@@ -189,13 +192,13 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return wait_result.status();
   }
   auto& wait_response = wait_result.value();
-  if (wait_response.status != ZX_OK) {
-    return wait_response.status;
+  if (wait_response.is_error()) {
+    return wait_response.error_value();
   }
-  fuchsia_sysmem::wire::BufferCollectionInfo2& collection_info =
-      wait_response.buffer_collection_info;
+  fuchsia_sysmem2::wire::BufferCollectionInfo& collection_info =
+      wait_response->buffer_collection_info();
 
-  if (!collection_info.settings.has_image_format_constraints) {
+  if (!collection_info.settings().has_image_format_constraints()) {
     zxlogf(ERROR, "no image format constraints");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -205,15 +208,15 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  auto sysmem2_collection_format = sysmem::V2CopyFromV1PixelFormatType(
-      collection_info.settings.image_format_constraints.pixel_format.type);
+  auto sysmem2_collection_format =
+      collection_info.settings().image_format_constraints().pixel_format();
   if (sysmem2_collection_format != format_) {
     zxlogf(ERROR, "Image format from sysmem (%u) doesn't match expected format (%u)",
            static_cast<uint32_t>(sysmem2_collection_format), static_cast<uint32_t>(format_));
     return ZX_ERR_INVALID_ARGS;
   }
 
-  zx::vmo vmo = std::move(collection_info.buffers[0].vmo);
+  zx::vmo vmo = std::move(collection_info.buffers()[0].vmo());
 
   zx_info_handle_basic_t import_info;
   size_t actual, avail;
@@ -298,7 +301,7 @@ void SimpleDisplay::DisplayControllerImplApplyConfiguration(
 
 zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
   auto result =
-      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
+      sysmem_->ConnectServerV2(fidl::ServerEnd<fuchsia_sysmem2::Allocator>(std::move(connection)));
   if (!result.ok()) {
     zxlogf(ERROR, "could not connect to sysmem: %s", result.status_string());
     return result.status();
@@ -317,41 +320,38 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
-  const fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
+  const fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
-  fuchsia_sysmem::wire::BufferCollectionConstraints constraints = {};
-  constraints.usage.display = fuchsia_sysmem::wire::kDisplayUsageLayer;
-  constraints.has_buffer_memory_constraints = true;
-  fuchsia_sysmem::wire::BufferMemoryConstraints& buffer_constraints =
-      constraints.buffer_memory_constraints;
-  buffer_constraints.min_size_bytes = 0;
   const uint32_t bytes_per_pixel =
       ImageFormatStrideBytesPerWidthPixel(PixelFormatAndModifier(format_, kFormatModifier));
   uint32_t bytes_per_row = stride_ * bytes_per_pixel;
-  buffer_constraints.max_size_bytes = height_ * bytes_per_row;
-  buffer_constraints.physically_contiguous_required = false;
-  buffer_constraints.secure_required = false;
-  buffer_constraints.ram_domain_supported = true;
-  buffer_constraints.cpu_domain_supported = true;
-  buffer_constraints.heap_permitted_count = 1;
-  buffer_constraints.heap_permitted[0] = fuchsia_sysmem::wire::HeapType::kFramebuffer;
-  constraints.image_format_constraints_count = 1;
-  fuchsia_sysmem::wire::ImageFormatConstraints& image_constraints =
-      constraints.image_format_constraints[0];
-  image_constraints.pixel_format.type = sysmem::V1CopyFromV2PixelFormatType(format_);
-  image_constraints.pixel_format.has_format_modifier = true;
-  image_constraints.pixel_format.format_modifier.value = kFormatModifier;
-  image_constraints.color_spaces_count = 1;
-  image_constraints.color_space[0].type = fuchsia_sysmem::wire::ColorSpaceType::kSrgb;
-  image_constraints.min_coded_width = width_;
-  image_constraints.max_coded_width = width_;
-  image_constraints.min_coded_height = height_;
-  image_constraints.max_coded_height = height_;
-  image_constraints.min_bytes_per_row = bytes_per_row;
-  image_constraints.max_bytes_per_row = bytes_per_row;
-  constraints.image_format_constraints_count = 1;
 
-  auto result = collection->SetConstraints(true, constraints);
+  fidl::Arena arena;
+  auto constraints = fuchsia_sysmem2::wire::BufferCollectionConstraints::Builder(arena);
+  auto buffer_usage = fuchsia_sysmem2::wire::BufferUsage::Builder(arena);
+  buffer_usage.display(fuchsia_sysmem2::wire::kDisplayUsageLayer);
+  constraints.usage(buffer_usage.Build());
+  auto buffer_constraints = fuchsia_sysmem2::wire::BufferMemoryConstraints::Builder(arena);
+  buffer_constraints.min_size_bytes(0);
+  buffer_constraints.max_size_bytes(height_ * bytes_per_row);
+  buffer_constraints.physically_contiguous_required(false);
+  buffer_constraints.secure_required(false);
+  buffer_constraints.ram_domain_supported(true);
+  buffer_constraints.cpu_domain_supported(true);
+  buffer_constraints.heap_permitted(std::array{fuchsia_sysmem2::wire::HeapType::kFramebuffer});
+  auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
+  image_constraints.pixel_format(format_);
+  image_constraints.pixel_format_modifier(kFormatModifier);
+  image_constraints.color_spaces(std::array{fuchsia_images2::ColorSpace::kSrgb});
+  image_constraints.min_size({width_, height_});
+  image_constraints.max_size({width_, height_});
+  image_constraints.min_bytes_per_row(bytes_per_row);
+  image_constraints.max_bytes_per_row(bytes_per_row);
+  constraints.image_format_constraints(std::array{image_constraints.Build()});
+
+  auto set_request = fuchsia_sysmem2::wire::BufferCollectionSetConstraintsRequest::Builder(arena);
+  set_request.constraints(constraints.Build());
+  auto result = collection->SetConstraints(set_request.Build());
 
   if (!result.ok()) {
     zxlogf(ERROR, "failed to set constraints, %s", result.FormatDescription().c_str());
@@ -468,13 +468,13 @@ zx_status_t SimpleDisplay::Bind(const char* name, std::unique_ptr<SimpleDisplay>
 }
 
 zx_status_t SimpleDisplay::InitSysmemAllocatorClient() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
   if (!endpoints.is_ok()) {
     zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
     return endpoints.status_value();
   }
   auto& [client, server] = endpoints.value();
-  auto connect_result = sysmem_->ConnectServer(std::move(server));
+  auto connect_result = sysmem_->ConnectServerV2(std::move(server));
   if (!connect_result.ok()) {
     zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
            connect_result.status_string());
@@ -484,8 +484,12 @@ zx_status_t SimpleDisplay::InitSysmemAllocatorClient() {
 
   zx_koid_t current_process_koid = GetCurrentProcessKoid();
   std::string debug_name = "simple-display[" + std::to_string(current_process_koid) + "]";
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), current_process_koid);
+  fidl::Arena arena;
+  auto set_debug_request =
+      fuchsia_sysmem2::wire::AllocatorSetDebugClientInfoRequest::Builder(arena);
+  set_debug_request.name(debug_name);
+  set_debug_request.id(current_process_koid);
+  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(set_debug_request.Build());
   if (!set_debug_status.ok()) {
     zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
   }

@@ -100,7 +100,7 @@ class SimpleDisplay : public DeviceType,
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
   const std::unordered_map<display::DriverBufferCollectionId,
-                           fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>&
+                           fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>&
   GetBufferCollectionsForTesting() const {
     return buffer_collections_;
   }
@@ -113,11 +113,11 @@ class SimpleDisplay : public DeviceType,
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
-                     fidl::WireSyncClient<fuchsia_sysmem::BufferCollection>>
+                     fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
   async::Loop loop_;
