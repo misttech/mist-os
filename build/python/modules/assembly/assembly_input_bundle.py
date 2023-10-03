@@ -256,34 +256,6 @@ class AssemblyInputBundle(ImageAssemblyConfig):
         """Serialize to a JSON string"""
         return serialization.json_dumps(self, indent=2)
 
-    def intersection(
-        self, other: "AssemblyInputBundle"
-    ) -> "AssemblyInputBundle":
-        """Return the intersection of the two 'ImageAssemblyConfiguration's"""
-        result = super().intersection(other)
-        config_data: ConfigDataEntries = {}
-        for package in self.config_data.keys():
-            if package in other.config_data:
-                entries = self.config_data[package]
-                other_entries = other.config_data[package]
-                entries = entries.intersection(other_entries)
-                config_data[package] = entries
-        if config_data:
-            result.config_data = config_data
-        return result
-
-    def difference(self, other: "AssemblyInputBundle") -> "AssemblyInputBundle":
-        """Return the difference of the two 'ImageAssemblyConfiguration's"""
-        result = super().difference(other)
-        for package, entries in self.config_data.items():
-            if package not in other.config_data:
-                result.config_data[package] = entries
-            else:
-                entries = entries.difference(other.config_data[package])
-                if len(entries) > 0:
-                    result.config_data[package] = entries
-        return result
-
     def all_file_paths(self) -> List[FilePath]:
         """Return a list of all files that are referenced by this AssemblyInputBundle."""
         file_paths = []

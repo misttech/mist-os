@@ -133,15 +133,12 @@ def copy_to_assembly_input_bundle(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Create an image assembly configuration that is what remains after removing the configs to 'subtract'"
+        description="Create an image assembly configuration"
     )
     parser.add_argument(
         "--image-assembly-config", type=argparse.FileType("r"), required=True
     )
     parser.add_argument("--config-data-entries", type=argparse.FileType("r"))
-    parser.add_argument(
-        "--subtract", default=[], nargs="*", type=argparse.FileType("r")
-    )
     parser.add_argument("--outdir", required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"))
     parser.add_argument("--export-manifest", type=argparse.FileType("w"))
@@ -168,15 +165,10 @@ def main():
     parser.add_argument("--bootfs-files-package", required=True)
     args = parser.parse_args()
 
-    # Read in the legacy config and the others to subtract from it
+    # Read in the legacy config.
     legacy: ImageAssemblyConfig = ImageAssemblyConfig.json_load(
         args.image_assembly_config
     )
-    subtract = [ImageAssemblyConfig.json_load(other) for other in args.subtract]
-
-    # Subtract each from the legacy config, in the order given in args.
-    for other in subtract:
-        legacy = legacy.difference(other)
 
     # Read in the config_data entries if available.
     if args.config_data_entries:
