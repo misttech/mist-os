@@ -234,17 +234,17 @@ impl FileOps for TimerFile {
         _current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
-        handler: EventHandler,
+        event_handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        let signal_handler = move |signals: zx::Signals| {
-            let events = TimerFile::get_events_from_signals(signals);
-            handler.handle(events);
+        let signal_handler = SignalHandler {
+            inner: SignalHandlerInner::ZxHandle(TimerFile::get_events_from_signals),
+            event_handler,
         };
         let canceler = waiter
             .wake_on_zircon_signals(
                 self.timer.as_ref(),
                 TimerFile::get_signals_from_events(events),
-                Box::new(signal_handler),
+                signal_handler,
             )
             .unwrap(); // TODO return error
         let timer = Arc::downgrade(&self.timer);

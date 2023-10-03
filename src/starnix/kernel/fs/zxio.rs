@@ -4,7 +4,9 @@
 
 use crate::{
     fs::FdEvents,
-    task::{EventHandler, WaitCanceler, Waiter},
+    task::{
+        EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
+    },
     types::{error, Errno},
 };
 
@@ -68,27 +70,27 @@ pub fn zxio_wait_async(
     zxio: &Arc<Zxio>,
     waiter: &Waiter,
     events: FdEvents,
-    handler: EventHandler,
+    event_handler: EventHandler,
 ) -> WaitCanceler {
     let (handle, signals) = zxio.wait_begin(get_zxio_signals_from_events(events));
     if handle.is_invalid() {
         let observed_zxio_signals = zxio.wait_end(zx::Signals::empty());
         let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
-        waiter.wake_immediately(observed_events, handler);
+        waiter.wake_immediately(observed_events, event_handler);
         return WaitCanceler::new(move || {});
     }
 
-    let zxio_clone = zxio.clone();
-    let signal_handler = move |signals: zx::Signals| {
-        let observed_zxio_signals = zxio_clone.wait_end(signals);
-        let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
-        handler.handle(observed_events);
+    let signal_handler = SignalHandler {
+        inner: SignalHandlerInner::Zxio(ZxioSignalHandler {
+            zxio: zxio.clone(),
+            get_events_from_zxio_signals,
+        }),
+        event_handler,
     };
 
     // unwrap OK here as errors are only generated from misuse
     let zxio = Arc::downgrade(zxio);
-    let canceler =
-        waiter.wake_on_zircon_signals(&handle, signals, Box::new(signal_handler)).unwrap();
+    let canceler = waiter.wake_on_zircon_signals(&handle, signals, signal_handler).unwrap();
     WaitCanceler::new(move || {
         if let Some(zxio) = zxio.upgrade() {
             let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());

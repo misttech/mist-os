@@ -11,6 +11,7 @@ use std::{
         Arc, Weak,
     },
 };
+use syncio::{zxio::zxio_signals_t, Zxio};
 
 use crate::{
     fs::{FdEvents, FdNumber},
@@ -92,7 +93,35 @@ impl EventHandler {
     }
 }
 
-pub type SignalHandler = Box<dyn FnOnce(zx::Signals) + Send + Sync>;
+pub struct ZxioSignalHandler {
+    pub zxio: Arc<Zxio>,
+    pub get_events_from_zxio_signals: fn(zxio_signals_t) -> FdEvents,
+}
+
+pub enum SignalHandlerInner {
+    Zxio(ZxioSignalHandler),
+    ZxHandle(fn(zx::Signals) -> FdEvents),
+}
+
+pub struct SignalHandler {
+    pub inner: SignalHandlerInner,
+    pub event_handler: EventHandler,
+}
+
+impl SignalHandler {
+    fn handle(self, signals: zx::Signals) {
+        let SignalHandler { inner, event_handler } = self;
+        let events = match inner {
+            SignalHandlerInner::Zxio(ZxioSignalHandler { zxio, get_events_from_zxio_signals }) => {
+                get_events_from_zxio_signals(zxio.wait_end(signals))
+            }
+            SignalHandlerInner::ZxHandle(get_events_from_zx_signals) => {
+                get_events_from_zx_signals(signals)
+            }
+        };
+        event_handler.handle(events)
+    }
+}
 
 pub enum WaitCallback {
     SignalHandler(SignalHandler),
@@ -232,7 +261,7 @@ impl PortWaiter {
                             if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
                                     WaitCallback::SignalHandler(handler) => {
-                                        handler(sigpkt.observed())
+                                        handler.handle(sigpkt.observed())
                                     }
                                     WaitCallback::EventHandler(_) => {
                                         panic!("wrong type of handler called")
