@@ -26,7 +26,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+
+	"golang.org/x/exp/maps"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
@@ -40,18 +43,18 @@ type clippyReporter struct {
 	clippyTargets []build.ClippyTarget
 }
 
-func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanalysis.Finding, error) {
-	buildRelPath, err := filepath.Rel(a.buildDir, filepath.Join(a.checkoutDir, path))
+func (c *clippyReporter) report(ctx context.Context, path string) ([]*staticanalysis.Finding, error) {
+	buildRelPath, err := filepath.Rel(c.buildDir, filepath.Join(c.checkoutDir, path))
 	if err != nil {
 		return nil, err
 	}
-	clippyTarget, hasClippy := a.clippyTargetForFile(buildRelPath)
+	clippyTarget, hasClippy := c.clippyTargetForFile(buildRelPath)
 	if !hasClippy {
 		return nil, nil
 	}
 
 	// Make sure the Clippy output file was built.
-	outputPath := filepath.Join(a.buildDir, clippyTarget.Output)
+	outputPath := filepath.Join(c.buildDir, clippyTarget.Output)
 	if _, err := os.Stat(outputPath); errors.Is(err, os.ErrNotExist) {
 		// TODO(olivernewman): consider making these failures blocking once
 		// we're confident that the configuration is correct and the files
@@ -86,7 +89,7 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 			continue
 		}
 
-		spanPath, err := staticanalysis.BuildPathToCheckoutPath(primarySpan.FileName, a.buildDir, a.checkoutDir)
+		spanPath, err := c.buildPathToCheckoutPath(primarySpan.FileName)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +100,7 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 			continue
 		}
 
-		var suggestions []staticanalysis.Suggestion
+		var replacements []string
 
 		messageLines := []string{result.Message}
 
@@ -109,7 +112,10 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 				continue
 			}
 
-			var replacements []staticanalysis.Replacement
+			if len(child.Spans) == 0 {
+				messageLines = append(messageLines, fmt.Sprintf("help: %s", child.Message))
+			}
+
 			for _, span := range child.Spans {
 				// Some suggestions have multiple primary spans to indicate that
 				// multiple separate chunks of text need to be updated - e.g.
@@ -118,42 +124,11 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 				if !span.Primary || span.SuggestedReplacement == "" {
 					continue
 				}
-				replacementPath, err := staticanalysis.BuildPathToCheckoutPath(span.FileName, a.buildDir, a.checkoutDir)
-				if err != nil {
-					return nil, err
-				}
-				replacements = append(replacements, staticanalysis.Replacement{
-					Path:        replacementPath,
-					Replacement: span.SuggestedReplacement,
-					StartLine:   span.LineStart,
-					EndLine:     span.LineEnd,
-					// Clippy uses one-based column numbers but staticanalysis
-					// finding character indices must be zero-based.
-					StartChar: span.ColumnStart - 1,
-					EndChar:   span.ColumnEnd - 1,
-				})
-			}
-
-			if len(replacements) > 0 {
-				suggestions = append(suggestions, staticanalysis.Suggestion{
-					Description:  child.Message,
-					Replacements: replacements,
-				})
-			}
-
-			switch len(replacements) {
-			case 0:
-				messageLines = append(messageLines, fmt.Sprintf("help: %s", child.Message))
-			case 1:
-				// If there's a single suggested replacement, child.Message will
-				// be some text like "try" that is intended to be followed by
-				// the suggested replacement.
-				repl := replacements[0].Replacement
-				// Only include the suggestion in the message if the suggested
-				// replacement is a single line. It it spans multiple lines it
-				// probably won't make much sense when rendered out of context.
-				if !strings.Contains(repl, "\n") {
-					messageLines = append(messageLines, fmt.Sprintf("help: %s: `%s`", child.Message, repl))
+				if span.equals(primarySpan) {
+					replacements = append(replacements, span.SuggestedReplacement)
+					messageLines = append(messageLines, fmt.Sprintf(
+						"help: %s: `%s`", child.Message, span.SuggestedReplacement,
+					))
 				}
 			}
 		}
@@ -164,16 +139,14 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 		category := fmt.Sprintf("Clippy/%s/%s", result.Level, lintID)
 
 		findings = append(findings, &staticanalysis.Finding{
-			Category:  category,
-			Message:   strings.Join(messageLines, "\n\n"),
-			Path:      path,
-			StartLine: primarySpan.LineStart,
-			EndLine:   primarySpan.LineEnd,
-			// Clippy uses one-based column numbers but staticanalysis finding
-			// character indices must be zero-based.
-			StartChar:   primarySpan.ColumnStart - 1,
-			EndChar:     primarySpan.ColumnEnd - 1,
-			Suggestions: suggestions,
+			Category:     category,
+			Message:      strings.Join(messageLines, "\n\n"),
+			Path:         path,
+			Line:         primarySpan.LineStart,
+			EndLine:      primarySpan.LineEnd,
+			Col:          primarySpan.ColumnStart,
+			EndCol:       primarySpan.ColumnEnd,
+			Replacements: replacements,
 		})
 	}
 
@@ -183,8 +156,8 @@ func (a *clippyReporter) report(ctx context.Context, path string) ([]*staticanal
 // clippyTargetForFile returns the Clippy output target for the library that a
 // given source file is included in. If the file is not associated with any
 // Clippy target, returns false.
-func (a *clippyReporter) clippyTargetForFile(buildRelPath string) (target build.ClippyTarget, ok bool) {
-	for _, target := range a.clippyTargets {
+func (c *clippyReporter) clippyTargetForFile(buildRelPath string) (target build.ClippyTarget, ok bool) {
+	for _, target := range c.clippyTargets {
 		for _, source := range target.Sources {
 			// Assumes each file only feeds into a single clippy target.
 			if source == buildRelPath {
@@ -193,6 +166,19 @@ func (a *clippyReporter) clippyTargetForFile(buildRelPath string) (target build.
 		}
 	}
 	return build.ClippyTarget{}, false
+}
+
+// buildPathToCheckoutPath converts a path relative to the build directory into
+// a source-relative path with platform-agnostic separators.
+//
+// E.g. "../../src/foo/bar.py" -> "src/foo/bar.py".
+func (c *clippyReporter) buildPathToCheckoutPath(path string) (string, error) {
+	absPath := filepath.Clean(filepath.Join(c.buildDir, path))
+	path, err := filepath.Rel(c.checkoutDir, absPath)
+	if err != nil {
+		return "", err
+	}
+	return filepath.ToSlash(path), nil
 }
 
 // clippyResult represents one clippy finding.
@@ -250,6 +236,20 @@ type clippySpan struct {
 	ColumnEnd   int `json:"column_end"`
 }
 
+func (s clippySpan) asMap() map[string]string {
+	return map[string]string{
+		"file_name":    s.FileName,
+		"line_start":   strconv.Itoa(s.LineStart),
+		"line_end":     strconv.Itoa(s.LineEnd),
+		"column_start": strconv.Itoa(s.ColumnStart),
+		"column_end":   strconv.Itoa(s.ColumnEnd),
+	}
+}
+
+func (s clippySpan) equals(other clippySpan) bool {
+	return maps.Equal(s.asMap(), other.asMap())
+}
+
 func mainImpl() error {
 	var filesJSON string
 	var checkoutDir string
@@ -268,7 +268,7 @@ func mainImpl() error {
 	if err := jsonutil.ReadFromFile(filesJSON, &paths); err != nil {
 		return fmt.Errorf("failed to read -files-json: %w", err)
 	}
-	a := clippyReporter{
+	cr := clippyReporter{
 		checkoutDir:   checkoutDir,
 		buildDir:      buildDir,
 		clippyTargets: mod.ClippyTargets(),
@@ -276,7 +276,7 @@ func mainImpl() error {
 
 	findings := []*staticanalysis.Finding{}
 	for _, path := range paths {
-		f, err := a.report(context.Background(), path)
+		f, err := cr.report(context.Background(), path)
 		if err != nil {
 			return err
 		}

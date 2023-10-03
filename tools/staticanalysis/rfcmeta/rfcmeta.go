@@ -128,20 +128,20 @@ func (a *analyzer) analyzeToc() ([]*staticanalysis.Finding, error) {
 				Category: "rfcmeta/toc/unexpected_path",
 				Message: fmt.Sprintf("path for %q should begin with %q; found %q",
 					entry.Title, expectedPathPrefix, entry.Path),
-				Path:      tocPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Path:    tocPath,
+				Line:    lineNo,
+				EndLine: lineNo,
 			})
 		}
 
 		// Ensure the path actually exists.
 		if _, err := os.Stat(filepath.Join(a.checkoutDir, entry.Path)); errors.Is(err, os.ErrNotExist) {
 			findings = append(findings, &staticanalysis.Finding{
-				Category:  "rfcmeta/toc/file_not_found",
-				Message:   fmt.Sprintf("File %q doesn't exist", entry.Path),
-				Path:      tocPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Category: "rfcmeta/toc/file_not_found",
+				Message:  fmt.Sprintf("File %q doesn't exist", entry.Path),
+				Path:     tocPath,
+				Line:     lineNo,
+				EndLine:  lineNo,
 			})
 		} else if err != nil {
 			return findings, err
@@ -199,9 +199,9 @@ func (a *analyzer) analyzeRfcIndex() ([]*staticanalysis.Finding, error) {
 				Category: "rfcmeta/index/invalid_name",
 				Message: fmt.Sprintf(
 					"RFC name %q should look like \"RFC-1234\"", rfc.Title),
-				Path:      rfcIndexPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Path:    rfcIndexPath,
+				Line:    lineNo,
+				EndLine: lineNo,
 			})
 			continue
 		}
@@ -217,9 +217,9 @@ func (a *analyzer) analyzeRfcIndex() ([]*staticanalysis.Finding, error) {
 				Category: "rfcmeta/index/missing_area",
 				Message: fmt.Sprintf("Include an 'area' for this RFC. Options are listed in //%s",
 					areasPath),
-				Path:      rfcIndexPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Path:    rfcIndexPath,
+				Line:    lineNo,
+				EndLine: lineNo,
 			})
 		}
 
@@ -231,9 +231,9 @@ func (a *analyzer) analyzeRfcIndex() ([]*staticanalysis.Finding, error) {
 					Category: "rfcmeta/index/unknown_area",
 					Message: fmt.Sprintf("area %q is not listed in //%s",
 						area, areasPath),
-					Path:      rfcIndexPath,
-					StartLine: lineNo,
-					EndLine:   lineNo,
+					Path:    rfcIndexPath,
+					Line:    lineNo,
+					EndLine: lineNo,
 				})
 			}
 		}
@@ -244,9 +244,9 @@ func (a *analyzer) analyzeRfcIndex() ([]*staticanalysis.Finding, error) {
 				Category: "rfcmeta/index/unexpected_path",
 				Message: fmt.Sprintf("path for %q should begin with %q; found %q",
 					rfc.Name, rfcId+"_", rfc.File),
-				Path:      rfcIndexPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Path:    rfcIndexPath,
+				Line:    lineNo,
+				EndLine: lineNo,
 			})
 		}
 
@@ -256,9 +256,9 @@ func (a *analyzer) analyzeRfcIndex() ([]*staticanalysis.Finding, error) {
 				Category: "rfcmeta/index/file_not_found",
 				Message: fmt.Sprintf("file %q does not exist",
 					filepath.Join(rfcsDir, rfc.File)),
-				Path:      rfcIndexPath,
-				StartLine: lineNo,
-				EndLine:   lineNo,
+				Path:    rfcIndexPath,
+				Line:    lineNo,
+				EndLine: lineNo,
 			})
 		} else if err != nil {
 			return findings, err
@@ -399,32 +399,19 @@ func analyzeSetRfcIdTag(path string, rfcId string, file []string) []*staticanaly
 		if match[2] == rfcId {
 			// The tag looks good.
 			return nil
-		} else {
-			return []*staticanalysis.Finding{{
-				Category: "rfcmeta/file/rfcid_mismatch",
-				Message:  fmt.Sprintf("Filename has RFC ID %q, but the rfcid tag has ID %q", rfcId, match[2]),
-				Path:     path,
-
-				StartLine: i + 1,
-				EndLine:   i + 1,
-				StartChar: 0,
-				EndChar:   len(line),
-
-				Suggestions: []staticanalysis.Suggestion{{
-					Description: "Fix the tag to match the filename.",
-					Replacements: []staticanalysis.Replacement{
-						{
-							Path:        path,
-							Replacement: match[1] + rfcId + match[3],
-							StartLine:   i + 1,
-							EndLine:     i + 1,
-							StartChar:   0,
-							EndChar:     len(line),
-						},
-					},
-				}},
-			}}
 		}
+		return []*staticanalysis.Finding{{
+			Category: "rfcmeta/file/rfcid_mismatch",
+			Message:  fmt.Sprintf("Filename has RFC ID %q, but the rfcid tag has ID %q", rfcId, match[2]),
+			Path:     path,
+			Line:     i + 1,
+			EndLine:  i + 1,
+			Col:      1,
+			EndCol:   len(line) + 1,
+			Replacements: []string{
+				match[1] + rfcId + match[3],
+			},
+		}}
 	}
 
 	// If we made it to the end without finding the tag, complain.

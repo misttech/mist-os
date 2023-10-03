@@ -113,16 +113,15 @@ def _rfcmeta(ctx):
     ] + files).wait()
 
     for finding in json.decode(res.stdout):
-        col = finding.get("start_char")
-        end_col = finding.get("end_char")
         ctx.emit.finding(
             message = finding["message"],
             level = "warning",
             filepath = finding["path"],
-            line = finding.get("start_line"),
-            end_line = finding.get("end_line"),
-            col = col + 1 if col else None,
-            end_col = end_col + 1 if end_col else None,
+            line = finding["line"],
+            end_line = finding["end_line"],
+            col = finding["col"],
+            end_col = finding["end_col"],
+            replacements = finding["replacements"],
         )
 
 def register_doc_checks():

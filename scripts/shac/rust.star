@@ -33,30 +33,16 @@ def _clippy(ctx):
     ]).wait()
 
     for finding in json.decode(res.stdout):
-        span = _convert_span(finding)
-        replacements = [
-            r["replacement"]
-            for s in finding.get("suggestions", [])
-            for r in s.get("replacements", [])
-            if _convert_span(s) == span
-        ]
         ctx.emit.finding(
             message = finding["message"],
             level = "warning",
             filepath = finding["path"],
-            replacements = replacements,
-            **span
+            line = finding["line"],
+            end_line = finding["end_line"],
+            col = finding["col"],
+            end_col = finding["end_col"],
+            replacements = finding["replacements"],
         )
-
-def _convert_span(finding):
-    col = finding.get("start_char")
-    end_col = finding.get("end_char")
-    return dict(
-        line = finding.get("start_line"),
-        end_line = finding.get("end_line"),
-        col = col + 1 if col else None,
-        end_col = end_col + 1 if end_col else None,
-    )
 
 def _rustfmt(ctx):
     """Runs rustfmt on a Rust code base.
