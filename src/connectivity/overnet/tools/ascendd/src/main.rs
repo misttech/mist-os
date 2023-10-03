@@ -6,6 +6,6 @@ use {anyhow::Error, ascendd::Ascendd};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    let hoist = hoist::Hoist::new(Some(std::time::Duration::from_millis(500)))?;
-    Ascendd::new(argh::from_env(), &hoist).await?.await
+    let node = overnet_core::Router::new(Some(std::time::Duration::from_millis(500)))?;
+    Ascendd::new(argh::from_env(), node).await?.await
 }
