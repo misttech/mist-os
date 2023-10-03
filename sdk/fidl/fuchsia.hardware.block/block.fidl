@@ -92,7 +92,7 @@ closed protocol Block {
     ///
     /// storage_metrics.CallStat.bytes_transferred is number of bytes requested
     /// to be transferred.
-    @available(deprecated=15, removed=HEAD, note="use new signature of GetStats")
+    @available(removed=15)
     strict GetStats(struct {
         clear bool;
     }) -> (struct {
@@ -114,7 +114,7 @@ closed protocol Block {
     }) error zx.Status;
 
     /// Returns stats about block device operations. Setting `clear` will reset stats counters.
-    @available(added=HEAD)
+    @available(added=15)
     strict GetStats(struct {
         clear bool;
     }) -> (struct {
