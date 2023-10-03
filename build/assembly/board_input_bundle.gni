@@ -204,8 +204,12 @@ template("board_input_bundle") {
       creation_deps += [ ":${target_name}.${package_set}" ]
 
       # Add all the package manifests to the creation args.
-      creation_args += [ string_replace("--${package_set}", "_", "-") ] +
-                       rebase_path(_package_manifests, root_build_dir)
+      foreach(_package_manifest, _package_manifests) {
+        creation_args += [
+          string_replace("--${package_set}", "_", "-"),
+          rebase_path(_package_manifest, root_build_dir),
+        ]
+      }
 
       # Because of a bug in GN, where using `invoker[package_set]` doesn't mark
       # invoker.base_packages (etc.) as having been used...

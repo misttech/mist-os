@@ -37,10 +37,10 @@ import("//build/python/python_action.gni")
 #    The list if valid strings is currently an unstable API between boards and
 #    assembly and can change at any time.
 #
-#  main_bundle (optional)
-#    [GN label] The GN label of the "main" Board Input Bundle for this board.
-#    This must be the label of a board_input_bundle() target.  If the target
-#    isn't a board_input_bundle() target, it will cause an error like:
+#  input_bundles (optional)
+#    [list; GN Labels] The GN labels of the Board Input Bundles for this board.
+#    Each must be the label of a board_input_bundle() target.  If the target
+#    isn't a board_input_bundle() target, it will cause an error such as:
 #      "no dependency provides the input <target_name>/board_input_bundle.json"
 #
 #  filesystems (optional)
@@ -81,9 +81,15 @@ template("board_configuration") {
     bazel_inputs = "${target_name}_bazel_inputs"
 
     # Inputs
-    if (defined(invoker.main_bundle)) {
-      main_bundle = invoker.main_bundle
-      validate_main_bundle = "${main_target}.validate_main_bundle_input"
+    if (defined(invoker.input_bundles)) {
+      input_bundles = invoker.input_bundles
+
+      # The validation task that the bundles are all created by the
+      # board_input_bundle() template.
+      validate_input_bundles = "${main_target}.validate_input_bundle_targets"
+
+      # The input bundle copying targets.
+      input_bundle_copy_targets = []
     }
 
     # Intermediate Files
@@ -108,24 +114,15 @@ template("board_configuration") {
     # The files that we create as book-keeping between our tasks.
     depfile = "${bundles_dir}/${target_name}.d"
 
-    # Inputs
-    if (defined(labels.main_bundle)) {
-      main_bundle_input_dir =
-          get_label_info(labels.main_bundle, "target_out_dir") + "/" +
-          get_label_info(labels.main_bundle, "name")
-
-      main_bundle_input_file =
-          "${main_bundle_input_dir}/board_input_bundle.json"
-
-      main_bundle_output_dir = "${board_configuration_dir}/main_bundle"
-
-      main_bundle_output_file =
-          "${main_bundle_output_dir}/board_input_bundle.json"
-    }
-
     # Intermediate Files
     _gen_files = "${target_gen_dir}/${target_name}"
     base_info = "${_gen_files}.base_info.json"
+
+    if (defined(labels.input_bundles)) {
+      # The directory of input bundles
+      input_bundles_dir = "${board_configuration_dir}/input_bundles"
+      input_bundle_dirs = []
+    }
 
     # The output path for the generated file which collects kernel cmdline
     # arguments.
@@ -194,42 +191,72 @@ template("board_configuration") {
     }
   }
 
-  if (defined(labels.main_bundle)) {
-    # Validate that the main bundle target is actually a board_input_bundle()
-    # target.
-    group_with_inputs(labels.validate_main_bundle) {
-      forward_variables_from(invoker, [ "testonly" ])
-      visibility = [ ":${labels.main_target}.main_bundle_copy" ]
-      deps = [ labels.main_bundle ]
-      inputs = [ files.main_bundle_input_file ]
+  if (defined(labels.input_bundles)) {
+    _input_bundle_manifest_files = []
+
+    foreach(input_bundle, labels.input_bundles) {
+      _input_bundle_name = get_label_info(input_bundle, "name")
+      _input_bundle_input_dir = get_label_info(input_bundle, "target_out_dir") +
+                                "/" + _input_bundle_name
+
+      _input_bundle_input_file =
+          "${_input_bundle_input_dir}/board_input_bundle.json"
+
+      _input_bundle_manifest_files += [ _input_bundle_input_file ]
+
+      _input_bundle_output_dir =
+          "${files.input_bundles_dir}/${_input_bundle_name}"
+
+      _input_bundle_output_file =
+          "${_input_bundle_output_dir}/board_input_bundle.json"
+
+      assert(
+          files.input_bundle_dirs ==
+              files.input_bundle_dirs + [ _input_bundle_output_dir ] -
+                  [ _input_bundle_output_dir ],
+          "All input bundle targets must have unique 'name' portions of their label.")
+
+      files.input_bundle_dirs += [ _input_bundle_output_dir ]
+
+      # Copy the Board Input Bundle into the board's own directory, to make the
+      # whole board portable.
+      _input_bundle_copy_target = "${target_name}.${_input_bundle_name}.copy"
+      action(_input_bundle_copy_target) {
+        forward_variables_from(invoker, [ "testonly" ])
+        visibility = [ ":${labels.main_target}" ]
+        script = "//build/copy_tree.py"
+        deps = [ ":${labels.validate_input_bundles}" ]
+        depfile = "${target_out_dir}/${target_name}.d"
+
+        outputs = [ _input_bundle_output_file ]
+
+        # The contents of these folders are dynamic, and managed entirely by this
+        # action.  Further, this action will need to delete items from these
+        # directories that are not added back (on an incremental build, if an item
+        # is removed from one of these sets)
+        hermetic_action_ignored_prefixes = [ _input_bundle_output_dir ]
+
+        args = [
+          rebase_path(_input_bundle_input_dir, root_build_dir),
+          rebase_path(_input_bundle_output_dir, root_build_dir),
+          rebase_path(outputs[0], root_build_dir),
+          "--depfile",
+          rebase_path(depfile, root_build_dir),
+        ]
+      }
+      labels.input_bundle_copy_targets += [ ":${_input_bundle_copy_target}" ]
     }
 
-    # Copy the Board Input Bundle into the board's own directory, to make the
-    # whole board portable.
-    action("${target_name}.main_bundle_copy") {
+    # Validate that the input bundle targets are actually board_input_bundle()
+    # targets.
+    group_with_inputs(labels.validate_input_bundles) {
       forward_variables_from(invoker, [ "testonly" ])
-      visibility = [ ":${labels.main_target}" ]
-      script = "//build/copy_tree.py"
-      deps = [ ":${labels.validate_main_bundle}" ]
-      depfile = "${target_out_dir}/${target_name}.d"
-
-      outputs = [ files.main_bundle_output_file ]
-
-      # The contents of these folders are dynamic, and managed entirely by this
-      # action.  Further, this action will need to delete items from these
-      # directories that are not added back (on an incremental build, if an item
-      # is removed from one of these sets)
-      hermetic_action_ignored_prefixes = [ "${files.main_bundle_output_dir}" ]
-
-      args = [
-        rebase_path(files.main_bundle_input_dir, root_build_dir),
-        rebase_path(files.main_bundle_output_dir, root_build_dir),
-        rebase_path(outputs[0], root_build_dir),
-        "--depfile",
-        rebase_path(depfile, root_build_dir),
-      ]
+      visibility = labels.input_bundle_copy_targets
+      deps = labels.input_bundles
+      inputs = _input_bundle_manifest_files
     }
-    creation_deps += [ ":${target_name}.main_bundle_copy" ]
+
+    creation_deps += labels.input_bundle_copy_targets
   }
 
   base_info_contents = {
@@ -239,9 +266,9 @@ template("board_configuration") {
       filesystems = _filesystems
     }
 
-    if (defined(files.main_bundle_output_dir)) {
-      main_bundle = rebase_path(files.main_bundle_output_dir,
-                                files.board_configuration_dir)
+    if (defined(files.input_bundle_dirs)) {
+      input_bundles =
+          rebase_path(files.input_bundle_dirs, files.board_configuration_dir)
     }
 
     forward_variables_from(invoker, [ "provided_features" ])
