@@ -224,7 +224,7 @@ class MsdVsiDevice : public msd::Device,
   void EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request);
 
   int InterruptThreadLoop();
-  magma::Status ProcessInterrupt();
+  magma::Status ProcessInterrupt(registers::IrqAck irq_status);
   magma::Status ProcessDumpStatusToLog();
   void ProcessRequestBacklog();
 
