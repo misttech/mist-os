@@ -279,6 +279,48 @@
     - fidl: 'fuchsia.net.name'
       description: 'Application-level name resolution.'
 
+- name: 'Power'
+  api_primary: 'mbrunson@google.com'
+  api_secondary: ''
+  description: |
+    <p>
+      The set of APIs for centralized power and thermal management, including
+      system power state control, administration of power dependencies, and
+      thermal throttling. Also includes aspects of power delivery such as
+      battery management.
+    </p>
+    <p>
+      Naturally overlaps with other API areas on power/thermal-related drivers
+      and subsystem-specific power management APIs. Ownership of overlapping
+      APIs is deferred to other API areas where practical, with the Power area
+      operating in a consulting role.
+    </p>
+  examples:
+    - fidl: 'fuchsia.power.battery'
+    - fidl: 'fuchsia.power.systemmode'
+    - fidl: 'fuchsia.thermal'
+
+- name: 'Product Assembly'
+  api_primary: 'aaronwood@google.com'
+  api_secondary: 'awolter@google.com'
+  description: |
+    <p>
+      A set of APIs to combine software from a variety of sources into a
+      flashable, updatable product image. Product Assembly is concerned with:
+      <ul>
+          <li>
+              The assembly-time product/platform interface, which allows
+              product owners to specify how the platform should be configured
+              for a particular product.
+          </li>
+          <li>
+              The contract for how assembly input artifacts are specified to
+              the assembly tools which assemble the correct set of artifacts for
+              a given product build.
+          </li>
+      </ul>
+    </p>
+
 - name: 'Security'
   api_primary: ''
   api_secondary: ''
@@ -307,27 +349,6 @@
     </p>
   examples:
     - fidl: 'fuchsia.element'
-
-- name: 'Product Assembly'
-  api_primary: 'aaronwood@google.com'
-  api_secondary: 'awolter@google.com'
-  description: |
-    <p>
-      A set of APIs to combine software from a variety of sources into a
-      flashable, updatable product image. Product Assembly is concerned with:
-      <ul>
-          <li>
-              The assembly-time product/platform interface, which allows
-              product owners to specify how the platform should be configured
-              for a particular product.
-          </li>
-          <li>
-              The contract for how assembly input artifacts are specified to
-              the assembly tools which assemble the correct set of artifacts for
-              a given product build.
-          </li>
-      </ul>
-    </p>
 
 - name: 'Software Delivery'
   api_primary: 'kevinwells@google.com'
