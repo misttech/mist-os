@@ -10,6 +10,7 @@
   "pkg/zx/include/lib/zx/guest.h": "ca2b9c3872bfbe9cdd94c2cb4ee760fe",
   "pkg/zx/include/lib/zx/handle.h": "ea2bb0d4ad153ef048189ae1f486a53d",
   "pkg/zx/include/lib/zx/interrupt.h": "000a32e14c6b8e123654dc08da2060d7",
+  "pkg/zx/include/lib/zx/iob.h": "4f3de11d1239c4717a7eb9982ff0f885",
   "pkg/zx/include/lib/zx/iommu.h": "d407e69567efc11ef8b66541f5f84a75",
   "pkg/zx/include/lib/zx/job.h": "c49f1749c491a3386fd4fcdbe4dad167",
   "pkg/zx/include/lib/zx/msi.h": "7345ac86fdb18de4e297466ececf4eb0",
@@ -30,6 +31,6 @@
   "pkg/zx/include/lib/zx/time.h": "64599787524ec750f50cbe994654fb01",
   "pkg/zx/include/lib/zx/timer.h": "f91bc42de3e3a20877e2770259623a6b",
   "pkg/zx/include/lib/zx/vcpu.h": "830ce0b65c469d394cca3cad0ee51ad9",
-  "pkg/zx/include/lib/zx/vmar.h": "a7ec8d1686a6d043a253c2bfcfe52ee9",
+  "pkg/zx/include/lib/zx/vmar.h": "6748f652d7d60879374addc12e6b03b4",
   "pkg/zx/include/lib/zx/vmo.h": "897ae03c575ce2519179edbd5345a0fe"
 }

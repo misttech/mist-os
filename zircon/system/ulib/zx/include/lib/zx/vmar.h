@@ -5,6 +5,7 @@
 #ifndef LIB_ZX_VMAR_H_
 #define LIB_ZX_VMAR_H_
 
+#include <lib/zx/iob.h>
 #include <lib/zx/object.h>
 #include <lib/zx/vmo.h>
 #include <zircon/availability.h>
@@ -34,6 +35,13 @@ class vmar final : public object<vmar> {
   zx_status_t map(zx_vm_option_t options, size_t vmar_offset, const vmo& vmo_handle,
                   uint64_t vmo_offset, size_t len, zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(7) {
     return zx_vmar_map(get(), options, vmar_offset, vmo_handle.get(), vmo_offset, len, ptr);
+  }
+
+  zx_status_t map_iob(zx_vm_option_t options, size_t vmar_offset, const iob& iob_handle,
+                      uint32_t region_index, uint64_t region_offset, size_t region_len,
+                      zx_vaddr_t* ptr) const ZX_AVAILABLE_SINCE(14) {
+    return zx_vmar_map_iob(get(), options, vmar_offset, iob_handle.get(), region_index,
+                           region_offset, region_len, ptr);
   }
 
   zx_status_t unmap(uintptr_t address, size_t len) const ZX_AVAILABLE_SINCE(7) {

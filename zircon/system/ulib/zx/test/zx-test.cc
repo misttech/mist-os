@@ -10,6 +10,7 @@
 #include <lib/zx/event.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/handle.h>
+#include <lib/zx/iob.h>
 #include <lib/zx/iommu.h>
 #include <lib/zx/job.h>
 #include <lib/zx/port.h>
@@ -27,6 +28,7 @@
 #include <zircon/compiler.h>
 #include <zircon/limits.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/iob.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/syscalls/port.h>
 #include <zircon/threads.h>
@@ -747,6 +749,43 @@ TEST(ZxTestCase, VmoContentSize) {
   ASSERT_OK(zx_object_get_property(vmo.get(), ZX_PROP_VMO_CONTENT_SIZE, &retrieved_size,
                                    sizeof(retrieved_size)));
   EXPECT_EQ(retrieved_size, new_size);
+}
+
+TEST(ZxTestCase, IobCreateAndMap) {
+  zx::iob iob;
+  zx_iob_region_t regions[2] = {
+      zx_iob_region_t{
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = ZX_IOB_EP0_CAN_MAP_READ | ZX_IOB_EP0_CAN_MAP_WRITE,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+          .private_region =
+              {
+                  .options = 0,
+              },
+      },
+      zx_iob_region_t{
+          .type = ZX_IOB_REGION_TYPE_PRIVATE,
+          .access = ZX_IOB_EP1_CAN_MAP_READ | ZX_IOB_EP1_CAN_MAP_WRITE,
+          .size = ZX_PAGE_SIZE,
+          .discipline = zx_iob_discipline_t{.type = ZX_IOB_DISCIPLINE_TYPE_NONE},
+          .private_region =
+              {
+                  .options = 0,
+              },
+      },
+  };
+  zx::iob ep0;
+  zx::iob ep1;
+  ASSERT_OK(zx::iob::create(0, regions, 2, &ep0, &ep1));
+  ASSERT_OK(validate_handle(ep0.get()));
+  ASSERT_OK(validate_handle(ep1.get()));
+
+  uintptr_t out;
+  ASSERT_OK(zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep0, 0, 0,
+                                           ZX_PAGE_SIZE, &out));
+  ASSERT_OK(zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0u, ep1, 1, 0,
+                                           ZX_PAGE_SIZE, &out));
 }
 
 }  // namespace
