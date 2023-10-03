@@ -31,6 +31,65 @@ constexpr void UpdateBits(uint32_t* x, uint32_t mask, uint32_t loc, uint32_t val
   *x |= ((val << loc) & mask);
 }
 
+// Translates a Banjo sdmmc request (sdmmc_req_t) into a FIDL one
+// (fuchsia_hardware_sdmmc::wire::SdmmcReq).
+zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_req_t& banjo_req,
+                                                                  fdf::Arena* arena) {
+  fuchsia_hardware_sdmmc::wire::SdmmcReq wire_req;
+
+  wire_req.cmd_idx = banjo_req.cmd_idx;
+  wire_req.cmd_flags = banjo_req.cmd_flags;
+  wire_req.arg = banjo_req.arg;
+  wire_req.blocksize = banjo_req.blocksize;
+  wire_req.suppress_error_messages = banjo_req.suppress_error_messages;
+  wire_req.client_id = banjo_req.client_id;
+
+  wire_req.buffers.Allocate(*arena, banjo_req.buffers_count);
+  for (size_t i = 0; i < banjo_req.buffers_count; i++) {
+    if (banjo_req.buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
+      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId;
+      wire_req.buffers[i].buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(
+          banjo_req.buffers_list[i].buffer.vmo_id);
+    } else {
+      if (banjo_req.buffers_list[i].type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      zx::vmo dup;
+      // TODO(b/300145353): Remove duplication when removing Banjo.
+      zx_status_t status = zx_handle_duplicate(banjo_req.buffers_list[i].buffer.vmo,
+                                               ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
+        return zx::error(status);
+      }
+      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
+      wire_req.buffers[i].buffer =
+          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
+    }
+
+    wire_req.buffers[i].offset = banjo_req.buffers_list[i].offset;
+    wire_req.buffers[i].size = banjo_req.buffers_list[i].size;
+  }
+  return zx::ok(std::move(wire_req));
+}
+
+// Translates a collection of Banjo sdmmc requests into a FIDL one.
+zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> BanjoToFidlReqVector(
+    const sdmmc_req_t* req, size_t banjo_req_count, fdf::Arena* arena) {
+  fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> wire_req_vector;
+  wire_req_vector.Allocate(*arena, banjo_req_count);
+
+  for (size_t i = 0; i < banjo_req_count; i++) {
+    zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> wire_req = BanjoToFidlReq(*req, arena);
+    if (wire_req.is_error()) {
+      return zx::error(wire_req.error_value());
+    }
+    wire_req_vector[i] = std::move(*wire_req);
+    req++;
+  }
+  return zx::ok(wire_req_vector);
+}
+
 }  // namespace
 
 namespace sdmmc {
@@ -157,56 +216,70 @@ zx_status_t SdmmcDevice::SdmmcWaitForState(uint32_t state) {
   return ZX_ERR_TIMED_OUT;
 }
 
-zx_status_t SdmmcDevice::SdmmcIoRequestWithRetries(
-    const sdmmc_req_t& request, uint32_t* retries,
-    const std::optional<sdmmc_req_t>& set_block_count,
-    const std::optional<sdmmc_req_t>& set_block_count_for_header,
-    const std::optional<sdmmc_req_t>& write_header) {
-  zx_status_t st;
-  for (uint32_t i = 0; i < kTryAttempts; i++) {
-    if (i > 0) {
-      (*retries)++;
-    }
-
-    uint32_t unused_response[4];
-    if (set_block_count_for_header.has_value()) {
-      if ((st = Request(set_block_count_for_header.value(), unused_response)) != ZX_OK) {
-        continue;
-      }
-    }
-
-    if (write_header.has_value()) {
-      if ((st = Request(write_header.value(), unused_response)) != ZX_OK) {
-        continue;
-      }
-    }
-
-    if (set_block_count.has_value()) {
-      if ((st = Request(set_block_count.value(), unused_response)) != ZX_OK) {
-        continue;
-      }
-    }
-
-    sdmmc_req_t req = request;
-    req.suppress_error_messages = i < (kTryAttempts - 1);
-
-    if ((st = Request(req, unused_response)) == ZX_OK) {
-      break;
-    }
-
-    // Wait for the card to go idle (TRAN state) before retrying. SdmmcStopTransmission waits for
-    // the busy signal on dat0, so the card should be back in TRAN immediately after.
-
-    uint32_t status;
-    if (SdmmcStopTransmission(&status) == ZX_OK &&
-        MMC_STATUS_CURRENT_STATE(status) == MMC_STATUS_CURRENT_STATE_TRAN) {
-      continue;
-    }
-
-    SdmmcWaitForState(MMC_STATUS_CURRENT_STATE_TRAN);
+void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
+                                            fit::function<void(zx_status_t, uint32_t)> callback,
+                                            uint32_t retries) {
+  const bool last_retry = retries >= (kTryAttempts - 1);
+  for (auto& req : reqs) {
+    req.suppress_error_messages = !last_retry;
   }
 
-  return st;
+  if (!use_fidl_) {
+    zx_status_t status = ZX_OK;
+    for (const auto& req : reqs) {
+      uint32_t unused_response[4];
+      status = host_.Request(&req, unused_response);
+      if (status != ZX_OK) {
+        SdmmcStopForRetry();
+        break;
+      }
+    }
+    if (status != ZX_OK && !last_retry) {
+      return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
+    } else {
+      return callback(status, retries);
+    }
+  }
+
+  fdf::Arena arena('SDMC');
+  zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> wire_req_vector =
+      BanjoToFidlReqVector(reqs.data(), reqs.size(), &arena);
+  if (wire_req_vector.is_error()) {
+    return callback(wire_req_vector.error_value(), retries);
+  }
+
+  client_.buffer(arena)
+      ->Request(*wire_req_vector)
+      .Then([this, reqs = std::move(reqs), callback = std::move(callback), retries, last_retry](
+                fdf::WireUnownedResult<fuchsia_hardware_sdmmc::Sdmmc::Request>& result) mutable {
+        if (!result.ok()) {
+          zxlogf(ERROR, "Request request failed: %s", result.status_string());
+          return callback(result.status(), retries);  // Not retrying if FIDL error.
+        }
+
+        if (result->is_error()) {
+          SdmmcStopForRetry();  // Performed synchronously within this asynchronous context.
+          if (!last_retry) {
+            return SdmmcIoRequestWithRetries(std::move(reqs), std::move(callback), retries + 1);
+          } else {
+            return callback(result->error_value(), retries);
+          }
+        }
+        return callback(ZX_OK, retries);
+      });
+}
+
+void SdmmcDevice::SdmmcStopForRetry() {
+  // Wait for the card to go idle (TRAN state) before retrying. SdmmcStopTransmission waits for
+  // the busy signal on dat0, so the card should be back in TRAN immediately after.
+
+  uint32_t status;
+  if (SdmmcStopTransmission(&status) == ZX_OK &&
+      MMC_STATUS_CURRENT_STATE(status) == MMC_STATUS_CURRENT_STATE_TRAN) {
+    return;
+  }
+
+  SdmmcWaitForState(MMC_STATUS_CURRENT_STATE_TRAN);
 }
 
 // SD ops
@@ -860,43 +933,14 @@ zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4
     return host_.Request(req, out_response);
   }
 
-  fuchsia_hardware_sdmmc::wire::SdmmcReq wire_req;
-  wire_req.cmd_idx = req->cmd_idx;
-  wire_req.cmd_flags = req->cmd_flags;
-  wire_req.arg = req->arg;
-  wire_req.blocksize = req->blocksize;
-  wire_req.suppress_error_messages = req->suppress_error_messages;
-  wire_req.client_id = req->client_id;
-
   fdf::Arena arena('SDMC');
-  wire_req.buffers.Allocate(arena, req->buffers_count);
-  for (size_t i = 0; i < req->buffers_count; i++) {
-    if (req->buffers_list[i].type == SDMMC_BUFFER_TYPE_VMO_ID) {
-      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId;
-      wire_req.buffers[i].buffer =
-          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmoId(req->buffers_list[i].buffer.vmo_id);
-    } else {
-      if (req->buffers_list[i].type != SDMMC_BUFFER_TYPE_VMO_HANDLE) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-      zx::vmo dup;
-      // TODO(b/300145353): Remove duplication when removing Banjo.
-      zx_status_t status = zx_handle_duplicate(req->buffers_list[i].buffer.vmo,
-                                               ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
-        return status;
-      }
-      wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
-      wire_req.buffers[i].buffer =
-          fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup));
-    }
-
-    wire_req.buffers[i].offset = req->buffers_list[i].offset;
-    wire_req.buffers[i].size = req->buffers_list[i].size;
+  zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> wire_req_vector =
+      BanjoToFidlReqVector(req, 1, &arena);
+  if (wire_req_vector.is_error()) {
+    return wire_req_vector.error_value();
   }
 
-  auto result = client_.sync().buffer(arena)->Request(std::move(wire_req));
+  auto result = client_.sync().buffer(arena)->Request(*wire_req_vector);
   if (!result.ok()) {
     zxlogf(ERROR, "Request request failed: %s", result.status_string());
     return result.status();

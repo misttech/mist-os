@@ -192,8 +192,12 @@ closed protocol Sdmmc {
         vmo zx.Handle:VMO;
     }) error zx.Status;
 
-    /// Perform the request. The protocol implementation chooses whether or not to use DMA depending
-    /// on the properties of the request and the capabilities of the controller.
+    /// Perform the requests in order, atomically (i.e., no intervening requests). Furthermore,
+    /// calls are replied to in the order they are received. If an error occurs, abort any remaining
+    /// requests. Else, return the response of the last request.
+    ///
+    /// The protocol implementation chooses whether or not to use DMA
+    /// depending on the properties of the request and the capabilities of the controller.
     ///
     /// Clients are responsible for performing the following cache operations:
     ///
@@ -210,7 +214,7 @@ closed protocol Sdmmc {
     ///   client.
     /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
     strict Request(resource struct {
-        req SdmmcReq;
+        reqs vector<SdmmcReq>:MAX;
     }) -> (struct {
         response array<uint32, 4>;
     }) error zx.Status;

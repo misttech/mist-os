@@ -486,29 +486,16 @@ zx_status_t SdmmcBlockDevice::ProbeMmc(
       get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_READS], metadata);
   max_packed_writes_effective_ =
       get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_WRITES], metadata);
-  const int buffer_region_count =
-      std::max(max_packed_reads_effective_, max_packed_writes_effective_) +
-      1;  // +1 for header block.
-  if (buffer_region_count > 1) {
-    buffer_regions_ = std::make_unique<sdmmc_buffer_region_t[]>(buffer_region_count);
-    memset(buffer_regions_.get(), 0, sizeof(sdmmc_buffer_region_t) * buffer_region_count);
-
-    st = zx::vmo::create(block_info_.block_size, 0, &packed_command_header_vmo_);
+  if (max_packed_reads_effective_ > 1 || max_packed_writes_effective_ > 1) {
+    const uint32_t buffer_region_count =
+        std::max(max_packed_reads_effective_, max_packed_writes_effective_) +
+        1;  // +1 for header block.
+    st = readwrite_metadata_.InitForPackedCommands(buffer_region_count, block_info_.block_size);
     if (st != ZX_OK) {
-      zxlogf(ERROR, "Failed to create packed command header vmo: %s", zx_status_get_string(st));
+      zxlogf(ERROR, "Failed to initialize readwrite metadata for packed commands: %s",
+             zx_status_get_string(st));
       return st;
     }
-
-    st = packed_command_header_mapper_.Map(packed_command_header_vmo_);
-    if (st != ZX_OK) {
-      zxlogf(ERROR, "Failed to map packed command header vmo: %s", zx_status_get_string(st));
-      return st;
-    }
-
-    packed_command_header_data_ =
-        static_cast<PackedCommand*>(packed_command_header_mapper_.start());
-    memset(packed_command_header_data_, 0, block_info_.block_size);
-    packed_command_header_data_->version = 1;
   }
 
   return ZX_OK;

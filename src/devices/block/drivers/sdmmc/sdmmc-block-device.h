@@ -21,6 +21,7 @@
 #include <cinttypes>
 #include <deque>
 #include <memory>
+#include <semaphore>
 
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
@@ -31,6 +32,78 @@
 #include "sdmmc-types.h"
 
 namespace sdmmc {
+
+// This class serves two purposes:
+// 1. Maintain metadata for IO while the IO is in progress: When using Banjo, this is a hard
+//    requirement, as only object handles are passed through the call. When using FIDL, objects can
+//    be transferred through the call. However for performance, we avoid repeatedly creating and
+//    initializing objects.
+// 2. Control the number of pending IOs in progress: When using synchronous Banjo, only one IO is
+//    ever pending. When using asynchronous FIDL, restricting the number of pending IOs encourages
+//    block operations to queue and form a large packed command (batch). Without this measure, the
+//    throughput when using FIDL is as if command packing is disabled.
+class ReadWriteMetadata {
+ public:
+  struct Entry {
+    // For non-packed commands, only this is needed, as initialized here.
+    std::unique_ptr<sdmmc_buffer_region_t[]> buffer_regions =
+        std::make_unique<sdmmc_buffer_region_t[]>(1);
+
+    // For packed commands, the following are also needed.
+    zx::vmo packed_command_header_vmo;
+    fzl::VmoMapper packed_command_header_mapper;
+    PackedCommand* packed_command_header_data;
+  };
+
+  // This initialization is only required if packed commands are used.
+  zx_status_t InitForPackedCommands(uint32_t buffer_region_count, uint32_t block_size) {
+    for (int i = 0; i < kMaxPendingReadWrites; i++) {
+      entries_[i].buffer_regions = std::make_unique<sdmmc_buffer_region_t[]>(buffer_region_count);
+      memset(entries_[i].buffer_regions.get(), 0,
+             sizeof(sdmmc_buffer_region_t) * buffer_region_count);
+
+      zx_status_t status = zx::vmo::create(block_size, 0, &entries_[i].packed_command_header_vmo);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to create packed command header vmo: %s",
+               zx_status_get_string(status));
+        return status;
+      }
+
+      status = entries_[i].packed_command_header_mapper.Map(entries_[i].packed_command_header_vmo);
+      if (status != ZX_OK) {
+        zxlogf(ERROR, "Failed to map packed command header vmo: %s", zx_status_get_string(status));
+        return status;
+      }
+
+      entries_[i].packed_command_header_data =
+          static_cast<PackedCommand*>(entries_[i].packed_command_header_mapper.start());
+      memset(entries_[i].packed_command_header_data, 0, block_size);
+      entries_[i].packed_command_header_data->version = 1;
+    }
+    return ZX_OK;
+  }
+
+  Entry* WaitForEntry() {
+    pending_readwrites_.acquire();
+    Entry* entry = &entries_[entry_index_++];
+    if (entry_index_ == kMaxPendingReadWrites) {
+      entry_index_ = 0;
+    }
+    return entry;
+  }
+
+  // No need to say which entry, since IOs are handled in order.
+  void DoneWithEntry() { pending_readwrites_.release(); }
+
+ private:
+  // Balanced between keeping the sdmmc server busy and encouraging command packing.
+  static constexpr int kMaxPendingReadWrites = 3;
+
+  std::counting_semaphore<> pending_readwrites_ = std::counting_semaphore<>(kMaxPendingReadWrites);
+
+  Entry entries_[kMaxPendingReadWrites];
+  int entry_index_ = 0;
+};
 
 class SdmmcBlockDevice;
 using SdmmcBlockDeviceType = ddk::Device<SdmmcBlockDevice, ddk::Unbindable, ddk::Suspendable>;
@@ -82,7 +155,8 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  zx_status_t ReadWrite(const std::vector<BlockOperation>& btxns, const EmmcPartition partition);
+  void ReadWrite(std::vector<BlockOperation>& btxns, EmmcPartition partition,
+                 ReadWriteMetadata::Entry* entry);
   zx_status_t Flush();
   zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition);
   zx_status_t SetPartition(const EmmcPartition partition);
@@ -142,13 +216,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
 
   uint32_t max_packed_reads_effective_ = 0;   // Use command packing up to this many reads.
   uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
-  // During device probing, this buffer is replaced (extended) to support multiple buffer regions
-  // for packed commands.
-  std::unique_ptr<sdmmc_buffer_region_t[]> buffer_regions_ =
-      std::make_unique<sdmmc_buffer_region_t[]>(1);
-  zx::vmo packed_command_header_vmo_;
-  fzl::VmoMapper packed_command_header_mapper_;
-  PackedCommand* packed_command_header_data_;
+  ReadWriteMetadata readwrite_metadata_;
 
   inspect::Inspector inspector_;
   inspect::Node root_;
