@@ -13,7 +13,7 @@ def _pyfmt(ctx):
     py_files = [
         f
         for f in ctx.scm.affected_files()
-        if f.endswith(".py") and not f.startswith("third_party/")
+        if f.endswith(".py") and "third_party" not in f.split("/")
     ]
     if not py_files:
         return
