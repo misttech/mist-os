@@ -99,6 +99,7 @@ test("syscalls_cpp_test_bin") {
     "extended_pstate_test.cc",
     "fcntl_test.cc",
     "fs_test.cc",
+    "fsverity_test.cc",
     "fuse_test.cc",
     "futex_test.cc",
     "input_test.cc",
@@ -134,6 +135,7 @@ test("syscalls_cpp_test_bin") {
   ]
   deps = [
     ":test_utils",
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
     "//sdk/lib/stdcompat",
     "//src/lib/files",
     "//src/lib/fxl/test:gtest_main",

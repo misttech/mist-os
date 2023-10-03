@@ -1704,6 +1704,11 @@ pub const SYNC_FILE_RANGE_WAIT_BEFORE: u32 = 1;
 pub const SYNC_FILE_RANGE_WRITE: u32 = 2;
 pub const SYNC_FILE_RANGE_WAIT_AFTER: u32 = 4;
 pub const SYNC_FILE_RANGE_WRITE_AND_WAIT: u32 = 7;
+pub const FS_VERITY_HASH_ALG_SHA256: u32 = 1;
+pub const FS_VERITY_HASH_ALG_SHA512: u32 = 2;
+pub const FS_VERITY_METADATA_TYPE_MERKLE_TREE: u32 = 1;
+pub const FS_VERITY_METADATA_TYPE_DESCRIPTOR: u32 = 2;
+pub const FS_VERITY_METADATA_TYPE_SIGNATURE: u32 = 3;
 pub const FUSE_KERNEL_VERSION: u32 = 7;
 pub const FUSE_KERNEL_MINOR_VERSION: u32 = 38;
 pub const FUSE_ROOT_ID: u32 = 1;
@@ -8666,6 +8671,65 @@ pub struct fsxattr {
     pub fsx_pad: [crate::types::c_uchar; 8usize],
 }
 pub type __kernel_rwf_t = crate::types::c_int;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct fsverity_enable_arg {
+    pub version: __u32,
+    pub hash_algorithm: __u32,
+    pub block_size: __u32,
+    pub salt_size: __u32,
+    pub salt_ptr: __u64,
+    pub sig_size: __u32,
+    pub __reserved1: __u32,
+    pub sig_ptr: __u64,
+    pub __reserved2: [__u64; 11usize],
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct fsverity_digest {
+    pub digest_algorithm: __u16,
+    pub digest_size: __u16,
+    pub digest: __IncompleteArrayField<__u8>,
+}
+#[repr(C)]
+#[derive(Debug, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct fsverity_descriptor {
+    pub version: __u8,
+    pub hash_algorithm: __u8,
+    pub log_blocksize: __u8,
+    pub salt_size: __u8,
+    pub __reserved_0x04: __le32,
+    pub data_size: __le64,
+    pub root_hash: [__u8; 64usize],
+    pub salt: [__u8; 32usize],
+    pub __reserved: [__u8; 144usize],
+}
+impl Default for fsverity_descriptor {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct fsverity_formatted_digest {
+    pub magic: [crate::types::c_char; 8usize],
+    pub digest_algorithm: __le16,
+    pub digest_size: __le16,
+    pub digest: __IncompleteArrayField<__u8>,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct fsverity_read_metadata_arg {
+    pub metadata_type: __u64,
+    pub offset: __u64,
+    pub length: __u64,
+    pub buf_ptr: __u64,
+    pub __reserved: __u64,
+}
 pub type int_least64_t = i64;
 pub type uint_least64_t = u64;
 pub type int_fast64_t = i64;
@@ -12243,6 +12307,12 @@ pub const _FS_IOC_GETFLAGS: __u32 = 2148034049;
 pub const FS_IOC_GETFLAGS: __u32 = 2148034049;
 pub const _FS_IOC_SETFLAGS: __u32 = 1074292226;
 pub const FS_IOC_SETFLAGS: __u32 = 1074292226;
+pub const _FS_IOC_ENABLE_VERITY: __u32 = 1082156677;
+pub const FS_IOC_ENABLE_VERITY: __u32 = 1082156677;
+pub const _FS_IOC_MEASURE_VERITY: __u32 = 3221513862;
+pub const FS_IOC_MEASURE_VERITY: __u32 = 3221513862;
+pub const _FS_IOC_READ_VERITY_METADATA: __u32 = 3223873159;
+pub const FS_IOC_READ_VERITY_METADATA: __u32 = 3223873159;
 pub type __uint128_t = u128;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]

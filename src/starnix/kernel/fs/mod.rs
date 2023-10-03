@@ -16,6 +16,7 @@ mod file_system;
 mod file_write_guard;
 mod fs_context;
 mod fs_node;
+mod fsverity;
 mod inotify_mask;
 mod namespace;
 mod record_locks;

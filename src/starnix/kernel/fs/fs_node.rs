@@ -6,7 +6,7 @@ use crate::{
     arch::uapi::stat_time_t,
     auth::FsCred,
     device::DeviceMode,
-    fs::{pipe::Pipe, rw_queue::RwQueue, socket::*, *},
+    fs::{fsverity::FsVerityState, pipe::Pipe, rw_queue::RwQueue, socket::*, *},
     lock::{Mutex, RwLock, RwLockReadGuard},
     logging::log_error,
     signals::*,
@@ -92,6 +92,9 @@ pub struct FsNode {
 
     /// Tracks lock state for this file.
     pub write_guard_state: Mutex<FileWriteGuardState>,
+
+    /// Cached Fsverity state associated with this node.
+    pub fsverity: Mutex<FsVerityState>,
 
     /// Inotify watchers on this node. See inotify(7).
     pub watchers: inotify::InotifyWatchers,
@@ -325,6 +328,7 @@ bitflags! {
         const AT_STATX_SYNC_AS_STAT = uapi::AT_STATX_SYNC_AS_STAT;
         const AT_STATX_FORCE_SYNC = uapi::AT_STATX_FORCE_SYNC;
         const AT_STATX_DONT_SYNC = uapi::AT_STATX_DONT_SYNC;
+        const STATX_ATTR_VERITY = uapi::STATX_ATTR_VERITY;
     }
 }
 
@@ -654,6 +658,49 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     fn forget(&self, _node: &FsNode, _current_task: &CurrentTask) -> Result<(), Errno> {
         Ok(())
     }
+
+    ////////////////////
+    // FS-Verity operations
+
+    /// Marks that FS-Verity is being built.
+    /// This should ensure there are no writable file handles and return EBUSY if called already.
+    fn begin_enable_fsverity(&self) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
+
+    /// Writes fsverity descriptor and merkle data in a filesystem-specific format.
+    fn end_enable_fsverity(
+        &self,
+        _descriptor: &fsverity_descriptor,
+        _merkle_tree_size: usize,
+    ) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
+
+    /// Read fsverity descriptor, if supported.
+    fn get_fsverity_descriptor(&self) -> Result<fsverity_descriptor, Errno> {
+        error!(ENOTSUP)
+    }
+
+    /// Get a VMO for reading fsverity merkle data, if supported.
+    ///
+    /// Nb: Linux provides read page method for this, but because we will most likely be
+    /// producing this data outside of the filesystem component, the call overheads would be too
+    /// high to adopt the same approach.
+    /// TODO(fxbug.dev/302620512): Use a VMO, not a boxed array.
+    fn get_fsverity_merkle_data(&self) -> Result<Box<[u8]>, Errno> {
+        error!(ENOTSUP)
+    }
+
+    /// Set a VMO for reading/writing fsverity merkle data, if supported.
+    ///
+    /// Nb: Linux provides write page method for this, but because we will most likely be
+    /// producing this data outside of the filesystem component, the call overheads would be too
+    /// high to adopt the same approach.
+    /// TODO(fxbug.dev/302620512): Use a VMO, not an array.
+    fn set_fsverity_merkle_data(&self, _data: &[u8]) -> Result<(), Errno> {
+        error!(ENOTSUP)
+    }
 }
 
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
@@ -920,8 +967,9 @@ impl FsNode {
                 flock_info: Default::default(),
                 record_locks: Default::default(),
                 link_behavior: Default::default(),
-                watchers: Default::default(),
                 write_guard_state: Default::default(),
+                fsverity: Mutex::new(FsVerityState::None),
+                watchers: Default::default(),
             };
             #[cfg(any(test, debug_assertions))]
             {
@@ -929,6 +977,7 @@ impl FsNode {
                 let _l2 = result.info.read();
                 let _l3 = result.flock_info.lock();
                 let _l4 = result.write_guard_state.lock();
+                let _l5 = result.fsverity.lock();
             }
             result
         }
@@ -1572,6 +1621,13 @@ impl FsNode {
             return error!(EINVAL);
         }
 
+        let mut stx_attributes = 0; // TODO(fxbug.dev/302594110)
+        let stx_attributes_mask = STATX_ATTR_VERITY as u64;
+
+        if matches!(*self.fsverity.lock(), FsVerityState::FsVerity { .. }) {
+            stx_attributes |= STATX_ATTR_VERITY as u64;
+        }
+
         Ok(statx {
             stx_mask: STATX_NLINK
                 | STATX_UID
@@ -1584,7 +1640,7 @@ impl FsNode {
                 | STATX_BLOCKS
                 | STATX_BASIC_STATS,
             stx_blksize: info.blksize.try_into().map_err(|_| errno!(EINVAL))?,
-            stx_attributes: 0, // TODO
+            stx_attributes,
             stx_nlink: info.link_count.try_into().map_err(|_| errno!(EINVAL))?,
             stx_uid: info.uid,
             stx_gid: info.gid,
@@ -1592,8 +1648,7 @@ impl FsNode {
             stx_ino: info.ino,
             stx_size: info.size.try_into().map_err(|_| errno!(EINVAL))?,
             stx_blocks: info.blocks.try_into().map_err(|_| errno!(EINVAL))?,
-            stx_attributes_mask: 0, // TODO
-
+            stx_attributes_mask,
             stx_ctime: Self::statx_timestamp_from_time(info.time_status_change),
             stx_mtime: Self::statx_timestamp_from_time(info.time_modify),
             stx_atime: Self::statx_timestamp_from_time(info.time_access),
@@ -1603,7 +1658,7 @@ impl FsNode {
 
             stx_dev_major: self.fs().dev_id.major(),
             stx_dev_minor: self.fs().dev_id.minor(),
-            stx_mnt_id: 0, // TODO
+            stx_mnt_id: 0, // TODO(fxbug.dev/302594110)
             ..Default::default()
         })
     }

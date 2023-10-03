@@ -29,6 +29,7 @@
 #include <linux/fcntl.h>
 #include <linux/filter.h>
 #include <linux/fs.h>
+#include <linux/fsverity.h>
 #include <linux/fuse.h>
 #include <linux/futex.h>
 #include <linux/if_packet.h>

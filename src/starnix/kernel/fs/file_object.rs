@@ -10,6 +10,7 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         file_server::serve_file,
+        fsverity::{self, FsVerityState},
         *,
     },
     lock::Mutex,
@@ -584,7 +585,11 @@ pub fn default_ioctl(
         FS_IOC_GETFLAGS => {
             not_implemented!("FS_IOC_GETFLAGS");
             let arg = UserAddress::from(arg).into();
-            current_task.write_object(arg, &u32::default())?;
+            let mut flags: u32 = 0;
+            if matches!(*file.node().fsverity.lock(), FsVerityState::FsVerity { .. }) {
+                flags |= FS_VERITY_FL;
+            }
+            current_task.write_object(arg, &flags)?;
             Ok(SUCCESS)
         }
         FS_IOC_SETFLAGS => {
@@ -592,6 +597,15 @@ pub fn default_ioctl(
             let arg = UserAddress::from(arg).into();
             let _: u32 = current_task.read_object(arg)?;
             Ok(SUCCESS)
+        }
+        FS_IOC_ENABLE_VERITY => {
+            Ok(fsverity::ioctl::enable(current_task, UserAddress::from(arg).into(), file)?)
+        }
+        FS_IOC_MEASURE_VERITY => {
+            Ok(fsverity::ioctl::measure(current_task, UserAddress::from(arg).into(), file)?)
+        }
+        FS_IOC_READ_VERITY_METADATA => {
+            Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)
         }
         _ => {
             not_implemented!("ioctl: request=0x{:x}", request);

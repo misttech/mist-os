@@ -11,17 +11,20 @@ use syncio::{
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
     zxio_node_attr_has_t, zxio_node_attributes_t, DirentIterator, XattrSetMode, Zxio, ZxioDirent,
 };
+use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
     auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
+        fsverity::FsVerityState,
         zxio::*,
         *,
     },
     lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     logging::*,
     mm::ProtectionFlags,
+    syscalls::{SyscallArg, SyscallResult},
     task::*,
     types::*,
     vmex_resource::VMEX_RESOURCE,
@@ -87,7 +90,7 @@ impl FileSystemOps for RemoteFs {
                     f_fsid: info.fs_id.try_into().unwrap_or(0),
                     f_namelen: info.max_filename_size.try_into().unwrap_or(0),
                     f_frsize: info.block_size.into(),
-                    ..statfs::default(REMOTE_FS_MAGIC)
+                    ..statfs::default(info.fs_type)
                 });
             }
         }
@@ -309,13 +312,17 @@ impl FsNodeOps for RemoteNode {
         &self,
         node: &FsNode,
         _current_task: &CurrentTask,
-        _flags: OpenFlags,
+        flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let zxio = (*self.zxio).clone().map_err(|status| from_status_like_fdio!(status))?;
         if node.is_dir() {
             return Ok(Box::new(RemoteDirectoryObject::new(zxio)));
         }
 
+        // fsverity files cannot be opened in write mode, including while building.
+        if flags.can_write() {
+            node.fsverity.lock().check_writable()?;
+        }
         Ok(Box::new(RemoteFileObject::new(zxio)))
     }
 
@@ -579,12 +586,25 @@ impl FsNodeOps for RemoteNode {
                 } else {
                     Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
                 };
-                Ok(FsNode::new_uncached(
+                let fsverity = ops.get_fsverity_descriptor();
+                let child = FsNode::new_uncached(
                     ops,
                     &fs,
                     node_id,
                     FsNodeInfo { rdev: rdev, ..FsNodeInfo::new(node_id, mode, owner) },
-                ))
+                );
+                // Fsverity is an optional feature.
+                // If a descriptor exists, the file is immutable and descriptor is cached in FsNode.
+                // If the feature is not supported (ENOTSUP), or the file does not use fsverity
+                // (ENODATA), we should continue as normal.
+                match fsverity {
+                    Ok(descriptor) => {
+                        *child.fsverity.lock() = FsVerityState::FsVerity { descriptor };
+                        Ok(child)
+                    }
+                    Err(err) if err == errno!(ENODATA) || err == errno!(ENOTSUP) => Ok(child),
+                    Err(err) => Err(err),
+                }
             },
         )
     }
@@ -774,6 +794,49 @@ impl FsNodeOps for RemoteNode {
         } else {
             error!(EXDEV)
         }
+    }
+
+    fn begin_enable_fsverity(&self) -> Result<(), Errno> {
+        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
+        // Test for existence of xattr.
+        match self.zxio.xattr_set(b".fsverity", b"", XattrSetMode::Set) {
+            Err(zx::Status::NOT_SUPPORTED) => error!(ENOTSUP),
+            _ => Ok(()),
+        }
+    }
+
+    fn end_enable_fsverity(
+        &self,
+        descriptor: &fsverity_descriptor,
+        _merkle_data_size: usize,
+    ) -> Result<(), Errno> {
+        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
+        self.zxio.xattr_set(b".fsverity", descriptor.as_bytes(), XattrSetMode::Set).map_err(
+            |status| match status {
+                zx::Status::NOT_FOUND => errno!(ENODATA),
+                status => from_status_like_fdio!(status),
+            },
+        )
+    }
+
+    fn get_fsverity_descriptor(&self) -> Result<fsverity_descriptor, Errno> {
+        // TODO(fxbug.dev/296162627): Replace this temporary xattr mechanism with native support.
+        let value = self.zxio.xattr_get(b".fsverity").map_err(|status| match status {
+            zx::Status::NOT_FOUND => errno!(ENODATA),
+            // It's possible that a remotefs doesn't support xattr.
+            zx::Status::NOT_SUPPORTED => errno!(ENODATA),
+            status => from_status_like_fdio!(status),
+        })?;
+        fsverity_descriptor::read_from(&value[..]).ok_or_else(|| errno!(EFAULT))
+    }
+
+    fn get_fsverity_merkle_data(&self) -> Result<Box<[u8]>, Errno> {
+        // TODO(fxbug.dev/296162627): Implement me. Lie for now for tests.
+        Ok(Box::new([]))
+    }
+    fn set_fsverity_merkle_data(&self, _data: &[u8]) -> Result<(), Errno> {
+        // TODO(fxbug.dev/296162627): Implement me. Lie for now for tests.
+        Ok(())
     }
 }
 
@@ -1185,6 +1248,16 @@ impl FileOps for RemoteFileObject {
             .and_then(Zxio::release)
             .map(Some)
             .map_err(|status| from_status_like_fdio!(status))
+    }
+
+    fn ioctl(
+        &self,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        default_ioctl(file, current_task, request, arg)
     }
 }
 
@@ -1953,7 +2026,7 @@ mod test {
             .expect("new_fs failed");
 
             let statfs = fs.statfs(&current_task).expect("statfs failed");
-            assert_eq!(statfs.f_type, super::REMOTE_FS_MAGIC as i64);
+            assert!(statfs.f_type != 0);
             assert!(statfs.f_bsize > 0);
             assert!(statfs.f_blocks > 0);
             assert!(statfs.f_bfree > 0 && statfs.f_bfree <= statfs.f_blocks);

@@ -10,12 +10,17 @@
         binary: "data/tests/syscalls_cpp_test_bin",
         uid: "0",
         test_type: "gtest",
+        environ: [ "FSVERITY_TMPDIR={component_path}/data" ],
     },
     use: [
         {
             storage: "custom_artifacts",
             rights: [ "rw*" ],
             path: "/custom_artifacts",
+        },
+        {
+            storage: "data",
+            path: "/data",
         },
     ],
 }
