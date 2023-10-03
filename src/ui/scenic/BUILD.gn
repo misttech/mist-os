@@ -25,7 +25,6 @@ group("tests") {
     ":flatland_display_compositor_pixeltests_with_fake_display",
     ":flatland_display_compositor_smoketests",
     ":flatland_engine_unittests",
-    ":flatland_renderer_unittests",
     ":flatland_unittests",
     ":focus_unittests",
     ":fuzzers",
@@ -43,6 +42,11 @@ group("tests") {
     ":view_tree_unittests",
     "tests",
   ]
+
+  # TODO(fxbug.dev/134434): This test times out on core.nelson-debug.
+  if (board_name != "nelson") {
+    public_deps += [ ":flatland_renderer_unittests" ]
+  }
 }
 
 group("fuzzers") {
