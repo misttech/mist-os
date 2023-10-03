@@ -70,6 +70,7 @@ sysroot_uninstrumented_libc_entries = [
         "zircon/syscalls/debug.h",
         "zircon/syscalls/exception.h",
         "zircon/syscalls/hypervisor.h",
+        "zircon/syscalls/iob.h",
         "zircon/syscalls/iommu.h",
         "zircon/syscalls/log.h",
         "zircon/syscalls/object.h",

@@ -119,7 +119,7 @@ typedef struct zx_restricted_exception {
 
 // ====== Kernel-based memory attribution support ====== //
 // Topic for zx_object_get_info.
-#define ZX_INFO_MEMORY_ATTRIBUTION ((zx_object_info_topic_t)34u)  // zx_info_memory_attribution_t[n]
+#define ZX_INFO_MEMORY_ATTRIBUTION ((zx_object_info_topic_t)36u)  // zx_info_memory_attribution_t[n]
 
 typedef struct zx_info_memory_attribution {
   // The koid of the process for which these attribution statistics apply.
@@ -133,26 +133,4 @@ typedef struct zx_info_memory_attribution {
 } zx_info_memory_attribution_t;
 
 // ====== End of kernel-based memory attribution support ====== //
-
-// ====== IOB support ====== //
-#define ZX_INFO_IOB ((zx_object_info_topic_t)35u)  // zx_info_iob_t[1]
-#define ZX_INFO_IOB_REGIONS \
-  ((zx_object_info_topic_t)36u)  // zx_iob_region_info_t[n]
-                                 //
-typedef struct zx_info_iob {
-  // The value of the *options* parameter passed to `zx_iob_create`.
-  uint64_t options;
-  // The number of regions in the IOB.
-  uint32_t region_count;
-  uint8_t padding1[4];
-} zx_info_iob_t;
-
-typedef struct zx_iob_region_info {
-  // The region description, with potentially swapped access bits.
-  zx_iob_region_t region;
-
-  /// The koid of the underlying memory object.
-  zx_koid_t koid;
-} zx_iob_region_info_t;
-// ====== End of IOB support ====== //
 #endif  // ZIRCON_SYSCALLS_NEXT_H_

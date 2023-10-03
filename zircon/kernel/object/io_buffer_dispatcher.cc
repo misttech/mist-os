@@ -9,8 +9,8 @@
 #include <string.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
-#include <zircon/syscalls-next.h>
 #include <zircon/syscalls/iob.h>
+#include <zircon/syscalls/object.h>
 #include <zircon/types.h>
 
 #include <cstdint>

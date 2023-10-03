@@ -111,7 +111,6 @@ closed protocol Iob {
     ///
     /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory to allocated the
     /// requested buffers.
-    @next
     strict Create(struct {
         options uint64;
         @voidptr

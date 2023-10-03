@@ -56,6 +56,8 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_KMEM_STATS_EXTENDED         ((zx_object_info_topic_t) 31u) // zx_info_kmem_stats_extended_t[1]
 #define ZX_INFO_VCPU                        ((zx_object_info_topic_t) 32u) // zx_info_vcpu_t[1]
 #define ZX_INFO_KMEM_STATS_COMPRESSION      ((zx_object_info_topic_t) 33u) // zx_info_kmem_stats_compression[1]
+#define ZX_INFO_IOB                         ((zx_object_info_topic_t) 34u) // zx_info_iob_t[1]
+#define ZX_INFO_IOB_REGIONS                 ((zx_object_info_topic_t) 35u) // zx_iob_region_info_t[n]
 
 // Return codes set when a task is killed.
 #define ZX_TASK_RETCODE_SYSCALL_KILL            ((int64_t) -1024)   // via zx_task_kill().
@@ -896,6 +898,22 @@ typedef struct zx_info_vcpu {
 #define ZX_INFO_VCPU_FLAG_KICKED            ((uint32_t) (1u<<0))
 
 #define ZX_INFO_CPU_STATS_FLAG_ONLINE       (1u<<0)
+
+typedef struct zx_info_iob {
+  // The value of the *options* parameter passed to `zx_iob_create`.
+  uint64_t options;
+  // The number of regions in the IOB.
+  uint32_t region_count;
+  uint8_t padding1[4];
+} zx_info_iob_t;
+
+typedef struct zx_iob_region_info {
+  // The region description, with potentially swapped access bits.
+  zx_iob_region_t region;
+
+  /// The koid of the underlying memory object.
+  zx_koid_t koid;
+} zx_iob_region_info_t;
 
 // Object properties.
 
