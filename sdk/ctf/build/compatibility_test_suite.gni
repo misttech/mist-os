@@ -22,31 +22,42 @@ import("//sdk/ctf/build/internal/ctf.gni")
 #    A list of FAR archive names containing tests to skip.
 #    The archive names can be found in //prebult/cts/<version>/<platform>/cts.
 template("compatibility_test_suite") {
+  assert(defined(invoker.api_level), "api_level is required")
   assert(defined(invoker.path),
          "The path to the extracted CTF archive is required.")
 
-  # ABI Tests
-  abi_test_target_name = "${target_name}_abi"
-  ctf_prebuilt_tests_from_manifest(abi_test_target_name) {
+  # On-device ABI Tests.
+  # See issuetracker.google.com/301268871: These tests use a deprecated manifest
+  # format. All of the tests have been migrated to the new format and this block
+  # will be deleted when the CTF release using this format falls off CQ.
+  legacy_on_device_tests = "${target_name}_on_device_tests_legacy"
+  ctf_prebuilt_tests_from_manifest(legacy_on_device_tests) {
     forward_variables_from(invoker, [ "disabled_tests" ])
     ctf_path = rebase_path(invoker.path)
   }
 
-  test_targets = [ ":$abi_test_target_name" ]
+  # On-device ABI tests.
+  on_device_tests = "${target_name}_api${invoker.api_level}"
+  generate_ctf_tests(on_device_tests) {
+    forward_variables_from(invoker, [ "api_level" ])
+    manifest = "${invoker.path}/package_archives.json"
+  }
 
   # Host Tool Tests
-  host_tool_test_target_name = "${target_name}_host"
+  host_tests = "${target_name}_host"
   if (is_host) {
-    prebuilt_host_test_manifest(host_tool_test_target_name) {
+    prebuilt_host_test_manifest(host_tests) {
       forward_variables_from(invoker, [ "disabled_tests" ])
       archive_dir = rebase_path(invoker.path)
     }
   }
 
-  test_targets += [ ":$host_tool_test_target_name($host_toolchain)" ]
-
   group(target_name) {
     testonly = true
-    deps = test_targets
+    deps = [
+      ":$host_tests($host_toolchain)",
+      ":$legacy_on_device_tests",
+      ":$on_device_tests",
+    ]
   }
 }

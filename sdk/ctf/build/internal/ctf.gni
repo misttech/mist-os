@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//sdk/ctf/build/generate_ctf_tests.gni")
+
 # This file is for internal only CTF templates.
 #
 # Please keep the list sorted alphabetically.
