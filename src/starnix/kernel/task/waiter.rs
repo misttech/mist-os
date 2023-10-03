@@ -243,12 +243,16 @@ impl PortWaiter {
         // while doing so.
         debug_assert_no_local_temp_ref();
 
+        profile_duration!("PortWaiterWaitInternal");
+
         match self.port.wait(deadline) {
             Ok(packet) => match packet.status() {
                 zx::sys::ZX_OK => {
                     let contents = packet.contents();
                     match contents {
                         zx::PacketContents::SignalOne(sigpkt) => {
+                            profile_duration!("PortWaiterHandleSignalPacket");
+
                             let key = WaitKey { raw: packet.key() };
                             if let Some(callback) = self.remove_callback(&key) {
                                 match callback {
@@ -262,6 +266,8 @@ impl PortWaiter {
                             }
                         }
                         zx::PacketContents::User(_) => {
+                            profile_duration!("PortWaiterHandleUserPacket");
+
                             // User packet w/ OK status is only used to wake up
                             // the waiter after handling starnix-internal events.
                             //
@@ -390,6 +396,8 @@ impl PortWaiter {
     }
 
     fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
+        profile_duration!("PortWaiterHandleEvent");
+
         scopeguard::defer! {
             // Perform the `swap` with `Ordering::Release` so that all memory
             // writes before this point (the state of objects that are ready)
@@ -401,6 +409,7 @@ impl PortWaiter {
             // either since we may not actually perform work for the event in
             // some cases (e.g. with the `None` or `EnqueueOnce` variants).
             if !self.has_pending_user_packet.swap(true, Ordering::Release) {
+                profile_duration!("PortWaiterEnqueueUserPacket");
                 self.queue_user_packet_data(zx::sys::ZX_OK)
             }
         }
