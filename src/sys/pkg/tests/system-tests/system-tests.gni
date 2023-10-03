@@ -139,18 +139,9 @@ template("system_test_upgrade_suite") {
   assert(is_linux || is_mac, "system_tests are for linux/mac only")
 
   assert(
-      defined(invoker.downgrade_release_builder) ||
-          defined(invoker.downgrade_release_build_id),
-      "downgrade_release_builder or downgrade_release_build_id must be defined for $target_name")
-  assert(
       !(defined(invoker.downgrade_release_builder) &&
             defined(invoker.downgrade_release_build_id)),
       "downgrade_release_builder and downgrade_release_build_id are mutually exclusive for $target_name")
-
-  assert(
-      !(defined(invoker.upgrade_release_builder) &&
-            defined(invoker.upgrade_release_build_id)),
-      "upgrade_release_builder and upgrade_release_build_id are mutually exclusive for $target_name")
 
   assert(
       !(defined(invoker.builds) && defined(invoker.downgrade_release_builder)),
@@ -206,6 +197,8 @@ template("system_test_upgrade_suite") {
 
     _builds += [ _build ]
   }
+
+  assert(_builds != [], "upgrade builds must be specified")
 
   _tests =
       [ "//src/sys/pkg/tests/system-tests/upgrade_test:system_tests_upgrade" ]
