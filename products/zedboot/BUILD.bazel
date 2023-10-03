@@ -76,7 +76,7 @@ fuchsia_product_configuration(
 ]]
 
 [fuchsia_product_image(
-    name = "{}-with-fxfs".format(board),
+    name = "{}_with_fxfs".format(board),
     board_config = "//boards:{}".format(board),
     create_system_mode = ZEDBOOT_IMAGE_ARGS["create_system_mode"],
     legacy_aib = ZEDBOOT_IMAGE_ARGS["legacy_aib"],
