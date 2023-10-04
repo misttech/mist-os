@@ -18,7 +18,6 @@ use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_root as fnet_root;
-use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_test_realm as fntr;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_zircon as zx;
@@ -234,7 +233,6 @@ async fn add_interface_to_netstack<'a>(
 /// A forwarding entry is also added for the relevant interface and the provided
 /// `subnet`.
 async fn add_address_to_hermetic_interface(
-    netstack_variant: fntr::Netstack,
     interface_name: &str,
     subnet: fnet::Subnet,
     realm: &netemul::TestRealm<'_>,
@@ -253,38 +251,16 @@ async fn add_address_to_hermetic_interface(
     let address_state_provider = netstack_testing_common::interfaces::add_address_wait_assigned(
         &control,
         subnet,
-        fidl_fuchsia_net_interfaces_admin::AddressParameters::default(),
+        fidl_fuchsia_net_interfaces_admin::AddressParameters {
+            add_subnet_route: Some(true),
+            ..Default::default()
+        },
     )
     .await
     .expect("add_address_wait_assigned failed");
 
     // Allow the address to live beyond the `address_state_provider` handle.
     address_state_provider.detach().expect("detatch failed");
-
-    // While Netstack3 installs a link-local subnet route when an interface is
-    // added, Netstack2 installs it only when an interface is enabled. Add the
-    // forwarding entry manually for Netstack2 to compensate.
-    // TODO(https://fxbug.dev/123440): Unify behavior for adding a link-local
-    // subnet route between NS2/NS3.
-    if netstack_variant == fntr::Netstack::V2 {
-        let stack_proxy =
-            connect_to_hermetic_network_realm_protocol::<fstack::StackMarker>(&realm).await;
-        stack_proxy
-            .add_forwarding_entry(&fidl_fuchsia_net_stack::ForwardingEntry {
-                subnet: fnet_ext::apply_subnet_mask(subnet),
-                device_id: id,
-                next_hop: None,
-                metric: 0,
-            })
-            .await
-            .expect("add_forwarding_entry failed")
-            .unwrap_or_else(|_| {
-                panic!(
-                    "add_forwarding_entry error for addr {:?}",
-                    fnet_ext::apply_subnet_mask(subnet)
-                )
-            });
-    }
 }
 
 /// Adds an interface to the hermetic Netstack with `interface_name` and
@@ -296,7 +272,6 @@ async fn join_network_with_hermetic_netstack<'a>(
     realm: &'a netemul::TestRealm<'a>,
     network: &'a netemul::TestNetwork<'a>,
     network_test_realm: &'a fntr::ControllerProxy,
-    netstack_variant: fntr::Netstack,
     interface_name: &'a str,
     mac_address: fnet::MacAddress,
     subnet: fnet::Subnet,
@@ -317,7 +292,7 @@ async fn join_network_with_hermetic_netstack<'a>(
         .expect("add_interface failed")
         .expect("add_interface error");
 
-    add_address_to_hermetic_interface(netstack_variant, interface_name, subnet, realm).await;
+    add_address_to_hermetic_interface(interface_name, subnet, realm).await;
     interface
 }
 
@@ -1404,7 +1379,7 @@ async fn ping(
         .expect("add_interface failed")
         .expect("add_interface error");
 
-    add_address_to_hermetic_interface(netstack, INTERFACE1_NAME, source_subnet, &realm).await;
+    add_address_to_hermetic_interface(INTERFACE1_NAME, source_subnet, &realm).await;
 
     assert_eq!(
         network_test_realm
@@ -1696,7 +1671,6 @@ async fn join_multicast_group(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1775,7 +1749,6 @@ async fn join_multicast_group_after_stop(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1807,7 +1780,6 @@ async fn join_multicast_group_after_stop(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE2_NAME,
         INTERFACE2_MAC_ADDRESS,
         subnet,
@@ -1879,7 +1851,6 @@ async fn leave_multicast_group(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -2014,7 +1985,6 @@ async fn join_multicast_group_with_non_multicast_address(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -2088,7 +2058,6 @@ async fn join_same_multicast_group_multiple_times(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -2182,7 +2151,6 @@ async fn leave_multicast_group_with_non_multicast_address(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -2256,7 +2224,6 @@ async fn leave_unjoined_multicast_group(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -2313,7 +2280,6 @@ async fn start_dhcpv6_client(
         &realm,
         &network,
         &network_test_realm,
-        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
