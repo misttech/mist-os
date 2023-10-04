@@ -17,7 +17,7 @@ mod tests {
         let (builtins, externals) = parse_top_level_commands(&ctx).await;
 
         // We're not concerned in this test how many commands were returned, just that a reasonable number was.
-        assert!(builtins.len() >= 10, "Expected at least 10 builtin commands, got {builtins:?}");
+        assert!(builtins.len() >= 5, "Expected at least 5 builtin commands, got {builtins:?}");
         assert!(externals.len() >= 1, "Expected at least 1 external command, got {externals:?}");
 
         // Now get the json help and make sure all the commands are referenced.

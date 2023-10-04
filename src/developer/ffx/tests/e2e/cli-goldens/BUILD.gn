@@ -6,6 +6,7 @@ import("//build/compiled_action.gni")
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/testing/golden_files.gni")
+import("//src/developer/ffx/config.gni")
 import("ffx_command_golden_file_test.gni")
 
 if (is_host && has_board) {
@@ -109,7 +110,10 @@ group("e2e_tests") {
   # For now, just test on linux.
   # Also check for has_board, since this test cannot run on a configuration without a
   # board.
-  if (is_host && is_linux && has_board) {
+  # TODO(b/287779902) Also check that dual mode as subtools aren't enabled,
+  # because that produces an incomplete SDK.
+  if (is_host && is_linux && has_board &&
+      !ffx_build_dual_mode_plugins_as_subtools) {
     deps = [ ":ffx-golden-command-list" ] + command_test_deps
   }
 }
