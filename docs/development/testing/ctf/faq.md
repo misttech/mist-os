@@ -51,55 +51,38 @@ CQ may run several versions of the same CTF test at a time: The version from
 tip-of-tree, from the latest canary release, and from a previous milestone
 release.
 
-The tip-of-tree version of the test has a package name without a release version.
-For example:
+CTF test packages are named after the Fuchsia API level they test:
 
-```
-fuchsia-pkg://fuchsia.com/memfs-test-package#meta/memfs-component.cm
-```
+| Version | Example package name |
+|-|-|
+| tip of tree  | my_test |
+| canary       | my_test_apicanary |
+| API level $N | my_test_api$N |
 
-The canary or milestone versions of the test include the release version. For
-example:
+The full package URL will look something like:
 
+```text
+fuchsia-pkg://fuchsia.com/my_test_api24#meta/my_test.cm
 ```
-fuchsia-pkg://fuchsia.com/memfs-test-package_6.20211109.1.3166058#meta/memfs-component.cm
-```
-
 
 ## How do I reproduce a CTF test failure locally? {#repro}
 
-This depends on the [version](#which-test-version) of the test you'd like to run.
-
-To run the tip-of-tree version locally, you can do:
-
-```sh
-fx set //sdk/ctf/tests
-fx test TEST_NAME
-```
-
-For example:
+To build and run a specific [version](#which-test-version) of a test, you can
+use the following examples:
 
 ```sh
-fx set //sdk/ctf/tests
-fx test memfs-test-package
+# Build the test.
+fx set //sdk/ctf/tests/fidl/fuchsia.example:tests
+fx build
+
+# Run all versions.
+fx test
+
+# Run the version for API level 20.
+fx test fuchsia.example_test_api20
 ```
 
-To run the release version locally, you can do:
-
-```sh
-fx set //sdk/ctf/release:tests
-fx test TEST_NAME
-```
-
-For example:
-
-```sh
-fx set //sdk/ctf/release:tests
-fx test memfs-test-package_6.20211109.1.3166058
-```
-
-Please see [Run Fuchsia Tests] for more information about how to run
-tests.
+Please also see [this guide][run_fuchsia_tests] about running Fuchsia tests.
 
 ## What do I do if a CTF test is blocking my CL? {#broken-test}
 
@@ -117,66 +100,26 @@ soft transition. The general worklow is as follows:
 
 ## Are there any examples of CTF tests? {#examples}
 
-Yes!  See [//sdk/ctf/examples] for some examples, or peruse the complete set
-of tests under [//sdk/ctf/tests].
+See [//sdk/ctf/examples] and [//sdk/ctf/tests].
 
 ## When and why should I write a CTF test? {#why-cts}
 
-You should write a CTF test if:
+You should write a CTF test if the software being tested is in the public or
+partner [SDK category].
 
-1. Your software is part of the public or partner SDKs.
-2. You want CQ to prevent backward-incompatible changes to your software
-   across multiple releases of the Fuchsia platform.
+## How do I remove a CTF test? {#remove-a-test}
 
-## How do I retire a CTF test? {#retire-a-test}
-
-A CTF test should stop guarding against breaking changes once the SDK element
-it covers is removed (deprecated and no longer supported by the platform, even
-for legacy clients). This process is called test "retirement" and allows Fuchsia
-contributors to remove things from the SDK.
-
-To retire an entire CTF test, delete the test at HEAD before the upcoming
-milestone release. The version of the test from the previous CTF release will
-continue running in CQ until the next release is cut.
-
-To retire a few test cases, follow the same procedure: Delete the test cases at
-HEAD and wait for the next milestone release.
-
-If you must immediately make changes to a previously released version of a test,
-you'll need to get approval from the Release Team to have the change cherry
-picked onto the appropriate release branch.
-
-To verify that your change will succeed, you should sync your local Fuchsia
-checkout to the release branch and test the change yourself, first.  After
-verifying, submit the CL and file a bug against the Release Team.
-
-## How do I temporarily disable a CTF test? {#disable-a-test}
-
-You can disable a test by adding the test's archive name to the list of
-`disabled_tests` on the appropriate `compatibility_test_suite` target in
-`//sdk/ctf/release/BUILD.gn`.
-
-For example:
-
-```gn
-compatibility_test_suite("canary") {
-  {{ '<strong>' }}disabled_tests = [ "my_test" ]{{ '</strong>' }}
-}
-```
-
-To find the archive name, check the //prebuilt/cts/$version>/$platform/cts/test_manifest.json
-file for the archive name corresponding to the test.
-
-Please include a comment with a bug ID as a reminder to enable the test again.
-Tests should be enabled again within 72 hours.
+See the section in the [contributing guide](contributing_tests.md) on
+[removing tests](contributing_tests.md#remove-a-test).
 
 ## Additional questions
 
-For questions and clarification on this document, please reach out to this
-directory's owners or file a bug in the [CTF bug component].
+For additional questions please reach out to <fuchsia-ctf-team@google.com> or
+file a bug in the [CTF bug component].
 
 [CTF bug component]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Fuchsia+Compatibility+Test+Suite+%28CTS%29
 [CTF overview]: /docs/development/testing/ctf/overview.md
-[Run Fuchsia Tests]: /docs/development/testing/run_fuchsia_tests.md
+[run_fuchsia_tests]: /docs/development/testing/run_fuchsia_tests.md
 [//sdk/ctf/examples]: /sdk/ctf/tests/examples/
 [//sdk/ctf/tests]: /sdk/ctf/tests/
+[SDK category]: /docs/contribute/sdk/categories.md

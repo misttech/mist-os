@@ -5,31 +5,33 @@ to detect compatibility changes between two different versions of the
 Fuchsia platform surface.  To learn how it works, and to get started on adding
 CTF tests for your area, please see the links below.
 
-## Fuchsia CTF Definition
+## Contributing to CTF
 
-* [CTF Overview][overview]: Background, motivation and goals for building the
-Fuchsia CTF.
-* [CTF RFC][rfc15]: Requirements, design and implementation strategy.
-* [FAQ][faq]: Frequently asked questions.
+* To learn how to add a test to CTF, read the [contributing guide].
+* For examples, see the [Rust echo test], the [C++ echo test] and the complete
+  set of tests in [//sdk/ctf/tests][all tests].
 
-## Contributing to the CTF
+## Documentation
 
-* [Contributing Guide][contributing]: One-stop shop with everything you need
-to know about contributing to the Fuchsia CTF. Start here!
+* For the background, motivation and goals of CTF, see the [CTF overview].
+* For frequently asked questions, see the [FAQ].
 
-* Example FIDL Tests:
-  * [Rust Echo Test][rust_echo_test]
-  * [C++ Echo Test][cpp_echo_test]
-  * For more examples, see [//sdk/ctf/tests/fidl][existing_tests]
+### RFCs
 
-## CTF Test Coverage
+* [RFC-0141]: CTF Process
+* [RFC-0015]: Compatibility Tests for Fuchsia (CTF).
 
-Note: TODO: Dashboards are currently internal-only
+## Contact
 
-[overview]: /docs/development/testing/ctf/compatibility_testing.md
-[rfc15]: /docs/contribute/governance/rfcs/0015_cts.md
-[faq]: /docs/development/testing/ctf/faq.md
-[contributing]: /docs/development/testing/ctf/contributing_tests.md
-[cpp_echo_test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/
-[rust_echo_test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/
-[existing_tests]: /sdk/ctf/tests/fidl/
+* Email: <fuchsia-ctf-team@google.com>
+* Bugs: <https://issuetracker.google.com/components/1375729>
+
+<!-- Links. Please link source code to https://cs.opensource.google -->
+[all tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/tests
+[contributing guide]: /docs/development/testing/ctf/contributing_tests.md
+[CTF overview]: /docs/development/testing/ctf/compatibility_testing.md
+[FAQ]: /docs/development/testing/ctf/faq.md
+[RFC-0015]: /docs/contribute/governance/rfcs/0015_cts.md
+[RFC-0141]: /docs/contribute/governance/rfcs/0141_cts_process.md
+[C++ echo test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/
+[Rust echo test]: /sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/

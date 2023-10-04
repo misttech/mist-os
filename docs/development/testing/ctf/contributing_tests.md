@@ -1,246 +1,286 @@
 # Contributing Tests to CTF
 
-<!--
-TODO(113454): Turn this doc into an index of guides for writing CTF tests
-for different plasa elements (fidls, C++ libraries, tools, etc...)
--->
+This guide explains how to [add](#add-a-test) and [remove](#remove-a-test) [CTF]
+tests.
 
-This guide will walk you through the process of writing a CTF test for a FIDL API.
+## How to add a test to CTF {#add-a-test}
 
-{% set fidl_library = "fuchsia.examples" %}
-{% set fidl_service = "fuchsia.examples.Echo" %}
+Please read the CTF [test requirements](#test-requirements) before getting
+started. The most notable requirement is that a test must use a
+[test realm factory] before this guide can be followed.
 
-To test a FIDL API, we write a test that uses the API's client bindings in the SDK to
-interact with the FIDL service. For this guide we'll be testing an example FIDL service
-`{{ fidl_service }}` from the library `{{ fidl_library }}`. Throughout this guide, you
-can replace the library and service with your own values to match your use case.
+A test is included in CTF if it is in the group at [//sdk/ctf/tests:tests].
+Before adding the test to this group, it's build rules must be rewritten to use
+CTF versions. This is an unfortunate but necessary step that will go away soon.
 
-The test will consist of two components: The first is a __test driver binary__ which
-implements the core test logic, and is the part of your test that will be released in CTF.
-The second is a __test realm__ which provides the capabilities and dependencies that we
-want to test, is always built from the sources at HEAD, and is not released as part of CTF.
+To add a test to this group, perform each of the steps below in the BUILD.gn
+file containing the test's `fuchsia_test_component` target.
 
-## Requirements
+### 1. Import CTF build rules
 
-* Tests must be written in C, C++, or Rust.
-* Tests must only depend on APIs, ABIs, and tools in partner facing SDKs.
-
-Note: Exceptions for dependencies are made by updating the allowlist [here][allow list].
-
-Note: The examples in this guide use synchronous FIDL clients, but this is not a requirement.
-Test authors can choose to use synchronous or asynchronous clients.
-
-If you are writing a CTF test for a FIDL service whose `fidl` target is not in the partner
-SDK category, please see this section.
-
-## Concepts
-
-* [Components]
-* [Component Manifests]
-* [Packages]
-* [Test Components]
-* [Subpackages]
-
-## Steps
-
-### 1. Setup
-
-First create a directory for the test. The directory name should match the name of the
-FIDL library. You can copy these commands to generate some scaffolding:
-
-{% set test_root = "sdk/ctf/tests/fidl/" + fidl_library %}
-{% set test_component_name = fidl_service|lower + "_test" %}
-
-  * {C/C++}
-
-    ```sh
-    mkdir {{ test_root }}
-    mkdir {{ test_root }}/meta/
-    touch {{ test_root }}/meta/{{ test_component_name }}.cml
-    touch {{ test_root }}/BUILD.gn
-    touch {{ test_root }}/main.cc
-    ```
-
-  * {Rust}
-
-    ```sh
-    mkdir {{ test_root }}
-    mkdir {{ test_root }}/meta/
-    # Rust tests need an additional component to offer the subpackaged test runner.
-    touch {{ test_root }}/meta/{{ test_component_name }}_root.cml
-    touch {{ test_root }}/meta/{{ test_component_name }}.cml
-    touch {{ test_root }}/BUILD.gn
-    touch {{ test_root }}/main.rs
-    ```
-
-### 2. Create the test realm
-
-The test realm is a component whose sole purpose is to `expose` the FIDL API that we want to test.
-The test realm component is always built from the HEAD of the current Fuchsia branch. This is what
-makes the CTF test a compatibility test: The test and the FIDL capability it's testing are built at
-different versions.
-
-For convenience, the test realm component can be defined anywhere in the source tree but we prefer
-if all realms are defined in `//sdk/ctf/test_realm/BUILD.gn.`
-
-To create the realm, add contents like the following to `//sdk/ctf/test_realm/BUILD.gn`:
-
-```build
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/test_realm/BUILD.gn" region_tag="example" adjust_indentation="auto" %}
+```gn
+import("//sdk/ctf/build/ctf.gni")
 ```
 
-{% set test_realm_package = fidl_library + "_test_realm" %}
+### 2. Use CTF GN templates {#the-ctf-templates}
 
-Then create the test realm's component manifest at `//sdk/ctf/test_realm/meta/{{ test_realm_package }}.cml`:
+Replace the test's `fuchsia_package` declaration and each of its direct
+dependencies' declarations with equivalent `ctf_*` GN targets. For example,
+`fuchsia_package` should be changed to `ctf_fuchsia_package`. This only needs to
+be done for the package's dependencies because they are versioned with the test
+in CTF. It does not need to be done to any parent packages that subpackage the
+test. For a list of all available CTF templates, see [//sdk/ctf/build].
 
-```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/test_realm/meta/fuchsia.example_test_realm.cml" region_tag="example" adjust_indentation="auto" %}
+* {Before (Rust)}
+
+  ```gn
+  rustc_test("bin") {
+    edition = "2018"
+    name = "fuchsia_example_test"
+    source_root = "src/main.rs"
+    sources = [ "src/main.rs" ]
+    deps = [ ... ]
+  }
+
+  fuchsia_component("fuchsia-example-test-component") {
+    testonly = true
+    component_name = "fuchsia-example-test"
+    manifest = "meta/fuchsia-example-test.cml"
+    deps = [ ":bin" ]
+  }
+
+  fuchsia_package("fuchsia-example-tests") {
+    testonly = true
+    package_name = "fuchsia-example-tests"
+    deps = [ ":fuchsia-example-test-component" ]
+  }
+  ```
+
+* {After (Rust)}
+
+  ```gn
+  ctf_rustc_test("bin") {
+    edition = "2018"
+    name = "fuchsia_example_test"
+    source_root = "src/main.rs"
+    sources = [ "src/main.rs" ]
+    deps = [ ... ]
+  }
+
+  ctf_fuchsia_component("fuchsia-example-test-component") {
+    testonly = true
+    component_name = "fuchsia-example-test"
+    manifest = "meta/fuchsia-example-test.cml"
+    deps = [ ":bin" ]
+  }
+
+  ctf_fuchsia_package("fuchsia-example-tests") {
+    testonly = true
+    package_name = "fuchsia-example-tests"
+    deps = [ ":fuchsia-example-test-component" ]
+  }
+  ```
+
+* {Before (C++)}
+
+  ```gn
+  executable("bin") {
+    testonly = true
+    name = "fuchsia_example_test"
+    sources = [ "src/main.cc" ]
+    deps = [ ... ]
+  }
+
+  fuchsia_component("fuchsia-example-test-component") {
+    testonly = true
+    component_name = "fuchsia-example-test"
+    manifest = "meta/fuchsia-example-test.cml"
+    deps = [ ":bin" ]
+  }
+
+  fuchsia_package("fuchsia-example-tests") {
+    testonly = true
+    package_name = "fuchsia-example-tests"
+    deps = [ ":fuchsia-example-test-component" ]
+  }
+  ```
+
+* {After (C++)}
+
+  ```gn
+  ctf_executable("bin") {
+    testonly = true
+    name = "fuchsia_example_test"
+    sources = [ "src/main.cc" ]
+    deps = [ ... ]
+  }
+
+  ctf_fuchsia_component("fuchsia-example-test-component") {
+    testonly = true
+    component_name = "fuchsia-example-test"
+    manifest = "meta/fuchsia-example-test.cml"
+    deps = [ ":bin" ]
+  }
+
+  ctf_fuchsia_package("fuchsia-example-tests") {
+    testonly = true
+    package_name = "fuchsia-example-tests"
+    deps = [ ":fuchsia-example-test-component" ]
+  }
+  ```
+
+### 3. Add the test release archive to the build graph {#the-test-archive}
+
+`ctf_fuchsia_package` generates a `${target_name}_archive` target that produces
+a FAR archive of the test. This archive is what gets released in CTF. Add a
+`group("tests")` target to the BUILD.gn file if it doesn't exist, then add the
+archive as a dependency:
+
+```gn
+group("tests") {
+  testonly = true
+  deps = [
+    ":fuchsia-example-tests_archive",
+    ...
+  ]
+}
 ```
 
-Finally, add the realm's label to the list in `//sdk/ctf/build/ctf_test_realms.gni`.
-This will cause the build to include the test realm as a [subpackage][Subpackages] of your
-test. We'll explain this in more detail, later.
+You successfully added a `group("tests")` to the `BUILD.gn` file. You are now
+ready to add that group to [//sdk/ctf/tests:tests].
 
-### 3. Write the BUILD.gn file
+### 4. Add a GN template to build the prebuilt CTF test {#the-gn-template}
 
-Add contents like the following to `//{{ test_root }}/BUILD.gn` to define an
-executable, test driver component, and package for your test. Be sure to add
-the `:tests` target as a dependency of `//sdk/ctf/tests/fidl:tests` in order
-to include the test in the build graph for CI and CQ builds.
+To teach CTF how to build the test's prebuilt package into a runnable target,
+create a GN template that generates a package identical to the
+`fuchsia_test_package` used to run the latest version of the test. For example,
+if the test root component and test package look like this:
 
-  * {C/C++}
+```gn
+fuchsia_test_component("fuchsia-example-test-root") {
+  testonly = true
+  manifest = "meta/fuchsia-example-test-root.cml"
+  test_type = "ctf"
+}
 
-    ```build
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/BUILD.gn" region_tag="build" adjust_indentation="auto" %}
-    ```
+fuchsia_test_package("fuchsia-example-tests-latest") {
+  test_components = [ ":fuchsia-example-test-root" ]
+  subpackages = [
+    ":fuchsia-example-tests", # latest version of the test suite.
+    ":fuchsia-example-test-realm-factory",
+  ]
+  deps = [ ":fuchsia-example-test-helper" ]
+}
+```
 
-  * {Rust}
+Then add this template to [//sdk/ctf/build/generate_ctf_tests.gni]
 
-    ```build
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/BUILD.gn" region_tag="build" adjust_indentation="auto" %}
-    ```
+```gn
+template("generate_fuchsia-example-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "{{ '<var>' }}//path/to/test{{ '</var>' }}:fuchsia-example-test-root",
+    test_component_name = "test-root.cm"
+    subpackages = [
+      test_info.target_label, # prebuilt version of the test suite.
+      "{{ '<var>' }}//path/to/test{{ '</var>' }}:fuchsia-example-test-realm_factory"
+    ]
+    deps = [ "{{ '<var>' }}//path/to/test{{ '</var>' }}:fuchsia-example-test-helper" ]
+  }
+}
+```
 
-### 4. Implement the test driver
+Note:
 
-This component implements the core logic for your test.
+* For CTF to match this template with the prebuilt test package, this template
+  _must_ be named as `generate_{package_name}` and `package_name` must match
+  the test's original `ctf_fuchsia_package` name.
+* This template subpackages `test_info.target_label` instead of
+  `:fuchsia-example-tests` because the former points to the prebuilt version of
+  the test from CIPD and the latter points to the latest version built from
+  source.
 
-First we need to create the component manifest. Add contents like the following
-to `{{ test_component_name }}.cml`:
+### 5. Test the changes
 
-  * {C/C++}
+To verify that these steps were completed correctly, run these commands:
 
-    ```json5
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/meta/fuchsia.examples.echo_test.cml" region_tag="example" adjust_indentation="auto" %}
-    ```
+```sh
+fx set core.x64 --with //sdk/ctf:ctf_artifacts
+fx build
+```
 
-  * {Rust}
+The build should show an error prompt to run a command that updates
+[//sdk/ctf/goldens/package_archives.json]. Run that command, then run
+`fx build` again.
 
-    This test root component includes `//sdk/ctf/meta/rust.shard.cml`, which defines the rust test runner as a subpackage. The `echo_test` component must be started in the `subpackaged-runner-env`.
+At this stage the build will print an error if the GN template defined in the
+previous step is missing or if it cannot match the prebuilt version of the test
+with the GN template. If everything succeeds, the test can be run using this
+command:
 
-    ```json5
-    // echo_test_root.cml
+```sh
+fx test fuchsia-example-test_apitest
+```
 
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/meta/fuchsia.examples.echo_test_root.cml" region_tag="example" adjust_indentation="auto" %}
-    ```
-
-    The test component. The test realm is offered from the test root rather than the test itself.
-
-    ```json5
-    // echo_test.cml
-
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/meta/fuchsia.examples.echo_test.cml" region_tag="example" adjust_indentation="auto" %}
-    ```
-
-The package URL `{{ test_realm_package }}#meta/default.cm` loads the test realm we created
-earlier from a subpackage. Every time this test runs it receives a new version of this
-subpackage which is built from the current commit, regardless of whether the test itself
-is built from the current commit or obtained as a prebuilt.
-
-Next we need to implement the executable. Add contents like the following to the test's
-source file:
-
-  * {C/C++}
-
-    ```C++
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/cc/main.cc" region_tag="example" adjust_indentation="auto" %}
-    ```
-
-  * {Rust}
-
-    ```rust
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/fidl/fuchsia.examples/rust/main.rs" region_tag="example" adjust_indentation="auto" %}
-    ```
-
-### 5. Running the test
-
-These instructions require you to open several terminal tabs.
-Follow the insructions for each tab, from left to right:
-
-  * {Build Fuchsia}
-
-    ```devsite-terminal
-    fx set core.x64 --with //{{ test_root }}:tests
-    fx build
-    ```
-
-  * {Run the emulator}
-
-    ```devsite-terminal
-    ffx emu start --headless
-    ```
-
-  * {Serve packages}
-
-    ```devsite-terminal
-    fx serve
-    ```
-
-  * {Stream logs}
-
-    ```devsite-terminal
-    ffx log
-    ```
-
-  * {Run the tests}
-
-    ```devsite-terminal
-    fx test -v {{ test_component_name }}
-    # -v enables verbose output.
-    ```
-
-If you need additional help debugging at this step, please reach out to fuchsia-ctf-team@google.com.
+The `_apitest` suffix indicates that this is the version of the prebuilt test
+from the latest build rather than some version from a previous CTF release.
 
 ### 6. Submit the changes
 
-If the tests pass, send your changes for review. After submission the tests willji
-automatically be included in the next CTF release when the next milestone branch
-is cut.
+Send the changes for review. After submission the test will automatically be
+included in the next CTF release when the next milestone branch is cut. For
+additional review, please reach out to <fuchsia-ctf-team@google.com>.
 
-## Testing experimental FIDL APIs
+## How to remove a test from CTF {#remove-a-test}
 
-You can follow this guide to write a CTF test for a FIDL API that is not in the partner
-SDK category, but you must not release the test in CTF until the API has been added to the
-partner category. To prevent the test from being released, set `release_in_ctf = false` on
-the test package:
+To remove a test from future CTF releases:
 
-```build
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/ctf/tests/examples/experimental_fidl/BUILD.gn" region_tag="norelease_example" adjust_indentation="auto" %}
-```
+1. Remove the [test archive](#the-test-archive) from the build graph.
+2. Delete the test's [gn template](#the-gn-template).
+3. Remove the test's dependencies from the [allowlist].
+4. Remove the [ctf templates](#the-ctf-templates) from the test's build rules.
 
-## See Also
+Submit these changes to the main branch. Over time all of the API levels
+corresponding to each release will become unsupported and the last version of
+the test will stop running in CQ.
 
-The FAQ sections about [retiring tests] and [disabling tests].
+If you must immediately remove a test and all of its prebuilt version from CQ,
+as an additional step you should follow Fuchsia's change control process and
+cherry pick a CL that removes the test from the each of the corresponding
+release branches. For example, If you want to remove a test from the CTF release
+for API level 20, your CL needs to be cherry picked onto the `releases/f20`
+branch.
 
-[Component Manifests]: /docs/concepts/components/v2/component_manifests.md
-[Components]: /docs/concepts/components/v2
-[Fuchsia language policy]: /docs/contribute/governance/policy/programming_languages.md
-[Packages]: /docs/concepts/packages/package.md
-[Start the Fuchsia Emulator]: /docs/get-started/set_up_femu.md
-[Test Components]: /docs/development/testing/components/test_component.md
-[file a bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=component%3ADeveloperExperience%3ECTS
-[relative component URL]: /docs/reference/components/url.md#relative
-[CTF bug component]: https://bugs.fuchsia.dev/p/fuchsia/templates/detail?saved=1&template=Fuchsia%20Compatibility%20Test%20Suite%20%28CTS%29&ts=1627669234
-[disabling tests]: /docs/development/testing/ctf/faq.md#disable-a-test
-[retiring tests]: /docs/development/testing/ctf/faq.md#retire-a-test
-[allow list]: /sdk/ctf/build/internal/allowed_ctf_deps.gni
-[Subpackages]: /docs/concepts/components/v2/subpackaging.md
+## Test requirements
+
+Every test must meet these requirements before being added to CTF.
+
+### CTF tests must use the test realm factory pattern
+
+The [test realm factory] pattern allows the build to version the test suite
+component in CTF without versioning the component(s) under test. Please read the
+test realm factory guide and refactor the test if necessary before following
+this guide.
+
+### CTF tests must only depend on partner-facing ABIs
+
+A CTF test must only depend on software in the partner [SDK category] at
+runtime because the test will force its dependencies to remain stable.
+Exceptions for dependencies that are not in the partner SDK category are made by
+updating the [allowlist].
+
+### CTF tests must be written in C, C++, or Rust
+
+At the time of writing CTF only supports these languages.
+
+<!-- Links. Please link source code to https://cs.opensource.google -->
+[allowlist]: /sdk/ctf/build/internal/allowed_ctf_deps.gni
+[CTF]: /docs/development/testing/ctf/compatibility_testing.md
+[SDK category]: /docs/contribute/sdk/categories.md
+[test realm factory]: /docs/development/testing/components/test_realm_factory.md
+[test root component]: /docs/development/testing/components/test_realm_factory.md#package-structure
+[//sdk/ctf/tests:tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/tests/BUILD.gn
+[//sdk/ctf/build]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/
+[//sdk/ctf/build/generate_ctf_tests.gni]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/generate_ctf_tests.gni
+[//sdk/ctf/goldens/package_archives.json]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/goldens/package_archives.json
+[//sdk/ctf/test_realm/meta/test-collection.shard.cml]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/test_realm/meta/test-collection.shard.cml
