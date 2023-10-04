@@ -217,7 +217,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:105
+From //boards/common/x64-common.gni:103
 
 **Overridden from the default:** `""`
 
@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:103
+From //boards/common/x64-common.gni:101
 
 **Overridden from the default:** `""`
 
@@ -386,7 +386,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:105
 
 **Overridden from the default:** `false`
 
@@ -632,7 +632,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:29
 
-**Current value for `target_cpu = "x64"`:** `["//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt", "//src/factory/factory_store_providers/config/qemu", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/hwinfo:default_board_config"]`
+**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/hwinfo:default_board_config"]`
 
 From //boards/common/x64-common.gni:83
 
@@ -921,7 +921,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:111
+From //boards/common/x64-common.gni:109
 
 **Overridden from the default:** `false`
 
@@ -1440,23 +1440,15 @@ From //build/config/compiler.gni:52
 
 ### default_configs
 
-Default configs and dependencies targets provided by the toolchain. These
-are applied to all of the pw_* target types. They are set from a toolchain's
-toolchain_args for cross-toolchain deps, e.g. for
-
-  `deps = [ //pw_some_module(//pw_toolchain:not_default) ]`
-
-The default toolchain is never used.
-
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_build/defaults.gni:25
+From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:34
 
 ### default_public_deps
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_build/defaults.gni:26
+From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:35
 
 ### delegated_network_provisioning
 
@@ -4529,7 +4521,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:109
+From //boards/common/x64-common.gni:107
 
 **Overridden from the default:** `false`
 
@@ -5321,7 +5313,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:99
+From //boards/common/x64-common.gni:97
 
 **Overridden from the default:** `[]`
 
@@ -5342,7 +5334,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:98
+From //boards/common/x64-common.gni:96
 
 **Overridden from the default:** `false`
 
@@ -5577,7 +5569,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:317
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:318
 
 ### pw_arduino_build_BOARD
 
@@ -5788,9 +5780,9 @@ at least include the Pigweed repository ("$dir_pigweed/*").
 
 Explicitly setting a target's visibility overrides this default.
 
-**Current value (from the default):** `"*"`
+**Current value (from the default):** `["*"]`
 
-From //third_party/pigweed/src/pw_build/defaults.gni:38
+From //third_party/pigweed/src/pw_build/defaults.gni:58
 
 ### pw_build_EXECUTABLE_TARGET_TYPE
 
@@ -5802,7 +5794,7 @@ available.
 
 **Current value (from the default):** `"executable"`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:31
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:33
 
 ### pw_build_EXECUTABLE_TARGET_TYPE_FILE
 
@@ -5813,7 +5805,7 @@ If pw_build_EXECUTABLE_TARGET_TYPE is not the default of `executable`, this
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:37
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:39
 
 ### pw_build_LINK_DEPS
 
@@ -5830,7 +5822,7 @@ From //.gn:81
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:26
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_assert:impl", "//third_party/pigweed/src/pw_log:impl"]`
 
@@ -5838,7 +5830,7 @@ From //.gn:81
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:24
+From //third_party/pigweed/src/pw_build/gn_internal/build_target.gni:26
 
 ### pw_build_PIP_CONSTRAINTS
 
@@ -7352,7 +7344,7 @@ From //.gn:125
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/defaults.gni:27
+From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
 
 **Current value for `target_cpu = "x64"`:** `["//third_party/pigweed/src/pw_build:reduced_size"]`
 
@@ -7360,7 +7352,13 @@ From //.gn:125
 
 **Overridden from the default:** `[]`
 
-From //third_party/pigweed/src/pw_build/defaults.gni:27
+From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:36
+
+### remove_default_public_deps
+
+**Current value (from the default):** `[]`
+
+From //third_party/pigweed/src/pw_build/gn_internal/defaults.gni:37
 
 ### repository_publish_blob_copy_mode
 
@@ -8521,7 +8519,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:112
+From //boards/common/x64-common.gni:110
 
 **Overridden from the default:** `false`
 
@@ -8700,7 +8698,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:101
+From //boards/common/x64-common.gni:99
 
 **Overridden from the default:** `false`
 
