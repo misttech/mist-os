@@ -263,12 +263,17 @@ impl FileOps for BinderConnection {
 #[derive(Debug)]
 pub struct RemoteBinderConnection {
     binder_connection: BinderConnection,
-    binder_process: Arc<BinderProcess>,
 }
 
 impl RemoteBinderConnection {
-    pub fn map_external_vmo(&self, vmo: fidl::Vmo, mapped_address: u64) -> Result<(), Errno> {
-        self.binder_process.map_external_vmo(vmo, mapped_address)
+    pub fn map_external_vmo(
+        &self,
+        current_task: &CurrentTask,
+        vmo: fidl::Vmo,
+        mapped_address: u64,
+    ) -> Result<(), Errno> {
+        let binder_process = self.binder_connection.proc(current_task)?;
+        binder_process.map_external_vmo(vmo, mapped_address)
     }
 
     pub fn ioctl(
@@ -277,10 +282,8 @@ impl RemoteBinderConnection {
         request: u32,
         arg: SyscallArg,
     ) -> Result<(), Errno> {
-        self.binder_connection
-            .driver
-            .ioctl(current_task, &self.binder_process, request, arg)
-            .map(|_| ())
+        let binder_process = self.binder_connection.proc(current_task)?;
+        self.binder_connection.driver.ioctl(current_task, &binder_process, request, arg).map(|_| ())
     }
 
     pub fn interrupt(&self) {
@@ -2714,7 +2717,7 @@ impl BinderDriver {
         let process_accessor =
             fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
         let binder_process = self.create_remote_process(
-            current_task.id,
+            current_task.get_pid(),
             RemoteResourceAccessor {
                 kernel: current_task.kernel().clone(),
                 process_accessor,
@@ -2726,7 +2729,6 @@ impl BinderDriver {
                 identifier: binder_process.identifier,
                 driver: self.clone(),
             },
-            binder_process,
         })
     }
 
@@ -4139,9 +4141,10 @@ pub mod tests {
         fn new() -> Self {
             let (kernel, sender_task) = create_kernel_and_task();
             let driver = BinderDriver::new();
-            let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
+            let (sender_proc, sender_thread) =
+                driver.create_process_and_thread(sender_task.get_pid());
             let receiver_task = create_task(&kernel, "receiver_task");
-            let receiver_proc = driver.create_local_process(receiver_task.id);
+            let receiver_proc = driver.create_local_process(receiver_task.get_pid());
 
             mmap_shared_memory(&driver, &sender_task, &sender_proc);
             mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
@@ -6894,8 +6897,9 @@ pub mod tests {
         let receiver_task = create_task(&kernel, "test-task2");
 
         let driver = BinderDriver::new();
-        let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
-        let (receiver_proc, _receiver_thread) = driver.create_process_and_thread(receiver_task.id);
+        let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.get_pid());
+        let (receiver_proc, _receiver_thread) =
+            driver.create_process_and_thread(receiver_task.get_pid());
 
         // Initialize the receiver process with shared memory in the driver.
         mmap_shared_memory(&driver, &receiver_task, &receiver_proc);
@@ -7014,8 +7018,9 @@ pub mod tests {
         let receiver_task = create_task(&kernel, "test-task2");
 
         let driver = BinderDriver::new();
-        let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.id);
-        let (receiver_proc, _receiver_thread) = driver.create_process_and_thread(receiver_task.id);
+        let (sender_proc, sender_thread) = driver.create_process_and_thread(sender_task.get_pid());
+        let (receiver_proc, _receiver_thread) =
+            driver.create_process_and_thread(receiver_task.get_pid());
 
         // Initialize the receiver process with shared memory in the driver.
         mmap_shared_memory(&driver, &receiver_task, &receiver_proc);

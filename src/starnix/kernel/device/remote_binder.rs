@@ -979,7 +979,11 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     mapped_address,
                     responder,
                 } => {
-                    let result = remote_binder_connection.map_external_vmo(vmo, mapped_address);
+                    let result = remote_binder_connection.map_external_vmo(
+                        current_task,
+                        vmo,
+                        mapped_address,
+                    );
                     let interruption = must_interrupt(&result);
                     responder(result).map_err(|_| errno!(EINVAL))?;
                     interruption
