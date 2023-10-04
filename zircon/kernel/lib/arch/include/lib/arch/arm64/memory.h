@@ -65,12 +65,12 @@ struct ArmMairNormalAttribute {
     return inner == other.inner && outer == other.outer;
   }
 
-  ArmCacheabilityAttribute inner;
-  ArmCacheabilityAttribute outer;
+  ArmCacheabilityAttribute inner = ArmCacheabilityAttribute::kNonCacheable;
+  ArmCacheabilityAttribute outer = ArmCacheabilityAttribute::kNonCacheable;
 };
 
 // Represents a MAIR_ELx attribute value.
-using ArmMairAttribute = std::variant<ArmDeviceMemory, ArmMairNormalAttribute>;
+using ArmMairAttribute = std::variant<ArmMairNormalAttribute, ArmDeviceMemory>;
 
 // Memory Attribute Indirection Register
 //
@@ -119,6 +119,21 @@ struct ArmMemoryAttrIndirectionRegister
   constexpr ArmMemoryAttrIndirectionRegister& SetAttribute(unsigned int index,
                                                            ArmMairAttribute attr) {
     return SetAttributeValue(index, AttributeToValue(attr));
+  }
+
+  // Returns the index associated with a given, configured attribute, if
+  // present.
+  constexpr std::optional<unsigned int> GetIndex(uint8_t value) const {
+    for (unsigned int i = 0; i < kNumAttributes; ++i) {
+      if (value == GetAttributeValue(i)) {
+        return i;
+      }
+    }
+    return {};
+  }
+
+  constexpr std::optional<unsigned int> GetIndex(const ArmMairAttribute& attr) const {
+    return GetIndex(AttributeToValue(attr));
   }
 
   // Converts structured attribute to the associated raw value.

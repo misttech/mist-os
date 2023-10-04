@@ -34,26 +34,84 @@ enum class X86PagingLevel {
   kPageTable,
 };
 
-// Captures the system state influencing x86 paging.
-struct X86SystemPagingState {
-  template <class MsrIo, class CpuidIo>
-  static X86SystemPagingState Create(MsrIo&& msr, CpuidIo&& cpuid) {
-    // Safety check; this should always be present.
-    ZX_DEBUG_ASSERT(X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe());
+//
+// Implementations of the PagingTraits API (defined in <lib/arch/paging.h>) for
+// 4- and 5-level long mode x86 paging.
+//
 
-    return {.page1gb = cpuid.template Read<CpuidAmdFeatureFlagsD>().page1gb()};
+struct X86PagingTraitsBase {
+  using LevelType = X86PagingLevel;
+
+  template <X86PagingLevel Level>
+  class TableEntry;
+
+  // Memory configuration is not page-based for x86. Rather, it is managed
+  // through the MTRR MSRs.
+  struct MemoryType {};
+
+  // Captures the system state influencing x86 paging.
+  struct SystemState {
+    template <class MsrIo, class CpuidIo>
+    static SystemState Create(MsrIo&& msr, CpuidIo&& cpuid) {
+      // Safety check; this should always be present.
+      ZX_DEBUG_ASSERT(X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).nxe());
+
+      return {.page1gb = cpuid.template Read<CpuidAmdFeatureFlagsD>().page1gb()};
+    }
+
+    // Whether 1GiB pages are supported.
+    bool page1gb = false;
+  };
+
+  using PagingSettings = internal::PagingSettings<MemoryType>;
+
+  static constexpr std::array kAllLevels = {
+      X86PagingLevel::kPml5Table,
+      X86PagingLevel::kPml4Table,
+      X86PagingLevel::kPageDirectoryPointerTable,
+      X86PagingLevel::kPageDirectory,
+      X86PagingLevel::kPageTable,
+  };
+
+  static constexpr unsigned int kMaxPhysicalAddressSize = 52;
+
+  static constexpr unsigned int kTableAlignmentLog2 = 12;
+
+  template <X86PagingLevel Level>
+  static constexpr unsigned int kNumTableEntriesLog2 = 9;
+
+  static constexpr bool kNonTerminalAccessPermissions = true;
+
+  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = std::nullopt;
+
+  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
+
+  // Whether the given access permission are valid for an X86 page table entry.
+  static constexpr bool IsValidPageAccess(const SystemState& state,
+                                          const AccessPermissions& access) {
+    // Must always be readable.
+    return access.readable;
   }
 
-  // Whether 1GiB pages are supported.
-  bool page1gb = false;
+  template <X86PagingLevel Level>
+  static constexpr bool LevelCanBeTerminal(const SystemState& state) {
+    if constexpr (Level == X86PagingLevel::kPml5Table || Level == X86PagingLevel::kPml4Table) {
+      return false;
+    } else if constexpr (Level == X86PagingLevel::kPageDirectoryPointerTable) {
+      return state.page1gb;
+    } else {
+      return true;
+    }
+  }
 };
 
-// Whether the given access permission are valid for an X86 page table entry.
-static constexpr bool X86IsValidPageAccess(const X86SystemPagingState& state,
-                                           const AccessPermissions& access) {
-  // Must always be readable.
-  return access.readable;
-}
+struct X86FourLevelPagingTraits : public X86PagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+};
+
+struct X86FiveLevelPagingTraits : public X86PagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels};
+};
 
 // [intel/vol3]: Figure 4-11. Formats of CR3 and Paging-Structure Entries with 4-Level Paging and
 // 5-Level Paging
@@ -64,9 +122,10 @@ static constexpr bool X86IsValidPageAccess(const X86SystemPagingState& state,
 // Many of the operations below are dependent on whether the entry is terminal:
 // if a constructed entry is intended to be terminal that should be set first.
 template <X86PagingLevel Level>
-class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>, uint64_t> {
+class X86PagingTraitsBase::TableEntry
+    : public hwreg::RegisterBase<X86PagingTraitsBase::TableEntry<Level>, uint64_t> {
  private:
-  using SelfType = X86PagingStructure<Level>;
+  using SelfType = X86PagingTraitsBase::TableEntry<Level>;
 
  public:
   DEF_BIT(63, xd);  // eXecute Disable (or NX - No eXecute - on AMD)
@@ -172,7 +231,9 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
   constexpr bool executable() const { return !xd(); }
   constexpr bool user_accessible() const { return u_s(); }
 
-  constexpr SelfType& Set(const X86SystemPagingState& state, const PagingSettings& settings) {
+  constexpr MemoryType Memory(const SystemState& state) const { return {}; }
+
+  constexpr SelfType& Set(const SystemState& state, const PagingSettings& settings) {
     set_p(settings.present);
     if (!settings.present) {
       return *this;
@@ -187,7 +248,7 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
     }
 
     const AccessPermissions& access = settings.access;
-    ZX_DEBUG_ASSERT(X86IsValidPageAccess(state, access));
+    ZX_DEBUG_ASSERT(IsValidPageAccess(state, access));
     set_r_w(access.writable).set_xd(!access.executable).set_u_s(access.user_accessible);
 
     ZX_DEBUG_ASSERT_MSG((fbl::ExtractBits<63, 52, uint64_t>(settings.address) == 0), "%#" PRIx64,
@@ -219,62 +280,8 @@ class X86PagingStructure : public hwreg::RegisterBase<X86PagingStructure<Level>,
   DEF_BIT(7, ps_or_pat_7);
 };
 
-//
-// Implementations of the PagingTraits API (defined in <lib/arch/paging.h>) for
-// 4- and 5-level long mode x86 paging.
-//
-
-struct X86PagingTraitsBase {
-  using LevelType = X86PagingLevel;
-
-  template <X86PagingLevel Level>
-  using TableEntry = X86PagingStructure<Level>;
-
-  using SystemState = X86SystemPagingState;
-
-  static constexpr std::array kAllLevels = {
-      X86PagingLevel::kPml5Table,
-      X86PagingLevel::kPml4Table,
-      X86PagingLevel::kPageDirectoryPointerTable,
-      X86PagingLevel::kPageDirectory,
-      X86PagingLevel::kPageTable,
-  };
-
-  static constexpr unsigned int kMaxPhysicalAddressSize = 52;
-
-  static constexpr unsigned int kTableAlignmentLog2 = 12;
-
-  template <X86PagingLevel Level>
-  static constexpr unsigned int kNumTableEntriesLog2 = 9;
-
-  static constexpr bool kNonTerminalAccessPermissions = true;
-
-  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = std::nullopt;
-
-  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
-
-  static constexpr bool (*IsValidPageAccess)(const X86SystemPagingState&,
-                                             const AccessPermissions&) = X86IsValidPageAccess;
-
-  template <X86PagingLevel Level>
-  static constexpr bool LevelCanBeTerminal(const X86SystemPagingState& state) {
-    if constexpr (Level == X86PagingLevel::kPml5Table || Level == X86PagingLevel::kPml4Table) {
-      return false;
-    } else if constexpr (Level == X86PagingLevel::kPageDirectoryPointerTable) {
-      return state.page1gb;
-    } else {
-      return true;
-    }
-  }
-};
-
-struct X86FourLevelPagingTraits : public X86PagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
-};
-
-struct X86FiveLevelPagingTraits : public X86PagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels};
-};
+template <X86PagingLevel Level>
+using X86PagingStructure = X86PagingTraitsBase::TableEntry<Level>;
 
 }  // namespace arch
 

@@ -29,34 +29,84 @@ enum class RiscvPagingLevel {
   k0 = 0,
 };
 
-// Captures the system state influencing RISC-V paging.
-struct RiscvSystemPagingState {};
+// When the Svpbmt extension is available, a page table entry's pbmt field
+// determines the physical memory type being accessed.  Without that extension,
+// those bits must be all zero, which is also the PMA type (meaning the memory
+// type is controlled by the Physical Memory Attributes specification instead).
+enum class RiscvMemoryType {
+  kPma = 0,  // None
+  kNc = 1,   // Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory
+  kIo = 2,   // Non-cacheable, non-idempotent, strongly-ordered (I/O ordering), I/O
+};
 
-static constexpr unsigned int kRiscvMaxPhysicalAddressSize = 57;
+//
+// Implementations of the PagingTraits API (defined in <lib/arch/paging.h>) for
+// RISC-V.
+//
 
-// Whether the given access permission are valid for a RISC-V page.
-static constexpr bool RiscvIsValidPageAccess(const RiscvSystemPagingState& state,
-                                             const AccessPermissions& access) {
-  // A page is either readable or execute-only.
-  return access.readable || !access.writable;
-}
+struct RiscvPagingTraitsBase {
+  using LevelType = RiscvPagingLevel;
 
-template <RiscvPagingLevel Level>
-class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level>, uint64_t> {
- private:
-  using SelfType = RiscvPageTableEntry;
+  template <RiscvPagingLevel Level>
+  class TableEntry;
 
- public:
-  // When the Svpbmt extension is available, the pbmt field determines the
-  // physical memory type being accessed.  Without that extension, those bits
-  // must be all zero, which is also the PMA type (meaning the memory type is
-  // controlled by the Physical Memory Attributes specification instead).
-  enum class MemoryType : uint64_t {
-    kPma = 0,  // None
-    kNc = 1,   // Non-cacheable, idempotent, weakly-ordered (RVWMO), main memory
-    kIo = 2,   // Non-cacheable, non-idempotent, strongly-ordered (I/O ordering), I/O
+  using MemoryType = RiscvMemoryType;
+
+  static constexpr MemoryType kDefaultMemory = RiscvMemoryType::kPma;
+
+  struct SystemState {};
+
+  using PagingSettings = internal::PagingSettings<MemoryType, kDefaultMemory>;
+
+  static constexpr std::array kAllLevels = {
+      RiscvPagingLevel::k4, RiscvPagingLevel::k3, RiscvPagingLevel::k2,
+      RiscvPagingLevel::k1, RiscvPagingLevel::k0,
   };
 
+  static constexpr unsigned int kMaxPhysicalAddressSize = 57;
+
+  static constexpr unsigned int kTableAlignmentLog2 = 12;
+
+  template <RiscvPagingLevel Level>
+  static constexpr unsigned int kNumTableEntriesLog2 = 9;
+
+  static constexpr bool kNonTerminalAccessPermissions = false;
+
+  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = std::nullopt;
+
+  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
+
+  static constexpr bool IsValidPageAccess(const SystemState& state,
+                                          const AccessPermissions& access) {
+    // A page is either readable or execute-only.
+    return access.readable || !access.writable;
+  }
+
+  template <RiscvPagingLevel Level>
+  static constexpr bool LevelCanBeTerminal(const SystemState& state) {
+    return true;
+  }
+};
+
+struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(2);
+};
+
+struct RiscvSv48PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
+};
+
+struct RiscvSv57PagingTraits : public RiscvPagingTraitsBase {
+  static constexpr auto kLevels = cpp20::span{kAllLevels};
+};
+
+template <RiscvPagingLevel Level>
+class RiscvPagingTraitsBase::TableEntry
+    : public hwreg::RegisterBase<RiscvPagingTraitsBase::TableEntry<Level>, uint64_t> {
+ private:
+  using SelfType = RiscvPagingTraitsBase::TableEntry<Level>;
+
+ public:
   // When the Svnapot extension is available, setting the N bit means that
   // this PTE is part of a larger Naturally Aligned Power-of-2 (NAPOT) range.
   // The low bits of PPN indicate what power of 2 is the actual granularity of
@@ -112,7 +162,9 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
   constexpr bool executable() const { return terminal() ? x() : true; }
   constexpr bool user_accessible() const { return terminal() ? u() : true; }
 
-  constexpr SelfType& Set(const RiscvSystemPagingState& state, const PagingSettings& settings) {
+  constexpr RiscvMemoryType Memory(const SystemState& state) const { return pbmt(); }
+
+  constexpr SelfType& Set(const SystemState& state, const PagingSettings& settings) {
     set_v(settings.present);
     if (!settings.present) {
       return *this;
@@ -120,11 +172,12 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
 
     const AccessPermissions& access = settings.access;
     if (settings.terminal) {
-      ZX_DEBUG_ASSERT(RiscvIsValidPageAccess(state, access));
+      ZX_DEBUG_ASSERT(IsValidPageAccess(state, access));
       set_r(access.readable)
           .set_w(access.writable)
           .set_x(access.executable)
-          .set_u(access.user_accessible);
+          .set_u(access.user_accessible)
+          .set_pbmt(settings.memory);
     } else {
       // Since access permissions cannot be applied to non-terminal levels to
       // constrain later ones, the provided permissions here are expected to be
@@ -150,62 +203,13 @@ class RiscvPageTableEntry : public hwreg::RegisterBase<RiscvPageTableEntry<Level
                           settings.address);
     }
     ZX_DEBUG_ASSERT(
-        (fbl::ExtractBits<63, kRiscvMaxPhysicalAddressSize, uint64_t>(settings.address) == 0));
+        (fbl::ExtractBits<63, kMaxPhysicalAddressSize, uint64_t>(settings.address) == 0));
     return set_ppn(settings.address >> 12);
   }
 };
 
-//
-// Implementations of the PagingTraits API (defined in <lib/arch/paging.h>) for
-// RISC-V.
-//
-
-struct RiscvPagingTraitsBase {
-  using LevelType = RiscvPagingLevel;
-
-  template <RiscvPagingLevel Level>
-  using TableEntry = RiscvPageTableEntry<Level>;
-
-  using SystemState = RiscvSystemPagingState;
-
-  static constexpr std::array kAllLevels = {
-      RiscvPagingLevel::k4, RiscvPagingLevel::k3, RiscvPagingLevel::k2,
-      RiscvPagingLevel::k1, RiscvPagingLevel::k0,
-  };
-
-  static constexpr unsigned int kMaxPhysicalAddressSize = kRiscvMaxPhysicalAddressSize;
-
-  static constexpr unsigned int kTableAlignmentLog2 = 12;
-
-  template <RiscvPagingLevel Level>
-  static constexpr unsigned int kNumTableEntriesLog2 = 9;
-
-  static constexpr bool kNonTerminalAccessPermissions = false;
-
-  static constexpr std::optional<unsigned int> kVirtualAddressSizeOverride = std::nullopt;
-
-  static constexpr auto kVirtualAddressExtension = VirtualAddressExtension::kCanonical;
-
-  static constexpr bool (*IsValidPageAccess)(const RiscvSystemPagingState&,
-                                             const AccessPermissions&) = RiscvIsValidPageAccess;
-
-  template <RiscvPagingLevel Level>
-  static constexpr bool LevelCanBeTerminal(const RiscvSystemPagingState& state) {
-    return true;
-  }
-};
-
-struct RiscvSv39PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(2);
-};
-
-struct RiscvSv48PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels}.subspan(1);
-};
-
-struct RiscvSv57PagingTraits : public RiscvPagingTraitsBase {
-  static constexpr auto kLevels = cpp20::span{kAllLevels};
-};
+template <RiscvPagingLevel Level>
+using RiscvPageTableEntry = RiscvPagingTraitsBase::TableEntry<Level>;
 
 }  // namespace arch
 

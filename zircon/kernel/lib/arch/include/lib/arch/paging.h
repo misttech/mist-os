@@ -25,9 +25,33 @@
 
 namespace arch {
 
-// Forward-declared; defined below.
-struct AccessPermissions;
-struct PagingSettings;
+/// Settings relating to the access permissions of a page or pages that map
+/// through an entry.
+struct AccessPermissions {
+  bool readable = false;
+  bool writable = false;
+  bool executable = false;
+  bool user_accessible = false;
+};
+
+namespace internal {
+
+template <typename T, typename = std::enable_if_t<std::is_default_constructible_v<T>>>
+constexpr T kDefaultConstructedValue = {};
+
+// See ExamplePagingTraits::PagingSettings below.
+template <typename MemoryType, auto& DefaultMemoryValue = kDefaultConstructedValue<MemoryType>>
+struct PagingSettings {
+  static constexpr MemoryType kDefaultMemory = DefaultMemoryValue;
+
+  uint64_t address = 0u;
+  bool present = false;
+  bool terminal = false;
+  AccessPermissions access;
+  MemoryType memory = DefaultMemoryValue;
+};
+
+}  // namespace internal
 
 /// Parameterizes the unaddressable bits of a virtual address.
 enum class VirtualAddressExtension {
@@ -75,12 +99,35 @@ struct ExamplePagingTraits {
   ///
   enum class LevelType { kExampleLevel };
 
+  /// A type describing 'memory' configuration (both RAM and MMIO). This might
+  /// encode cache coherence policy or similar architecture-specific details.
+  struct MemoryType {};
+
   /// Captures runtime system information that feeds into translation or
   /// mapping considerations. The construction of this information is
   /// context-dependent and so is left to the user of the API.
   ///
   /// SystemState is expected to be default-constructible.
   struct SystemState {};
+
+  /// PagingSettings should be a class with the following public fields,
+  /// corresponding to TableEntry's accessors below:
+  /// *  bool present;
+  /// *  bool terminal;
+  /// *  uint64_t address;
+  /// *  AccessPermissions access;
+  /// *  MemoryType memory;
+  ///
+  /// Further, PagingSettings should define a default memory type value in the
+  /// form of
+  /// *  static constexpr MemoryType kDefaultMemory;
+  ///
+  /// This abstraction allows traits to define their own default settings.
+  ///
+  /// PagingSettings must be default-constructible.
+  ///
+  /// TODO(fxbug.dev/129344): Extend with a 'global' setting.
+  using PagingSettings = internal::PagingSettings<MemoryType>;
 
   /// The register type representing a page table entry at a given level. It
   /// must meet the defined API below.
@@ -121,6 +168,15 @@ struct ExamplePagingTraits {
     constexpr bool executable() const { return false; }
     constexpr bool user_accessible() const { return false; }
 
+    /// Returns the memory type of the associated page, which may require
+    /// access to system state to decode.
+    ///
+    /// This method may only be called on a terminal entry.
+    constexpr MemoryType Memory(const SystemState& state) const {
+      assert(terminal());
+      return PagingSettings::kDefaultMemory;
+    }
+
     /// Bulk-apply paging settings to the entry. This is done in one go as
     /// there can be interdependicies among the different aspects of entry
     /// state: these could not otherwise be captured by individual setters with
@@ -137,7 +193,9 @@ struct ExamplePagingTraits {
     /// before making this call; otherwise if
     /// `!Traits::kNonTerminalAccessPermissions` then the provided access
     /// permissions are expected to be maximally permissive.
-    constexpr TableEntry& Set(const PagingSettings& settings) { return *this; }
+    constexpr TableEntry& Set(const SystemState& state, const PagingSettings& settings) {
+      return *this;
+    }
   };
 
   /// The maximum number of addressable physical address bits permitted by the
@@ -188,24 +246,6 @@ struct ExamplePagingTraits {
   }
 };
 
-/// Settings relating to the access permissions of a page or pages that map
-/// through an entry.
-struct AccessPermissions {
-  bool readable = false;
-  bool writable = false;
-  bool executable = false;
-  bool user_accessible = false;
-};
-
-/// As described by `ExamplePagingTraits::TableEntry<Level>::Set()`.
-struct PagingSettings {
-  uint64_t address = 0u;
-  bool present = false;
-  bool terminal = false;
-  AccessPermissions access;
-  // TODO(fxbug.dev/129344): global, memory type.
-};
-
 /// A range of (zero-indexed) bits within a virtual address.
 struct VirtualAddressBitRange {
   unsigned int high, low;
@@ -251,13 +291,6 @@ struct MapError {
   Type type = Type::kUnknown;
 };
 
-/// The settings to apply to each page mapped in the context of the mapping
-/// utilities below.
-struct MapSettings {
-  AccessPermissions access;
-  // TODO(fxbug.dev/129344): global, memory type.
-};
-
 /// Paging provides paging-related operations for a given a set of paging
 /// traits.
 template <class PagingTraits>
@@ -269,7 +302,18 @@ class Paging : public PagingTraits {
   template <LevelType Level>
   using TableEntry = typename PagingTraits::template TableEntry<Level>;
 
+  using typename PagingTraits::MemoryType;
+  using typename PagingTraits::PagingSettings;
   using typename PagingTraits::SystemState;
+
+  /// The settings to apply to each page mapped in the context of the mapping
+  /// utilities below.
+  struct MapSettings {
+    AccessPermissions access;
+    MemoryType memory = PagingTraits::PagingSettings::kDefaultMemory;
+
+    // TODO(fxbug.dev/129344): global.
+  };
 
   using PagingTraits::kLevels;
   static_assert(kLevels.size() > 0);
@@ -575,7 +619,7 @@ class Paging : public PagingTraits {
         : on_terminal_(std::move(on_terminal)) {}
 
     template <class TableIo, LevelType Level>
-    std::optional<value_type> operator()(TableIo & io, TableEntry<Level>& entry, uint64_t vaddr) {
+    std::optional<value_type> operator()(TableIo& io, TableEntry<Level>& entry, uint64_t vaddr) {
       if (!entry.present()) {
         return fit::failed();
       }
@@ -608,6 +652,8 @@ class Paging : public PagingTraits {
  private:
   // TODO(fxbug.dev/131202): Once hwreg is constexpr-friendly, we can add a static
   // assert that zeroed entries at any level report as non-present.
+
+  static_assert(std::is_default_constructible_v<PagingSettings>);
 
   /// A visitor tailor-made to help perform a mapping of
   /// `[input_vaddr, input_vaddr + size)` to
@@ -642,7 +688,7 @@ class Paging : public PagingTraits {
     uint64_t next_vaddr() const { return input_vaddr_; }
 
     template <typename TableIo, LevelType Level>
-    std::optional<fit::result<MapError>> operator()(TableIo && io, TableEntry<Level>& entry,
+    std::optional<fit::result<MapError>> operator()(TableIo&& io, TableEntry<Level>& entry,
                                                     uint64_t table_paddr) {
       auto to_error = [entry_paddr = table_paddr + kEntrySize<Level> * entry.reg_addr(),
                        vaddr = input_vaddr_](MapError::Type type) -> MapError {
@@ -681,8 +727,9 @@ class Paging : public PagingTraits {
       if (terminal) {
         settings.address = output_paddr_;
         settings.access = settings_.access;
+        settings.memory = settings_.memory;
       } else {
-        std::optional<uint64_t> new_table_paddr = allocator_(kTableAlignment, kTableSize<Level>);
+        std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
         if (!new_table_paddr) {
           return fit::error(to_error(MapError::Type::kAllocationFailure));
         }
