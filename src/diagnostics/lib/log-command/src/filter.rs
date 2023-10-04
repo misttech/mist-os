@@ -113,6 +113,35 @@ impl LogFilterCriteria {
             || log.metadata.component_url.as_ref().map_or(false, |s| s.contains(filter_string));
     }
 
+    // TODO(b/303315896): If/when debuglog is strutured remove this.
+    fn parse_tags(value: &str) -> Vec<&str> {
+        let mut tags = Vec::new();
+        let mut current = value;
+        if current.chars().next() != Some('[') {
+            return tags;
+        }
+        loop {
+            match current.find('[') {
+                Some(opening_index) => {
+                    current = &current[opening_index + 1..];
+                }
+                None => return tags,
+            }
+            match current.find(']') {
+                Some(closing_index) => {
+                    tags.push(&current[..closing_index]);
+                    current = &current[closing_index + 1..];
+                }
+                None => return tags,
+            }
+        }
+    }
+
+    fn match_synthetic_klog_tags(&self, klog_str: &str) -> bool {
+        let tags = Self::parse_tags(klog_str);
+        self.tags.iter().any(|f| tags.iter().filter(|t| t.contains(f)).next().is_some())
+    }
+
     /// Returns true if the given `LogsData` matches the moniker string.
     fn matches_filter_by_moniker_string(filter_string: &str, log: &LogsData) -> bool {
         let filter_moniker = Moniker::from_str(filter_string);
@@ -162,6 +191,9 @@ impl LogFilterCriteria {
         if !self.tags.is_empty()
             && !self.tags.iter().any(|f| data.tags().map(|t| t.contains(f)).unwrap_or(false))
         {
+            if data.moniker == "klog" {
+                return self.match_synthetic_klog_tags(data.msg().unwrap_or(""));
+            }
             return false;
         }
 
@@ -558,6 +590,79 @@ mod test {
 
     #[fuchsia::test]
     async fn test_criteria_klog_only() {
+        let cmd = LogCommand { tag: vec!["component_manager".into()], ..empty_dump_command() };
+        let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
+
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("[component_manager] included message")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("excluded message[component_manager]")
+            .build()
+            .into()
+        )));
+        assert!(criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("[tag0][component_manager] included message")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("[other] excluded message")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "klog".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("no tags, excluded")
+            .build()
+            .into()
+        )));
+        assert!(!criteria.matches(&make_log_entry(
+            diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                timestamp_nanos: 0.into(),
+                component_url: Some(String::default()),
+                moniker: "other/moniker".to_string(),
+                severity: diagnostics_data::Severity::Error,
+            })
+            .set_message("[component_manager] excluded message")
+            .build()
+            .into()
+        )));
+    }
+
+    #[fuchsia::test]
+    async fn test_criteria_klog_tag_hack() {
         let cmd = LogCommand { kernel: true, ..empty_dump_command() };
         let criteria = LogFilterCriteria::try_from(&cmd).unwrap();
 
