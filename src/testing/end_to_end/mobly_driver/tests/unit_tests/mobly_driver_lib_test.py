@@ -5,6 +5,7 @@
 """Unit tests for Mobly driver's mobly_driver_lib.py."""
 
 import os
+import subprocess
 import unittest
 from unittest import mock
 
@@ -24,19 +25,15 @@ class MoblyDriverLibTest(unittest.TestCase):
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
-    def test_run_success(self, mock_popen, mock_print):
+    def test_run_success(self, mock_popen, *unused_args):
         """Test case to ensure run succeeds"""
-        self.mock_process.stdout.readline.return_value = "TEST_OUTPUT"
-        self.mock_process.poll.side_effect = [None, 0]
+        self.mock_process.wait.return_value = 0
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
         mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
 
         self.mock_driver.generate_test_config.assert_called()
         self.mock_driver.teardown.assert_called()
-        self.assertIn(
-            mock.call("TEST_OUTPUT", flush=True), mock_print.call_args_list
-        )
 
     @parameterized.expand(
         [
@@ -61,46 +58,38 @@ class MoblyDriverLibTest(unittest.TestCase):
         self, mock_popen, *unused_args
     ):
         """Test case to ensure exception raised on test failure"""
-        self.mock_process.poll.return_value = 1
+        self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
         with self.assertRaises(mobly_driver_lib.MoblyTestFailureException):
             mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
 
     @mock.patch("builtins.print")
-    @mock.patch("time.time")
     @mock.patch("subprocess.Popen")
-    def test_run_mobly_test_timeout_exception(
-        self, mock_popen, mock_time, *unused_args
-    ):
+    def test_run_mobly_test_timeout_exception(self, mock_popen, *unused_args):
         """Test case to ensure exception raised on test timeout"""
         mock_popen.return_value.__enter__.return_value = self.mock_process
-
-        mock_time.side_effect = [0, 10]
+        self.mock_process.wait.side_effect = [
+            subprocess.TimeoutExpired("", ""),
+            0,
+        ]
 
         with self.assertRaises(mobly_driver_lib.MoblyTestTimeoutException):
-            mobly_driver_lib.run(
-                self.mock_driver, "/py/path", "/test/path", timeout_sec=5
-            )
+            mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_process.kill.assert_called()
 
     @mock.patch("builtins.print")
     @mock.patch("subprocess.Popen")
     def test_run_teardown_runs_despite_subprocess_error(
-        self, mock_popen, mock_print
+        self, mock_popen, *unused_args
     ):
         """Test case to ensure teardown always executes"""
-        self.mock_process.stdout.readline.return_value = "MOCK_FAILURE_OUTPUT"
-        self.mock_process.poll.side_effect = [None, 1]
+        self.mock_process.wait.return_value = 1
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
         with self.assertRaises(mobly_driver_lib.MoblyTestFailureException):
             mobly_driver_lib.run(self.mock_driver, "/py/path", "/test/path")
         self.mock_driver.teardown.assert_called()
-        self.assertIn(
-            mock.call("MOCK_FAILURE_OUTPUT", flush=True),
-            mock_print.call_args_list,
-        )
 
     @parameterized.expand([[True], [False]])
     @mock.patch("builtins.print")
@@ -114,7 +103,7 @@ class MoblyDriverLibTest(unittest.TestCase):
         py_path = "/py/path"
         test_path = "/test/path"
         self.mock_tmp.name = tmp_path
-        self.mock_process.poll.side_effect = [None, 0]
+        self.mock_process.wait.return_value = 0
         mock_tempfile.return_value.__enter__.return_value = self.mock_tmp
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
@@ -123,8 +112,6 @@ class MoblyDriverLibTest(unittest.TestCase):
         )
         mock_popen.assert_called_once_with(
             [py_path, test_path, "-c", tmp_path] + (["-v"] if verbose else []),
-            stdout=mock.ANY,
-            stderr=mock.ANY,
             universal_newlines=mock.ANY,
             env=mock.ANY,
         )
@@ -133,8 +120,7 @@ class MoblyDriverLibTest(unittest.TestCase):
     @mock.patch("subprocess.Popen")
     def test_run_updates_env_with_testdata_dir(self, mock_popen, *unused_args):
         """Test case to ensure env is updated when test_data_path is provided"""
-        self.mock_process.stdout.readline.return_value = "TEST_OUTPUT"
-        self.mock_process.poll.side_effect = [None, 0]
+        self.mock_process.wait.return_value = 0
         mock_popen.return_value.__enter__.return_value = self.mock_process
 
         env = {"PATH": "/system/path"}
@@ -147,8 +133,6 @@ class MoblyDriverLibTest(unittest.TestCase):
             )
             mock_popen.assert_called_once_with(
                 mock.ANY,
-                stdout=mock.ANY,
-                stderr=mock.ANY,
                 universal_newlines=mock.ANY,
                 env={"PATH": "/test_data/path:/system/path"},
             )

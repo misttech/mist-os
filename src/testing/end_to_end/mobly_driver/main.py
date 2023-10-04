@@ -27,7 +27,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "-test_timeout_sec",
-    default=0,
+    default=None,
     help="integer to specify number of seconds before a Mobly test times out.",
 )
 parser.add_argument(

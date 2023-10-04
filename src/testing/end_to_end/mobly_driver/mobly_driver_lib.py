@@ -25,7 +25,7 @@ def _execute_test(
     driver: base_mobly_driver.BaseDriver,
     python_path: str,
     test_path: str,
-    timeout_sec: int = 0,
+    timeout_sec: Optional[int] = None,
     test_data_path: Optional[str] = None,
     transport: Optional[str] = None,
     verbose: bool = False,
@@ -39,7 +39,7 @@ def _execute_test(
       python_path: path to the Python runtime for to use.
       test_path: path to the Mobly test executable to run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
-        If set to 0, timeout is not enforced.
+        If set to None, timeout is not enforced.
       test_data_path: path to directory containing test-time data
         dependencies.
       transport: host->target transport type to use.
@@ -75,38 +75,29 @@ def _execute_test(
 
         with subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
             universal_newlines=True,
             env=test_env,
         ) as proc:
-            timeout_ts = time.time() + timeout_sec
-            # Poll the process to stream output.
-            while not timeout_sec or time.time() < timeout_ts:
-                return_code = proc.poll()
-                if return_code is not None:
-                    if return_code == 0:
-                        return
-                    # TODO(fxbug.dev/119651) - differentiate between legitimate
-                    # test failures vs unexpected crashes.
-                    raise MoblyTestFailureException("Mobly test failed.")
-                output = proc.stdout.readline()
-                if output:
-                    # Immediately flush Mobly test output for responsiveness.
-                    print(output.strip(), flush=True)
-            # Mobly test timed out.
-            proc.kill()
-            proc.wait(timeout=10)
-            raise MoblyTestTimeoutException(
-                f"Mobly test timed out after {timeout_sec} seconds."
-            )
+            try:
+                return_code = proc.wait(timeout=timeout_sec)
+            except subprocess.TimeoutExpired:
+                # Mobly test timed out.
+                proc.kill()
+                proc.wait(timeout=10)
+                raise MoblyTestTimeoutException(
+                    f"Mobly test timed out after {timeout_sec} seconds."
+                )
+        if return_code != 0:
+            # TODO(fxbug.dev/119651) - differentiate between legitimate
+            # test failures vs unexpected crashes.
+            raise MoblyTestFailureException("Mobly test failed.")
 
 
 def run(
     driver: base_mobly_driver.BaseDriver,
     python_path: str,
     test_path: str,
-    timeout_sec: int = 0,
+    timeout_sec: Optional[int] = None,
     test_data_path: Optional[str] = None,
     transport: Optional[str] = None,
     verbose: bool = False,
@@ -122,7 +113,7 @@ def run(
       python_path: path to the Python runtime to use for test execution.
       test_path: path to the Mobly test executable to run.
       timeout_sec: Number of seconds before a test is killed due to timeout.
-          If set to 0, timeout is not enforced.
+          If None, timeout is not enforced.
       test_data_path: path to directory containing test-time data
           dependencies.
       transport: host->target transport type to use.
@@ -139,8 +130,10 @@ def run(
         raise ValueError("|python_path| must not be empty.")
     if not test_path:
         raise ValueError("|test_path| must not be empty.")
-    if timeout_sec < 0:
-        raise ValueError("|timeout_sec| must be a positive integer.")
+    if timeout_sec is not None and timeout_sec < 0:
+        raise ValueError(
+            "|timeout_sec| must be None or a non-negative integer."
+        )
     print(f"Running [{driver.__class__.__name__}]")
     try:
         _execute_test(
