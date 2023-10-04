@@ -232,13 +232,12 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     cmd: DoctorCommand,
     mut writer: W,
 ) -> Result<()> {
-    // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
-    // instead.
-    let hoist = hoist::hoist();
+    let node = overnet_core::Router::new(None)
+        .with_context(|| ffx_error!("Could not initialize Overnet"))?;
     let context = ffx_config::global_env_context()
         .with_context(|| ffx_error!("No environment context loaded"))?;
     let ascendd_path = context.get_ascendd_path().await?;
-    let daemon_manager = DefaultDaemonManager::new(hoist.clone(), ascendd_path);
+    let daemon_manager = DefaultDaemonManager::new(node, ascendd_path);
     let delay = Duration::from_millis(cmd.retry_delay);
 
     let ffx: ffx_command::Ffx = argh::from_env();

@@ -27,8 +27,6 @@ struct FfxSuite {
     external_commands: ExternalSubToolSuite,
 }
 
-const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_millis(500);
-
 #[async_trait::async_trait(?Send)]
 impl ToolSuite for FfxSuite {
     async fn from_env(env: &EnvironmentContext) -> Result<Self> {
@@ -159,12 +157,11 @@ async fn run_legacy_subcommand(
     context: EnvironmentContext,
     subcommand: FfxBuiltIn,
 ) -> Result<()> {
-    let router_interval = if is_daemon(&subcommand) { Some(CIRCUIT_REFRESH_RATE) } else { None };
     let daemon_version_string = DaemonVersionCheck::SameBuildId(context.daemon_version_string()?);
     tracing::debug!("initializing overnet");
     let injector = Injection::initialize_overnet(
         context,
-        router_interval,
+        None,
         daemon_version_string,
         app.global.machine,
         app.global.target().await?,

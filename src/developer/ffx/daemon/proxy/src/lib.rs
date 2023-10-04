@@ -81,13 +81,8 @@ impl Injection {
         format: Option<Format>,
         target: Option<String>,
     ) -> ffx_command_error::Result<Injection> {
-        // todo(fxbug.dev/287694609) we should get this in the environment context instead and leave the global
-        // hoist() unset for ffx but I'm leaving the last couple uses of it in place for the sake of
-        // avoiding complicated merge conflicts with isolation. Once we're ready for that, this should be
-        // `let Hoist = hoist::Hoist::new()...`
         tracing::debug!("Initializing Hoist");
-        let hoist = hoist::init_hoist_with(Hoist::new(router_interval)?)
-            .bug_context("Failed to initialize overnet")?;
+        let hoist = Hoist::new(router_interval).bug_context("Failed to initialize overnet")?;
         tracing::debug!("Getting target");
         let target = ffx_target::maybe_inline_target(target, &env_context).await;
         tracing::debug!("Building Injection");

@@ -8,10 +8,10 @@ use ffx_daemon::{
 };
 use fidl_fuchsia_developer_ffx::DaemonProxy;
 use fuchsia_async::Timer;
-use hoist::Hoist;
 use std::{
     path::{Path, PathBuf},
     process::Command,
+    sync::Arc,
     time::Duration,
 };
 
@@ -39,13 +39,13 @@ pub trait DaemonManager {
 }
 
 pub struct DefaultDaemonManager {
-    hoist: Hoist,
+    node: Arc<overnet_core::Router>,
     socket_path: PathBuf,
 }
 
 impl DefaultDaemonManager {
-    pub fn new(hoist: Hoist, socket_path: PathBuf) -> Self {
-        Self { hoist, socket_path }
+    pub fn new(node: Arc<overnet_core::Router>, socket_path: PathBuf) -> Self {
+        Self { node, socket_path }
     }
 }
 
@@ -153,6 +153,6 @@ impl DaemonManager for DefaultDaemonManager {
     }
 
     async fn find_and_connect(&self) -> Result<DaemonProxy> {
-        find_and_connect(&self.hoist.node(), self.socket_path.clone()).await
+        find_and_connect(&self.node, self.socket_path.clone()).await
     }
 }

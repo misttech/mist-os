@@ -15,6 +15,7 @@ pub struct DaemonStartTool {
 }
 
 fho::embedded_plugin!(DaemonStartTool);
+const CIRCUIT_REFRESH_RATE: std::time::Duration = std::time::Duration::from_millis(500);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for DaemonStartTool {
@@ -22,9 +23,8 @@ impl FfxMain for DaemonStartTool {
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         tracing::debug!("in daemon start main");
-        // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
-        // instead.
-        let hoist = hoist::hoist();
+        let node = overnet_core::Router::new(Some(CIRCUIT_REFRESH_RATE))
+            .user_message("Failed to initialize overnet")?;
         let ascendd_path = match self.cmd.path {
             Some(path) => path,
             None => self
@@ -44,6 +44,6 @@ impl FfxMain for DaemonStartTool {
         })?;
         tracing::debug!("creating daemon");
         let mut daemon = ffx_daemon_server::Daemon::new(ascendd_path);
-        daemon.start(hoist.node()).await.bug()
+        daemon.start(node).await.bug()
     }
 }

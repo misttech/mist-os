@@ -1266,14 +1266,9 @@ mod test {
         }
     }
 
-    static INIT: std::sync::Once = std::sync::Once::new();
-
     #[fuchsia::test]
     async fn test_start_with_failure() {
         let env = ffx_config::test_init().await.unwrap();
-        INIT.call_once(|| {
-            hoist::init_hoist().expect("init hoist");
-        });
 
         // Set the ssh key paths to something, the contents do no matter for this test.
         env.context
@@ -1321,10 +1316,6 @@ mod test {
         fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
             .expect("setting permissions");
 
-        INIT.call_once(|| {
-            hoist::init_hoist().expect("init hoist");
-        });
-
         // Set the ssh key paths to something, the contents do no matter for this test.
         env.context
             .query("ssh.pub")
@@ -1371,10 +1362,6 @@ mod test {
         fs::write(&ssh_path, SUPPORTED_HOST_PIPE_SH).expect("writing test script");
         fs::set_permissions(&ssh_path, fs::Permissions::from_mode(0o770))
             .expect("setting permissions");
-
-        INIT.call_once(|| {
-            hoist::init_hoist().expect("init hoist");
-        });
 
         // Set the ssh key paths to something, the contents do no matter for this test.
         env.context
