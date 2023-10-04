@@ -35,6 +35,16 @@ use std::{mem, ptr};
 /// }
 /// ```
 pub fn replace_with<T, F: FnOnce(T) -> T>(dst: &mut T, f: F) {
+    replace_with_and(dst, move |t| (f(t), ()))
+}
+
+/// Uses `f` to replace the referent of `dst` and returns a value from the
+/// transformation.
+///
+/// Like [`replace_with`] but the provided function returns a tuple of `(T, R`)
+/// where `T` is the new value for `dst` and `R` is returned from
+/// `replace_with_and`.
+pub fn replace_with_and<T, R, F: FnOnce(T) -> (T, R)>(dst: &mut T, f: F) -> R {
     // This is not necessary today, but it may be necessary if the "strict
     // pointer provenance" model [1] is adopted in the future.
     //
@@ -75,8 +85,9 @@ pub fn replace_with<T, F: FnOnce(T) -> T>(dst: &mut T, f: F) {
     //   - `dst` is properly aligned
     unsafe {
         let old = ptr::read(dst);
-        let new = abort_on_panic(move || f(old));
+        let (new, ret) = abort_on_panic(move || f(old));
         ptr::write(dst, new);
+        ret
     }
 }
 
