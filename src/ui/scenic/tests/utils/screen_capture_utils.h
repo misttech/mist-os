@@ -29,6 +29,7 @@ static constexpr uint8_t kRed[] = {0, 0, 255, 255};
 static constexpr uint8_t kGreen[] = {0, 255, 0, 255};
 static constexpr uint8_t kBlue[] = {255, 0, 0, 255};
 static constexpr uint8_t kYellow[] = {0, 255, 255, 255};
+static constexpr uint8_t kZero[] = {0, 0, 0, 0};
 
 bool PixelEquals(const uint8_t* a, const uint8_t* b);
 

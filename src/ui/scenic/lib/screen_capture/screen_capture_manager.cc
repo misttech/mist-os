@@ -29,19 +29,23 @@ ScreenCaptureManager::ScreenCaptureManager(
 
 void ScreenCaptureManager::CreateClient(
     fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture> request) {
-  bindings_.AddBinding(std::make_unique<ScreenCapture>(
-                           buffer_collection_importers_, renderer_,
-                           [this]() {
-                             FX_DCHECK(flatland_manager_);
-                             FX_DCHECK(engine_);
+  bindings_.AddBinding(
+      std::make_unique<ScreenCapture>(
+          buffer_collection_importers_, renderer_,
+          [this]() {
+            FX_DCHECK(flatland_manager_);
+            FX_DCHECK(engine_);
 
-                             auto display =
-                                 flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
-                             FX_DCHECK(display);
+            auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
+            if (!display) {
+              FX_LOGS(WARNING)
+                  << "No FlatlandDisplay attached at root. Returning an empty screenshot.";
+              return flatland::Renderables();
+            }
 
-                             return engine_->GetRenderables(*display);
-                           }),
-                       std::move(request));
+            return engine_->GetRenderables(*display);
+          }),
+      std::move(request));
 }
 
 }  // namespace screen_capture

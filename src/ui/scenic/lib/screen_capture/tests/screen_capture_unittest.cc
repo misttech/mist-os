@@ -40,6 +40,7 @@ class ScreenCaptureTest : public gtest::TestLoopFixture {
         std::shared_ptr<allocation::BufferCollectionImporter>(mock_buffer_collection_importer_);
 
     renderer_ = std::make_shared<flatland::MockRenderer>();
+    // Empty vectors.
     renderables_ =
         std::make_pair<std::vector<ImageRect>, std::vector<allocation::ImageMetadata>>({}, {});
 

@@ -186,6 +186,54 @@ class ScreenCaptureIntegrationTest : public LoggingEventLoop, public ::testing::
   uint32_t num_pixels_ = 0;
 };
 
+TEST_F(ScreenCaptureIntegrationTest, EmptyScreenshot) {
+  // Detach |flatland_display_| from the scene graph.
+  flatland_display_.Unbind();
+
+  const uint32_t render_target_width = display_width_;
+  const uint32_t render_target_height = display_height_;
+
+  // Create buffer collection to render into for GetNextFrame().
+  allocation::BufferCollectionImportExportTokens scr_ref_pair =
+      allocation::BufferCollectionImportExportTokens::New();
+
+  fuchsia::sysmem::BufferCollectionInfo_2 sc_buffer_collection_info =
+      CreateBufferCollectionInfo2WithConstraints(
+          utils::CreateDefaultConstraints(/*buffer_count=*/1, render_target_width,
+                                          render_target_height),
+          std::move(scr_ref_pair.export_token), flatland_allocator_.get(), sysmem_allocator_.get(),
+          RegisterBufferCollectionUsages::SCREENSHOT);
+
+  // Configure buffers in ScreenCapture client.
+  ScreenCaptureConfig sc_args;
+  sc_args.set_import_token(std::move(scr_ref_pair.import_token));
+  sc_args.set_buffer_count(sc_buffer_collection_info.buffer_count);
+  sc_args.set_size({render_target_width, render_target_height});
+
+  bool alloc_result = false;
+  screen_capture_->Configure(std::move(sc_args),
+                             [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
+                               EXPECT_FALSE(result.is_error());
+                               alloc_result = true;
+                             });
+
+  RunLoopUntil([&alloc_result] { return alloc_result; });
+
+  const auto& cs_result = CaptureScreen(screen_capture_);
+  EXPECT_FALSE(cs_result.is_error());
+  const auto& read_values =
+      ExtractScreenCapture(cs_result.value().buffer_id(), sc_buffer_collection_info, kBytesPerPixel,
+                           render_target_width, render_target_height);
+
+  // Compare read and write values.
+  uint32_t num_zero = 0;
+  for (size_t i = 0; i < read_values.size(); i += kBytesPerPixel) {
+    if (PixelEquals(&read_values[i], kZero))
+      num_zero++;
+  }
+  EXPECT_EQ(num_zero, num_pixels_);
+}
+
 TEST_F(ScreenCaptureIntegrationTest, SingleColorUnrotatedScreenshot) {
   const uint32_t image_width = display_width_;
   const uint32_t image_height = display_height_;

@@ -20,6 +20,7 @@
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
 #include "src/ui/scenic/lib/display/color_converter.h"
 #include "src/ui/scenic/lib/display/display_power_manager.h"
+#include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 #include "src/ui/scenic/lib/flatland/renderer/null_renderer.h"
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
@@ -528,7 +529,11 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           FX_DCHECK(flatland_engine_);
 
           auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
-          FX_DCHECK(display);
+          if (!display) {
+            FX_LOGS(WARNING)
+                << "No FlatlandDisplay attached at root. Returning an empty screenshot.";
+            return flatland::Renderables();
+          }
 
           return flatland_engine_->GetRenderables(*display);
         });
@@ -550,7 +555,16 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
     screenshot_manager_.emplace(
         allocator_, flatland_renderer,
         [this]() {
+          FX_DCHECK(flatland_manager_);
+          FX_DCHECK(flatland_engine_);
+
           auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
+          if (!display) {
+            FX_LOGS(WARNING)
+                << "No FlatlandDisplay attached at root. Returning an empty screenshot.";
+            return flatland::Renderables();
+          }
+
           return flatland_engine_->GetRenderables(*display);
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
