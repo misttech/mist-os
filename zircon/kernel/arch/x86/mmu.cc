@@ -416,8 +416,9 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
       return;
     }
 
-    /* Full context shootdowns handled here */
-    if (context->pending->full_shootdown) {
+    // Handle full shootdowns of the TLB. This happens anytime full_shootdown is set and whenever
+    // this is a TLB invalidation of a shared entry.
+    if (context->pending->full_shootdown || context->is_shared) {
       if (context->pending->contains_global) {
         kcounter_add(tlb_invalidations_full_global_received, 1);
         x86_tlb_global_invalidate();
@@ -445,10 +446,10 @@ void X86PageTableMmu::TlbInvalidate(const PendingTlbInvalidation* pending) {
         case PageTableLevel::PDP_L:
         case PageTableLevel::PD_L:
         case PageTableLevel::PT_L:
-          // Terminal entry is being asked to be flushed. If it's a global page, does not belong to
-          // a special PCID, or is an address in a shared page table, use the invlpg instruction.
+          // Terminal entry is being asked to be flushed. If it's a global page or does not belong
+          // to a special PCID, use the invlpg instruction.
           if (context->target_root_ptable == current_root_ptable || item.is_global() ||
-              context->pcid == MMU_X86_UNUSED_PCID || context->is_shared) {
+              context->pcid == MMU_X86_UNUSED_PCID) {
             invlpg(item.addr());
           } else {
             /* This is a user page with a tagged PCID.
