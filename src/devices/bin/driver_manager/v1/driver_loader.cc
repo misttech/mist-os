@@ -53,7 +53,7 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
   }
 
   driver_index_->WaitForBaseDrivers().Then(
-      [this, callback = std::move(callback)](
+      [callback = std::move(callback)](
           fidl::WireUnownedResult<fdi::DriverIndex::WaitForBaseDrivers>& result) mutable {
         if (!result.ok()) {
           // Since IsolatedDevmgr doesn't use the ComponentFramework, DriverIndex can be
@@ -68,13 +68,11 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
 
           return;
         }
-        include_fallback_drivers_ = true;
         callback();
       });
 }
 
-const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
-                                          bool use_full_resolver) {
+const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url, bool use_full_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
   if (const Driver* driver = UrlToDriver(manifest_url); driver != nullptr) {
     return driver;
@@ -176,7 +174,6 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     std::string_view name, fidl::VectorView<fdf::wire::NodeProperty> props,
     const MatchDeviceConfig& config) {
   std::vector<MatchedDriver> matched_drivers;
-  std::vector<MatchedDriver> matched_fallback_drivers;
   if (!driver_index_.is_valid()) {
     return matched_drivers;
   }
@@ -223,12 +220,6 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
   MatchedDriverInfo matched_driver_info = {};
 
   auto fidl_driver_info = driver.driver();
-  if (!fidl_driver_info.has_is_fallback()) {
-    LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing is_fallback");
-    return matched_drivers;
-  }
-  matched_driver_info.is_fallback = fidl_driver_info.is_fallback();
-
   if (!fidl_driver_info.has_url()) {
     LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing url");
     return matched_drivers;
@@ -250,26 +241,11 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
     matched_driver_info.package_type = fidl_driver_info.package_type();
   }
 
-  if (!matched_driver_info.is_fallback && config.only_return_base_and_fallback_drivers &&
-      IsFuchsiaBootScheme(matched_driver_info.component_url)) {
-    return matched_drivers;
-  }
-
   if (config.driver_url_suffix.empty() ||
       cpp20::ends_with(std::string_view(matched_driver_info.component_url),
                        config.driver_url_suffix)) {
-    if (fidl_driver_info.is_fallback()) {
-      if (include_fallback_drivers_ || !config.driver_url_suffix.empty()) {
-        matched_fallback_drivers.push_back(matched_driver_info);
-      }
-    } else {
-      matched_drivers.push_back(matched_driver_info);
-    }
+    matched_drivers.push_back(matched_driver_info);
   }
-
-  // Fallback drivers need to be at the end of the matched drivers.
-  matched_drivers.insert(matched_drivers.end(), matched_fallback_drivers.begin(),
-                         matched_fallback_drivers.end());
 
   return matched_drivers;
 }

@@ -294,8 +294,7 @@ Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manag
              }()),
       package_resolver_(config_.boot_args),
       driver_loader_(config_.boot_args, std::move(config_.driver_index), &base_resolver_,
-                     dispatcher, config_.delay_fallback_until_base_drivers_indexed,
-                     &package_resolver_),
+                     dispatcher, &package_resolver_),
       firmware_loader_(firmware_dispatcher) {
   bind_driver_manager_ = std::make_unique<BindDriverManager>(this);
 
@@ -322,16 +321,9 @@ void Coordinator::LoadV1Drivers(std::string_view root_device_driver) {
   DriverLoader::MatchDeviceConfig config;
   bind_driver_manager_->BindAllDevices(config);
 
-  if (config_.delay_fallback_until_base_drivers_indexed) {
-    LOGF(INFO, "Fallback drivers will be loaded after base drivers are indexed.");
-  }
-
   // Schedule the base drivers to load.
-  driver_loader_.WaitForBaseDrivers([this]() {
-    DriverLoader::MatchDeviceConfig config;
-    config.only_return_base_and_fallback_drivers = true;
-    bind_driver_manager_->BindAllDevices(config);
-  });
+  driver_loader_.WaitForBaseDrivers(
+      [this]() { bind_driver_manager_->BindAllDevices(DriverLoader::MatchDeviceConfig{}); });
 }
 
 void Coordinator::InitCoreDevices(std::string_view root_device_driver) {

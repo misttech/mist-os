@@ -32,11 +32,9 @@ class DriverLoader {
                         fidl::WireSharedClient<fdi::DriverIndex> driver_index,
                         internal::PackageResolverInterface* base_resolver,
                         async_dispatcher_t* dispatcher,
-                        bool delay_fallback_until_base_drivers_indexed,
                         internal::PackageResolverInterface* full_resolver)
       : base_resolver_(base_resolver),
         driver_index_(std::move(driver_index)),
-        include_fallback_drivers_(!delay_fallback_until_base_drivers_indexed),
         full_resolver_(full_resolver) {}
 
   // This will schedule a task on the async_dispatcher that will return
@@ -47,10 +45,6 @@ class DriverLoader {
   struct MatchDeviceConfig {
     // If this is non-empty, then only drivers who match this url suffix will be matched.
     std::string_view driver_url_suffix;
-    // This config should only be true after the base drivers are loaded.
-    // We will need to go through all the devices and bind just base drivers
-    // and fallback drivers.
-    bool only_return_base_and_fallback_drivers = false;
   };
 
   void AddCompositeNodeSpec(fuchsia_driver_framework::wire::CompositeNodeSpec spec,
@@ -77,10 +71,6 @@ class DriverLoader {
 
   internal::PackageResolverInterface* base_resolver_;
   fidl::WireSharedClient<fdi::DriverIndex> driver_index_;
-
-  // When this is true we will return DriverIndex fallback drivers.
-  // This is true after the system is loaded (or if require_system is false)
-  bool include_fallback_drivers_;
 
   // The full package resolver.
   // Currently used only for ephemeral drivers.

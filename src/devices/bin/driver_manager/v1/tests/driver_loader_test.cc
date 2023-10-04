@@ -90,7 +90,7 @@ TEST_F(DriverLoaderTest, TestUrl) {
   driver->url = name;
   resolver.map[name] = std::move(driver);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -113,7 +113,7 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
   driver->url = name;
   resolver.map[name] = std::move(driver);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -151,37 +151,12 @@ TEST_F(DriverLoaderTest, TestTooLongRelativeUrl) {
   driver->url = name;
   resolver.map[name] = std::move(driver);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
   DriverLoader::MatchDeviceConfig config;
   config.driver_url_suffix = long_name;
-  fidl::VectorView<fdf::wire::NodeProperty> props{};
-  auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
-
-  ASSERT_EQ(drivers.size(), 0);
-}
-
-TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
-  std::string name = "fuchsia-boot:///#driver1.cm";
-
-  fidl::Arena arena;
-  auto driver_info =
-      fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false).package_type(
-          fdi::wire::DriverPackageType::kBoot);
-  driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
-
-  auto driver = std::make_unique<Driver>();
-  driver->url = name;
-  resolver.map[name] = std::move(driver);
-
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
-                             nullptr);
-  loop.StartThread("fidl-thread");
-
-  DriverLoader::MatchDeviceConfig config;
-  config.only_return_base_and_fallback_drivers = true;
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
@@ -209,7 +184,7 @@ TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
       allocator,
       fdi::wire::MatchedCompositeNodeParentInfo::Builder(allocator).specs(specs).Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -240,7 +215,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoTopologicalPath) {
   driver_index_server.driver =
       fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -260,7 +235,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupNoNodes) {
   driver_index_server.driver =
       fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -289,7 +264,7 @@ TEST_F(DriverLoaderTest, TestReturnNodeGroupMultipleNodes) {
   driver_index_server.driver =
       fdi::wire::MatchedDriver::WithParentSpec(allocator, parent_spec.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), false,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              nullptr);
   loop.StartThread("fidl-thread");
 
@@ -321,7 +296,7 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
   driver1->url = name;
   universe_resolver.map[name] = std::move(driver1);
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              &universe_resolver);
   loop.StartThread("fidl-thread");
 
@@ -342,7 +317,7 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   auto driver_info = fdi::wire::MatchedDriverInfo::Builder(arena).url(name).is_fallback(false);
   driver_index_server.driver = fdi::wire::MatchedDriver::WithDriver(arena, driver_info.Build());
 
-  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(), true,
+  DriverLoader driver_loader(nullptr, std::move(driver_index), &resolver, loop.dispatcher(),
                              &universe_resolver);
   loop.StartThread("fidl-thread");
 
