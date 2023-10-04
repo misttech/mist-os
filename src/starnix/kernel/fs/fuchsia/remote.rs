@@ -586,7 +586,15 @@ impl FsNodeOps for RemoteNode {
                 } else {
                     Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
                 };
-                let fsverity = ops.get_fsverity_descriptor();
+                // Nb: Special-case here is to avoid the cost of the additional FIDL call.
+                // This will go away when remote filesystems expose fsverity state natively.
+                // TODO(fxbug.dev/926432): When remote filesystems expose fsverity state,
+                // remove this.
+                let fsverity = if name.ends_with("/fsverity") {
+                    ops.get_fsverity_descriptor()
+                } else {
+                    error!(ENOTSUP)
+                };
                 let child = FsNode::new_uncached(
                     ops,
                     &fs,
