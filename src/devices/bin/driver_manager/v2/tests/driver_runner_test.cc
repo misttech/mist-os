@@ -1197,11 +1197,58 @@ TEST_F(DriverRunnerTest, StartSecondDriverHostRestartOnCrash) {
   // The driver host and driver should be started again by the node.
   auto [driver_3, controller_3] = StartSecondDriver(false, true);
 
+  // Now try to drop the node and close the binding at the same time. They should not break each
+  // other.
+  PrepareRealmForSecondDriverComponentStart();
+  driver_3->CloseBinding();
+  EXPECT_TRUE(RunLoopUntilIdle());
+  driver_3->DropNode();
+  EXPECT_FALSE(RunLoopUntilIdle());
+
+  signals = 0;
+  ASSERT_EQ(ZX_OK, controller_3.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                   &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // The driver host and driver should be started again by the node.
+  auto [driver_4, controller_4] = StartSecondDriver(false, true);
+
+  // Again try to drop the node and close the binding at the same time but in opposite order.
+  PrepareRealmForSecondDriverComponentStart();
+  driver_4->DropNode();
+  EXPECT_TRUE(RunLoopUntilIdle());
+  driver_4->CloseBinding();
+  EXPECT_FALSE(RunLoopUntilIdle());
+
+  signals = 0;
+  ASSERT_EQ(ZX_OK, controller_4.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                   &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // The driver host and driver should be started again by the node.
+  auto [driver_5, controller_5] = StartSecondDriver(false, true);
+
+  // Finally don't RunLoopUntilIdle in between the two.
+  PrepareRealmForSecondDriverComponentStart();
+  driver_5->CloseBinding();
+  driver_5->DropNode();
+  EXPECT_TRUE(RunLoopUntilIdle());
+
+  signals = 0;
+  ASSERT_EQ(ZX_OK, controller_5.channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
+                                                   &signals));
+  ASSERT_TRUE(signals & ZX_CHANNEL_PEER_CLOSED);
+
+  // The driver host and driver should be started again by the node.
+  auto [driver_6, controller_6] = StartSecondDriver(false, true);
+
   StopDriverComponent(std::move(root_driver->controller));
 
   realm().AssertDestroyedChildren(
       {CreateChildRef("dev", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers"),
-       CreateChildRef("dev.second", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers")});
+       CreateChildRef("dev.second", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers"),
+       CreateChildRef("dev.second", "boot-drivers"), CreateChildRef("dev.second", "boot-drivers"),
+       CreateChildRef("dev.second", "boot-drivers")});
 }
 
 // The root driver adds a node that only binds after a RequestBind() call.

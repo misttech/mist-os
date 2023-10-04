@@ -561,6 +561,13 @@ void Node::FinishRestart() {
   shutdown_intent_ = ShutdownIntent::kRemoval;
   node_state_ = NodeState::kRunning;
 
+  // Store previous url before we reset the driver_component_.
+  std::string previous_url = driver_url();
+
+  // Perform cleanups for previous driver before we try to start the next driver.
+  driver_component_.reset();
+  CloseIfExists(node_ref_);
+
   if (restart_driver_url_suffix_.has_value()) {
     auto tracker = CreateBindResultTracker();
     node_manager_.value()->BindToUrl(*this, restart_driver_url_suffix_.value(), std::move(tracker));
@@ -583,8 +590,8 @@ void Node::FinishRestart() {
       pkg_type = fuchsia_driver_index::DriverPackageType::kUniverse;
       break;
   }
-  std::string url = driver_url();
-  zx::result start_result = node_manager_.value()->StartDriver(*this, url, pkg_type);
+
+  zx::result start_result = node_manager_.value()->StartDriver(*this, previous_url, pkg_type);
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", name().c_str(), start_result.status_string());
   }
