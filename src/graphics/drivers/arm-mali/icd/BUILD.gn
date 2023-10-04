@@ -4,13 +4,8 @@
 
 import("//build/images/args.gni")
 import("//build/packages/prebuilt_package.gni")
+import("//src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
-
-declare_args() {
-  # Disable packaging a prebuilt ARM Mali Vulkan ICD. This can save space if a
-  # test ICD is being used instead.
-  disable_prebuilt_arm_mali_vulkan = false
-}
 
 # hardware_id is a hexadecimal (without the 0x) version of the GPU_ID register.
 icd_list = [
