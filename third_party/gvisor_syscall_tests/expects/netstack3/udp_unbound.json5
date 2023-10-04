@@ -44,7 +44,6 @@
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfConnect/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackIfNicSelfNoLoop/*",
                 "IPv4UDPSockets/IPv4UDPUnboundSocketTest.IpMulticastLoopbackNicNoDefaultSendIf/*",
-                "IPv4UDPSockets/IPv4UDPUnboundSocketTest.TestTwoSocketsJoinSameMulticastGroup/*",
 
                 // Uncategorized
                 "IPv4UDPSockets/IPv4UDPUnboundSocketNogotsanTest.UDPBindPortExhaustion/*",

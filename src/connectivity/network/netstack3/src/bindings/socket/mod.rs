@@ -644,7 +644,8 @@ impl IntoErrno for SetMulticastMembershipError {
             | Self::DeviceDoesNotExist
             | Self::NoDeviceWithAddress
             | Self::NoDeviceAvailable => Errno::Enodev,
-            Self::NoMembershipChange => Errno::Eaddrinuse,
+            Self::GroupNotJoined => Errno::Eaddrnotavail,
+            Self::GroupAlreadyJoined => Errno::Eaddrinuse,
             Self::WrongDevice => Errno::Einval,
         }
     }

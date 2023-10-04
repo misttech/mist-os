@@ -3850,7 +3850,7 @@ mod tests {
                 MulticastInterfaceSelector::LocalAddress(local_ip).into(),
                 true
             ),
-            Err(SetMulticastMembershipError::NoMembershipChange)
+            Err(SetMulticastMembershipError::GroupAlreadyJoined)
         );
     }
 
@@ -3916,7 +3916,7 @@ mod tests {
                 MulticastInterfaceSelector::LocalAddress(local_ip).into(),
                 true
             ),
-            Err(SetMulticastMembershipError::NoMembershipChange)
+            Err(SetMulticastMembershipError::GroupAlreadyJoined)
         );
     }
 

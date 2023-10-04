@@ -2247,7 +2247,7 @@ async fn leave_unjoined_multicast_group(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");

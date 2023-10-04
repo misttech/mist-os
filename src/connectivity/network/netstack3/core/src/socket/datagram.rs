@@ -3277,9 +3277,10 @@ pub enum SetMulticastMembershipError {
     /// No device or address was specified and there is no device with a route
     /// to the multicast address.
     NoDeviceAvailable,
-    /// The requested membership change had no effect (tried to leave a group
-    /// without joining, or to join a group again).
-    NoMembershipChange,
+    /// Tried to join a group again.
+    GroupAlreadyJoined,
+    /// Tried to leave an unjoined group.
+    GroupNotJoined,
     /// The socket is bound to a device that doesn't match the one specified.
     WrongDevice,
 }
@@ -3406,7 +3407,11 @@ pub(crate) fn set_multicast_membership<
         let change = ip_options
             .multicast_memberships
             .apply_membership_change(multicast_group, &interface.as_weak(sync_ctx), want_membership)
-            .ok_or(SetMulticastMembershipError::NoMembershipChange)?;
+            .ok_or(if want_membership {
+                SetMulticastMembershipError::GroupAlreadyJoined
+            } else {
+                SetMulticastMembershipError::GroupNotJoined
+            })?;
 
         DatagramBoundStateContext::<I, _, _>::with_transport_context(sync_ctx, |sync_ctx| {
             match change {
