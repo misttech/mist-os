@@ -43,7 +43,7 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         .resolve_paths_from_file(&board_info_path)
         .context("Resolving paths in board configuration.")?;
 
-    let mut builder = ImageAssemblyConfigBuilder::default();
+    let mut builder = ImageAssemblyConfigBuilder::new(config.platform.build_type.clone());
 
     // Get platform configuration based on the AssemblyConfig and the BoardInformation.
     let ramdisk_image = mode == PackageMode::DiskImageInZbi;

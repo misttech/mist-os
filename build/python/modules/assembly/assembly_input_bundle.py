@@ -152,6 +152,8 @@ class AssemblyInputBundle(ImageAssemblyConfig):
                 <package name>
             cache/
                 <package name>
+            flexible/
+                <package name>
             system/
                 <package name>
             bootfs_packages/
@@ -401,6 +403,7 @@ class AIBCreator:
         # The package sets (paths to package manifests)
         self.base: Set[FilePath] = set()
         self.cache: Set[FilePath] = set()
+        self.flexible: Set[FilePath] = set()
         self.system: Set[FilePath] = set()
         self.shell_commands: Dict[str, List[str]] = defaultdict(list)
 
@@ -496,6 +499,16 @@ class AIBCreator:
         deps.update(cache_deps)
         result.add_packages([PackageDetails(m, "cache") for m in cache_pkgs])
 
+        (
+            flexible_pkgs,
+            flexible_blobs,
+            flexible_deps,
+        ) = self._copy_packages("flexible")
+        deps.update(flexible_deps)
+        result.packages.update(
+            [PackageDetails(m, "flexible") for m in flexible_pkgs]
+        )
+
         # Copy base driver packages into the base driver list of the assembly bundle
         for d in self.provided_base_driver_details:
             if d.package not in self.base_drivers:
@@ -578,6 +591,7 @@ class AIBCreator:
         for merkle, source in [
             *base_blobs,
             *cache_blobs,
+            *flexible_blobs,
             *base_driver_blobs,
             *boot_driver_blobs,
             *system_blobs,

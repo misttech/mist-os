@@ -45,6 +45,9 @@ def create_bundle(args: argparse.Namespace) -> None:
     if args.cache_pkg_list:
         add_pkg_list_from_file(aib_creator, args.cache_pkg_list, "cache")
 
+    if args.flexible_pkg_list:
+        add_pkg_list_from_file(aib_creator, args.flexible_pkg_list, "flexible")
+
     if args.system_pkg_list:
         add_pkg_list_from_file(aib_creator, args.system_pkg_list, "system")
 
@@ -500,6 +503,11 @@ def main():
         "--cache-pkg-list",
         type=argparse.FileType("r"),
         help="Path to a json list of package manifests for the 'cache' package set",
+    )
+    bundle_creation_parser.add_argument(
+        "--flexible-pkg-list",
+        type=argparse.FileType("r"),
+        help="Path to a json list of package manifests for the 'flexible' package set",
     )
     bundle_creation_parser.add_argument(
         "--system-pkg-list",

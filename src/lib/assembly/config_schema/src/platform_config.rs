@@ -208,7 +208,7 @@ pub enum FeatureSupportLevel {
 /// These control security and behavioral settings within the platform, and can
 /// change the platform packages placed into the assembled product image.
 ///
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 pub enum BuildType {
     #[serde(rename = "eng")]
     Eng,

@@ -77,7 +77,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     // the BoardInputBundle struct.
     let mut packages = vec![];
     for (pkg_set, pkgs) in
-        [(PackageSet::Base, base_packages), (PackageSet::BootFS, bootfs_packages)]
+        [(PackageSet::Base, base_packages), (PackageSet::Bootfs, bootfs_packages)]
     {
         for package_manifest_path in pkgs {
             let copied_package_manifest_path = package_copier

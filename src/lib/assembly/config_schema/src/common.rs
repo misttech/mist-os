@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// NOTE: Not all of the sets defined in the RFC are currently supported by this
 /// enum.  They are being added as they are needed by assembly.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "snake_case")]
 pub enum PackageSet {
     /// The packages in this set are stored in the pkg-cache, and are not
     /// garbage collected.  They are always available, and are pinned by merkle
@@ -29,6 +29,10 @@ pub enum PackageSet {
     /// in production.
     Cache,
 
+    /// The packages in this set are placed in one of the other package sets by
+    /// assembly based on the assembly context.
+    Flexible,
+
     /// The packages in this set are merged into the "base" package
     /// (system image) to make them available to the software delivery
     /// subsystem while the system is booting up.
@@ -39,7 +43,7 @@ pub enum PackageSet {
     /// by merkle when the ZBI is created.
     ///
     /// They cannot be updated without performing an OTA of the system.
-    BootFS,
+    Bootfs,
 }
 
 /// Details about a package that contains drivers.
