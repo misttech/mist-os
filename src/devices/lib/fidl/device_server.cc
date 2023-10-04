@@ -87,13 +87,6 @@ void DeviceServer::Serve(zx::channel channel, fidl::internal::IncomingMessageDis
 
 DeviceServer::MessageDispatcher::Node::Node(MessageDispatcher& parent) : parent_(parent) {}
 
-void DeviceServer::MessageDispatcher::Node::NotImplemented_(const std::string& name,
-                                                            fidl::CompleterBase& completer) {
-  std::string error = "Unsupported call to " + name;
-  parent_.parent_.controller_.LogError(error.c_str());
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void DeviceServer::MessageDispatcher::Node::Close(CloseCompleter::Sync& completer) {
   completer.ReplySuccess();
   completer.Close(ZX_OK);
@@ -117,6 +110,56 @@ void DeviceServer::MessageDispatcher::Node::Clone(CloneRequestView request,
   }
   parent_.parent_.ServeMultiplexed(request->object.TakeChannel(), parent_.multiplex_node_,
                                    parent_.multiplex_controller_);
+}
+
+void DeviceServer::MessageDispatcher::Node::GetAttr(GetAttrCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to GetAttr");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::SetAttr(fuchsia_io::wire::Node1SetAttrRequest* request,
+                                                    SetAttrCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to SetAttr");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::GetFlags(GetFlagsCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to GetFlags");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::SetFlags(
+    fuchsia_io::wire::Node1SetFlagsRequest* request, SetFlagsCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to SetFlags");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::QueryFilesystem(
+    QueryFilesystemCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to QueryFilesystem");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+                                                   ReopenCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to Reopen");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::GetConnectionInfo(
+    GetConnectionInfoCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to GetConnectionInfo");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::GetAttributes(
+    ::fuchsia_io::wire::Node2GetAttributesRequest* request,
+    GetAttributesCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to GetAttributes");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::UpdateAttributes(
+    ::fuchsia_io::wire::MutableNodeAttributes* request,
+    UpdateAttributesCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to UpdateAttributes");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
+}
+void DeviceServer::MessageDispatcher::Node::Sync(SyncCompleter::Sync& completer) {
+  parent_.parent_.controller_.LogError("Unsupported call to Sync");
+  completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
 DeviceServer::MessageDispatcher::MessageDispatcher(DeviceServer& parent, bool multiplex_node,

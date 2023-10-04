@@ -6,7 +6,7 @@
 #define SRC_DEVICES_LIB_FIDL_DEVICE_SERVER_H_
 
 #include <fidl/fuchsia.device/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire_test_base.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/device.h>
 #include <lib/fidl/cpp/wire/internal/server_details.h>
 
@@ -48,15 +48,32 @@ class DeviceServer {
     void dispatch_message(fidl::IncomingHeaderAndMessage&& msg, fidl::Transaction* txn,
                           fidl::internal::MessageStorageViewBase* storage_view) override;
 
-    class Node : public fidl::testing::WireTestBase<fuchsia_io::Node> {
+    class Node final : public fidl::WireServer<fuchsia_io::Node> {
      public:
       explicit Node(MessageDispatcher& parent);
 
      private:
-      void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override;
+      // Implemented methods from fuchsia.io/Node.
       void Close(CloseCompleter::Sync& completer) override;
       void Query(QueryCompleter::Sync& completer) override;
       void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override;
+
+      // Unimplemented methods from fuchsia.io/Node.
+      void GetAttr(GetAttrCompleter::Sync& completer) override;
+      void SetAttr(fuchsia_io::wire::Node1SetAttrRequest* request,
+                   SetAttrCompleter::Sync& completer) override;
+      void GetFlags(GetFlagsCompleter::Sync& completer) override;
+      void SetFlags(fuchsia_io::wire::Node1SetFlagsRequest* request,
+                    SetFlagsCompleter::Sync& completer) override;
+      void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) override;
+      void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+                  ReopenCompleter::Sync& completer) override;
+      void GetConnectionInfo(GetConnectionInfoCompleter::Sync& completer) override;
+      void GetAttributes(::fuchsia_io::wire::Node2GetAttributesRequest* request,
+                         GetAttributesCompleter::Sync& completer) override;
+      void UpdateAttributes(::fuchsia_io::wire::MutableNodeAttributes* request,
+                            UpdateAttributesCompleter::Sync& completer) override;
+      void Sync(SyncCompleter::Sync& completer) override;
 
       MessageDispatcher& parent_;
     };
