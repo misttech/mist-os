@@ -17,12 +17,6 @@ use std::{sync::Arc, time::Duration};
 
 pub static CIRCUIT_ID: [u8; 8] = *b"CIRCUIT\0";
 
-pub fn default_ascendd_path() -> PathBuf {
-    let mut path = std::env::temp_dir();
-    path.push("ascendd");
-    path
-}
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Overnet <-> API bindings
 

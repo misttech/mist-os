@@ -12,7 +12,7 @@ rustc_library("lib") {
 
   deps = [
     "macro:config-macros",
-    "//src/connectivity/overnet/lib/hoist",
+    "//src/connectivity/overnet/lib/ascendd",
     "//src/developer/ffx/config/domain:lib",
     "//src/developer/ffx/lib/buildid:lib",
     "//src/developer/ffx/lib/errors:lib",

@@ -53,7 +53,7 @@ impl EnvironmentContext {
             (_, EnvironmentKind::ConfigDomain { isolate_root: Some(isolate_root), .. }) => {
                 Ok(isolate_root.join("daemon.sock").into())
             }
-            (_, _) => Ok(hoist::default_ascendd_path()),
+            (_, _) => Ok(ascendd::default_ascendd_path()),
         }
     }
 
