@@ -81,6 +81,14 @@ file from scratch and override the default behavior.
 NOTE: For infra execution, Mobly config generation is entirely automated by
 Lacewing so nothing is required from test authors (besides picking the correct
 |environments| in the `BUILD.gn` for test targets to run against).
+```sh
+$ touch my_config.yaml
+````
+
+For simplicity, this is an example of a single Fuchsia device testbed.
+
+Multi-device testbeds follows a similar configuration but is out-of-scope of this guide - Please direct to
+[Multi-device setup and execution](https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/end_to_end/examples/test_multi_device/README.md)
 
 ### Lacewing test module
 
