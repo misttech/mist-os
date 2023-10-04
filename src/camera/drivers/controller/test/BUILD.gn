@@ -32,6 +32,7 @@ executable("controller_unittest_bin") {
   deps = [
     ":constants",
     "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit-promise",

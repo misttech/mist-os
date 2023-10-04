@@ -26,7 +26,7 @@ source_set("common_srcs") {
     ":aml_hdmi_bind",
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",

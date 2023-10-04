@@ -19,6 +19,9 @@
 
   #include <iostream>
   #include <lib/fidl/cpp/natural_ostream.h>
+  {{ if .ContainsDriverReferences -}}
+    #include <lib/fidl_driver/cpp/natural_ostream.h>
+  {{ end -}}
 
   #include <{{ .Library | Filename "NaturalTypesHeader" }}>
 
@@ -32,52 +35,66 @@
   {{ EnsureNamespace "" }}
   {{- range .Decls }}
     {{- if and (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
+      {{- if .IsResourceType }}
+        {{- IfdefFuchsia }}
+      {{- end }}
       template<>
       struct fidl::ostream::Formatter<{{ . }}> {
         static std::ostream& Format(std::ostream& os, const {{ . }}& value);
       };
+      {{- if .IsResourceType }}
+        {{- EndifFuchsia -}}
+      {{- end }}
     {{- end }}
   {{- end }}
 
   {{ range .Decls }}
     {{ EnsureNamespace . }}
     {{- if and (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
+      {{- if .IsResourceType }}
+        {{- IfdefFuchsia }}
+      {{- end }}
       std::ostream& operator<<(std::ostream& os, const {{ . }}& value);
+      {{- if .IsResourceType }}
+        {{- EndifFuchsia -}}
+      {{- end }}
     {{- end }}
   {{- end }}
 
   {{ EnsureNamespace "" }}
-  {{- range .Protocols }}
-    {{- if .Transport }}
-      template<>
-      struct fidl::ostream::Formatter<{{ .ClientEnd }}> {
-        static std::ostream& Format(std::ostream& os, const {{ .ClientEnd }}& value) {
-          return os << "ClientEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
-        }
-      };
+  {{- IfdefFuchsia }}
+    {{- range .Protocols }}
+      {{- if .Transport }}
+        template<>
+        struct fidl::ostream::Formatter<{{ .ClientEnd }}> {
+          static std::ostream& Format(std::ostream& os, const {{ .ClientEnd }}& value) {
+            return os << "ClientEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+          }
+        };
 
-      template<>
-      struct fidl::ostream::Formatter<{{ .ServerEnd }}> {
-        static std::ostream& Format(std::ostream& os, const {{ .ServerEnd }}& value) {
-          return os << "ServerEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
-        }
-      };
+        template<>
+        struct fidl::ostream::Formatter<{{ .ServerEnd }}> {
+          static std::ostream& Format(std::ostream& os, const {{ .ServerEnd }}& value) {
+            return os << "ServerEnd<" << "{{ .NoLeading }}" << ">(" << value.channel().get() << ")";
+          }
+        };
+      {{- end }}
     {{- end }}
-  {{- end }}
 
-  {{ range .Protocols }}
-    {{- if .Transport }}
-      {{ EnsureNamespace .Transport.Namespace }}
+    {{ range .Protocols }}
+      {{- if .Transport }}
+        {{ EnsureNamespace .Transport.Namespace }}
 
-      inline std::ostream& operator<<(std::ostream& os, const {{ .ClientEnd }}& value) {
-          return fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(os, value);
-      }
+        inline std::ostream& operator<<(std::ostream& os, const {{ .ClientEnd }}& value) {
+            return fidl::ostream::Formatter<{{ .ClientEnd }}>::Format(os, value);
+        }
 
-      inline std::ostream& operator<<(std::ostream& os, const {{ .ServerEnd }}& value) {
-          return fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(os, value);
-      }
+        inline std::ostream& operator<<(std::ostream& os, const {{ .ServerEnd }}& value) {
+            return fidl::ostream::Formatter<{{ .ServerEnd }}>::Format(os, value);
+        }
+      {{- end }}
     {{- end }}
-  {{- end }}
+  {{- EndifFuchsia }}
 
   #pragma clang diagnostic pop
 

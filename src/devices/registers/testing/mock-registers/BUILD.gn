@@ -9,9 +9,8 @@ source_set("mock-registers") {
   testonly = true
   sources = [ "mock-registers.h" ]
 
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
-  ]
+  public_deps =
+      [ "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp" ]
 }
 
 test("mock-registers-test") {

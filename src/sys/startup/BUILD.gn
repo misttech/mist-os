@@ -8,7 +8,7 @@ executable("startup") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_wire",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
     "//sdk/lib/component/incoming/cpp",
   ]
 }

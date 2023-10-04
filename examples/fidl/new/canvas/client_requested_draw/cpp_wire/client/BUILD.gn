@@ -21,7 +21,7 @@ executable("bin") {
 
   deps = [
     ":config",
-    "//examples/fidl/new/canvas/client_requested_draw/fidl:examples.canvas.clientrequesteddraw_cpp_wire",
+    "//examples/fidl/new/canvas/client_requested_draw/fidl:examples.canvas.clientrequesteddraw_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop",

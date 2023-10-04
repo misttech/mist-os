@@ -13,8 +13,8 @@ group("tests") {
 test("device_controller_fidl") {
   sources = [ "test.cc" ]
   deps = [
-    "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/component/incoming/cpp",

@@ -27,7 +27,7 @@ source_set("common") {
     "//sdk/banjo/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.hci:fuchsia.hardware.usb.hci_cpp",
-    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
@@ -79,7 +79,7 @@ fuchsia_driver("virtual-bus-tester-driver") {
   ]
   sources = [ "host.cc" ]
   deps = [
-    ":fuchsia.hardware.usb.virtualbustest_cpp_wire",
+    ":fuchsia.hardware.usb.virtualbustest_cpp",
     ":usb-virtual-bus-tester-bind",
     "//sdk/banjo/fuchsia.hardware.usb:fuchsia.hardware.usb_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.usb.composite:fuchsia.hardware.usb.composite_banjo_cpp",
@@ -143,10 +143,10 @@ test("usb-virtual-bus-test-bin") {
   output_name = "usb-virtual-bus-test"
   sources = [ "usb-virtual-bus-test.cc" ]
   deps = [
-    ":fuchsia.hardware.usb.virtualbustest_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp_wire",
+    ":fuchsia.hardware.usb.virtualbustest_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/devices/usb/lib/usb",

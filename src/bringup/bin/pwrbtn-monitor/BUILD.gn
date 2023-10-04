@@ -14,10 +14,10 @@ executable("pwrbtn-monitor") {
     "oom_watcher.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.power.button:fuchsia.power.button_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.power.button:fuchsia.power.button_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
@@ -48,8 +48,8 @@ test("pwrbtn-monitor-unittests-bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
-    "//sdk/fidl/fuchsia.power.button:fuchsia.power.button_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
+    "//sdk/fidl/fuchsia.power.button:fuchsia.power.button_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

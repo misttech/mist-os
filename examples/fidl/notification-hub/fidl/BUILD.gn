@@ -9,7 +9,7 @@ import("//build/fidl/fidl.gni")
 # language-specific suffix:
 #
 # ":fuchsia.examples.notificationhub_rust"
-# ":fuchsia.examples.notificationhub_cpp_wire"
+# ":fuchsia.examples.notificationhub_cpp"
 # ...and so on
 #
 fidl("fuchsia.examples.notificationhub") {

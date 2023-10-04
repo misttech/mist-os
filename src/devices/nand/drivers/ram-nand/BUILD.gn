@@ -28,7 +28,7 @@ fuchsia_driver("ram-nand-driver") {
     ":common",
     ":ram-nand-bind",
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
     "//src/devices/lib/nand",
@@ -57,7 +57,7 @@ source_set("common") {
   sources = [ "ram-nand.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
@@ -83,8 +83,8 @@ test("test") {
   deps = [
     ":common",
     "//sdk/banjo/fuchsia.hardware.nand:fuchsia.hardware.nand_banjo_cpp",
-    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
+    "//sdk/fidl/fuchsia.hardware.nand:fuchsia.hardware.nand_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm",

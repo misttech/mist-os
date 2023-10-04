@@ -27,19 +27,19 @@ source_set("common") {
     "pty-server.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire" ]
+  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp" ]
 }
 
 test("ptysvc-test") {
   sources = [ "pty-tests.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fit",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

@@ -24,8 +24,8 @@ group("tests") {
 common_deps = [
   ":intel_gspi_bind",
   "//sdk/banjo/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl_banjo_cpp",
-  "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp_wire",
-  "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
+  "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver",
   "//src/devices/lib/mmio",

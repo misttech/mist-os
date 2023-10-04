@@ -23,7 +23,7 @@ fuchsia_component("server") {
 }
 
 # The Fuchsia package, containing all of our child components in one neat artifact.
-fuchsia_package("examples_fidl_keyvaluestore_supportexports_cpp_wire") {
+fuchsia_package("examples_fidl_keyvaluestore_supportexports_cpp") {
   deps = [
     ":client",
     ":server",

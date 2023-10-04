@@ -64,7 +64,7 @@ executable("dash") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
-    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",

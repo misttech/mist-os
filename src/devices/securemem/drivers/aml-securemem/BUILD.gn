@@ -37,10 +37,10 @@ fuchsia_driver("aml-securemem-driver") {
 
   deps = [
     ":aml-securemem-bind",
-    "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/fit-promise",
@@ -76,10 +76,10 @@ test("aml-securemem-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":aml-securemem-bind",
-    "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.securemem:fuchsia.hardware.securemem_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",

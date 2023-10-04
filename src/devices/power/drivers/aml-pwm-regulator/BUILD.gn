@@ -20,8 +20,8 @@ driver_bind_rules("aml-pwm-regulator-bind") {
 group("common") {
   public_deps = [
     ":aml-pwm-regulator-bind",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
+    "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
@@ -55,6 +55,7 @@ test("aml-pwm-regulator-test-bin") {
   ]
   deps = [
     ":common",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/lib/metadata:llcpp",
     "//src/devices/testing/mock-ddk",

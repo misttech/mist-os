@@ -115,6 +115,10 @@ template("_fidl_cpp_codegen_impl") {
 #    This should be the same flavor as the one used when instantiating
 #    the fidl_cpp_library template.
 #
+#  dep_suffix (optional)
+#    What to add to the end of FIDL dependency labels to get the label for bindings.
+#    Defaults to "_$bindings_flavor".
+#
 #  generated_sources (optional)
 #    A list of source files that will be generated for this binding, relative
 #    to the target-specific generation directory.
@@ -158,6 +162,7 @@ template("_fidl_cpp_library_impl") {
   generation_target_name = "${fidl_target}_${invoker.bindings_flavor}_generate"
 
   root = "$fidl_gen_dir/${invoker.bindings_flavor}"
+  not_needed([ "root" ])
 
   if (defined(invoker.generated_headers)) {
     config_target_name = "${target_name}__config"
@@ -217,30 +222,30 @@ template("_fidl_cpp_library_impl") {
     ]
 
     # Map FIDL library dependencies to generated library dependencies
-    # of the same type (identified by bindings_flavor or bindings_layer).
-    not_needed(invoker, [ "bindings_flavor" ])
-    not_needed(invoker, [ "bindings_layer" ])
+    # of the same type (identified by bindings_flavor or dep_suffix).
+    dep_suffix = "_${invoker.bindings_flavor}"
+    if (defined(invoker.dep_suffix)) {
+      dep_suffix = invoker.dep_suffix
+    }
+    not_needed([ "dep_suffix" ])
+
     if (defined(invoker.public_deps)) {
       if (invoker.public_deps != []) {
-        if (defined(invoker.bindings_layer)) {
-          bindings_layer = invoker.bindings_layer
-        } else {
-          bindings_layer = invoker.bindings_flavor
-        }
         foreach(dep, invoker.public_deps) {
           label = get_label_info(dep, "label_no_toolchain")
           if (label == "//zircon/vdso/zx:zx") {
             # For the zx library, only link in the coding tables.
             public_deps += [ "${label}_tables" ]
-            not_needed([ "bindings_layer" ])
           } else {
-            public_deps += [ "${label}_${bindings_layer}" ]
+            public_deps += [ "${label}${dep_suffix}" ]
           }
         }
       }
     }
 
-    public_deps += invoker.additional_public_deps
+    if (defined(invoker.additional_public_deps)) {
+      public_deps += invoker.additional_public_deps
+    }
   }
 }
 
@@ -261,20 +266,6 @@ template("_fidl_cpp_library_impl") {
 #    Identifies which kind of bindings (hlcpp, cpp, ...).
 #    This should be the same suffix as the one used when instantiating
 #    the fidl_cpp_codegen template.
-#
-#  bindings_layer (optional)
-#    A particular binding may be decomposed into multiple layers. In that case,
-#    this identifies the particular layer that makes up this library (e.g.
-#    domain objects layer, messaging layer, ...). When adding dependencies,
-#    a particular layer for a FIDL library depends on the corresponding
-#    layers of the dependencies of that FIDL library.
-#
-#    Some examples of valid layers are:
-#      * cpp_wire: Wire messaging over channel transport
-#      * cpp_wire_types: Wire domain objects
-#      * cpp_driver: Unified messaging over driver transport
-#
-#    If missing, defaults to bindings_flavor.
 #
 #  generated_sources (optional)
 #    A list of source files that will be generated for this binding, relative
@@ -381,23 +372,6 @@ template("fidl_cpp_family") {
     not_needed(invoker, [ "sdk_category" ])
   }
 
-  # Determine the C++ bindings dependencies based on Fuchsia/host.
-  if (is_fuchsia) {
-    hlcpp_public_deps = [ "//sdk/lib/fidl/cpp" ]
-    llcpp_public_deps = [
-      "//sdk/lib/fidl",
-      "//sdk/lib/fidl/cpp/wire",
-      "//sdk/lib/fit",
-    ]
-  } else {
-    # On host.
-    hlcpp_public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
-    llcpp_public_deps = [
-      "//sdk/lib/fidl/cpp/wire",
-      "//sdk/lib/fit",
-    ]
-  }
-
   if (enable_hlcpp) {
     #
     # HLCPP Bindings
@@ -413,7 +387,8 @@ template("fidl_cpp_family") {
       generated_sources = [ "$library_name_slashes/cpp/fidl.cc" ]
     }
 
-    fidl_cpp_codegen("${target_name}_hlcpp") {
+    _hlcpp_target = "${target_name}_hlcpp"
+    fidl_cpp_codegen(_hlcpp_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
@@ -434,14 +409,16 @@ template("fidl_cpp_family") {
                                "fidl_gen_dir",
                              ])
       forward_variables_from(hlcpp_options, "*")
-      additional_public_deps = hlcpp_public_deps
+      if (is_fuchsia) {
+        additional_public_deps = [ "//sdk/lib/fidl/cpp" ]
+      } else {
+        additional_public_deps = [ "//sdk/lib/fidl/cpp:cpp_base" ]
+      }
 
       if (!defined(visibility) && !(defined(testonly) && testonly)) {
         visibility = hlcpp_visibility
       }
     }
-  } else {
-    not_needed([ "hlcpp_public_deps" ])
   }
 
   # Only define the SDK Atoms in the default toolchain.
@@ -462,165 +439,9 @@ template("fidl_cpp_family") {
   #
   # New C++ bindings
   #
-  # These bindings are defined as a set of layers that build upon each other.
-  # All of the layers are generated in a single fidlgen invocation but are
-  # exposed as separate source_sets to user code so that it's easy to include
-  # just the parts of the bindings that you need.
-  #
-  # New layers must also be added to the list in //build/sdk/meta/common.json
-  # TODO (fxbug.dev/109833) Automatic validation of this would be helpful
-  cpp_layers = []
   if (enable_cpp) {
-    cpp_layers += [
-      {
-        layer = "cpp_common"
-        headers = [
-          "fidl/$library_name/cpp/common_types.h",
-          "fidl/$library_name/cpp/markers.h",
-        ]
-        sources = [ "fidl/$library_name/cpp/common_types.cc" ]
-        public_deps = llcpp_public_deps
-      },
-
-      {
-        layer = "cpp_wire_types"
-        headers = [ "fidl/$library_name/cpp/wire_types.h" ]
-        sources = [ "fidl/$library_name/cpp/wire_types.cc" ]
-
-        layer_deps = [ "cpp_common" ]
-        if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
-          public_deps = [ "//sdk/lib/fidl_driver" ]
-        }
-      },
-
-      {
-        layer = "cpp_wire"  # AKA: wire_channel_messaging
-        headers = [
-          "fidl/$library_name/cpp/wire.h",
-          "fidl/$library_name/cpp/wire_messaging.h",
-        ]
-        sources = [ "fidl/$library_name/cpp/wire_messaging.cc" ]
-        layer_deps = [ "cpp_wire_types" ]
-      },
-
-      {
-        layer = "cpp_wire_testing"
-        headers = [ "fidl/$library_name/cpp/wire_test_base.h" ]
-        layer_deps = [ "cpp_wire" ]
-        testonly = true
-      },
-
-      {
-        layer = "cpp_natural_types"
-        headers = [ "fidl/$library_name/cpp/natural_types.h" ]
-        sources = [ "fidl/$library_name/cpp/natural_types.cc" ]
-        public_deps = [ "//src/lib/fidl/cpp:cpp_base" ]
-        layer_deps = [ "cpp_common" ]
-        if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
-          public_deps += [ "//sdk/lib/fidl_driver:fidl_driver_natural" ]
-        }
-      },
-
-      {
-        layer = "cpp_natural_ostream"
-        headers = [ "fidl/$library_name/cpp/natural_ostream.h" ]
-        sources = [ "fidl/$library_name/cpp/natural_ostream.cc" ]
-        public_deps = [ "//src/lib/fidl/cpp:natural_ostream" ]
-        layer_deps = [ "cpp_natural_types" ]
-        if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
-          public_deps += [ "//sdk/lib/fidl_driver:fidl_driver_natural" ]
-        }
-      },
-
-      {
-        layer = "cpp_type_conversions"
-        headers = [ "fidl/$library_name/cpp/type_conversions.h" ]
-        sources = [ "fidl/$library_name/cpp/type_conversions.cc" ]
-
-        # TODO(fxbug.dev/101525): Type conversion should not depend on messaging layer.
-        # We should only need `cpp_base` here.
-        if (is_fuchsia) {
-          public_deps = [ "//src/lib/fidl/cpp" ]
-        } else {
-          public_deps = [ "//src/lib/fidl/cpp:cpp_base" ]
-        }
-
-        layer_deps = [
-          "cpp_natural_types",
-
-          # TODO(fxbug.dev/101525): Replace with "cpp_wire_types".
-          "cpp_wire",
-        ]
-      },
-
-      {
-        layer = "cpp"  # AKA: unified_channel_messaging
-        headers = [
-          "fidl/$library_name/cpp/fidl.h",
-          "fidl/$library_name/cpp/natural_messaging.h",
-        ]
-        sources = [ "fidl/$library_name/cpp/natural_messaging.cc" ]
-        layer_deps = [
-          "cpp_natural_types",
-          "cpp_type_conversions",
-          "cpp_wire",
-        ]
-        public_deps = [ "//src/lib/fidl/cpp" ]
-      },
-
-      {
-        layer = "cpp_testing"
-        headers = [ "fidl/$library_name/cpp/test_base.h" ]
-        layer_deps = [ "cpp" ]
-        testonly = true
-      },
-
-      {
-        layer = "cpp_driver_wire"  # AKA: wire_driver_messaging
-        headers = [
-          "fidl/$library_name/cpp/driver/wire.h",
-          "fidl/$library_name/cpp/driver/wire_messaging.h",
-        ]
-        sources = [ "fidl/$library_name/cpp/driver/wire_messaging.cc" ]
-        public_deps = [ "//sdk/lib/fidl_driver" ]
-        layer_deps = [ "cpp_wire_types" ]
-      },
-
-      {
-        layer = "cpp_driver"  # AKA: driver_messaging
-        headers = [ "fidl/$library_name/cpp/driver/natural_messaging.h" ]
-        sources = [ "fidl/$library_name/cpp/driver/natural_messaging.cc" ]
-        public_deps = [ "//sdk/lib/fidl_driver:fidl_driver_natural" ]
-        layer_deps = [
-          "cpp_driver_wire",
-          "cpp_natural_types",
-          "cpp_type_conversions",
-        ]
-      },
-    ]
-  }
-
-  if (enable_hlcpp) {
-    cpp_layers += [
-      {
-        layer = "cpp_hlcpp_conversion"
-        headers = [ "fidl/$library_name/cpp/hlcpp_conversion.h" ]
-        public_deps = [
-          ":${target_name}_hlcpp",
-          "//src/lib/fidl/cpp:hlcpp_conversion",
-        ]
-        layer_deps = [ "cpp_natural_types" ]
-      },
-    ]
-  }
-
-  assert(cpp_layers != [], "fidl_cpp() was called, but no layers are enabled.")
-
-  # Define new C++ binding targets.
-  layer_target_prefix = target_name + "_"
-  foreach(layer, cpp_layers) {
-    layer_target_name = layer_target_prefix + layer.layer
-    fidl_cpp_library(layer_target_name) {
+    _cpp_target = "${target_name}_cpp"
+    fidl_cpp_library(_cpp_target) {
       forward_variables_from(invoker,
                              [
                                "testonly",
@@ -631,37 +452,143 @@ template("fidl_cpp_family") {
                                "fidl_gen_dir",
                              ])
       bindings_flavor = "cpp"
-      bindings_layer = layer.layer
-      if (defined(layer.headers)) {
-        generated_headers = layer.headers
+      generated_headers = [
+        "fidl/$library_name/cpp/common_types.h",
+        "fidl/$library_name/cpp/markers.h",
+        "fidl/$library_name/cpp/wire_types.h",
+        "fidl/$library_name/cpp/natural_types.h",
+        "fidl/$library_name/cpp/wire.h",
+        "fidl/$library_name/cpp/natural_ostream.h",
+        "fidl/$library_name/cpp/type_conversions.h",
+        "fidl/$library_name/cpp/fidl.h",
+      ]
+      generated_sources = [
+        "fidl/$library_name/cpp/common_types.cc",
+        "fidl/$library_name/cpp/natural_ostream.cc",
+        "fidl/$library_name/cpp/natural_types.cc",
+        "fidl/$library_name/cpp/type_conversions.cc",
+        "fidl/$library_name/cpp/wire_types.cc",
+      ]
+      additional_public_deps = [
+        "//sdk/lib/fidl/cpp/wire",
+        "//sdk/lib/fit",
+        "//src/lib/fidl/cpp:cpp_base",
+        "//src/lib/fidl/cpp:natural_ostream",
+      ]
+      if (is_fuchsia) {
+        generated_headers += [
+          "fidl/$library_name/cpp/wire_messaging.h",
+          "fidl/$library_name/cpp/natural_messaging.h",
+        ]
+        generated_sources += [
+          "fidl/$library_name/cpp/natural_messaging.cc",
+          "fidl/$library_name/cpp/wire_messaging.cc",
+        ]
+        additional_public_deps += [
+          "//sdk/lib/fidl",
+          "//src/lib/fidl/cpp",
+        ]
       }
-      if (defined(layer.sources)) {
-        generated_sources = layer.sources
-      }
-      if (defined(layer.testonly)) {
-        testonly = layer.testonly
-      }
-      additional_public_deps = []
-      if (defined(layer.public_deps)) {
-        additional_public_deps += layer.public_deps
-      }
-      if (defined(layer.layer_deps)) {
-        foreach(layer_dep, layer.layer_deps) {
-          additional_public_deps += [ ":${layer_target_prefix}${layer_dep}" ]
+      if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
+        generated_headers += [ "fidl/$library_name/cpp/driver/wire.h" ]
+        additional_public_deps += [
+          "//sdk/lib/fidl_driver",
+          "//sdk/lib/fidl_driver:fidl_driver_natural",
+        ]
+        if (is_fuchsia) {
+          generated_headers += [
+            "fidl/$library_name/cpp/driver/wire_messaging.h",
+            "fidl/$library_name/cpp/driver/natural_messaging.h",
+          ]
+          generated_sources += [
+            "fidl/$library_name/cpp/driver/natural_messaging.cc",
+            "fidl/$library_name/cpp/driver/wire_messaging.cc",
+          ]
         }
       }
     }
 
+    # Testing target
+    fidl_cpp_library("${target_name}_cpp_testing") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "public_configs",
+                               "fidl_target",
+                               "fidl_gen_dir",
+                               "public_deps",
+                             ])
+      bindings_flavor = "cpp"
+      dep_suffix = "_cpp_testing"
+      generated_headers = [
+        "fidl/$library_name/cpp/test_base.h",
+        "fidl/$library_name/cpp/wire_test_base.h",
+      ]
+      testonly = true
+      additional_public_deps = [ ":${_cpp_target}" ]
+    }
+
+    # SDK atoms for the new c++ bindings core and testing.
     if (current_toolchain == default_toolchain) {
-      # Set up an LLCPP SDK item for this library
       if (defined(invoker.sdk_category) && invoker.sdk_category != "excluded") {
-        # Instead of depending on the generated bindings, set up a dependency on
-        # the original library.
-        sdk_atom_alias("${layer_target_name}_sdk") {
+        sdk_atom_alias("${_cpp_target}_sdk") {
+          atom = ":$sdk_target_name($fidl_toolchain)"
+        }
+        sdk_atom_alias("${target_name}_cpp_testing_sdk") {
           atom = ":$sdk_target_name($fidl_toolchain)"
         }
       }
     }
+  }
+
+  if (enable_hlcpp) {
+    fidl_cpp_library("${target_name}_cpp_hlcpp_conversion") {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                               "public_configs",
+                               "fidl_target",
+                               "fidl_gen_dir",
+                               "public_deps",
+                             ])
+      bindings_flavor = "cpp"
+      dep_suffix = "_cpp_hlcpp_conversion"
+      generated_headers = [ "fidl/$library_name/cpp/hlcpp_conversion.h" ]
+      additional_public_deps = [
+        ":${_cpp_target}",
+        ":${_hlcpp_target}",
+        "//src/lib/fidl/cpp:hlcpp_conversion",
+      ]
+    }
+  }
+
+  group("${target_name}_cpp_wire") {
+    public_deps = [ ":${invoker.target_name}_cpp" ]
+    visibility = [
+      "//third_party/*",
+      "//vendor/*",
+    ]
+    forward_variables_from(invoker, [ "testonly" ])
+  }
+
+  group("${target_name}_cpp_wire_testing") {
+    public_deps = [ ":${invoker.target_name}_cpp_testing" ]
+    visibility = [
+      "//third_party/*",
+      "//vendor/*",
+    ]
+    testonly = true
+  }
+
+  group("${target_name}_cpp_natural_ostream") {
+    public_deps = [ ":${invoker.target_name}_cpp" ]
+    visibility = [
+      "//third_party/*",
+      "//vendor/*",
+    ]
+    forward_variables_from(invoker, [ "testonly" ])
   }
 
   fidl_cpp_codegen("${target_name}_cpp") {
@@ -674,18 +601,40 @@ template("fidl_cpp_family") {
                            ])
     bindings_flavor = "cpp"
     fidlgen_tool = "//tools/fidl/fidlgen_cpp"
-    generated_headers = []
-    generated_sources = []
-    additional_visibility = []
-    foreach(layer, cpp_layers) {
-      additional_visibility += [ ":${layer_target_prefix}${layer.layer}" ]
-      if (defined(layer.headers)) {
-        generated_headers += layer.headers
-      }
-      if (defined(layer.sources)) {
-        generated_sources += layer.sources
-      }
-    }
+    generated_headers = [
+      "fidl/$library_name/cpp/common_types.h",
+      "fidl/$library_name/cpp/driver/natural_messaging.h",
+      "fidl/$library_name/cpp/driver/wire_messaging.h",
+      "fidl/$library_name/cpp/driver/wire.h",
+      "fidl/$library_name/cpp/fidl.h",
+      "fidl/$library_name/cpp/hlcpp_conversion.h",
+      "fidl/$library_name/cpp/markers.h",
+      "fidl/$library_name/cpp/natural_messaging.h",
+      "fidl/$library_name/cpp/natural_ostream.h",
+      "fidl/$library_name/cpp/natural_types.h",
+      "fidl/$library_name/cpp/test_base.h",
+      "fidl/$library_name/cpp/type_conversions.h",
+      "fidl/$library_name/cpp/wire_messaging.h",
+      "fidl/$library_name/cpp/wire_test_base.h",
+      "fidl/$library_name/cpp/wire_types.h",
+      "fidl/$library_name/cpp/wire.h",
+    ]
+    generated_sources = [
+      "fidl/$library_name/cpp/common_types.cc",
+      "fidl/$library_name/cpp/driver/natural_messaging.cc",
+      "fidl/$library_name/cpp/driver/wire_messaging.cc",
+      "fidl/$library_name/cpp/natural_messaging.cc",
+      "fidl/$library_name/cpp/natural_ostream.cc",
+      "fidl/$library_name/cpp/natural_types.cc",
+      "fidl/$library_name/cpp/type_conversions.cc",
+      "fidl/$library_name/cpp/wire_messaging.cc",
+      "fidl/$library_name/cpp/wire_types.cc",
+    ]
+    additional_visibility = [
+      ":${target_name}",
+      ":${target_name}_testing",
+      ":${target_name}_hlcpp_conversion",
+    ]
   }
 
   #
@@ -743,7 +692,7 @@ template("fidl_cpp_family") {
         # The generated headers `#include` the hlcpp and new C++ bindings headers
         # generated by the clauses above, so the generated target needs
         # that bindings library target in its public_deps.
-        ":${fidl_target}_cpp_wire",
+        ":${fidl_target}_cpp",
         ":${fidl_target}_hlcpp",
       ]
 

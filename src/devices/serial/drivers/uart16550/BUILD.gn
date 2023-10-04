@@ -38,7 +38,7 @@ template("define_common_lib") {
     sources = [ "uart16550.cc" ]
     deps = [
       ":uart16550_bind",
-      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     ]
     public_deps = [
       "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",

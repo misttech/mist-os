@@ -26,7 +26,7 @@ test("ddktl-test") {
   ]
   deps = [
     ":testlib_bind_cpp",
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp_wire",
+    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
     "//sdk/lib/fdio",

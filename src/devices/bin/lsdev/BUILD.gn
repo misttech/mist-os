@@ -8,7 +8,7 @@ executable("lsdev") {
   visibility = [ ":*" ]
   sources = [ "lsdev.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
   ]

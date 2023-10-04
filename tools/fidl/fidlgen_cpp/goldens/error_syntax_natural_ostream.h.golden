@@ -40,6 +40,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseO
 
 }  // namespace test_errorsyntax
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
@@ -67,7 +69,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_errorsyntax::ExampleUseOfErrorSyntax>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

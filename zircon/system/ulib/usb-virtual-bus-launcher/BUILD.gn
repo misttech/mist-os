@@ -16,8 +16,8 @@ zx_library("usb-virtual-bus-launcher") {
     "usb-virtual-bus-launcher.cc",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//zircon/system/ulib/ddk-platform-defs",
   ]

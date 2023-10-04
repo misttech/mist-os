@@ -14,7 +14,7 @@ zx_library("profile") {
   sdk_headers = [ "lib/profile/profile.h" ]
   public_deps = [ "//zircon/system/ulib/svc" ]
   deps = [
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp",
     "//src/lib/files",

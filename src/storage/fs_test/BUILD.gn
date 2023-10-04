@@ -20,7 +20,7 @@ static_library("fs_test") {
   deps = [
     ":crypt_service",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
@@ -40,7 +40,7 @@ static_library("fs_test") {
   public_deps = [
     # fs_test.h:
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_hlcpp",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
     "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//sdk/lib/sys/inspect/cpp",
     "//src/storage/blobfs",
@@ -56,7 +56,7 @@ test("access_tests") {
   sources = [ "access.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fdio-caller",
   ]
@@ -110,7 +110,7 @@ test("corrupt_tests") {
   sources = [ "corrupt.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/syslog/cpp:cpp-macros",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
@@ -130,7 +130,7 @@ test("dot_dot_tests") {
   sources = [ "dot_dot.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
@@ -262,7 +262,7 @@ test("rename_tests") {
   sources = [ "rename.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
@@ -273,7 +273,7 @@ test("resize_tests") {
   sources = [ "resize.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/fvm",
     "//src/storage/minfs",
@@ -361,7 +361,7 @@ test("watcher_tests") {
   sources = [ "watcher.cc" ]
   deps = [
     ":fs_test",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
@@ -423,7 +423,7 @@ static_library("crypt_service") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
-    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp_wire",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
     "//zircon/system/ulib/zx",
   ]
 }

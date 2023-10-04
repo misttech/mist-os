@@ -28,7 +28,7 @@ shared_library("lib") {
   deps = [
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
-    "//src/lib/fake-clock/fidl:fidl_cpp_wire",
+    "//src/lib/fake-clock/fidl:fidl_cpp",
     "//src/lib/fake-clock/named-timer:named-timer-headers",
   ]
 

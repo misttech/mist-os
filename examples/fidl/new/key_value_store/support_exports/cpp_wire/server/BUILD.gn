@@ -11,7 +11,7 @@ executable("bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//examples/fidl/new/key_value_store/support_exports/fidl:examples.keyvaluestore.supportexports_cpp_wire",
+    "//examples/fidl/new/key_value_store/support_exports/fidl:examples.keyvaluestore.supportexports_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/cpp",

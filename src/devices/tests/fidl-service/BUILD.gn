@@ -19,7 +19,7 @@ test("test") {
   sources = [ "fidl-service-test.cc" ]
 
   deps = [
-    ":echo_cpp_wire",
+    ":echo_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/device-watcher/cpp",
@@ -54,9 +54,9 @@ fuchsia_driver("parent-driver") {
   output_name = "fidl-service-parent"
   sources = [ "parent-driver.cc" ]
   deps = [
-    ":echo_cpp_wire",
+    ":echo_cpp",
     ":parent-driver-bind",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver",
@@ -84,7 +84,7 @@ fuchsia_driver("child-driver") {
   sources = [ "child-driver.cc" ]
   deps = [
     ":child-driver-bind",
-    ":echo_cpp_wire",
+    ":echo_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",

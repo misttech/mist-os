@@ -37,7 +37,7 @@ source_set("storage_driver_test_support") {
     "zxcrypt.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_hlcpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_hlcpp",
     "//sdk/lib/component/incoming/cpp",
@@ -60,9 +60,9 @@ source_set("storage_driver_test_support") {
 source_set("fake-paver") {
   sources = [ "fake-paver.cc" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

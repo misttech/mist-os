@@ -31,10 +31,10 @@ fuchsia_driver("root_driver") {
   output_name = "nodegroup_root"
   sources = [ "root_driver.cc" ]
   deps = [
-    ":fuchsia.nodegroup.test_cpp_wire",
+    ":fuchsia.nodegroup.test_cpp",
     ":fuchsia.nodegroupbind.test_cpp",
     ":root_bind",
-    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp_wire",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
@@ -59,7 +59,7 @@ fuchsia_driver("leaf_driver") {
   output_name = "nodegroup_leaf"
   sources = [ "leaf_driver.cc" ]
   deps = [
-    ":fuchsia.nodegroup.test_cpp_wire",
+    ":fuchsia.nodegroup.test_cpp",
     ":nodegroup_leaf_bind",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",

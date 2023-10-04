@@ -19,7 +19,7 @@ source_set("lib") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
@@ -29,16 +29,16 @@ source_set("lib") {
 
   public_deps = [
     # console_launcher.h has #include <fidl/fuchsia.boot/cpp/wire.h>
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
 
     # console_launcher.h has #include <fidl/fuchsia.hardware.pty/cpp/wire.h>
-    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
 
     # console_launcher.h has #include <fidl/fuchsia.io/cpp/wire.h>
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
 
     # console_launcher.h has #include <fidl/fuchsia.ldsvc/cpp/wire.h>
-    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp_wire",
+    "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
 
     # console_launcher.h has #include <fbl/unique_fd.h>
     "//zircon/system/ulib/fbl",
@@ -52,8 +52,8 @@ executable("bin") {
 
   deps = [
     ":lib",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.virtualconsole:fuchsia.virtualconsole_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.virtualconsole:fuchsia.virtualconsole_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",

@@ -22,8 +22,8 @@ group("tests") {
 }
 
 common_deps = [
-  "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp_wire",
-  "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.input:fuchsia.hardware.input_cpp",
+  "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
   "//sdk/lib/input_report_reader",
   "//src/devices/lib/driver",
   "//src/devices/lib/driver:driver_runtime",

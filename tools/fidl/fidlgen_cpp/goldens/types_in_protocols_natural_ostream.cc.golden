@@ -47,6 +47,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Struct>::Format(
   os << "}";
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value) {
   os << "test_typesinprotocols::ResourceStruct";
   os << "{ ";
@@ -55,6 +57,9 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>:
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Basic>::Format(std::ostream& os, const ::test_typesinprotocols::Basic& value) {
   os << "test_typesinprotocols::Basic";
   os << "{ ";
@@ -233,6 +238,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNeste
   os << "}";
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Format(std::ostream& os, const ::test_typesinprotocols::Resource& value) {
   os << "test_typesinprotocols::Resource";
   os << "{ ";
@@ -293,18 +300,26 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Forma
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Table>::Format(std::ostream& os, const ::test_typesinprotocols::Table& value) {
   os << "test_typesinprotocols::Table";
   os << "{ ";
   os << "}";
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value) {
   os << "test_typesinprotocols::ResourceTable";
   os << "{ ";
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Union>::Format(std::ostream& os, const ::test_typesinprotocols::Union& value) {
   os << "test_typesinprotocols::Union::";
   switch (value.Which()) {
@@ -316,6 +331,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Union>::Format(s
   }
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value) {
   os << "test_typesinprotocols::ResourceUnion::";
   switch (value.Which()) {
@@ -327,6 +344,9 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::
   }
   return os;
 }
+
+#endif  // __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value) {
   os << "test_typesinprotocols::ProtocolErrorBasicResult::";
   switch (value.Which()) {
@@ -439,6 +459,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArr
   }
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult>::Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value) {
   os << "test_typesinprotocols::ProtocolErrorResourceResult::";
   switch (value.Which()) {
@@ -453,6 +475,8 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorRes
   }
   return os;
 }
+
+#endif  // __Fuchsia__
 
 namespace test_typesinprotocols {
 
@@ -476,17 +500,29 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Union&
   return fidl::ostream::Formatter<::test_typesinprotocols::Union>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Basic& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::Basic>::Format(os, value);
@@ -520,9 +556,13 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayV
   return fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNested>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult>::Format(os, value);
@@ -556,9 +596,13 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Protoc
   return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

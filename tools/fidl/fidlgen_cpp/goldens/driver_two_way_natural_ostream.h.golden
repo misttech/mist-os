@@ -10,6 +10,7 @@
 
 #include <fidl/test.drivertwoway/cpp/natural_types.h>
 #include <lib/fidl/cpp/natural_ostream.h>
+#include <lib/fidl_driver/cpp/natural_ostream.h>
 
 #include <iostream>
 
@@ -32,6 +33,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddR
 std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddResponse& value);
 
 }  // namespace test_drivertwoway
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_drivertwoway::TwoWay>> {
@@ -60,7 +63,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
 }
+}  // namespace fdf
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fdf

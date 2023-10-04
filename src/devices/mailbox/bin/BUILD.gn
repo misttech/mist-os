@@ -5,7 +5,7 @@
 executable("hifi4rpctest") {
   sources = [ "hifi4rpctest.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.mailbox:fuchsia.hardware.mailbox_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
   ]

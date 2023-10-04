@@ -8,8 +8,8 @@ import("//src/sys/core/build/core_shard.gni")
 
 group("common") {
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/sys/cpp",
@@ -45,7 +45,7 @@ test("adb-reboot-test-bin") {
   deps = [
     ":common",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl/test:gtest_main",

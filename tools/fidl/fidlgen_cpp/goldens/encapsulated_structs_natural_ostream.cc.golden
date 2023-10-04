@@ -51,6 +51,8 @@ std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::StructPadding
   os << "}";
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStructTestStruct>::Format(std::ostream& os, const ::test_encapsulatedstructs::NonInlineStructTestStruct& value) {
   os << "test_encapsulatedstructs::NonInlineStructTestStruct";
   os << "{ ";
@@ -61,6 +63,11 @@ std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStru
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct>::Format(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value) {
   os << "test_encapsulatedstructs::TopLevelStruct";
   os << "{ ";
@@ -71,6 +78,8 @@ std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruc
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
 
 namespace test_encapsulatedstructs {
 
@@ -90,13 +99,21 @@ std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::Str
   return fidl::ostream::Formatter<::test_encapsulatedstructs::StructPaddingTestStruct>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::NonInlineStructTestStruct& value) {
   return fidl::ostream::Formatter<::test_encapsulatedstructs::NonInlineStructTestStruct>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value) {
   return fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

@@ -26,9 +26,9 @@ fuchsia_driver("integration-test-driver") {
   # TODO: testonly = true
   sources = [ "test.cc" ]
   deps = [
-    ":fuchsia.board.test_cpp_wire",
+    ":fuchsia.board.test_cpp",
     ":test-bus-bind",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",

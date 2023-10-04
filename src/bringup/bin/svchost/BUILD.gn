@@ -23,7 +23,7 @@ zx_library("crashsvc") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp_wire",
+    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/debug:backtrace-request-utils",
     "//src/lib/fsl",
@@ -54,9 +54,9 @@ executable("svchost") {
   deps = [
     ":crashsvc",
     ":svchost_config",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/debug:backtrace-request-utils",
     "//src/sys/lib/stdout-to-debuglog/cpp",
@@ -87,7 +87,7 @@ test("crashsvc-test") {
   sources = [ "crashsvc-test.cc" ]
   deps = [
     ":crashsvc",
-    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp_wire",
+    "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",

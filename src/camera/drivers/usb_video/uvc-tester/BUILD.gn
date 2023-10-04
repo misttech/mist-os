@@ -18,8 +18,8 @@ executable("bin") {
 
   deps = [
     "//sdk/fidl/fuchsia.camera:fuchsia.camera_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.camera:fuchsia.hardware.camera_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fit-promise",

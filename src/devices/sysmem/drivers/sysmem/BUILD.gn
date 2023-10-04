@@ -145,7 +145,7 @@ test("sysmem-unittest-bin") {
   deps = [
     ":sysmem_common_srcs",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//src/devices/bus/testing/fake-pdev",

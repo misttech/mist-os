@@ -8,7 +8,7 @@ import("//build/fidl/fidl.gni")
 # may be imported by depending on this target, followed by a language-specific underscore:
 #
 #   ":examples.keyvaluestore.addreaditem_rust"
-#   ":examples.keyvaluestore.addreaditem_cpp_wire"
+#   ":examples.keyvaluestore.addreaditem_cpp"
 #   ...and so on
 #
 fidl("examples.keyvaluestore.addreaditem") {

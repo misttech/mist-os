@@ -25,6 +25,10 @@ func (*Bits) Kind() declKind {
 var _ Kinded = (*Bits)(nil)
 var _ namespaced = (*Bits)(nil)
 
+func (*Bits) IsResourceType() bool {
+	return false
+}
+
 type BitsMember struct {
 	Attributes
 	nameVariants

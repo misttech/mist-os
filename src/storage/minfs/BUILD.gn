@@ -138,16 +138,16 @@ static_library("minfs") {
       "//zircon/system/ulib/async-loop:async-loop-cpp",
 
       # mount.h includes fidl/fuchsia.process.lifecycle/cpp/wire.h
-      "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
+      "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     ]
     deps += [
-      "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+      "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/lib/fidl",
       "//sdk/lib/inspect/service/cpp:cpp",
       "//sdk/lib/sys/cpp:cpp",
       "//sdk/lib/syslog/cpp",
-      "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
+      "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/fvm",
       "//src/storage/lib/storage-metrics",
       "//zircon/system/ulib/async",

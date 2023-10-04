@@ -24,18 +24,7 @@ sdk_source_set("fidl_driver_transport") {
 sdk_source_set("fidl_driver") {
   category = "partner"
   sdk_name = "fidl_driver"
-  public = [
-    "include/lib/fidl_driver/cpp/internal/server_details.h",
-    "include/lib/fidl_driver/cpp/internal/wire_client_details.h",
-    "include/lib/fidl_driver/cpp/server.h",
-    "include/lib/fidl_driver/cpp/sync_call.h",
-    "include/lib/fidl_driver/cpp/unknown_interactions.h",
-    "include/lib/fidl_driver/cpp/wire_client.h",
-    "include/lib/fidl_driver/cpp/wire_messaging.h",
-    "include/lib/fidl_driver/cpp/wire_messaging_declarations.h",
-    "include/lib/fidl_driver/cpp/wire_types.h",
-  ]
-  sources = [ "unknown_interactions.cc" ]
+  public = [ "include/lib/fidl_driver/cpp/wire_types.h" ]
   public_configs = [ ":include" ]
   public_deps = [
     ":fidl_driver_transport",
@@ -43,25 +32,47 @@ sdk_source_set("fidl_driver") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl/cpp/wire",
   ]
+
+  if (is_fuchsia) {
+    public += [
+      "include/lib/fidl_driver/cpp/internal/server_details.h",
+      "include/lib/fidl_driver/cpp/internal/wire_client_details.h",
+      "include/lib/fidl_driver/cpp/server.h",
+      "include/lib/fidl_driver/cpp/sync_call.h",
+      "include/lib/fidl_driver/cpp/unknown_interactions.h",
+      "include/lib/fidl_driver/cpp/wire_client.h",
+      "include/lib/fidl_driver/cpp/wire_messaging.h",
+      "include/lib/fidl_driver/cpp/wire_messaging_declarations.h",
+    ]
+    sources = [ "unknown_interactions.cc" ]
+  }
 }
 
 sdk_source_set("fidl_driver_natural") {
   category = "partner"
   sdk_name = "fidl_driver_natural"
   public = [
-    "include/lib/fidl_driver/cpp/internal/endpoint_conversions.h",
-    "include/lib/fidl_driver/cpp/internal/natural_client_details.h",
-    "include/lib/fidl_driver/cpp/natural_client.h",
-    "include/lib/fidl_driver/cpp/natural_messaging.h",
+    "include/lib/fidl_driver/cpp/natural_ostream.h",
     "include/lib/fidl_driver/cpp/natural_types.h",
-    "include/lib/fidl_driver/cpp/unified_messaging_declarations.h",
   ]
-  sources = [ "natural_messaging.cc" ]
   public_configs = [ ":include" ]
   public_deps = [
     ":fidl_driver",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//src/lib/fidl/cpp",
+    "//src/lib/fidl/cpp:cpp_base",
+    "//src/lib/fidl/cpp:natural_ostream",
   ]
+
+  if (is_fuchsia) {
+    public += [
+      "include/lib/fidl_driver/cpp/internal/endpoint_conversions.h",
+      "include/lib/fidl_driver/cpp/internal/natural_client_details.h",
+      "include/lib/fidl_driver/cpp/natural_client.h",
+      "include/lib/fidl_driver/cpp/natural_messaging.h",
+      "include/lib/fidl_driver/cpp/unified_messaging_declarations.h",
+    ]
+    sources = [ "natural_messaging.cc" ]
+    public_deps += [ "//src/lib/fidl/cpp" ]
+  }
 }

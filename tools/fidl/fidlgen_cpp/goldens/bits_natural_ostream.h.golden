@@ -45,4 +45,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_bits::EmptyBits& value);
 
 }  // namespace test_bits
 
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

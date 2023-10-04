@@ -51,7 +51,7 @@ fuchsia_driver("vim3-devicetree-driver") {
   deps = [
     ":vim3-devicetree-bind",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
     "//sdk/lib/driver/devicetree/visitors/default",

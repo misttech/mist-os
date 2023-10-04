@@ -77,7 +77,7 @@ fuchsia_driver("fake-asix-88179-driver") {
   ]
   sources = [ "asix-88179-function.cc" ]
   deps = [
-    ":asix-88179-test-helper_cpp_wire",
+    ":asix-88179-test-helper_cpp",
     ":asix-88179-test-helper_hlcpp",
     ":fake_usb_ax88179_bind",
     "//sdk/banjo/fuchsia.hardware.ethernet:fuchsia.hardware.ethernet_banjo_cpp",
@@ -109,10 +109,10 @@ test("asix-88179-integration") {
   output_name = "asix-88179-integration-test"
   sources = [ "asix-88179-test.cc" ]
   deps = [
-    ":asix-88179-test-helper_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp_wire",
+    ":asix-88179-test-helper_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp",
     "//sdk/lib/async-loop-testing/cpp",
     "//sdk/lib/fdio",
     "//src/connectivity/lib/network-device/cpp",

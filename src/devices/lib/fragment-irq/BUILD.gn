@@ -13,7 +13,7 @@ source_set("dfv1") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
   ]
@@ -27,7 +27,7 @@ source_set("dfv2") {
     "dfv2/fragment-irq.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
   ]
 }

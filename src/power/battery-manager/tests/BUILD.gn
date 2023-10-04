@@ -9,7 +9,7 @@ executable("bin") {
   output_name = "battery_manager_test_cpp"
   sources = [ "integration_test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp",
+    "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp_testing",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",

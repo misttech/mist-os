@@ -39,6 +39,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResult&
 
 }  // namespace test_error
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_error::Example>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_error::Example>& value) {
@@ -66,7 +68,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_error::Example>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_error::Example>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

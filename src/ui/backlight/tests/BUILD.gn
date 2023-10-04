@@ -14,7 +14,7 @@ test("backlight-test") {
   output_name = "backlight-test"
   sources = [ "backlight-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zxtest",
   ]

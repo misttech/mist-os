@@ -28,7 +28,7 @@ wlansoftmac_convert_deps = [
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_banjo_c",
-  "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
+  "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
   "//src/connectivity/wlan/drivers/lib/log/cpp",
   "//src/connectivity/wlan/lib/mlme/cpp:mlme",
   "//src/lib/ddk",

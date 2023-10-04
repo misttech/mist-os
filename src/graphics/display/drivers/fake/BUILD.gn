@@ -56,7 +56,7 @@ static_library("sysmem-proxy-device") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
@@ -80,9 +80,9 @@ static_library("fake-display-stack") {
   public_deps = [
     ":fake-lib",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",

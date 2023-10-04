@@ -58,6 +58,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::E
 
 }  // namespace test_placementofattributes
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_placementofattributes::ExampleProtocol>& value) {
@@ -85,7 +87,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

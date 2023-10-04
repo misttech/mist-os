@@ -48,7 +48,7 @@ test("tests") {
   sources = [ "test.cc" ]
   deps = [
     ":metadata-test-bind",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//src/devices/testing/devmgr-integration-test-shim",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddktl",

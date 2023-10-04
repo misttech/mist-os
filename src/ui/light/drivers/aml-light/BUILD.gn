@@ -31,12 +31,11 @@ fuchsia_driver("aml-light-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "aml-light.cc" ]
-  public_deps =
-      [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
   deps = [
     ":aml_light_bind",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
@@ -64,9 +63,9 @@ test("aml-light-test") {
   ]
   deps = [
     ":aml_light_bind",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/gpio/testing/fake-gpio",

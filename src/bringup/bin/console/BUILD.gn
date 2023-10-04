@@ -19,10 +19,10 @@ source_set("common") {
     "fifo.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/lib/fit",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -31,7 +31,7 @@ source_set("common") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//src/lib/fxl",
@@ -73,8 +73,8 @@ test("console-test") {
   ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//zircon/system/ulib/mock-boot-arguments",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zxtest",

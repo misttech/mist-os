@@ -20,7 +20,7 @@ library_headers("headers") {
       "lib/ld/testing/test-processargs.h",
     ]
     public_deps += [
-      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp_wire",
+      "//sdk/fidl/fuchsia.ldsvc:fuchsia.ldsvc_cpp",
       "//third_party/googletest:gmock",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",

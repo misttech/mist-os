@@ -46,8 +46,8 @@ source_set("common-dfv1") {
   public_configs = [ ":logging-dfv1" ]
   public_deps = [
     ":bind",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
@@ -111,12 +111,12 @@ source_set("common-dfv2") {
   public_configs = [ ":logging-dfv2" ]
   deps = [
     ":bind",
-    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp_wire",
+    "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",

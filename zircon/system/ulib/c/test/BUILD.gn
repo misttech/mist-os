@@ -75,8 +75,8 @@ test("cdebugdata-test") {
   sources = [ "debugdata.cc" ]
   data_deps = [ ":debugdata-test-helper" ]
   deps = [
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//src/storage/lib/vfs/cpp",

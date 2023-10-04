@@ -26,7 +26,7 @@ fuchsia_driver("root_driver") {
   output_name = "devfs_exporter_root"
   sources = [ "root_driver.cc" ]
   deps = [
-    ":fuchsia.devfs.test_cpp_wire",
+    ":fuchsia.devfs.test_cpp",
     ":root_bind",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",

@@ -22,6 +22,7 @@
 #ifdef __Fuchsia__
 
   #include <lib/zx/channel.h>
+  #include <lib/fidl_driver/cpp/natural_types.h>
   
 
 #endif  // __Fuchsia__

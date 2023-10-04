@@ -17,8 +17,8 @@ group("test") {
 }
 
 test_deps = [
-  "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
-  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+  "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
   "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
   "//sdk/lib/fdio",
   "//sdk/lib/sys/inspect/cpp",
@@ -119,7 +119,7 @@ test("f2fs_component_runner_test") {
   sources = [ "unit/component_runner_test.cc" ]
   deps = test_deps + [
            "//sdk/lib/component/incoming/cpp",
-           "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
+           "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
            "//zircon/system/ulib/id_allocator",
            "//zircon/system/ulib/zx",
          ]

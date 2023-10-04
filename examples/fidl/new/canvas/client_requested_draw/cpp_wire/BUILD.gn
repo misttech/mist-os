@@ -18,7 +18,7 @@ fuchsia_component("server") {
 }
 
 # The Fuchsia package, containing all of our child components in one neat artifact.
-fuchsia_package("examples_fidl_canvas_clientrequesteddraw_cpp_wire") {
+fuchsia_package("examples_fidl_canvas_clientrequesteddraw_cpp") {
   deps = [
     ":client",
     ":server",

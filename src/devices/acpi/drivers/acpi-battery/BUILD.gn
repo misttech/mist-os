@@ -20,8 +20,8 @@ driver_bind_rules("bind") {
 
 common_deps = [
   ":bind",
-  "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
-  "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
+  "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
   "//sdk/lib/driver/runtime:driver_runtime_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver:driver_runtime",

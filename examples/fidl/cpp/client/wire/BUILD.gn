@@ -13,7 +13,7 @@ executable("bin") {
 
   # [START deps]
   deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp_wire",
+    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
 
     # This library is used to log messages.
     "//sdk/lib/syslog/cpp",

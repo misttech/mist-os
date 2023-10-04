@@ -9,7 +9,7 @@ test("device-protocol-pdev-test") {
   sources = [ "pdev-test.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",

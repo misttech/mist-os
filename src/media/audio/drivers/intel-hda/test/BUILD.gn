@@ -18,7 +18,7 @@ source_set("test_libs") {
     "silence_generator.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",

@@ -13,8 +13,8 @@ executable("cpuctl") {
     "performance-domain.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",
     "//zircon/system/ulib/zx",
@@ -33,8 +33,9 @@ test("cpuctl-test-bin") {
   ]
   include_dirs = [ "." ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_testing",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_testing",
+    "//sdk/fidl/fuchsia.hardware.cpu.ctrl:fuchsia.hardware.cpu.ctrl_cpp_testing",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

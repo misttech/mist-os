@@ -36,18 +36,33 @@ template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::Union> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Union& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::Basic> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Basic& value);
@@ -80,10 +95,15 @@ template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNested> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::Resource> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Resource& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorBasicResult> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value);
@@ -116,10 +136,14 @@ template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ProtocolErrorResourceResult> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value);
 };
+
+#endif  // __Fuchsia__
 
 namespace test_typesinprotocols {
 
@@ -133,11 +157,23 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Table&
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Union& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Basic& value);
 
@@ -155,7 +191,11 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Vector
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorBasicResult& value);
 
@@ -173,9 +213,15 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Protoc
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorArrayVectorNestedResult& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ProtocolErrorResourceResult& value);
 
+#endif  // __Fuchsia__
+
 }  // namespace test_typesinprotocols
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_typesinprotocols::Protocol>> {
@@ -204,7 +250,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_typesinprotocols::Protocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

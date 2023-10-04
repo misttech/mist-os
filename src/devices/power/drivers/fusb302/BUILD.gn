@@ -24,8 +24,8 @@ group("common") {
   public_deps = [
     ":fusb302-bind",
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

@@ -10,6 +10,7 @@
 
 #include <fidl/test.driverservice/cpp/natural_types.h>
 #include <lib/fidl/cpp/natural_ostream.h>
+#include <lib/fidl_driver/cpp/natural_ostream.h>
 
 #include <iostream>
 
@@ -19,6 +20,8 @@
 namespace test_driverservice {
 
 }  // namespace test_driverservice
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fdf::ClientEnd<::test_driverservice::SomeDriverProtocol>> {
@@ -47,7 +50,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_driverservice::SomeDriverProtocol>>::Format(os, value);
 }
+}  // namespace fdf
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fdf

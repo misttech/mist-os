@@ -17,7 +17,7 @@ driver_bind_rules("intel_rtc_bind") {
 
 common_deps = [
   ":intel_rtc_bind",
-  "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.rtc:fuchsia.hardware.rtc_cpp",
   "//src/devices/lib/acpi",
   "//src/devices/lib/driver",
   "//src/devices/rtc/lib/rtc:rtc",

@@ -64,12 +64,12 @@ foreach(test_name, test_names) {
     sources = [ test_name + ".cc" ]
     deps = [
       ":fidl_driver_transport_testing_lib",
-      ":test.transport_cpp_driver",
+      ":test.transport_cpp",
       "//sdk/lib/driver/runtime:driver_runtime_testing",
       "//sdk/lib/driver/runtime/testing/cpp",
       "//sdk/lib/fidl_driver",
       "//sdk/lib/fidl_driver:fidl_driver_natural",
-      "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp_driver",
+      "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp",
       "//src/devices/bin/driver_runtime:driver_runtime_impl",
       "//src/devices/testing/driver-runtime-main:zxtest",
       "//zircon/system/ulib/async:async-cpp",
@@ -94,13 +94,13 @@ test("fidl_driver_api_test_bin") {
   ]
   deps = [
     ":fidl_driver_transport_testing_lib",
-    ":test.transport_cpp_driver",
+    ":test.transport_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_testing",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/fidl_driver",
     "//sdk/lib/fidl_driver:fidl_driver_natural",
-    "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp_driver",
+    "//sdk/testing/fidl/protocols_tests:test.unknown.interactions_cpp",
     "//src/devices/bin/driver_runtime:driver_runtime_impl",
     "//src/devices/testing/driver-runtime-main:gtest",
     "//src/lib/testing/predicates",

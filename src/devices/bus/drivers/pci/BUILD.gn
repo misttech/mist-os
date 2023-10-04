@@ -41,8 +41,8 @@ source_set("user_pci") {
 
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.acpi:fuchsia.acpi_cpp",
@@ -123,7 +123,7 @@ if (platform_enable_user_pci) {
       "//sdk/banjo/fuchsia.hardware.pciroot:fuchsia.hardware.pciroot_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
-      "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
       "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/driver/runtime:driver_runtime_cpp",
       "//sdk/lib/fidl",

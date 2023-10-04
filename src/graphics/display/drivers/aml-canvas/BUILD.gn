@@ -25,7 +25,7 @@ source_set("common_srcs") {
   sources = [ "aml-canvas.cc" ]
   public_deps = [
     ":aml_canvas_bind",
-    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",

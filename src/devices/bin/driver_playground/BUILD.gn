@@ -19,12 +19,12 @@ source_set("lib") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_cpp_wire",
+    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_cpp",
     "//src/devices/lib/log",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.process:fuchsia.process_cpp_wire",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fdio:fdio-spawn-actions",

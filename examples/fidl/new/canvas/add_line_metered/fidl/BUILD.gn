@@ -8,7 +8,7 @@ import("//build/fidl/fidl.gni")
 # may be imported by depending on this target, followed by a language-specific underscore:
 #
 #   ":examples.canvas.addlinemetered_rust"
-#   ":examples.canvas.addlinemetered_cpp_wire"
+#   ":examples.canvas.addlinemetered_cpp"
 #   ...and so on
 #
 fidl("examples.canvas.addlinemetered") {

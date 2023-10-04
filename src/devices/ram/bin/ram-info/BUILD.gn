@@ -9,7 +9,7 @@ import("//build/test.gni")
 source_set("lib") {
   sources = [ "ram-info.cc" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.ram.metrics:fuchsia.hardware.ram.metrics_cpp",
     "//zircon/system/ulib/zx",
   ]
   deps = [

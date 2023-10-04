@@ -14,8 +14,8 @@ executable("bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.dotmatrixdisplay:fuchsia.hardware.dotmatrixdisplay_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.dotmatrixdisplay:fuchsia.hardware.dotmatrixdisplay_cpp",
+    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp",
     "//sdk/lib/component/incoming/cpp",
   ]
 }
@@ -26,7 +26,7 @@ executable("bin2") {
   sources = [ "create_ssd1306.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.ftdi:fuchsia.hardware.ftdi_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/ddk",
   ]

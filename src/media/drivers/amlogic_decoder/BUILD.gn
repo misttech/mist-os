@@ -85,7 +85,7 @@ if (target_cpu == "arm64") {
       ":sources",
       ":test_sources",
       ":test_support",
-      "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/syslog/cpp:backend",
     ]
@@ -176,11 +176,11 @@ if (target_cpu == "arm64") {
     ]
     public_deps = [
       "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
-      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp_wire",
-      "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
-      "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp_wire",
-      "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-      "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",
+      "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+      "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp",
+      "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+      "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
       "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
       "//sdk/lib/fit",
       "//sdk/lib/fit-promise",

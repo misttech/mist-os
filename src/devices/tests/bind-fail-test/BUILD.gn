@@ -43,7 +43,7 @@ test("tests") {
   testonly = true
   sources = [ "test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//src/devices/testing/devmgr-integration-test-shim",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",

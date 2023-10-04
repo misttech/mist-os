@@ -28,6 +28,10 @@ func (*Enum) Kind() declKind {
 var _ Kinded = (*Enum)(nil)
 var _ namespaced = (*Enum)(nil)
 
+func (*Enum) IsResourceType() bool {
+	return false
+}
+
 func (e Enum) UnknownValueForTmpl() interface{} {
 	return e.Enum.UnknownValueForTmpl()
 }

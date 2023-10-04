@@ -16,13 +16,13 @@ source_set("lib") {
 
   public_deps = [
     # <factory_reset.h> has #include <fidl/fuchsia.fshost/cpp.wire.h>
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
 
     # <factory_reset.h> has #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp",
 
     # <factory_reset.h> has #include <fidl/fuchsia.recovery/cpp/wire.h>
-    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp_wire",
+    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp",
   ]
 
   deps = [
@@ -58,7 +58,7 @@ executable("fdr") {
   sources = [ "cli_main.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp_wire",
+    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp",
     "//sdk/lib/component/incoming/cpp",
   ]
 }
@@ -97,8 +97,10 @@ test("factory_reset_unittests") {
   deps = [
     ":lib",
     "////src/lib/testing/loop_fixture",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_testing",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_testing",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/fxl/test:gtest_main",

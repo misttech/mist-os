@@ -32,12 +32,11 @@ source_set("common") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "vim3-pwm-backlight.cc" ]
-  public_deps =
-      [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
   deps = [
     ":vim3-pwm-backlight-bind",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//sdk/lib/fidl",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
@@ -68,7 +67,8 @@ test("vim3-pwm-backlight-test") {
   sources = [ "vim3-pwm-backlight-test.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp:cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",

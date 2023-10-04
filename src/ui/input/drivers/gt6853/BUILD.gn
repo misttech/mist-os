@@ -50,9 +50,9 @@ group("common") {
   public_deps = [
     ":gt6853-bind",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
-    "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
     "//sdk/lib/input_report_reader",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
@@ -113,7 +113,7 @@ test("gt6853-test") {
   ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/gpio/testing/fake-gpio",
 
     # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to

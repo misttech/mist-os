@@ -12,7 +12,7 @@ executable("biotime") {
   testonly = true
   sources = [ "biotime.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fit",

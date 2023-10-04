@@ -207,6 +207,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::OnlyReservedFlexi
 
 }  // namespace test_union
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_union::TestProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_union::TestProtocol>& value) {
@@ -234,7 +236,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

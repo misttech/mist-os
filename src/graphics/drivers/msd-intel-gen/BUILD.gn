@@ -68,7 +68,7 @@ source_set("msd_intel_entry") {
   deps = [
     ":msd_intel_bind",
     "src",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//src/devices/lib/driver",
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform/zircon:status",
@@ -93,7 +93,7 @@ source_set("msd_intel_test_entry") {
   deps = [
     ":msd_intel_test_bind",
     "src",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//src/devices/lib/driver",
     "//src/graphics/magma/lib/magma/platform:trace",
     "//src/graphics/magma/lib/magma/platform/zircon:status",

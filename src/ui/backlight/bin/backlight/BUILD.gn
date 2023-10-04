@@ -8,7 +8,7 @@ executable("backlight") {
   visibility = [ ":*" ]
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/lib/component/incoming/cpp",
   ]
 }

@@ -14,7 +14,7 @@ executable("bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/ddk",
     "//src/lib/files",
@@ -42,7 +42,7 @@ test("print-input-report-test-bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//src/lib/ddk",
     "//src/lib/fxl/test:gtest_main",
     "//src/ui/input/lib/hid-input-report",

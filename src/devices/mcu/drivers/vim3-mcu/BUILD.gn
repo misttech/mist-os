@@ -68,7 +68,7 @@ test("vim3-mcu-test-bin") {
   sources = [ "vim3-mcu-test.cc" ]
   deps = [
     ":common_sources",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/i2c/testing/mock-i2c",

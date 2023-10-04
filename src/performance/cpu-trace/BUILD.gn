@@ -22,7 +22,7 @@ source_set("perf-mon") {
   }
 
   deps = [
-    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zircon-internal",
   ]
@@ -39,7 +39,7 @@ executable("cpu-trace-bin") {
   deps = [
     ":perf-mon",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl",
@@ -66,7 +66,7 @@ test("perf-mon-tests-bin") {
   sources = [ "tests/perf-mon-tests.cc" ]
   deps = [
     ":perf-mon",
-    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp_wire",
+    "//sdk/fidl/fuchsia.perfmon.cpu:fuchsia.perfmon.cpu_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",

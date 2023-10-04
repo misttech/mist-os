@@ -9,7 +9,7 @@ executable("bin") {
   sources = [ "main.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp_natural_ostream",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",

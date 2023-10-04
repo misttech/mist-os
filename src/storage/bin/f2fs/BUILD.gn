@@ -9,8 +9,8 @@ import("//src/storage/testing/driver_test_realm.gni")
 executable("f2fs") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/sys/inspect/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/storage/f2fs",
@@ -27,13 +27,13 @@ fuchsia_component("f2fs-component") {
 test("f2fs_component_test") {
   sources = [ "f2fs_test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_wire",
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
     "//src/storage/testing:storage_driver_test_support",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

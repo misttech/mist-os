@@ -20,7 +20,7 @@ source_set("headers") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//zircon/kernel/lib/devicetree",
     "//zircon/system/ulib/zx",

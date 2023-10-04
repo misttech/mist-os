@@ -12,7 +12,7 @@ test("platform-bus") {
   output_name = "platform-bus-test"
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/fdio",
     "//src/devices/testing/devmgr-integration-test-shim",
     "//src/lib/ddk",
@@ -50,7 +50,7 @@ fuchsia_driver("test-board-driver") {
   deps = [
     ":test-board-bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
@@ -94,7 +94,7 @@ fuchsia_driver("test-gpio-driver") {
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -159,7 +159,7 @@ fuchsia_driver("test-clock-driver") {
     ":test-clock-bind",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -380,7 +380,7 @@ fuchsia_driver("test-bti-board-driver") {
   sources = [ "test-bti-board.cc" ]
   deps = [
     ":test-bti-board-bind",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp_driver",
+    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
@@ -408,7 +408,7 @@ fuchsia_driver("test-bti-driver") {
   configs += [ "//build/config:all_source" ]
   sources = [ "test-bti.cc" ]
   deps = [
-    ":fuchsia.hardware.btitest_cpp_wire",
+    ":fuchsia.hardware.btitest_cpp",
     ":test-bti-bind",
     "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -431,7 +431,7 @@ test("platform-bus-bti") {
   output_name = "platform-bus-bti-test"
   sources = [ "bti-test.cc" ]
   deps = [
-    ":fuchsia.hardware.btitest_cpp_wire",
+    ":fuchsia.hardware.btitest_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",

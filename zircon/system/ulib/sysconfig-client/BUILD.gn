@@ -26,12 +26,12 @@ zx_library("sysconfig-sync-client") {
     "sync-client.cc",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//zircon/system/ulib/fzl",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl",

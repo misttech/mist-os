@@ -8,7 +8,6 @@ zx_library("spi") {
   sdk = "source"
   sdk_headers = [ "lib/spi/spi.h" ]
   sources = [ "spi.cc" ]
-  public_deps =
-      [ "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp_wire" ]
-  deps = [ "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp_wire" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp" ]
+  deps = [ "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp" ]
 }

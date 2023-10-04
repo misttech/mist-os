@@ -13,10 +13,10 @@ source_set("shared") {
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//sdk/lib/zbi-format",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
@@ -43,6 +43,8 @@ test("simple-display-test-bin") {
   sources = [ "simple-display-test.cc" ]
   deps = [
     ":shared",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/no_ddk",
     "//src/lib/fsl",

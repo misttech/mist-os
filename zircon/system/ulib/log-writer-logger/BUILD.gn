@@ -13,7 +13,7 @@ zx_library("log-writer-logger") {
 
   sources = [ "log-writer-logger.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp_wire",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
     "//zircon/system/ulib/fbl",

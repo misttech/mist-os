@@ -11,8 +11,8 @@ executable("iochk") {
   ]
   sources = [ "iochk.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/block_client/cpp",
     "//zircon/system/ulib/fbl",

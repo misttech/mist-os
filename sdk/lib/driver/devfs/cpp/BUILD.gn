@@ -29,7 +29,7 @@ executable("cpp_test") {
   deps = [
     ":cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_hlcpp",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp_wire",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/component/cpp:test_base",
     "//sdk/lib/fidl/cpp",

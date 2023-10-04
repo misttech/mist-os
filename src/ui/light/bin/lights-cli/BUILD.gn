@@ -15,7 +15,7 @@ executable("bin") {
     "main.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

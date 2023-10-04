@@ -13,8 +13,8 @@ source_set("lib") {
   ]
 
   public_deps = [
-    "../fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp_wire",
+    "../fuchsia.powermanager.driver.fidl:fuchsia.powermanager.driver.temperaturecontrol_cpp",
+    "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
   ]

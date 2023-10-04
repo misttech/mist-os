@@ -26,7 +26,7 @@ all_deps = [
   "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_hlcpp",
   "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_cpp",
-  "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp_driver",
+  "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_cpp",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_hlcpp",
   "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",

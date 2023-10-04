@@ -23,7 +23,7 @@ fuchsia_driver("pwm-driver") {
   sources = [ "pwm.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//src/devices/lib/driver",
   ]
 }
@@ -61,7 +61,7 @@ group("common") {
   public_deps = [
     ":pwm-bind",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",

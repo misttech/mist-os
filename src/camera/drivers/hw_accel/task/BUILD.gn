@@ -17,7 +17,7 @@ source_set("camera-task") {
     "//zircon/system/ulib/fzl",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/camera/lib/vmo_pool_wrapper",
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/zx",

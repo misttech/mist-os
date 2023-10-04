@@ -63,7 +63,7 @@ test("aml-uart-test-bin") {
     ":aml_uart_bind",
     "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fit",

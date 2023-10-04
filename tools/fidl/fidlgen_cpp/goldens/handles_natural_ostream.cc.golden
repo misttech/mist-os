@@ -11,6 +11,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_handles::Handles>::Format(std::ostream& os, const ::test_handles::Handles& value) {
   os << "test_handles::Handles";
   os << "{ ";
@@ -85,6 +87,11 @@ std::ostream& fidl::ostream::Formatter<::test_handles::Handles>::Format(std::ost
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(std::ostream& os, const ::test_handles::FdfHandles& value) {
   os << "test_handles::FdfHandles";
   os << "{ ";
@@ -98,15 +105,25 @@ std::ostream& fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(std::
   return os;
 }
 
+#endif  // __Fuchsia__
+
 namespace test_handles {
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handles::Handles& value) {
   return fidl::ostream::Formatter<::test_handles::Handles>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_handles::FdfHandles& value) {
   return fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

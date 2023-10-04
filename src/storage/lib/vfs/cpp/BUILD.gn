@@ -93,8 +93,8 @@ static_library("cpp") {
       "watcher.cc",
     ]
     public_deps += [
-      "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+      "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/lib/file-lock:cpp",
       "//zircon/system/ulib/async",
 
@@ -106,9 +106,9 @@ static_library("cpp") {
       "//zircon/system/ulib/trace",
     ]
     deps += [
-      "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp_wire",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-      "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
+      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+      "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/fidl",
       "//sdk/lib/fit",
@@ -160,8 +160,8 @@ test("fs-vnode-test") {
   ]
   deps = [
     ":test_support",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//src/storage/lib/vfs/cpp",
@@ -191,9 +191,9 @@ test("fs-connection-test") {
     "paging_test.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire_testing",
-    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp_wire",
-    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
+    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_cpp",
+    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//sdk/lib/zxio",

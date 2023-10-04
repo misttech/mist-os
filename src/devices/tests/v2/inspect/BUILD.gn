@@ -36,7 +36,7 @@ fuchsia_driver("root-driver") {
   deps = [
     ":bind",
     "//src/devices/lib/driver",
-    "//src/devices/tests/v2/inspect:fuchsia.inspect.test_cpp_wire",
+    "//src/devices/tests/v2/inspect:fuchsia.inspect.test_cpp",
     "//src/devices/tests/v2/inspect/bind:fuchsia.inspect_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",

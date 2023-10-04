@@ -872,6 +872,10 @@ func compile(r fidlgen.Root) *Root {
 
 	for _, v := range r.Protocols {
 		if p := c.compileProtocol(v); p != nil {
+			_, isDriver := v.Transports()["Driver"]
+			if isDriver {
+				c.containsDriverReferences = true
+			}
 			decls[v.Name] = p
 		}
 	}

@@ -10,8 +10,8 @@ import("//build/test.gni")
 source_set("verified-volume-client") {
   sources = [ "verified-volume-client.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp",
     "//sdk/lib/device-watcher/cpp",
     "//src/lib/digest",
     "//src/storage/lib/ramdevice_client/cpp",
@@ -95,7 +95,7 @@ source_set("config") {
   sources = [ "config.cc" ]
   public_deps = [ "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp",
     "//src/lib/ddk",
   ]
 }
@@ -106,7 +106,7 @@ test("config-test") {
   sources = [ "config-tests.cc" ]
   deps = [
     ":config",
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp",
     "//src/devices/testing/no_ddk",
     "//src/lib/ddk",
     "//zircon/system/ulib/zxtest",
@@ -148,7 +148,7 @@ fuchsia_driver("block-verity-driver") {
     ":geometry",
     ":sealer",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -170,9 +170,9 @@ test("block-verity-test") {
   sources = [ "block-verity-test.cc" ]
   deps = [
     ":verified-volume-client",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.verified:fuchsia.hardware.block.verified_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/digest",

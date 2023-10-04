@@ -76,7 +76,7 @@ executable("fake_buffer_collection_unittest_bin") {
   deps = [
     ":fake_buffer_collection",
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",
     "//src/devices/lib/mmio",

@@ -27,9 +27,9 @@ group("common") {
   public_deps = [
     ":nelson-brownout-protection-bind",
     "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
     "//src/lib/ddktl",

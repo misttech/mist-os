@@ -19,7 +19,7 @@ fuchsia_driver("driver") {
     ":node-group-bind",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/tests/v2/compat-node-group:fuchsia.compat.nodegroup.test_cpp_wire",
+    "//src/devices/tests/v2/compat-node-group:fuchsia.compat.nodegroup.test_cpp",
     "//zircon/system/ulib/async:async-cpp",
   ]
 }

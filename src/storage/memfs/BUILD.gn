@@ -43,7 +43,7 @@ source_set("cpp") {
   public = [ "mounted_memfs.h" ]
   sources = [ "mounted_memfs.cc" ]
 
-  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire" ]
+  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp" ]
 
   public_deps = [
     ":lib",

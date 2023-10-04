@@ -33,8 +33,8 @@ source_set("common_srcs") {
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//src/devices/bus/lib/virtio",
     "//src/graphics/display/lib/api-types-cpp",
     "//src/lib/ddk",
@@ -83,7 +83,8 @@ test("virtio-gpu-test") {
   ]
   deps = [
     ":common_srcs",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire_testing",
+    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_testing",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
     "//sdk/lib/async-loop-testing/cpp",
     "//src/devices/bus/lib/virtio",
     "//src/devices/testing/fake-bti",

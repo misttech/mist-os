@@ -12,7 +12,7 @@ zx_library("kcounter") {
     "provider.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//zircon/kernel/lib/counters",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/inspect",

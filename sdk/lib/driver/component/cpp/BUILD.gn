@@ -49,7 +49,7 @@ sdk_source_set("cpp") {
   public_deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
-    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_driver_wire",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/outgoing/cpp",
@@ -89,8 +89,8 @@ executable("cpp_test") {
   deps = [
     ":cpp",
     ":test_base",
-    "tests/fidl:fuchsia.driver.component.test_cpp_driver_wire",
-    "tests/fidl:fuchsia.driver.component.test_cpp_wire",
+    "tests/fidl:fuchsia.driver.component.test_cpp",
+    "tests/fidl:fuchsia.driver.component.test_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",

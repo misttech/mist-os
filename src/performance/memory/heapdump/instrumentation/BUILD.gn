@@ -57,7 +57,7 @@ sdk_shared_library("instrumentation") {
 
   deps = [
     ":core",
-    "//sdk/fidl/fuchsia.memory.heapdump.process:fuchsia.memory.heapdump.process_cpp_wire",
+    "//sdk/fidl/fuchsia.memory.heapdump.process:fuchsia.memory.heapdump.process_cpp",
     "//sdk/lib/fdio",
     "//src/zircon/lib/zircon",
   ]

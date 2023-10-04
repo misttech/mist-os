@@ -17,7 +17,7 @@ executable("clkctl") {
   visibility = [ ":*" ]
   sources = [ "clkctl.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/files",
   ]

@@ -8,7 +8,7 @@ executable("lspwr") {
   visibility = [ ":*" ]
   sources = [ "lspwr.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
   ]

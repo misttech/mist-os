@@ -19,7 +19,7 @@ test("component_cpp_unittests_bin") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",
     "//sdk/lib/sys/cpp",

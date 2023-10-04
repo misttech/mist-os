@@ -30,14 +30,14 @@ source_set("paver-core") {
     "validation.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
@@ -52,11 +52,11 @@ source_set("paver-core") {
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
-    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp_wire",
+    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//sdk/lib/zbi-format",
     "//src/firmware/lib/abr",
     "//src/lib/uuid",
@@ -70,7 +70,7 @@ source_set("paver-core") {
 # Helper libraries to aid board specific implementations.
 source_set("gpt") {
   sources = [ "gpt.cc" ]
-  deps = [ "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire" ]
+  deps = [ "//sdk/fidl/fuchsia.device:fuchsia.device_cpp" ]
   public_deps = [
     ":paver-core",
     "//sdk/lib/component/incoming/cpp",
@@ -86,7 +86,7 @@ source_set("skip-block") {
   deps = [ "//src/lib/uuid" ]
   public_deps = [
     ":paver-core",
-    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/storage/gpt",
     "//zircon/system/ulib/fdio-caller",
@@ -117,7 +117,7 @@ source_set("astro") {
   deps = [
     ":paver-core",
     ":sysconfig",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
@@ -175,7 +175,7 @@ source_set("pinecrest") {
   deps = [
     ":gpt",
     ":paver-core",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/uuid",
     "//src/storage/gpt",
@@ -220,7 +220,7 @@ zx_library("paver") {
     ":sherlock",
     ":vim3",
     ":x64",
-    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp_wire",
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
   ]
   public_deps = [ "//zircon/system/ulib/svc" ]
 }

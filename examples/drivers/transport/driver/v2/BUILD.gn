@@ -16,7 +16,7 @@ fuchsia_driver("parent_driver") {
   deps = [
     ":parent_bind",
     "//examples/drivers/transport/driver:fuchsia.examples.gizmo_bindlib_cpp",
-    "//examples/drivers/transport/driver:fuchsia.examples.gizmo_cpp_driver",
+    "//examples/drivers/transport/driver:fuchsia.examples.gizmo_cpp",
     "//examples/drivers/transport/tests:fuchsia.gizmo.protocol_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
@@ -47,7 +47,7 @@ fuchsia_driver("child_driver") {
   sources = [ "child-driver.cc" ]
   deps = [
     ":child_bind",
-    "//examples/drivers/transport/driver:fuchsia.examples.gizmo_cpp_driver",
+    "//examples/drivers/transport/driver:fuchsia.examples.gizmo_cpp",
     "//examples/drivers/transport/tests:fuchsia.gizmo.protocol_cpp",
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_cpp",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",

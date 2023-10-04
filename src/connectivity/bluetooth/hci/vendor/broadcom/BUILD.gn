@@ -43,9 +43,8 @@ source_set("common") {
     "//zircon/system/ulib/sync",
   ]
 
-  public_deps = [
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp_wire",
-  ]
+  public_deps =
+      [ "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]

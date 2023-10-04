@@ -21,17 +21,29 @@ template <>
 struct fidl::ostream::Formatter<::test_aliases::ObjType> {
   static std::ostream& Format(std::ostream& os, const ::test_aliases::ObjType& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases> {
   static std::ostream& Format(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value);
 };
 
+#endif  // __Fuchsia__
+
 namespace test_aliases {
 
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ObjType& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value);
 
+#endif  // __Fuchsia__
+
 }  // namespace test_aliases
+
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

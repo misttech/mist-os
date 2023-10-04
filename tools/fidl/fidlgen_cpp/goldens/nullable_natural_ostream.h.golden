@@ -24,10 +24,15 @@ template <>
 struct fidl::ostream::Formatter<::test_nullable::StructWithNullableVector> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableVector& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_nullable::StructWithNullableHandle> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableHandle& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_nullable::SimpleProtocolAddRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::SimpleProtocolAddRequest& value);
@@ -36,14 +41,24 @@ template <>
 struct fidl::ostream::Formatter<::test_nullable::SimpleProtocolAddResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::SimpleProtocolAddResponse& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_nullable::StructWithNullableProtocol> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableProtocol& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_nullable::StructWithNullableRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::StructWithNullableRequest& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_nullable::Int32Wrapper> {
   static std::ostream& Format(std::ostream& os, const ::test_nullable::Int32Wrapper& value);
@@ -67,15 +82,27 @@ std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNull
 
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableVector& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableHandle& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::SimpleProtocolAddRequest& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::SimpleProtocolAddResponse& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableProtocol& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableRequest& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::Int32Wrapper& value);
 
@@ -86,6 +113,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_nullable::SimpleUnion& v
 std::ostream& operator<<(std::ostream& os, const ::test_nullable::StructWithNullableUnion& value);
 
 }  // namespace test_nullable
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_nullable::SimpleProtocol>> {
@@ -114,7 +143,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_nullable::SimpleProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_nullable::SimpleProtocol>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

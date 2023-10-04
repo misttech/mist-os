@@ -11,7 +11,7 @@ visibility = [ "./*" ]
 executable("minfs") {
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp_wire",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
     "//src/lib/scheduler/cpp",
@@ -38,13 +38,13 @@ group("minfs-test-component") {
 test("minfs_component_test") {
   sources = [ "minfs_test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp_wire",
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:gtest_main",
-    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp_wire",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
     "//src/storage/testing:storage_driver_test_support",
     "//zircon/system/ulib/async-loop",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

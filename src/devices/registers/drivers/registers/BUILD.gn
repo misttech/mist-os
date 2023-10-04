@@ -60,7 +60,7 @@ test("registers-test") {
 
 group("common") {
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",

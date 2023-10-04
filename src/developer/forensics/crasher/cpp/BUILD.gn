@@ -21,7 +21,7 @@ executable("crasher_exe") {
   ]
   cflags = [ "-fstack-protector-all" ]
   deps = [
-    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp_wire",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
     "//src/zircon/lib/zircon",

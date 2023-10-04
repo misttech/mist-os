@@ -20,8 +20,8 @@ driver_bind_rules("bind") {
 
 common_deps = [
   ":bind",
-  "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
-  "//sdk/fidl/fuchsia.hardware.google.ec:fuchsia.hardware.google.ec_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
+  "//sdk/fidl/fuchsia.hardware.google.ec:fuchsia.hardware.google.ec_cpp",
 
   # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
   # "//sdk/lib/component/outgoing/cpp".

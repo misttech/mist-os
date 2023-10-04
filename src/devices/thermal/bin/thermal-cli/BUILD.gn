@@ -11,7 +11,7 @@ executable("thermal-cli") {
   sources = [ "main.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
@@ -28,7 +28,7 @@ source_set("common") {
     "thermal-cli.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
@@ -41,7 +41,7 @@ test("thermal-cli-test-bin") {
   include_dirs = [ "." ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.thermal:fuchsia.hardware.thermal_cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

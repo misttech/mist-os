@@ -7,7 +7,7 @@ import("//build/components.gni")
 
 group("common") {
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/lib/amlogic",
   ]

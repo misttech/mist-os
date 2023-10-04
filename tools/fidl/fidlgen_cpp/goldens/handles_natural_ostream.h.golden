@@ -11,28 +11,48 @@
 #include <fidl/fdf/cpp/natural_ostream.h>
 #include <fidl/test.handles/cpp/natural_types.h>
 #include <lib/fidl/cpp/natural_ostream.h>
+#include <lib/fidl_driver/cpp/natural_ostream.h>
 
 #include <iostream>
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_handles::Handles> {
   static std::ostream& Format(std::ostream& os, const ::test_handles::Handles& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_handles::FdfHandles> {
   static std::ostream& Format(std::ostream& os, const ::test_handles::FdfHandles& value);
 };
 
+#endif  // __Fuchsia__
+
 namespace test_handles {
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_handles::Handles& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_handles::FdfHandles& value);
 
+#endif  // __Fuchsia__
+
 }  // namespace test_handles
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_handles::SomeProtocol>> {
@@ -88,7 +108,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_handles::DriverProtocol>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_handles::DriverProtocol>>::Format(os, value);
 }
+}  // namespace fdf
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fdf

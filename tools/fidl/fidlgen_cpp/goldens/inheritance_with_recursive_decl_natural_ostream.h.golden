@@ -16,22 +16,41 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_inheritancewithrecursivedecl::ParentFirstRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_inheritancewithrecursivedecl::ParentFirstRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_inheritancewithrecursivedecl::ChildSecondRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_inheritancewithrecursivedecl::ChildSecondRequest& value);
 };
 
+#endif  // __Fuchsia__
+
 namespace test_inheritancewithrecursivedecl {
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_inheritancewithrecursivedecl::ParentFirstRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_inheritancewithrecursivedecl::ChildSecondRequest& value);
 
+#endif  // __Fuchsia__
+
 }  // namespace test_inheritancewithrecursivedecl
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_inheritancewithrecursivedecl::Parent>> {
@@ -85,7 +104,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Child>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

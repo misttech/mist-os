@@ -13,7 +13,7 @@ shared_library("agent") {
   ]
   sources = [ "src/fuchsia-tcti-agent.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp_wire",
+    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
@@ -31,7 +31,7 @@ static_library("device") {
   ]
   sources = [ "src/fuchsia-tcti-device.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp_wire",
+    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
@@ -43,7 +43,7 @@ executable("fuchsia-tcti-tests-agent-bin") {
   sources = [ "src/fuchsia-tcti-unittests.cc" ]
   deps = [
     ":agent",
-    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp_wire",
+    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]
@@ -54,7 +54,7 @@ executable("fuchsia-tcti-tests-device-bin") {
   sources = [ "src/fuchsia-tcti-unittests.cc" ]
   deps = [
     ":device",
-    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp_wire",
+    "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//src/lib/fxl/test:gtest_main",
     "//third_party/googletest:gtest",
   ]

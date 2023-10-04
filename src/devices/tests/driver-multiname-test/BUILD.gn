@@ -64,7 +64,7 @@ fuchsia_driver("parent_device") {
     "parent_device.cc",
   ]
   deps = [
-    ":driver.multiname.test_cpp_wire",
+    ":driver.multiname.test_cpp",
     ":parent_device_bind",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",

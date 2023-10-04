@@ -96,7 +96,7 @@ source_set("audio_core_lib") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_cpp_wire",
+    "//sdk/fidl/fuchsia.audio.effects:fuchsia.audio.effects_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_hlcpp",
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/fidl/fuchsia.media.tuning:fuchsia.media.tuning_hlcpp",

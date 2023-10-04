@@ -10,7 +10,7 @@ executable("sysinfo") {
   output_dir = "$root_out_dir/zircon-migrated"
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/sys/lib/stdout-to-debuglog/cpp",
@@ -22,7 +22,7 @@ test("test") {
   output_name = "sysinfo-test"
   sources = [ "sysinfo-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zxtest",
   ]

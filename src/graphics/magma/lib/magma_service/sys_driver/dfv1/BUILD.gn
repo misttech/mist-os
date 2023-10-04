@@ -13,7 +13,7 @@ source_set("performance_counter_device") {
     "//src/graphics/magma/lib/magma/util:short_macros",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",
@@ -29,7 +29,7 @@ source_set("dependency_injection_device") {
     "magma_dependency_injection_device.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//src/devices/lib/driver",
     "//src/graphics/magma:msd",
     "//src/graphics/magma/lib/magma/util:macros",
@@ -49,7 +49,7 @@ source_set("device_impl") {
     ":dependency_injection_device",
     ":performance_counter_device",
     "..:sys_driver",
-    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+    "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//src/devices/lib/driver",
     "//src/graphics/magma/lib/magma/platform:thread",
     "//src/graphics/magma/lib/magma/platform/zircon:status",

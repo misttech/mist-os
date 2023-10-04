@@ -18,7 +18,7 @@ executable("ihda") {
     "zircon_device.cc",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.intel.hda:fuchsia.hardware.intel.hda_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/media/audio/drivers/lib/intel-hda",
     "//zircon/system/ulib/fbl",

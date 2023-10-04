@@ -30,7 +30,7 @@ fuchsia_driver("ddk-lifecycle-test-driver") {
     "test-driver.cc",
   ]
   deps = [
-    ":fuchsia.device.lifecycle.test_cpp_wire",
+    ":fuchsia.device.lifecycle.test_cpp",
     ":test-lifecycle-bind",
     "//sdk/lib/fdio",
     "//src/devices/lib/driver",
@@ -51,10 +51,10 @@ fuchsia_driver_component("ddk-lifecycle-test") {
 driver_compat_test("ddk-lifecycle") {
   sources = [ "test.cc" ]
   deps = [
-    ":fuchsia.device.lifecycle.test_cpp_wire",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    ":fuchsia.device.lifecycle.test_cpp",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fit",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",

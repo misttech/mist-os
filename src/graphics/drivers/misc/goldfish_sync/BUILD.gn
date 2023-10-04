@@ -16,7 +16,7 @@ driver_bind_rules("goldfish-sync-bind") {
 source_set("common_deps") {
   public_deps = [
     ":goldfish-sync-bind",
-    "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/acpi",

@@ -48,8 +48,8 @@ fuchsia_library_fuzzer("sysmem_fuzzer") {
   ]
   deps = [
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
   ]
@@ -65,8 +65,8 @@ fuchsia_library_fuzzer("sysmem_fuzzer_multi") {
 
   deps = [
     "//sdk/banjo/fuchsia.sysmem:fuchsia.sysmem_banjo_c",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_wire",
-    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_wire",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",

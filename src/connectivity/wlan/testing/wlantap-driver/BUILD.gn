@@ -40,11 +40,11 @@ fuchsia_driver("wlantap_driver-driver") {
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_bindlib_cpp",
-    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_bindlib_cpp",
-    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
-    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_wire",
-    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp_driver",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
+    "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp",
+    "//sdk/fidl/fuchsia.wlan.tap:fuchsia.wlan.tap_cpp",
 
     # ddk is still needed for ZX_PROTOCOL* definitions
     "//sdk/lib/driver/component/cpp:cpp",

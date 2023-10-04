@@ -20,7 +20,7 @@ fuchsia_driver("fuchsia_driver") {
   deps = [
     ":bt_hci_passthrough_bind",
     "//sdk/banjo/fuchsia.hardware.bt.hci:fuchsia.hardware.bt.hci_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

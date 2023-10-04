@@ -12,7 +12,7 @@ zx_library("device-protocol-i2c-channel") {
   public_deps = [
     # <lib/device-protocol-i2c-channel/i2c-channel.h> has
     # #includes <fidl/fuchsia.hardware.i2c/cpp/wire.h>
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
 
     # <lib/device-protocol-i2c-channel/i2c-channel.h> has #include <zircon/types.h>
     "//zircon/system/ulib/zx",
@@ -28,7 +28,7 @@ executable("i2c-channel-test-bin") {
   output_name = "i2c-channel-test"
   sources = [ "test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",

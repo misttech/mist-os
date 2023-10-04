@@ -9,6 +9,6 @@ static_library("fake-gpio") {
   public = [ "fake-gpio.h" ]
   sources = [ "fake-gpio.cc" ]
   public_deps =
-      [ "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire" ]
+      [ "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_testing" ]
   deps = [ "//zircon/system/ulib/async-default:async-default" ]
 }

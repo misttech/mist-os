@@ -31,7 +31,7 @@ fuchsia_driver("tas27xx-driver") {
   sources = [ "tas27xx.cc" ]
   deps = [
     ":ti_tas27xx-bind",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/devices/lib/ti",
@@ -65,8 +65,8 @@ test("tas27xx-test-bin") {
   deps = [
     ":tas27xx",
     ":ti_tas27xx-bind",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
     "//src/devices/gpio/testing/fake-gpio",

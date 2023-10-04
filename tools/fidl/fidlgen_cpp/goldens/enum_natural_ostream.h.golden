@@ -45,4 +45,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_enum::MyEmptyFlexibleEnu
 
 }  // namespace test_enum
 
+#ifdef __Fuchsia__
+
+#endif  // __Fuchsia__
+
 #pragma clang diagnostic pop

@@ -28,7 +28,7 @@ source_set("igc_core") {
 
   public_deps = [
     ":igc_bind",
-    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
     "//src/lib/vmo_store",
   ]

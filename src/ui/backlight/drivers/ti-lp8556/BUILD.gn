@@ -36,7 +36,7 @@ fuchsia_driver("ti-lp8556-driver") {
   ]
   sources = [ "ti-lp8556.cc" ]
   deps = [
-    ":fuchsia.hardware.adhoc.lp8556_cpp_wire",
+    ":fuchsia.hardware.adhoc.lp8556_cpp",
     ":ti-lp8556-bind",
     "//sdk/lib/fidl",
     "//src/devices/bus/lib/device-protocol-pdev",
@@ -71,7 +71,7 @@ test("ti-lp8556-test") {
     "ti-lp8556.cc",
   ]
   deps = [
-    ":fuchsia.hardware.adhoc.lp8556_cpp_wire",
+    ":fuchsia.hardware.adhoc.lp8556_cpp",
     ":ti-lp8556-bind",
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/component/outgoing/cpp",

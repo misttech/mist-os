@@ -21,12 +21,11 @@ fuchsia_driver("aml-pwm-init-driver") {
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [ "aml-pwm-init.cc" ]
-  public_deps =
-      [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire" ]
+  public_deps = [ "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp" ]
   deps = [
     ":aml-pwm-init-bind",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
@@ -52,9 +51,9 @@ test("aml-pwm-init-test-bin") {
   ]
   deps = [
     ":aml-pwm-init-bind",
-    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/lib/async_patterns/testing/cpp",
     "//src/devices/bind/fuchsia.pwm:fuchsia.pwm_cpp",
     "//src/devices/gpio/testing/fake-gpio",

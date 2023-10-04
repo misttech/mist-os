@@ -19,9 +19,9 @@ source_set("coverage-source") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/stdcompat",
     "//sdk/lib/sys/cpp",
@@ -35,7 +35,7 @@ executable("app") {
   sources = [ "main.cc" ]
   deps = [
     ":coverage-source",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
@@ -52,8 +52,8 @@ test("coverage-source-test") {
   sources = [ "coverage_source_test.cc" ]
   deps = [
     ":coverage-source",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
-    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp_wire",
+    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+    "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",

@@ -20,8 +20,8 @@ test("service-proxy-dir") {
 
   sources = [ "service-proxy-dir.cc" ]
   deps = [
-    ":fidl.test.echo_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    ":fidl.test.echo_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fidl",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

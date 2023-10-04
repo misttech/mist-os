@@ -11,6 +11,8 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_driverhandle::ClientEndWrapper>::Format(std::ostream& os, const ::test_driverhandle::ClientEndWrapper& value) {
   os << "test_driverhandle::ClientEndWrapper";
   os << "{ ";
@@ -19,6 +21,11 @@ std::ostream& fidl::ostream::Formatter<::test_driverhandle::ClientEndWrapper>::F
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_driverhandle::ServerEndWrapper>::Format(std::ostream& os, const ::test_driverhandle::ServerEndWrapper& value) {
   os << "test_driverhandle::ServerEndWrapper";
   os << "{ ";
@@ -27,6 +34,11 @@ std::ostream& fidl::ostream::Formatter<::test_driverhandle::ServerEndWrapper>::F
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_driverhandle::HandlesInProtocolSendHandlesRequest>::Format(std::ostream& os, const ::test_driverhandle::HandlesInProtocolSendHandlesRequest& value) {
   os << "test_driverhandle::HandlesInProtocolSendHandlesRequest";
   os << "{ ";
@@ -35,6 +47,11 @@ std::ostream& fidl::ostream::Formatter<::test_driverhandle::HandlesInProtocolSen
   os << "}";
   return os;
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_driverhandle::T>::Format(std::ostream& os, const ::test_driverhandle::T& value) {
   os << "test_driverhandle::T";
   os << "{ ";
@@ -50,23 +67,41 @@ std::ostream& fidl::ostream::Formatter<::test_driverhandle::T>::Format(std::ostr
   return os;
 }
 
+#endif  // __Fuchsia__
+
 namespace test_driverhandle {
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::ClientEndWrapper& value) {
   return fidl::ostream::Formatter<::test_driverhandle::ClientEndWrapper>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::ServerEndWrapper& value) {
   return fidl::ostream::Formatter<::test_driverhandle::ServerEndWrapper>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::T& value) {
   return fidl::ostream::Formatter<::test_driverhandle::T>::Format(os, value);
 }
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_driverhandle::HandlesInProtocolSendHandlesRequest& value) {
   return fidl::ostream::Formatter<::test_driverhandle::HandlesInProtocolSendHandlesRequest>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

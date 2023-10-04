@@ -52,9 +52,9 @@ shared_library("zxcrypt-fdio") {
   ]
   configs += [ "//build/config/fuchsia:integer-paranoia" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp",
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//src/storage/lib/block_client/cpp",
@@ -76,10 +76,10 @@ source_set("zxcrypt-client") {
     "//zircon/system/ulib/fdio-caller",
 
     # client.h has #include <fidl/fuchsia.hardware.block.encrypted/cpp/wire.h>
-    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.block.encrypted:fuchsia.hardware.block.encrypted_cpp",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fdio",
     "//src/security/lib/kms-stateless",

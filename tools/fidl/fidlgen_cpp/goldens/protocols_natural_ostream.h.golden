@@ -68,14 +68,24 @@ template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxErrorAsEnumResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResult& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithErrorSyntaxHandleInResultResult> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMethodARequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolMethodARequest& value);
@@ -92,18 +102,33 @@ template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMethodBResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolMethodBResponse& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolTakeHandleRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolTakeHandleRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMutateSocketRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ChannelProtocolMutateSocketResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketResponse& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::SyscallProtocolMethodCRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::SyscallProtocolMethodCRequest& value);
@@ -124,50 +149,105 @@ template <>
 struct fidl::ostream::Formatter<::test_protocols::TransitionalEventRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::TransitionalEventRequest& value);
 };
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolNoResponseMethodRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolNoResponseMethodRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolResponseMethodRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolResponseMethodResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodResponse& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::HandleRightsProtocolAnEventRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::HandleRightsProtocolAnEventRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ProtocolEnds> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ProtocolEnds& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsClientEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsClientEndsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsResponse& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsServerEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsServerEndsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsResponse& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsStructContainingEndsRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsRequest& value);
 };
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::WithProtocolEndsStructContainingEndsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsResponse& value);
 };
+
+#endif  // __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::test_protocols::ManyParametersFifteenRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_protocols::ManyParametersFifteenRequest& value);
@@ -213,9 +293,17 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSynt
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxErrorAsEnumResult& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResponse& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithErrorSyntaxHandleInResultResult& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMethodARequest& value);
 
@@ -225,11 +313,23 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtoc
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMethodBResponse& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolTakeHandleRequest& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ChannelProtocolMutateSocketResponse& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::SyscallProtocolMethodCRequest& value);
 
@@ -241,27 +341,71 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::TransitionalO
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::TransitionalEventRequest& value);
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolNoResponseMethodRequest& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolResponseMethodResponse& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::HandleRightsProtocolAnEventRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ProtocolEnds& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsClientEndsResponse& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsServerEndsResponse& value);
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsRequest& value);
 
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::WithProtocolEndsStructContainingEndsResponse& value);
+
+#endif  // __Fuchsia__
 
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::ManyParametersFifteenRequest& value);
 
@@ -272,6 +416,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::MethodWithUni
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::MethodWithUnionUnionMethodResponse& value);
 
 }  // namespace test_protocols
+
+#ifdef __Fuchsia__
 
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_protocols::WithAndWithoutRequestResponse>> {
@@ -525,7 +671,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_protocols::MethodWithUnion>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_protocols::MethodWithUnion>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

@@ -9,7 +9,7 @@ executable("bin") {
   output_name = "radar-integration-test"
   sources = [ "radar-integration-test.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.radar:fuchsia.hardware.radar_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fit",

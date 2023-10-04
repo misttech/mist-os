@@ -30,7 +30,7 @@ executable("bin") {
     "//src/lib/testing/predicates",
     "//src/tests/fidl/dynsuite/channel_util",
     "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_cpp",
-    "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_cpp_natural_ostream",
+    "//src/tests/fidl/dynsuite/server_suite/fidl:fidl.serversuite_cpp",
     "//third_party/googletest:gtest",
   ]
 }

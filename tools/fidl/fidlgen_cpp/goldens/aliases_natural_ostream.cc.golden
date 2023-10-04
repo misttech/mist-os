@@ -26,6 +26,8 @@ std::ostream& fidl::ostream::Formatter<::test_aliases::ObjType>::Format(std::ost
   }
   return os;
 }
+#ifdef __Fuchsia__
+
 std::ostream& fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases>::Format(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value) {
   os << "test_aliases::ExampleOfUseOfAliases";
   os << "{ ";
@@ -49,15 +51,21 @@ std::ostream& fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases>::F
   return os;
 }
 
+#endif  // __Fuchsia__
+
 namespace test_aliases {
 
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ObjType& value) {
   return fidl::ostream::Formatter<::test_aliases::ObjType>::Format(os, value);
 }
 
+#ifdef __Fuchsia__
+
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value) {
   return fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases>::Format(os, value);
 }
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
 

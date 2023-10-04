@@ -12,7 +12,7 @@ executable("touchpad-test-bin") {
   sources = [ "touchpad-test.cc" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp_wire",
+    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fhcp/cpp",

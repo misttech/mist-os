@@ -28,7 +28,7 @@ source_set("system_metrics_daemon_lib") {
 
   public_deps = [
     ":metrics_registry_cc",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_hlcpp",
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_hlcpp",
     "//sdk/lib/component/incoming/cpp",

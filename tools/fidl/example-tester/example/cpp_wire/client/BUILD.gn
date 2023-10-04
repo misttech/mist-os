@@ -23,6 +23,6 @@ executable("bin") {
     ":config",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
-    "//tools/fidl/example-tester/example/fidl:test.exampletester_cpp_wire",
+    "//tools/fidl/example-tester/example/fidl:test.exampletester_cpp",
   ]
 }

@@ -24,8 +24,8 @@ source_set("optee_lib") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_cpp",
+    "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -44,8 +44,8 @@ source_set("optee_lib") {
 
   deps = [
     ":optee-bind",
-    "//sdk/fidl/fuchsia.tee:fuchsia.tee_cpp_wire",
-    "//sdk/fidl/fuchsia.tee.manager:fuchsia.tee.manager_cpp_wire",
+    "//sdk/fidl/fuchsia.tee:fuchsia.tee_cpp",
+    "//sdk/fidl/fuchsia.tee.manager:fuchsia.tee.manager_cpp",
     "//sdk/lib/fidl",
     "//src/devices/lib/driver",
   ]
@@ -145,7 +145,7 @@ test("optee-uuid-test-bin") {
   output_name = "optee-uuid-test"
   deps = [
     ":optee_lib",
-    "//sdk/fidl/fuchsia.tee:fuchsia.tee_cpp_wire",
+    "//sdk/fidl/fuchsia.tee:fuchsia.tee_cpp",
     "//zircon/system/ulib/zxtest",
   ]
 }

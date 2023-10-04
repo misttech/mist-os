@@ -5,7 +5,7 @@
 executable("usbctl") {
   sources = [ "usbctl.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
     "//src/devices/usb/lib/usb",

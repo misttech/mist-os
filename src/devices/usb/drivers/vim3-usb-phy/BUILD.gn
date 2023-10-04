@@ -29,7 +29,7 @@ fuchsia_driver("vim3-usb-phy-driver") {
   deps = [
     ":vim3_usb_phy_bind",
     "//sdk/banjo/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",

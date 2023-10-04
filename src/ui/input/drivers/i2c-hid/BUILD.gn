@@ -29,7 +29,7 @@ fuchsia_driver("i2c-hid-driver") {
   sources = [ "i2c-hid.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
@@ -61,7 +61,7 @@ test("i2c-hid-test") {
   deps = [
     ":i2c_hid_bind",
     "//sdk/banjo/fuchsia.hardware.hidbus:fuchsia.hardware.hidbus_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp_wire",
+    "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_cpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",

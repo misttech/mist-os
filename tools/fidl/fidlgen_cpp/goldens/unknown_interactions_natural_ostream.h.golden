@@ -11,6 +11,7 @@
 
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
 #include <lib/fidl/cpp/natural_ostream.h>
+#include <lib/fidl_driver/cpp/natural_ostream.h>
 
 #include <iostream>
 
@@ -940,6 +941,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_unknowninteractions::Unk
 
 }  // namespace test_unknowninteractions
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsProtocol>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_unknowninteractions::UnknownInteractionsProtocol>& value) {
@@ -1094,7 +1097,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>>::Format(os, value);
 }
+}  // namespace fdf
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fdf

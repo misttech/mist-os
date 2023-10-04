@@ -9,7 +9,7 @@ executable("bin") {
   sources = [ "main.cc" ]
 
   deps = [
-    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp_wire",
+    "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/fidl",

@@ -14,8 +14,8 @@ source_set("devfs_fidl") {
   deps = [ "//src/lib/ddktl" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/fidl/cpp/wire",
     "//src/lib/ddk",
   ]
@@ -26,6 +26,8 @@ test("test") {
   sources = [ "test.cc" ]
   deps = [
     ":devfs_fidl",
+    "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_testing",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_testing",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",

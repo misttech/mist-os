@@ -29,7 +29,7 @@ fuchsia_driver("ddk-environment-test-driver") {
   ]
   sources = [ "test-driver.cc" ]
   deps = [
-    ":fuchsia.device.environment.test_cpp_wire",
+    ":fuchsia.device.environment.test_cpp",
     ":test-environment-bind",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:backend",
@@ -51,7 +51,7 @@ fuchsia_driver_component("ddk-environment-test") {
 test("ddk-environment") {
   sources = [ "test.cc" ]
   deps = [
-    ":fuchsia.device.environment.test_cpp_wire",
+    ":fuchsia.device.environment.test_cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/ddk",
     "//zircon/system/ulib/zx",

@@ -22,6 +22,8 @@ namespace test_foreigntypeinresponseusedthroughcompose {
 
 }  // namespace test_foreigntypeinresponseusedthroughcompose
 
+#ifdef __Fuchsia__
+
 template <>
 struct fidl::ostream::Formatter<::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>> {
   static std::ostream& Format(std::ostream& os, const ::fidl::ClientEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
@@ -49,7 +51,8 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>>::Format(os, value);
 }
+}  // namespace fidl
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop
-
-}  // namespace fidl

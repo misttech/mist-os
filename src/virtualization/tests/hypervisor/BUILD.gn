@@ -25,8 +25,8 @@ executable("hypervisor_integration_tests") {
     ]
   }
   deps = [
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
-    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/lib/fxl/test:test_settings",
     "//src/virtualization/bin/vmm:bits",

@@ -101,7 +101,7 @@ zx_library("syslog") {
   ]
   deps = [
     ":helpers",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp_wire",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog:client_includes",
     "//sdk/lib/syslog/cpp:cpp-macros",
@@ -164,7 +164,7 @@ _test_sources = [
 
 _test_deps = [
   ":helpers",
-  "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp_wire",
+  "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/zx",
   "//zircon/system/ulib/zxtest",

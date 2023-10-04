@@ -50,38 +50,41 @@ config("cpp_base.headers") {
 # The IPC library that adds messaging APIs on top of domain objects.
 #
 # It is Fuchsia-only.
-sdk_source_set("cpp") {
-  category = "partner"
+if (is_fuchsia) {
+  sdk_source_set("cpp") {
+    category = "partner"
 
-  # TODO(fxbug.dev/104801): Rename SDK element to "fidl_cpp".
-  api = "fidl_cpp_v2.api"
-  sdk_name = "fidl_cpp_v2"
+    # TODO(fxbug.dev/104801): Rename SDK element to "fidl_cpp".
+    api = "fidl_cpp_v2.api"
+    sdk_name = "fidl_cpp_v2"
 
-  # TODO(fxbug.dev/90775): We should represent the library as a
-  # `sdk_static_library` when supported.
-  build_as_static = true
+    # TODO(fxbug.dev/90775): We should represent the library as a
+    # `sdk_static_library` when supported.
+    build_as_static = true
 
-  public = [
-    "include/lib/fidl/cpp/any_error_in.h",
-    "include/lib/fidl/cpp/channel.h",
-    "include/lib/fidl/cpp/client.h",
-    "include/lib/fidl/cpp/internal/channel_endpoint_conversions.h",
-    "include/lib/fidl/cpp/internal/client_details.h",
-    "include/lib/fidl/cpp/internal/make_response_context.h",
-    "include/lib/fidl/cpp/internal/natural_client_base.h",
-    "include/lib/fidl/cpp/internal/natural_message_encoder.h",
-    "include/lib/fidl/cpp/internal/thenable.h",
-    "include/lib/fidl/cpp/unified_messaging.h",
-    "include/lib/fidl/cpp/unified_messaging_declarations.h",
-  ]
-  sources = [
-    "any_error_in.cc",
-    "internal/natural_message_encoder.cc",
-  ]
-  public_deps = [
-    "//sdk/lib/fidl_base",
-    "//src/lib/fidl/cpp:cpp_base",
-  ]
+    public = [
+      "include/lib/fidl/cpp/any_error_in.h",
+      "include/lib/fidl/cpp/channel.h",
+      "include/lib/fidl/cpp/client.h",
+      "include/lib/fidl/cpp/internal/channel_endpoint_conversions.h",
+      "include/lib/fidl/cpp/internal/client_details.h",
+      "include/lib/fidl/cpp/internal/make_response_context.h",
+      "include/lib/fidl/cpp/internal/natural_client_base.h",
+      "include/lib/fidl/cpp/internal/natural_message_encoder.h",
+      "include/lib/fidl/cpp/internal/thenable.h",
+      "include/lib/fidl/cpp/unified_messaging.h",
+      "include/lib/fidl/cpp/unified_messaging_declarations.h",
+    ]
+    sources = [
+      "any_error_in.cc",
+      "internal/natural_message_encoder.cc",
+    ]
+    public_deps = [
+      "//sdk/lib/fidl_base",
+      "//src/lib/fidl/cpp:cpp_base",
+      "//zircon/system/ulib/async",
+    ]
+  }
 }
 
 # The support header for HLCPP / Natural conversion

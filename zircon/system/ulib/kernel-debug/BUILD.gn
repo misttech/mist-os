@@ -9,7 +9,7 @@ zx_library("kernel-debug") {
   sdk_headers = [ "lib/kernel-debug/kernel-debug.h" ]
   sources = [ "kernel-debug.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp_wire",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]

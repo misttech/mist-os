@@ -37,7 +37,7 @@ fuchsia_driver("root-driver") {
   sources = [ "root-driver.cc" ]
   deps = [
     ":composite.test.lib_cpp",
-    ":fuchsia.runtime.composite.test_cpp_driver",
+    ":fuchsia.runtime.composite.test_cpp",
     ":root-driver-bind",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -66,7 +66,7 @@ fuchsia_driver("leaf-driver") {
   sources = [ "leaf-driver.cc" ]
   deps = [
     ":composite.test.lib_cpp",
-    ":fuchsia.runtime.composite.test_cpp_driver",
+    ":fuchsia.runtime.composite.test_cpp",
     ":leaf-driver-bind",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
@@ -95,7 +95,7 @@ fuchsia_driver("composite-driver") {
   sources = [ "composite-driver.cc" ]
   deps = [
     ":composite-bind",
-    ":fuchsia.runtime.composite.test_cpp_driver",
+    ":fuchsia.runtime.composite.test_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/lib/driver",

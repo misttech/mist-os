@@ -73,6 +73,9 @@
   {{- end }}
 
   {{- range .Structs }}
+    {{- if .IsResourceType }}
+      {{- IfdefFuchsia }}
+    {{- end }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}";
       os << "{ ";
@@ -83,9 +86,15 @@
       os << "}";
       return os;
     }
+    {{- if .IsResourceType }}
+      {{- EndifFuchsia -}}
+    {{- end }}
   {{- end }}
 
   {{- range .Tables }}
+    {{- if .IsResourceType }}
+      {{- IfdefFuchsia }}
+    {{- end }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}";
       os << "{ ";
@@ -98,9 +107,15 @@
       os << "}";
       return os;
     }
+    {{- if .IsResourceType }}
+      {{- EndifFuchsia -}}
+    {{- end }}
   {{- end }}
 
   {{- range .Unions }}
+    {{- if .IsResourceType }}
+      {{- IfdefFuchsia }}
+    {{- end }}
     std::ostream& fidl::ostream::Formatter<{{ . }}>::Format(std::ostream& os, const {{ . }}& value) {
       os << "{{ .NoLeading }}::";
       switch (value.Which()) {
@@ -114,14 +129,23 @@
       }
       return os;
     }
+    {{- if .IsResourceType }}
+      {{- EndifFuchsia -}}
+    {{- end }}
   {{- end }}
 
   {{ range .Decls }}
     {{- if and (ne .Kind Kinds.Const) (ne .Kind Kinds.Protocol) (ne .Kind Kinds.Service) }}
       {{- EnsureNamespace . }}
+      {{- if .IsResourceType }}
+        {{- IfdefFuchsia }}
+      {{- end }}
       std::ostream& operator<<(std::ostream& os, const {{ . }}& value) {
         return fidl::ostream::Formatter<{{ . }}>::Format(os, value);
       }
+      {{- if .IsResourceType }}
+        {{- EndifFuchsia -}}
+      {{- end }}
     {{- end }}
   {{- end }}
 
