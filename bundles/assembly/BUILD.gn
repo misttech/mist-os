@@ -1913,6 +1913,24 @@ assembly_input_bundle("netstack_migration_packages_gub") {
   base_packages = [ "//src/connectivity/network:netstack-migration_gub" ]
 }
 
+# Includes network-tun functionality.
+assembly_input_bundle("network_tun") {
+  flexible_packages = [ "//src/connectivity/network/tun/network-tun" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/network/tun/network-tun/meta/network-tun.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # WLAN base support
 #
 # feature_set_levels: utility, minimal

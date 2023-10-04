@@ -82,6 +82,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "network_realm",
     "network_realm_packages",
     "network_realm_packages_gub",
+    "network_tun",
     "networking_basic",
     "networking_basic_packages",
     "networking_basic_packages_gub",

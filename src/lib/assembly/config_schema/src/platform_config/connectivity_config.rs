@@ -39,6 +39,10 @@ pub struct PlatformNetworkConfig {
     /// optimizations.
     #[serde(default)]
     pub use_unified_binary: bool,
+
+    /// Whether to include network-tun.
+    #[serde(default)]
+    pub include_tun: bool,
 }
 
 /// Network stack version to use.

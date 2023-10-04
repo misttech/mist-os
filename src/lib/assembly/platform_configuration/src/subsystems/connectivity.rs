@@ -143,6 +143,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                     builder.platform_bundle("wlan_softmac_support");
                 }
             }
+
+            if connectivity_config.network.include_tun {
+                builder.platform_bundle("network_tun");
+            }
         }
 
         Ok(())

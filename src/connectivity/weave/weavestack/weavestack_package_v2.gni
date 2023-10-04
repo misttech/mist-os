@@ -58,8 +58,6 @@ template("_weavestack_package_v2") {
 
   core_shard("weavestack-core-shard") {
     shard_file = invoker.component_shard_file
-    deps =
-        [ "//src/connectivity/network/tun/network-tun:network-tun-core-shard" ]
   }
 }
 
