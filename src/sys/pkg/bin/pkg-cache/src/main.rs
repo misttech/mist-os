@@ -123,7 +123,7 @@ async fn main_inner() -> Result<(), Error> {
         (config.use_fxblob, config.use_system_image)
     };
 
-    let mut package_index = PackageIndex::new(inspector.root().create_child("index"));
+    let mut package_index = PackageIndex::new();
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
@@ -178,6 +178,7 @@ async fn main_inner() -> Result<(), Error> {
     let base_packages = Arc::new(base_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
+    inspector.root().record_lazy_child("index", PackageIndex::record_lazy_inspect(&package_index));
     let scope = vfs::execution_scope::ExecutionScope::new();
     let (cobalt_sender, cobalt_fut) = ProtocolConnector::new_with_buffer_size(
         CobaltConnectedService,
@@ -363,11 +364,9 @@ async fn shell_commands_bin_dir(
 ) -> anyhow::Result<fio::DirectoryProxy> {
     let (client, server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().context("create proxy")?;
-    let Some(hash) = base_packages.get(
-        &"fuchsia-pkg://fuchsia.com/shell-commands"
-            .parse()
-            .expect("valid url")
-        ) else {
+    let Some(hash) =
+        base_packages.get(&"fuchsia-pkg://fuchsia.com/shell-commands".parse().expect("valid url"))
+    else {
         tracing::warn!(
             "no 'shell-commands' package in base, so exposed 'shell-commands-bin' directory will \
              close connections"

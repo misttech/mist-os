@@ -4,15 +4,12 @@
 
 use {
     anyhow::anyhow,
-    fuchsia_inspect::{self as finspect, Property as _},
+    fuchsia_inspect::{self as finspect},
     fuchsia_merkle::Hash,
     fuchsia_pkg::PackagePath,
     fuchsia_zircon as zx,
     futures::StreamExt as _,
-    std::{
-        collections::{HashMap, HashSet},
-        convert::TryInto,
-    },
+    std::collections::{HashMap, HashSet},
     system_image::CachePackages,
     tracing::{error, warn},
 };
@@ -22,14 +19,13 @@ const CACHE_PACKAGE_LOADING_CONCURRENCY: usize = 100;
 /// Warn if loading cache packages takes longer than this.
 const CACHE_PACKAGE_LOADING_WARN_DURATION: zx::Duration = zx::Duration::from_millis(500);
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DynamicIndex {
-    /// map of package hash to package name, variant and set of blob hashes it needs.
-    packages: HashMap<Hash, PackageWithInspect>,
+    /// contains the active packages and packages still being cached that will become active when
+    /// complete.
+    packages: HashMap<Hash, Package>,
     /// map of package path to most recently activated package hash.
     active_packages: HashMap<PackagePath, Hash>,
-    /// The index's root node.
-    node: finspect::Node,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -55,17 +51,13 @@ pub enum AddBlobsError {
 }
 
 impl DynamicIndex {
-    pub fn new(node: finspect::Node) -> Self {
-        DynamicIndex { node, ..Default::default() }
+    pub fn new() -> Self {
+        Default::default()
     }
 
     #[cfg(test)]
     pub fn packages(&self) -> HashMap<Hash, Package> {
-        let mut package_map = HashMap::new();
-        for (key, val) in &self.packages {
-            package_map.insert(*key, val.package.clone());
-        }
-        package_map
+        self.packages.clone()
     }
 
     /// Returns a snapshot of all active packages and their hashes.
@@ -76,38 +68,7 @@ impl DynamicIndex {
 
     /// True iff the package is active in the dynamic index.
     pub fn is_active(&self, hash: &Hash) -> bool {
-        matches!(
-            self.packages.get(hash),
-            Some(PackageWithInspect { package: Package::Active { .. }, .. })
-        )
-    }
-
-    fn make_package_node(&mut self, package: &Package, hash: &Hash) -> PackageNode {
-        let child_node = self.node.create_child(hash.to_string());
-
-        match package {
-            Package::Pending => PackageNode::Pending {
-                state: child_node.create_string("state", "pending"),
-                time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
-                node: child_node,
-            },
-            Package::WithMetaFar { path, required_blobs } => PackageNode::WithMetaFar {
-                state: child_node.create_string("state", "with_meta_far"),
-                path: child_node.create_string("path", format!("{path}")),
-                time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
-                required_blobs: child_node
-                    .create_int("required_blobs", required_blobs.len().try_into().unwrap_or(-1)),
-                node: child_node,
-            },
-            Package::Active { path, required_blobs } => PackageNode::Active {
-                state: child_node.create_string("state", "active"),
-                path: child_node.create_string("path", format!("{path}")),
-                time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
-                required_blobs: child_node
-                    .create_int("required_blobs", required_blobs.len().try_into().unwrap_or(-1)),
-                node: child_node,
-            },
-        }
+        matches!(self.packages.get(hash), Some(Package::Active { .. }))
     }
 
     // Add the given package to the dynamic index.
@@ -121,14 +82,12 @@ impl DynamicIndex {
                 }
             }
         }
-
-        let package_node = self.make_package_node(&package, &hash);
-        self.packages.insert(hash, PackageWithInspect { package, package_node });
+        self.packages.insert(hash, package);
     }
 
     /// Returns the content blobs associated with the given package hash, if known.
     pub fn lookup_content_blobs(&self, package_hash: &Hash) -> Option<&HashSet<Hash>> {
-        self.packages.get(package_hash)?.package.content_blobs()
+        self.packages.get(package_hash)?.content_blobs()
     }
 
     /// Returns all blobs protected by the dynamic index.
@@ -136,7 +95,7 @@ impl DynamicIndex {
         self.packages
             .iter()
             .flat_map(|(hash, package)| {
-                let blobs = match &package.package {
+                let blobs = match &package {
                     Package::Pending => None,
                     Package::WithMetaFar { required_blobs, .. } => Some(required_blobs.iter()),
                     Package::Active { required_blobs, .. } => Some(required_blobs.iter()),
@@ -150,18 +109,7 @@ impl DynamicIndex {
     /// Notifies dynamic index that the given package is going to be installed, to keep the meta
     /// far blob protected.
     pub fn start_install(&mut self, package_hash: Hash) {
-        let Self { packages, node, .. } = self;
-        packages.entry(package_hash).or_insert_with(|| {
-            let child_node = node.create_child(package_hash.to_string());
-            PackageWithInspect {
-                package: Package::Pending,
-                package_node: PackageNode::Pending {
-                    state: child_node.create_string("state", "pending"),
-                    time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
-                    node: child_node,
-                },
-            }
-        });
+        self.packages.entry(package_hash).or_insert(Package::Pending);
     }
 
     /// Notifies dynamic index that the given package's meta far is now present in blobfs,
@@ -169,22 +117,19 @@ impl DynamicIndex {
     /// calls to `add_blobs`.
     pub fn fulfill_meta_far(
         &mut self,
-        package_hash: Hash,
-        package_path: PackagePath,
+        hash: Hash,
+        path: PackagePath,
     ) -> Result<(), FulfillNotNeededBlobError> {
-        if let Some(wrong_state) = match self.packages.get(&package_hash).map(|pwi| &pwi.package) {
+        if let Some(wrong_state) = match &self.packages.get(&hash) {
             Some(Package::Pending) => None,
             None => Some("missing"),
             Some(Package::Active { .. }) => Some("Active"),
             Some(Package::WithMetaFar { .. }) => Some("WithMetaFar"),
         } {
-            return Err(FulfillNotNeededBlobError { hash: package_hash, state: wrong_state });
+            return Err(FulfillNotNeededBlobError { hash, state: wrong_state });
         }
 
-        self.add_package(
-            package_hash,
-            Package::WithMetaFar { path: package_path, required_blobs: HashSet::new() },
-        );
+        self.add_package(hash, Package::WithMetaFar { path, required_blobs: HashSet::new() });
 
         Ok(())
     }
@@ -196,79 +141,37 @@ impl DynamicIndex {
         additional_blobs: &HashSet<Hash>,
     ) -> Result<(), AddBlobsError> {
         match self.packages.get_mut(&package_hash) {
-            Some(PackageWithInspect {
-                package: Package::WithMetaFar { required_blobs, .. },
-                package_node,
-            }) => {
+            Some(Package::WithMetaFar { required_blobs, .. }) => {
                 required_blobs.extend(additional_blobs);
-                if let PackageNode::WithMetaFar {
-                    required_blobs: inspect_required_blobs,
-                    time,
-                    ..
-                } = package_node
-                {
-                    inspect_required_blobs.set(required_blobs.len() as i64);
-                    time.set(zx::Time::get_monotonic().into_nanos());
-                } else {
-                    error!(
-                        "dynamic index state for package {} was WithMetaFar but inspect state \
-                         was {:?}",
-                        package_hash, package_node
-                    );
-                }
+                Ok(())
             }
-            Some(PackageWithInspect { package, .. }) => {
-                return Err(AddBlobsError::WrongState(package.state_str()));
-            }
-            None => {
-                return Err(AddBlobsError::UnknownPackage);
-            }
+            Some(package) => Err(AddBlobsError::WrongState(package.state_str())),
+            None => Err(AddBlobsError::UnknownPackage),
         }
-        Ok(())
     }
 
     /// Notifies dynamic index that the given package has completed installation.
     pub fn complete_install(&mut self, package_hash: Hash) -> Result<(), CompleteInstallError> {
         match self.packages.get_mut(&package_hash) {
-            Some(PackageWithInspect {
-                package: package @ Package::WithMetaFar { .. },
-                package_node,
-            }) => {
-                if let Package::WithMetaFar { path, required_blobs } =
+            Some(package @ Package::WithMetaFar { .. }) => {
+                let Package::WithMetaFar { path, required_blobs } =
                     std::mem::replace(package, Package::Pending)
-                {
-                    let child_node = self.node.create_child(package_hash.to_string());
-                    let required_blobs_size = required_blobs.len().try_into().unwrap_or(-1);
-                    *package = Package::Active { path: path.clone(), required_blobs };
-                    *package_node = PackageNode::Active {
-                        state: child_node.create_string("state", "active"),
-                        path: child_node.create_string("path", format!("{path}")),
-                        required_blobs: child_node
-                            .create_int("required_blobs", required_blobs_size),
-                        time: child_node.create_int("time", zx::Time::get_monotonic().into_nanos()),
-                        node: child_node,
-                    };
-
-                    if let Some(previous_package) = self.active_packages.insert(path, package_hash)
-                    {
-                        self.packages.remove(&previous_package);
-                    }
-                } else {
-                    unreachable!()
+                else {
+                    unreachable!("outer match guarantees `package` is a WithMetaFar");
+                };
+                *package = Package::Active { path: path.clone(), required_blobs };
+                if let Some(previous_package) = self.active_packages.insert(path, package_hash) {
+                    self.packages.remove(&previous_package);
                 }
+                Ok(())
             }
-            package => {
-                return Err(CompleteInstallError::UnexpectedPackageState(
-                    package.map(|pwi| pwi.package.to_owned()),
-                ));
-            }
+            package => Err(CompleteInstallError::UnexpectedPackageState(package.cloned())),
         }
-        Ok(())
     }
 
     /// Notifies dynamic index that the given package installation has been canceled.
     pub fn cancel_install(&mut self, package_hash: &Hash) {
-        match self.packages.get(package_hash).map(|pwi| &pwi.package) {
+        match self.packages.get(package_hash) {
             Some(Package::Pending) | Some(Package::WithMetaFar { .. }) => {
                 self.packages.remove(package_hash);
             }
@@ -278,6 +181,23 @@ impl DynamicIndex {
             None => {
                 error!("Unable to cancel install for unknown package {}", package_hash);
             }
+        }
+    }
+
+    /// Records self to `node`.
+    pub fn record_inspect(&self, node: &finspect::Node) {
+        for (hash, state) in &self.packages {
+            node.record_child(hash.to_string(), |n| {
+                n.record_string("state", state.state_str());
+                match state {
+                    Package::Pending => (),
+                    Package::WithMetaFar { path, required_blobs }
+                    | Package::Active { path, required_blobs } => {
+                        n.record_string("path", path.to_string());
+                        n.record_uint("required_blobs", required_blobs.len() as u64);
+                    }
+                }
+            })
         }
     }
 }
@@ -384,35 +304,6 @@ async fn load_cache_packages_impl(
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
-pub enum PackageNode {
-    Pending {
-        node: finspect::Node,
-        state: finspect::StringProperty,
-        time: finspect::IntProperty,
-    },
-    WithMetaFar {
-        node: finspect::Node,
-        state: finspect::StringProperty,
-        path: finspect::StringProperty,
-        required_blobs: finspect::IntProperty,
-        time: finspect::IntProperty,
-    },
-    Active {
-        node: finspect::Node,
-        state: finspect::StringProperty,
-        path: finspect::StringProperty,
-        required_blobs: finspect::IntProperty,
-        time: finspect::IntProperty,
-    },
-}
-
-#[derive(Debug, Eq, PartialEq)]
-struct PackageWithInspect {
-    package: Package,
-    package_node: PackageNode,
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Package {
     /// Only the package hash is known, meta.far isn't available yet.
@@ -464,8 +355,7 @@ mod tests {
 
     #[test]
     fn test_is_active() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
         dynamic_index.add_package(
             Hash::from([2; 32]),
@@ -495,8 +385,7 @@ mod tests {
 
     #[test]
     fn test_all_blobs() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
         assert_eq!(dynamic_index.all_blobs(), HashSet::new());
 
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
@@ -535,8 +424,7 @@ mod tests {
 
     #[test]
     fn lookup_content_blobs_handles_withmetafar_and_active_states() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         dynamic_index.add_package(Hash::from([1; 32]), Package::Pending);
         dynamic_index.add_package(
@@ -574,8 +462,7 @@ mod tests {
 
     #[test]
     fn test_complete_install() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let path = PackagePath::from_name_and_variant(
@@ -612,8 +499,7 @@ mod tests {
 
     #[test]
     fn complete_install_unknown_package() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         assert_matches!(
             dynamic_index.complete_install(Hash::from([2; 32])),
@@ -623,8 +509,7 @@ mod tests {
 
     #[test]
     fn complete_install_pending_package() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         dynamic_index.add_package(hash, Package::Pending);
@@ -636,8 +521,7 @@ mod tests {
 
     #[test]
     fn complete_install_active_package() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let package = Package::Active {
@@ -656,8 +540,7 @@ mod tests {
 
     #[test]
     fn start_install() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         dynamic_index.start_install(hash);
@@ -667,8 +550,7 @@ mod tests {
 
     #[test]
     fn start_install_do_not_overwrite() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let package = Package::WithMetaFar {
@@ -687,8 +569,7 @@ mod tests {
 
     #[test]
     fn cancel_install() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         dynamic_index.start_install(hash);
@@ -699,8 +580,7 @@ mod tests {
 
     #[test]
     fn cancel_install_with_meta_far() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         dynamic_index.add_package(
@@ -719,8 +599,7 @@ mod tests {
 
     #[test]
     fn cancel_install_active() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let path = PackagePath::from_name_and_variant(
@@ -739,8 +618,7 @@ mod tests {
 
     #[test]
     fn cancel_install_unknown() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         dynamic_index.start_install(Hash::from([2; 32]));
         dynamic_index.cancel_install(&Hash::from([4; 32]));
@@ -842,8 +720,7 @@ mod tests {
             ),
         ]);
 
-        let mut dynamic_index =
-            DynamicIndex::new(finspect::Inspector::default().root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let () = load_cache_packages(&mut dynamic_index, &cache_packages, &blobfs.client()).await;
 
@@ -894,8 +771,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_transitions_package_from_pending_to_with_meta_far() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let path = PackagePath::from_name_and_variant(
@@ -920,8 +796,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_unknown_package() {
-        let inspector = finspect::Inspector::default();
-        let mut index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut index = DynamicIndex::new();
 
         assert_matches!(
             index
@@ -939,8 +814,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_package_with_meta_far() {
-        let inspector = finspect::Inspector::default();
-        let mut index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let path = PackagePath::from_name_and_variant(
@@ -958,8 +832,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn fulfill_meta_far_fails_on_active_package() {
-        let inspector = finspect::Inspector::default();
-        let mut index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut index = DynamicIndex::new();
 
         let hash = Hash::from([2; 32]);
         let path =
@@ -976,8 +849,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn add_blobs_adds_blobs() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
         let hash = Hash::from([0; 32]);
         let path = PackagePath::from_name_and_variant(
             "fake-package".parse().unwrap(),
@@ -1001,8 +873,7 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn add_blobs_errors_on_unknown_package() {
-        let inspector = finspect::Inspector::default();
-        let mut dynamic_index = DynamicIndex::new(inspector.root().create_child("index"));
+        let mut dynamic_index = DynamicIndex::new();
 
         assert_matches!(
             dynamic_index.add_blobs(Hash::from([0; 32]), &hashset! { Hash::from([1; 32])}),

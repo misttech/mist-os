@@ -4,121 +4,33 @@
 
 use {
     fuchsia_hash::Hash,
-    fuchsia_inspect::{self as finspect, NumericProperty, Property},
-    fuchsia_zircon as zx,
+    fuchsia_inspect::{self as finspect},
     std::collections::{HashMap, HashSet},
 };
 
 /// An index of packages considered to be part of a new system's base package set.
-#[derive(Debug)]
-#[cfg_attr(test, derive(Default, PartialEq, Eq))]
+#[derive(Clone, Debug, Default)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct RetainedIndex {
     /// Map from package hash to content and subpackage blobs (meta.fars and content blobs of
     /// all subpackages, plus the subpackages' subpackage blobs, recursively), if known.
     /// If the package is not cached (or is in the process of being cached), the list of
     /// content and subpackage blobs may not be complete.
-    packages: HashMap<Hash, RetainedHashes>,
-
-    /// Inspect nodes and properties for the retained index.
-    inspect: RetainedIndexInspect,
-}
-
-#[derive(Debug, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-struct RetainedIndexInspect {
-    /// Inspect node for the index.
-    // TODO(fxbug.dev/84729)
-    #[allow(unused)]
-    inspect_node: finspect::Node,
-
-    /// Inspect node for the inspect packages collection.
-    /// Child nodes in it are created with package hash as a key.
-    packages_inspect_node: finspect::Node,
-
-    /// Inspect property for the timestamp when the retained index was updated.
-    last_set: finspect::IntProperty,
-
-    /// Inspect property for the sequential generation number of the retained index.
-    generation: finspect::UintProperty,
-}
-
-#[derive(Debug, Default)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-struct RetainedHashes {
-    /// Content and subpackage blobs to be protected from GC. None if no hashes have been added
-    /// yet, i.e. if the package's meta.far was not available when the package was added to the
-    /// index. Some if at least some of the required blobs are known.
+    /// Value will be None if no hashes have been added yet, i.e. if the package's meta.far was not
+    /// available when the package was added to the index.
+    /// Value will be Some if at least some of the required blobs are known.
     /// TODO(fxbug.dev/112568) Explicitly model the intermediate state in which the meta.far is
     /// cached but not all subpackage meta.fars are cached. The blobs cached in the intermediate
     /// state are protected from GC (serve_needed_blobs gives MissingBlobs a callback that adds
     /// blobs to the retained index as they are encountered in the caching process), but this could
     /// be made more obvious with more specific types.
-    hashes: Option<HashSet<Hash>>,
-
-    /// Inspect node for the package.
-    inspect_node: finspect::Node,
-
-    /// Inspect property for last timestamp the index was updated.
-    last_set: finspect::IntProperty,
-
-    /// Inspect node for the package state.
-    /// May be either "need-meta-far" or "known".
-    state: finspect::StringProperty,
-
-    /// Inspect node for number of blobs in the package, if known.
-    blobs_count: finspect::UintProperty,
-}
-
-#[cfg(test)]
-impl Clone for RetainedIndex {
-    fn clone(&self) -> Self {
-        let inspect = RetainedIndexInspect::default();
-        RetainedIndex { packages: self.packages.clone(), inspect }
-    }
-}
-
-#[cfg(test)]
-impl Clone for RetainedHashes {
-    fn clone(&self) -> Self {
-        RetainedHashes { hashes: self.hashes.clone(), ..Default::default() }
-    }
-}
-
-impl RetainedHashes {
-    fn add_hashes(&mut self, new_hashes: &HashSet<Hash>) {
-        self.last_set.set(zx::Time::get_monotonic().into_nanos());
-        self.state.set("known");
-        let count = if let Some(hashes) = &mut self.hashes {
-            hashes.extend(new_hashes);
-            hashes.len()
-        } else {
-            self.hashes = Some(new_hashes.clone());
-            new_hashes.len()
-        };
-        self.blobs_count = self.inspect_node.create_uint("blobs-count", count as u64);
-    }
-
-    fn set_inspect_node(&mut self, inspect_node: finspect::Node) {
-        self.last_set = inspect_node.create_int("last-set", zx::Time::get_monotonic().into_nanos());
-        if let Some(hashes) = &self.hashes {
-            self.state = inspect_node.create_string("state", "known");
-            self.blobs_count = inspect_node.create_uint("blobs-count", hashes.len() as u64);
-        } else {
-            self.state = inspect_node.create_string("state", "need-meta-far");
-        }
-        self.inspect_node = inspect_node;
-    }
+    packages: HashMap<Hash, Option<HashSet<Hash>>>,
 }
 
 impl RetainedIndex {
-    /// Creates a new, empty instance of the RetainedIndex.
-    pub fn new(inspect_node: finspect::Node) -> Self {
-        let packages_inspect_node = inspect_node.create_child("entries");
-        let generation = inspect_node.create_uint("generation", 0);
-        let last_set = inspect_node.create_int("last-set", zx::Time::get_monotonic().into_nanos());
-        let inspect =
-            RetainedIndexInspect { inspect_node, packages_inspect_node, generation, last_set };
-        Self { packages: HashMap::default(), inspect }
+    /// Creates an empty instance of the RetainedIndex.
+    pub fn new() -> Self {
+        Default::default()
     }
 
     /// Determines if the given meta_hash is tracked by this index.
@@ -136,7 +48,7 @@ impl RetainedIndex {
         let mut res = self
             .packages
             .iter()
-            .filter_map(|(k, v)| match v.hashes {
+            .filter_map(|(k, v)| match v {
                 None => Some(*k),
                 Some(_) => None,
             })
@@ -147,58 +59,43 @@ impl RetainedIndex {
 
     #[cfg(test)]
     pub fn from_packages(packages: HashMap<Hash, Option<HashSet<Hash>>>) -> Self {
-        Self {
-            packages: packages
-                .into_iter()
-                .map(|(hash, hashes)| (hash, RetainedHashes { hashes, ..Default::default() }))
-                .collect(),
-            ..Default::default()
-        }
+        Self { packages }
     }
 
     #[cfg(test)]
     pub fn packages(&self) -> HashMap<Hash, Option<HashSet<Hash>>> {
-        self.packages
-            .iter()
-            .map(|(&hash, packages_entry)| (hash, packages_entry.hashes.clone()))
-            .collect()
+        self.packages.clone()
     }
 
     /// Associates blobs with the given package hash if that package is known to the retained
     /// index, protecting those blobs from garbage collection.
     /// Returns true iff the package is known to this index.
     pub fn add_blobs(&mut self, meta_hash: &Hash, blobs: &HashSet<Hash>) -> bool {
-        let packages_entry = match self.packages.get_mut(meta_hash) {
-            Some(packages_entry) => packages_entry,
-            // `meta_hash` is not a retained package.
-            None => return false,
-        };
-
-        packages_entry.add_hashes(blobs);
-        true
+        match self.packages.get_mut(meta_hash) {
+            Some(required_blobs) => {
+                match required_blobs {
+                    Some(required_blobs) => required_blobs.extend(blobs),
+                    None => *required_blobs = Some(blobs.clone()),
+                }
+                true
+            }
+            None => false,
+        }
     }
 
     /// Replaces this retained index instance with other, populating other's blob sets
     /// using data from `self` when possible.
     pub fn replace(&mut self, mut other: Self) {
-        for (meta_hash, other_packages_entry) in other.packages.iter_mut() {
-            if let Some(this_packages_entry) = self.packages.remove(meta_hash) {
-                if let Some(this_retained_hashes) = this_packages_entry.hashes {
-                    if let Some(ref mut other_retained_hashes) = other_packages_entry.hashes {
-                        other_retained_hashes.extend(this_retained_hashes)
-                    } else {
-                        other_packages_entry.hashes = Some(this_retained_hashes);
-                    }
+        for (meta_hash, other_hashes) in other.packages.iter_mut() {
+            if let Some(Some(this_hashes)) = self.packages.remove(meta_hash) {
+                if let Some(ref mut other_hashes) = other_hashes {
+                    other_hashes.extend(this_hashes)
+                } else {
+                    *other_hashes = Some(this_hashes);
                 }
             }
-            other_packages_entry.set_inspect_node(
-                self.inspect.packages_inspect_node.create_child(meta_hash.to_string()),
-            )
         }
-
         self.packages = other.packages;
-        self.inspect.generation.add(1);
-        self.inspect.last_set.set(zx::Time::get_monotonic().into_nanos());
     }
 
     /// Returns the set of all blobs currently protected by the retained index.
@@ -206,10 +103,26 @@ impl RetainedIndex {
         self.packages
             .iter()
             .flat_map(|(meta_hash, retained_hashes)| {
-                std::iter::once(meta_hash).chain(retained_hashes.hashes.iter().flatten())
+                std::iter::once(meta_hash).chain(retained_hashes.iter().flatten())
             })
             .copied()
             .collect()
+    }
+
+    /// Records self to `node`.
+    pub fn record_inspect(&self, node: &finspect::Node) {
+        node.record_child("entries", |n| {
+            for (hash, state) in &self.packages {
+                n.record_child(hash.to_string(), |n| {
+                    if let Some(blobs) = state {
+                        n.record_string("state", "known");
+                        n.record_uint("blobs-count", blobs.len() as u64);
+                    } else {
+                        n.record_string("state", "need-meta-far");
+                    }
+                })
+            }
+        })
     }
 }
 
@@ -232,12 +145,9 @@ pub async fn populate_retained_index(
         )
         .await
         .ok();
-        let retained_hashes = RetainedHashes { hashes: found, ..Default::default() };
-        packages.insert(*meta_hash, retained_hashes);
+        packages.insert(*meta_hash, found);
     }
-
-    let inspect = RetainedIndexInspect::default();
-    RetainedIndex { packages, inspect }
+    RetainedIndex { packages }
 }
 
 #[cfg(test)]
@@ -245,7 +155,6 @@ mod tests {
     use {
         super::*,
         crate::test_utils::add_meta_far_to_blobfs,
-        diagnostics_assertions::{assert_data_tree, AnyProperty},
         maplit::{hashmap, hashset},
     };
 
@@ -436,37 +345,6 @@ mod tests {
             RetainedIndex::from_packages(hashmap! {
                 hash(2) => Some(HashSet::from_iter([ hash(10), hash(11) ])),
             })
-        );
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn replace_index_sets_inspect() {
-        let inspector = finspect::Inspector::default();
-
-        let mut index = RetainedIndex::new(inspector.root().create_child("test-node"));
-
-        let other = RetainedIndex::from_packages(hashmap! {
-            hash(2) => Some(HashSet::from_iter([hash(10), hash(11)])),
-        });
-
-        index.replace(other);
-
-        let hierarchy = finspect::reader::read(&inspector).await.unwrap();
-        assert_data_tree!(
-            hierarchy,
-            "root": {
-                "test-node": {
-                    "last-set": AnyProperty,
-                    "entries": {
-                        "0202020202020202020202020202020202020202020202020202020202020202": {
-                            "blobs-count": 2u64,
-                            "state": "known",
-                            "last-set": AnyProperty,
-                        }
-                    },
-                    "generation": 1u64,
-                }
-            }
         );
     }
 

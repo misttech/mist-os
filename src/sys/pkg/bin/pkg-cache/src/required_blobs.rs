@@ -99,6 +99,7 @@ pub(crate) fn find_required_blobs_recursive<'a>(
         }
 
         memoized_packages.write().await.insert(*meta_hash, required_blobs.clone());
+        required_blobs.shrink_to_fit();
         Ok(required_blobs)
     }
     .boxed()

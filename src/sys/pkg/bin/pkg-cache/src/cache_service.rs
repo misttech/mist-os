@@ -765,9 +765,7 @@ mod serve_needed_blobs_tests {
 
         let (blobfs, _) = blobfs::Client::new_test();
         let inspector = finspect::Inspector::default();
-        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
-            inspector.root().create_child("test_does_not_use_inspect "),
-        )));
+        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
 
         assert_matches!(
             serve_needed_blobs(
@@ -792,9 +790,7 @@ mod serve_needed_blobs_tests {
 
         let (blobfs, blobfs_mock) = blobfs::Client::new_mock();
         let inspector = finspect::Inspector::default();
-        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
-            inspector.root().create_child("test_does_not_use_inspect "),
-        )));
+        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
 
         (
             Task::spawn(async move {
@@ -2198,9 +2194,7 @@ mod get_handler_tests {
         let meta_blob_info = BlobInfo { blob_id: [0; 32].into(), length: 0 };
         let (blobfs, _) = blobfs::Client::new_test();
         let inspector = fuchsia_inspect::Inspector::default();
-        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new(
-            inspector.root().create_child("test_does_not_use_inspect "),
-        )));
+        let package_index = Arc::new(async_lock::RwLock::new(PackageIndex::new()));
 
         assert_matches::assert_matches!(
             get(
