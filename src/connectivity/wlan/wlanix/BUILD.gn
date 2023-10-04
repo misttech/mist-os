@@ -53,6 +53,7 @@ rustc_binary("wlanix_bin") {
   ]
 
   sources = [
+    "src/ifaces.rs",
     "src/main.rs",
     "src/nl80211/attr/band.rs",
     "src/nl80211/attr/bss.rs",
@@ -61,8 +62,6 @@ rustc_binary("wlanix_bin") {
     "src/nl80211/constants.rs",
     "src/nl80211/mod.rs",
     "src/nl80211/nested.rs",
-    "src/service/mod.rs",
-    "src/service/sme.rs",
   ]
 }
 

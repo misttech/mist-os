@@ -4,24 +4,29 @@
 
 use {
     anyhow::{bail, Context, Error},
-    fidl_fuchsia_wlan_wlanix as fidl_wlanix, fuchsia_async as fasync,
+    fidl_fuchsia_wlan_sme as fidl_sme, fidl_fuchsia_wlan_wlanix as fidl_wlanix,
+    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
     futures::StreamExt,
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
-    std::sync::Arc,
+    std::{
+        convert::{TryFrom, TryInto},
+        sync::Arc,
+    },
     tracing::{error, info, warn},
+    wlan_common::channel::Channel,
 };
 
+mod ifaces;
 #[allow(unused)]
 mod nl80211;
-mod service;
 
 use {
+    ifaces::{ClientIface, IfaceManager},
     nl80211::{Nl80211, Nl80211Attr, Nl80211BandAttr, Nl80211Cmd, Nl80211FrequencyAttr},
-    service::WlanixService,
 };
 
 const FAKE_CHIP_ID: u32 = 1;
@@ -254,11 +259,11 @@ struct SupplicantStaIfaceState {
     callbacks: Vec<fidl_wlanix::SupplicantStaIfaceCallbackProxy>,
 }
 
-async fn handle_supplicant_sta_network_request<S: WlanixService>(
+async fn handle_supplicant_sta_network_request<C: ClientIface>(
     req: fidl_wlanix::SupplicantStaNetworkRequest,
     sta_network_state: Arc<Mutex<SupplicantStaNetworkState>>,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
-    service: &S,
+    iface: Arc<C>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::SupplicantStaNetworkRequest::SetSsid { payload, .. } => {
@@ -271,7 +276,7 @@ async fn handle_supplicant_sta_network_request<S: WlanixService>(
             info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
             let ssid = sta_network_state.lock().ssid.clone();
             let result = match ssid {
-                Some(ssid) => match service.connect_to_network(&ssid[..]).await {
+                Some(ssid) => match iface.connect_to_network(&ssid[..]).await {
                     Ok(connected_result) => {
                         info!("Connected to requested network");
                         let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
@@ -308,10 +313,10 @@ async fn handle_supplicant_sta_network_request<S: WlanixService>(
     Ok(())
 }
 
-async fn serve_supplicant_sta_network<S: WlanixService>(
+async fn serve_supplicant_sta_network<C: ClientIface>(
     reqs: fidl_wlanix::SupplicantStaNetworkRequestStream,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
-    service: &S,
+    iface: Arc<C>,
 ) {
     let sta_network_state = Arc::new(Mutex::new(SupplicantStaNetworkState::default()));
     reqs.for_each_concurrent(None, |req| async {
@@ -321,7 +326,7 @@ async fn serve_supplicant_sta_network<S: WlanixService>(
                     req,
                     Arc::clone(&sta_network_state),
                     Arc::clone(&sta_iface_state),
-                    service,
+                    Arc::clone(&iface),
                 )
                 .await
                 {
@@ -336,10 +341,10 @@ async fn serve_supplicant_sta_network<S: WlanixService>(
     .await;
 }
 
-async fn handle_supplicant_sta_iface_request<S: WlanixService>(
+async fn handle_supplicant_sta_iface_request<C: ClientIface>(
     req: fidl_wlanix::SupplicantStaIfaceRequest,
     sta_iface_state: Arc<Mutex<SupplicantStaIfaceState>>,
-    service: &S,
+    iface: Arc<C>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::SupplicantStaIfaceRequest::RegisterCallback { payload, .. } => {
@@ -355,12 +360,8 @@ async fn handle_supplicant_sta_iface_request<S: WlanixService>(
                     .into_stream()
                     .context("create SupplicantStaNetwork stream")?;
                 // TODO(fxbug.dev/128604): Should we return NetworkAdded event?
-                serve_supplicant_sta_network(
-                    supplicant_sta_network_stream,
-                    sta_iface_state,
-                    service,
-                )
-                .await;
+                serve_supplicant_sta_network(supplicant_sta_network_stream, sta_iface_state, iface)
+                    .await;
             }
         }
         fidl_wlanix::SupplicantStaIfaceRequest::_UnknownMethod { ordinal, .. } => {
@@ -370,17 +371,20 @@ async fn handle_supplicant_sta_iface_request<S: WlanixService>(
     Ok(())
 }
 
-async fn serve_supplicant_sta_iface<S: WlanixService>(
+async fn serve_supplicant_sta_iface<C: ClientIface>(
     reqs: fidl_wlanix::SupplicantStaIfaceRequestStream,
-    service: &S,
+    iface: Arc<C>,
 ) {
     let sta_iface_state = Arc::new(Mutex::new(SupplicantStaIfaceState::default()));
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) =
-                    handle_supplicant_sta_iface_request(req, Arc::clone(&sta_iface_state), service)
-                        .await
+                if let Err(e) = handle_supplicant_sta_iface_request(
+                    req,
+                    Arc::clone(&sta_iface_state),
+                    Arc::clone(&iface),
+                )
+                .await
                 {
                     warn!("Failed to handle SupplicantRequest: {}", e);
                 }
@@ -393,18 +397,26 @@ async fn serve_supplicant_sta_iface<S: WlanixService>(
     .await;
 }
 
-async fn handle_supplicant_request<S: WlanixService>(
+async fn handle_supplicant_request<I: IfaceManager>(
     req: fidl_wlanix::SupplicantRequest,
-    service: &S,
+    iface_manager: Arc<I>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::SupplicantRequest::AddStaInterface { payload, .. } => {
             info!("fidl_wlanix::SupplicantRequest::AddStaInterface");
             if let Some(supplicant_sta_iface) = payload.iface {
-                let supplicant_sta_iface_stream = supplicant_sta_iface
-                    .into_stream()
-                    .context("create SupplicantStaIface stream")?;
-                serve_supplicant_sta_iface(supplicant_sta_iface_stream, service).await;
+                // TODO(fxbug.dev/128604): Actually create the iface.
+                let existing_ifaces = iface_manager.list_interfaces().await?;
+                for iface in existing_ifaces {
+                    if iface.role == fidl_fuchsia_wlan_common::WlanMacRole::Client {
+                        let client_iface = iface_manager.get_client_iface(iface.id).await?;
+                        let supplicant_sta_iface_stream = supplicant_sta_iface
+                            .into_stream()
+                            .context("create SupplicantStaIface stream")?;
+                        serve_supplicant_sta_iface(supplicant_sta_iface_stream, client_iface).await;
+                        break;
+                    }
+                }
             }
         }
         fidl_wlanix::SupplicantRequest::_UnknownMethod { ordinal, .. } => {
@@ -414,14 +426,14 @@ async fn handle_supplicant_request<S: WlanixService>(
     Ok(())
 }
 
-async fn serve_supplicant<S: WlanixService>(
+async fn serve_supplicant<I: IfaceManager>(
     reqs: fidl_wlanix::SupplicantRequestStream,
-    service: &S,
+    iface_manager: Arc<I>,
 ) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_supplicant_request(req, service).await {
+                if let Err(e) = handle_supplicant_request(req, Arc::clone(&iface_manager)).await {
                     warn!("Failed to handle SupplicantRequest: {}", e);
                 }
             }
@@ -466,11 +478,11 @@ fn build_nl80211_done() -> fidl_wlanix::Nl80211Message {
     }
 }
 
-async fn handle_nl80211_message<S: WlanixService>(
+async fn handle_nl80211_message<I: IfaceManager>(
     netlink_message: fidl_wlanix::Nl80211Message,
     responder: fidl_wlanix::Nl80211MessageResponder,
     state: Arc<Mutex<WifiState>>,
-    service: &S,
+    iface_manager: Arc<I>,
 ) -> Result<(), Error> {
     let payload = match netlink_message {
         fidl_wlanix::Nl80211Message {
@@ -518,7 +530,23 @@ async fn handle_nl80211_message<S: WlanixService>(
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
-            service.get_nl80211_interfaces(responder).await?;
+            let ifaces = iface_manager.list_interfaces().await?;
+            let mut resp = vec![];
+            for iface in ifaces {
+                resp.push(build_nl80211_message(
+                    Nl80211Cmd::NewInterface,
+                    vec![
+                        Nl80211Attr::IfaceIndex(iface.id.into()),
+                        // TODO(fxbug.dev/128604): Populate this with the real iface name assigned by netcfg.
+                        Nl80211Attr::IfaceName(IFACE_NAME.to_string()),
+                        Nl80211Attr::Mac(iface.sta_addr),
+                    ],
+                ));
+            }
+            resp.push(build_nl80211_done());
+            responder
+                .send(Ok(nl80211_message_resp(resp)))
+                .context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetProtocolFeatures => {
             info!("Nl80211Cmd::GetProtocolFeatures");
@@ -531,11 +559,52 @@ async fn handle_nl80211_message<S: WlanixService>(
         }
         Nl80211Cmd::TriggerScan => {
             info!("Nl80211Cmd::TriggerScan");
-            service.trigger_nl80211_scan(message.payload.attrs, responder, state).await?;
+            match find_iface_id(&message.payload.attrs[..]) {
+                Some(iface_id) => {
+                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+                    responder
+                        .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                        .context("Failed to ack TriggerScan")?;
+                    match client_iface.trigger_scan().await {
+                        Ok(()) => info!("Passive scan completed successfully"),
+                        Err(e) => error!("Failed to run passive scan: {:?}", e),
+                    }
+                    if let Some(proxy) = state.lock().scan_multicast_proxy.as_ref() {
+                        proxy
+                            .message(fidl_wlanix::Nl80211MulticastMessageRequest {
+                                message: Some(build_nl80211_message(
+                                    Nl80211Cmd::NewScanResults,
+                                    vec![Nl80211Attr::IfaceIndex(iface_id)],
+                                )),
+                                ..Default::default()
+                            })
+                            .context("Failed to send NewScanResults")?;
+                    }
+                }
+                None => bail!("TriggerScan did not include an iface id"),
+            }
         }
         Nl80211Cmd::GetScan => {
             info!("Nl80211Cmd::GetScan");
-            service.get_nl80211_scan(responder)?;
+            match find_iface_id(&message.payload.attrs[..]) {
+                Some(iface_id) => {
+                    let client_iface = iface_manager.get_client_iface(iface_id.try_into()?).await?;
+                    let results = client_iface.get_last_scan_results();
+                    info!("Processing {} scan results", results.len());
+                    let mut resp = vec![];
+                    for result in results {
+                        resp.push(build_nl80211_message(
+                            Nl80211Cmd::NewScanResults,
+                            vec![Nl80211Attr::IfaceIndex(iface_id), convert_scan_result(result)],
+                        ));
+                    }
+                    resp.push(build_nl80211_done());
+                    responder
+                        .send(Ok(nl80211_message_resp(resp)))
+                        .context("Failed to send scan results")?;
+                }
+                None => bail!("TriggerScan did not include an iface id"),
+            }
         }
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
@@ -547,10 +616,41 @@ async fn handle_nl80211_message<S: WlanixService>(
     Ok(())
 }
 
-async fn serve_nl80211<S: WlanixService>(
+fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
+    use crate::nl80211::{ChainSignalAttr, Nl80211BssAttr};
+    let channel = Channel::try_from(result.bss_description.channel).unwrap();
+    let center_freq = channel.get_center_freq().expect("Failed to get center freq").into();
+    Nl80211Attr::Bss(vec![
+        Nl80211BssAttr::Bssid(result.bss_description.bssid),
+        Nl80211BssAttr::Frequency(center_freq),
+        Nl80211BssAttr::InformationElement(result.bss_description.ies),
+        Nl80211BssAttr::LastSeenBoottime(fasync::Time::now().into_nanos() as u64),
+        Nl80211BssAttr::SignalMbm(result.bss_description.rssi_dbm as i32 * 100),
+        Nl80211BssAttr::Capability(result.bss_description.capability_info),
+        Nl80211BssAttr::Status(0),
+        // TODO(fxbug.dev/128604): Determine whether we should provide real chain signals.
+        Nl80211BssAttr::ChainSignal(vec![ChainSignalAttr {
+            id: 0,
+            rssi: result.bss_description.rssi_dbm.into(),
+        }]),
+    ])
+}
+
+fn find_iface_id(attrs: &[Nl80211Attr]) -> Option<u32> {
+    attrs
+        .iter()
+        .filter_map(|attr| match attr {
+            Nl80211Attr::IfaceIndex(idx) => Some(idx),
+            _ => None,
+        })
+        .cloned()
+        .next()
+}
+
+async fn serve_nl80211<I: IfaceManager>(
     mut reqs: fidl_wlanix::Nl80211RequestStream,
     state: Arc<Mutex<WifiState>>,
-    service: &S,
+    iface_manager: Arc<I>,
 ) {
     loop {
         let Some(req) = reqs.next().await else {
@@ -560,9 +660,13 @@ async fn serve_nl80211<S: WlanixService>(
         match req {
             Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, .. }) => {
                 if let Some(message) = payload.message {
-                    if let Err(e) =
-                        handle_nl80211_message(message, responder, Arc::clone(&state), service)
-                            .await
+                    if let Err(e) = handle_nl80211_message(
+                        message,
+                        responder,
+                        Arc::clone(&state),
+                        Arc::clone(&iface_manager),
+                    )
+                    .await
                     {
                         error!("Failed to handle Nl80211 message: {}", e);
                     }
@@ -596,10 +700,10 @@ async fn serve_nl80211<S: WlanixService>(
     }
 }
 
-async fn handle_wlanix_request<S: WlanixService>(
+async fn handle_wlanix_request<I: IfaceManager>(
     req: fidl_wlanix::WlanixRequest,
     state: Arc<Mutex<WifiState>>,
-    service: &S,
+    iface_manager: Arc<I>,
 ) -> Result<(), Error> {
     match req {
         fidl_wlanix::WlanixRequest::GetWifi { payload, .. } => {
@@ -614,14 +718,14 @@ async fn handle_wlanix_request<S: WlanixService>(
             if let Some(supplicant) = payload.supplicant {
                 let supplicant_stream =
                     supplicant.into_stream().context("create Supplicant stream")?;
-                serve_supplicant(supplicant_stream, service).await;
+                serve_supplicant(supplicant_stream, Arc::clone(&iface_manager)).await;
             }
         }
         fidl_wlanix::WlanixRequest::GetNl80211 { payload, .. } => {
             info!("fidl_wlanix::WlanixRequest::GetNl80211");
             if let Some(nl80211) = payload.nl80211 {
                 let nl80211_stream = nl80211.into_stream().context("create Nl80211 stream")?;
-                serve_nl80211(nl80211_stream, Arc::clone(&state), service).await;
+                serve_nl80211(nl80211_stream, Arc::clone(&state), Arc::clone(&iface_manager)).await;
             }
         }
         fidl_wlanix::WlanixRequest::_UnknownMethod { ordinal, .. } => {
@@ -631,15 +735,17 @@ async fn handle_wlanix_request<S: WlanixService>(
     Ok(())
 }
 
-async fn serve_wlanix<S: WlanixService>(
+async fn serve_wlanix<I: IfaceManager>(
     reqs: fidl_wlanix::WlanixRequestStream,
     state: Arc<Mutex<WifiState>>,
-    service: Arc<S>,
+    iface_manager: Arc<I>,
 ) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_wlanix_request(req, Arc::clone(&state), &*service).await {
+                if let Err(e) =
+                    handle_wlanix_request(req, Arc::clone(&state), Arc::clone(&iface_manager)).await
+                {
                     warn!("Failed to handle WlanixRequest: {}", e);
                 }
             }
@@ -651,12 +757,12 @@ async fn serve_wlanix<S: WlanixService>(
     .await;
 }
 
-async fn serve_fidl<S: WlanixService>(service: Arc<S>) -> Result<(), Error> {
+async fn serve_fidl<I: IfaceManager>(iface_manager: Arc<I>) -> Result<(), Error> {
     let mut fs = ServiceFs::new();
     let state = Arc::new(Mutex::new(WifiState::default()));
-    let _ = fs
-        .dir("svc")
-        .add_fidl_service(move |reqs| serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&service)));
+    let _ = fs.dir("svc").add_fidl_service(move |reqs| {
+        serve_wlanix(reqs, Arc::clone(&state), Arc::clone(&iface_manager))
+    });
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(None, |t| async { t.await }).await;
     Ok(())
@@ -671,8 +777,9 @@ async fn main() {
     )
     .expect("Failed to initialize wlanix logs");
     info!("Starting Wlanix");
-    let service = service::sme::SmeService::new().expect("Failed to connect Wlanix to SME");
-    match serve_fidl(Arc::new(service)).await {
+    let iface_manager = ifaces::DeviceMonitorIfaceManager::new()
+        .expect("Failed to connect wlanix to wlandevicemonitor");
+    match serve_fidl(Arc::new(iface_manager)).await {
         Ok(()) => info!("Wlanix exiting cleanly"),
         Err(e) => error!("Wlanix exiting with error: {}", e),
     }
@@ -682,29 +789,23 @@ async fn main() {
 mod tests {
     use {
         super::*,
-        crate::service::ConnectedResult,
-        async_trait::async_trait,
         fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy},
         futures::{pin_mut, task::Poll, Future},
-        ieee80211::Bssid,
+        ifaces::test_utils::TestIfaceManager,
         std::pin::Pin,
         wlan_common::assert_variant,
     };
 
-    #[derive(Default)]
-    struct TestService {
-        connect_to_ssid: Mutex<Option<Vec<u8>>>,
-    }
-    #[async_trait]
-    impl WlanixService for TestService {
-        async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
-            self.connect_to_ssid.lock().replace(ssid.to_vec());
-            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: Bssid([42, 42, 42, 42, 42, 42]) })
-        }
-    }
-
-    fn test_service() -> TestService {
-        TestService::default()
+    // This will only work if the message is a parseable nl80211 message. Some
+    // attributes are currently write only in our NL80211 implementation. If a
+    // write-only attribute is included, this function will panic.
+    fn expect_nl80211_message(message: &fidl_wlanix::Nl80211Message) -> GenlMessage<Nl80211> {
+        assert_eq!(message.message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
+        GenlMessage::deserialize(
+            &NetlinkHeader::default(),
+            &message.payload.as_ref().expect("Message should always have a payload")[..],
+        )
+        .expect("Failed to deserialize genetlink message")
     }
 
     #[test]
@@ -903,8 +1004,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
-        let service = Arc::new(test_service());
-        let test_fut = serve_wlanix(wlanix_stream, wifi_state, service);
+        let iface_manager = Arc::new(TestIfaceManager::new());
+        let test_fut = serve_wlanix(wlanix_stream, wifi_state, iface_manager);
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -941,7 +1042,10 @@ mod tests {
             Poll::Ready(Ok(Ok(())))
         );
 
-        assert_eq!(*test_helper.service.connect_to_ssid.lock(), Some(vec![b'f', b'o', b'o']));
+        assert_eq!(
+            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
+            Some(vec![b'f', b'o', b'o'])
+        );
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
@@ -956,7 +1060,7 @@ mod tests {
         _supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
         supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
         supplicant_sta_iface_callback_stream: fidl_wlanix::SupplicantStaIfaceCallbackRequestStream,
-        service: Arc<TestService>,
+        iface_manager: Arc<TestIfaceManager>,
 
         // Note: keep the executor field last in the struct so it gets dropped last.
         exec: fasync::TestExecutor,
@@ -1011,8 +1115,8 @@ mod tests {
         assert_variant!(result, Ok(()));
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
-        let service = Arc::new(test_service());
-        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&service));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let test_fut = serve_wlanix(wlanix_stream, wifi_state, Arc::clone(&iface_manager));
         let mut test_fut = Box::pin(test_fut);
         assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -1022,7 +1126,7 @@ mod tests {
             _supplicant_sta_iface_proxy: supplicant_sta_iface_proxy,
             supplicant_sta_network_proxy,
             supplicant_sta_iface_callback_stream,
-            service,
+            iface_manager,
             exec,
         };
         (test_helper, test_fut)
@@ -1034,8 +1138,8 @@ mod tests {
         let (proxy, stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("Failed to get proxy and req stream");
         let state = Arc::new(Mutex::new(WifiState::default()));
-        let service = Arc::new(test_service());
-        let wlanix_fut = serve_wlanix(stream, state, service);
+        let iface_manager = Arc::new(TestIfaceManager::new());
+        let wlanix_fut = serve_wlanix(stream, state, iface_manager);
         pin_mut!(wlanix_fut);
         let (nl_proxy, nl_server) =
             create_proxy::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
@@ -1056,8 +1160,8 @@ mod tests {
             create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
 
         let state = Arc::new(Mutex::new(WifiState::default()));
-        let service = test_service();
-        let nl80211_fut = serve_nl80211(stream, state, &service);
+        let iface_manager = Arc::new(TestIfaceManager::new());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
         pin_mut!(nl80211_fut);
 
         let (mcast_client, mut mcast_stream) =
@@ -1083,14 +1187,48 @@ mod tests {
     }
 
     #[test]
+    fn get_interface() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
+        let get_interface_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(get_interface_message),
+            ..Default::default()
+        });
+        pin_mut!(get_interface_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut get_interface_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
+        );
+
+        assert_eq!(responses.len(), 2);
+        let message = expect_nl80211_message(&responses[0]);
+        assert_eq!(message.payload.cmd, Nl80211Cmd::NewInterface);
+        assert!(message.payload.attrs.iter().any(|attr| *attr
+            == Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())));
+        assert!(message.payload.attrs.iter().any(
+            |attr| *attr == Nl80211Attr::Mac(ifaces::test_utils::FAKE_IFACE_RESPONSE.sta_addr)
+        ));
+        assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
+    }
+
+    #[test]
     fn trigger_scan() {
         let mut exec = fasync::TestExecutor::new();
         let (proxy, stream) =
             create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
 
         let state = Arc::new(Mutex::new(WifiState::default()));
-        let service = test_service();
-        let nl80211_fut = serve_nl80211(stream, state, &service);
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
         pin_mut!(nl80211_fut);
 
         let (mcast_client, mut mcast_stream) =
@@ -1109,11 +1247,13 @@ mod tests {
         pin_mut!(next_mcast);
         assert_variant!(exec.run_until_stalled(&mut next_mcast), Poll::Pending);
 
-        let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
+        let trigger_scan_message =
+            build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(0)]);
         let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
             message: Some(trigger_scan_message),
             ..Default::default()
         });
+
         pin_mut!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         let responses = assert_variant!(
@@ -1132,5 +1272,34 @@ mod tests {
             GenlMessage::<Nl80211>::deserialize(&NetlinkHeader::default(), &payload[..])
                 .expect("Failed to deserialize payload");
         assert_eq!(deser_msg.payload.cmd, Nl80211Cmd::NewScanResults);
+    }
+
+    #[test]
+    fn get_scan_results() {
+        let mut exec = fasync::TestExecutor::new();
+        let (proxy, stream) =
+            create_proxy_and_stream::<fidl_wlanix::Nl80211Marker>().expect("Failed to get proxy");
+
+        let state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new_with_client());
+        let nl80211_fut = serve_nl80211(stream, state, iface_manager);
+        pin_mut!(nl80211_fut);
+
+        let get_scan_message =
+            build_nl80211_message(Nl80211Cmd::GetScan, vec![Nl80211Attr::IfaceIndex(0)]);
+        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
+            message: Some(get_scan_message),
+            ..Default::default()
+        });
+
+        pin_mut!(get_scan_fut);
+        assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
+        let responses = assert_variant!(
+            exec.run_until_stalled(&mut get_scan_fut),
+            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
+        );
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
+        assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
     }
 }
