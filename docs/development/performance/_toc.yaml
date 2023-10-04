@@ -28,3 +28,5 @@ toc:
   path: /docs/development/performance/documenting_tests.md
 - title: "Chromeperf uploading and config"
   path: /docs/development/performance/chromeperf_uploading_config.md
+- title: "FAQ"
+  path: /docs/development/performance/faq.md
