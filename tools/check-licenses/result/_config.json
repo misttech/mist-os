@@ -30,6 +30,7 @@
         "name": "AllProjectsMustHaveALicense",
         "allowlist": {
           "prebuilt/third_party/black/linux-x64": true,
+          "third_party/tink/cc/third_party/boringssl_fips": true,
           "prebuilt/drivers/wlan/intel/iwlwifi": true,
           "prebuilt/audio/config": true,
           "prebuilt/drivers/wlan/intel/iwlwifi": true,
@@ -178,6 +179,8 @@
           "vendor": true,
           "zircon/third_party": true,
           "third_party/golibs/vendor": true,
+          "third_party/tink/cc/third_party": true,
+          "third_party/tink/cc/integration/awskms/third_party": true,
           "third_party/syzkaller": true
         }
       },
@@ -186,11 +189,11 @@
         "allowlist": {
           "tools/net/digest/digest.go": true,
           "src/connectivity/wlan/lib/common/cpp/bitfield_test.cc": true,
-	  "src/connectivity/wlan/lib/common/cpp/ieee80211_codes_test.cc": true,
-	  "src/connectivity/wlan/lib/common/cpp/include/wlan/common/mcs_rate_lookup.h": true,
-	  "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup.cc": true,
-	  "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup_test.cc": true,
-	  "src/media/audio/audio_core/shared/schema/make_schema_header.py": true,
+          "src/connectivity/wlan/lib/common/cpp/ieee80211_codes_test.cc": true,
+          "src/connectivity/wlan/lib/common/cpp/include/wlan/common/mcs_rate_lookup.h": true,
+          "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup.cc": true,
+          "src/connectivity/wlan/lib/common/cpp/mcs_rate_lookup_test.cc": true,
+          "src/media/audio/audio_core/shared/schema/make_schema_header.py": true,
           "src/connectivity/network/netstack/dhcp/server.go": true
         }
       },

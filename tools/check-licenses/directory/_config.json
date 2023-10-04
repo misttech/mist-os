@@ -53,14 +53,6 @@
             },
             {
                 "paths": [
-                    "third_party/tink"
-                ],
-                "notes": [
-                    "Temporary skip to support uprev & directory changes"
-                ]
-            },
-            {
-                "paths": [
                     "prebuilt/tools/shac"
                 ],
                 "notes": [
