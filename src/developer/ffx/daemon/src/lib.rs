@@ -9,15 +9,16 @@ use ffx_config::EnvironmentContext;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
 use fidl_fuchsia_overnet_protocol::NodeId;
-use fuchsia_async::Timer;
+use fuchsia_async::{TimeoutExt, Timer};
 use futures::prelude::*;
-use hoist::Hoist;
 use nix::sys::signal;
 use std::{
+    io::ErrorKind,
     path::{Path, PathBuf},
     pin::Pin,
     process::{Child, Command},
-    time::Duration,
+    sync::Arc,
+    time::{Duration, SystemTime},
 };
 
 mod config;
@@ -30,15 +31,106 @@ pub use constants::LOG_FILE_PREFIX;
 
 pub use socket::SocketDetails;
 
-async fn create_daemon_proxy(hoist: &Hoist, id: &mut NodeId) -> Result<DaemonProxy> {
+async fn create_daemon_proxy(
+    node: &Arc<overnet_core::Router>,
+    id: &mut NodeId,
+) -> Result<DaemonProxy> {
     let (s, p) = fidl::Channel::create();
-    hoist.node().connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
+    node.connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
     let proxy = fidl::AsyncChannel::from_channel(p).context("failed to make async channel")?;
     Ok(DaemonProxy::new(proxy))
 }
 
+/// Start a one-time ascendd connection, attempting to connect to the
+/// unix socket a few times, but only running a single successful
+/// connection to completion. This function will timeout with an
+/// error after one second if no connection could be established.
+async fn run_single_ascendd_link(
+    node: Arc<overnet_core::Router>,
+    sockpath: PathBuf,
+) -> Result<(), anyhow::Error> {
+    const MAX_SINGLE_CONNECT_TIME: u64 = 1;
+
+    tracing::trace!(ascendd_path = %sockpath.display());
+    let now = SystemTime::now();
+
+    let unix_socket = loop {
+        let safe_socket_path = ascendd::short_socket_path(&sockpath)?;
+        let started = std::time::Instant::now();
+        let conn = async_net::unix::UnixStream::connect(&safe_socket_path)
+            .on_timeout(Duration::from_secs(30), || {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    anyhow::format_err!(
+                        "Timed out (30s) connecting to ascendd socket at {}",
+                        sockpath.display()
+                    ),
+                ))
+            })
+            .await;
+        match conn {
+            // We got our connections.
+            Ok(conn) => {
+                let elapsed = std::time::Instant::now() - started;
+                if elapsed.as_millis() > 100 {
+                    tracing::warn!("Socket connection took {elapsed:?}");
+                }
+                break conn;
+            }
+            // There was an error connecting that's likely due to the daemon not being ready yet.
+            Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::ConnectionRefused) => {
+                if now.elapsed()?.as_secs() > MAX_SINGLE_CONNECT_TIME {
+                    bail!(
+                        "took too long connecting to ascendd socket at {}. Last error: {e:#?}",
+                        sockpath.display(),
+                    );
+                }
+            }
+            // There was an unknown error connecting.
+            Err(e) => {
+                bail!(
+                    "unexpected error while trying to connect to ascendd socket at {}: {e:?}",
+                    sockpath.display()
+                );
+            }
+        }
+    };
+
+    let (mut rx, mut tx) = unix_socket.split();
+
+    run_ascendd_connection(node, &mut rx, &mut tx).await
+}
+
+async fn run_ascendd_connection<'a>(
+    node: Arc<overnet_core::Router>,
+    rx: &'a mut (dyn AsyncRead + Unpin + Send),
+    tx: &'a mut (dyn AsyncWrite + Unpin + Send),
+) -> Result<(), anyhow::Error> {
+    let (errors_sender, errors) = futures::channel::mpsc::unbounded();
+    tx.write_all(&ascendd::CIRCUIT_ID).await?;
+    futures::future::join(
+        circuit::multi_stream::multi_stream_node_connection_to_async(
+            node.circuit_node(),
+            rx,
+            tx,
+            false,
+            circuit::Quality::LOCAL_SOCKET,
+            errors_sender,
+            "ascendd".to_owned(),
+        ),
+        errors
+            .map(|e| {
+                tracing::warn!("An ascendd circuit failed: {e:?}");
+            })
+            .collect::<()>(),
+    )
+    .map(|(result, ())| result)
+    .await
+    .map_err(anyhow::Error::from)
+}
+
 pub async fn get_daemon_proxy_single_link(
-    hoist: &Hoist,
+    node: &Arc<overnet_core::Router>,
     socket_path: PathBuf,
     exclusions: Option<Vec<NodeId>>,
 ) -> Result<(NodeId, DaemonProxy, Pin<Box<impl Future<Output = Result<()>>>>), FfxError> {
@@ -51,9 +143,9 @@ pub async fn get_daemon_proxy_single_link(
         tracing::warn!("'overnet.cso' config is no longer supported (non-CSO is deprecated)");
     }
 
-    let link = hoist.clone().run_single_ascendd_link(socket_path.clone()).fuse();
+    let link = run_single_ascendd_link(Arc::clone(node), socket_path.clone()).fuse();
     let mut link = Box::pin(link);
-    let find = find_next_daemon(hoist, exclusions).fuse();
+    let find = find_next_daemon(node, exclusions).fuse();
     let mut find = Box::pin(find);
     let mut timeout = Timer::new(Duration::from_secs(5)).fuse();
 
@@ -70,10 +162,10 @@ pub async fn get_daemon_proxy_single_link(
 }
 
 async fn find_next_daemon<'a>(
-    hoist: &Hoist,
+    node: &Arc<overnet_core::Router>,
     exclusions: Option<Vec<NodeId>>,
 ) -> Result<(NodeId, DaemonProxy)> {
-    let lpc = hoist.node().new_list_peers_context().await;
+    let lpc = node.new_list_peers_context().await;
     loop {
         let peers = lpc.list_peers().await?;
         for peer in peers.iter() {
@@ -96,7 +188,7 @@ async fn find_next_daemon<'a>(
                 }
                 None => {}
             }
-            return create_daemon_proxy(hoist, &mut peer.id.clone())
+            return create_daemon_proxy(node, &mut peer.id.clone())
                 .await
                 .map(|proxy| (peer.id.clone(), proxy));
         }
@@ -104,11 +196,14 @@ async fn find_next_daemon<'a>(
 }
 
 // Note that this function assumes the daemon has been started separately.
-pub async fn find_and_connect(hoist: &Hoist, socket_path: PathBuf) -> Result<DaemonProxy> {
+pub async fn find_and_connect(
+    node: &Arc<overnet_core::Router>,
+    socket_path: PathBuf,
+) -> Result<DaemonProxy> {
     // This function is due for deprecation/removal. It should only be used
     // currently by the doctor daemon_manager, which should instead learn to
     // understand the link state in future revisions.
-    get_daemon_proxy_single_link(hoist, socket_path, None)
+    get_daemon_proxy_single_link(node, socket_path, None)
         .await
         .map(|(_nodeid, proxy, link_fut)| {
             fuchsia_async::Task::local(link_fut.map(|_| ())).detach();
@@ -230,7 +325,7 @@ pub fn is_daemon_running_at_path(socket_path: &Path) -> bool {
         }
     }
 
-    let sock = hoist::short_socket_path(&socket_path)
+    let sock = ascendd::short_socket_path(&socket_path)
         .and_then(|safe_socket_path| std::os::unix::net::UnixStream::connect(&safe_socket_path));
     match sock {
         Ok(sock) => match sock.peer_addr() {

@@ -153,6 +153,6 @@ impl DaemonManager for DefaultDaemonManager {
     }
 
     async fn find_and_connect(&self) -> Result<DaemonProxy> {
-        find_and_connect(&self.hoist, self.socket_path.clone()).await
+        find_and_connect(&self.hoist.node(), self.socket_path.clone()).await
     }
 }

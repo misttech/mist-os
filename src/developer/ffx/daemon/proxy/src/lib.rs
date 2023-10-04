@@ -284,7 +284,7 @@ async fn init_daemon_proxy(
     }
 
     let (nodeid, proxy, link) =
-        get_daemon_proxy_single_link(&hoist, ascendd_path.clone(), None).await?;
+        get_daemon_proxy_single_link(&hoist.node(), ascendd_path.clone(), None).await?;
 
     // Spawn off the link task, so that FIDL functions can be called (link IO makes progress).
     let link_task = fuchsia_async::Task::local(link.map(|_| ()));
@@ -352,7 +352,7 @@ async fn init_daemon_proxy(
     }
 
     let (_nodeid, proxy, link) =
-        get_daemon_proxy_single_link(&hoist, ascendd_path, Some(vec![nodeid])).await?;
+        get_daemon_proxy_single_link(&hoist.node(), ascendd_path, Some(vec![nodeid])).await?;
 
     fuchsia_async::Task::local(link.map(|_| ())).detach();
 
