@@ -116,10 +116,6 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
 
   // Indicates whether the VMO was immutable at creation time.
   const InitialMutability initial_mutability_;
-
-  // See the comment above near the shrink_lock() method. Note that this lock might be held whilst
-  // waiting for page requests to be fulfilled.
-  mutable DECLARE_MUTEX(VmObjectDispatcher, lockdep::LockFlagsActiveListDisabled) shrink_lock_;
 };
 
 enum class VmoOwnership { kHandle, kMapping, kIoBuffer };
