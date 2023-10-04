@@ -15,7 +15,6 @@ if (is_host) {
       "src/api.rs",
       "src/blob.rs",
       "src/bootfs.rs",
-      "src/component.rs",
       "src/data_source.rs",
       "src/hash.rs",
       "src/lib.rs",

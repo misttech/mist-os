@@ -133,10 +133,9 @@ fn output_package(package: &dyn scrutiny::Package) {
 }
 
 fn output_package_components(package: &dyn scrutiny::Package) {
-    for (path, component) in package.components().expect("package components") {
+    for (path, component) in package.component_manifests().expect("package components") {
         debug!("  Component at {:?}", path);
-        let declaration = component.declaration();
-        debug!("    {} children", declaration.children.len());
+        debug!("    {} static children", component.children.len());
     }
 }
 

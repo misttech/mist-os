@@ -79,8 +79,8 @@ pub trait Scrutiny {
     /// Iterate over all packages from all system data sources.
     fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
 
-    /// Iterate over all components in the system.
-    fn components(&self) -> Box<dyn Iterator<Item = Box<dyn Component>>>;
+    /// Iterate over all component manifests in the system.
+    fn component_manifests(&self) -> Box<dyn Iterator<Item = ComponentDecl>>;
 
     /// Iterate over all component instances in the system. Note that a component instance is a
     /// component situated at a particular point in the system's component tree.
@@ -557,9 +557,9 @@ pub trait Package: DynClone {
     fn meta_blobs(&self) -> Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Blob>)>>;
 
     /// Constructs iterator over blobs that appear to be component manifests.
-    fn components(
+    fn component_manifests(
         &self,
-    ) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, Box<dyn Component>)>>, PackageComponentsError>;
+    ) -> Result<Box<dyn Iterator<Item = (Box<dyn Path>, ComponentDecl)>>, PackageComponentsError>;
 }
 
 impl PartialEq for dyn Package {
@@ -697,18 +697,6 @@ pub enum PackageResolverUrlParseError {
     BootWithResource,
 }
 
-/// Model for a Fuchsia component. Note that this model is of a component as described by a
-/// component manifest, not to be confused with a component _instance_, which is a component
-/// situated at a particular point in a runtime component tree. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2 for details.
-pub trait Component {
-    /// Returns the package from which this component was constructed.
-    fn package(&self) -> Box<dyn Package>;
-
-    /// Returns the component declaration parsed from the component manifest.
-    fn declaration(&self) -> ComponentDecl;
-}
-
 /// Model for a component resolution strategy. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities/resolvers for details.
 pub trait ComponentResolver {
@@ -808,7 +796,7 @@ pub trait ComponentInstance {
     fn environment(&self) -> Box<dyn Environment>;
 
     /// Accessor for the underlying component.
-    fn component(&self) -> Box<dyn Component>;
+    fn component_manifest(&self) -> ComponentDecl;
 
     /// Accessor for the parent component instance.
     fn parent(&self) -> Box<dyn ComponentInstance>;

@@ -9,10 +9,10 @@
 use super::api;
 use super::blob::BlobOpenError;
 use super::blob::BlobSet;
-use super::component::Component;
 use super::data_source as ds;
 use super::hash::Hash;
 use super::DataSource;
+use cm_rust::ComponentDecl;
 use cm_rust::FidlIntoNative as _;
 use fidl_fuchsia_component_decl as fdecl;
 use fuchsia_archive::Error as FarError;
@@ -257,22 +257,19 @@ impl api::Package for Package {
         }))
     }
 
-    fn components(
+    fn component_manifests(
         &self,
     ) -> Result<
-        Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>>,
+        Box<dyn Iterator<Item = (Box<dyn api::Path>, ComponentDecl)>>,
         api::PackageComponentsError,
     > {
-        let package: Box<dyn api::Package> = Box::new(self.clone());
         let mut components = vec![];
         for (path, meta_blob) in self.meta_blobs() {
             let mut meta_blob_reader = meta_blob.reader_seeker()?;
             let mut bytes = vec![];
             meta_blob_reader.read_to_end(&mut bytes)?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
-                let manifest = manifest.fidl_into_native();
-                let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest));
+                let component = manifest.fidl_into_native();
                 components.push((path, component));
             }
         }
@@ -282,9 +279,7 @@ impl api::Package for Package {
             let mut bytes = vec![];
             content_blob_reader.read_to_end(&mut bytes)?;
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
-                let manifest = manifest.fidl_into_native();
-                let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest));
+                let component = manifest.fidl_into_native();
                 components.push((path, component));
             }
         }
@@ -387,11 +382,12 @@ pub(crate) mod test {
     use super::super::api;
     use super::super::blob::test::VerifiedMemoryBlobSet;
     use super::super::blob::BlobSet as _;
-    use super::super::component::test::placeholder_component_cm;
-    use super::super::component::test::placeholder_component_path;
     use super::super::data_source as ds;
     use super::super::hash::Hash;
     use super::Package;
+    use cm_rust as cm;
+    use cm_rust::NativeIntoFidl as _;
+    use cm_rust_testing as cmt;
     use fuchsia_merkle::MerkleTree as FuchsiaMerkleTree;
     use fuchsia_pkg::MetaContents as FuchsiaMetaContents;
     use fuchsia_pkg::MetaPackage as FuchsiaMetaPackage;
@@ -402,6 +398,57 @@ pub(crate) mod test {
     use maplit::hashmap;
     use std::io;
     use std::str::FromStr as _;
+
+    const PLACEHOLDER_COMPONENT_PATH: &str = "meta/placeholder.cm";
+    const PLACEHOLDER_CHILD_URL: &str = "#meta/test_child.cm";
+
+    /// Returns the resource path to the placeholder component within the placeholder package.
+    pub(crate) fn placeholder_component_path() -> String {
+        PLACEHOLDER_COMPONENT_PATH.to_string()
+    }
+
+    /// Returns the child URL used to refer to the placeholder component in component manifests.
+    pub(crate) fn placeholder_component_child_url() -> api::ComponentResolverUrl {
+        api::ComponentResolverUrl::parse(PLACEHOLDER_CHILD_URL).expect("placeholder child url")
+    }
+
+    /// Returns the component declaration for the placeholder component.
+    pub(crate) fn placeholder_component() -> cm::ComponentDecl {
+        cmt::ComponentDeclBuilder::new()
+            .add_child(cmt::ChildDeclBuilder::new().url(PLACEHOLDER_CHILD_URL).build())
+            .use_(cm::UseDecl::Protocol(cm::UseProtocolDecl {
+                dependency_type: cm::DependencyType::Strong,
+                source: cm::UseSource::Parent,
+                source_name: "test_protocol".parse().expect("use protocol name"),
+                target_path: "/svc/test_protocol".parse().expect("use protocol target path"),
+                availability: cm::Availability::Required,
+            }))
+            .expose(cm::ExposeDecl::Protocol(cm::ExposeProtocolDecl {
+                source: cm::ExposeSource::Self_,
+                source_name: "test_protocol".parse().expect("expose protocol source name"),
+                target_name: "test_protocol".parse().expect("expose protocol target name"),
+                target: cm::ExposeTarget::Parent,
+                availability: cm::Availability::Required,
+            }))
+            .offer(cm::OfferDecl::Protocol(cm::OfferProtocolDecl {
+                source: cm::OfferSource::Parent,
+                source_name: "test_protocol".parse().unwrap(),
+                target: cm::OfferTarget::static_child("test_child".to_string()),
+                target_name: "test_protocol".parse().unwrap(),
+                dependency_type: cm::DependencyType::Strong,
+                availability: cm::Availability::Required,
+            }))
+            .build()
+    }
+
+    /// Returns the hash and serialized contents of hte placeholder component.
+    pub(crate) fn placeholder_component_cm() -> (Box<dyn api::Hash>, Vec<u8>) {
+        let component = placeholder_component();
+        let component_fidl = component.native_into_fidl();
+        let component_bytes = fidl::persist(&component_fidl).expect("persist component fidl");
+        let component_hash = Hash::from_contents(component_bytes.as_slice());
+        (Box::new(component_hash), component_bytes)
+    }
 
     /// Returns the URL used for a placeholder package.
     pub(crate) fn placeholder_package_url() -> api::PackageResolverUrl {

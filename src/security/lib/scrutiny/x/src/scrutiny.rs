@@ -16,6 +16,7 @@ use super::package::Package;
 use super::product_bundle as pb;
 use super::system::Error as SystemError;
 use super::system::System;
+use cm_rust::ComponentDecl;
 use fuchsia_url::AbsolutePackageUrl;
 use std::rc::Rc;
 use thiserror::Error;
@@ -112,7 +113,7 @@ impl api::Scrutiny for Scrutiny {
         Box::new(self.0.packages.clone().into_iter())
     }
 
-    fn components(&self) -> Box<dyn Iterator<Item = Box<dyn api::Component>>> {
+    fn component_manifests(&self) -> Box<dyn Iterator<Item = ComponentDecl>> {
         todo!("TODO(fxbug.dev/111243): Integrate with production component API")
     }
 

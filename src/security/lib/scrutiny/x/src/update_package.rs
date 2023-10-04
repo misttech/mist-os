@@ -10,6 +10,7 @@ use super::data_source as ds;
 use super::data_source::DataSource;
 use super::package::Error as PackageError;
 use super::package::Package;
+use cm_rust::ComponentDecl;
 use fuchsia_url::PackageUrl;
 use fuchsia_url::PinnedAbsolutePackageUrl;
 use std::io;
@@ -103,13 +104,13 @@ impl api::Package for UpdatePackage {
         self.package.meta_blobs()
     }
 
-    fn components(
+    fn component_manifests(
         &self,
     ) -> Result<
-        Box<dyn Iterator<Item = (Box<dyn api::Path>, Box<dyn api::Component>)>>,
+        Box<dyn Iterator<Item = (Box<dyn api::Path>, ComponentDecl)>>,
         api::PackageComponentsError,
     > {
-        self.package.components()
+        self.package.component_manifests()
     }
 }
 
