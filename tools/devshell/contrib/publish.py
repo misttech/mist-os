@@ -9,8 +9,9 @@ import subprocess
 import shlex
 import sys
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 from terminal import Terminal
 
@@ -20,6 +21,41 @@ Publishes a given set of packages.
 TODO(fxbug.dev/127875): Currently only cache packages are supported by this
 tool.
 """
+
+
+@dataclass
+class PackageDiffs:
+    added: List[str]
+    modified: List[str]
+    removed: List[str]
+
+    @classmethod
+    def snapshot(cls, repo: Path) -> Dict[str, str]:
+        targets = json.loads((repo / "repository" / "targets.json").read_text())
+        return {
+            (package[:-2] if package.endswith("/0") else package): props[
+                "custom"
+            ]["merkle"]
+            for package, props in targets["signed"]["targets"].items()
+        }
+
+    @classmethod
+    def diff(cls, old: Dict[str, str], new: Dict[str, str]) -> "PackageDiffs":
+        return cls(
+            added=[package for package in new if package not in old],
+            modified=[
+                package
+                for package in old.keys() & new.keys()
+                if old[package] != new[package]
+            ],
+            removed=[package for package in old if package not in new],
+        )
+
+    def __len__(self) -> int:
+        return len(self.added) + len(self.modified) + len(self.removed)
+
+    def __bool__(self) -> bool:
+        return len(self) > 0
 
 
 def run(*command: str, failure_message: str, **kwargs) -> None:
@@ -104,6 +140,7 @@ def main() -> int:
     )
 
     # Publish the packages.
+    initial = PackageDiffs.snapshot(repo)
     run(
         package_tool,
         "repository",
@@ -117,26 +154,33 @@ def main() -> int:
         ],
         failure_message="An internal error occured while publishing.",
     )
+    final = PackageDiffs.snapshot(repo)
 
     # Report package publishing.
-    publish_count = sum(
-        [
-            len(json.loads(file.read_text())["content"]["manifests"])
-            for file in packages_to_publish
-        ]
-    )
-    publish_count_msg = f"Published {publish_count} packages"
+    package_diff = PackageDiffs.diff(initial, final)
+    if package_diff:
+        Terminal.info(f"Updated {len(package_diff)} packages!")
+        if package_diff.added:
+            Terminal.info(
+                f'Added packages: {", ".join(map(Terminal.bold, package_diff.added))}'
+            )
+        if package_diff.modified:
+            Terminal.info(
+                f'Modified packages: {", ".join(map(Terminal.bold, package_diff.modified))}'
+            )
+        if package_diff.removed:
+            Terminal.fatal("`fx publish` should never remove packages.")
+    else:
+        Terminal.warn("No packages were updated.")
+
+    # Check if package server is running.
     if subprocess.run(
         shlex.join(fx_command("is-package-server-running")),
         shell=True,
         capture_output=True,
     ).returncode:
-        Terminal.warn(
-            f"{publish_count_msg}, but it looks like the package server is not running."
-        )
+        Terminal.warn("Looks like the package server is not running.")
         Terminal.warn('You probably need to run "fx serve".')
-    else:
-        Terminal.info(f"{publish_count_msg}!")
 
     return 0
 
