@@ -83,6 +83,25 @@ class DriverDetails:
 
 
 @dataclass
+@serialization.serialize_json
+class PackageDetails:
+    """Details for a package"""
+
+    package: FilePath = field()  # Path to the package manifest
+    set: str = field()  # Package set that includes the package
+
+    def __hash__(self):
+        """
+        This intentionally only hashes the package manifest in order to
+        deduplicate packages across package sets.
+        """
+        return hash(self.package)
+
+    def __lt__(self, other):
+        return self.package < other.package
+
+
+@dataclass
 @serialize_json
 class CompiledPackageMainDefinition:
     """Primary definition of a compiled package which is created by Assembly"""
@@ -176,13 +195,31 @@ class AssemblyInputBundle(ImageAssemblyConfig):
     assembly_config.json schema::
 
         {
-            "base": [ "package1", "package2" ],
-            "cache": [ "package3", ... ],
+            "packages": [
+                {
+                    "package": "package1",
+                    "set": "base",
+                },
+                {
+                    "package": "package2",
+                    "set": "base",
+                },
+                {
+                    "package": "package3",
+                    "set": "cache",
+                },
+                {
+                    "package": "packageS1",
+                    "set": "system",
+                },
+                {
+                    "package": "packageB1",
+                    "set": "bootfs",
+                },
+            ],
             "base_drivers": [ "packageD1", ... ],
             "boot_drivers": [ "packageD1", ... ],
-            "system": [ "packageS1", ... ],
-            "bootfs_packages": [ "packageB1", ... ],
-            "bootfs_files_package": "packages/bootfs_packages/packageB2",
+            "bootfs_files_package": "packages/packageB2",
             "bootfs_files": [
                 { "destination": "path/in/bootfs", source: "path/in/layout" },
                 ...
@@ -240,6 +277,7 @@ class AssemblyInputBundle(ImageAssemblyConfig):
     that it supports which aren't in the ImageAssemblyConfig.
     """
 
+    packages: Set[PackageDetails] = field(default_factory=set)
     config_data: ConfigDataEntries = field(default_factory=dict)
     blobs: Set[FilePath] = field(default_factory=set)
     base_drivers: List[DriverDetails] = field(default_factory=list)
@@ -256,16 +294,19 @@ class AssemblyInputBundle(ImageAssemblyConfig):
         """Serialize to a JSON string"""
         return serialization.json_dumps(self, indent=2)
 
+    def add_packages(self, packages: List[PackageDetails]):
+        for details in packages:
+            # This 'in' check only looks at the package manifest file path and
+            # ignores the package set. This is intentional in order to
+            # deduplicate packages across sets.
+            if details in self.packages:
+                raise ValueError(f"Duplicate package {details.package}")
+            self.packages.add(details)
+
     def all_file_paths(self) -> List[FilePath]:
         """Return a list of all files that are referenced by this AssemblyInputBundle."""
         file_paths = []
-        file_paths.extend(self.base)
-        file_paths.extend(self.cache)
-        file_paths.extend(self.system)
-        file_paths.extend(self.bootfs_packages)
-        file_paths.extend([entry.source for entry in self.bootfs_files])
-        if self.bootfs_files_package:
-            file_paths.append(self.bootfs_files_package)
+        file_paths.extend([p.package for p in self.packages])
         if self.kernel.path is not None:
             file_paths.append(self.kernel.path)
         if self.qemu_kernel is not None:
@@ -448,12 +489,12 @@ class AIBCreator:
         # Copy the manifests for the base package set into the assembly bundle
         (base_pkgs, base_blobs, base_deps) = self._copy_packages("base")
         deps.update(base_deps)
-        result.base.update(base_pkgs)
+        result.add_packages([PackageDetails(m, "base") for m in base_pkgs])
 
         # Copy the manifests for the cache package set into the assembly bundle
         (cache_pkgs, cache_blobs, cache_deps) = self._copy_packages("cache")
         deps.update(cache_deps)
-        result.cache.update(cache_pkgs)
+        result.add_packages([PackageDetails(m, "cache") for m in cache_pkgs])
 
         # Copy base driver packages into the base driver list of the assembly bundle
         for d in self.provided_base_driver_details:
@@ -506,14 +547,14 @@ class AIBCreator:
         # Copy the manifests for the system package set into the assembly bundle
         (system_pkgs, system_blobs, system_deps) = self._copy_packages("system")
         deps.update(system_deps)
-        result.system.update(system_pkgs)
+        result.add_packages([PackageDetails(m, "system") for m in system_pkgs])
 
         # Copy the manifests for the bootfs package set into the assembly bundle
         (bootfs_pkgs, bootfs_pkg_blobs, bootfs_pkg_deps) = self._copy_packages(
             "bootfs_packages"
         )
         deps.update(bootfs_pkg_deps)
-        result.bootfs_packages.update(bootfs_pkgs)
+        result.add_packages([PackageDetails(m, "bootfs") for m in bootfs_pkgs])
 
         if self.bootfs_files_package:
             (

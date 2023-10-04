@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// NOTE: Not all of the sets defined in the RFC are currently supported by this
 /// enum.  They are being added as they are needed by assembly.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "lowercase")]
 pub enum PackageSet {
     /// The packages in this set are stored in the pkg-cache, and are not
     /// garbage collected.  They are always available, and are pinned by merkle
@@ -22,6 +22,17 @@ pub enum PackageSet {
     ///
     /// They cannot be updated without performing an OTA of the system.
     Base,
+
+    /// The contents of the cache package set are present on the device in
+    /// nearly all circumstances but the version may be updated in some
+    /// circumstances during local development. This package set is not used
+    /// in production.
+    Cache,
+
+    /// The packages in this set are merged into the "base" package
+    /// (system image) to make them available to the software delivery
+    /// subsystem while the system is booting up.
+    System,
 
     /// The packages in this set are stored in the BootFS in the zbi.  They are
     /// always available (via `fuchsia-boot:///<name>` pkg urls), and are pinned

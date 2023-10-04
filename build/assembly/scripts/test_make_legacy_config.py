@@ -25,6 +25,7 @@ from assembly.assembly_input_bundle import (
     CompiledPackageAdditionalShards,
     CompiledPackageMainDefinition,
     DriverDetails,
+    PackageDetails,
     DuplicatePackageException,
 )
 from fast_copy_mock import mock_fast_copy_in
@@ -236,16 +237,27 @@ class MakeLegacyConfig(unittest.TestCase):
             file_paths = aib.all_file_paths()
 
             # Validate the contents of the AssemblyInputBundle itself
+            # The base, cache, system, bootfs_packages lists are not used even
+            # though they are inherited from ImageAssemblyConfig.
+            self.assertEqual(aib.base, set([]))
+            self.assertEqual(aib.cache, set([]))
+            self.assertEqual(aib.system, set([]))
+            self.assertEqual(aib.bootfs_packages, set([]))
             self.assertEqual(
-                aib.base, set(["packages/base/base_a", "packages/base/base_b"])
-            )
-            self.assertEqual(
-                aib.cache,
-                set(["packages/cache/cache_a", "packages/cache/cache_b"]),
-            )
-            self.assertEqual(
-                aib.system,
-                set(["packages/system/system_a", "packages/system/system_b"]),
+                aib.packages,
+                set(
+                    [
+                        PackageDetails("packages/base/base_a", "base"),
+                        PackageDetails("packages/base/base_b", "base"),
+                        PackageDetails("packages/cache/cache_a", "cache"),
+                        PackageDetails("packages/cache/cache_b", "cache"),
+                        PackageDetails("packages/system/system_a", "system"),
+                        PackageDetails("packages/system/system_b", "system"),
+                        PackageDetails(
+                            "packages/bootfs_packages/bootfs", "bootfs"
+                        ),
+                    ]
+                ),
             )
             self.assertEqual(aib.boot_args, set(["boot-arg-1", "boot-arg-2"]))
             self.assertEqual(aib.kernel.path, "kernel/kernel.bin")
@@ -559,7 +571,6 @@ class MakeLegacyConfig(unittest.TestCase):
                     "packages/base/base_a",
                     "packages/base/base_b",
                     "packages/bootfs_packages/bootfs",
-                    "packages/bootfs_packages/bootfs_files_package",
                     "packages/cache/cache_a",
                     "packages/cache/cache_b",
                     "packages/system/system_a",
@@ -602,12 +613,17 @@ class MakeLegacyConfig(unittest.TestCase):
             )
 
             # Asserts that the duplicate package is present in the base package set after
-            # being copied to the AIB
-            self.assertIn(make_package_path(duplicate_package), aib.base)
-
-            # Asserts that the duplicate package is not present in the cache package set, since
-            # it's been added to base
-            self.assertNotIn(make_package_path(duplicate_package), aib.cache)
+            # being copied to the AIB, and not cache.
+            self.assertEqual(
+                aib.packages,
+                set(
+                    [
+                        PackageDetails(
+                            make_package_path(duplicate_package), "base"
+                        ),
+                    ]
+                ),
+            )
 
     def test_driver_package_removed_from_base(self):
         """
@@ -654,7 +670,7 @@ class MakeLegacyConfig(unittest.TestCase):
                     None,
                 )
 
-            self.assertNotIn(make_package_path(duplicate_package), aib.base)
+            self.assertEqual(aib.packages, set([]))
             self.assertIn(
                 make_package_path(duplicate_package), aib.base_drivers
             )

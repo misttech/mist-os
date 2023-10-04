@@ -15,6 +15,7 @@ from assembly.assembly_input_bundle import (
     CompiledPackageMainDefinition,
     CompiledPackageAdditionalShards,
     DriverDetails,
+    PackageDetails,
 )
 import assembly
 import serialization
@@ -189,6 +190,7 @@ raw_assembly_input_bundle_json = """{
     }
   ],
   "bootfs_packages": [],
+  "packages": [],
   "config_data": {
     "package1": [
       {
@@ -552,8 +554,8 @@ class AIBCreatorTest(unittest.TestCase):
                 another_package_manifest_path,
             ]
             expected_package_manifests = [
-                "packages/base/some_package",
-                "packages/base/another_package",
+                PackageDetails("packages/base/some_package", "base"),
+                PackageDetails("packages/base/another_package", "base"),
             ]
 
             # Create the AIBCreator and perform the operation that's under test.
@@ -573,7 +575,7 @@ class AIBCreatorTest(unittest.TestCase):
                 self.assertEqual(parsed_bundle, bundle)
 
             # Verify that resultant AIB contains the correct base packages.
-            self.assertEqual(bundle.base, set(expected_package_manifests))
+            self.assertEqual(bundle.packages, set(expected_package_manifests))
 
             # Verify that the package manfiests have been rewritten to use file-
             # relative blob paths into the correct directory.
@@ -604,11 +606,12 @@ class AIBCreatorTest(unittest.TestCase):
                 ]
                 self.assertEqual(parsed_manifest.blobs, expected_blobs)
 
-            for path, manifest in zip(
+            for package_details, manifest in zip(
                 expected_package_manifests, created_manifests
             ):
                 validate_rewritten_package_manifest(
-                    os.path.join(assembly_dir, path), manifest
+                    os.path.join(assembly_dir, package_details.package),
+                    manifest,
                 )
 
             # Verify that the copies that were performed by the mocked
@@ -644,7 +647,9 @@ class AIBCreatorTest(unittest.TestCase):
             # Verify that all_file_paths() returns the correct (AIB-relative)
             # files.
             expected_paths = [entry.destination for entry in expected_files]
-            expected_paths.extend(expected_package_manifests)
+            expected_paths.extend(
+                [p.package for p in expected_package_manifests]
+            )
             self.assertEqual(
                 sorted(bundle.all_file_paths()), sorted(expected_paths)
             )  # type: ignore
