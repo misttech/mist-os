@@ -93,6 +93,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "sensors_framework",
     "session_manager",
     "setui",
+    "thread_lowpan",
     "setui.icu_default_{}".format(icu_flavors.default_git_commit),
     "setui.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "setui.icu_stable_{}".format(icu_flavors.stable_git_commit),

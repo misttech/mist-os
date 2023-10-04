@@ -15,6 +15,8 @@ pub struct PlatformConnectivityConfig {
     pub wlan: PlatformWlanConfig,
     #[serde(default)]
     pub mdns: MdnsConfig,
+    #[serde(default)]
+    pub thread: ThreadConfig,
 }
 
 /// Platform configuration options for the network area.
@@ -82,4 +84,13 @@ pub struct PlatformWlanConfig {
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
     pub publish_fuchsia_dev_wired_service: Option<bool>,
+}
+
+/// Platform configuration options to use for the thread area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ThreadConfig {
+    /// Include the LoWPAN service.
+    #[serde(default)]
+    pub include_lowpan: bool,
 }

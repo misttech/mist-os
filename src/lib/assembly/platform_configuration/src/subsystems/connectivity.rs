@@ -147,6 +147,10 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             if connectivity_config.network.include_tun {
                 builder.platform_bundle("network_tun");
             }
+
+            if connectivity_config.thread.include_lowpan {
+                builder.platform_bundle("thread_lowpan");
+            }
         }
 
         Ok(())

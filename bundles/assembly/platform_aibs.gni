@@ -99,6 +99,7 @@ user_platform_aib_names =
       "network_realm_packages",
       "network_realm_packages_gub",
       "network_tun",
+      "thread_lowpan",
       "networking_with_virtualization",
       "networking_basic",
       "networking_basic_packages",
