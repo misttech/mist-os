@@ -265,6 +265,14 @@ impl TargetCollection {
 
         to_update.update_connection_state(|_| new_target.get_connection_state());
 
+        if new_target.is_transient() {
+            to_update.mark_transient();
+        }
+
+        if new_target.is_enabled() {
+            to_update.enable();
+        }
+
         to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
             tracing::warn!("unable to enqueue rediscovered event: {:#}", err)
         });
@@ -986,6 +994,36 @@ mod tests {
         assert_eq!(found2.addrs().into_iter().next().unwrap().ip(), ip);
         assert_eq!(found2.ssh_port(), Some(8023));
         assert_eq!(found2.nodename(), Some("t2".to_string()));
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_merge_enabled_and_transient() {
+        let tc = TargetCollection::new();
+
+        const NAME: &str = "foo";
+
+        let target = tc.merge_insert(Target::new_named(NAME));
+
+        assert!(!target.is_enabled());
+        assert!(!target.is_transient());
+
+        tc.merge_insert({
+            let target = Target::new_named(NAME);
+            target.enable();
+            target
+        });
+
+        assert!(target.is_enabled());
+        assert!(!target.is_transient());
+
+        tc.merge_insert({
+            let target = Target::new_named(NAME);
+            target.mark_transient();
+            target
+        });
+
+        assert!(target.is_enabled());
+        assert!(target.is_transient());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

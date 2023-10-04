@@ -25,7 +25,7 @@ use netext::IsLocalAddr;
 use rand::random;
 use rcs::{knock_rcs, RcsConnection, RcsConnectionError};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     cmp::Ordering,
     collections::{BTreeSet, HashSet},
     default::Default,
@@ -144,6 +144,16 @@ pub struct Target {
     ids: RefCell<HashSet<u64>>,
     nodename: RefCell<Option<String>>,
     state: RefCell<TargetConnectionState>,
+    // Discovered targets default to disabled and are marked as enabled during OpenTarget.
+    // Manually added targets are always considered enabled.
+    // Disabled targets are filtered by default in the public facing TargetCollection API,
+    // except within `discover_target`.
+    enabled: Cell<bool>,
+    // Indicates a target was manually added for a single ffx invocation and can be immediately
+    // disabled when not actively used.
+    // This transient bit is cleared when the target next transitions out of the `Disconnected`
+    // state.
+    transient: Cell<bool>,
     pub(crate) last_response: RefCell<DateTime<Utc>>,
     pub(crate) addrs: RefCell<BTreeSet<TargetAddrEntry>>,
     // ssh_port if set overrides the global default configuration for ssh port,
@@ -181,6 +191,8 @@ impl Target {
             nodename: RefCell::new(None),
             last_response: RefCell::new(Utc::now()),
             state: RefCell::new(Default::default()),
+            enabled: Cell::new(false),
+            transient: Cell::new(false),
             addrs: RefCell::new(BTreeSet::new()),
             ssh_port: RefCell::new(None),
             serial: RefCell::new(None),
@@ -700,6 +712,7 @@ impl Target {
             );
             return;
         }
+
         tracing::debug!(
             "Updating state for {}@{} from {:?} to {:?}",
             self.nodename_str(),
@@ -707,7 +720,23 @@ impl Target {
             former_state,
             new_state
         );
+
+        let rediscovered = matches!(former_state, TargetConnectionState::Disconnected);
+        let expired = matches!(new_state, TargetConnectionState::Disconnected);
+
         self.state.replace(new_state);
+
+        if rediscovered {
+            // If the target is going from the disconnected state to discovered, clear the transient
+            // flag.
+            if self.transient.get() {
+                tracing::debug!("Cleared transient flag for target connection state transition");
+                self.transient.set(false);
+            }
+        } else if expired && self.transient.get() && self.is_enabled() {
+            tracing::debug!("Enabled transient target expired, closing...");
+            self.disable();
+        }
 
         if self.get_connection_state().is_rcs() {
             self.events.push(TargetEvent::RcsActivated).unwrap_or_else(|err| {
@@ -739,6 +768,9 @@ impl Target {
         self.addrs.replace(repl_addr);
         self.fastboot_interface().replace(interface);
         self.update_connection_state(|_| TargetConnectionState::Fastboot(Instant::now()));
+
+        // Persist the enabled bit since the target is no longer "manually added" at this point.
+        self.enable();
     }
 
     pub fn rcs(&self) -> Option<RcsConnection> {
@@ -854,6 +886,7 @@ impl Target {
             assert_eq!(s, TargetConnectionState::Disconnected);
             TargetConnectionState::Mdns(Instant::now())
         });
+        s.enable();
         s
     }
 
@@ -1153,6 +1186,27 @@ impl Target {
         self.state.borrow().is_connected()
     }
 
+    pub fn is_enabled(&self) -> bool {
+        self.enabled.get() || self.state.borrow().is_manual() || self.is_manual()
+    }
+
+    pub(crate) fn enable(&self) {
+        self.enabled.set(true)
+    }
+
+    pub(crate) fn disable(&self) {
+        self.disconnect();
+        self.enabled.set(false);
+    }
+
+    pub fn is_transient(&self) -> bool {
+        self.transient.get()
+    }
+
+    pub fn mark_transient(&self) {
+        self.transient.set(true)
+    }
+
     pub fn is_manual(&self) -> bool {
         self.addrs
             .borrow()
@@ -1243,6 +1297,8 @@ impl Debug for Target {
             .field("id", &self.id)
             .field("ids", &self.ids.borrow().clone())
             .field("nodename", &self.nodename.borrow().clone())
+            .field("enabled", &self.enabled.get())
+            .field("transient", &self.transient.get())
             .field("state", &self.state.borrow().clone())
             .field("last_response", &self.last_response.borrow().clone())
             .field("addrs", &self.addrs.borrow().clone())
@@ -2286,6 +2342,112 @@ mod test {
             target.fastboot_interface.replace(None);
 
             assert_eq!(target.infer_fastboot_interface(), Some(FastbootInterface::Udp));
+        }
+    }
+
+    mod enabled {
+        use super::*;
+
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_enable() {
+            let target = Target::new();
+
+            assert!(!target.is_enabled());
+            target.enable();
+            assert!(target.is_enabled());
+        }
+
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_manual_targets_always_enable() {
+            let target = Target::new_with_addr_entries(
+                Some("foo"),
+                std::iter::once(TargetAddrEntry::new(
+                    SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 22).into(),
+                    chrono::MIN_DATETIME,
+                    TargetAddrType::Manual(None),
+                )),
+            );
+
+            assert!(target.is_enabled());
+            assert!(target.is_manual());
+            target.disable();
+            assert!(target.is_enabled());
+        }
+
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_disable() {
+            let target = Target::new_autoconnected("foo");
+
+            assert!(target.is_enabled());
+            target.disable();
+            assert!(!target.is_enabled());
+            assert!(!target.is_connected());
+        }
+
+        // Instant::now() - Duration panics on macOS builders.
+        #[cfg(not(target_os = "macos"))]
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_transient_expire() {
+            let target = Target::new_autoconnected("foo");
+
+            target.mark_transient();
+            assert!(target.is_transient());
+
+            // A call to expire_state should not disable when not expired.
+            assert!(target.is_enabled());
+            target.expire_state();
+            assert!(target.is_connected());
+            assert!(target.is_enabled());
+
+            target.update_connection_state(|_| {
+                TargetConnectionState::Mdns(Instant::now() - Duration::from_secs(60 * 60))
+            });
+
+            // But should disable when expired.
+            assert!(target.is_enabled());
+            target.expire_state();
+            assert!(!target.is_enabled());
+            assert!(!target.is_connected());
+        }
+
+        // Instant::now() - Duration panics on macOS builders.
+        #[cfg(not(target_os = "macos"))]
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_non_transient_expire() {
+            let target = Target::new_autoconnected("foo");
+
+            assert!(!target.is_transient());
+
+            // A call to expire_state should not disable when not expired.
+            assert!(target.is_enabled());
+            target.expire_state();
+            assert!(target.is_connected());
+            assert!(target.is_enabled());
+
+            target.update_connection_state(|_| {
+                TargetConnectionState::Mdns(Instant::now() - Duration::from_secs(60 * 60))
+            });
+
+            // And should not disable when expired.
+            assert!(target.is_enabled());
+            target.expire_state();
+            assert!(target.is_enabled());
+        }
+
+        #[fuchsia_async::run_singlethreaded(test)]
+        async fn test_reset_transient_on_rediscovery() {
+            let target = Target::new_autoconnected("foo");
+
+            target.mark_transient();
+            assert!(target.is_transient());
+
+            target.disable();
+
+            assert!(target.is_transient());
+
+            target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
+
+            assert!(!target.is_transient());
         }
     }
 }

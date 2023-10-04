@@ -432,7 +432,10 @@ impl FidlProtocol for TargetCollectionProtocol {
                 };
                 let target =
                     target_collection.merge_insert(match Target::from_fastboot_target_info(t) {
-                        Ok(ret) => ret,
+                        Ok(ret) => {
+                            ret.mark_transient();
+                            ret
+                        }
                         Err(e) => {
                             tracing::warn!("encountered unhandled error: {:?}", e);
                             return responder.send().map_err(Into::into);
