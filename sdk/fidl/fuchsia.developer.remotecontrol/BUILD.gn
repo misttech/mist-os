@@ -12,7 +12,6 @@ fidl("fuchsia.developer.remotecontrol") {
     "service-discovery.fidl",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.boot",
     "//sdk/fidl/fuchsia.buildinfo",
     "//sdk/fidl/fuchsia.component",
     "//sdk/fidl/fuchsia.device",

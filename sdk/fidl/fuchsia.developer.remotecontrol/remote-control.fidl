@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.developer.remotecontrol;
 
-using fuchsia.boot as boot;
 using fuchsia.component as component;
 using fuchsia.diagnostics as diagnostics;
 using fuchsia.io as io;
@@ -63,12 +62,6 @@ closed protocol RemoteControl {
     // Connects to the [`fuchsia.kernel/Stats`] protocol
     strict KernelStats(resource struct {
         server server_end:kernel.Stats;
-    }) -> () error zx.Status;
-
-    // Connects to the [`fuchsia.boot/Arguments`] protocol
-    @deprecated
-    strict BootArguments(resource struct {
-        server server_end:boot.Arguments;
     }) -> () error zx.Status;
 
     strict IdentifyHost() -> (struct {
