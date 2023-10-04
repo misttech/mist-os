@@ -8,4 +8,5 @@ fidl("fuchsia.driver.component.test") {
   testonly = true
   sources = [ "fuchsia.driver.component.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  contains_drivers = true
 }

@@ -25,6 +25,7 @@ group("drivers") {
 fidl("fuchsia.compat.runtime.test") {
   testonly = true
   sources = [ "compat.runtime.test.fidl" ]
+  contains_drivers = true
 }
 
 driver_bind_rules("root-bind") {

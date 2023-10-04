@@ -17,6 +17,7 @@ benchmark_suite_declarations = [
     name = "byte_vector"
     gidl = [ "byte_vector.gen.gidl" ]
     fidl = [ "byte_vector.test.fidl" ]
+    contains_drivers = true
   },
   {
     name = "byte_vector_limit"
@@ -50,6 +51,7 @@ benchmark_suite_declarations = [
       "handle_array_event.gen.test.fidl",
       "handle_array_event_protocol.test.fidl",
     ]
+    contains_drivers = true
   },
   {
     name = "handle_array_plain"
@@ -80,6 +82,7 @@ benchmark_suite_declarations = [
     name = "media"
     gidl = [ "media.gidl" ]
     fidl = [ "media.test.fidl" ]
+    contains_drivers = true
   },
   {
     name = "optional_struct_tree"
@@ -178,9 +181,13 @@ foreach(decl, benchmark_suite_declarations) {
 
   benchmark_suites += [
     {
-      name = decl.name
+      forward_variables_from(decl,
+                             [
+                               "name",
+                               "fidl",
+                               "contains_drivers",
+                             ])
       gidl = gidl_files
-      fidl = decl.fidl
       parts = []
       parts = string_split(get_path_info(fidl[0], "name"), ".")
       fidl_library_suffix = string_replace(parts[0], "_", "")

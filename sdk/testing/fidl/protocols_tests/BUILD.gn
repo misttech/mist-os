@@ -14,6 +14,7 @@ ctf_fidl("test.unknown.interactions") {
     "unknown_interactions_new_defaults",
   ]
   enable_hlcpp = true
+  contains_drivers = true
 }
 
 ctf_fidl("test.protocol.connector") {

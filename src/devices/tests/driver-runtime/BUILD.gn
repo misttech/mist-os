@@ -12,6 +12,7 @@ fidl("fuchsia.device.runtime.test") {
   sources = [ "test.fidl" ]
   visibility = [ ":*" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  contains_drivers = true
 }
 
 test("test") {

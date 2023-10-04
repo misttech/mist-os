@@ -13,6 +13,7 @@ fidl("benchmark_suite_fidl") {
   sources = benchmark_suite_fidl_files
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
+  contains_drivers = true
 }
 
 template("benchmark_fidl") {
@@ -41,6 +42,7 @@ template("benchmark_fidl") {
     public_deps = [ "//zircon/vdso/zx" ]
     enable_hlcpp = true
     disable_rustdoc = true
+    forward_variables_from(invoker, [ "contains_drivers" ])
   }
 }
 
@@ -55,6 +57,7 @@ if (current_toolchain != go_toolchain) {
       benchmark_fidl(get_label_info(suite.fidl_target, "name")) {
         fidl_library_suffix = suite.fidl_library_suffix
         sources = suite.fidl
+        forward_variables_from(suite, [ "contains_drivers" ])
       }
     }
   }

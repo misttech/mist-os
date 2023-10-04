@@ -17,4 +17,5 @@ group("driver") {
 fidl("fuchsia.examples.gizmo") {
   sources = [ "gizmo.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
+  contains_drivers = true
 }

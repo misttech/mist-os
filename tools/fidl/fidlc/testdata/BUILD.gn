@@ -89,10 +89,8 @@ foreach(filename, standalone_libraries) {
     # To output index jsons
     experimental_flags += [ "output_index_json" ]
 
-    if (is_fuchsia) {
-      # Some test files use the driver transport.
-      contains_drivers = true
-    }
+    # Some test files use the driver transport.
+    contains_drivers = true
 
     # Generate fuzzers to make sure they build.
     golden_fuzzer = true
