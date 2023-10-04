@@ -164,6 +164,8 @@ class RiscvPagingTraitsBase::TableEntry
 
   constexpr RiscvMemoryType Memory(const SystemState& state) const { return pbmt(); }
 
+  constexpr bool accessed() const { return terminal() ? a() : false; }
+
   constexpr SelfType& Set(const SystemState& state, const PagingSettings& settings) {
     set_v(settings.present);
     if (!settings.present) {
@@ -177,7 +179,8 @@ class RiscvPagingTraitsBase::TableEntry
           .set_w(access.writable)
           .set_x(access.executable)
           .set_u(access.user_accessible)
-          .set_pbmt(settings.memory);
+          .set_pbmt(settings.memory)
+          .set_a(settings.accessed);
     } else {
       // Since access permissions cannot be applied to non-terminal levels to
       // constrain later ones, the provided permissions here are expected to be
