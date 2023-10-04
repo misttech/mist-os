@@ -622,6 +622,7 @@ template("zircon_toolchain") {
       command_launcher =
           string_replace(_restat_cc_prefix, "{{DEPFILE}}", depfile) +
           compiler_prefix
+      restat = restat_cc
     }
 
     tool("cc") {
@@ -631,6 +632,7 @@ template("zircon_toolchain") {
       command_launcher =
           string_replace(_restat_cc_prefix, "{{DEPFILE}}", depfile) +
           compiler_prefix
+      restat = restat_cc
     }
 
     tool("cxx") {
@@ -640,6 +642,7 @@ template("zircon_toolchain") {
       command_launcher =
           string_replace(_restat_cc_prefix, "{{DEPFILE}}", depfile) +
           compiler_prefix
+      restat = restat_cc
     }
 
     tool("alink") {
