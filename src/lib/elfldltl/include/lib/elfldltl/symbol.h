@@ -408,6 +408,7 @@ class SymbolInfo {
     return symtab_.size();
   }
 
+ public:
   AbiStringView<Elf, AbiTraits> strtab_ = kEmptyStrtab;
   Span<Sym> symtab_;
   Span<Word> compat_hash_;

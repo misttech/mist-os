@@ -4,9 +4,12 @@
 
 #include <lib/ld/abi.h>
 #include <lib/ld/module.h>
+#include <string.h>
 
+#include <array>
 #include <type_traits>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 namespace {
@@ -40,6 +43,12 @@ TEST(LdTests, AbiTypes) {
 
   RDebug r_debug;
   r_debug = RDebug{r_debug};
+
+  // Test that this object is zero initialized so it can be put in bss.
+  Module x{elfldltl::kLinkerZeroInitialized};
+  std::array<std::byte, sizeof(Module)> bytes{};
+  memcpy(bytes.data(), &x, sizeof(Module));
+  EXPECT_THAT(bytes, testing::Each(testing::Eq(std::byte(0))));
 }
 
 }  // namespace

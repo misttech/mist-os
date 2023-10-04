@@ -8,6 +8,7 @@
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/posix.h>
 #include <sys/mman.h>
+#include <zircon/compiler.h>
 
 #include <array>
 #include <cassert>
@@ -182,13 +183,8 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       elfldltl::DiagnosticsPanicFlags{},
   };
 
-  abi::Abi<>::Module vdso_module;
-  if (vdso) {
-    // If there is no vDSO, then there will just be empty symbols to link
-    // against and no references can resolve to any vDSO-defined symbols.
-    vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
-  }
-  auto self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
+  auto& vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
+  auto& self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
   CompleteBootstrapModule(self_module, startup.page_size);
 
   // Now that things are bootstrapped, set up the main diagnostics object.

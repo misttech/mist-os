@@ -41,6 +41,13 @@ namespace ld::abi {
 
 template <class Elf, class AbiTraits>
 struct Abi<Elf, AbiTraits>::Module {
+  constexpr Module() = default;
+
+  constexpr explicit Module(elfldltl::LinkerZeroInitialized)
+      : symbols(elfldltl::kLinkerZeroInitialized) {}
+
+  constexpr void InitLinkerZeroInitialized() { symbols.InitLinkerZeroInitialized(); }
+
   // This is known to be the first member in the struct layout.  It forms the
   // old de facto ABI from SVR4 (traditionally `struct link_map` in <link.h>)
   // for enumerating the modules and their load/symbol-resolution order through
@@ -61,7 +68,7 @@ struct Abi<Elf, AbiTraits>::Module {
   // as the ld::abi::Module list as well.
   LinkMap link_map;
 
-  // The rest of the ld::abi::Module layout is a distinct extension that does
+  // The rest of the ld::abi::Module layout is a distinct extension that doesdsy
   // not overlap with any historical ABI.  (Traditional uses that have longer
   // data structures prefixed with `struct link_map` are all private formats.)
   //
@@ -103,6 +110,8 @@ struct Abi<Elf, AbiTraits>::Module {
   Type<elfldltl::InitFiniInfo> fini;
 
   // TODO(fxbug.dev/128502): TLS module ID
+
+  Word padding_ = 0;
 
   // Each and every module gets a "module ID" number that's used in symbolizer
   // markup contextual elements describing the module.  These are expected to

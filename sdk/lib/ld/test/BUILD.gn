@@ -24,6 +24,7 @@ test("ld-unittests") {
     "..:headers",
     "../testing",
     "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
   ]
 
   if (is_elf) {

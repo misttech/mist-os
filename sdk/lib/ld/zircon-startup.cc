@@ -11,6 +11,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
 #include <zircon/syscalls.h>
 
 #include <optional>
@@ -136,8 +137,8 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // is completed successfully, there's no way to make a system call to get an
   // error out anyway.
   auto bootstrap_diag = elfldltl::TrapDiagnostics();
-  auto vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
-  auto self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
+  auto& vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
+  auto& self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
   // Only now can we make the system call to discover the page size.
   const size_t page_size = zx_system_get_page_size();
   CompleteBootstrapModule(vdso_module, page_size);

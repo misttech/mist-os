@@ -51,12 +51,31 @@ inline constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
 // properly page-aligned.  In that case, CompleteVdsoModule (below) should be
 // called once the page size is known.
 template <class Diagnostics>
-inline abi::Abi<>::Module BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
-                                              size_t page_size = 1) {
+inline abi::Abi<>::Module& BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
+                                               size_t page_size = 1) {
   using Ehdr = elfldltl::Elf<>::Ehdr;
   using Phdr = elfldltl::Elf<>::Phdr;
   using Dyn = elfldltl::Elf<>::Dyn;
   using size_type = elfldltl::Elf<>::size_type;
+
+  // We want this object to be in bss to reduce the amount of data pages which need COW. In general
+  // the only data/bss we want should be part of `_ld_abi`, but the vdso module will always be in
+  // the `_ld_abi` list so it is safe to keep this object in .bss. It will be protected to read only
+  // later. The explicit .bss section attribute ensures this object is zero initialized, we will get
+  // an assembler error otherwise. We also rely on this when only initializing some of the members
+  // of `vdso`.
+  [[gnu::section(".bss.vdso_module")]] __CONSTINIT static abi::Abi<>::Module vdso{
+      elfldltl::kLinkerZeroInitialized};
+  vdso.InitLinkerZeroInitialized();
+
+#ifndef __Fuchsia__
+  if (!vdso_base) [[unlikely]] {
+    // If there is no vDSO, then there will just be empty symbols to link
+    // against and no references can resolve to any vDSO-defined symbols.
+    // This will on1y ever be true on Posix, never on Fuchsia.
+    return vdso;
+  }
+#endif
 
   elfldltl::DirectMemory memory(
       {
@@ -81,13 +100,12 @@ inline abi::Abi<>::Module BootstrapVdsoModule(Diagnostics&& diag, const void* vd
   const cpp20::span dyn = *memory.ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->memsz);
 
   const size_type bias = reinterpret_cast<uintptr_t>(vdso_base) - vaddr_start;
-  abi::Abi<>::Module vdso = {
-      .link_map = {.addr{bias}, .ld{dyn.data()}},
-      .vaddr_start = vaddr_start,
-      .vaddr_end = vaddr_start + vaddr_size,
-      .phdrs = phdrs,
-      .build_id = build_id->desc,  // The vDSO always has a build ID.
-  };
+  vdso.link_map.addr = bias;
+  vdso.link_map.ld = dyn.data();
+  vdso.vaddr_start = vaddr_start;
+  vdso.vaddr_end = vaddr_start + vaddr_size;
+  vdso.phdrs = phdrs;
+  vdso.build_id = build_id->desc;  // The vDSO always has a build ID.
 
   elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(vdso.symbols));
   vdso.soname = vdso.symbols.soname();
@@ -107,7 +125,7 @@ inline abi::Abi<>::Module BootstrapVdsoModule(Diagnostics&& diag, const void* vd
 // Module's vaddr_start and vaddr_end are not properly page-aligned until
 // CompleteBootstrapModule (below) is called.
 template <class Diagnostics>
-inline abi::Abi<>::Module BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
+inline abi::Abi<>::Module& BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
   auto memory = elfldltl::Self<>::Memory();
   const cpp20::span phdrs = elfldltl::Self<>::Phdrs();
 
@@ -119,15 +137,23 @@ inline abi::Abi<>::Module BootstrapSelfModule(Diagnostics&& diag, const abi::Abi
   const uintptr_t bias = elfldltl::Self<>::LoadBias();
   const uintptr_t start = memory.base() + bias;
   const cpp20::span dyn = elfldltl::Self<>::Dynamic();
-  abi::Abi<>::Module self = {
-      .link_map = {.addr{bias}, .ld{dyn.data()}},
-      .vaddr_start = start,
-      .vaddr_end = start + memory.image().size(),
-      .phdrs = phdrs,
-      .symbols = elfldltl::LinkStaticPieWithVdso(elfldltl::Self<>(), diag, vdso.symbols,
-                                                 vdso.link_map.addr),
-  };
 
+  // We want this object to be in bss to reduce the amount of data pages which need COW. In general
+  // the only data/bss we want should be part of `_ld_abi`, but the self module will always be in
+  // the `_ld_abi` list so it is safe to keep this object in .bss. It will be protected to read only
+  // later. The explicit .bss section attribute ensures this object is zero initialized, we will get
+  // an assembler error otherwise. We also rely on this when only initializing some of the members
+  // of `self`.
+  [[gnu::section(".bss.self_module")]] __CONSTINIT static abi::Abi<>::Module self{
+      elfldltl::kLinkerZeroInitialized};
+  self.InitLinkerZeroInitialized();
+  self.link_map.addr = bias;
+  self.link_map.ld = dyn.data();
+  self.vaddr_start = start;
+  self.vaddr_end = start + memory.image().size();
+  self.phdrs = phdrs;
+  self.symbols =
+      elfldltl::LinkStaticPieWithVdso(elfldltl::Self<>(), diag, vdso.symbols, vdso.link_map.addr);
   self.soname = self.symbols.soname();
   self.link_map.name = self.soname.str().data();
   self.build_id = build_id->desc;
