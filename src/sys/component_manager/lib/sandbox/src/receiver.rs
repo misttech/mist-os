@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 use {
     crate::{AnyCast, Capability, Remote, Sender},
+    derivative::Derivative,
     fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         channel::mpsc,
@@ -15,28 +16,42 @@ use {
     },
     std::fmt::Debug,
     std::pin::pin,
-    std::sync::Arc,
+    std::sync::{self, Arc},
 };
 
-/// A capability that represents the receiving end of a channel that transfers Zircon handles.
-#[derive(Capability, Debug, Clone)]
+#[derive(Debug)]
+pub enum Message {
+    Handle(zx::Handle),
+    Task(fasync::Task<()>),
+}
+
+/// A capability that represents a Zircon handle.
+// TODO(fxbug.dev/298112397): Does Receiver need to implement Clone? If not, we could remove the Arc around the Mutex
+#[derive(Capability, Clone, Derivative)]
+#[derivative(Debug)]
 #[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Receiver {
-    inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<zx::Handle>>>>,
-    sender: mpsc::UnboundedSender<zx::Handle>,
+    inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<Message>>>>,
+    sender: mpsc::UnboundedSender<Message>,
+    #[derivative(Debug = "ignore")]
+    sender_tasks: Arc<sync::Mutex<fasync::TaskGroup>>,
 }
 
 impl Receiver {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::unbounded();
-        Self { inner: Arc::new(Mutex::new(receiver.peekable())), sender }
+        Self {
+            inner: Arc::new(Mutex::new(receiver.peekable())),
+            sender,
+            sender_tasks: Arc::new(sync::Mutex::new(fasync::TaskGroup::new())),
+        }
     }
 
     pub fn new_sender(&self) -> Sender {
-        Sender { inner: self.sender.clone() }
+        Sender::new(self.sender.clone())
     }
 
-    pub async fn receive(&self) -> zx::Handle {
+    pub async fn receive(&self) -> Message {
         // Panic here instead of blocking, if this happens then we have a bug
         let mut receiver_guard = self
             .inner
@@ -62,10 +77,18 @@ impl Receiver {
         let mut on_closed = receiver_proxy.on_closed();
         loop {
             match future::select(pin!(self.receive()), on_closed).await {
-                Either::Left((handle, fut)) => {
+                Either::Left((msg, fut)) => {
                     on_closed = fut;
-                    if let Err(_) = receiver_proxy.receive(handle) {
-                        return;
+                    match msg {
+                        Message::Handle(handle) => {
+                            if let Err(_) = receiver_proxy.receive(handle) {
+                                return;
+                            }
+                        }
+                        Message::Task(task) => {
+                            let mut sender_tasks = self.sender_tasks.lock().unwrap();
+                            sender_tasks.add(task);
+                        }
                     }
                 }
                 Either::Right((_, _)) => {

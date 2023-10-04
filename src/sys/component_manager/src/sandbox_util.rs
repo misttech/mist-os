@@ -8,7 +8,7 @@ use {
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
     lazy_static::lazy_static,
-    sandbox::{Dict, Receiver, Sender, TryClone},
+    sandbox::{Dict, Message, Receiver, Sender, TryClone},
     tracing::warn,
 };
 
@@ -152,14 +152,21 @@ impl LaunchTaskOnReceive {
 
     pub async fn run(self) {
         loop {
-            let handle = self.receiver.receive().await;
-            let task_name = self.task_name.clone();
-            let fut = (self.task_to_launch)(handle);
-            self.task_group.spawn(async move {
-                if let Err(error) = fut.await {
-                    warn!(%error, "{} failed", task_name);
+            let msg = self.receiver.receive().await;
+            match msg {
+                Message::Handle(handle) => {
+                    let task_name = self.task_name.clone();
+                    let fut = (self.task_to_launch)(handle);
+                    self.task_group.spawn(async move {
+                        if let Err(error) = fut.await {
+                            warn!(%error, "{} failed", task_name);
+                        }
+                    });
                 }
-            });
+                Message::Task(task) => {
+                    self.task_group.spawn(task);
+                }
+            }
         }
     }
 }

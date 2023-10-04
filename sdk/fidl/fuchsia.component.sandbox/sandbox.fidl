@@ -59,16 +59,17 @@ closed protocol Dict {
     }) error DictError;
 };
 
-type SenderError = flexible enum {
-    /// The `Capability` handle was invalid.
-    BAD_HANDLE = 1;
-};
-
 closed protocol Sender {
     /// Sends a single Capability handle over this sender.
     strict Send(resource struct {
         capability Capability;
-    }) -> () error SenderError;
+    });
+    /// Clones this Sender. Calls to the cloned Sender will
+    /// go to the same Receiver.
+    // TODO(fxbug.dev/298112397): Should we compose fuchsia.unknown.Cloneable instead?
+    strict Clone(resource struct {
+        server_end server_end:Sender;
+    });
 };
 
 closed protocol Receiver {
