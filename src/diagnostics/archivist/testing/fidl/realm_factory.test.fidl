@@ -18,7 +18,7 @@ type PuppetDecl = struct {
 };
 
 /// RealmOptions tells the RealmFactory protocol how to create the test realm.
-type RealmOptions = resource table {
+type RealmOptions = table {
     /// Optional name to give to the realm component.
     /// This will become part of the realm's component selector.
     1: realm_name fuchsia.component.name;
@@ -47,7 +47,7 @@ open protocol RealmFactory {
     /// Specifies the options to use when creating the realm.
     ///
     /// Returns OperationError.INVALID if called more than once.
-    flexible SetRealmOptions(resource struct {
+    flexible SetRealmOptions(struct {
         options RealmOptions;
     }) -> () error fuchsia.testing.harness.OperationError;
 };

@@ -6,26 +6,16 @@ import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
+  testonly = true
   name = "iquery_test_component"
   edition = "2021"
   source_root = "main.rs"
-
+  sources = [ "main.rs" ]
   deps = [
-    "//sdk/fidl/fuchsia.inspect.deprecated:fuchsia.inspect.deprecated_rust",
-    "//src/lib/diagnostics/inspect/runtime/rust",
-    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/inspect/rust/testing:inspect_testing",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:structopt",
-  ]
-
-  sources = [
-    "deprecated_fidl_server.rs",
-    "main.rs",
-    "table.rs",
   ]
 }
 

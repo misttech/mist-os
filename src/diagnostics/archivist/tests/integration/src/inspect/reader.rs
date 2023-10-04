@@ -10,8 +10,7 @@ use diagnostics_reader::{ArchiveReader, Inspect};
 use difference::assert_diff;
 use fidl_fuchsia_archivist_test as ftest;
 use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, ArchiveAccessorProxy};
-use fuchsia_component_test::RealmInstance;
-use fuchsia_component_test::{Capability, ChildOptions, Ref, Route};
+use fuchsia_component_test::{Capability, ChildOptions, RealmInstance, Ref, Route};
 use lazy_static::lazy_static;
 
 const MONIKER_KEY: &str = "moniker";
@@ -43,7 +42,7 @@ lazy_static! {
 
 #[fuchsia::test]
 async fn read_components_inspect() {
-    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
         puppets: Some(vec![ftest::PuppetDecl { name: "child".to_string() }]),
         ..Default::default()
     })
@@ -74,21 +73,25 @@ async fn read_components_inspect() {
 }
 
 #[fuchsia::test]
-async fn read_component_with_hanging_lazy_node() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options {
-        archivist_url: INTEGRATION_ARCHIVIST_URL,
-        realm_name: Some("hanging_lazy"),
+async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        realm_name: Some("hanging_lazy".to_string()),
+        puppets: Some(vec![ftest::PuppetDecl { name: "hanging_data".to_string() }]),
+        ..Default::default()
     })
     .await
-    .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "hanging_data", HANGING_INSPECT_COMPONENT_URL)
-        .await
-        .expect("add child");
+    .expect("create realm");
 
-    let instance = builder.build().await.expect("create instance");
+    let puppet = test_topology::connect_to_puppet(&realm_proxy, "hanging_data").await?;
 
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    puppet.record_string("child", "value")?;
+
+    let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy()?;
+    lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() })?;
+
+    puppet.record_int("int", 3)?;
+
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("hanging_data:*")
@@ -100,23 +103,29 @@ async fn read_component_with_hanging_lazy_node() {
         child: "value",
         int: 3i64,
     });
+
+    Ok(())
 }
 
 #[fuchsia::test]
-async fn read_components_single_selector() {
-    let (builder, test_realm) = test_topology::create(test_topology::Options::default())
-        .await
-        .expect("create base topology");
-    test_topology::add_eager_child(&test_realm, "child_a", STUB_INSPECT_COMPONENT_URL)
-        .await
-        .expect("add child a");
-    test_topology::add_eager_child(&test_realm, "child_b", STUB_INSPECT_COMPONENT_URL)
-        .await
-        .expect("add child b");
-    let instance = builder.build().await.expect("create instance");
+async fn read_components_single_selector() -> Result<(), Error> {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
+        puppets: Some(vec![
+            ftest::PuppetDecl { name: "child_a".to_string() },
+            ftest::PuppetDecl { name: "child_b".to_string() },
+        ]),
+        ..Default::default()
+    })
+    .await
+    .expect("create realm");
 
-    let accessor =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let child_a = test_topology::connect_to_puppet(&realm_proxy, "child_a").await?;
+    child_a.set_health_ok().await?;
+
+    let child_b = test_topology::connect_to_puppet(&realm_proxy, "child_b").await?;
+    child_b.set_health_ok().await?;
+
+    let accessor = realm_proxy.connect_to_protocol::<ArchiveAccessorMarker>().await?;
     let data = ArchiveReader::new()
         .with_archive(accessor)
         .add_selector("child_a:root")
@@ -133,6 +142,8 @@ async fn read_components_single_selector() {
         }
     });
     assert_eq!(data[0].moniker, "child_a");
+
+    Ok(())
 }
 
 #[fuchsia::test]

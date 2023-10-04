@@ -64,7 +64,7 @@ async fn listen_for_syslog() {
 
 #[fuchsia::test]
 async fn listen_for_klog() {
-    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
         archivist_config: Some(ftest::ArchivistConfig::WithKernelLog),
         ..Default::default()
     })
@@ -85,7 +85,7 @@ async fn listen_for_klog() {
 
 #[fuchsia::test]
 async fn listen_for_syslog_routed_stdio() {
-    let realm_proxy = test_topology::create_realm(ftest::RealmOptions {
+    let realm_proxy = test_topology::create_realm(&ftest::RealmOptions {
         puppets: Some(vec![ftest::PuppetDecl { name: "stdio-puppet".to_string() }]),
         ..Default::default()
     })
