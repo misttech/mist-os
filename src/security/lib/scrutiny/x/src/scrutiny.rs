@@ -112,32 +112,12 @@ impl api::Scrutiny for Scrutiny {
         Box::new(self.0.packages.clone().into_iter())
     }
 
-    fn package_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn api::PackageResolver>>> {
-        todo!("TODO(fxbug.dev/111249): Integrate with production package resolver API")
-    }
-
     fn components(&self) -> Box<dyn Iterator<Item = Box<dyn api::Component>>> {
         todo!("TODO(fxbug.dev/111243): Integrate with production component API")
     }
 
-    fn component_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn api::ComponentResolver>>> {
-        todo!("TODO(fxbug.dev/111250): Integrate with production component resolver API")
-    }
-
-    fn component_capabilities(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn api::ComponentCapability>>> {
-        todo!("TODO(fxbug.dev/111244): Integrate with production component capability API")
-    }
-
     fn component_instances(&self) -> Box<dyn Iterator<Item = Box<dyn api::ComponentInstance>>> {
         todo!("TODO(fxbug.dev/111245): Integrate with production component instance API")
-    }
-
-    fn component_instance_capabilities(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn api::ComponentInstanceCapability>>> {
-        todo!("TODO(fxbug.dev/111246): Integrate with production component instance capability API")
     }
 }
 

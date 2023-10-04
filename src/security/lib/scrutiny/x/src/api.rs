@@ -7,7 +7,8 @@ use super::bootfs::AdditionalBootConfigurationError;
 use super::bootfs::BootfsPackageError;
 use super::bootfs::BootfsPackageIndexError;
 use super::bootfs::ComponentManagerConfigurationError;
-use super::component::Error as ComponentError;
+use cm_rust::CapabilityDecl;
+use cm_rust::ComponentDecl;
 use dyn_clone::clone_trait_object;
 use dyn_clone::DynClone;
 use fuchsia_url as furl;
@@ -78,26 +79,12 @@ pub trait Scrutiny {
     /// Iterate over all packages from all system data sources.
     fn packages(&self) -> Box<dyn Iterator<Item = Box<dyn Package>>>;
 
-    /// Iterate over all package resolvers in the system.
-    fn package_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn PackageResolver>>>;
-
     /// Iterate over all components in the system.
     fn components(&self) -> Box<dyn Iterator<Item = Box<dyn Component>>>;
-
-    /// Iterate over all component resolvers in the system.
-    fn component_resolvers(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentResolver>>>;
-
-    /// Iterate over all component's capabilities in the system.
-    fn component_capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
 
     /// Iterate over all component instances in the system. Note that a component instance is a
     /// component situated at a particular point in the system's component tree.
     fn component_instances(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstance>>>;
-
-    /// Iterate over all capabilities of component instances in the system.
-    fn component_instance_capabilities(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
 }
 
 /// High-level metadata about the system inspected by a [`Scrutiny`] instance.
@@ -240,10 +227,10 @@ pub trait ComponentManager {
     fn configuration(&self) -> Box<dyn ComponentManagerConfiguration>;
 
     /// Capabilities the system provides to the component manager.
-    fn namespace_capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
+    fn namespace_capabilities(&self) -> Box<dyn Iterator<Item = CapabilityDecl>>;
 
     /// Capabilities the component manager provides to all components that it manages.
-    fn builtin_capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
+    fn builtin_capabilities(&self) -> Box<dyn Iterator<Item = CapabilityDecl>>;
 }
 
 // TODO(fxbug.dev/112121): What should this API look like? This is just a starting point to
@@ -600,8 +587,6 @@ pub enum PackageComponentsError {
     Open(#[from] BlobError),
     #[error("failed read blob for parsing as component: {0}")]
     Read(#[from] std::io::Error),
-    #[error("failed read construct component from manifest: {0}")]
-    Component(#[from] ComponentError),
 }
 
 // TODO(fxbug.dev/112121): Define API consistent with fuchsia_pkg::MetaPackage.
@@ -720,24 +705,8 @@ pub trait Component {
     /// Returns the package from which this component was constructed.
     fn package(&self) -> Box<dyn Package>;
 
-    /// Iterate over known child component URLs.
-    fn children(&self) -> Box<dyn Iterator<Item = ComponentResolverUrl>>;
-
-    /// Iterate over capability that the component uses.
-    fn uses(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
-
-    /// Iterate over capabilities that the component exposes to its parent.
-    fn exposes(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
-
-    /// Iterate over capabilities that the component offers to one or more of its children.
-    fn offers(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
-
-    /// Iterate over capabilities defined by (i.e., originating from) the component.
-    fn capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentCapability>>>;
-
-    /// Iterate over instances of the component that appear in the component tree known to the
-    /// [`Scrutiny`] instance that underpins this component.
-    fn instances(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstance>>>;
+    /// Returns the component declaration parsed from the component manifest.
+    fn declaration(&self) -> ComponentDecl;
 }
 
 /// Model for a component resolution strategy. See
@@ -828,95 +797,6 @@ pub enum ComponentResolverUrlParseError {
     BootWithoutResource,
 }
 
-/// A capability named in a particular component manifest. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/component_manifests and
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities for details.
-pub trait ComponentCapability {
-    /// Accessor for component that names the capability.
-    fn component(&self) -> Box<dyn Component>;
-
-    /// Accessor for the kind of capability.
-    fn kind(&self) -> CapabilityKind;
-
-    /// Accessor for the component-local notion of the capability's source, such as the parent
-    /// component or a particular child component. Note that this is different from a
-    /// [`ComponentInstance`] notion of source, which refers to the component instance where the
-    /// capability originates before being routed around the component tree.
-    fn source(&self) -> CapabilitySource;
-
-    /// Accessor for the component-local notion of the capability's destination, such as the parent
-    /// component or a particular child component. Note that this is different from a
-    /// [`ComponentInstance`] notion of source, which refers to the component instances to which
-    /// the capability is routed to, and routed no further.
-    fn destination(&self) -> CapabilityDestination;
-
-    /// Accessor for the component-local source name for this capability, if any. Capabilities can
-    /// be renamed as they are routed around in the component tree by designating different source
-    /// and destination names.
-    fn source_name(&self) -> Option<Box<dyn ComponentCapabilityName>>;
-
-    /// Accessor for the component-local source name for this capability, if any. Capabilities can
-    /// be renamed as they are routed around in the component tree by designating different source
-    /// and destination names.
-    fn destination_name(&self) -> Option<Box<dyn ComponentCapabilityName>>;
-
-    /// Accessor for the component-local source path for this capability, if any. Capabilities can
-    /// be mapped to different path locations as they are routed around the component tree by
-    /// designating different source and destination paths.
-    fn source_path(&self) -> Option<Box<dyn ComponentCapabilityPath>>;
-
-    /// Accessor for the component-local destination path for this capability, if any. Capabilities
-    /// can be mapped to different path locations as they are routed around the component tree by
-    /// designating different source and destination paths.
-    fn destination_path(&self) -> Option<Box<dyn ComponentCapabilityPath>>;
-}
-
-/// Various kinds of capabilities that a [`Scrutiny`] instance can reason about. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities#capability-types for
-/// details.
-pub enum CapabilityKind {
-    // TODO(fxbug.dev/112121): Add kinds of capabilities based on cm capability types.
-    /// The kind of capability denoted in the component manfiest is not recognized by the
-    /// underlying [`Scrutiny`] instance.
-    Unknown,
-}
-
-/// The component-local source from which a capability is routed. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities#routing for details.
-pub enum CapabilitySource {
-    // TODO(fxbug.dev/112121): Add capability sources based on cm capability types.
-    /// The capability source denoted in the component manfiest is not recognized by the
-    /// underlying [`Scrutiny`] instance.
-    Unknown,
-}
-
-/// The component-local destination to which a capability is routed. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities#routing for details.
-pub enum CapabilityDestination {
-    // TODO(fxbug.dev/112121): Add capability destinations based on cm capability types.
-    /// The capability destination denoted in the component manfiest is not recognized by the
-    /// underlying [`Scrutiny`] instance.
-    Unknown,
-}
-
-/// The name of a capability in the context of its component manifest.
-pub trait ComponentCapabilityName {
-    /// Returns a borrowed string representation of the capability name.
-    fn as_str(&self) -> &str;
-
-    /// Accessor for the capability that uses this name.
-    fn component(&self) -> Box<dyn ComponentCapability>;
-}
-
-/// The path associated with a capability in the context of its component manifest.
-pub trait ComponentCapabilityPath {
-    /// Returns a copy of the capability path.
-    fn as_path(&self) -> Box<dyn Path>;
-
-    /// Accessor for the capability that uses this path.
-    fn component(&self) -> Box<dyn ComponentCapability>;
-}
-
 /// Model of a component instance that appears at a particular location in a component tree. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2/topology#component-instances for details.
 pub trait ComponentInstance {
@@ -941,18 +821,6 @@ pub trait ComponentInstance {
 
     /// Iterate over the full set of ancestors above this component in the component tree.
     fn ancestors(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstance>>>;
-
-    /// Iterate over capabilities that the component instance uses.
-    fn uses(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-
-    /// Iterate over capabilities that the component instance exposes to its parent.
-    fn exposes(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-
-    /// Iterate over capabilities that the component instance offers to one or more of its children.
-    fn offers(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-
-    /// Iterate over capabilities defined by (i.e., originating from) the component instance.
-    fn capabilities(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
 }
 
 // TODO(fxbug.dev/112121): Define API compatible with moniker::Moniker.
@@ -968,37 +836,6 @@ pub trait Moniker {}
 /// the component tree constructed by the underlying [`Scrutiny`] instance. See
 /// https://fuchsia.dev/fuchsia-src/concepts/components/v2/environments for details.
 pub trait Environment {}
-
-/// A capability named by a component instance in the context of the component tree constructed
-/// by the underlying [`Scrutiny`] instance. See
-/// https://fuchsia.dev/fuchsia-src/concepts/components/v2/capabilities#routing for details.
-pub trait ComponentInstanceCapability {
-    /// Accessor for the component capability for which this instance is a special case.
-    fn component_capability(&self) -> Box<dyn ComponentCapability>;
-
-    /// Accessor for the component instance that names this capability.
-    fn component_instance(&self) -> Box<dyn ComponentInstance>;
-
-    /// The source where this capability originates.
-    fn source(&self) -> Box<dyn ComponentInstanceCapability>;
-
-    /// Iterate over the component instance capabilities that constitute the capability route from
-    /// its origin to this component instance capability (inclusive).
-    fn source_path(&self) -> Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>;
-
-    /// Iterate over the component instance capabilities that constitute all routes from this
-    /// component instance capability to destinations that route no further (inclusive).
-    fn destination_paths(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>>>;
-
-    /// Iterate over the component instance capabilities that constitute all routes from this
-    /// component instance capability's source to all destinations that route no further
-    /// (inclusive).
-    fn all_paths(
-        &self,
-    ) -> Box<dyn Iterator<Item = Box<dyn Iterator<Item = Box<dyn ComponentInstanceCapability>>>>>;
-}
 
 #[cfg(test)]
 mod tests {

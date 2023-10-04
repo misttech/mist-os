@@ -272,7 +272,7 @@ impl api::Package for Package {
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
                 let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest)?);
+                    Box::new(Component::new(package.clone(), manifest));
                 components.push((path, component));
             }
         }
@@ -284,7 +284,7 @@ impl api::Package for Package {
             if let Ok(manifest) = fidl::unpersist::<fdecl::Component>(bytes.as_slice()) {
                 let manifest = manifest.fidl_into_native();
                 let component: Box<dyn api::Component> =
-                    Box::new(Component::new(package.clone(), manifest).expect("component"));
+                    Box::new(Component::new(package.clone(), manifest));
                 components.push((path, component));
             }
         }
