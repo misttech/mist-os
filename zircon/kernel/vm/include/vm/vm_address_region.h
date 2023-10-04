@@ -175,8 +175,8 @@ class VmAddressRegionOrMapping
 
  private:
   fbl::Canary<fbl::magic("VMRM")> canary_;
-  const bool is_mapping_;
   VmAddressRegionSubtreeState subtree_state_ TA_GUARDED(lock());
+  const bool is_mapping_;
 
  protected:
   // friend VmAddressRegion so it can access DestroyLocked
