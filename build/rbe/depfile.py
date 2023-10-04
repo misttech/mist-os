@@ -10,7 +10,7 @@ import dataclasses
 import re
 
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Sequence
+from typing import AbstractSet, Callable, Iterable, Optional, Sequence
 
 
 class LexError(ValueError):
@@ -172,6 +172,12 @@ class Dep(object):
     def is_phony(self) -> bool:
         return len(self.deps) == 0
 
+    @property
+    def absolute_paths(self) -> AbstractSet[Path]:
+        return {
+            p for p in self.target_paths + self.deps_paths if p.is_absolute()
+        }
+
 
 class _ParserState(enum.Enum):
     EXPECTING_FIRST_TARGET = 0
@@ -263,7 +269,7 @@ def parse_lines(lines: Iterable[str]) -> Iterable[Dep]:
     """Parse lines of a depfile.
 
     Args:
-      lines: lines of depfile
+      lines: lines of depfile (including trailing newline)
 
     Yields:
       Dep objects.
@@ -272,3 +278,10 @@ def parse_lines(lines: Iterable[str]) -> Iterable[Dep]:
       ParseError or LexError if input is malformed.
     """
     yield from _parse_tokens(lex(lines))
+
+
+def absolute_paths(deps: Iterable[Dep]) -> AbstractSet[Path]:
+    unique_paths = set()
+    for d in deps:
+        unique_paths.update(d.absolute_paths)
+    return unique_paths

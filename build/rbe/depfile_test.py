@@ -292,6 +292,48 @@ class ParseOneDepTests(unittest.TestCase):
                 )
             )
 
+    def test_absolute_paths_none(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # multiple targets
+                    depfile.Token("target/thing", depfile.TokenType.PATH),
+                    depfile.Token(":", depfile.TokenType.COLON),
+                    depfile.Token("src/dep.cc", depfile.TokenType.PATH),
+                    depfile.Token("\n", depfile.TokenType.NEWLINE),
+                ]
+            )
+        )
+        self.assertEqual(dep.absolute_paths, set())
+
+    def test_absolute_paths_target(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # multiple targets
+                    depfile.Token("/target/thing", depfile.TokenType.PATH),
+                    depfile.Token(":", depfile.TokenType.COLON),
+                    depfile.Token("src/dep.cc", depfile.TokenType.PATH),
+                    depfile.Token("\n", depfile.TokenType.NEWLINE),
+                ]
+            )
+        )
+        self.assertEqual(dep.absolute_paths, {Path("/target/thing")})
+
+    def test_absolute_paths_dep(self):
+        dep = depfile._parse_one_dep(
+            iter(
+                [
+                    # multiple targets
+                    depfile.Token("target/thing", depfile.TokenType.PATH),
+                    depfile.Token(":", depfile.TokenType.COLON),
+                    depfile.Token("/src/dep.cc", depfile.TokenType.PATH),
+                    depfile.Token("\n", depfile.TokenType.NEWLINE),
+                ]
+            )
+        )
+        self.assertEqual(dep.absolute_paths, {Path("/src/dep.cc")})
+
 
 class ParseLinesTestes(unittest.TestCase):
     def test_empty(self):
@@ -359,6 +401,29 @@ class ParseLinesTestes(unittest.TestCase):
         self.assertEqual(deps[2].target_paths, [Path("p.out")])
         self.assertEqual(deps[2].deps_paths, [])
         self.assertTrue(deps[2].is_phony)
+
+
+class AbsolutePathsTests(unittest.TestCase):
+    def test_none_found(self):
+        abspaths = depfile.absolute_paths(
+            depfile.parse_lines(
+                ["a.out: bb.o\n", "z.out :\\\n", "y.h\n", "p.out : \n"]
+            )
+        )
+        self.assertEqual(abspaths, set())
+
+    def test_some_found(self):
+        abspaths = depfile.absolute_paths(
+            depfile.parse_lines(
+                [
+                    "/tmp/a.out: bb.o\n",
+                    "z.out :\\\n",
+                    "/foo/y.h\n",
+                    "p.out : \n",
+                ]
+            )
+        )
+        self.assertEqual(abspaths, {Path("/tmp/a.out"), Path("/foo/y.h")})
 
 
 if __name__ == "__main__":

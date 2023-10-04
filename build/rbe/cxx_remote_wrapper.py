@@ -198,7 +198,32 @@ class CxxRemoteAction(object):
         # to the remote build environment, use -no-canonical-prefixes (clang and
         # gcc).  Otherwise, you will need to self._rewrite_remote_depfile().
 
+        # This is temporary to help debug the origins of unexpected absolute
+        # paths in remote depfiles.
+        if self.compiler_type == cxx.Compiler.GCC and self.depfile.exists():
+            return self._verify_remote_depfile()
+
         # TODO: if downloads were skipped, need to force-download depfile
+        return 0
+
+    def _verify_remote_depfile(self) -> int:
+        abspaths = depfile.absolute_paths(
+            depfile.parse_lines(
+                self.depfile.read_text().splitlines(keepends=True)
+            )
+        )
+        if abspaths:
+            msg(
+                f"Found the following absolute paths in {self.depfile}: {abspaths}"
+            )
+            msg(
+                "Absolute paths pointing to remote build environments will fail the ninja-no-op check."
+            )
+            msg(
+                "Recommend: pass only relative paths and  '-no-canonical-prefixes' to the compiler."
+            )
+            return 1
+
         return 0
 
     def _rewrite_remote_depfile(self):

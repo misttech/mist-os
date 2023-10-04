@@ -302,7 +302,9 @@ def rewrite_file_by_lines_in_place(
 def rewrite_depfile(
     dep_file: Path, transform: Callable[[str], str], output: Path = None
 ):
-    """Relativize absolute paths in a depfile.
+    """Apply generic path transformations to a depfile.
+
+    e.g. Relativize absolute paths.
 
     Args:
       dep_file: depfile to transform
