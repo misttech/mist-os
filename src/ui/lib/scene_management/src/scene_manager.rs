@@ -12,7 +12,7 @@ use {
     async_trait::async_trait,
     async_utils::hanging_get::server as hanging_get,
     fidl,
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
     fidl_fuchsia_ui_app as ui_app,
     fidl_fuchsia_ui_composition::{self as ui_comp, ContentId, TransformId},
@@ -32,6 +32,7 @@ use {
     math as fmath,
     parking_lot::Mutex,
     std::collections::VecDeque,
+    std::process,
     std::sync::{Arc, Weak},
     tracing::{error, info, warn},
 };
@@ -451,6 +452,10 @@ impl SceneManager {
         display_pixel_density: Option<f32>,
         viewing_distance: Option<ViewingDistance>,
     ) -> Result<Self, Error> {
+        // If scenic closes, all the Scenic connections become invalid. This task exits the
+        // process in response.
+        start_exit_on_scenic_closed_task(display.clone());
+
         let mut id_generator = scenic::flatland::IdGenerator::new();
 
         // Generate unique transform/content IDs that will be used to create the sub-scenegraphs
@@ -801,6 +806,15 @@ pub fn create_viewport_hanging_get(
     Arc::new(Mutex::new(hanging_get::HangingGet::new(initial_spec, notify_fn)))
 }
 
+pub fn start_exit_on_scenic_closed_task(flatland_proxy: ui_comp::FlatlandDisplayProxy) {
+    fasync::Task::local(async move {
+        let _ = flatland_proxy.on_closed().await;
+        info!("Scenic died, closing SceneManager too.");
+        process::exit(1);
+    })
+    .detach()
+}
+
 pub fn start_flatland_presentation_loop(
     mut receiver: PresentationReceiver,
     weak_flatland: Weak<Mutex<ui_comp::FlatlandProxy>>,
@@ -836,7 +850,7 @@ pub fn start_flatland_presentation_loop(
                         None => {}
                     }
                 }
-                flatland_event = flatland_event_stream.next().fuse() => {
+                flatland_event = flatland_event_stream.next() => {
                     match flatland_event {
                         Some(Ok(ui_comp::FlatlandEvent::OnNextFrameBegin{ values })) => {
                             trace::duration!("scene_manager", "SceneManager::OnNextFrameBegin",

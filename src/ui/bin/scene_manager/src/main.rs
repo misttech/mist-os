@@ -424,6 +424,7 @@ pub async fn handle_scene_manager_request_stream(
     while let Ok(Some(request)) = request_stream.try_next().await {
         match request {
             SceneManagerRequest::SetRootView { view_provider, responder } => {
+                info!("Processing SceneManagerRequest::SetRootView().");
                 if let Ok(proxy) = view_provider.into_proxy() {
                     let mut scene_manager = scene_manager.lock().await;
                     let set_root_view_result =
@@ -447,6 +448,7 @@ pub async fn handle_scene_manager_request_stream(
                 }
             }
             SceneManagerRequest::PresentRootView { viewport_creation_token, responder } => {
+                info!("Processing SceneManagerRequest::PresentRootView().");
                 let mut scene_manager = scene_manager.lock().await;
                 let set_root_view_result =
                     scene_manager.set_root_view(viewport_creation_token, None).await.map_err(|e| {
