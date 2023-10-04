@@ -82,7 +82,10 @@ where
     };
 
     for base_url in &base_urls {
-        let prods = pb_gather_from_url(base_url, auth, ui, &client).await?;
+        let prods = pb_gather_from_url(base_url, auth, ui, &client).await.unwrap_or_else(|_| {
+            println!("Failed to fetch from base_url: {}", &base_url);
+            Vec::new()
+        });
         products.extend(prods);
     }
 
