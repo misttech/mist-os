@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Once};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Once},
+};
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_net as fidl_net;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_stack as fidl_net_stack;
@@ -37,6 +40,7 @@ use tracing_subscriber::{
 use crate::bindings::{
     ctx::BindingsNonSyncCtxImpl,
     devices::{BindingId, Devices},
+    routes,
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
     Ctx, TimerId, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
@@ -742,17 +746,20 @@ async fn test_list_del_routes() {
             .non_sync_ctx()
             .apply_route_change_either(match route.into() {
                 netstack3_core::ip::types::AddableEntryEither::V4(entry) => {
-                    crate::bindings::routes::ChangeEither::V4(crate::bindings::routes::Change::Add(
-                        entry,
+                    routes::ChangeEither::V4(routes::Change::RouteOp(
+                        routes::RouteOp::Add(entry),
+                        routes::SetMembership::Global,
                     ))
                 }
                 netstack3_core::ip::types::AddableEntryEither::V6(entry) => {
-                    crate::bindings::routes::ChangeEither::V6(crate::bindings::routes::Change::Add(
-                        entry,
+                    routes::ChangeEither::V6(routes::Change::RouteOp(
+                        routes::RouteOp::Add(entry),
+                        routes::SetMembership::Global,
                     ))
                 }
             })
             .await
+            .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("add route should succeed");
     }
 

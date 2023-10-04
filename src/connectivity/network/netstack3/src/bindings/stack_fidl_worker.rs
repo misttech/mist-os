@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::{
+    routes,
     util::{TryFromFidlWithContext as _, TryIntoCore as _},
     Ctx,
 };
@@ -97,7 +98,7 @@ impl StackFidlWorker {
         };
 
         type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
-        fn try_to_storable_entry<I: Ip>(
+        fn try_to_addable_entry<I: Ip>(
             ctx: &mut Ctx,
             entry: AddableEntry<I::Addr, Option<DeviceId>>,
         ) -> Option<AddableEntry<I::Addr, DeviceId>> {
@@ -117,13 +118,13 @@ impl StackFidlWorker {
 
         let entry = match entry {
             AddableEntryEither::V4(entry) => {
-                try_to_storable_entry::<Ipv4>(&mut self.netstack.ctx, entry)
+                try_to_addable_entry::<Ipv4>(&mut self.netstack.ctx, entry)
                     .ok_or(fidl_net_stack::Error::BadState)?
                     .map_device_id(|d| d.downgrade())
                     .into()
             }
             AddableEntryEither::V6(entry) => {
-                try_to_storable_entry::<Ipv6>(&mut self.netstack.ctx, entry)
+                try_to_addable_entry::<Ipv6>(&mut self.netstack.ctx, entry)
                     .ok_or(fidl_net_stack::Error::BadState)?
                     .map_device_id(|d| d.downgrade())
                     .into()
@@ -133,17 +134,23 @@ impl StackFidlWorker {
         self.netstack
             .ctx
             .non_sync_ctx()
-            .apply_route_change_either(crate::bindings::routes::ChangeEither::add(entry))
+            .apply_route_change_either(routes::ChangeEither::add(
+                entry,
+                routes::SetMembership::Global,
+            ))
             .await
             .map_err(|err| match err {
-                crate::bindings::routes::Error::AlreadyExists => {
-                    fidl_net_stack::Error::AlreadyExists
-                }
-                crate::bindings::routes::Error::NotFound => fidl_net_stack::Error::NotFound,
-                crate::bindings::routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
-                crate::bindings::routes::Error::ShuttingDown => panic!(
+                routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                routes::Error::ShuttingDown => panic!(
                     "can't apply route change because route change runner has been shut down"
                 ),
+                routes::Error::SetRemoved => {
+                    unreachable!("fuchsia.net.stack only uses the global route set")
+                }
+            })
+            .and_then(|outcome| match outcome {
+                routes::ChangeOutcome::NoChange => Err(fidl_net_stack::Error::AlreadyExists),
+                routes::ChangeOutcome::Changed => Ok(()),
             })
     }
 
@@ -155,25 +162,30 @@ impl StackFidlWorker {
         if let Ok(subnet) = subnet.try_into_core() {
             non_sync_ctx
                 .apply_route_change_either(match subnet {
-                    net_types::ip::SubnetEither::V4(subnet) => {
-                        crate::bindings::routes::Change::RemoveToSubnet(subnet).into()
-                    }
-                    net_types::ip::SubnetEither::V6(subnet) => {
-                        crate::bindings::routes::Change::RemoveToSubnet(subnet).into()
-                    }
+                    net_types::ip::SubnetEither::V4(subnet) => routes::Change::RouteOp(
+                        routes::RouteOp::RemoveToSubnet(subnet),
+                        routes::SetMembership::Global,
+                    )
+                    .into(),
+                    net_types::ip::SubnetEither::V6(subnet) => routes::Change::RouteOp(
+                        routes::RouteOp::RemoveToSubnet(subnet),
+                        routes::SetMembership::Global,
+                    )
+                    .into(),
                 })
                 .await
                 .map_err(|err| match err {
-                    crate::bindings::routes::Error::AlreadyExists => {
-                        fidl_net_stack::Error::AlreadyExists
-                    }
-                    crate::bindings::routes::Error::NotFound => fidl_net_stack::Error::NotFound,
-                    crate::bindings::routes::Error::DeviceRemoved => {
-                        fidl_net_stack::Error::InvalidArgs
-                    }
-                    crate::bindings::routes::Error::ShuttingDown => panic!(
+                    routes::Error::DeviceRemoved => fidl_net_stack::Error::InvalidArgs,
+                    routes::Error::ShuttingDown => panic!(
                         "can't apply route change because route change runner has been shut down"
                     ),
+                    super::routes::Error::SetRemoved => {
+                        unreachable!("fuchsia.net.stack only uses the global route set")
+                    }
+                })
+                .and_then(|outcome| match outcome {
+                    routes::ChangeOutcome::NoChange => Err(fidl_net_stack::Error::NotFound),
+                    routes::ChangeOutcome::Changed => Ok(()),
                 })
         } else {
             Err(fidl_net_stack::Error::InvalidArgs)

@@ -63,6 +63,8 @@ pub fn main() {
         .add_fidl_service(Service::RoutesState)
         .add_fidl_service(Service::RoutesStateV4)
         .add_fidl_service(Service::RoutesStateV6)
+        .add_fidl_service(Service::RoutesAdminV4)
+        .add_fidl_service(Service::RoutesAdminV6)
         .add_fidl_service(Service::Interfaces)
         .add_fidl_service(Service::InterfacesAdmin)
         .add_fidl_service(Service::Filter)

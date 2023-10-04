@@ -4,7 +4,10 @@
 
 //! Extensions for fuchsia.net.routes.admin.
 
+use std::fmt::Debug;
+
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use futures::future::Either;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
@@ -29,17 +32,83 @@ pub trait FidlRouteAdminIpExt: Ip {
     type SetProviderMarker: DiscoverableProtocolMarker;
     /// The "route set" protocol to use for this IP version.
     type RouteSetMarker: ProtocolMarker;
+    /// The request stream for the route set protocol.
+    type RouteSetRequestStream: fidl::endpoints::RequestStream;
+    /// The responder for AddRoute requests.
+    type AddRouteResponder: Responder<Payload = Result<bool, fnet_routes_admin::RouteSetError>>;
+    /// The responder for RemoveRoute requests.
+    type RemoveRouteResponder: Responder<Payload = Result<bool, fnet_routes_admin::RouteSetError>>;
+    /// The responder for AuthenticateForInterface requests.
+    type AuthenticateForInterfaceResponder: Responder<
+        Payload = Result<(), fnet_routes_admin::AuthenticateForInterfaceError>,
+    >;
 }
 
 impl FidlRouteAdminIpExt for Ipv4 {
     type SetProviderMarker = fnet_routes_admin::SetProviderV4Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV4Marker;
+    type RouteSetRequestStream = fnet_routes_admin::RouteSetV4RequestStream;
+    type AddRouteResponder = fnet_routes_admin::RouteSetV4AddRouteResponder;
+    type RemoveRouteResponder = fnet_routes_admin::RouteSetV4RemoveRouteResponder;
+    type AuthenticateForInterfaceResponder =
+        fnet_routes_admin::RouteSetV4AuthenticateForInterfaceResponder;
 }
 
 impl FidlRouteAdminIpExt for Ipv6 {
     type SetProviderMarker = fnet_routes_admin::SetProviderV6Marker;
     type RouteSetMarker = fnet_routes_admin::RouteSetV6Marker;
+    type RouteSetRequestStream = fnet_routes_admin::RouteSetV6RequestStream;
+    type AddRouteResponder = fnet_routes_admin::RouteSetV6AddRouteResponder;
+    type RemoveRouteResponder = fnet_routes_admin::RouteSetV6RemoveRouteResponder;
+    type AuthenticateForInterfaceResponder =
+        fnet_routes_admin::RouteSetV6AuthenticateForInterfaceResponder;
 }
+
+/// Abstracts over AddRoute and RemoveRoute RouteSet method responders.
+pub trait Responder: fidl::endpoints::Responder + Debug {
+    /// The payload of the response.
+    type Payload;
+
+    /// Sends a FIDL response.
+    fn send(self, result: Self::Payload) -> Result<(), fidl::Error>;
+}
+
+macro_rules! impl_responder {
+    ($resp:ty, $payload:ty $(,)?) => {
+        impl Responder for $resp {
+            type Payload = $payload;
+
+            fn send(self, result: Self::Payload) -> Result<(), fidl::Error> {
+                <$resp>::send(self, result)
+            }
+        }
+    };
+}
+
+impl_responder!(
+    fnet_routes_admin::RouteSetV4AddRouteResponder,
+    Result<bool, fnet_routes_admin::RouteSetError>,
+);
+impl_responder!(
+    fnet_routes_admin::RouteSetV4RemoveRouteResponder,
+    Result<bool, fnet_routes_admin::RouteSetError>,
+);
+impl_responder!(
+    fnet_routes_admin::RouteSetV6AddRouteResponder,
+    Result<bool, fnet_routes_admin::RouteSetError>,
+);
+impl_responder!(
+    fnet_routes_admin::RouteSetV6RemoveRouteResponder,
+    Result<bool, fnet_routes_admin::RouteSetError>,
+);
+impl_responder!(
+    fnet_routes_admin::RouteSetV4AuthenticateForInterfaceResponder,
+    Result<(), fnet_routes_admin::AuthenticateForInterfaceError>,
+);
+impl_responder!(
+    fnet_routes_admin::RouteSetV6AuthenticateForInterfaceResponder,
+    Result<(), fnet_routes_admin::AuthenticateForInterfaceError>,
+);
 
 /// Dispatches `new_route_set` on either the `SetProviderV4`
 /// or `SetProviderV6` proxy.
@@ -112,4 +181,71 @@ pub async fn remove_route<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
         },
     );
     result_fut.await
+}
+
+/// GenericOverIp version of RouteSetV{4, 6}Request.
+#[derive(GenericOverIp, Debug)]
+#[generic_over_ip(I, Ip)]
+pub enum RouteSetRequest<I: FidlRouteAdminIpExt> {
+    /// Adds a route to the route set.
+    AddRoute {
+        /// The route to add.
+        route: Result<
+            crate::Route<I>,
+            crate::FidlConversionError<crate::RoutePropertiesRequiredFields>,
+        >,
+        /// The responder for this request.
+        responder: I::AddRouteResponder,
+    },
+    /// Removes a route from the route set.
+    RemoveRoute {
+        /// The route to add.
+        route: Result<
+            crate::Route<I>,
+            crate::FidlConversionError<crate::RoutePropertiesRequiredFields>,
+        >,
+        /// The responder for this request.
+        responder: I::RemoveRouteResponder,
+    },
+    /// Authenticates the route set for managing routes on an interface.
+    AuthenticateForInterface {
+        /// The credential proving authorization for this interface.
+        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+        /// The responder for this request.
+        responder: I::AuthenticateForInterfaceResponder,
+    },
+}
+
+impl From<fnet_routes_admin::RouteSetV4Request> for RouteSetRequest<Ipv4> {
+    fn from(value: fnet_routes_admin::RouteSetV4Request) -> Self {
+        match value {
+            fnet_routes_admin::RouteSetV4Request::AddRoute { route, responder } => {
+                RouteSetRequest::AddRoute { route: route.try_into(), responder }
+            }
+            fnet_routes_admin::RouteSetV4Request::RemoveRoute { route, responder } => {
+                RouteSetRequest::RemoveRoute { route: route.try_into(), responder }
+            }
+            fnet_routes_admin::RouteSetV4Request::AuthenticateForInterface {
+                credential,
+                responder,
+            } => RouteSetRequest::AuthenticateForInterface { credential, responder },
+        }
+    }
+}
+
+impl From<fnet_routes_admin::RouteSetV6Request> for RouteSetRequest<Ipv6> {
+    fn from(value: fnet_routes_admin::RouteSetV6Request) -> Self {
+        match value {
+            fnet_routes_admin::RouteSetV6Request::AddRoute { route, responder } => {
+                RouteSetRequest::AddRoute { route: route.try_into(), responder }
+            }
+            fnet_routes_admin::RouteSetV6Request::RemoveRoute { route, responder } => {
+                RouteSetRequest::RemoveRoute { route: route.try_into(), responder }
+            }
+            fnet_routes_admin::RouteSetV6Request::AuthenticateForInterface {
+                credential,
+                responder,
+            } => RouteSetRequest::AuthenticateForInterface { credential, responder },
+        }
+    }
 }

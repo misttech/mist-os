@@ -36,8 +36,8 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx, DeviceId,
-    DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
+    devices, interfaces_admin, routes, trace_duration, BindingId, BindingsNonSyncCtxImpl, Ctx,
+    DeviceId, DeviceIdExt as _, Ipv6DeviceConfiguration, Netstack, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -140,7 +140,9 @@ impl NetdeviceWorker {
                 // be removed under us. Note that when the device removal has
                 // completed, the interface's `PortHandler` will be uninstalled
                 // from the port slab (table of ports for this network device).
-                tracing::debug!("received frame for device after it has been removed; device_id={:?}", id);
+                tracing::debug!(
+                    "received frame for device after it has been removed; device_id={id:?}"
+                );
                 // We continue because even though we got frames for a removed
                 // device, this network device may have other ports that will
                 // receive and handle frames.
@@ -527,7 +529,12 @@ async fn add_initial_routes(
         ),
     ]
     .into_iter()
-    .map(crate::bindings::routes::Change::Add)
+    .map(|entry| {
+        routes::Change::RouteOp(
+            routes::RouteOp::Add(entry),
+            routes::SetMembership::InitialDeviceRoutes,
+        )
+    })
     .map(Into::into);
 
     let v6_changes = [
@@ -543,13 +550,19 @@ async fn add_initial_routes(
         ),
     ]
     .into_iter()
-    .map(crate::bindings::routes::Change::Add)
+    .map(|entry| {
+        routes::Change::RouteOp(
+            routes::RouteOp::Add(entry),
+            routes::SetMembership::InitialDeviceRoutes,
+        )
+    })
     .map(Into::into);
 
     for change in v4_changes.chain(v6_changes) {
         non_sync_ctx
             .apply_route_change_either(change)
             .await
+            .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding initial routes should succeed");
     }
 }

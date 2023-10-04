@@ -497,7 +497,7 @@ impl<T> Strong<T> {
 ///
 /// Note that `Weak`'s implementation of [`Hash`] and [`PartialEq`] operate on
 /// the pointer itself and not the underlying data.
-#[derive(Debug, Derivative)]
+#[derive(Debug)]
 pub struct Weak<T>(alloc::sync::Weak<Inner<T>>);
 
 impl<T> core::cmp::Eq for Weak<T> {}

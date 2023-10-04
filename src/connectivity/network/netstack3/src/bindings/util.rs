@@ -26,9 +26,8 @@ use net_types::{
         AddrSubnetEither, AddrSubnetError, GenericOverIp, Ip, IpAddr, IpAddress,
         IpInvariant as IpInv, Ipv4Addr, Ipv6Addr, SubnetEither, SubnetError,
     },
-    AddrAndZone, MulticastAddr, ZonedAddr,
+    AddrAndZone, MulticastAddr, SpecifiedAddr, Witness, ZonedAddr,
 };
-use net_types::{SpecifiedAddr, Witness};
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{ExistsError, NetstackError, NotFoundError},
@@ -1144,6 +1143,53 @@ impl TryFromFidlWithContext<fidl_net_stack::ForwardingEntry>
                 return Err(ForwardingConversionError::TypeMismatch)
             }
         })
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub(crate) enum AddableEntryFromRoutesExtError {
+    UnknownAction,
+    DeviceNotFound,
+}
+
+impl<I: Ip> TryFromFidlWithContext<fnet_routes_ext::Route<I>>
+    for AddableEntry<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>
+{
+    type Error = AddableEntryFromRoutesExtError;
+
+    fn try_from_fidl_with_ctx<C: ConversionContext>(
+        ctx: &C,
+        fidl: fnet_routes_ext::Route<I>,
+    ) -> Result<Self, Self::Error> {
+        let fnet_routes_ext::Route {
+            destination,
+            action,
+            properties:
+                fnet_routes_ext::RouteProperties {
+                    specified_properties: fnet_routes_ext::SpecifiedRouteProperties { metric },
+                },
+        } = fidl;
+        let fnet_routes_ext::RouteTarget { outbound_interface, next_hop } = match action {
+            fnet_routes_ext::RouteAction::Unknown => {
+                return Err(AddableEntryFromRoutesExtError::UnknownAction)
+            }
+            fnet_routes_ext::RouteAction::Forward(target) => target,
+        };
+        let device: DeviceId<BindingsNonSyncCtxImpl> = BindingId::new(outbound_interface)
+            .ok_or(AddableEntryFromRoutesExtError::DeviceNotFound)?
+            .try_into_core_with_ctx(ctx)
+            .map_err(|DeviceNotFoundError| AddableEntryFromRoutesExtError::DeviceNotFound)?;
+
+        let metric = match metric {
+            fnet_routes::SpecifiedMetric::InheritedFromInterface(fnet_routes::Empty) => {
+                AddableMetric::MetricTracksInterface
+            }
+            fnet_routes::SpecifiedMetric::ExplicitMetric(metric) => {
+                AddableMetric::ExplicitMetric(RawMetric(metric))
+            }
+        };
+
+        Ok(AddableEntry { subnet: destination, device, gateway: next_hop, metric })
     }
 }
 

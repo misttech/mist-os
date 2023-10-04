@@ -58,8 +58,9 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices, netdevice_worker, util::IntoCore as _, util::TryIntoCore as _, BindingId, Ctx,
-    DeviceIdExt as _, Netstack, StackTime,
+    devices, netdevice_worker, routes,
+    util::{IntoCore as _, TryIntoCore as _},
+    BindingId, Ctx, DeviceIdExt as _, Netstack, StackTime,
 };
 
 use super::BindingsNonSyncCtxImpl;
@@ -1094,7 +1095,7 @@ async fn run_address_state_provider(
     let (address, subnet) = addr_subnet_either.addr_subnet();
     struct StateInCore {
         address: bool,
-        subnet_route: bool,
+        subnet_route: Option<routes::admin::UserRouteSet>,
     }
 
     // Add the address to Core. Note that even though we verified the address
@@ -1121,7 +1122,7 @@ async fn run_address_state_provider(
             );
             // The address already existed, so don't attempt to remove it.
             // Otherwise we would accidentally remove an address we didn't add!
-            (StateInCore { address: false, subnet_route: false }, None)
+            (StateInCore { address: false, subnet_route: None }, None)
         }
         Ok(()) => {
             let state_to_remove = if add_subnet_route {
@@ -1132,38 +1133,49 @@ async fn run_address_state_provider(
                     .expect("missing device info for interface")
                     .downgrade();
 
-                let add_route_result = non_sync_ctx.apply_route_change_either(
-                    crate::bindings::routes::ChangeEither::add(
-                        match subnet {
-                            net_types::ip::SubnetEither::V4(subnet) => {
-                                netstack3_core::ip::types::AddableEntry {
-                                    subnet,
-                                    device: core_id,
-                                    metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
-                                    gateway: None,
-                                }.into()
-                            }
-                            net_types::ip::SubnetEither::V6(subnet) => {
-                                netstack3_core::ip::types::AddableEntry {
-                                    subnet,
-                                    device: core_id,
-                                    metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
-                                    gateway: None,
-                                }.into()
-                            }
-                        }
-                    )
-                ).await;
+                let route_set = routes::admin::UserRouteSet::new(ctx.clone());
+
+                let add_route_result = match subnet {
+                    net_types::ip::SubnetEither::V4(subnet) => {
+                        let entry = netstack3_core::ip::types::AddableEntry {
+                            subnet,
+                            device: core_id,
+                            metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                            gateway: None,
+                        };
+                        route_set.apply_route_op(routes::RouteOp::Add(entry)).await
+                    }
+                    net_types::ip::SubnetEither::V6(subnet) => {
+                        let entry = netstack3_core::ip::types::AddableEntry {
+                            subnet,
+                            device: core_id,
+                            metric: netstack3_core::ip::types::AddableMetric::MetricTracksInterface,
+                            gateway: None,
+                        };
+                        route_set.apply_route_op(routes::RouteOp::Add(entry)).await
+                    }
+                };
 
                 match add_route_result {
                     Err(e) => {
                         tracing::warn!("failed to add subnet route {:?}: {:?}", subnet, e);
-                        StateInCore { address: true, subnet_route: false }
+                        route_set.close().await;
+                        StateInCore { address: true, subnet_route: None }
                     }
-                    Ok(()) => StateInCore { address: true, subnet_route: true },
+                    Ok(outcome) => {
+                        assert_matches!(
+                            outcome,
+                            routes::ChangeOutcome::Changed,
+                            "subnet route for {subnet:?} should be new to \
+                            route set, since route set was created especially \
+                            for this"
+                        );
+
+                        StateInCore { address: true, subnet_route: Some(route_set) }
+                    }
                 }
             } else {
-                StateInCore { address: true, subnet_route: false }
+                StateInCore { address: true, subnet_route: None }
             };
 
             control_handle.send_on_address_added().unwrap_or_else(|e| {
@@ -1225,34 +1237,16 @@ async fn run_address_state_provider(
             }
         };
 
-    let StateInCore { address: remove_address, subnet_route: remove_subnet_route } =
-        state_to_remove_from_core;
+    let StateInCore { address: remove_address, subnet_route } = state_to_remove_from_core;
     let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
-    if remove_subnet_route {
-        // TODO(https://fxbug.dev/123319): Migrate away from the
-        // `add_subnet_route` flag and only remove the route when the
-        // last handle for it is gone.
-        //
-        // The `add_subnet_route` flag is deprecated and is only being
-        // used to support the DHCP client. Once the new routes admin
-        // API is implemented, the flag will be removed and its usages
-        // will be migrated. Until then, provide best-effort support
-        // without complex reference counting.
-        match non_sync_ctx
-            .apply_route_change_either(
-                crate::bindings::routes::ChangeEither::remove_matching_without_gateway(
-                    subnet,
-                    device_id.downgrade(),
-                ),
-            )
-            .await
-        {
-            Ok(()) => {}
-            Err(e) => {
-                tracing::error!("error removing subnet route {subnet:?}: {e:?}");
-            }
-        }
+
+    // The presence of this `route_set` indicates that we added a subnet route
+    // previously due to the `add_subnet_route` AddressParameters option.
+    // Closing `route_set` will correctly remove this route.
+    if let Some(route_set) = subnet_route {
+        route_set.close().await;
     }
+
     if remove_address {
         assert_matches!(
             netstack3_core::del_ip_addr(sync_ctx, non_sync_ctx, &device_id, address),
@@ -1783,8 +1777,7 @@ mod tests {
 
     use crate::bindings::{
         integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder},
-        interfaces_watcher::InterfaceEvent,
-        interfaces_watcher::InterfaceUpdate,
+        interfaces_watcher::{InterfaceEvent, InterfaceUpdate},
         util::IntoFidl,
     };
 

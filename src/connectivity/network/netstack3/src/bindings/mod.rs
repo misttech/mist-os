@@ -41,7 +41,8 @@ use std::{
     time::Duration,
 };
 
-use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
+use assert_matches::assert_matches;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestStream};
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
@@ -122,7 +123,7 @@ mod ctx {
     }
 
     impl Ctx {
-        fn new(routes_change_sink: crate::bindings::routes::ChangeSink) -> Self {
+        fn new(routes_change_sink: routes::ChangeSink) -> Self {
             let mut non_sync_ctx = BindingsNonSyncCtxImpl(Arc::new(
                 BindingsNonSyncCtxImplInner::new(routes_change_sink),
             ));
@@ -209,7 +210,7 @@ mod ctx {
 
 pub(crate) use ctx::{BindingsNonSyncCtxImpl, Ctx, NetstackSeed};
 
-use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
+use crate::bindings::{interfaces_watcher::AddressPropertiesUpdate, util::TaskWaitGroup};
 
 /// Extends the methods available to [`DeviceId`].
 trait DeviceIdExt {
@@ -625,16 +626,21 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
         // observing the result, so we just discard the result receiver.
         match event {
             netstack3_core::ip::IpLayerEvent::AddRoute(entry) => {
-                self.routes.fire_change_and_forget(routes::Change::Add(
-                    entry.map_device_id(|d| d.downgrade()),
+                self.routes.fire_change_and_forget(routes::Change::RouteOp(
+                    routes::RouteOp::Add(entry.map_device_id(|d| d.downgrade())),
+                    routes::SetMembership::CoreNdp,
                 ))
             }
             netstack3_core::ip::IpLayerEvent::RemoveRoutes { subnet, device, gateway } => {
-                self.routes.fire_change_and_forget(routes::Change::RemoveMatching {
-                    subnet,
-                    device: device.downgrade(),
-                    gateway,
-                })
+                self.routes.fire_change_and_forget(routes::Change::RouteOp(
+                    routes::RouteOp::RemoveMatching {
+                        subnet,
+                        device: device.downgrade(),
+                        gateway,
+                        metric: None,
+                    },
+                    routes::SetMembership::CoreNdp,
+                ))
             }
         };
     }
@@ -722,14 +728,14 @@ impl BindingsNonSyncCtxImpl {
     pub(crate) async fn apply_route_change<I: Ip>(
         &self,
         change: routes::Change<I::Addr>,
-    ) -> Result<(), routes::Error> {
+    ) -> Result<routes::ChangeOutcome, routes::Error> {
         self.routes.send_change(change).await
     }
 
     pub(crate) async fn apply_route_change_either(
         &self,
         change: routes::ChangeEither,
-    ) -> Result<(), routes::Error> {
+    ) -> Result<routes::ChangeOutcome, routes::Error> {
         match change {
             routes::ChangeEither::V4(change) => self.apply_route_change::<Ipv4>(change).await,
             routes::ChangeEither::V6(change) => self.apply_route_change::<Ipv6>(change).await,
@@ -740,12 +746,24 @@ impl BindingsNonSyncCtxImpl {
         &self,
         device: &netstack3_core::device::WeakDeviceId<Self>,
     ) {
-        self.apply_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(device.clone()))
+        match self
+            .apply_route_change::<Ipv4>(routes::Change::RemoveMatchingDevice(device.clone()))
             .await
-            .expect("deleting routes on device during removal should succeed");
-        self.apply_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(device.clone()))
+            .expect("deleting routes on device during removal should succeed")
+        {
+            routes::ChangeOutcome::Changed | routes::ChangeOutcome::NoChange => {
+                // We don't care whether there were any routes on the device or not.
+            }
+        }
+        match self
+            .apply_route_change::<Ipv6>(routes::Change::RemoveMatchingDevice(device.clone()))
             .await
-            .expect("deleting routes on device during removal should succeed");
+            .expect("deleting routes on device during removal should succeed")
+        {
+            routes::ChangeOutcome::Changed | routes::ChangeOutcome::NoChange => {
+                // We don't care whether there were any routes on the device or not.
+            }
+        }
     }
 }
 
@@ -795,7 +813,9 @@ async fn add_loopback_routes(
         ),
     ]
     .into_iter()
-    .map(routes::Change::Add)
+    .map(|entry| {
+        routes::Change::RouteOp(routes::RouteOp::Add(entry), routes::SetMembership::Loopback)
+    })
     .map(Into::into);
 
     let v6_changes = [
@@ -811,13 +831,16 @@ async fn add_loopback_routes(
         ),
     ]
     .into_iter()
-    .map(routes::Change::Add)
+    .map(|entry| {
+        routes::Change::RouteOp(routes::RouteOp::Add(entry), routes::SetMembership::Loopback)
+    })
     .map(Into::into);
 
     for change in v4_changes.chain(v6_changes) {
         non_sync_ctx
             .apply_route_change_either(change)
             .await
+            .map(|outcome| assert_matches!(outcome, routes::ChangeOutcome::Changed))
             .expect("adding loopback routes should succeed");
     }
 }
@@ -993,6 +1016,8 @@ pub(crate) enum Service {
     RoutesState(fidl_fuchsia_net_routes::StateRequestStream),
     RoutesStateV4(fidl_fuchsia_net_routes::StateV4RequestStream),
     RoutesStateV6(fidl_fuchsia_net_routes::StateV6RequestStream),
+    RoutesAdminV4(fidl_fuchsia_net_routes_admin::SetProviderV4RequestStream),
+    RoutesAdminV6(fidl_fuchsia_net_routes_admin::SetProviderV6RequestStream),
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
     Verifier(fidl_fuchsia_update_verify::NetstackVerifierRequestStream),
@@ -1161,6 +1186,8 @@ impl NetstackSeed {
         // Use a reference to the watcher sink in the services loop.
         let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
 
+        let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
+
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
         // `Future` returned by this function fails to implement `Send` with the
@@ -1224,6 +1251,30 @@ impl NetstackSeed {
                             routes_fidl_worker::serve_state_v6(rs, &route_update_dispatcher_v6)
                                 .await
                         }
+                        Service::RoutesAdminV4(rs) => routes::admin::serve_provider_v4(
+                            rs,
+                            route_set_spawner.clone(),
+                            &netstack.ctx,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                                "error serving {}: {e:?}",
+                                fidl_fuchsia_net_routes_admin::SetProviderV4Marker::DEBUG_NAME
+                            );
+                        }),
+                        Service::RoutesAdminV6(rs) => routes::admin::serve_provider_v6(
+                            rs,
+                            route_set_spawner.clone(),
+                            &netstack.ctx,
+                        )
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::error!(
+                                "error serving {}: {e:?}",
+                                fidl_fuchsia_net_routes_admin::SetProviderV6Marker::DEBUG_NAME
+                            );
+                        }),
                         Service::Interfaces(interfaces) => {
                             interfaces
                                 .serve_with(|rs| {
@@ -1298,6 +1349,9 @@ impl NetstackSeed {
         ctx.non_sync_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
+
+        // Collect the routes admin waitgroup.
+        route_set_waitgroup.await;
 
         // We've signalled all long running tasks, now we can collect them.
         no_finish_tasks.map(|name| info!("{name} finished")).collect::<()>().await;

@@ -24,6 +24,7 @@ use async_utils::fold;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_stack as fnet_stack;
 use futures::{Future, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::{
@@ -65,6 +66,31 @@ impl<T: Debug + Display> FidlConversionError<T> {
             }
             FidlConversionError::UnspecifiedNextHop => FidlConversionError::UnspecifiedNextHop,
             FidlConversionError::NextHopNotUnicast => FidlConversionError::NextHopNotUnicast,
+        }
+    }
+}
+
+impl From<FidlConversionError<RoutePropertiesRequiredFields>> for fnet_routes_admin::RouteSetError {
+    fn from(error: FidlConversionError<RoutePropertiesRequiredFields>) -> Self {
+        match error {
+            FidlConversionError::RequiredFieldUnset(field_name) => match field_name {
+                RoutePropertiesRequiredFields::SpecifiedProperties => {
+                    fnet_routes_admin::RouteSetError::MissingRouteProperties
+                }
+                RoutePropertiesRequiredFields::WithinSpecifiedProperties(field_name) => {
+                    match field_name {
+                        SpecifiedRoutePropertiesRequiredFields::Metric => {
+                            fnet_routes_admin::RouteSetError::MissingMetric
+                        }
+                    }
+                }
+            },
+            FidlConversionError::DestinationSubnet(_subnet_error) => {
+                fnet_routes_admin::RouteSetError::InvalidDestinationSubnet
+            }
+            FidlConversionError::UnspecifiedNextHop | FidlConversionError::NextHopNotUnicast => {
+                fnet_routes_admin::RouteSetError::InvalidNextHop
+            }
         }
     }
 }
