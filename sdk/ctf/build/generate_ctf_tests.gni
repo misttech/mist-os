@@ -199,6 +199,24 @@ template("generate_pkgdir-tests") {
   }
 }
 
+template("generate_simulate-scan-wlan-hw-sim-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "test-root.cm"
+    test_specs = {
+      log_settings = {
+        max_severity = "ERROR"
+      }
+    }
+    subpackages = [
+      test_info.target_label,
+      "//src/connectivity/wlan/testing/hw-sim/testing/realm-factory",
+      "//src/lib/fuchsia-component-test/realm_builder_server:pkg",
+    ]
+    test_component = "//src/connectivity/wlan/testing/hw-sim/test:simulate-scan-test-root-component"
+  }
+}
+
 # Expands a prebuilt CTF test into a runnable fuchsia package.
 #
 # This template is called several times with every combination of ctf_test and

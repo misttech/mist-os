@@ -4,12 +4,15 @@
 
 import("//build/components.gni")
 import("//build/testing/environments.gni")
+import("//sdk/ctf/build/ctf.gni")
 
 # Template to generate all the components and packages required for a hw-sim integration test.
 # This outputs:
 #   - A component named "${target_name}-test-root-component" which is the unique test root for this
 #   test case.
-#   - A package named "${target_name}-wlan-hw-sim-integration-test" that contains the full
+#   - An archive named "${target_name}-wlan-hw-sim-tests_archive that contains a built test suite
+#   component. This is used by CTF.
+#   - A package named "${target_name}-wlan-hw-sim-tests-latest" that contains the full
 #   integration test for the input test case, including the test root component and realm factory.
 #
 # Parameters
@@ -21,36 +24,68 @@ import("//build/testing/environments.gni")
 #
 #   test_specs (optional)
 #     Test specifications to apply to the test. By default, this will ignore ERROR logs.
+#
+#   ctf (optional)
+#     Indicates whether this integration test
 template("_hw_sim_integration_test") {
   assert(defined(invoker.manifest))
   assert(defined(invoker.deps))
 
+  is_ctf = defined(invoker.ctf) && invoker.ctf
+
   component_name = "${target_name}-component"
-  test_suite_package_name = "${target_name}-wlan-hw-sim-test-suite"
-  integration_test_package_name = "${target_name}-wlan-hw-sim-integration-test"
+  test_suite_package_name = "${target_name}-wlan-hw-sim-tests"
+  integration_test_package_name = "${target_name}-wlan-hw-sim-tests-latest"
 
-  # Component containing test suite and wlantap-driver, used only in this BUILD file.
-  fuchsia_component(component_name) {
-    testonly = true
-    component_name = "test-suite"
-    manifest = invoker.manifest
-    visibility = [ ":*" ]
-    deps = invoker.deps +
-           [ "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver" ]
-  }
+  if (is_ctf) {
+    # Component containing test suite and wlantap-driver, used only in this BUILD file.
+    ctf_fuchsia_component(component_name) {
+      testonly = true
+      manifest = invoker.manifest
 
-  # Test suite package. Will be subpackaged by the integration test package.
-  fuchsia_package(test_suite_package_name) {
-    testonly = true
-    package_name = "${test_suite_package_name}"
-    deps = [ ":$component_name" ]
-    visibility = [ ":*" ]
+      # NOTE: do not change this name. This will be the name that test-root uses to find the
+      # component manifest for the test suite. Because this component is archived for use in CTF,
+      # changing this name (and the relative used by the generated test-root) will result in
+      # failures in CTF tests.
+      component_name = "test-suite"
+      visibility = [ ":*" ]
+      deps = invoker.deps +
+             [ "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver" ]
+    }
+
+    # CTF test suite package. This produces an archive that is used externally by CTF.
+    # The archive is named ${test_suite_package_name}_archive.
+    ctf_fuchsia_package(test_suite_package_name) {
+      testonly = true
+      package_name = "${test_suite_package_name}"
+      deps = [ ":$component_name" ]
+    }
+  } else {
+    # Component containing test suite and wlantap-driver, used only in this BUILD file.
+    fuchsia_component(component_name) {
+      testonly = true
+      manifest = invoker.manifest
+      component_name = "test-suite"
+      visibility = [ ":*" ]
+      deps = invoker.deps +
+             [ "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver" ]
+    }
+
+    # Test suite package. Will be subpackaged by the integration test package.
+    fuchsia_package(test_suite_package_name) {
+      testonly = true
+      package_name = "${test_suite_package_name}"
+      deps = [ ":$component_name" ]
+      visibility = [ ":*" ]
+    }
   }
 
   # Generates component manifest for the test root component.
   test_root_name = "${target_name}-test-root"
   test_root_manifest_target = "${test_root_name}-manifest"
   test_root_manifest = "${target_gen_dir}/${test_root_name}.cml"
+
+  # TODO(b/286435361) test realm factory should autogenerate test-root components
   generated_file(test_root_manifest_target) {
     testonly = true
     contents = {
@@ -59,7 +94,8 @@ template("_hw_sim_integration_test") {
       ]
       children = [
         {
-          name = "test_suite"
+          name = "test_suite"  # NOTE: this name needs to match the name used in
+                               # test-root.shard.cml
           url = "${test_suite_package_name}#meta/test-suite.cm"
         },
       ]
@@ -71,13 +107,18 @@ template("_hw_sim_integration_test") {
 
   # Create test-root using generated component manifest.
   test_root_component = "${test_root_name}-component"
-  fuchsia_component(test_root_component) {
+  fuchsia_test_component(test_root_component) {
     testonly = true
     manifest = test_root_manifest
+    component_name = "test-root"
     deps = [
       ":${test_root_manifest_target}",
       "//src/storage/memfs:memfs_component",
     ]
+
+    if (is_ctf) {
+      test_type = "ctf"
+    }
   }
 
   # Package containing full integration test.
@@ -177,6 +218,7 @@ _hw_sim_integration_test("sim-client-vs-sim-ap") {
 }
 
 _hw_sim_integration_test("simulate-scan") {
+  ctf = true
   manifest = "meta/simulate_scan.cml"
   deps = [ "simulate_scan" ]
 }
@@ -215,26 +257,31 @@ _hw_sim_integration_test("rate-selection") {
 group("wlan-hw-sim-component-tests") {
   testonly = true
   deps = [
-    ":autoconnect-idle-iface-wlan-hw-sim-integration-test",
-    ":connect-to-all-modern-bss-protections-wlan-hw-sim-integration-test",
-    ":connect-to-open-network-wlan-hw-sim-integration-test",
-    ":connect-to-wpa1-network-wlan-hw-sim-integration-test",
-    ":connect-with-bad-password-wlan-hw-sim-integration-test",
-    ":connect-with-failed-association-wlan-hw-sim-integration-test",
-    ":connect-with-wrong-credential-type-wlan-hw-sim-integration-test",
-    ":ethernet-tx-rx-wlan-hw-sim-integration-test",
-    ":handle-tx-event-hooks-wlan-hw-sim-integration-test",
-    ":multiple-clients-ap-wlan-hw-sim-integration-test",
-    ":open-ap-connect-wlan-hw-sim-integration-test",
-    ":rate-selection-wlan-hw-sim-integration-test",
-    ":reconnect-to-wpa2-network-wlan-hw-sim-integration-test",
-    ":run-without-regulatory-manager-wlan-hw-sim-integration-test",
-    ":scan-contemporary-privacy-wlan-hw-sim-integration-test",
-    ":scan-legacy-privacy-wlan-hw-sim-integration-test",
-    ":set-country-wlan-hw-sim-integration-test",
-    ":sim-client-vs-sim-ap-wlan-hw-sim-integration-test",
-    ":simulate-scan-wlan-hw-sim-integration-test",
-    ":verify-ethernet-wlan-hw-sim-integration-test",
-    ":verify-wlan-inspect-wlan-hw-sim-integration-test",
+    ":autoconnect-idle-iface-wlan-hw-sim-tests-latest",
+    ":connect-to-all-modern-bss-protections-wlan-hw-sim-tests-latest",
+    ":connect-to-open-network-wlan-hw-sim-tests-latest",
+    ":connect-to-wpa1-network-wlan-hw-sim-tests-latest",
+    ":connect-with-bad-password-wlan-hw-sim-tests-latest",
+    ":connect-with-failed-association-wlan-hw-sim-tests-latest",
+    ":connect-with-wrong-credential-type-wlan-hw-sim-tests-latest",
+    ":ethernet-tx-rx-wlan-hw-sim-tests-latest",
+    ":handle-tx-event-hooks-wlan-hw-sim-tests-latest",
+    ":multiple-clients-ap-wlan-hw-sim-tests-latest",
+    ":open-ap-connect-wlan-hw-sim-tests-latest",
+    ":rate-selection-wlan-hw-sim-tests-latest",
+    ":reconnect-to-wpa2-network-wlan-hw-sim-tests-latest",
+    ":run-without-regulatory-manager-wlan-hw-sim-tests-latest",
+    ":scan-contemporary-privacy-wlan-hw-sim-tests-latest",
+    ":scan-legacy-privacy-wlan-hw-sim-tests-latest",
+    ":set-country-wlan-hw-sim-tests-latest",
+    ":sim-client-vs-sim-ap-wlan-hw-sim-tests-latest",
+    ":simulate-scan-wlan-hw-sim-tests-latest",
+    ":verify-ethernet-wlan-hw-sim-tests-latest",
+    ":verify-wlan-inspect-wlan-hw-sim-tests-latest",
   ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":simulate-scan-wlan-hw-sim-tests_archive" ]
 }

@@ -41,6 +41,8 @@ ALLOWED_CTS_DEPS = [
   "//third_party/rust_crates:log",
   "//third_party/rust_crates:pretty_assertions",
   "//third_party/rust_crates:tracing",
+  "//third_party/rust_crates:lazy_static",
+  "//third_party/rust_crates:pin-utils",
 
   # Needed by //sdk/ctf/tests/examples/host_tool:tests.
   "//src/developer/ffx:ffx_bin",
@@ -57,6 +59,14 @@ ALLOWED_CTS_DEPS = [
   "//sdk/lib/component/incoming/cpp:cpp",
   "//sdk/lib/syslog/cpp:cpp-macros",
   "//src/testing/realm_proxy:realm_proxy",
+
+  # Needed by //src/connectivity/wlan/testing/hw-sim/test:ctf_tests
+  "//src/connectivity/wlan/testing/hw-sim/testing/fidl:test.wlan.realm",
+  "//src/connectivity/wlan/testing/hw-sim/testing/fidl:test.wlan.realm_rust",
+  "//src/connectivity/wlan/lib/common/rust:wlan-common",
+  "//src/connectivity/wlan/lib/ieee80211:ieee80211",
+  "//src/connectivity/wlan/testing/hw-sim:wlan-hw-sim",
+  "//src/connectivity/wlan/testing/wlantap-driver:wlantap_driver",
 
   # TODO(123604): All of the deps below should be managed by test realm proxies.
   # They can be removed from this allowlist after making this change, because
