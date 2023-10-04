@@ -54,8 +54,9 @@ struct LoadExecutableResult : public StartupLoadResult {
 LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
                                     ScratchAllocator& scratch, InitialExecAllocator& initial_exec,
                                     zx::vmo vmo) {
+  constexpr elfldltl::Soname<> kEmpty{""};
   LoadExecutableResult result = {
-      .module = StartupModule::New(diag, scratch, "", startup.vmar),
+      .module = StartupModule::New(diag, scratch, kEmpty, startup.vmar),
   };
   if (!vmo) [[unlikely]] {
     diag.SystemError("no executable VMO in bootstrap message");
@@ -137,12 +138,14 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // is completed successfully, there's no way to make a system call to get an
   // error out anyway.
   auto bootstrap_diag = elfldltl::TrapDiagnostics();
-  auto& vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
-  auto& self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
+
+  BootsrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
+  BootsrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
+
   // Only now can we make the system call to discover the page size.
   const size_t page_size = zx_system_get_page_size();
-  CompleteBootstrapModule(vdso_module, page_size);
-  CompleteBootstrapModule(self_module, page_size);
+  CompleteBootstrapModule(vdso_module.module, page_size);
+  CompleteBootstrapModule(self_module.module, page_size);
 
   // Read the bootstrap message.
   zx::channel bootstrap{std::exchange(handle, {})};
@@ -161,7 +164,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // still possible for either the last bit of instrumented code in the startup
   // path, or just stray pointer writes in the process after startup will
   // modify it, but will be ignored or will be tolerable noise in the data.
-  auto profdata = PublishProfdata(diag, startup.vmar.borrow(), self_module.build_id);
+  auto profdata = PublishProfdata(diag, startup.vmar.borrow(), self_module.module.build_id);
 
   // Set up the allocators.  These objects hold zx::unowned_vmar copies but do
   // not own the VMAR handle.
@@ -173,12 +176,11 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
 
-  // TODO(mcgrathr): Load deps.
+  StartupModule::LinkModules(diag, scratch, initial_exec, main.module, {vdso_module, self_module},
+                             main.needed_count, startup.vmar);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);
-
-  StartupModule::LinkModules(diag, main.module);
 
   if constexpr (kProtectData) {
     // Now that startup is completed, protect not only the RELRO, but also all

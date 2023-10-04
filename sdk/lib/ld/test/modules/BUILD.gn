@@ -15,6 +15,8 @@ executables = [
   ":relative-reloc.in-process",
   ":symbolic-reloc",
   ":symbolic-reloc.in-process",
+  ":ld-dep",
+  ":ld-dep.in-process",
 ]
 libs = []
 modules = []
@@ -190,4 +192,10 @@ test_executable("symbolic-reloc") {
   defines = [ "DYNAMIC_LINKER_PATH=\"${toolchain_variant.libprefix}ld.so.1\"" ]
   deps = [ "//zircon/system/public" ]
   configs = [ ":temporarily-build-as-shared" ]
+}
+
+test_executable("ld-dep") {
+  can_be_in_process = true
+  sources = [ "ld-dep.cc" ]
+  deps = [ "../.." ]
 }

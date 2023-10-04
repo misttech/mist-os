@@ -22,10 +22,9 @@ using LoadTypes = ::testing::Types<
 // TODO(fxbug.dev/130483): The separate-process tests require symbolic
 // relocation so they can make the syscall to exit. The spawn-process
 // tests also need a loader service to get ld.so.1 itself.
-#if 0  // def __Fuchsia__
+#ifdef __Fuchsia__
     ld::testing::LdStartupCreateProcessTests<>,
-#endif
-#ifndef __Fuchsia__
+#else
     ld::testing::LdStartupSpawnProcessTests,
 #endif
     ld::testing::LdStartupInProcessTests>;
@@ -62,6 +61,21 @@ TYPED_TEST(LdLoadTests, Symbolic) {
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Load("symbolic-reloc"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
+TYPED_TEST(LdLoadTests, LoadWithNeeded) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  // There is only a reference to ld.so which doesn't need to be loaded to satisfy.
+  ASSERT_NO_FATAL_FAILURE(this->Needed({}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("ld-dep"));
 
   EXPECT_EQ(this->Run(), kReturnValue);
 

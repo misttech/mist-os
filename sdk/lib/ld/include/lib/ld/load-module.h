@@ -70,6 +70,7 @@ class LoadModule {
   // When the object has a DT_SONAME (Module::soname), this is usually the
   // same; but nothing guarantees that.
   constexpr explicit LoadModule(std::string_view name) : name_(name) {}
+  constexpr explicit LoadModule(const Soname& name) : name_(name) {}
 
   constexpr const Soname& name() const { return name_; }
 
@@ -98,7 +99,7 @@ class LoadModule {
     return *module_;
   }
 
-  constexpr Soname& soname() const { return module().soname; }
+  constexpr const Soname& soname() const { return module().soname; }
 
   // This returns an object that can be used like a LoadModule* pointing at
   // this, but is suitable for use in a container like std::unordered_set or
@@ -139,7 +140,7 @@ class LoadModule {
   // The following methods satisfy the Module template API for use with
   // elfldltl::ResolverDefinition (see <lib/elfldltl/resolve.h>).
 
-  constexpr auto& symbol_info() const { return module().symbols; }
+  constexpr const auto& symbol_info() const { return module().symbols; }
 
   constexpr size_type load_bias() const { return module().link_map.addr; }
 
@@ -161,7 +162,13 @@ class LoadModule {
     return 0;
   }
 
- private:
+  template <bool Inline = InlineModule == LoadModuleInline::kYes,
+            typename = std::enable_if_t<!Inline>>
+  constexpr void set_module(Module& module) {
+    module_ = &module;
+  }
+
+ protected:
   using ModuleStorage =
       std::conditional_t<InlineModule == LoadModuleInline::kYes, std::optional<Module>, Module*>;
 

@@ -37,6 +37,27 @@ namespace ld {
 // profdata instrumentation before it's moot.
 inline constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
 
+struct BootsrapModule {
+  abi::Abi<>::Module& module;
+  cpp20::span<const elfldltl::Elf<>::Dyn> dyn;
+};
+
+inline BootsrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
+                                            cpp20::span<const elfldltl::Elf<>::Dyn> dyn,
+                                            size_t vaddr_start, size_t vaddr_size, size_t bias,
+                                            cpp20::span<const elfldltl::Elf<>::Phdr> phdrs,
+                                            const elfldltl::ElfNote& build_id) {
+  module.link_map.addr = bias;
+  module.link_map.ld = dyn.data();
+  module.vaddr_start = vaddr_start;
+  module.vaddr_end = vaddr_start + vaddr_size;
+  module.phdrs = phdrs;
+  module.soname = module.symbols.soname();
+  module.link_map.name = module.soname.str().data();
+  module.build_id = build_id.desc;
+  return {module, dyn};
+}
+
 // This fills out all the fields of a Module except the linked-list pointers.
 // The Module describes the vDSO, which is already fully loaded according to
 // its PT_LOAD segments, relocated and initialized in place as we find it.  The
@@ -51,8 +72,8 @@ inline constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
 // properly page-aligned.  In that case, CompleteVdsoModule (below) should be
 // called once the page size is known.
 template <class Diagnostics>
-inline abi::Abi<>::Module& BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
-                                               size_t page_size = 1) {
+inline BootsrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
+                                          size_t page_size = 1) {
   using Ehdr = elfldltl::Elf<>::Ehdr;
   using Phdr = elfldltl::Elf<>::Phdr;
   using Dyn = elfldltl::Elf<>::Dyn;
@@ -73,7 +94,7 @@ inline abi::Abi<>::Module& BootstrapVdsoModule(Diagnostics&& diag, const void* v
     // If there is no vDSO, then there will just be empty symbols to link
     // against and no references can resolve to any vDSO-defined symbols.
     // This will on1y ever be true on Posix, never on Fuchsia.
-    return vdso;
+    return {vdso, {}};
   }
 #endif
 
@@ -98,20 +119,11 @@ inline abi::Abi<>::Module& BootstrapVdsoModule(Diagnostics&& diag, const void* v
                                        elfldltl::ObserveBuildIdNote(build_id)));
 
   const cpp20::span dyn = *memory.ReadArray<Dyn>(dyn_phdr->vaddr, dyn_phdr->memsz);
+  elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(vdso.symbols));
 
   const size_type bias = reinterpret_cast<uintptr_t>(vdso_base) - vaddr_start;
-  vdso.link_map.addr = bias;
-  vdso.link_map.ld = dyn.data();
-  vdso.vaddr_start = vaddr_start;
-  vdso.vaddr_end = vaddr_start + vaddr_size;
-  vdso.phdrs = phdrs;
-  vdso.build_id = build_id->desc;  // The vDSO always has a build ID.
 
-  elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(vdso.symbols));
-  vdso.soname = vdso.symbols.soname();
-  vdso.link_map.name = vdso.soname.str().data();
-
-  return vdso;
+  return FinishBootstrapModule(vdso, dyn, vaddr_start, vaddr_size, bias, phdrs, *build_id);
 }
 
 // This bootstraps this dynamic linker itself, doing its own dynamic linking
@@ -125,18 +137,22 @@ inline abi::Abi<>::Module& BootstrapVdsoModule(Diagnostics&& diag, const void* v
 // Module's vaddr_start and vaddr_end are not properly page-aligned until
 // CompleteBootstrapModule (below) is called.
 template <class Diagnostics>
-inline abi::Abi<>::Module& BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
+inline BootsrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
+  using Phdr = elfldltl::Elf<>::Phdr;
+  using Dyn = elfldltl::Elf<>::Dyn;
+
   auto memory = elfldltl::Self<>::Memory();
   const cpp20::span phdrs = elfldltl::Self<>::Phdrs();
 
   std::optional<elfldltl::ElfNote> build_id;
-  elfldltl::DecodePhdrs(diag, phdrs,
+  std::optional<Phdr> dyn_phdr;
+  elfldltl::DecodePhdrs(diag, phdrs, elfldltl::PhdrDynamicObserver<elfldltl::Elf<>>(dyn_phdr),
                         elfldltl::PhdrMemoryNoteObserver(elfldltl::Elf<>{}, memory,
                                                          elfldltl::ObserveBuildIdNote(build_id)));
 
   const uintptr_t bias = elfldltl::Self<>::LoadBias();
   const uintptr_t start = memory.base() + bias;
-  const cpp20::span dyn = elfldltl::Self<>::Dynamic();
+  cpp20::span dyn = elfldltl::Self<>::Dynamic();
 
   // We want this object to be in bss to reduce the amount of data pages which need COW. In general
   // the only data/bss we want should be part of `_ld_abi`, but the self module will always be in
@@ -146,19 +162,16 @@ inline abi::Abi<>::Module& BootstrapSelfModule(Diagnostics&& diag, const abi::Ab
   // of `self`.
   [[gnu::section(".bss.self_module")]] __CONSTINIT static abi::Abi<>::Module self{
       elfldltl::kLinkerZeroInitialized};
+  // Note, this call could be elided because it only sets `symbols` which will be immediately
+  // replaced. In case this function changes to do more we should keep the call. The compiler should
+  // be smart enough to figure out this is a dead store.
   self.InitLinkerZeroInitialized();
-  self.link_map.addr = bias;
-  self.link_map.ld = dyn.data();
-  self.vaddr_start = start;
-  self.vaddr_end = start + memory.image().size();
-  self.phdrs = phdrs;
+
   self.symbols =
       elfldltl::LinkStaticPieWithVdso(elfldltl::Self<>(), diag, vdso.symbols, vdso.link_map.addr);
-  self.soname = self.symbols.soname();
-  self.link_map.name = self.soname.str().data();
-  self.build_id = build_id->desc;
 
-  return self;
+  dyn = dyn.subspan(0, dyn_phdr->memsz / sizeof(Dyn));
+  return FinishBootstrapModule(self, dyn, start, memory.image().size(), bias, phdrs, *build_id);
 }
 
 inline void CompleteBootstrapModule(abi::Abi<>::Module& module, size_t page_size) {

@@ -52,9 +52,10 @@ using InitialExecAllocator = decltype(MakeStartupInitialExecAllocator(SystemPage
 
 // This "loads" the executable image that's already in memory such that the
 // StartupModule returned is fully populated like loading another module does.
-StartupModule* LoadExecutable(Diagnostics& diag, StartupData& startup, ScratchAllocator& scratch,
-                              InitialExecAllocator& initial_exec, uintptr_t entry, uintptr_t phdr,
-                              uintptr_t phnum) {
+std::pair<StartupModule*, size_t> LoadExecutable(Diagnostics& diag, StartupData& startup,
+                                                 ScratchAllocator& scratch,
+                                                 InitialExecAllocator& initial_exec,
+                                                 uintptr_t entry, uintptr_t phdr, uintptr_t phnum) {
   if (entry == reinterpret_cast<uintptr_t>(&_start)) [[unlikely]] {
     // The dynamic linker was started directly as a standalone program,
     // rather than via PT_INTERP.
@@ -79,7 +80,7 @@ StartupModule* LoadExecutable(Diagnostics& diag, StartupData& startup, ScratchAl
   }
 
   // Allocate the StartupModule for the main executable.
-  StartupModule* main_executable = StartupModule::New(diag, scratch, "", startup.page_size);
+  StartupModule* main_executable = StartupModule::New(diag, scratch, {}, startup.page_size);
   fbl::AllocChecker ac;
   main_executable->NewModule(initial_exec, ac);
   CheckAlloc(diag, ac, "passive ABI module");
@@ -120,9 +121,9 @@ StartupModule* LoadExecutable(Diagnostics& diag, StartupData& startup, ScratchAl
   // the executable image, but the object will never be destroyed anyway.
   main_executable->memory() = ModuleMemory{module};
 
-  main_executable->DecodeDynamic(diag, phdr_info.dyn_phdr);
+  size_t needed_count = main_executable->DecodeDynamic(diag, phdr_info.dyn_phdr);
 
-  return main_executable;
+  return {main_executable, needed_count};
 }
 
 [[maybe_unused]] void ProtectData(Diagnostics& diag, size_t page_size) {
@@ -183,9 +184,9 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       elfldltl::DiagnosticsPanicFlags{},
   };
 
-  auto& vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
-  auto& self_module = BootstrapSelfModule(bootstrap_diag, vdso_module);
-  CompleteBootstrapModule(self_module, startup.page_size);
+  BootsrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
+  BootsrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
+  CompleteBootstrapModule(self_module.module, startup.page_size);
 
   // Now that things are bootstrapped, set up the main diagnostics object.
   auto diag = MakeDiagnostics(startup);
@@ -198,14 +199,14 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   // "Load" the main executable.  It's usually already loaded by the system
   // program loader before the dynamic linker was loaded, so this really
   // consists of doing the bookkeeping that loading other modules does.
-  auto* main_executable = LoadExecutable(diag, startup, scratch, initial_exec, entry, phdr, phnum);
+  auto [main_executable, needed_count] =
+      LoadExecutable(diag, startup, scratch, initial_exec, entry, phdr, phnum);
 
-  // TODO(mcgrathr): Load deps.
+  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable,
+                             {vdso_module, self_module}, needed_count, startup.page_size);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);
-
-  StartupModule::LinkModules(diag, main_executable);
 
   if constexpr (kProtectData) {
     // Now that startup is completed, protect not only the RELRO, but also all

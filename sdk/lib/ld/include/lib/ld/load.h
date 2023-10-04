@@ -86,14 +86,14 @@ constexpr ModulePhdrInfo<Elf> DecodeModulePhdrs(Diagnostics& diag,
 // dynamic section observers can be passed to include in the same scan.
 template <class Elf = elfldltl::Elf<>, class Diagnostics, class Memory,
           typename... DynamicObservers>
-constexpr void DecodeModuleDynamic(AbiModule<Elf>& module, Diagnostics& diag, Memory& memory,
-                                   const std::optional<typename Elf::Phdr>& dyn_phdr,
-                                   DynamicObservers&&... dynamic_observers) {
+constexpr cpp20::span<const typename Elf::Dyn> DecodeModuleDynamic(
+    AbiModule<Elf>& module, Diagnostics& diag, Memory& memory,
+    const std::optional<typename Elf::Phdr>& dyn_phdr, DynamicObservers&&... dynamic_observers) {
   using Dyn = const typename Elf::Dyn;
 
   if (!dyn_phdr) [[unlikely]] {
     diag.FormatError("no PT_DYNAMIC program header found");
-    return;
+    return {};
   }
 
   const size_t count = dyn_phdr->filesz / sizeof(Dyn);
@@ -101,7 +101,7 @@ constexpr void DecodeModuleDynamic(AbiModule<Elf>& module, Diagnostics& diag, Me
   if (!read_dyn) [[unlikely]] {
     diag.FormatError("cannot read", count, "entries from PT_DYNAMIC",
                      elfldltl::FileAddress{dyn_phdr->vaddr});
-    return;
+    return {};
   }
   cpp20::span<const Dyn> dyn = *read_dyn;
 
@@ -110,6 +110,7 @@ constexpr void DecodeModuleDynamic(AbiModule<Elf>& module, Diagnostics& diag, Me
   elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
                           std::forward<DynamicObservers>(dynamic_observers)...);
   module.soname = module.symbols.soname();
+  return dyn;
 }
 
 // Return an observer object to be passed to elfldltl::*NoteObserver.  When
