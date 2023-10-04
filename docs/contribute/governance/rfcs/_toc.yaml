@@ -470,3 +470,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0226_zircon_pager_writeback.md
   - title: "RFC-0227: Fuchsia Release Process"
     path: /docs/contribute/governance/rfcs/0227_fuchsia_release_process.md
+  - title: "RFC-0228: FDomain: Remote control of Fuchsia targets"
+    path: /docs/contribute/governance/rfcs/0228_fdomain.md
