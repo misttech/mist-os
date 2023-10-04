@@ -81,6 +81,12 @@ fuchsia_test_component("fuchsia-storage-benchmarks-component") {
 fuchsia_test_package("benchmarks") {
   package_name = "storage-benchmarks"
   test_components = [ ":fuchsia-storage-benchmarks-component" ]
+
+  # Prevent this test from being run as a target-side test, because it
+  # is run by a host-side wrapper.
+  test_specs = {
+    environments = []
+  }
   deps = [
     "//src/storage/benchmarks/fuchsia/memfs-component",
     "//src/storage/bin/blobfs:blobfs-component",
