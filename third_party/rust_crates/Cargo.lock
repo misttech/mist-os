@@ -1363,7 +1363,7 @@ dependencies = [
  "maybe-owned",
  "md-5",
  "memchr",
- "memoffset 0.5.3",
+ "memoffset 0.7.1",
  "miniz_oxide",
  "mio 0.8.5",
  "mockall",

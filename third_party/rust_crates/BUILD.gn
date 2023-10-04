@@ -483,7 +483,7 @@ group("memchr") {
 }
 
 group("memoffset") {
-  public_deps = [ ":memoffset-v0_5_3" ]
+  public_deps = [ ":memoffset-v0_7_1" ]
 }
 
 group("miniz_oxide") {
