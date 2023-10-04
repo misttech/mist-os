@@ -163,7 +163,8 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
         return Err(format_err!(
             concat!(
                 "Missing <log-level> in selector. Expecting: '{}#<log-level>', ",
-                "such as #DEBUG or #INFO."),
+                "such as #DEBUG or #INFO."
+            ),
             selector
         ));
     };
@@ -184,7 +185,8 @@ pub fn parse_log_interest_selector(selector: &str) -> Result<LogInterestSelector
         return Err(format_err!(
             concat!(
                 "Invalid <log-level> in selector '{}'. Expecting: a min log level ",
-                "such as #DEBUG or #INFO."),
+                "such as #DEBUG or #INFO."
+            ),
             selector
         ));
     };
@@ -660,7 +662,7 @@ impl<'a> TokenBuilder<'a> {
     }
 }
 
-pub trait SelectorMatchExt {
+pub trait SelectorExt {
     fn match_against_selectors<'a, S>(
         &self,
         selectors: &'a [S],
@@ -675,6 +677,8 @@ pub trait SelectorMatchExt {
     where
         S: Borrow<ComponentSelector>;
 
+    fn into_component_selector(self) -> ComponentSelector;
+
     fn matches_selector(&self, selector: &Selector) -> Result<bool, anyhow::Error>;
 
     fn matches_component_selector(
@@ -685,7 +689,7 @@ pub trait SelectorMatchExt {
     fn sanitized(&self) -> String;
 }
 
-impl SelectorMatchExt for ExtendedMoniker {
+impl SelectorExt for ExtendedMoniker {
     fn match_against_selectors<'a, S>(
         &self,
         selectors: &'a [S],
@@ -753,9 +757,28 @@ impl SelectorMatchExt for ExtendedMoniker {
             ExtendedMoniker::ComponentInstance(moniker) => moniker.sanitized(),
         }
     }
+
+    fn into_component_selector(self) -> ComponentSelector {
+        ComponentSelector {
+            moniker_segments: Some(
+                match self {
+                    ExtendedMoniker::ComponentManager => {
+                        vec![EXTENDED_MONIKER_COMPONENT_MANAGER_STR.into()]
+                    }
+                    ExtendedMoniker::ComponentInstance(moniker) => {
+                        moniker.path().iter().map(|value| value.to_string()).collect()
+                    }
+                }
+                .into_iter()
+                .map(|value| StringSelector::ExactMatch(value))
+                .collect(),
+            ),
+            ..Default::default()
+        }
+    }
 }
 
-impl SelectorMatchExt for Moniker {
+impl SelectorExt for Moniker {
     fn match_against_selectors<'a, S>(
         &self,
         selectors: &'a [S],
@@ -796,6 +819,18 @@ impl SelectorMatchExt for Moniker {
             .map(|s| sanitize_string_for_selectors(&s).into_owned())
             .collect::<Vec<String>>()
             .join("/")
+    }
+
+    fn into_component_selector(self) -> ComponentSelector {
+        ComponentSelector {
+            moniker_segments: Some(
+                self.path()
+                    .into_iter()
+                    .map(|value| StringSelector::ExactMatch(value.to_string()))
+                    .collect(),
+            ),
+            ..Default::default()
+        }
     }
 }
 
@@ -840,6 +875,7 @@ mod tests {
     use super::*;
     use std::fs::File;
     use std::io::prelude::*;
+    use std::str::FromStr;
     use tempfile::TempDir;
 
     #[fuchsia::test]
@@ -1115,6 +1151,28 @@ a:b:c
         assert!(parse_log_interest_selector("anything////#FATAL").is_err());
         assert!(parse_log_interest_selector("core/network").is_err());
         assert!(parse_log_interest_selector("core/network#FAKE").is_err());
+    }
+
+    #[test]
+    fn test_moniker_to_selector() {
+        assert_eq!(
+            Moniker::from_str("a/b/c").unwrap().into_component_selector(),
+            parse_component_selector::<VerboseError>("a/b/c").unwrap()
+        );
+        assert_eq!(
+            ExtendedMoniker::ComponentManager.into_component_selector(),
+            parse_component_selector::<VerboseError>("<component_manager>").unwrap()
+        );
+        assert_eq!(
+            ExtendedMoniker::ComponentInstance(Moniker::from_str("a/b/c").unwrap())
+                .into_component_selector(),
+            parse_component_selector::<VerboseError>("a/b/c").unwrap()
+        );
+        assert_eq!(
+            ExtendedMoniker::ComponentInstance(Moniker::from_str("a/coll:id/c").unwrap())
+                .into_component_selector(),
+            parse_component_selector::<VerboseError>("a/coll\\:id/c").unwrap()
+        );
     }
 
     #[test]

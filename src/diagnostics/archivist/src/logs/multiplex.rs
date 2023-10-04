@@ -8,7 +8,7 @@ use fuchsia_trace as ftrace;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::{Stream, StreamExt};
 use lazy_static::lazy_static;
-use selectors::SelectorMatchExt;
+use selectors::SelectorExt;
 use std::{
     cmp::Ordering,
     fmt::Debug,

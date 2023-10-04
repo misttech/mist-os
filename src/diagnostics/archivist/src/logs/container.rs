@@ -33,7 +33,7 @@ use futures::{
     channel::{mpsc, oneshot},
     prelude::*,
 };
-use selectors::SelectorMatchExt;
+use selectors::SelectorExt;
 use std::{
     cmp::Ordering,
     collections::BTreeMap,

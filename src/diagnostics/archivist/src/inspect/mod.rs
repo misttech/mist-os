@@ -15,7 +15,7 @@ use {
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::prelude::*,
-    selectors::SelectorMatchExt,
+    selectors::SelectorExt,
     std::{
         convert::{TryFrom, TryInto},
         sync::Arc,

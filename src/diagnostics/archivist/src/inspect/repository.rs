@@ -22,7 +22,7 @@ use fuchsia_zircon::Koid;
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
-use selectors::SelectorMatchExt;
+use selectors::SelectorExt;
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},

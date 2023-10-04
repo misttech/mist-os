@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_diagnostics::{self, ArchiveAccessorMarker, Selector},
     fuchsia_inspect as inspect,
     moniker::ExtendedMoniker,
-    selectors::SelectorMatchExt,
+    selectors::SelectorExt,
     std::{collections::HashMap, ops::Deref, path::Path, sync::Arc},
 };
 

@@ -13,7 +13,7 @@ use diagnostics_hierarchy::HierarchyMatcher;
 use fidl_fuchsia_diagnostics::{DataType, Selector, Severity as FidlSeverity};
 use flyweights::FlyStr;
 use moniker::{ExtendedMoniker, MonikerError};
-use selectors::SelectorMatchExt;
+use selectors::SelectorExt;
 use serde::{
     self,
     de::{DeserializeOwned, Deserializer},
