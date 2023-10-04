@@ -254,6 +254,15 @@
             },
             {
                 "paths": [
+                    "__pycache__"
+                ],
+                "notes": [
+                    "These contain compiled python files which are unreadable by check-licenses."
+                ],
+                "skipAnywhere": true
+            },
+            {
+                "paths": [
                     "testdata"
                 ],
                 "notes": [
