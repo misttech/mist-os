@@ -104,14 +104,14 @@ when and how FIDL APIs change. The SDK category mechanism determines the
 SDK categories have been implemented in the [`sdk_atom`][gn-sdk-atom] GN Rule.
 Each SDK Atom has an `category` parameter with one of the following values:
 
- - `excluded`: the Atom may not be included in SDKs;
- - `experimental`: (this SDK category does not make much sense);
- - `internal`: supported for use within the Fuchsia platform source tree;
- - `cts`: supported for use in the Compatibility Tests for Fuchsia;
- - `partner_internal`: supported for use in non-source SDK atoms in the
-   `partner` category but not exposed to the SDK users;
- - `partner`: supported for use by select partners;
- - `public`: supported for use by the general public.
+- `excluded`: the Atom may not be included in SDKs;
+- `experimental`: (this SDK category does not make much sense);
+- `internal`: supported for use within the Fuchsia platform source tree;
+- `cts`: supported for use in the Compatibility Tests for Fuchsia;
+- `partner_internal`: supported for use in non-source SDK atoms in the
+  `partner` category but not exposed to the SDK users;
+- `partner`: supported for use by select partners;
+- `public`: supported for use by the general public.
 
 These categories form an ordered list with a monotonically increasing audience.
 For example, an SDK Atom in the `public` category is necessarily available to
@@ -159,8 +159,8 @@ change `partner_internal` APIs.
 Namely, the owners of an API in the `partner_internal` category agree to:
 
 * Use [FIDL Versioning][fidl-versioning] annotations on their APIs.
-* Only ever modify their API at the `in-development` API level (see
-  [version_history.json]).
+* Only ever modify their API at the `in-development` API level, or at `HEAD`.
+  Once an API level is declared stable, it should not be changed (see [version_history.json]).
 * Keep the platform components that implement those APIs compatible with all
   Fuchsia-supported API levels (see [version_history.json]).
 
