@@ -77,8 +77,9 @@ impl InspectRepository {
         let mut guard = self.inner.write().await;
         // insert_inspect_artifact_container returns None when we were already tracking the
         // directory for this component. If that's the case we can return early.
-        let Some(on_closed_fut) = guard.insert_inspect_artifact_container(
-            Arc::clone(&identity), proxy_handle)  else {
+        let Some(on_closed_fut) =
+            guard.insert_inspect_artifact_container(Arc::clone(&identity), proxy_handle)
+        else {
             return;
         };
 
@@ -120,7 +121,7 @@ impl InspectRepository {
                 pipeline.write().await.add_inspect_artifacts(&identity.moniker).unwrap_or_else(
                     |e| {
                         warn!(%identity, ?e,
-                            "Failed to add inspect artifacts to pipeline wrapper");
+                                "Failed to add inspect artifacts to pipeline wrapper");
                     },
                 );
             }
