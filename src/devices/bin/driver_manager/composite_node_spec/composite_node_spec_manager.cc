@@ -10,12 +10,12 @@
 
 namespace fdd = fuchsia_driver_development;
 namespace fdi = fuchsia_driver_index;
-namespace fdf = fuchsia_driver_framework;
+namespace fdfw = fuchsia_driver_framework;
 
 CompositeNodeSpecManager::CompositeNodeSpecManager(CompositeManagerBridge *bridge)
     : bridge_(bridge) {}
 
-fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
+fit::result<fdfw::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
     fuchsia_driver_framework::wire::CompositeNodeSpec fidl_spec,
     std::unique_ptr<CompositeNodeSpec> spec) {
   ZX_ASSERT(spec);
@@ -24,7 +24,7 @@ fit::result<fdf::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
   auto name = std::string(fidl_spec.name().get());
   if (specs_.find(name) != specs_.end()) {
     LOGF(ERROR, "Duplicate composite node spec %.*s", static_cast<int>(name.size()), name.data());
-    return fit::error(fdf::CompositeNodeSpecError::kAlreadyExists);
+    return fit::error(fdfw::CompositeNodeSpecError::kAlreadyExists);
   }
 
   auto parent_count = fidl_spec.parents().count();

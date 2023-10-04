@@ -21,7 +21,7 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace fdata = fuchsia_data;
-namespace fdf = fuchsia_driver_framework;
+namespace fdfw = fuchsia_driver_framework;
 namespace fdh = fuchsia_driver_host;
 namespace fio = fuchsia_io;
 namespace fprocess = fuchsia_process;
@@ -52,8 +52,8 @@ struct NodeChecker {
 };
 
 struct CreatedChild {
-  std::optional<fidl::Client<fdf::Node>> node;
-  std::optional<fidl::Client<fdf::NodeController>> node_controller;
+  std::optional<fidl::Client<fdfw::Node>> node;
+  std::optional<fidl::Client<fdfw::NodeController>> node_controller;
 };
 
 void CheckNode(const inspect::Hierarchy& hierarchy, const NodeChecker& checker) {
@@ -217,14 +217,14 @@ class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
 
 class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
  public:
-  explicit TestDriver(async_dispatcher_t* dispatcher, fidl::ClientEnd<fdf::Node> node,
+  explicit TestDriver(async_dispatcher_t* dispatcher, fidl::ClientEnd<fdfw::Node> node,
                       fidl::ServerEnd<fdh::Driver> server)
       : dispatcher_(dispatcher),
         stop_handler_([]() {}),
         node_(std::move(node), dispatcher),
         driver_binding_(dispatcher, std::move(server), this, fidl::kIgnoreBindingClosure) {}
 
-  fidl::Client<fdf::Node>& node() { return node_; }
+  fidl::Client<fdfw::Node>& node() { return node_; }
 
   using StopHandler = fit::function<void()>;
   void SetStopHandler(StopHandler handler) { stop_handler_ = std::move(handler); }
@@ -243,20 +243,20 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
 
   std::shared_ptr<CreatedChild> AddChild(std::string_view child_name, bool owned,
                                          bool expect_error) {
-    fdf::NodeAddArgs args({.name = std::make_optional<std::string>(child_name)});
+    fdfw::NodeAddArgs args({.name = std::make_optional<std::string>(child_name)});
     return AddChild(std::move(args), owned, expect_error);
   }
 
   std::shared_ptr<CreatedChild> AddChild(
-      fdf::NodeAddArgs child_args, bool owned, bool expect_error,
+      fdfw::NodeAddArgs child_args, bool owned, bool expect_error,
       fit::function<void()> on_bind = []() {}) {
-    auto controller_endpoints = fidl::CreateEndpoints<fdf::NodeController>();
+    auto controller_endpoints = fidl::CreateEndpoints<fdfw::NodeController>();
     ZX_ASSERT(ZX_OK == controller_endpoints.status_value());
 
-    auto child_node_endpoints = fidl::CreateEndpoints<fdf::Node>();
+    auto child_node_endpoints = fidl::CreateEndpoints<fdfw::Node>();
     ZX_ASSERT(ZX_OK == child_node_endpoints.status_value());
 
-    fidl::ServerEnd<fdf::Node> child_node_server = {};
+    fidl::ServerEnd<fdfw::Node> child_node_server = {};
     if (owned) {
       child_node_server = std::move(child_node_endpoints->server);
     }
@@ -264,7 +264,7 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
     node_
         ->AddChild({std::move(child_args), std::move(controller_endpoints->server),
                     std::move(child_node_server)})
-        .Then([expect_error](fidl::Result<fdf::Node::AddChild> result) {
+        .Then([expect_error](fidl::Result<fdfw::Node::AddChild> result) {
           if (expect_error) {
             EXPECT_TRUE(result.is_error());
           } else {
@@ -272,20 +272,20 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
           }
         });
 
-    class NodeEventHandler : public fidl::AsyncEventHandler<fdf::Node> {
+    class NodeEventHandler : public fidl::AsyncEventHandler<fdfw::Node> {
      public:
       explicit NodeEventHandler(std::shared_ptr<CreatedChild> child) : child_(std::move(child)) {}
       void on_fidl_error(::fidl::UnbindInfo error) override {
         child_->node.reset();
         delete this;
       }
-      void handle_unknown_event(fidl::UnknownEventMetadata<fdf::Node> metadata) override {}
+      void handle_unknown_event(fidl::UnknownEventMetadata<fdfw::Node> metadata) override {}
 
      private:
       std::shared_ptr<CreatedChild> child_;
     };
 
-    class ControllerEventHandler : public fidl::AsyncEventHandler<fdf::NodeController> {
+    class ControllerEventHandler : public fidl::AsyncEventHandler<fdfw::NodeController> {
      public:
       explicit ControllerEventHandler(std::shared_ptr<CreatedChild> child,
                                       fit::function<void()> on_bind)
@@ -295,8 +295,8 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
         child_->node_controller.reset();
         delete this;
       }
-      void handle_unknown_event(fidl::UnknownEventMetadata<fdf::NodeController> metadata) override {
-      }
+      void handle_unknown_event(
+          fidl::UnknownEventMetadata<fdfw::NodeController> metadata) override {}
 
      private:
       std::shared_ptr<CreatedChild> child_;
@@ -317,7 +317,7 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
  private:
   async_dispatcher_t* dispatcher_;
   StopHandler stop_handler_;
-  fidl::Client<fdf::Node> node_;
+  fidl::Client<fdfw::Node> node_;
   fidl::ServerBinding<fdh::Driver> driver_binding_;
   bool dont_close_binding_in_stop_ = false;
 
@@ -329,7 +329,7 @@ class TestDriver : public fidl::testing::TestBase<fdh::Driver> {
 class TestDriverHost : public fidl::testing::TestBase<fdh::DriverHost> {
  public:
   using StartHandler =
-      fit::function<void(fdf::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver)>;
+      fit::function<void(fdfw::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver)>;
 
   void SetStartHandler(StartHandler start_handler) { start_handler_ = std::move(start_handler); }
 
@@ -505,14 +505,14 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     fidl::ClientEnd<frunner::ComponentController> controller;
   };
 
-  using StartDriverHandler = fit::function<void(TestDriver*, fdf::DriverStartArgs)>;
+  using StartDriverHandler = fit::function<void(TestDriver*, fdfw::DriverStartArgs)>;
 
   StartDriverResult StartDriver(Driver driver,
                                 std::optional<StartDriverHandler> start_handler = std::nullopt) {
     std::unique_ptr<TestDriver> started_driver;
     driver_host().SetStartHandler(
         [&started_driver, dispatcher = dispatcher(), start_handler = std::move(start_handler)](
-            fdf::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver) mutable {
+            fdfw::DriverStartArgs start_args, fidl::ServerEnd<fdh::Driver> driver) mutable {
           started_driver = std::make_unique<TestDriver>(
               dispatcher, std::move(start_args.node().value()), std::move(driver));
           start_args.node().reset();
@@ -579,7 +579,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
     }
     EXPECT_TRUE(RunLoopUntilIdle());
 
-    StartDriverHandler start_handler = [](TestDriver* driver, fdf::DriverStartArgs start_args) {
+    StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
       ValidateProgram(start_args.program(), root_driver_binary, "false", "false");
     };
     return zx::ok(StartDriver(
@@ -592,7 +592,7 @@ class DriverRunnerTest : public gtest::TestLoopFixture {
 
   StartDriverResult StartSecondDriver(bool colocate = false, bool host_restart_on_crash = false) {
     StartDriverHandler start_handler = [colocate, host_restart_on_crash](
-                                           TestDriver* driver, fdf::DriverStartArgs start_args) {
+                                           TestDriver* driver, fdfw::DriverStartArgs start_args) {
       if (!colocate) {
         EXPECT_FALSE(start_args.symbols().has_value());
       }
@@ -780,7 +780,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferMissingSource) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .offers =
           {
@@ -807,7 +807,7 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_OfferHasRef) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .offers =
           {
@@ -840,16 +840,16 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_DuplicateSymbols) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "sym",
                       .address = 0xf00d,
                   }),
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "sym",
                       .address = 0xf00d,
                   }),
@@ -872,12 +872,12 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingAddress) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = std::make_optional<std::string>("sym"),
                   }),
               },
@@ -898,12 +898,12 @@ TEST_F(DriverRunnerTest, StartRootDriver_AddUnownedChild_SymbolMissingName) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = std::nullopt,
                       .address = 0xfeed,
                   }),
@@ -948,7 +948,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
         EXPECT_EQ("fuchsia.package.Renamed", protocol.target_name());
       });
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .offers =
           {
@@ -962,7 +962,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_NewDriverHost) {
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "sym",
                       .address = 0xfeed,
                   }),
@@ -995,7 +995,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   PrepareRealmForSecondDriverComponentStart();
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .offers =
           {
@@ -1009,7 +1009,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "sym",
                       .address = 0xfeed,
                   }),
@@ -1024,7 +1024,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_SameDriverHost) {
   EXPECT_TRUE(RunLoopUntilIdle());
   EXPECT_TRUE(did_bind);
 
-  StartDriverHandler start_handler = [](TestDriver* driver, fdf::DriverStartArgs start_args) {
+  StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     auto& symbols = start_args.symbols().value();
     EXPECT_EQ(1u, symbols.size());
     EXPECT_EQ("sym", symbols[0].name().value());
@@ -1075,14 +1075,14 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UseProperties) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   PrepareRealmForSecondDriverComponentStart();
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .properties =
           {
               {
-                  fdf::NodeProperty({
-                      .key = fdf::NodePropertyKey::WithIntValue(0x1985),
-                      .value = fdf::NodePropertyValue::WithIntValue(0x2301),
+                  fdfw::NodeProperty({
+                      .key = fdfw::NodePropertyKey::WithIntValue(0x1985),
+                      .value = fdfw::NodePropertyValue::WithIntValue(0x2301),
                   }),
               },
           },
@@ -1225,7 +1225,7 @@ TEST_F(DriverRunnerTest, BindThroughRequest) {
   PrepareRealmForDriverComponentStart("dev.child", second_driver_url);
   AssertNodeControllerBound(child);
   child->node_controller.value()
-      ->RequestBind(fdf::NodeControllerRequestBindRequest())
+      ->RequestBind(fdfw::NodeControllerRequestBindRequest())
       .Then([](auto result) {});
   EXPECT_TRUE(RunLoopUntilIdle());
   ASSERT_EQ(0u, driver_runner().bind_manager().NumOrphanedNodes());
@@ -1267,9 +1267,9 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   PrepareRealmForDriverComponentStart("dev.child", second_driver_url);
 
   // Bind the child node to the second-driver driver.
-  auto bind_request = fdf::NodeControllerRequestBindRequest();
+  auto bind_request = fdfw::NodeControllerRequestBindRequest();
   child->node_controller.value()
-      ->RequestBind(fdf::NodeControllerRequestBindRequest())
+      ->RequestBind(fdfw::NodeControllerRequestBindRequest())
       .Then([](auto result) {});
   EXPECT_TRUE(RunLoopUntilIdle());
   ASSERT_EQ(0u, driver_runner().bind_manager().NumOrphanedNodes());
@@ -1282,7 +1282,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
 
   // Request rebind of the second-driver to the node.
   child->node_controller.value()
-      ->RequestBind(fdf::NodeControllerRequestBindRequest({
+      ->RequestBind(fdfw::NodeControllerRequestBindRequest({
           .force_rebind = true,
       }))
       .Then([](auto result) {});
@@ -1296,7 +1296,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
 
   // Request rebind of the node with the third-driver.
   child->node_controller.value()
-      ->RequestBind(fdf::NodeControllerRequestBindRequest({
+      ->RequestBind(fdfw::NodeControllerRequestBindRequest({
           .force_rebind = true,
           .driver_url_suffix = "third",
       }))
@@ -1304,7 +1304,7 @@ TEST_F(DriverRunnerTest, BindAndRestartThroughRequest) {
   EXPECT_TRUE(RunLoopUntilIdle());
 
   // Get the third-driver running.
-  StartDriverHandler start_handler = [&](TestDriver* driver, fdf::DriverStartArgs start_args) {
+  StartDriverHandler start_handler = [&](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     EXPECT_FALSE(start_args.symbols().has_value());
     ValidateProgram(start_args.program(), "driver/third-driver.so", "false", "false");
   };
@@ -1361,14 +1361,14 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .properties =
           {
               {
-                  fdf::NodeProperty({
-                      .key = fdf::NodePropertyKey::WithStringValue("driver.prop-one"),
-                      .value = fdf::NodePropertyValue::WithStringValue("value"),
+                  fdfw::NodeProperty({
+                      .key = fdfw::NodePropertyKey::WithStringValue("driver.prop-one"),
+                      .value = fdfw::NodePropertyValue::WithStringValue("value"),
                   }),
               },
           },
@@ -1480,7 +1480,7 @@ TEST_F(DriverRunnerTest, StartDriverChain_UnbindSecondNode) {
     children.emplace_back(drivers.back().driver->AddChild(child_name, false, false));
     EXPECT_TRUE(RunLoopUntilIdle());
 
-    StartDriverHandler start_handler = [](TestDriver* driver, fdf::DriverStartArgs start_args) {
+    StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
       EXPECT_FALSE(start_args.symbols().has_value());
       ValidateProgram(start_args.program(), "driver/driver.so", "false", "false");
     };
@@ -1715,7 +1715,7 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
 
   ASSERT_TRUE(driver_runner().composite_node_spec_manager().specs().at(name)->parent_specs().at(1));
 
-  StartDriverHandler start_handler = [](TestDriver* driver, fdf::DriverStartArgs start_args) {
+  StartDriverHandler start_handler = [](TestDriver* driver, fdfw::DriverStartArgs start_args) {
     ValidateProgram(start_args.program(), "driver/composite-driver.so", "true", "false");
   };
   auto composite_driver = StartDriver(
@@ -1765,7 +1765,7 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
   ASSERT_EQ(ZX_OK, root_driver.status_value());
 
   PrepareRealmForSecondDriverComponentStart();
-  fdf::NodeAddArgs args({
+  fdfw::NodeAddArgs args({
       .name = "second",
       .offers =
           {
@@ -1783,11 +1783,11 @@ TEST_F(DriverRunnerTest, StartAndInspect) {
       .symbols =
           {
               {
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "symbol-A",
                       .address = 0x2301,
                   }),
-                  fdf::NodeSymbol({
+                  fdfw::NodeSymbol({
                       .name = "symbol-B",
                       .address = 0x1985,
                   }),

@@ -20,7 +20,7 @@
 
 namespace {
 
-namespace fdf = fuchsia_driver_framework;
+namespace fdfw = fuchsia_driver_framework;
 
 using TestAddCompositeNodeSpecCallback =
     fit::function<void(fuchsia_device_manager::wire::CompositeNodeSpecDescriptor)>;
@@ -372,14 +372,14 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
 
         auto parent_1_bind_rule_1_result = node_result_1.bind_rules.at(0);
         EXPECT_EQ(2, parent_1_bind_rule_1_result.key.int_value());
-        EXPECT_EQ(fdf::wire::Condition::kAccept, node_result_1.bind_rules.at(0).condition);
+        EXPECT_EQ(fdfw::wire::Condition::kAccept, node_result_1.bind_rules.at(0).condition);
         ASSERT_EQ(2, parent_1_bind_rule_1_result.values.count());
         EXPECT_EQ(1, parent_1_bind_rule_1_result.values.at(0).int_value());
         EXPECT_EQ(30, parent_1_bind_rule_1_result.values.at(1).int_value());
 
         auto parent_1_bind_rule_2_result = node_result_1.bind_rules.at(1);
         EXPECT_EQ(10, parent_1_bind_rule_2_result.key.int_value());
-        EXPECT_EQ(fdf::wire::Condition::kReject, node_result_1.bind_rules.at(1).condition);
+        EXPECT_EQ(fdfw::wire::Condition::kReject, node_result_1.bind_rules.at(1).condition);
         ASSERT_EQ(1, parent_1_bind_rule_2_result.values.count());
         EXPECT_EQ(3, parent_1_bind_rule_2_result.values.at(0).int_value());
 
@@ -396,13 +396,13 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
 
         auto parent_2_bind_rule_1 = node_result_2.bind_rules.at(0);
         EXPECT_EQ(12, parent_2_bind_rule_1.key.int_value());
-        EXPECT_EQ(fdf::wire::Condition::kReject, parent_2_bind_rule_1.condition);
+        EXPECT_EQ(fdfw::wire::Condition::kReject, parent_2_bind_rule_1.condition);
         ASSERT_EQ(1, parent_2_bind_rule_1.values.count());
         EXPECT_EQ(false, parent_2_bind_rule_1.values.at(0).bool_value());
 
         auto parent_2_bind_rule_2 = node_result_2.bind_rules.at(1);
         EXPECT_STREQ("curlew", parent_2_bind_rule_2.key.string_value().get());
-        EXPECT_EQ(fdf::wire::Condition::kReject, parent_2_bind_rule_2.condition);
+        EXPECT_EQ(fdfw::wire::Condition::kReject, parent_2_bind_rule_2.condition);
         ASSERT_EQ(2, parent_2_bind_rule_2.values.count());
         EXPECT_STREQ("willet", parent_2_bind_rule_2.values.at(0).string_value().get());
         EXPECT_STREQ("sanderling", parent_2_bind_rule_2.values.at(1).string_value().get());
