@@ -81,8 +81,6 @@ board_driver_package_labels += [
 ]
 
 board_package_labels += [
-  "//src/media/codec/codecs/vaapi:codec_runner_intel_gen_prebuilt",
-
   # The following are all config_data entries, only.
   "//src/factory/factory_store_providers/config/qemu",
   "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config",

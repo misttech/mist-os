@@ -15,7 +15,10 @@ board_configuration("qemu-x64") {
     "fuchsia::wlan_softmac",
   ]
 
-  input_bundles = [ "//boards/x64:main_bundle" ]
+  input_bundles = [
+    "//boards/x64:main_bundle",
+    "//boards/x64:prebuilt_codec_runner",
+  ]
 
   filesystems = {
     vbmeta = {
