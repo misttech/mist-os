@@ -184,7 +184,18 @@ pub struct OwnedRef<T: Releasable> {
 
 impl<T: Releasable> OwnedRef<T> {
     pub fn new(value: T) -> Self {
-        Self { inner: RefInner::new(value), drop_guard: Default::default() }
+        Self { inner: Arc::new(RefInner::new(value)), drop_guard: Default::default() }
+    }
+
+    pub fn new_cyclic<F>(data_fd: F) -> Self
+    where
+        F: FnOnce(WeakRef<T>) -> T,
+    {
+        let inner = Arc::new_cyclic(|weak_inner| {
+            let weak = WeakRef(weak_inner.clone());
+            RefInner::new(data_fd(weak))
+        });
+        Self { inner, drop_guard: Default::default() }
     }
 
     /// Produce a `WeakRef` from a `OwnedRef`.
@@ -477,12 +488,12 @@ pub fn debug_assert_no_local_temp_ref() {
 }
 
 impl<T: Releasable> RefInner<T> {
-    fn new(value: T) -> Arc<Self> {
-        Arc::new(Self {
+    fn new(value: T) -> Self {
+        Self {
             value: value.into(),
             owned_refs_count: AtomicUsize::new(1),
             temp_refs_count: 0.into(),
-        })
+        }
     }
 
     /// Increase `temp_refs_count`. Must be called each time a new `TempRef` is built.
@@ -802,5 +813,18 @@ mod test {
         std::thread::sleep(std::time::Duration::from_millis(10));
         value.release(());
         // The test must finish, and no assertion should trigger.
+    }
+
+    #[::fuchsia::test]
+    fn new_cyclic() {
+        let mut weak_value = None;
+        let value = OwnedRef::new_cyclic(|weak| {
+            weak_value = Some(weak);
+            Data {}
+        });
+        let weak_value = weak_value.expect("weak_value");
+        assert!(weak_value.upgrade().is_some());
+        value.release(());
+        assert!(weak_value.upgrade().is_none());
     }
 }
