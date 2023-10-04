@@ -149,6 +149,13 @@ class SymbolName : public std::string_view {
       cpp20::is_constant_evaluated() ? GnuHashString(*this) : kGnuNoHash;
 };
 
+// This type can be used as a constructor tag to zero-construct an object whose
+// default constructor would otherwise not be zero initializable. This can
+// allow and object to be placed in bss. See
+// `SymbolInfo::SymbolInfo(LinkerZeroInitialized)` for more.
+struct LinkerZeroInitialized {};
+inline constexpr LinkerZeroInitialized kLinkerZeroInitialized{};
+
 // This represents all the dynamic symbol table information for one ELF file.
 // It's primarily used for hash table lookup via SymbolName::Lookup, but can
 // also be used to enumerate the symbol table or the hash tables.  It holds
@@ -161,6 +168,16 @@ class SymbolInfo {
   using Addr = typename Elf::Addr;
   using size_type = typename Elf::size_type;
   using Sym = typename Elf::Sym;
+
+  constexpr SymbolInfo() = default;
+
+  // This constructor can be used to zero-initialize a SymbolInfo object.
+  // This can be useful for performance reasons. Note, a SymbolInfo object in
+  // this state must never be used until `InitLinkerZeroInitialized` has been
+  // called.
+  constexpr explicit SymbolInfo(LinkerZeroInitialized) : strtab_{} {}
+
+  constexpr void InitLinkerZeroInitialized() { strtab_ = kEmptyStrtab; }
 
   // Each flavor of hash table has a support class with a compatible API,
   // except for the argument to the constructor and Valid, which is a

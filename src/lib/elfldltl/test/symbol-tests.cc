@@ -188,4 +188,21 @@ TYPED_TEST(ElfldltlSymbolTests, Remote) {
   si = RemoteSymbolInfo(si);
 }
 
+#ifdef __APPLE__
+#define SECTION_NAME "__DATA,__bss"
+#else
+#define SECTION_NAME ".bss"
+#endif
+
+TYPED_TEST(ElfldltlSymbolTests, ZeroInitialized) {
+  using Elf = typename TestFixture::Elf;
+
+  // Test that this object can be zero initialized by putting it in .bss
+  [[gnu::section(SECTION_NAME)]] static elfldltl::SymbolInfo<Elf> foo{
+      elfldltl::kLinkerZeroInitialized};
+  foo.InitLinkerZeroInitialized();
+
+  EXPECT_EQ(foo.strtab(), std::string_view("", 1));
+}
+
 }  // namespace
