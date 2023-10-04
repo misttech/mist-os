@@ -103,20 +103,21 @@ def _fuchsia_sdk_repository_impl(ctx):
     else:
         fail("The fuchsia sdk no longer supports downloading content via the cipd tool. Please use local_paths or provide a local fuchsia build.")
 
+    # Extract the target CPU names supported by our SDK manifests, then
+    # write it to generated_constants.bzl file.
+    constants = generate_sdk_constants(ctx, manifests)
+
     ctx.file("WORKSPACE.bazel", content = "", executable = False)
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
         ctx.attr._template,
         substitutions = {
+            "{{HOST_CPU}}": constants.host_cpus[0],
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
         },
         executable = False,
     )
-
-    # Extract the target CPU names supported by our SDK manifests, then
-    # write it to generated_constants.bzl file.
-    constants = generate_sdk_constants(ctx, manifests)
 
     # TODO(fxbug.dev/117511): Allow generate_sdk_build_rules to provide
     # substitutions directly to the call to ctx.template above.
