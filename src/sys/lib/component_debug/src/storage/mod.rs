@@ -4,10 +4,13 @@
 
 mod copy;
 mod delete;
+mod delete_all;
 mod list;
 mod make_directory;
 
-pub use {copy::copy, delete::delete, list::list, make_directory::make_directory};
+pub use {
+    copy::copy, delete::delete, delete_all::delete_all, list::list, make_directory::make_directory,
+};
 
 #[cfg(test)]
 pub mod test {

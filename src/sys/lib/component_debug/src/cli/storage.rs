@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::storage::{copy, delete, list, make_directory},
+    crate::storage::{copy, delete, delete_all, list, make_directory},
     anyhow::{format_err, Result},
     fidl_fuchsia_sys2 as fsys,
     moniker::{Moniker, MonikerBase},
@@ -89,4 +89,15 @@ pub async fn storage_delete_cmd(
     let storage_admin =
         get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
     delete(storage_admin, path).await
+}
+
+pub async fn storage_delete_all_cmd(
+    storage_provider_moniker: String,
+    storage_capability_name: String,
+    moniker: String,
+    realm_query: fsys::RealmQueryProxy,
+) -> Result<()> {
+    let storage_admin =
+        get_storage_admin(realm_query, storage_provider_moniker, storage_capability_name).await?;
+    delete_all(storage_admin, moniker).await
 }
