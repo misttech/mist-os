@@ -17,27 +17,8 @@ source_set("object_linker") {
   ]
 }
 
-source_set("ids") {
-  sources = [
-    # TODO(fxbug.dev/24590): IDs don't belong here, but this will work until we factor
-    # out another system that needs ids outside of gfx.
-    "id.cc",
-    "id.h",
-  ]
-  public_deps = [ "//src/ui/scenic/lib/scheduling:id" ]
-}
-
 source_set("util") {
-  sources = [
-    "util/time.h",
-    "util/unwrap.h",
-    "util/wrap.h",
-  ]
-  deps = [
-    # TODO(fxbug.dev/24590): Needed by wrap/unwrap.  Move to separate source_set?
-    "//src/lib/fxl",
-    "//src/ui/lib/escher",
-  ]
+  sources = [ "util/time.h" ]
 }
 
 source_set("validate_eventpair") {
