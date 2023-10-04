@@ -6,7 +6,7 @@ use {
     crate::fuchsia::{
         directory::FxDirectory, errors::map_to_status, node::FxNode, volume::FxVolume,
     },
-    anyhow::{bail, Error},
+    anyhow::Error,
     async_trait::async_trait,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fxfs::{
@@ -20,8 +20,8 @@ use {
     },
     std::sync::Arc,
     vfs::{
-        attributes, directory::entry_container::MutableDirectory, name::Name, node::Node,
-        symlink::Symlink,
+        attributes, common::rights_to_posix_mode_bits,
+        directory::entry_container::MutableDirectory, name::Name, node::Node, symlink::Symlink,
     },
 };
 
@@ -97,7 +97,17 @@ impl Node for FxSymlink {
     }
 
     async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-        Err(zx::Status::NOT_SUPPORTED)
+        let props = self.get_properties().await.map_err(map_to_status)?;
+        Ok(fio::NodeAttributes {
+            mode: fio::MODE_TYPE_SYMLINK
+                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
+            id: self.object_id(),
+            content_size: props.data_attribute_size,
+            storage_size: props.allocated_size,
+            link_count: props.refs,
+            creation_time: props.creation_time.as_nanos(),
+            modification_time: props.modification_time.as_nanos(),
+        })
     }
 
     async fn link_into(
@@ -172,7 +182,8 @@ impl FxNode for FxSymlink {
                 sub_dirs: 0,
                 posix_attributes,
             }),
-            _ => bail!(FxfsError::NotFile),
+            ObjectValue::None => Err(FxfsError::NotFound.into()),
+            _ => Err(FxfsError::NotFile.into()),
         }
     }
 

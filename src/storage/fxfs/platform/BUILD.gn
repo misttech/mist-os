@@ -82,6 +82,7 @@ rustc_library("platform") {
     ]
     test_deps += [
       "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
+      "//src/lib/fdio/rust:fdio",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-component",
       "//src/lib/fuchsia-fs",
@@ -95,6 +96,7 @@ rustc_library("platform") {
       "//src/storage/lib/ramdevice_client/rust:ramdevice_client",
       "//src/sys/pkg/lib/fuchsia-merkle",
       "//third_party/rust_crates:assert_matches",
+      "//third_party/rust_crates:libc",
       "//third_party/rust_crates:rand",
     ]
   }

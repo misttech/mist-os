@@ -8,8 +8,7 @@ use {
     crate::{
         common::{
             decode_extended_attribute_value, encode_extended_attribute_value,
-            extended_attributes_sender, inherit_rights_for_clone, rights_to_posix_mode_bits,
-            send_on_open_with_error, IntoAny,
+            extended_attributes_sender, inherit_rights_for_clone, send_on_open_with_error, IntoAny,
         },
         directory::entry::{DirectoryEntry, EntryInfo},
         execution_scope::ExecutionScope,
@@ -17,13 +16,13 @@ use {
         node::Node,
         object_request::Representation,
         path::Path,
-        ObjectRequest, ProtocolsExt, ToObjectRequest,
+        ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
     async_trait::async_trait,
     fidl::endpoints::{ControlHandle as _, Responder, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::StreamExt,
-    std::sync::Arc,
+    std::{future::Future, sync::Arc},
 };
 
 #[async_trait]
@@ -50,9 +49,9 @@ pub trait Symlink: Node {
     }
 }
 
-pub struct Connection {
+pub struct Connection<T> {
     scope: ExecutionScope,
-    symlink: Arc<dyn Symlink>,
+    symlink: Arc<T>,
 }
 
 pub struct SymlinkOptions;
@@ -70,30 +69,30 @@ fn null_node_attributes() -> fio::NodeAttributes {
     }
 }
 
-impl Connection {
-    /// Spawns a new task to run the connection.
-    pub fn spawn(
-        scope: ExecutionScope,
-        symlink: Arc<dyn Symlink>,
-        options: SymlinkOptions,
-        object_request: ObjectRequest,
-    ) {
-        scope.clone().spawn(Self::run(scope, symlink, options, object_request));
+impl<T: Symlink> Connection<T> {
+    /// Returns a new connection object.
+    pub fn new(scope: ExecutionScope, symlink: Arc<T>) -> Self {
+        Self { scope, symlink }
     }
 
-    /// Processes requests for this connection until either `shutdown` is notfied, the connection is
-    /// closed, or an error with the connection is encountered.
-    pub async fn run(
+    /// Upon success, returns a future that will proceess requests for the connection.
+    pub fn create(
         scope: ExecutionScope,
-        symlink: Arc<dyn Symlink>,
-        _options: SymlinkOptions,
-        object_request: ObjectRequest,
-    ) {
-        let mut connection = Connection { scope, symlink };
-        if let Ok(mut requests) = object_request.into_request_stream(&connection).await {
+        symlink: Arc<T>,
+        protocols: impl ProtocolsExt,
+        object_request: ObjectRequestRef,
+    ) -> Result<impl Future<Output = ()>, zx::Status> {
+        let _options = protocols.to_symlink_options()?;
+        Ok(Connection::new(scope, symlink).run(object_request.take()))
+    }
+
+    /// Process requests until either `shutdown` is notfied, the connection is closed, or an error
+    /// with the connection is encountered.
+    pub async fn run(mut self, object_request: ObjectRequest) {
+        if let Ok(mut requests) = object_request.into_request_stream(&self).await {
             while let Some(Ok(request)) = requests.next().await {
-                let Some(_guard) = connection.scope.try_active_guard() else { break };
-                if connection.handle_request(request).await.unwrap_or(true) {
+                let Some(_guard) = self.scope.try_active_guard() else { break };
+                if self.handle_request(request).await.unwrap_or(true) {
                     break;
                 }
             }
@@ -133,7 +132,7 @@ impl Connection {
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
-            fio::SymlinkRequest::GetAttr { responder } => match self.handle_get_attr().await {
+            fio::SymlinkRequest::GetAttr { responder } => match self.symlink.get_attrs().await {
                 Ok(attrs) => responder.send(zx::Status::OK.into_raw(), &attrs)?,
                 Err(status) => responder.send(status.into_raw(), &null_node_attributes())?,
             },
@@ -204,28 +203,14 @@ impl Connection {
             }
         };
         flags.to_object_request(server_end).handle(|object_request| {
-            Self::spawn(
+            self.scope.spawn(Self::create(
                 self.scope.clone(),
                 self.symlink.clone(),
-                flags.to_symlink_options()?,
-                object_request.take(),
-            );
+                flags,
+                object_request,
+            )?);
             Ok(())
         });
-    }
-
-    async fn handle_get_attr(&mut self) -> Result<fio::NodeAttributes, zx::Status> {
-        // TODO(fxbug.dev/123390): Add support for more attributes such as timestamps
-        Ok(fio::NodeAttributes {
-            mode: fio::MODE_TYPE_SYMLINK
-                | rights_to_posix_mode_bits(/*r*/ true, /*w*/ false, /*x*/ false),
-            id: fio::INO_UNKNOWN,
-            content_size: self.symlink.read_target().await?.len() as u64,
-            storage_size: 0,
-            link_count: 1,
-            creation_time: 0,
-            modification_time: 0,
-        })
     }
 
     async fn handle_link_into(
@@ -299,7 +284,7 @@ impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
             if !path.is_empty() {
                 return Err(zx::Status::NOT_DIR);
             }
-            Connection::spawn(scope, self, flags.to_symlink_options()?, object_request.take());
+            scope.spawn(Connection::create(scope.clone(), self, flags, object_request)?);
             Ok(())
         });
     }
@@ -310,7 +295,7 @@ impl<T: IntoAny + Symlink + Send + Sync> DirectoryEntry for T {
 }
 
 #[async_trait]
-impl Representation for Connection {
+impl<T: Symlink> Representation for Connection<T> {
     type Protocol = fio::SymlinkMarker;
 
     async fn get_representation(
@@ -337,7 +322,7 @@ mod tests {
         super::{Connection, Symlink},
         crate::{
             common::rights_to_posix_mode_bits, execution_scope::ExecutionScope, node::Node,
-            symlink::SymlinkOptions, ProtocolsExt, ToObjectRequest,
+            ToObjectRequest,
         },
         assert_matches::assert_matches,
         async_trait::async_trait,
@@ -349,6 +334,8 @@ mod tests {
             sync::{Arc, Mutex},
         },
     };
+
+    const TARGET: &[u8] = b"target";
 
     struct TestSymlink {
         xattrs: Mutex<HashMap<Vec<u8>, Vec<u8>>>,
@@ -363,7 +350,7 @@ mod tests {
     #[async_trait]
     impl Symlink for TestSymlink {
         async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
-            Ok(b"target".to_vec())
+            Ok(TARGET.to_vec())
         }
         async fn list_extended_attributes(&self) -> Result<Vec<Vec<u8>>, zx::Status> {
             let map = self.xattrs.lock().unwrap();
@@ -402,7 +389,18 @@ mod tests {
         }
 
         async fn get_attrs(&self) -> Result<fio::NodeAttributes, zx::Status> {
-            unreachable!();
+            Ok(fio::NodeAttributes {
+                mode: fio::MODE_TYPE_SYMLINK
+                    | rights_to_posix_mode_bits(
+                        /*r*/ true, /*w*/ false, /*x*/ false,
+                    ),
+                id: fio::INO_UNKNOWN,
+                content_size: TARGET.len() as u64,
+                storage_size: TARGET.len() as u64,
+                link_count: 1,
+                creation_time: 0,
+                modification_time: 0,
+            })
         }
     }
 
@@ -411,11 +409,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let (client_end, server_end) =
             create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
-        Connection::spawn(
-            scope,
-            Arc::new(TestSymlink::new()),
-            SymlinkOptions,
-            fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end),
+
+        scope.spawn(
+            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
+                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
         );
 
         assert_eq!(
@@ -433,13 +430,12 @@ mod tests {
                 create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
             flags |= fio::OpenFlags::DESCRIBE;
             flags.to_object_request(server_end).handle(|object_request| {
-                Connection::spawn(
+                object_request.spawn_connection(
                     scope.clone(),
                     Arc::new(TestSymlink::new()),
-                    flags.to_symlink_options()?,
-                    object_request.take(),
-                );
-                Ok(())
+                    flags,
+                    Connection::create,
+                )
             });
             async move {
                 zx::Status::from_raw(
@@ -482,12 +478,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let (client_end, server_end) =
             create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        Connection::spawn(
-            scope,
-            Arc::new(TestSymlink::new()),
-            flags.to_symlink_options().unwrap(),
-            flags.to_object_request(server_end.into_channel()),
+
+        scope.spawn(
+            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
+                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
         );
 
         assert_matches!(
@@ -498,7 +492,7 @@ mod tests {
                     mode,
                     id: fio::INO_UNKNOWN,
                     content_size: 6,
-                    storage_size: 0,
+                    storage_size: 6,
                     link_count: 1,
                     creation_time: 0,
                     modification_time: 0,
@@ -513,12 +507,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let (client_end, server_end) =
             create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        Connection::spawn(
-            scope,
-            Arc::new(TestSymlink::new()),
-            flags.to_symlink_options().unwrap(),
-            flags.to_object_request(server_end),
+
+        scope.spawn(
+            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
+                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
         );
 
         assert_matches!(
@@ -535,12 +527,10 @@ mod tests {
         let scope = ExecutionScope::new();
         let (client_end, server_end) =
             create_proxy::<fio::SymlinkMarker>().expect("create_proxy failed");
-        let flags = fio::OpenFlags::RIGHT_READABLE;
-        Connection::spawn(
-            scope,
-            Arc::new(TestSymlink::new()),
-            flags.to_symlink_options().unwrap(),
-            flags.to_object_request(server_end),
+
+        scope.spawn(
+            Connection::new(scope.clone(), Arc::new(TestSymlink::new()))
+                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(server_end)),
         );
 
         client_end

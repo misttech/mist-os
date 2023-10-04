@@ -362,8 +362,7 @@ impl ProtocolsExt for fio::OpenFlags {
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::RIGHT_EXECUTABLE,
         );
-        const ALLOWED_FLAGS: fio::OpenFlags = fio::OpenFlags::NODE_REFERENCE
-            .union(fio::OpenFlags::DESCRIBE)
+        const ALLOWED_FLAGS: fio::OpenFlags = fio::OpenFlags::DESCRIBE
             .union(fio::OpenFlags::CREATE)
             .union(fio::OpenFlags::CREATE_IF_ABSENT)
             .union(fio::OpenFlags::APPEND)
@@ -379,9 +378,6 @@ impl ProtocolsExt for fio::OpenFlags {
         let mut prohibited_flags = fio::OpenFlags::empty();
         if !self.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
             prohibited_flags |= fio::OpenFlags::TRUNCATE
-        }
-        if self.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            prohibited_flags |= !fio::OPEN_FLAGS_ALLOWED_WITH_NODE_REFERENCE;
         }
         if self.intersects(prohibited_flags) {
             return Err(zx::Status::INVALID_ARGS);
@@ -406,8 +402,6 @@ impl ProtocolsExt for fio::OpenFlags {
     }
 
     fn to_symlink_options(&self) -> Result<SymlinkOptions, zx::Status> {
-        // TODO(fxbug.dev/123390): Support NODE_REFERENCE.
-
         if self.intersects(fio::OpenFlags::DIRECTORY) {
             return Err(zx::Status::NOT_DIR);
         }

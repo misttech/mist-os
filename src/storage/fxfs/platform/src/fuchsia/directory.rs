@@ -46,8 +46,7 @@ use {
         },
         execution_scope::ExecutionScope,
         path::Path,
-        symlink::{self, SymlinkOptions},
-        ObjectRequestRef, ProtocolsExt, ToObjectRequest,
+        symlink, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
     },
 };
 
@@ -633,11 +632,10 @@ impl MutableDirectory for FxDirectory {
                     .commit_with_callback(|_| {
                         let node = Arc::new(FxSymlink::new(self.volume().clone(), object_id));
                         p.commit(&(node.clone() as Arc<dyn FxNode>));
-                        symlink::Connection::spawn(
-                            self.volume().scope().clone(),
-                            node,
-                            SymlinkOptions,
-                            fio::OpenFlags::RIGHT_READABLE.to_object_request(connection),
+                        let scope = self.volume().scope();
+                        scope.spawn(
+                            symlink::Connection::new(scope.clone(), node)
+                                .run(fio::OpenFlags::RIGHT_READABLE.to_object_request(connection)),
                         );
                     })
                     .await
@@ -709,13 +707,12 @@ impl DirectoryEntry for FxDirectory {
                     }
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    Ok(symlink::Connection::run(
-                        scope,
+                    object_request.create_connection(
+                        scope.clone(),
                         node.take(),
-                        flags.to_symlink_options()?,
-                        object_request.take(),
+                        flags,
+                        symlink::Connection::create,
                     )
-                    .boxed())
                 } else {
                     unreachable!();
                 }
@@ -752,13 +749,12 @@ impl DirectoryEntry for FxDirectory {
                     FxFile::create_connection_async(node, scope, protocols, object_request)
                 } else if node.is::<FxSymlink>() {
                     let node = node.downcast::<FxSymlink>().unwrap_or_else(|_| unreachable!());
-                    Ok(symlink::Connection::run(
-                        scope,
+                    object_request.create_connection(
+                        scope.clone(),
                         node.take(),
-                        protocols.to_symlink_options()?,
-                        object_request.take(),
+                        protocols,
+                        symlink::Connection::create,
                     )
-                    .boxed())
                 } else {
                     unreachable!();
                 }
@@ -961,7 +957,7 @@ mod tests {
             },
         },
         assert_matches::assert_matches,
-        fidl::endpoints::{create_proxy, ServerEnd},
+        fidl::endpoints::{create_proxy, Proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::{DirEntry, DirentKind},
         fuchsia_fs::file,
@@ -969,7 +965,7 @@ mod tests {
         futures::StreamExt,
         fxfs::object_store::Timestamp,
         rand::Rng,
-        std::{sync::Arc, time::Duration},
+        std::{os::fd::AsRawFd, sync::Arc, time::Duration},
         storage_device::{fake_device::FakeDevice, DeviceHolder},
         vfs::{common::rights_to_posix_mode_bits, node::Node, path::Path},
     };
@@ -1822,6 +1818,39 @@ mod tests {
                 .expect("link_into failed");
 
             open_symlink(&root, "symlink2").await;
+        }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_symlink_stat() {
+        let fixture = TestFixture::new().await;
+
+        {
+            let root = fixture.root();
+
+            root.create_symlink("symlink", b"target", None)
+                .await
+                .expect("FIDL call failed")
+                .expect("create_symlink failed");
+
+            let root = fuchsia_fs::directory::clone_no_describe(root, None)
+                .expect("clone_no_describe failed");
+
+            fasync::unblock(|| {
+                let root: std::os::fd::OwnedFd =
+                    fdio::create_fd(root.into_channel().unwrap().into_zx_channel().into())
+                        .expect("create_fd failed");
+
+                let mut stat: libc::stat = unsafe { std::mem::zeroed() };
+                let name = std::ffi::CString::new("symlink").expect("CString::new failed");
+                assert_eq!(
+                    unsafe { libc::fstatat(root.as_raw_fd(), name.as_ptr(), &mut stat, 0) },
+                    0
+                );
+            })
+            .await;
         }
 
         fixture.close().await;
