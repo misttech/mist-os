@@ -198,6 +198,18 @@ impl<T: Releasable> OwnedRef<T> {
         Self { inner, drop_guard: Default::default() }
     }
 
+    /// Provides a raw pointer to the data.
+    ///
+    /// See `Arc::as_ptr`
+    pub fn as_ptr(this: &Self) -> *const T {
+        &this.inner.value.value as *const T
+    }
+
+    /// Returns true if the two objects point to the same allocation
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        Self::as_ptr(this) == Self::as_ptr(other)
+    }
+
     /// Produce a `WeakRef` from a `OwnedRef`.
     pub fn downgrade(this: &Self) -> WeakRef<T> {
         WeakRef(Arc::downgrade(&this.inner))
@@ -329,6 +341,20 @@ impl<T: Releasable> WeakRef<T> {
         }
         None
     }
+
+    /// Returns a raw pointer to the object T pointed to by this WeakRef<T>.
+    ///
+    /// See `Weak::as_ptr`
+    pub fn as_ptr(&self) -> *const T {
+        let base = self.0.as_ptr();
+        let value = memoffset::raw_field!(base, RefInner<T>, value);
+        memoffset::raw_field!(value, ReleaseGuard<T>, value)
+    }
+
+    /// Returns true if the two objects point to the same allocation
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        Self::as_ptr(this) == Self::as_ptr(other)
+    }
 }
 
 impl<T: Releasable> Default for WeakRef<T> {
@@ -368,6 +394,18 @@ impl<'a, T: Releasable> TempRef<'a, T> {
     fn new(inner: Arc<RefInner<T>>) -> Self {
         inner.inc_temp_ref();
         Self(inner, Default::default())
+    }
+
+    /// Provides a raw pointer to the data.
+    ///
+    /// See `Arc::as_ptr`
+    pub fn as_ptr(this: &Self) -> *const T {
+        &this.0.value.value as *const T
+    }
+
+    /// Returns true if the two objects point to the same allocation
+    pub fn ptr_eq(this: &Self, other: &Self) -> bool {
+        Self::as_ptr(this) == Self::as_ptr(other)
     }
 
     /// This allows to change the lifetime annotation of a `TempRef` to static.
@@ -826,5 +864,16 @@ mod test {
         assert!(weak_value.upgrade().is_some());
         value.release(());
         assert!(weak_value.upgrade().is_none());
+    }
+
+    #[::fuchsia::test]
+    fn as_ptr() {
+        let value = OwnedRef::new(Data {});
+        let weak = OwnedRef::downgrade(&value);
+        let temp = weak.upgrade().expect("upgrade");
+        assert_eq!(OwnedRef::as_ptr(&value), weak.as_ptr());
+        assert_eq!(OwnedRef::as_ptr(&value), TempRef::as_ptr(&temp));
+        std::mem::drop(temp);
+        value.release(());
     }
 }
