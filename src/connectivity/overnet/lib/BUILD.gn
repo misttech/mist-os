@@ -4,10 +4,7 @@
 
 group("lib") {
   testonly = true
-  deps = [
-    "core",
-    "onet_test_util",
-  ]
+  deps = [ "core" ]
   if (is_host) {
     deps += [
       "ascendd",
@@ -23,6 +20,5 @@ group("tests") {
     "circuit:tests",
     "core:tests",
     "hoist:tests($host_toolchain)",
-    "onet_test_util:tests",
   ]
 }
