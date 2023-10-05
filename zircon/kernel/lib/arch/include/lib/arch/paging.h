@@ -49,6 +49,7 @@ struct PagingSettings {
   bool terminal = false;
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
+  bool accessed = true;
 };
 
 }  // namespace internal
@@ -117,6 +118,7 @@ struct ExamplePagingTraits {
   /// *  uint64_t address;
   /// *  AccessPermissions access;
   /// *  MemoryType memory;
+  /// *  bool accessed;
   ///
   /// Further, PagingSettings should define a default memory type value in the
   /// form of
@@ -125,6 +127,9 @@ struct ExamplePagingTraits {
   /// This abstraction allows traits to define their own default settings.
   ///
   /// PagingSettings must be default-constructible.
+  ///
+  /// internal::PagingSettings may be instantiated to satisfy these
+  /// requirements.
   ///
   /// TODO(fxbug.dev/129344): Extend with a 'global' setting.
   using PagingSettings = internal::PagingSettings<MemoryType>;
@@ -167,6 +172,16 @@ struct ExamplePagingTraits {
     constexpr bool writable() const { return false; }
     constexpr bool executable() const { return false; }
     constexpr bool user_accessible() const { return false; }
+
+    /// If terminal, whether the associated page was read from, written to, or
+    /// executed. If non-terminal, this *may* for certain implementations
+    /// indicate whether a page that maps through this entry was similarly
+    /// accessed; otherwise, this is expected to return false.
+    ///
+    /// Hardware may often be configured so as to manage this bit
+    /// automatically - but otherwise software must do so and contend with
+    /// access faults when unset.
+    constexpr bool accessed() const { return false; }
 
     /// Returns the memory type of the associated page, which may require
     /// access to system state to decode.
@@ -303,14 +318,19 @@ class Paging : public PagingTraits {
   using TableEntry = typename PagingTraits::template TableEntry<Level>;
 
   using typename PagingTraits::MemoryType;
+
   using typename PagingTraits::PagingSettings;
+  static_assert(std::is_default_constructible_v<PagingSettings>);
+
   using typename PagingTraits::SystemState;
+  static_assert(std::is_default_constructible_v<SystemState>);
 
   /// The settings to apply to each page mapped in the context of the mapping
   /// utilities below.
   struct MapSettings {
     AccessPermissions access;
     MemoryType memory = PagingTraits::PagingSettings::kDefaultMemory;
+    bool accessed = true;
 
     // TODO(fxbug.dev/129344): global.
   };
@@ -653,8 +673,6 @@ class Paging : public PagingTraits {
   // TODO(fxbug.dev/131202): Once hwreg is constexpr-friendly, we can add a static
   // assert that zeroed entries at any level report as non-present.
 
-  static_assert(std::is_default_constructible_v<PagingSettings>);
-
   /// A visitor tailor-made to help perform a mapping of
   /// `[input_vaddr, input_vaddr + size)` to
   /// `[output_paddr, output_paddr + size)` in the context of `Map()`. Calling
@@ -728,6 +746,7 @@ class Paging : public PagingTraits {
         settings.address = output_paddr_;
         settings.access = settings_.access;
         settings.memory = settings_.memory;
+        settings.accessed = settings_.accessed;
       } else {
         std::optional<uint64_t> new_table_paddr = allocator_(kTableSize<Level>, kTableAlignment);
         if (!new_table_paddr) {
