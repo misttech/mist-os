@@ -758,6 +758,9 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
       : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInvalidArgs  ? "invalid args"
       : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kInternalError
           ? "internal error"
+      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kShouldWait ? "should wait"
+      : scan_end.code == fuchsia_wlan_fullmac_wire::WlanScanResult::kCanceledByDriverOrFirmware
+          ? "canceled by driver or firmware"
           : "unknown",
       ndev->scan_num_results);
   auto result = ndev->if_proto.buffer(*arena)->OnScanEnd(scan_end);
