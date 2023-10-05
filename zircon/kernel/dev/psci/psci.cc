@@ -50,12 +50,12 @@ uint32_t psci_cpu_on(uint64_t mpid, paddr_t entry) {
   return (uint32_t)do_psci_call(PSCI64_CPU_ON, mpid, entry, 0);
 }
 
-int32_t psci_get_affinity_info(uint64_t mpid) {
-  return (uint32_t)do_psci_call(PSCI64_AFFINITY_INFO, mpid, 0, 0);
+int64_t psci_get_affinity_info(uint64_t mpid) {
+  return (int64_t)do_psci_call(PSCI64_AFFINITY_INFO, mpid, 0, 0);
 }
 
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
-  int32_t aff_info = psci_get_affinity_info(mpid);
+  int64_t aff_info = psci_get_affinity_info(mpid);
   switch (aff_info) {
     case PSCI_INVALID_PARAMETERS:
       return zx::error(ZX_ERR_INVALID_ARGS);
@@ -69,7 +69,7 @@ zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
     case 2:
       return zx::success(power_cpu_state::ON_PENDING);
     default:
-      dprintf(INFO, "Tried to get affinity info for MPID %lu, got invalid return code %d\n", mpid,
+      dprintf(INFO, "Tried to get affinity info for MPID %lu, got invalid return code %ld\n", mpid,
               aff_info);
       return zx::error(ZX_ERR_INTERNAL);
   }
@@ -189,8 +189,8 @@ static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    int32_t ret = psci_get_affinity_info(ARM64_MPID(argv[2].u, argv[3].u));
-    printf("affinity info returns %d\n", ret);
+    int64_t ret = psci_get_affinity_info(ARM64_MPID(argv[2].u, argv[3].u));
+    printf("affinity info returns %ld\n", ret);
   } else {
     uint32_t function = static_cast<uint32_t>(argv[1].u);
     uint64_t arg0 = (argc >= 3) ? argv[2].u : 0;
