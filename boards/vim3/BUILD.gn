@@ -18,7 +18,10 @@ board_configuration("vim3") {
     "fuchsia::wlan_fullmac",
   ]
 
-  input_bundles = [ "//boards/vim3:main_bundle" ]
+  input_bundles = [
+    ":main_bundle",
+    ":vulkan_arm_mali",
+  ]
 
   filesystems = {
     vbmeta = {
@@ -49,4 +52,10 @@ board_configuration("vim3") {
 }
 
 board_input_bundle("main_bundle") {
+  base_packages = [ "//src/graphics/bin/vulkan_loader" ]
+}
+
+board_input_bundle("vulkan_arm_mali") {
+  base_packages =
+      [ "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0" ]
 }

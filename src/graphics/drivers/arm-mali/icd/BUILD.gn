@@ -7,6 +7,8 @@ import("//build/packages/prebuilt_package.gni")
 import("//src/graphics/drivers/arm-mali/icd/prebuilt_arm_mali.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
+assert(target_cpu == "arm64", "The arm-mali drivers are arm64-only.")
+
 # hardware_id is a hexadecimal (without the 0x) version of the GPU_ID register.
 icd_list = [
   {
@@ -15,17 +17,11 @@ icd_list = [
   },
 ]
 
-# Also don't include ICDs on bringup builds (bootfs_only), because the metadata
-# files in them conflict with each other and the vulkan_loader can't load from
-# bootfs anyway.
-enable_icd =
-    target_cpu == "arm64" && !bootfs_only && !disable_prebuilt_arm_mali_vulkan
-
 # See //src/graphics/bin/vulkan_loader/README.md for a description of ICD
 # package layout requirements.
 foreach(icd, icd_list) {
   icd_name = icd.name
-  if (enable_icd) {
+  if (!disable_prebuilt_arm_mali_vulkan) {
     hardware_id = icd.hardware_id
     prebuilt_package(icd_name) {
       package_name = "libvulkan_arm_mali_${hardware_id}"
