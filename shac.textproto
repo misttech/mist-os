@@ -11,7 +11,7 @@ ignore: "/third_party/rust_crates/vendor"
 vars: [
   {
     name: "fuchsia_dir"
-    description: "relative path to the fuchsia build output directory"
+    description: "relative path to the root of the fuchsia repository"
     default: "."
   },
   {
