@@ -37,16 +37,16 @@ namespace ld {
 // profdata instrumentation before it's moot.
 inline constexpr bool kProtectData = !HAVE_LLVM_PROFDATA;
 
-struct BootsrapModule {
+struct BootstrapModule {
   abi::Abi<>::Module& module;
   cpp20::span<const elfldltl::Elf<>::Dyn> dyn;
 };
 
-inline BootsrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
-                                            cpp20::span<const elfldltl::Elf<>::Dyn> dyn,
-                                            size_t vaddr_start, size_t vaddr_size, size_t bias,
-                                            cpp20::span<const elfldltl::Elf<>::Phdr> phdrs,
-                                            const elfldltl::ElfNote& build_id) {
+inline BootstrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
+                                             cpp20::span<const elfldltl::Elf<>::Dyn> dyn,
+                                             size_t vaddr_start, size_t vaddr_size, size_t bias,
+                                             cpp20::span<const elfldltl::Elf<>::Phdr> phdrs,
+                                             const elfldltl::ElfNote& build_id) {
   module.link_map.addr = bias;
   module.link_map.ld = dyn.data();
   module.vaddr_start = vaddr_start;
@@ -72,8 +72,8 @@ inline BootsrapModule FinishBootstrapModule(abi::Abi<>::Module& module,
 // properly page-aligned.  In that case, CompleteVdsoModule (below) should be
 // called once the page size is known.
 template <class Diagnostics>
-inline BootsrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
-                                          size_t page_size = 1) {
+inline BootstrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_base,
+                                           size_t page_size = 1) {
   using Ehdr = elfldltl::Elf<>::Ehdr;
   using Phdr = elfldltl::Elf<>::Phdr;
   using Dyn = elfldltl::Elf<>::Dyn;
@@ -137,7 +137,7 @@ inline BootsrapModule BootstrapVdsoModule(Diagnostics&& diag, const void* vdso_b
 // Module's vaddr_start and vaddr_end are not properly page-aligned until
 // CompleteBootstrapModule (below) is called.
 template <class Diagnostics>
-inline BootsrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
+inline BootstrapModule BootstrapSelfModule(Diagnostics&& diag, const abi::Abi<>::Module& vdso) {
   using Phdr = elfldltl::Elf<>::Phdr;
   using Dyn = elfldltl::Elf<>::Dyn;
 

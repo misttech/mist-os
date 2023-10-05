@@ -207,7 +207,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   template <typename ScratchAllocator, typename InitialExecAllocator, typename... LoaderArgs>
   static void LinkModules(Diagnostics& diag, ScratchAllocator& scratch,
                           InitialExecAllocator& initial_exec, StartupLoadModule* main_executable,
-                          std::initializer_list<BootsrapModule> preloaded_module_list,
+                          std::initializer_list<BootstrapModule> preloaded_module_list,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
     List modules = main_executable->MakeList();
     List preloaded_modules =
@@ -240,7 +240,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   template <typename Allocator, typename... LoaderArgs>
   static List MakePreloadedList(Diagnostics& diag, Allocator& allocator,
-                                std::initializer_list<BootsrapModule> modules,
+                                std::initializer_list<BootstrapModule> modules,
                                 LoaderArgs&&... loader_args) {
     List preloaded_modules;
     for (const auto& [module, dyn] : modules) {

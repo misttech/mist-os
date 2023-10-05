@@ -139,8 +139,8 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // error out anyway.
   auto bootstrap_diag = elfldltl::TrapDiagnostics();
 
-  BootsrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
-  BootsrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
+  BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso);
+  BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
 
   // Only now can we make the system call to discover the page size.
   const size_t page_size = zx_system_get_page_size();

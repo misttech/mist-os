@@ -184,8 +184,8 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
       elfldltl::DiagnosticsPanicFlags{},
   };
 
-  BootsrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
-  BootsrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
+  BootstrapModule vdso_module = BootstrapVdsoModule(bootstrap_diag, vdso, startup.page_size);
+  BootstrapModule self_module = BootstrapSelfModule(bootstrap_diag, vdso_module.module);
   CompleteBootstrapModule(self_module.module, startup.page_size);
 
   // Now that things are bootstrapped, set up the main diagnostics object.
