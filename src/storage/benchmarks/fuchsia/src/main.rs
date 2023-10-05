@@ -142,6 +142,8 @@ async fn load_blobs_for_tracing() {
     Minfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
     Blobfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
     Fxblob.start_filesystem(&ramdisk_factory).await.shutdown().await;
+    PkgDirTest::new_fxblob().start_filesystem(&ramdisk_factory).await.shutdown().await;
+    PkgDirTest::new_blobfs().start_filesystem(&ramdisk_factory).await.shutdown().await;
 }
 
 #[fuchsia::main(logging_tags = ["storage_benchmarks"])]
