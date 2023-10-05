@@ -49,7 +49,10 @@ void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& eld) {
   // Populate the ELD header.
   hda::EldHeader* header = reinterpret_cast<hda::EldHeader*>(p);
   header->set_eld_ver(2);
-  header->set_baseline_eld_len(eld_length);
+  // These asserts guarantee the cast directly below will not cause UB.
+  ZX_ASSERT_MSG(eld_length > 0, "Overflow while computing ELD length");
+  ZX_ASSERT(eld_length < std::numeric_limits<uint32_t>::max());
+  header->set_baseline_eld_len(static_cast<uint32_t>(eld_length));
   p += sizeof(hda::EldHeader);
 
   // Populate the ELD baseline part 1.
@@ -57,8 +60,10 @@ void ComputeEld(const edid::Edid& edid, fbl::Array<uint8_t>& eld) {
   // "with CEA-861-C and continuing through present, incrementing the version number is no longer
   // required. The revision number shall be set to 0x03"
   part1->set_cea_edid_ver(3);
-  part1->set_mnl(monitor_name_string_len);
-  part1->set_sad_count(number_of_short_audio_descriptors);
+  // The cast does not cause UB because monitor_name_string_len has an upper
+  // bound of kMaxMonitorNameStringLength, which is 16.
+  part1->set_mnl(static_cast<char>(monitor_name_string_len));
+  part1->set_sad_count(static_cast<uint8_t>(number_of_short_audio_descriptors));
   part1->set_conn_type(edid.is_hdmi() ? 0 : 1);
   part1->set_s_ai(0);          // Not supported: ACP, ISRC1, or ISRC2 packets.
   part1->set_hdcp(0);          // Not supported.
