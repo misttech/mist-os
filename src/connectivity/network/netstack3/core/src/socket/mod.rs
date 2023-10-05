@@ -26,7 +26,7 @@ use crate::{
             Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
         },
     },
-    device::{Id, StrongId, WeakId},
+    device,
     error::{ExistsError, NotFoundError},
     socket::address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
 };
@@ -55,7 +55,11 @@ pub(crate) fn must_have_zone<A: IpAddress>(addr: &SpecifiedAddr<A>) -> bool {
 
 /// Determines where a change in device is allowed given the local and remote
 /// addresses.
-pub(crate) fn can_device_change<A: IpAddress, W: WeakId<Strong = S>, S: StrongId>(
+pub(crate) fn can_device_change<
+    A: IpAddress,
+    W: device::WeakId<Strong = S>,
+    S: device::StrongId,
+>(
     local_ip: Option<&SpecifiedAddr<A>>,
     remote_ip: Option<&SpecifiedAddr<A>>,
     old_device: Option<&W>,
@@ -103,7 +107,7 @@ pub(crate) struct ListenerAddrInfo {
     pub(crate) specified_addr: bool,
 }
 
-impl<A: IpAddress, D: Id, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
+impl<A: IpAddress, D: device::Id, LI> ListenerAddr<ListenerIpAddr<A, LI>, D> {
     pub(crate) fn info(&self) -> ListenerAddrInfo {
         let Self { device, ip: ListenerIpAddr { addr, identifier: _ } } = self;
         ListenerAddrInfo { has_device: device.is_some(), specified_addr: addr.is_some() }
@@ -226,8 +230,13 @@ pub(crate) trait SocketMapAddrStateUpdateSharingSpec: SocketMapAddrStateSpec {
     ) -> Result<(), IncompatibleError>;
 }
 
-pub(crate) trait SocketMapConflictPolicy<Addr, SharingState, I: Ip, D: Id, A: SocketMapAddrSpec>:
-    SocketMapStateSpec
+pub(crate) trait SocketMapConflictPolicy<
+    Addr,
+    SharingState,
+    I: Ip,
+    D: device::Id,
+    A: SocketMapAddrSpec,
+>: SocketMapStateSpec
 {
     /// Checks whether a new socket with the provided state can be inserted at
     /// the given address in the existing socket map, returning an error
@@ -244,7 +253,7 @@ pub(crate) trait SocketMapConflictPolicy<Addr, SharingState, I: Ip, D: Id, A: So
     ) -> Result<(), InsertError>;
 }
 
-pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: Id, A>:
+pub(crate) trait SocketMapUpdateSharingPolicy<Addr, SharingState, I: Ip, D: device::Id, A>:
     SocketMapConflictPolicy<Addr, SharingState, I, D, A>
 where
     A: SocketMapAddrSpec,
@@ -291,8 +300,8 @@ pub(crate) enum AddrVec<I: Ip, D, A: SocketMapAddrSpec + ?Sized> {
     Conn(ConnAddr<ConnIpAddr<I::Addr, A::LocalIdentifier, A::RemoteIdentifier>, D>),
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized> Tagged<AddrVec<I, D, A>>
-    for Bound<S>
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized>
+    Tagged<AddrVec<I, D, A>> for Bound<S>
 {
     type Tag = S::AddrVecTag;
     fn tag(&self, address: &AddrVec<I, D, A>) -> Self::Tag {
@@ -311,7 +320,7 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec + ?Sized> Tagged<
     }
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec> IterShadows for AddrVec<I, D, A> {
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec> IterShadows for AddrVec<I, D, A> {
     type IterShadows = AddrVecIter<I, D, A>;
 
     fn iter_shadows(&self) -> Self::IterShadows {
@@ -429,7 +438,8 @@ where
 /// address).
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct BoundSocketMap<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> {
+pub(crate) struct BoundSocketMap<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+{
     addr_to_state: SocketMap<AddrVec<I, D, A>, Bound<S>>,
 }
 
@@ -444,7 +454,7 @@ pub(crate) struct Sockets<AddrToStateMap, SocketType>(AddrToStateMap, PhantomDat
 impl<
         'a,
         I: Ip,
-        D: Id,
+        D: device::Id,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
@@ -486,7 +496,7 @@ where
 pub(crate) struct SocketStateEntry<
     'a,
     I: Ip,
-    D: Id,
+    D: device::Id,
     A: SocketMapAddrSpec,
     S: SocketMapStateSpec,
     SocketType,
@@ -499,7 +509,7 @@ pub(crate) struct SocketStateEntry<
 impl<
         'a,
         I: Ip,
-        D: Id,
+        D: device::Id,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec
@@ -607,7 +617,7 @@ pub(crate) struct UpdateSharingError;
 impl<
         'a,
         I: Ip,
-        D: Id,
+        D: device::Id,
         SocketType: ConvertSocketMapState<I, D, A, S>,
         A: SocketMapAddrSpec,
         S: SocketMapStateSpec,
@@ -621,9 +631,9 @@ where
     }
 
     #[cfg(test)]
-    pub(crate) fn id(&self) -> SocketType::Id {
+    pub(crate) fn id(&self) -> &SocketType::Id {
         let Self { id, addr_entry: _, _marker } = self;
-        SocketType::from_socket_id_ref(id).clone()
+        SocketType::from_socket_id_ref(id)
     }
 
     pub(crate) fn try_update_addr(
@@ -710,7 +720,7 @@ where
     }
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S> BoundSocketMap<I, D, A, S>
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S> BoundSocketMap<I, D, A, S>
 where
     AddrVec<I, D, A>: IterShadows,
     S: SocketMapStateSpec,
@@ -820,8 +830,8 @@ pub(crate) trait ConvertSocketMapState<I: Ip, D, A: SocketMapAddrSpec, S: Socket
     fn from_socket_id_ref(id: &SocketId<S>) -> &Self::Id;
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMapState<I, D, A, S>
-    for Listener
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+    ConvertSocketMapState<I, D, A, S> for Listener
 {
     type Id = S::ListenerId;
     type SharingState = S::ListenerSharingState;
@@ -866,8 +876,8 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMap
     }
 }
 
-impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: SocketMapStateSpec> ConvertSocketMapState<I, D, A, S>
-    for Connection
+impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, S: SocketMapStateSpec>
+    ConvertSocketMapState<I, D, A, S> for Connection
 {
     type Id = S::ConnId;
     type SharingState = S::ConnSharingState;
@@ -1182,7 +1192,7 @@ mod tests {
             let entry =
                 bound.listeners_mut().try_insert(addr, 'v', Listener(fake_id_gen.next())).unwrap();
             assert_eq!(entry.get_addr(), &addr);
-            entry.id()
+            entry.id().clone()
         };
 
         assert_eq!(bound.listeners().get_by_addr(&addr), Some(&Multiple('v', vec![id])));
@@ -1202,7 +1212,7 @@ mod tests {
         let id = {
             let entry = bound.conns_mut().try_insert(addr, 'v', Conn(fake_id_gen.next())).unwrap();
             assert_eq!(entry.get_addr(), &addr);
-            entry.id()
+            entry.id().clone()
         };
 
         assert_eq!(bound.conns().get_by_addr(&addr), Some(&Multiple('v', vec![id])));
@@ -1264,7 +1274,7 @@ mod tests {
         let addr = LISTENER_ADDR;
 
         // Insert a listener so that future calls can conflict.
-        let _: Listener = bound.listeners_mut().try_insert(addr, 'a', Listener(0)).unwrap().id();
+        let _: &Listener = bound.listeners_mut().try_insert(addr, 'a', Listener(0)).unwrap().id();
 
         // All of the below try_insert_with calls should fail, but more
         // importantly, they should not call the `make_id` callback (because it
@@ -1308,7 +1318,7 @@ mod tests {
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = LISTENER_ADDR;
 
-        let _: Listener =
+        let _: &Listener =
             bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
             bound.listeners_mut().try_insert(addr, 'b', Listener(fake_id_gen.next())),
@@ -1327,7 +1337,7 @@ mod tests {
             ListenerAddr { device: Some(FakeWeakDeviceId(FakeDeviceId)), ..addr }
         };
 
-        let _: Listener =
+        let _: &Listener =
             bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
             bound.listeners_mut().try_insert(shadows_addr, 'b', Listener(fake_id_gen.next())),
@@ -1349,7 +1359,7 @@ mod tests {
             },
         };
 
-        let _: Listener =
+        let _: &Listener =
             bound.listeners_mut().try_insert(addr, 'a', Listener(fake_id_gen.next())).unwrap().id();
         assert_matches!(
             bound.conns_mut().try_insert(shadows_addr, 'b', Conn(fake_id_gen.next())),
@@ -1364,10 +1374,18 @@ mod tests {
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = LISTENER_ADDR;
 
-        let a =
-            bound.listeners_mut().try_insert(addr, 'x', Listener(fake_id_gen.next())).unwrap().id();
-        let b =
-            bound.listeners_mut().try_insert(addr, 'x', Listener(fake_id_gen.next())).unwrap().id();
+        let a = bound
+            .listeners_mut()
+            .try_insert(addr, 'x', Listener(fake_id_gen.next()))
+            .unwrap()
+            .id()
+            .clone();
+        let b = bound
+            .listeners_mut()
+            .try_insert(addr, 'x', Listener(fake_id_gen.next()))
+            .unwrap()
+            .id()
+            .clone();
         assert_ne!(a, b);
 
         assert_eq!(bound.listeners_mut().remove(&a, &addr), Ok(()));
@@ -1381,8 +1399,10 @@ mod tests {
         let mut fake_id_gen = FakeSocketIdGen::default();
         let addr = CONN_ADDR;
 
-        let a = bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id();
-        let b = bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id();
+        let a =
+            bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id().clone();
+        let b =
+            bound.conns_mut().try_insert(addr, 'x', Conn(fake_id_gen.next())).unwrap().id().clone();
         assert_ne!(a, b);
 
         assert_eq!(bound.conns_mut().remove(&a, &addr), Ok(()));
@@ -1411,12 +1431,14 @@ mod tests {
             .listeners_mut()
             .try_insert(first_addr, 'a', Listener(fake_id_gen.next()))
             .unwrap()
-            .id();
+            .id()
+            .clone();
         let second = bound
             .listeners_mut()
             .try_insert(second_addr, 'b', Listener(fake_id_gen.next()))
             .unwrap()
-            .id();
+            .id()
+            .clone();
 
         // Moving from (1, "aaa") to (1, None) should fail since it is shadowed
         // by (1, "yyy"), and vise versa.
@@ -1428,7 +1450,7 @@ mod tests {
             .expect_err("update should fail");
 
         // The entry should correspond to `second`.
-        assert_eq!(entry.id(), second);
+        assert_eq!(entry.id(), &second);
         drop(entry);
 
         let (ExistsError, entry) = bound
@@ -1449,7 +1471,8 @@ mod tests {
             .conns_mut()
             .try_insert(addr.clone(), 'a', Conn(fake_id_gen.next()))
             .expect("failed to insert")
-            .id();
+            .id()
+            .clone();
         assert_matches!(map.conns_mut().remove(&conn_id, &addr), Ok(()));
 
         assert!(map.conns_mut().entry(&conn_id, &addr).is_none());
