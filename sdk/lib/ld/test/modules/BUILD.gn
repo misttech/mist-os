@@ -4,7 +4,6 @@
 
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/toolchain_environment.gni")
-import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 # This only gets instantiated in the environment where the test modules are
 # meant to be built.
@@ -18,10 +17,8 @@ executables = [
   ":symbolic-reloc.in-process",
   ":ld-dep",
   ":ld-dep.in-process",
-  ":basic-dep",
-  ":basic-dep.in-process",
 ]
-shlibs = [ ":ld-dep-a" ]
+libs = []
 modules = []
 
 if (is_fuchsia) {
@@ -31,9 +28,9 @@ if (is_fuchsia) {
   group("modules") {
     testonly = true
 
-    deps = executables + modules
+    deps = executables + libs + modules
   }
-} else if (current_toolchain != shlib_toolchain) {
+} else {
   if (is_linux) {
     assert(toolchain_environment == "linux",
            "$current_toolchain is $toolchain_environment")
@@ -51,20 +48,20 @@ if (is_fuchsia) {
       sources += [ "$root_out_dir/$name" ]
     }
 
-    shlib_out_dir = get_label_info(".($shlib_toolchain)", "root_out_dir")
+    # shlib_out_dir = get_label_info(".($shlib_toolchain)", "root_out_dir")
 
-    foreach(label, shlibs) {
+    foreach(label, libs) {
       name = get_label_info(label, "name")
 
       deps += [ "$label($shlib_toolchain)" ]
-      sources += [ "$shlib_out_dir/lib$name.so" ]
+      sources += [ "$shlib_out_dir/lib$file.so" ]
     }
 
     foreach(label, modules) {
       name = get_label_info(label, "name")
 
       deps += [ "$label($shlib_toolchain)" ]
-      sources += [ "$shlib_out_dir/$name.so" ]
+      sources += [ "$shlib_out_dir/$file.so" ]
     }
   }
 }
@@ -159,38 +156,6 @@ foreach(in_process,
   }
 }
 
-# clang++ will add -lc++ and -lm, which we don't want for these tests. Note
-# there are differences between the Fuchsia and GNU toolchains in clang. The
-# GNU toolchain will unconditionally add -lm regardless of -nostdlib++ though
-# the Fuchsia driver doesn't. -nodefaultlibs will stop the driver from adding
-# -lm, but we get unused -nolibc warning because the arg is never read when
-# -nodefaultlibs is specified, so just ignore the warning.
-config("nostdlibs") {
-  if (is_fuchsia) {
-    ldflags = [ "-nostdlib++" ]
-  } else {
-    ldflags = [
-      "-nodefaultlibs",
-      "-Wno-unused-command-line-argument",
-    ]
-  }
-}
-
-template("test_shared_library") {
-  shared_library(target_name) {
-    ldflags = []
-    public_deps = [ "//sdk/lib/ld:standalone" ]
-    forward_variables_from(invoker, "*")
-
-    if (is_linux) {
-      configs -= [ "//build/config/linux:implicit-host-libs" ]
-    }
-    configs += [ ":nostdlibs" ]
-
-    exclude_toolchain_tags = [ "instrumentation-runtime" ]
-  }
-}
-
 config("test-executable.in-process.config") {
   visibility = [ ":*" ]
   ldflags = [ "-Wl,-e,TestStart" ]
@@ -233,15 +198,4 @@ test_executable("ld-dep") {
   can_be_in_process = true
   sources = [ "ld-dep.cc" ]
   deps = [ "../.." ]
-}
-
-test_shared_library("ld-dep-a") {
-  sources = [ "a.cc" ]
-  deps = [ "//zircon/system/public" ]
-}
-
-test_executable("basic-dep") {
-  can_be_in_process = true
-  sources = [ "basic-dep.cc" ]
-  deps = [ ":ld-dep-a" ]
 }

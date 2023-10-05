@@ -11,10 +11,6 @@
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
 
-#include <string_view>
-
-#include "diagnostics.h"
-
 namespace ld {
 
 // This collects the data from the bootstrap channel.
@@ -27,11 +23,7 @@ struct StartupData {
 
   zx::vmo executable_vmo;
 
-  zx::channel ldsvc;
-
   bool ld_debug = false;
-
-  zx::vmo GetLibraryVmo(Diagnostics& diag, std::string_view name);
 };
 
 StartupData ReadBootstrap(zx::unowned_channel bootstrap);

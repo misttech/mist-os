@@ -27,8 +27,6 @@
 namespace ld {
 namespace {
 
-using VmoFile = elfldltl::VmoFile<Diagnostics>;
-
 using StartupModule = StartupLoadModule<elfldltl::LocalVmarLoader>;
 
 using SystemPageAllocator = trivial_allocator::ZirconVmar;
@@ -178,16 +176,8 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   LoadExecutableResult main =
       LoadExecutable(diag, startup, scratch, initial_exec, std::move(startup.executable_vmo));
 
-  auto get_vmo_file = [&diag,
-                       &startup](const elfldltl::Soname<>& soname) -> std::optional<VmoFile> {
-    if (zx::vmo vmo = startup.GetLibraryVmo(diag, soname.c_str())) {
-      return VmoFile{std::move(vmo), diag};
-    }
-    return {};
-  };
-
-  StartupModule::LinkModules(diag, scratch, initial_exec, main.module, get_vmo_file,
-                             {vdso_module, self_module}, main.needed_count, startup.vmar);
+  StartupModule::LinkModules(diag, scratch, initial_exec, main.module, {vdso_module, self_module},
+                             main.needed_count, startup.vmar);
 
   // Bail out before relocation if there were any loading errors.
   CheckErrors(diag);

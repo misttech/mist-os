@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <lib/elfldltl/mmap-loader.h>
 #include <lib/elfldltl/posix.h>
 #include <lib/ld/memory.h>
@@ -28,8 +27,6 @@ namespace {
 // This is defined in assembly, and doesn't actually use the C calling
 // convention.  It calls StartLd.
 extern "C" [[noreturn]] void _start();
-
-using UniqueFdFile = elfldltl::UniqueFdFile<Diagnostics>;
 
 using StartupModule = StartupLoadModule<elfldltl::MmapLoader>;
 
@@ -205,14 +202,7 @@ extern "C" uintptr_t StartLd(StartupStack& stack) {
   auto [main_executable, needed_count] =
       LoadExecutable(diag, startup, scratch, initial_exec, entry, phdr, phnum);
 
-  auto open_file = [&diag](const elfldltl::Soname<>& soname) -> std::optional<UniqueFdFile> {
-    if (fbl::unique_fd fd{open(soname.c_str(), O_RDONLY)}) {
-      return UniqueFdFile{std::move(fd), diag};
-    }
-    return {};
-  };
-
-  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable, open_file,
+  StartupModule::LinkModules(diag, scratch, initial_exec, main_executable,
                              {vdso_module, self_module}, needed_count, startup.page_size);
 
   // Bail out before relocation if there were any loading errors.
