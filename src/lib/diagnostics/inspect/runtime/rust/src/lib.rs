@@ -5,7 +5,7 @@
 //!
 //! This library contains the necessary functions to serve inspect from a component.
 
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker};
 use fidl_fuchsia_inspect::{InspectSinkMarker, InspectSinkPublishRequest, TreeMarker};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
@@ -83,6 +83,9 @@ pub struct PublishOptions {
     /// An optional name value which will show up in the metadata of snapshots
     /// taken from this `fuchsia.inspect.Tree` server.
     pub(crate) tree_name: Option<String>,
+
+    /// Channel over which the InspectSink protocol will be used.
+    pub(crate) inspect_sink_client: Option<ClientEnd<InspectSinkMarker>>,
 }
 
 impl PublishOptions {
@@ -103,6 +106,12 @@ impl PublishOptions {
         self.tree_name = Some(name.into());
         self
     }
+
+    /// This allows the client to provide the InspectSink client channel.
+    pub fn on_inspect_sink_client(mut self, client: ClientEnd<InspectSinkMarker>) -> Self {
+        self.inspect_sink_client = Some(client);
+        self
+    }
 }
 
 /// Spawns a server handling `fuchsia.inspect.Tree` requests and a handle
@@ -115,7 +124,7 @@ impl PublishOptions {
 /// * Failing to connect to the `InspectSink` protocol
 /// * Failing to send the connection over the wire
 pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync::Task<()>> {
-    let PublishOptions { vmo_preference, tree_name } = options;
+    let PublishOptions { vmo_preference, tree_name, inspect_sink_client } = options;
     let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), vmo_preference) {
         Ok((task, tree)) => (task, Some(tree)),
         Err(err) => {
@@ -124,12 +133,21 @@ pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync:
         }
     };
 
-    let inspect_sink = match client::connect_to_protocol::<InspectSinkMarker>() {
-        Ok(inspect_sink) => inspect_sink,
-        Err(err) => {
-            error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
-            return None;
-        }
+    let inspect_sink = match inspect_sink_client {
+        None => match client::connect_to_protocol::<InspectSinkMarker>() {
+            Ok(inspect_sink) => inspect_sink,
+            Err(err) => {
+                error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
+                return None;
+            }
+        },
+        Some(client_end) => match client_end.into_proxy() {
+            Ok(proxy) => proxy,
+            Err(err) => {
+                error!(%err, "failed to convert ClientEnd to Proxy");
+                return None;
+            }
+        },
     };
 
     if let Err(err) = inspect_sink.publish(InspectSinkPublishRequest {
@@ -216,11 +234,16 @@ mod tests {
     };
     use diagnostics_assertions::assert_json_diff;
     use diagnostics_reader::{ArchiveReader, Inspect};
+    use fidl::endpoints::RequestStream;
+    use fidl_fuchsia_inspect::{
+        InspectSinkPublishRequest, InspectSinkRequest, InspectSinkRequestStream,
+    };
     use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async as fasync;
     use fuchsia_component::{client, server::ServiceObj};
     use fuchsia_component_test::ScopedInstance;
     use fuchsia_inspect::{reader::read, InspectorConfig};
+    use fuchsia_zircon as zx;
     use fuchsia_zircon::DurationNum;
     use futures::FutureExt;
 
@@ -344,5 +367,33 @@ mod tests {
         });
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn publish_on_provided_channel() {
+        let (client, server) = zx::Channel::create();
+        let inspector = Inspector::default();
+        inspector.root().record_string("hello", "world");
+        let _inspect_sink_server_task = publish(
+            &inspector,
+            PublishOptions::default()
+                .on_inspect_sink_client(ClientEnd::<InspectSinkMarker>::new(client)),
+        );
+        let mut request_stream = InspectSinkRequestStream::from_channel(
+            fidl::AsyncChannel::from_channel(server).unwrap(),
+        );
+
+        let tree = request_stream.next().await.unwrap();
+
+        assert_matches!(tree, Ok(InspectSinkRequest::Publish {
+            payload: InspectSinkPublishRequest { tree: Some(tree), .. }, ..}) => {
+                let hierarchy = read(&tree.into_proxy().unwrap()).await.unwrap();
+                assert_json_diff!(hierarchy, root: {
+                    hello: "world"
+                });
+            }
+        );
+
+        assert!(request_stream.next().await.is_none());
     }
 }
