@@ -1,3 +1,13 @@
 Name: gRPC - An RPC library and framework
+
 License File: LICENSE
+ -> License File Format: Single License
+ -> License Classifications: Apache-2.0, BSD-3-Clause, Copyright, MPL-2.0
+
 License File: NOTICE.txt
+ -> License File Format: Single License
+ -> License Classifications: Apache-2.0, Copyright
+
+License File: src/php/ext/grpc/LICENSE
+ -> License File Format: Single License
+ -> License Classifications: Apache-2.0, Copyright

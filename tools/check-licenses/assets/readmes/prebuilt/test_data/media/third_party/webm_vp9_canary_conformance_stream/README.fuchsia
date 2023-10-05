@@ -1,9 +1,11 @@
 Name: VP9 Decoder Performance Tests
 URL: https://www.webmproject.org/vp9/levels/
-LICENSE: https://www.webmproject.org/license/
-License File: LICENSE
-Description:
 
+License File: LICENSE
+ -> License File Format: Single License
+ -> License Classifications: BSD-3-Clause, Copyright
+
+Description:
 These are VP9 decode conformance test files.
 
 The files have been converted from .webm to .ivf, and the md5 hashes in the spreadsheet

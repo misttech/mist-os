@@ -1,13 +1,14 @@
 Name: libpng
 URL: http://libpng.org/
-Upstream Git: https://github.com/glennrp/libpng
 Version: 1.6.37
-Security Critical: yes
-License: libpng license
-License File: src/LICENSE
+Upstream Git: https://github.com/glennrp/libpng
 License Android Compatible: yes
-Description:
 
+License File: src/LICENSE
+ -> License File Format: Single License
+ -> License Classifications: Copyright
+
+Description:
 Updated to 1.6.37, stripped all unneeded files.
 
 - Strip all unneeded files

@@ -1,8 +1,6 @@
 Name: Fuchsia
-URL:
-Version:
-License:
+
 License File: LICENSE
-Description:
-Local Modifications:
-check-licenses: file format: copyright_header
+ -> License File Format: Single License
+ -> License Classifications: BSD-2-Clause, Copyright
+

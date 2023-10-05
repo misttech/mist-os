@@ -165,7 +165,7 @@ func (f *File) LicenseType() string {
 		licenseTypes = append(licenseTypes, k)
 	}
 	sort.Strings(licenseTypes)
-	licenseTypeString := strings.Join(licenseTypes, ",")
+	licenseTypeString := strings.Join(licenseTypes, ", ")
 
 	return licenseTypeString
 }

@@ -1,9 +1,10 @@
 Name: boringssl
 URL: https://boringssl.googlesource.com/boringssl
 Version: git
-License: BSDish
+
 License File: ../../../boringssl/src/LICENSE
-Security Critical: yes
+ -> License File Format: Single License
+ -> License Classifications: BSD-3-Clause, Copyright, ISC, MIT, OpenSSL
 
 Description:
 A fork of OpenSSL, as described at https://www.imperialviolet.org/2014/06/20/boringssl.html

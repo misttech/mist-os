@@ -1,7 +1,7 @@
 Name: VP9 coefficiant adaption
-License: Apache 2.0
+
 License File: LICENSE
+ -> License File Format: Single License
+
 Description:
-
-This is the implementation of the function to calculate hardware register settings for VP9 decoder loop filter coefficients. 
-
+This is the implementation of the function to calculate hardware register settings for VP9 decoder loop filter coefficients.

@@ -1,7 +1,10 @@
 Name: The LLVM Project
-URL:
-Version:
-License:
+
 License File: LICENSE.TXT
+ -> License File Format: Single License
+ -> License Classifications: Apache-2.0, Copyright, NCSA
+
 Description:
+
+
 Local Modifications:

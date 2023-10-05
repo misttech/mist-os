@@ -1,7 +1,9 @@
 Name: shaderc
+Upstream Git: https://github.com/google/shaderc
+
 License File: LICENSE
-Upstream git: https://github.com/google/shaderc
+ -> License File Format: Single License
+ -> License Classifications: Apache-2.0
+
 Description:
-
 A collection of tools, libraries and tests for shader compilation.
-

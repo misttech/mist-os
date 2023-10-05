@@ -1,10 +1,13 @@
 Name: acpica
-Source: https://acpica.org/sites/acpica/files/acpica-unix2-20200110.tar.gz
-License: BSD
-License File: LICENSE
+URL: https://acpica.org/sites/acpica/files/acpica-unix2-20200110.tar.gz
 Version: 20200110
 
-Modifications:
+License File: LICENSE
+ -> License File Format: Single License
+ -> License Classifications: BSD-3-Clause
+
+
+Local Modifications:
 - Added README.fuchsia
 - Removed optional GPL license banner from sources
 - Added LICENSE containing copy of source license banner

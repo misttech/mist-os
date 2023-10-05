@@ -1,7 +1,17 @@
 Name: zlib
-URL:
-Version:
-License:
+
 License File: README
+ -> License File Format: Single License
+ -> License Classifications: Zlib
+
+License File: contrib/dotzlib/LICENSE_1_0.txt
+ -> License File Format: Single License
+ -> License Classifications: BSL-1.0
+
+License File: contrib/iostream3/LICENSE
+ -> License File Format: Single License
+
 Description:
+
+
 Local Modifications:
