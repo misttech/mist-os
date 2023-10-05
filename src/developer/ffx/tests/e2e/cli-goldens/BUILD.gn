@@ -16,9 +16,13 @@ if (is_host && has_board) {
     with_unit_tests = true
     output_name = "ffx_cli_goldens"
     sources = [ "src/main.rs" ]
-    data_deps = [ ":sdk_exported_for_ffx" ]
-
     deps = [
+      # Directly depend on the SDK here. This binary
+      # runs ffx from the sdk to build files read
+      # by the build, and without this it
+      # would run a stale version of ffx, causing
+      # golden file mismatches.
+      ":sdk_exported_for_ffx",
       "//src/developer/ffx/command:lib",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/lib/isolate:lib",
@@ -68,6 +72,10 @@ if (is_host && has_board) {
 
   compiled_action("generate_ffx_command_list") {
     testonly = true
+
+    # Avoid using prebuilt versions of the host
+    # tool coming from previous builds.
+    allow_prebuilt_tool_use = false
     tool = ":ffx_cli_goldens"
 
     outputs = [ _command_list ]
@@ -78,6 +86,10 @@ if (is_host && has_board) {
       "--sdk-root",
       rebase_path(_sdk_path, root_build_dir),
     ]
+
+    # Add a dependency on the SDK so ffx is up to
+    # date within the SDK.
+    deps = [ ":sdk_exported_for_ffx" ]
   }
 
   command_test_deps = []
@@ -87,6 +99,14 @@ if (is_host && has_board) {
     command_name = "ffx"
     golden_processor_tool = ":ffx_cli_goldens"
     sdk_path = _sdk_path
+
+    # Depend on generating the top level command list
+    # and the SDK so the command list represents the
+    # latest ffx commands.
+    deps = [
+      ":generate_ffx_command_list",
+      ":sdk_exported_for_ffx",
+    ]
   }
 
   command_test_deps += [ ":ffx_ffx_command_golden_file_test" ]
@@ -98,6 +118,14 @@ if (is_host && has_board) {
       command_name = c
       golden_processor_tool = ":ffx_cli_goldens"
       sdk_path = _sdk_path
+
+      # Since we're iterating over the command list to generate
+      # these targets, add the command list as dependency
+      # so if the list changes, the targets change.
+      deps = [
+        ":generate_ffx_command_list",
+        ":sdk_exported_for_ffx",
+      ]
     }
     command_test_deps += [ ":${c}_ffx_command_golden_file_test" ]
   }

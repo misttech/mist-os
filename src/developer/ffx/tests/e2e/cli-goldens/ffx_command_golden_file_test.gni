@@ -12,6 +12,10 @@ template("ffx_command_golden_file_test") {
   command_name = invoker.command_name
   golden_processor_tool = invoker.golden_processor_tool
   _sdk_path = invoker.sdk_path
+  _deps = []
+  if (defined(invoker.deps)) {
+    _deps += invoker.deps
+  }
 
   assert(
       defined(invoker.golden_source_dir),
@@ -32,11 +36,15 @@ template("ffx_command_golden_file_test") {
         candidate = _candidate_filelist
       },
     ]
-    deps = [ ":describe_ffx_${command_name}_cli_goldens" ]
+    deps = [ ":describe_ffx_${command_name}_cli_goldens" ] + _deps
   }
 
   compiled_action("describe_ffx_${command_name}_cli_goldens") {
     testonly = true
+
+    # Avoid using prebuilt versions of the host
+    # tool coming from previous builds.
+    allow_prebuilt_tool_use = false
     tool = golden_processor_tool
 
     outputs = [
@@ -58,10 +66,15 @@ template("ffx_command_golden_file_test") {
       "--filter-command",
       command_name,
     ]
+    deps = _deps
   }
 
   compiled_action("invoke_ffx_${command_name}_cli_goldens") {
     testonly = true
+
+    # Avoid using prebuilt versions of the host
+    # tool coming from previous builds.
+    allow_prebuilt_tool_use = false
     tool = golden_processor_tool
     outputs = []
     _golden_filename_list = read_file(_golden_filelist, "list lines")
@@ -79,9 +92,9 @@ template("ffx_command_golden_file_test") {
     ]
 
     deps = [
-      ":${_name}-manifest",
-      ":describe_ffx_${command_name}_cli_goldens",
-    ]
+             ":${_name}-manifest",
+             ":describe_ffx_${command_name}_cli_goldens",
+           ] + _deps
   }
 
   golden_files(target_name) {
@@ -89,8 +102,8 @@ template("ffx_command_golden_file_test") {
 
     comparisons = _comparisons_file
     deps = [
-      ":describe_ffx_${command_name}_cli_goldens",
-      ":invoke_ffx_${command_name}_cli_goldens($host_toolchain)",
-    ]
+             ":describe_ffx_${command_name}_cli_goldens",
+             ":invoke_ffx_${command_name}_cli_goldens($host_toolchain)",
+           ] + _deps
   }
 }
