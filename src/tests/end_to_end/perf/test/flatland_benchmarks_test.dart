@@ -27,7 +27,7 @@ Future<void> _killProcesses(PerfTestHelper helper) async {
   print('Finished killing processes for flatland_benchmarks_test');
 }
 
-void _addTest(String testName, String appUrl) {
+void _addTest(String testName) {
   test(testName, () async {
     final helper = await PerfTestHelper.make();
 
@@ -95,6 +95,5 @@ void _addTest(String testName, String appUrl) {
 void main() {
   enableLoggingOutput();
 
-  _addTest('fuchsia.flatland_latency.view-provider-example',
-      'fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-view-provider-example.cmx');
+  _addTest('fuchsia.flatland_latency.view-provider-example');
 }
