@@ -244,6 +244,7 @@ void Vout::PopulateAddedDisplayArgs(
 void Vout::DisplayConnected() {
   switch (type_) {
     case VoutType::kHdmi:
+      // A new connected display is not yet set up with any display mode.
       hdmi_.cur_display_mode_ = {};
       return;
     case VoutType::kDsi:
@@ -305,10 +306,6 @@ zx::result<> Vout::PowerOn() {
         return hdmi_host_on_result;
       }
 
-      // After HDMI host is on, the display timings is reset and the driver
-      // must perform modeset again.
-      // This clears the previously set display mode to force an HDMI modeset
-      // on the next ApplyConfiguration().
       hdmi_.cur_display_mode_ = {};
       return zx::ok();
     }
@@ -320,28 +317,13 @@ bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
   ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
                       "Vout DisplayMode check is only supported for HDMI output.");
   ZX_DEBUG_ASSERT(mode != nullptr);
-
-  // `cur_display_mode_` stores the most recently applied display mode,
-  // which is guaranteed to be supported. We skip the check if `mode` equals
-  // to `cur_display_mode_`.
-  // TODO(fxbug.dev/132602): This breaks the abstraction boundary between
-  // Vout and HdmiHost, the comparison should be moved to HdmiHost
-  // implementation.
-  // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
-  // We should replace `display_mode_t` (banjo type) with an internal type.
-  return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) == 0 ||
-         hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
+  return hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
 }
 
 zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
   ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
                       "Vout DisplayMode set is only supported for HDMI output.");
   ZX_DEBUG_ASSERT(mode != nullptr);
-  if (!memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t))) {
-    // No new configs
-    return zx::ok();
-  }
-
   zx_status_t status = hdmi_.hdmi_host->ModeSet(*mode);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to set HDMI display mode: %s", zx_status_get_string(status));

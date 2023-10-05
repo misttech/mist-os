@@ -255,6 +255,10 @@ class AmlogicDisplay
   // `vout_` must be initialized.
   bool IgnoreDisplayMode() const;
 
+  // Whether `mode` is a new display mode different from the mode currently
+  // applied to the display.
+  bool IsNewDisplayMode(const display_mode_t& mode);
+
   // Zircon handles
   zx::bti bti_;
   zx::interrupt inth_;
@@ -315,6 +319,12 @@ class AmlogicDisplay
 
   display::DisplayId display_id_ TA_GUARDED(display_mutex_) = kPanelDisplayId;
   bool display_attached_ TA_GUARDED(display_mutex_) = false;
+
+  // The DisplayMode applied most recently to the display.
+  //
+  // Default-constructed if no configuration is applied to the display yet or
+  // DisplayMode is ignored.
+  display_mode_t current_display_mode_ TA_GUARDED(display_mutex_) = {};
 
   // Hot Plug Detection
   fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> hpd_gpio_;

@@ -151,6 +151,12 @@ bool AmlogicDisplay::IgnoreDisplayMode() const {
   return vout_->type() == VoutType::kDsi;
 }
 
+bool AmlogicDisplay::IsNewDisplayMode(const display_mode_t& mode) {
+  // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
+  // We should replace `display_mode_t` (banjo type) with an internal type.
+  return memcmp(&current_display_mode_, &mode, sizeof(display_mode_t)) != 0;
+}
+
 zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
   if (fully_initialized()) {
     osd_->SetMinimumRgb(minimum_rgb);
@@ -449,8 +455,17 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  if (!IgnoreDisplayMode() && !vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+  if (!IgnoreDisplayMode()) {
+    // `current_display_mode_` is already applied to the display so it's
+    // guaranteed to be supported. We can skip the check if `mode` equals to
+    // `current_display_mode_`.
+    if (!IsNewDisplayMode(display_configs[0]->mode)) {
+      return CONFIG_CHECK_RESULT_OK;
+    }
+
+    if (!vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
+      return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    }
   }
 
   bool success = true;
@@ -531,13 +546,21 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
 
   if (display_count == 1 && display_configs[0]->layer_count) {
     if (!IgnoreDisplayMode()) {
+      // Perform Vout modeset iff there's a new display mode.
+      //
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
-      zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
-      if (!apply_config_result.is_ok()) {
-        zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
-        return;
+      if (IsNewDisplayMode(display_configs[0]->mode)) {
+        zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
+        if (!apply_config_result.is_ok()) {
+          zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
+          return;
+        }
+
+        // TODO(fxbug.dev/132603): Do not use byte-wise assignment for structs.
+        // We should replace `display_mode_t` (banjo type) with an internal type.
+        memcpy(&current_display_mode_, &display_configs[0]->mode, sizeof(display_mode_t));
       }
     }
 
@@ -805,7 +828,14 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t displa
     return ZX_ERR_NOT_FOUND;
   }
   if (power_on) {
-    return vout_->PowerOn().status_value();
+    zx::result<> power_on_result = vout_->PowerOn();
+    if (power_on_result.is_ok()) {
+      // Powering on the display panel also resets the display mode set on the
+      // display. This clears the display mode set previously to force a Vout
+      // modeset to be performed on the next ApplyConfiguration().
+      current_display_mode_ = {};
+    }
+    return power_on_result.status_value();
   }
   return vout_->PowerOff().status_value();
 }
@@ -1113,6 +1143,13 @@ void AmlogicDisplay::HpdThreadEntryPoint() {
       zxlogf(INFO, "Display is connected");
 
       display_attached_ = true;
+
+      // When the new display is attached to the display engine, it's not set
+      // up with any DisplayMode. This clears the display mode set previously
+      // to force a Vout modeset to be performed on the next
+      // ApplyConfiguration().
+      current_display_mode_ = {};
+
       vout_->DisplayConnected();
       vout_->PopulateAddedDisplayArgs(&added_display_args, display_id_,
                                       kSupportedBanjoPixelFormats);
