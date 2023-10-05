@@ -24,6 +24,12 @@ template <typename DriverBaseImpl>
 class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
   static_assert(std::is_base_of_v<fdf::DriverBase, DriverBaseImpl>,
                 "The driver type must implement the fdf::DriverBase class.");
+
+  static_assert(!std::is_abstract_v<DriverBaseImpl>,
+                "The driver class must not be abstract. Try making it a final class to "
+                "see the unimplemented pure virtual methods. Eg: "
+                "class Driver final : public fdf::DriverBase");
+
   static_assert(std::is_constructible_v<DriverBaseImpl, fuchsia_driver_framework::DriverStartArgs,
                                         fdf::UnownedSynchronizedDispatcher>,
                 "The driver must be constructible from "
