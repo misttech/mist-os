@@ -73,7 +73,7 @@ void motmot_shutdown() {
   dprintf(INFO, "Shutdown command failed, result was %" PRIx64 ".\n", result);
 }
 
-uint32_t motmot_cpu_off() {
+zx_status_t motmot_cpu_off() {
   // TODO(johngro):  Figure out how to properly power down our CPU on motmot.
   // It does not current respond to the PSCI command to turn off the current
   // CPU, and I have not found the proper bits in the HW to twiddle in order to
@@ -87,7 +87,7 @@ uint32_t motmot_cpu_off() {
   while (true) {
     __wfi();
   }
-  return 0;
+  return ZX_OK;
 }
 
 const struct pdev_power_ops motmot_power_ops = {

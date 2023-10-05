@@ -121,8 +121,8 @@ void riscv64_sbi_early_init() {
       .shutdown = []() { sbi_shutdown(); },
       // Null the cpu on/off with default hooks and use sbi directly for now.
       // Their api isn't expressive enough for the sbi arguments.
-      .cpu_off = []() -> uint32_t { PANIC_UNIMPLEMENTED; },
-      .cpu_on = [](uint64_t mpid, paddr_t entry) -> uint32_t { PANIC_UNIMPLEMENTED; },
+      .cpu_off = []() -> zx_status_t { PANIC_UNIMPLEMENTED; },
+      .cpu_on = [](uint64_t mpid, paddr_t entry) -> zx_status_t { PANIC_UNIMPLEMENTED; },
       .get_cpu_state = sbi_get_cpu_state,
   };
 

@@ -15,8 +15,8 @@
 struct pdev_power_ops {
   void (*reboot)(power_reboot_flags flags);
   void (*shutdown)();
-  uint32_t (*cpu_off)();
-  uint32_t (*cpu_on)(uint64_t hw_cpu_id, paddr_t entry);
+  zx_status_t (*cpu_off)();
+  zx_status_t (*cpu_on)(uint64_t hw_cpu_id, paddr_t entry);
   zx::result<power_cpu_state> (*get_cpu_state)(uint64_t hw_cpu_id);
 };
 

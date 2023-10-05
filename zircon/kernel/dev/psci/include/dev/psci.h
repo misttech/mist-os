@@ -54,6 +54,9 @@
 #define PSCI_NOT_PRESENT -7
 #define PSCI_DISABLED -8
 #define PSCI_INVALID_ADDRESS -9
+#define PSCI_TIMEOUT -10
+#define PSCI_RATE_LIMITED -11
+#define PSCI_BUSY -12
 
 /* TODO NOTE: - currently these routines assume cpu topologies that are described only in AFF0 and
    AFF1. If a system is architected such that AFF2 or AFF3 are non-zero then this code will need to
@@ -67,8 +70,8 @@ uint32_t psci_get_version();
 uint32_t psci_get_feature(uint32_t psci_call);
 
 /* powers down the calling cpu - only returns if call fails */
-uint32_t psci_cpu_off();
-uint32_t psci_cpu_on(uint64_t mpid, paddr_t entry);
+zx_status_t psci_cpu_off();
+zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry);
 int64_t psci_get_affinity_info(uint64_t mpid);
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid);
 

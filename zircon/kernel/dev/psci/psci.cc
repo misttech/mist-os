@@ -24,6 +24,38 @@ static uint64_t reboot_bootloader_args[3] = {0, 0, 0};
 static uint64_t reboot_recovery_args[3] = {0, 0, 0};
 static uint32_t reset_command = PSCI64_SYSTEM_RESET;
 
+zx_status_t psci_status_to_zx_status(uint64_t psci_result);
+zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
+  int64_t status = static_cast<int64_t>(psci_result);
+  switch (status) {
+    case PSCI_SUCCESS:
+      return ZX_OK;
+    case PSCI_NOT_SUPPORTED:
+    case PSCI_DISABLED:
+      return ZX_ERR_NOT_SUPPORTED;
+    case PSCI_INVALID_PARAMETERS:
+    case PSCI_INVALID_ADDRESS:
+      return ZX_ERR_INVALID_ARGS;
+    case PSCI_DENIED:
+      return ZX_ERR_ACCESS_DENIED;
+    case PSCI_ALREADY_ON:
+      return ZX_ERR_BAD_STATE;
+    case PSCI_ON_PENDING:
+      return ZX_ERR_SHOULD_WAIT;
+    case PSCI_INTERNAL_FAILURE:
+      return ZX_ERR_INTERNAL;
+    case PSCI_NOT_PRESENT:
+      return ZX_ERR_NOT_FOUND;
+    case PSCI_TIMEOUT:
+      return ZX_ERR_TIMED_OUT;
+    case PSCI_RATE_LIMITED:
+    case PSCI_BUSY:
+      return ZX_ERR_UNAVAILABLE;
+    default:
+      return ZX_ERR_BAD_STATE;
+  }
+}
+
 static uint64_t psci_smc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
   return arm_smccc_smc(function, arg0, arg1, arg2, 0, 0, 0, 0).x0;
 }
@@ -43,11 +75,13 @@ void psci_system_off() {
 uint32_t psci_get_version() { return (uint32_t)do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0); }
 
 /* powers down the calling cpu - only returns if call fails */
-uint32_t psci_cpu_off() { return (uint32_t)do_psci_call(PSCI64_CPU_OFF, 0, 0, 0); }
+zx_status_t psci_cpu_off() {
+  return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_OFF, 0, 0, 0));
+}
 
-uint32_t psci_cpu_on(uint64_t mpid, paddr_t entry) {
+zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry) {
   LTRACEF("CPU_ON mpid %#" PRIx64 ", entry %#" PRIx64 "\n", mpid, entry);
-  return (uint32_t)do_psci_call(PSCI64_CPU_ON, mpid, entry, 0);
+  return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, 0));
 }
 
 int64_t psci_get_affinity_info(uint64_t mpid) {
@@ -57,11 +91,6 @@ int64_t psci_get_affinity_info(uint64_t mpid) {
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
   int64_t aff_info = psci_get_affinity_info(mpid);
   switch (aff_info) {
-    case PSCI_INVALID_PARAMETERS:
-      return zx::error(ZX_ERR_INVALID_ARGS);
-    case PSCI_DISABLED:
-      // PSCI_DISABLED means the core is offline due to some physical reason (such as being faulty).
-      return zx::error(ZX_ERR_BAD_STATE);
     case 0:
       return zx::success(power_cpu_state::ON);
     case 1:
@@ -69,9 +98,7 @@ zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid) {
     case 2:
       return zx::success(power_cpu_state::ON_PENDING);
     default:
-      dprintf(INFO, "Tried to get affinity info for MPID %lu, got invalid return code %ld\n", mpid,
-              aff_info);
-      return zx::error(ZX_ERR_INTERNAL);
+      return zx::error(psci_status_to_zx_status(aff_info));
   }
 }
 
