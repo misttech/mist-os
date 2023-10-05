@@ -39,7 +39,7 @@ test("sysmem-v1") {
   deps = [ ":common_sources" ]
 
   # Uncomment this when narrowing down failures.
-  # cflags_cc = [ "-Wno-unused-function" ]
+  cflags_cc = [ "-Wno-unused-function" ]
 }
 
 test("sysmem-v2") {
@@ -47,7 +47,7 @@ test("sysmem-v2") {
   deps = [ ":common_sources" ]
 
   # Uncomment this when narrowing down failures.
-  # cflags_cc = [ "-Wno-unused-function" ]
+  cflags_cc = [ "-Wno-unused-function" ]
 }
 
 fuchsia_unittest_package("sysmem-test-v1") {

@@ -3072,16 +3072,7 @@ TEST(Sysmem, HeapAmlogicSecureV1) {
   }
 
   for (uint32_t i = 0; i < 64; ++i) {
-    bool need_aux = (i % 4 == 0);
-    bool allow_aux = (i % 2 == 0);
     auto collection = make_single_participant_collection_v1();
-
-    if (need_aux) {
-      fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers aux_constraints;
-      aux_constraints.need_clear_aux_buffers_for_secure = true;
-      aux_constraints.allow_clear_aux_buffers_for_secure = true;
-      ASSERT_OK(collection->SetConstraintsAuxBuffers(std::move(aux_constraints)));
-    }
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
@@ -3120,17 +3111,6 @@ TEST(Sysmem, HeapAmlogicSecureV1) {
               fuchsia_sysmem::wire::HeapType::kAmlogicSecure);
     EXPECT_EQ(buffer_collection_info->settings.has_image_format_constraints, false);
 
-    fuchsia_sysmem::wire::BufferCollectionInfo2 aux_buffer_collection_info;
-    if (need_aux || allow_aux) {
-      auto aux_result = collection->GetAuxBuffers();
-      ASSERT_OK(aux_result);
-      ASSERT_OK(aux_result.value().status);
-
-      EXPECT_EQ(aux_result.value().buffer_collection_info_aux_buffers.buffer_count,
-                buffer_collection_info->buffer_count);
-      aux_buffer_collection_info = std::move(aux_result.value().buffer_collection_info_aux_buffers);
-    }
-
     for (uint32_t i = 0; i < 64; ++i) {
       if (i < kBufferCount) {
         EXPECT_NE(buffer_collection_info->buffers[i].vmo.get(), ZX_HANDLE_INVALID);
@@ -3138,22 +3118,8 @@ TEST(Sysmem, HeapAmlogicSecureV1) {
         auto status = zx_vmo_get_size(buffer_collection_info->buffers[i].vmo.get(), &size_bytes);
         ASSERT_EQ(status, ZX_OK);
         EXPECT_EQ(size_bytes, kBufferSizeBytes);
-        if (need_aux) {
-          EXPECT_NE(aux_buffer_collection_info.buffers[i].vmo, ZX_HANDLE_INVALID);
-          uint64_t aux_size_bytes = 0;
-          status =
-              zx_vmo_get_size(aux_buffer_collection_info.buffers[i].vmo.get(), &aux_size_bytes);
-          ASSERT_EQ(status, ZX_OK);
-          EXPECT_EQ(aux_size_bytes, kBufferSizeBytes);
-        } else if (allow_aux) {
-          // This is how v1 indicates that aux buffers weren't allocated.
-          EXPECT_EQ(aux_buffer_collection_info.buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        }
       } else {
         EXPECT_EQ(buffer_collection_info->buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        if (need_aux) {
-          EXPECT_EQ(aux_buffer_collection_info.buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        }
       }
     }
 
@@ -3162,19 +3128,6 @@ TEST(Sysmem, HeapAmlogicSecureV1) {
     SecureVmoReadTester tester(std::move(the_vmo));
     ASSERT_DEATH(([&] { tester.AttemptReadFromSecure(); }));
     ASSERT_FALSE(tester.IsReadFromSecureAThing());
-
-    if (need_aux) {
-      zx::vmo aux_vmo = std::move(aux_buffer_collection_info.buffers[0].vmo);
-      aux_buffer_collection_info.buffers[0].vmo = zx::vmo();
-      SecureVmoReadTester aux_tester(std::move(aux_vmo));
-      // This shouldn't crash for the aux VMO.
-      aux_tester.AttemptReadFromSecure(/*expect_read_success=*/true);
-      // Read from aux VMO using REE (rich execution environment, in contrast to the TEE (trusted
-      // execution environment)) CPU should work.  In actual usage, only the non-encrypted parts of
-      // the data will be present in the VMO, and the encrypted parts will be all 0xFF.  The point
-      // of the aux VMO is to allow reading and parsing the non-encrypted parts using REE CPU.
-      ASSERT_TRUE(aux_tester.IsReadFromSecureAThing());
-    }
   }
 }
 
@@ -3325,16 +3278,7 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
   }
 
   for (uint32_t i = 0; i < 64; ++i) {
-    bool need_aux = (i % 4 == 0);
-    bool allow_aux = (i % 2 == 0);
     auto collection = make_single_participant_collection_v1();
-
-    if (need_aux) {
-      fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers aux_constraints;
-      aux_constraints.need_clear_aux_buffers_for_secure = true;
-      aux_constraints.allow_clear_aux_buffers_for_secure = true;
-      ASSERT_OK(collection->SetConstraintsAuxBuffers(std::move(aux_constraints)));
-    }
 
     fuchsia_sysmem::wire::BufferCollectionConstraints constraints;
     constraints.usage.video = fuchsia_sysmem::wire::kVideoUsageHwDecoder;
@@ -3373,17 +3317,6 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
               fuchsia_sysmem::wire::HeapType::kAmlogicSecure);
     EXPECT_EQ(buffer_collection_info->settings.has_image_format_constraints, false);
 
-    fuchsia_sysmem::wire::BufferCollectionInfo2 aux_buffer_collection_info;
-    if (need_aux || allow_aux) {
-      auto aux_result = collection->GetAuxBuffers();
-      ASSERT_OK(aux_result);
-      ASSERT_OK(aux_result.value().status);
-
-      EXPECT_EQ(aux_result.value().buffer_collection_info_aux_buffers.buffer_count,
-                buffer_collection_info->buffer_count);
-      aux_buffer_collection_info = std::move(aux_result.value().buffer_collection_info_aux_buffers);
-    }
-
     for (uint32_t i = 0; i < 64; ++i) {
       if (i < kBufferCount) {
         EXPECT_NE(buffer_collection_info->buffers[i].vmo.get(), ZX_HANDLE_INVALID);
@@ -3391,22 +3324,8 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
         auto status = zx_vmo_get_size(buffer_collection_info->buffers[i].vmo.get(), &size_bytes);
         ASSERT_EQ(status, ZX_OK);
         EXPECT_EQ(size_bytes, kBufferSizeBytes);
-        if (need_aux) {
-          EXPECT_NE(aux_buffer_collection_info.buffers[i].vmo, ZX_HANDLE_INVALID);
-          uint64_t aux_size_bytes = 0;
-          status =
-              zx_vmo_get_size(aux_buffer_collection_info.buffers[i].vmo.get(), &aux_size_bytes);
-          ASSERT_EQ(status, ZX_OK);
-          EXPECT_EQ(aux_size_bytes, kBufferSizeBytes);
-        } else if (allow_aux) {
-          // This is how v1 indicates that aux buffers weren't allocated.
-          EXPECT_EQ(aux_buffer_collection_info.buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        }
       } else {
         EXPECT_EQ(buffer_collection_info->buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        if (need_aux) {
-          EXPECT_EQ(aux_buffer_collection_info.buffers[i].vmo.get(), ZX_HANDLE_INVALID);
-        }
       }
     }
 
@@ -3415,19 +3334,6 @@ TEST(Sysmem, HeapAmlogicSecureMiniStressV1) {
     SecureVmoReadTester tester(std::move(the_vmo));
     ASSERT_DEATH(([&] { tester.AttemptReadFromSecure(); }));
     ASSERT_FALSE(tester.IsReadFromSecureAThing());
-
-    if (need_aux) {
-      zx::vmo aux_vmo = std::move(aux_buffer_collection_info.buffers[0].vmo);
-      aux_buffer_collection_info.buffers[0].vmo = zx::vmo();
-      SecureVmoReadTester aux_tester(std::move(aux_vmo));
-      // This shouldn't crash for the aux VMO.
-      aux_tester.AttemptReadFromSecure(/*expect_read_success=*/true);
-      // Read from aux VMO using REE (rich execution environment, in contrast to the TEE (trusted
-      // execution environment)) CPU should work.  In actual usage, only the non-encrypted parts of
-      // the data will be present in the VMO, and the encrypted parts will be all 0xFF.  The point
-      // of the aux VMO is to allow reading and parsing the non-encrypted parts using REE CPU.
-      ASSERT_TRUE(aux_tester.IsReadFromSecureAThing());
-    }
   }
 }
 
