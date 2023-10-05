@@ -150,20 +150,18 @@ impl WaitCanceler {
 /// Return values for wait_async methods that monitor the state of a handle. Calling `cancel` will
 /// cancel any running wait.
 pub struct HandleWaitCanceler {
-    canceler: Box<dyn Fn(zx::HandleRef<'_>) + Send + Sync>,
+    waiter: Weak<PortWaiter>,
+    key: WaitKey,
 }
 
 impl HandleWaitCanceler {
-    pub fn new<F>(canceler: F) -> Self
-    where
-        F: Fn(zx::HandleRef<'_>) + Send + Sync + 'static,
-    {
-        Self { canceler: Box::new(canceler) }
-    }
-
     /// Cancel the pending wait. It is valid to call this function multiple times.
     pub fn cancel(&self, handle: zx::HandleRef<'_>) {
-        (self.canceler)(handle);
+        let Self { waiter, key } = self;
+        if let Some(waiter) = waiter.upgrade() {
+            let _ = waiter.port.cancel(&handle, key.raw);
+            waiter.remove_callback(&key);
+        }
     }
 }
 
@@ -386,13 +384,7 @@ impl PortWaiter {
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
-        let weak_self = Arc::downgrade(self);
-        Ok(HandleWaitCanceler::new(move |handle_ref| {
-            if let Some(waiter) = weak_self.upgrade() {
-                let _ = waiter.port.cancel(&handle_ref, key.raw);
-                waiter.remove_callback(&key);
-            }
-        }))
+        Ok(HandleWaitCanceler { waiter: Arc::downgrade(self), key })
     }
 
     fn queue_events(&self, key: &WaitKey, events: WaitEvents) {
