@@ -109,16 +109,14 @@ ctf_executable("fidl-hlcpp-conformance-tests_bin") {
 
   output_name = "fidl-hlcpp-conformance-tests"
 
-  deps = [
-    "//sdk/testing/fidl:test",
-    "//sdk/testing/fidl:test_support",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/zxtest",
-  ]
-
   # TODO(75000): Add GIDL to the CTS archive.
-  non_cts_deps = gidl_deps
+  deps = gidl_deps + [
+           "//sdk/testing/fidl:test",
+           "//sdk/testing/fidl:test_support",
+           "//zircon/system/ulib/async-loop:async-loop-cpp",
+           "//zircon/system/ulib/async-loop:async-loop-default",
+           "//zircon/system/ulib/zxtest",
+         ]
 }
 
 ctf_fuchsia_component("fidl-hlcpp-conformance-tests-component") {

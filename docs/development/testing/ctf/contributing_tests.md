@@ -265,22 +265,20 @@ this guide.
 ### CTF tests must only depend on partner-facing ABIs
 
 A CTF test must only depend on software in the partner [SDK category] at
-runtime because the test will force its dependencies to remain stable.
-Exceptions for dependencies that are not in the partner SDK category are made by
-updating the [allowlist].
+runtime because the test will force its dependencies to remain stable. This is
+not enforced by presubmit checks. Usually test authors just need to verify that
+the FIDL protocols their test suite components use are all available in the
+`partner` SDK category.
 
 ### CTF tests must be written in C, C++, or Rust
 
 At the time of writing CTF only supports these languages.
 
 <!-- Links. Please link source code to https://cs.opensource.google -->
-[allowlist]: /sdk/ctf/build/internal/allowed_ctf_deps.gni
 [CTF]: /docs/development/testing/ctf/compatibility_testing.md
 [SDK category]: /docs/contribute/sdk/categories.md
 [test realm factory]: /docs/development/testing/components/test_realm_factory.md
-[test root component]: /docs/development/testing/components/test_realm_factory.md#package-structure
 [//sdk/ctf/tests:tests]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/tests/BUILD.gn
 [//sdk/ctf/build]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/
 [//sdk/ctf/build/generate_ctf_tests.gni]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/build/generate_ctf_tests.gni
 [//sdk/ctf/goldens/package_archives.json]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/goldens/package_archives.json
-[//sdk/ctf/test_realm/meta/test-collection.shard.cml]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/ctf/test_realm/meta/test-collection.shard.cml

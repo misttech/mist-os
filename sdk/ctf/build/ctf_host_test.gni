@@ -2,9 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import("//build/testing/host_test.gni")
-import("//sdk/ctf/build/internal/ctf_element.gni")
-import("//sdk/ctf/build/internal/ctf_version.gni")
-import("//sdk/ctf/build/internal/write_ctf_file.gni")
 
 # Defines a host_test that can be used in the CTF.
 #
@@ -12,30 +9,12 @@ import("//sdk/ctf/build/internal/write_ctf_file.gni")
 #
 # See host_test() for parameters.
 template("ctf_host_test") {
-  if (invoker.deps != [] && cts_version == "") {
-    verify_target = target_name + "_verify_deps"
-  }
-  write_file_target = target_name + "_ctf_file"
-
-  if (defined(verify_target)) {
-    ctf_element(verify_target) {
-      deps_to_verify = invoker.deps
-      invoker_label =
-          get_label_info(":${invoker.target_name}", "label_no_toolchain")
-    }
-  }
-
-  write_ctf_file(write_file_target) {
-  }
-
   main_target_name = target_name + "_host"
+
+  # TODO(fxbug.dev/303077069): This template should not generate
+  # the host_test target.
   host_test(main_target_name) {
     forward_variables_from(invoker, "*")
-
-    if (defined(verify_target)) {
-      deps += [ ":$verify_target" ]
-    }
-    deps += [ ":$write_file_target" ]
   }
 
   copy_target_name = target_name + "_copy"
@@ -55,14 +34,10 @@ template("ctf_host_test") {
 
   group(target_name) {
     testonly = true
-    _test_name = target_name
-    if (cts_version != "") {
-      _test_name += "_$cts_version"
-    }
     metadata = {
       host_test_manifest = [
         {
-          test_name = _test_name
+          test_name = target_name
           binary_path = rebase_path(invoker.binary_path, root_build_dir)
           args = invoker.args
         },

@@ -42,34 +42,29 @@ ctf_rustc_binary("write_startup_socket_bin") {
 
 ctf_fuchsia_component("write_startup_socket") {
   testonly = true
-  prebuilt_only = true
   deps = [ ":write_startup_socket_bin" ]
   manifest = "meta/write_startup_socket.cml"
 }
 
 ctf_fuchsia_component("trigger_a") {
   testonly = true
-  prebuilt_only = true
   deps = [ "//src/sys/component_manager/tests:trigger_bin" ]
   manifest = "meta/trigger_a.cml"
 }
 
 ctf_fuchsia_component("trigger_b") {
   testonly = true
-  prebuilt_only = true
   deps = [ "//src/sys/component_manager/tests:trigger_bin" ]
   manifest = "meta/trigger_b.cml"
 }
 
 ctf_fuchsia_component("trigger_realm") {
   testonly = true
-  prebuilt_only = true
   manifest = "meta/trigger_realm.cml"
 }
 
 ctf_fuchsia_component("collections_integration_test_component") {
   testonly = true
-  prebuilt_only = true
   manifest = "meta/collections_integration_test.cml"
   deps = [
     ":collections_integration_test_bin",

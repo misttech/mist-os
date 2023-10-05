@@ -21,7 +21,6 @@ ctf_rustc_binary("echo_server_testing") {
 
 ctf_fuchsia_component("echo_server") {
   testonly = true
-  prebuilt_only = true
   component_name = "echo_server"
   manifest = "meta/echo_server.cml"
   deps = [ ":echo_server_testing" ]
