@@ -194,10 +194,53 @@ zx::result<std::array<uint32_t, AmlSdmmc::kResponseCount>> AmlSdmmc::WaitForInte
   return zx::ok(response);
 }
 
+void AmlSdmmc::HostInfo(fdf::Arena& arena, HostInfoCompleter::Sync& completer) {
+  sdmmc_host_info_t info;
+  zx_status_t status = SdmmcHostInfo(&info);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+
+  fuchsia_hardware_sdmmc::wire::SdmmcHostInfo wire_info;
+  wire_info.caps = info.caps;
+  wire_info.max_transfer_size = info.max_transfer_size;
+  wire_info.max_transfer_size_non_dma = info.max_transfer_size_non_dma;
+  wire_info.max_buffer_regions = info.max_buffer_regions;
+  wire_info.prefs = info.prefs;
+  completer.buffer(arena).ReplySuccess(wire_info);
+}
+
 zx_status_t AmlSdmmc::SdmmcHostInfo(sdmmc_host_info_t* info) {
   dev_info_.prefs = board_config_.prefs;
   memcpy(info, &dev_info_, sizeof(dev_info_));
   return ZX_OK;
+}
+
+void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
+                           SetBusWidthCompleter::Sync& completer) {
+  sdmmc_bus_width_t bus_width;
+  switch (request->bus_width) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kEight:
+      bus_width = SDMMC_BUS_WIDTH_EIGHT;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kFour:
+      bus_width = SDMMC_BUS_WIDTH_FOUR;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcBusWidth::kOne:
+      bus_width = SDMMC_BUS_WIDTH_ONE;
+      break;
+    default:
+      bus_width = SDMMC_BUS_WIDTH_MAX;
+      break;
+  }
+
+  zx_status_t status = SdmmcSetBusWidth(bus_width);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
 }
 
 zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
@@ -225,9 +268,26 @@ zx_status_t AmlSdmmc::SdmmcSetBusWidth(sdmmc_bus_width_t bus_width) {
   return ZX_OK;
 }
 
+void AmlSdmmc::RegisterInBandInterrupt(RegisterInBandInterruptRequestView request,
+                                       fdf::Arena& arena,
+                                       RegisterInBandInterruptCompleter::Sync& completer) {
+  // Mirroring AmlSdmmc::SdmmcRegisterInBandInterrupt().
+  completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 zx_status_t AmlSdmmc::SdmmcRegisterInBandInterrupt(
     const in_band_interrupt_protocol_t* interrupt_cb) {
   return ZX_ERR_NOT_SUPPORTED;
+}
+
+void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
+                          SetBusFreqCompleter::Sync& completer) {
+  zx_status_t status = SdmmcSetBusFreq(request->bus_freq);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
 }
 
 zx_status_t AmlSdmmc::SdmmcSetBusFreq(uint32_t freq) {
@@ -309,6 +369,15 @@ void AmlSdmmc::ConfigureDefaultRegs() {
   }
 }
 
+void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
+  zx_status_t status = SdmmcHwReset();
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
 zx_status_t AmlSdmmc::SdmmcHwReset() {
   fbl::AutoLock lock(&lock_);
 
@@ -343,6 +412,33 @@ zx_status_t AmlSdmmc::SdmmcHwReset() {
   return ZX_OK;
 }
 
+void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
+                         SetTimingCompleter::Sync& completer) {
+  sdmmc_timing_t timing;
+  // Only handling the cases for AmlSdmmc::SdmmcSetTiming() to work correctly.
+  switch (request->timing) {
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHs400:
+      timing = SDMMC_TIMING_HS400;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kHsddr:
+      timing = SDMMC_TIMING_HSDDR;
+      break;
+    case fuchsia_hardware_sdmmc::wire::SdmmcTiming::kDdr50:
+      timing = SDMMC_TIMING_DDR50;
+      break;
+    default:
+      timing = SDMMC_TIMING_MAX;
+      break;
+  }
+
+  zx_status_t status = SdmmcSetTiming(timing);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
 zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
   fbl::AutoLock lock(&lock_);
 
@@ -368,6 +464,12 @@ zx_status_t AmlSdmmc::SdmmcSetTiming(sdmmc_timing_t timing) {
 
   config.WriteTo(&mmio_);
   return ZX_OK;
+}
+
+void AmlSdmmc::SetSignalVoltage(SetSignalVoltageRequestView request, fdf::Arena& arena,
+                                SetSignalVoltageCompleter::Sync& completer) {
+  // Mirroring AmlSdmmc::SdmmcSetSignalVoltage().
+  completer.buffer(arena).ReplySuccess();
 }
 
 zx_status_t AmlSdmmc::SdmmcSetSignalVoltage(sdmmc_voltage_t voltage) {
@@ -835,6 +937,16 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
   return min_distance;
 }
 
+void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena,
+                             PerformTuningCompleter::Sync& completer) TA_EXCL(tuning_lock_) {
+  zx_status_t status = SdmmcPerformTuning(request->cmd_idx);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
 zx_status_t AmlSdmmc::SdmmcPerformTuning(uint32_t tuning_cmd_idx) {
   fbl::AutoLock tuning_lock(&tuning_lock_);
 
@@ -948,6 +1060,18 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
   return zx::ok(results);
 }
 
+void AmlSdmmc::RegisterVmo(RegisterVmoRequestView request, fdf::Arena& arena,
+                           RegisterVmoCompleter::Sync& completer) {
+  zx_status_t status =
+      SdmmcRegisterVmo(request->vmo_id, request->client_id, std::move(request->vmo),
+                       request->offset, request->size, request->vmo_rights);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess();
+}
+
 zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo vmo,
                                        uint64_t offset, uint64_t size, uint32_t vmo_rights) {
   if (client_id > SDMMC_MAX_CLIENT_ID) {
@@ -975,6 +1099,17 @@ zx_status_t AmlSdmmc::SdmmcRegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
   return registered_vmos_[client_id].RegisterWithKey(vmo_id, std::move(stored_vmo));
 }
 
+void AmlSdmmc::UnregisterVmo(UnregisterVmoRequestView request, fdf::Arena& arena,
+                             UnregisterVmoCompleter::Sync& completer) {
+  zx::vmo vmo;
+  zx_status_t status = SdmmcUnregisterVmo(request->vmo_id, request->client_id, &vmo);
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+  completer.buffer(arena).ReplySuccess(std::move(vmo));
+}
+
 zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo* out_vmo) {
   if (client_id > SDMMC_MAX_CLIENT_ID) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -993,6 +1128,56 @@ zx_status_t AmlSdmmc::SdmmcUnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx:
   }
 
   return registered_vmos_[client_id].Unregister(vmo_id).status_value();
+}
+
+void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
+                       RequestCompleter::Sync& completer) {
+  fidl::Array<uint32_t, 4> response;
+  for (const auto& req : request->reqs) {
+    std::vector<sdmmc_buffer_region_t> buffer_regions;
+    buffer_regions.reserve(req.buffers.count());
+    for (const auto& buffer : req.buffers) {
+      sdmmc_buffer_region_t region;
+
+      if (buffer.buffer.is_vmo_id()) {
+        if (buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId) {
+          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        region.buffer.vmo_id = buffer.buffer.vmo_id();
+        region.type = SDMMC_BUFFER_TYPE_VMO_ID;
+      } else {
+        if (!buffer.buffer.is_vmo() ||
+            buffer.type != fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
+          completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+          return;
+        }
+        region.buffer.vmo = buffer.buffer.vmo().get();
+        region.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
+      }
+
+      region.offset = buffer.offset;
+      region.size = buffer.size;
+      buffer_regions.push_back(region);
+    }
+
+    sdmmc_req_t sdmmc_req = {
+        .cmd_idx = req.cmd_idx,
+        .cmd_flags = req.cmd_flags,
+        .arg = req.arg,
+        .blocksize = req.blocksize,
+        .suppress_error_messages = req.suppress_error_messages,
+        .client_id = req.client_id,
+        .buffers_list = buffer_regions.data(),
+        .buffers_count = buffer_regions.size(),
+    };
+    zx_status_t status = SdmmcRequest(&sdmmc_req, response.data());
+    if (status != ZX_OK) {
+      completer.buffer(arena).ReplyError(status);
+      return;
+    }
+  }
+  completer.buffer(arena).ReplySuccess(response);
 }
 
 zx_status_t AmlSdmmc::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]) {
@@ -1091,11 +1276,36 @@ zx_status_t AmlSdmmc::Init(const pdev_device_info_t& device_info) {
 }
 
 zx_status_t AmlSdmmc::Bind() {
+  auto protocol = [this](fdf::ServerEnd<fuchsia_hardware_sdmmc::Sdmmc> server_end) mutable {
+    fdf::BindServer(dispatcher_, std::move(server_end), this);
+  };
+  fuchsia_hardware_sdmmc::SdmmcService::InstanceHandler handler({.sdmmc = std::move(protocol)});
+  auto result = outgoing_dir_.AddService<fuchsia_hardware_sdmmc::SdmmcService>(std::move(handler));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service to outgoing directory: %s", result.status_string());
+    return result.status_value();
+  }
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    return endpoints.status_value();
+  }
+  result = outgoing_dir_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to serve outgoing directory: %s", result.status_string());
+    return result.status_value();
+  }
+
+  std::array offers = {
+      fuchsia_hardware_sdmmc::SdmmcService::Name,
+  };
+
   // Note: This name can't be changed without migrating users in other repos.
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-sd-emmc")
                                   .set_inspect_vmo(GetInspectVmo())
                                   .forward_metadata(parent(), DEVICE_METADATA_SDMMC)
-                                  .forward_metadata(parent(), DEVICE_METADATA_GPT_INFO));
+                                  .forward_metadata(parent(), DEVICE_METADATA_GPT_INFO)
+                                  .set_outgoing_dir(endpoints->client.TakeChannel())
+                                  .set_runtime_service_offers(offers));
   if (status != ZX_OK) {
     irq_.destroy();
     AML_SDMMC_ERROR("DdkAdd failed");
