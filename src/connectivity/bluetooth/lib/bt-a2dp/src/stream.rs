@@ -334,7 +334,7 @@ pub(crate) mod tests {
     use crate::media_task::tests::TestMediaTaskBuilder;
     use crate::media_types::*;
 
-    fn sbc_mediacodec_capability() -> avdtp::ServiceCapability {
+    pub(crate) fn sbc_mediacodec_capability() -> avdtp::ServiceCapability {
         let sbc_codec_info = SbcCodecInfo::new(
             SbcSamplingFrequency::FREQ48000HZ,
             SbcChannelMode::MONO | SbcChannelMode::JOINT_STEREO,

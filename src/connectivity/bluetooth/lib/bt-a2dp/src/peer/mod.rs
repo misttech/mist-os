@@ -373,10 +373,12 @@ impl Peer {
             let local_categories: HashSet<_> =
                 local_capabilities.iter().map(ServiceCapability::category).collect();
             // Filter things out if they don't have a match in the local capabilities.
-            let shared_capabilities: Vec<ServiceCapability> = capabilities
+            let mut shared_capabilities: Vec<ServiceCapability> = capabilities
                 .into_iter()
                 .filter(|cap| local_categories.contains(&cap.category()))
                 .collect();
+            // Order them by the ServiceCategory ordinal - some noncompliant devices care about it.
+            shared_capabilities.sort_by_key(ServiceCapability::category);
 
             trace!("Starting stream {local_id} to remote {remote_id} with {shared_capabilities:?}");
 
@@ -869,7 +871,7 @@ impl PeerInner {
             }
             GetConfiguration { stream_id, responder } => {
                 let Some(stream) = self.local.get(&stream_id) else {
-                     return responder.reject(ErrorCode::BadAcpSeid);
+                    return responder.reject(ErrorCode::BadAcpSeid);
                 };
                 match stream.endpoint().get_configuration() {
                     Some(c) => responder.send(&c),
@@ -897,11 +899,11 @@ impl PeerInner {
                         return Err((seid, ErrorCode::BadState));
                     };
                     let Ok(permit) = self.get_permit_or_reserve(&seid) else {
-                            // Happens when we cannot start because of permits.
-                            // Accept this one, then queue up for suspend.
-                            // We are already reserved for a permit.
-                            immediate_suspend.push(remote_id);
-                            return Ok(());
+                        // Happens when we cannot start because of permits.
+                        // Accept this one, then queue up for suspend.
+                        // We are already reserved for a permit.
+                        immediate_suspend.push(remote_id);
+                        return Ok(());
                     };
                     match self.start_local_stream(permit, &seid) {
                         Ok(()) => Ok(()),
@@ -1059,7 +1061,7 @@ mod tests {
 
     use crate::media_task::tests::{TestMediaTask, TestMediaTaskBuilder};
     use crate::media_types::*;
-    use crate::stream::tests::make_sbc_endpoint;
+    use crate::stream::tests::{make_sbc_endpoint, sbc_mediacodec_capability};
 
     fn fake_metrics(
     ) -> (bt_metrics::MetricsLogger, fidl_fuchsia_metrics::MetricEventLoggerRequestStream) {
@@ -1091,6 +1093,34 @@ mod tests {
         streams
     }
 
+    fn build_test_streams_delayable() -> Streams {
+        fn with_delay(seid: u8, direction: avdtp::EndpointType) -> StreamEndpoint {
+            StreamEndpoint::new(
+                seid,
+                avdtp::MediaType::Audio,
+                direction,
+                vec![
+                    avdtp::ServiceCapability::MediaTransport,
+                    avdtp::ServiceCapability::DelayReporting,
+                    sbc_mediacodec_capability(),
+                ],
+            )
+            .expect("endpoint creation should succeed")
+        }
+        let mut streams = Streams::new();
+        let source = Stream::build(
+            with_delay(1, avdtp::EndpointType::Source),
+            TestMediaTaskBuilder::new_delayable().builder(),
+        );
+        streams.insert(source);
+        let sink = Stream::build(
+            with_delay(2, avdtp::EndpointType::Sink),
+            TestMediaTaskBuilder::new().builder(),
+        );
+        streams.insert(sink);
+        streams
+    }
+
     pub(crate) fn recv_remote(remote: &Channel) -> Result<Vec<u8>, zx::Status> {
         let waiting = remote.as_ref().outstanding_read_bytes();
         assert!(waiting.is_ok());
@@ -1104,6 +1134,7 @@ mod tests {
     /// ProfileRequestStream connected to the profile_proxy, and the Peer object.
     fn setup_peer_test(
         use_cobalt: bool,
+        streams: Streams,
     ) -> (
         Channel,
         ProfileRequestStream,
@@ -1119,14 +1150,7 @@ mod tests {
         };
         let (profile_proxy, requests) =
             create_proxy_and_stream::<ProfileMarker>().expect("test proxy pair creation");
-        let peer = Peer::create(
-            PeerId(1),
-            avdtp,
-            build_test_streams(),
-            None,
-            profile_proxy,
-            metrics_logger,
-        );
+        let peer = Peer::create(PeerId(1), avdtp, streams, None, profile_proxy, metrics_logger);
 
         (remote, requests, cobalt_receiver, peer)
     }
@@ -1216,7 +1240,7 @@ mod tests {
     fn peer_collect_capabilities_success() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
+        let (remote, _, cobalt_receiver, peer) = setup_peer_test(true, build_test_streams());
 
         let p: ProfileDescriptor = ProfileDescriptor {
             profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
@@ -1345,7 +1369,7 @@ mod tests {
     fn peer_collect_all_capabilities_success() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, cobalt_receiver, peer) = setup_peer_test(true);
+        let (remote, _, cobalt_receiver, peer) = setup_peer_test(true, build_test_streams());
         let p: ProfileDescriptor = ProfileDescriptor {
             profile_id: ServiceClassProfileIdentifier::AdvancedAudioDistribution,
             major_version: 1,
@@ -1483,7 +1507,7 @@ mod tests {
     fn peer_collect_capabilities_discovery_fails() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, _, peer) = setup_peer_test(false);
+        let (remote, _, _, peer) = setup_peer_test(false, build_test_streams());
 
         let collect_future = peer.collect_capabilities();
         pin_mut!(collect_future);
@@ -1523,7 +1547,7 @@ mod tests {
     fn peer_collect_capabilities_get_capability_fails() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, _, peer) = setup_peer_test(true);
+        let (remote, _, _, peer) = setup_peer_test(true, build_test_streams());
 
         let collect_future = peer.collect_capabilities();
         pin_mut!(collect_future);
@@ -1615,7 +1639,8 @@ mod tests {
     fn peer_stream_start_success() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
+        let (remote, mut profile_request_stream, _, peer) =
+            setup_peer_test(false, build_test_streams());
 
         let remote_seid = 2_u8.try_into().unwrap();
 
@@ -1681,7 +1706,7 @@ mod tests {
     fn peer_stream_start_picks_correct_direction() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, _, peer) = setup_peer_test(false);
+        let (remote, _, _, peer) = setup_peer_test(false, build_test_streams());
         let remote = avdtp::Peer::new(remote);
         let mut remote_events = remote.take_request_stream();
 
@@ -1770,7 +1795,7 @@ mod tests {
     fn peer_stream_start_strips_unsupported_local_capabilities() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, _, _, peer) = setup_peer_test(false);
+        let (remote, _, _, peer) = setup_peer_test(false, build_test_streams());
         let remote = avdtp::Peer::new(remote);
         let mut remote_events = remote.take_request_stream();
 
@@ -1850,6 +1875,107 @@ mod tests {
         };
         let start_future =
             peer.stream_start(remote_seid, vec![codec_params, ServiceCapability::DelayReporting]);
+        pin_mut!(start_future);
+
+        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a set_configuration request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut start_future).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have an open request").unwrap());
+    }
+
+    #[fuchsia::test]
+    fn peer_stream_start_orders_local_capabilities() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (remote, _, _, peer) = setup_peer_test(false, build_test_streams_delayable());
+        let remote = avdtp::Peer::new(remote);
+        let mut remote_events = remote.take_request_stream();
+
+        // Respond as if we have a single SBC Source Stream
+        fn remote_handle_request(req: avdtp::Request) {
+            let expected_stream_id: StreamEndpointId = 4_u8.try_into().unwrap();
+            let res = match req {
+                avdtp::Request::Discover { responder } => {
+                    let infos = [avdtp::StreamInformation::new(
+                        expected_stream_id,
+                        false,
+                        avdtp::MediaType::Audio,
+                        avdtp::EndpointType::Source,
+                    )];
+                    responder.send(&infos)
+                }
+                avdtp::Request::GetAllCapabilities { stream_id, responder }
+                | avdtp::Request::GetCapabilities { stream_id, responder } => {
+                    assert_eq!(expected_stream_id, stream_id);
+                    let caps = &[
+                        ServiceCapability::MediaTransport,
+                        ServiceCapability::MediaCodec {
+                            media_type: avdtp::MediaType::Audio,
+                            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+                            codec_extra: vec![0x11, 0x45, 51, 250],
+                        },
+                        ServiceCapability::DelayReporting,
+                    ];
+                    responder.send(caps)
+                }
+                avdtp::Request::Open { responder, stream_id } => {
+                    assert_eq!(expected_stream_id, stream_id);
+                    responder.send()
+                }
+                avdtp::Request::SetConfiguration {
+                    responder,
+                    local_stream_id,
+                    remote_stream_id,
+                    capabilities,
+                } => {
+                    assert_eq!(local_stream_id, expected_stream_id);
+                    // This is the "sink" local stream id.
+                    assert_eq!(remote_stream_id, 2_u8.try_into().unwrap());
+                    // The capabilities should be in order.
+                    let mut capabilities_ordered = capabilities.clone();
+                    capabilities_ordered.sort_by_key(ServiceCapability::category);
+                    assert_eq!(capabilities, capabilities_ordered);
+                    responder.send()
+                }
+                x => panic!("Unexpected request: {:?}", x),
+            };
+            res.expect("should be able to respond");
+        }
+
+        // Need to discover the remote streams first, or the stream start will not work.
+        let collect_capabilities_fut = peer.collect_capabilities();
+        pin_mut!(collect_capabilities_fut);
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
+
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a discovery request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_pending());
+        let request = exec.run_singlethreaded(&mut remote_events.next());
+        remote_handle_request(request.expect("should have a get_capabilities request").unwrap());
+
+        assert!(exec.run_until_stalled(&mut collect_capabilities_fut).is_ready());
+
+        // Try to start the stream.  It should continue to configure and connect.
+        let remote_seid = 4_u8.try_into().unwrap();
+
+        let codec_params = ServiceCapability::MediaCodec {
+            media_type: avdtp::MediaType::Audio,
+            codec_type: avdtp::MediaCodecType::AUDIO_SBC,
+            codec_extra: vec![0x11, 0x45, 51, 51],
+        };
+        let start_future = peer.stream_start(
+            remote_seid,
+            vec![
+                ServiceCapability::MediaTransport,
+                ServiceCapability::DelayReporting,
+                codec_params,
+            ],
+        );
         pin_mut!(start_future);
 
         assert!(exec.run_until_stalled(&mut start_future).is_pending());
@@ -1957,7 +2083,8 @@ mod tests {
     fn peer_stream_start_fails_to_connect() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (remote, mut profile_request_stream, _, peer) = setup_peer_test(false);
+        let (remote, mut profile_request_stream, _, peer) =
+            setup_peer_test(false, build_test_streams());
 
         let remote_seid = 2_u8.try_into().unwrap();
 
@@ -2008,7 +2135,8 @@ mod tests {
     /// Test that the delay reports get acknowledged and they are sent to cobalt.
     #[fuchsia::test]
     async fn peer_delay_report() {
-        let (remote, _profile_requests, cobalt_recv, peer) = setup_peer_test(true);
+        let (remote, _profile_requests, cobalt_recv, peer) =
+            setup_peer_test(true, build_test_streams());
         let remote_peer = avdtp::Peer::new(remote);
         let mut remote_events = remote_peer.take_request_stream();
 
@@ -2067,14 +2195,16 @@ mod tests {
         pin_mut!(collect_fut);
 
         // Discover then a GetCapabilities.
-        let Either::Left((request, collect_fut)) = futures::future::select(
-            remote_events.next(), collect_fut).await else {
+        let Either::Left((request, collect_fut)) =
+            futures::future::select(remote_events.next(), collect_fut).await
+        else {
             panic!("Collect future shouldn't finish first");
         };
         pin_mut!(collect_fut);
         remote_handle_request(request.expect("a request").unwrap(), &remote_peer).await;
-        let Either::Left((request, collect_fut)) = futures::future::select(
-            remote_events.next(), collect_fut).await else {
+        let Either::Left((request, collect_fut)) =
+            futures::future::select(remote_events.next(), collect_fut).await
+        else {
             panic!("Collect future shouldn't finish first");
         };
         remote_handle_request(request.expect("a request").unwrap(), &remote_peer).await;

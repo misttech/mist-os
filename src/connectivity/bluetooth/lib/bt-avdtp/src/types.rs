@@ -186,8 +186,8 @@ impl RemoteReject {
 impl std::fmt::Display for RemoteReject {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         let Some(error_code) = self.error_code else {
-           return write!(f, "did not recognize {:?}", self.signal_id);
-       };
+            return write!(f, "did not recognize {:?}", self.signal_id);
+        };
 
         write!(f, "{:?}, ", self.signal_id)?;
         match self.signal_id {
@@ -545,6 +545,7 @@ decodable_enum! {
     /// Indicates the signaling command on a command packet.  The same identifier is used on the
     /// response to that command packet.
     /// See Section 8.4.4
+    #[derive(PartialOrd, Ord)]
     pub enum ServiceCategory<u8, Error, OutOfRange> {
         None = 0x00,
         MediaTransport = 0x01,
