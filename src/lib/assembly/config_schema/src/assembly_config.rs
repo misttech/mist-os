@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::image_assembly_config::PartialKernelConfig;
 use crate::PackageDetails;
 use assembly_package_utils::PackageInternalPathBuf;
 use camino::Utf8PathBuf;
@@ -27,15 +28,29 @@ pub struct AssemblyConfig {
 /// and the paths to those binaries
 pub type ShellCommands = BTreeMap<PackageName, BTreeSet<PackageInternalPathBuf>>;
 
-/// A bundle of inputs to be used in the assembly of a product.  This is closely
-/// related to the ImageAssembly Product config, but has more fields.
+/// A bundle of inputs to be used in the assembly of a product.
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyInputBundle {
-    /// The Image Assembly's ImageAssemblyConfiguration is most of the fields here, so
-    /// it's re-used to gain access to the methods it has for merging.
-    #[serde(flatten)]
-    pub image_assembly: crate::image_assembly_config::PartialImageAssemblyConfig,
+    /// The parameters that specify which kernel to put into the ZBI.
+    pub kernel: Option<PartialKernelConfig>,
+
+    /// The qemu kernel to use when starting the emulator.
+    #[serde(default)]
+    pub qemu_kernel: Option<Utf8PathBuf>,
+
+    /// The list of additional boot args to add.
+    #[serde(default)]
+    pub boot_args: Vec<String>,
+
+    /// The packages that are in the bootfs package list, which are
+    /// added to the BOOTFS in the ZBI.
+    #[serde(default)]
+    pub bootfs_packages: Vec<Utf8PathBuf>,
+
+    /// The set of files to be placed in BOOTFS in the ZBI.
+    #[serde(default)]
+    pub bootfs_files: Vec<FileEntry>,
 
     /// Package entries that internally specify their package set, instead of being grouped
     /// separately.
@@ -305,9 +320,6 @@ mod tests {
         let json5 = r#"
             {
               // json5 files can have comments in them.
-              system: ["package0"],
-              base: ["package1", "package2"],
-              cache: ["package3", "package4"],
               packages: [
                 {
                     package: "package5",
@@ -377,15 +389,6 @@ mod tests {
         "#;
         let bundle =
             util::from_reader::<_, AssemblyInputBundle>(&mut std::io::Cursor::new(json5)).unwrap();
-        assert_eq!(bundle.image_assembly.system, vec!(Utf8PathBuf::from("package0")));
-        assert_eq!(
-            bundle.image_assembly.base,
-            vec!(Utf8PathBuf::from("package1"), Utf8PathBuf::from("package2"),)
-        );
-        assert_eq!(
-            bundle.image_assembly.cache,
-            vec!(Utf8PathBuf::from("package3"), Utf8PathBuf::from("package4"),)
-        );
         assert_eq!(
             bundle.packages,
             vec!(
@@ -404,10 +407,10 @@ mod tests {
             args: vec!["arg1".to_string(), "arg2".to_string()],
             clock_backstop: Some(0),
         };
-        assert_eq!(bundle.image_assembly.kernel, Some(expected_kernel));
-        assert_eq!(bundle.image_assembly.boot_args, vec!("arg1".to_string(), "arg2".to_string()));
+        assert_eq!(bundle.kernel, Some(expected_kernel));
+        assert_eq!(bundle.boot_args, vec!("arg1".to_string(), "arg2".to_string()));
         assert_eq!(
-            bundle.image_assembly.bootfs_files,
+            bundle.bootfs_files,
             vec!(FileEntry {
                 source: Utf8PathBuf::from("path/to/source"),
                 destination: "path/to/destination".to_string()

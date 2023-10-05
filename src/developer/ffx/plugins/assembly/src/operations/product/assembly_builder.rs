@@ -143,7 +143,11 @@ impl ImageAssemblyConfigBuilder {
     ) -> Result<()> {
         let bundle_path = bundle_path.as_ref();
         let AssemblyInputBundle {
-            image_assembly: bundle,
+            kernel,
+            qemu_kernel,
+            boot_args,
+            bootfs_packages: _,
+            bootfs_files: _,
             packages,
             config_data,
             blobs: _,
@@ -185,10 +189,10 @@ impl ImageAssemblyConfigBuilder {
         }
 
         self.boot_args
-            .try_insert_all_unique(bundle.boot_args)
+            .try_insert_all_unique(boot_args)
             .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
 
-        if let Some(kernel) = bundle.kernel {
+        if let Some(kernel) = kernel {
             assembly_util::set_option_once_or(
                 &mut self.kernel_path,
                 kernel.path.map(|p| bundle_path.join(p)),
@@ -224,7 +228,7 @@ impl ImageAssemblyConfigBuilder {
 
         assembly_util::set_option_once_or(
             &mut self.qemu_kernel,
-            bundle.qemu_kernel.map(|p| bundle_path.join(p)),
+            qemu_kernel.map(|p| bundle_path.join(p)),
             anyhow!("Only one input bundle can specify a qemu kernel path"),
         )?;
 
@@ -880,20 +884,15 @@ mod tests {
             FileRelativePathBuf::FileRelative(write_empty_pkg(bundle_path, name, None).clone())
         };
         AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                base: vec![],
-                system: vec![],
-                cache: vec![],
-                bootfs_packages: vec![],
-                kernel: Some(PartialKernelConfig {
-                    path: Some("kernel/path".into()),
-                    args: vec!["kernel_arg0".into()],
-                    clock_backstop: Some(56244),
-                }),
-                qemu_kernel: Some("path/to/qemu/kernel".into()),
-                boot_args: vec!["boot_arg0".into()],
-                bootfs_files: vec![],
-            },
+            kernel: Some(PartialKernelConfig {
+                path: Some("kernel/path".into()),
+                args: vec!["kernel_arg0".into()],
+                clock_backstop: Some(56244),
+            }),
+            qemu_kernel: Some("path/to/qemu/kernel".into()),
+            boot_args: vec!["boot_arg0".into()],
+            bootfs_files: vec![],
+            bootfs_packages: vec![],
             packages: vec![
                 PackageDetails {
                     package: write_empty_bundle_pkg("base_package0"),
@@ -951,15 +950,12 @@ mod tests {
         package_names: Vec<String>,
     ) -> ImageAssemblyConfigBuilder {
         let minimum_bundle = AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                kernel: Some(PartialKernelConfig {
-                    path: Some("kernel/path".into()),
-                    args: Vec::default(),
-                    clock_backstop: Some(0),
-                }),
-                qemu_kernel: Some("kernel/qemu/path".into()),
-                ..assembly_config_schema::PartialImageAssemblyConfig::default()
-            },
+            kernel: Some(PartialKernelConfig {
+                path: Some("kernel/path".into()),
+                args: Vec::default(),
+                clock_backstop: Some(0),
+            }),
+            qemu_kernel: Some("kernel/qemu/path".into()),
             packages: package_names
                 .iter()
                 .map(|package_name| PackageDetails {
@@ -976,6 +972,7 @@ mod tests {
             shell_commands: ShellCommands::default(),
             packages_to_compile: Vec::default(),
             bootfs_files_package: None,
+            ..AssemblyInputBundle::default()
         };
         let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
@@ -1701,18 +1698,22 @@ mod tests {
         let dir_path2 = Utf8Path::from_path(tmp_path2.path()).unwrap();
         let tools = FakeToolProvider::default();
         let aib = AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                base: vec![write_empty_pkg(dir_path1, "base_package2", None).into()],
-                ..Default::default()
-            },
+            packages: vec![PackageDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    write_empty_pkg(dir_path1, "base_package2", None).into(),
+                ),
+                set: PackageSet::Base,
+            }],
             ..Default::default()
         };
 
         let aib2 = AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                base: vec![write_empty_pkg(dir_path2, "base_package2", None).into()],
-                ..Default::default()
-            },
+            packages: vec![PackageDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    write_empty_pkg(dir_path2, "base_package2", None).into(),
+                ),
+                set: PackageSet::Base,
+            }],
             ..Default::default()
         };
 
@@ -1770,18 +1771,22 @@ mod tests {
         let tmp_path2 = TempDir::new_in(outdir).unwrap();
         let dir_path2 = Utf8Path::from_path(tmp_path2.path()).unwrap();
         let aib = AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                base: vec![write_empty_pkg(dir_path1, "foo", Some("fuchsia.com")).into()],
-                ..Default::default()
-            },
+            packages: vec![PackageDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    write_empty_pkg(dir_path1, "foo", Some("fuchsia.com")).into(),
+                ),
+                set: PackageSet::Base,
+            }],
             ..Default::default()
         };
 
         let aib2 = AssemblyInputBundle {
-            image_assembly: assembly_config_schema::PartialImageAssemblyConfig {
-                cache: vec![write_empty_pkg(dir_path2, "foo", Some("google.com")).into()],
-                ..Default::default()
-            },
+            packages: vec![PackageDetails {
+                package: FileRelativePathBuf::FileRelative(
+                    write_empty_pkg(dir_path2, "foo", Some("google.com")).into(),
+                ),
+                set: PackageSet::Cache,
+            }],
             ..Default::default()
         };
 

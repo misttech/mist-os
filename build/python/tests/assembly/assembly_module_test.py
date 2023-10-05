@@ -160,17 +160,6 @@ class PackageManifestTest(unittest.TestCase):
 
 
 raw_assembly_input_bundle_json = """{
-  "base": [
-    "package1",
-    "package2"
-  ],
-  "cache": [
-    "package3",
-    "package4"
-  ],
-  "system": [
-    "package0"
-  ],
   "kernel": {
     "path": "path/to/kernel",
     "args": [
@@ -190,7 +179,28 @@ raw_assembly_input_bundle_json = """{
     }
   ],
   "bootfs_packages": [],
-  "packages": [],
+  "packages": [
+    {
+      "package": "package0",
+      "set": "system"
+    },
+    {
+      "package": "package1",
+      "set": "base"
+    },
+    {
+      "package": "package2",
+      "set": "base"
+    },
+    {
+      "package": "package3",
+      "set": "cache"
+    },
+    {
+      "package": "package4",
+      "set": "cache"
+    }
+  ],
   "config_data": {
     "package1": [
       {
@@ -255,9 +265,15 @@ class AssemblyInputBundleTest(unittest.TestCase):
         self.maxDiff = None
 
         aib = AssemblyInputBundle()
-        aib.base.update(["package1", "package2"])
-        aib.cache.update(["package3", "package4"])
-        aib.system.add("package0")
+        aib.add_packages(
+            [
+                PackageDetails("package1", "base"),
+                PackageDetails("package2", "base"),
+                PackageDetails("package3", "cache"),
+                PackageDetails("package4", "cache"),
+                PackageDetails("package0", "system"),
+            ]
+        )
         aib.kernel.path = "path/to/kernel"
         aib.kernel.args.update(["arg1", "arg2"])
         aib.kernel.clock_backstop = 1234
@@ -298,9 +314,15 @@ class AssemblyInputBundleTest(unittest.TestCase):
         self.maxDiff = None
 
         aib = AssemblyInputBundle()
-        aib.base.update(["package1", "package2"])
-        aib.cache.update(["package3", "package4"])
-        aib.system.add("package0")
+        aib.add_packages(
+            [
+                PackageDetails("package1", "base"),
+                PackageDetails("package2", "base"),
+                PackageDetails("package3", "cache"),
+                PackageDetails("package4", "cache"),
+                PackageDetails("package0", "system"),
+            ]
+        )
         aib.kernel.path = "path/to/kernel"
         aib.kernel.args.update(["arg1", "arg2"])
         aib.kernel.clock_backstop = 1234
@@ -342,9 +364,7 @@ class AssemblyInputBundleTest(unittest.TestCase):
                 getattr(parsed, field_name), getattr(expected, field_name)
             )
 
-        assert_field_equal(parsed_aib, aib, "base")
-        assert_field_equal(parsed_aib, aib, "cache")
-        assert_field_equal(parsed_aib, aib, "system")
+        assert_field_equal(parsed_aib, aib, "packages")
         assert_field_equal(parsed_aib, aib, "kernel")
 
         assert_field_equal(parsed_aib, aib, "boot_args")

@@ -237,12 +237,6 @@ class MakeLegacyConfig(unittest.TestCase):
             file_paths = aib.all_file_paths()
 
             # Validate the contents of the AssemblyInputBundle itself
-            # The base, cache, system, bootfs_packages lists are not used even
-            # though they are inherited from ImageAssemblyConfig.
-            self.assertEqual(aib.base, set([]))
-            self.assertEqual(aib.cache, set([]))
-            self.assertEqual(aib.system, set([]))
-            self.assertEqual(aib.bootfs_packages, set([]))
             self.assertEqual(
                 aib.packages,
                 set(

@@ -132,7 +132,7 @@ class CompiledPackageAdditionalShards:
 
 @dataclass
 @serialize_json
-class AssemblyInputBundle(ImageAssemblyConfig):
+class AssemblyInputBundle:
     """AssemblyInputBundle wraps a set of artifacts together for use by out-of-tree assembly, both
     the manifest of the artifacts, and the artifacts themselves.
 
@@ -274,10 +274,14 @@ class AssemblyInputBundle(ImageAssemblyConfig):
 
     All items are optional.  Files for `config_data` should be in the config_data section,
     not in a package called `config_data`.
-
-    The AssemblyInputBundle is an extension of the ImageAssemblyConfig class, adding new categories
-    that it supports which aren't in the ImageAssemblyConfig.
     """
+
+    # Fields shared with ImageAssemblyConfig.
+    kernel: KernelInfo = field(default_factory=KernelInfo)
+    qemu_kernel: Optional[FilePath] = None
+    boot_args: Set[str] = field(default_factory=set)
+    bootfs_files: Set[FileEntry] = field(default_factory=set)
+    bootfs_packages: Set[FilePath] = field(default_factory=set)
 
     packages: Set[PackageDetails] = field(default_factory=set)
     config_data: ConfigDataEntries = field(default_factory=dict)

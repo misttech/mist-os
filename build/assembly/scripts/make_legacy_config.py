@@ -21,7 +21,6 @@ from assembly import (
     AIBCreator,
     FileEntry,
     FilePath,
-    ImageAssemblyConfig,
     PackageManifest,
     KernelInfo,
 )
@@ -64,8 +63,9 @@ def copy_to_assembly_input_bundle(
     bootfs_files_package: Optional[FilePath],
 ) -> Tuple[AssemblyInputBundle, FilePath, DepSet]:
     """
-    Copy all the artifacts from the ImageAssemblyConfig into an AssemblyInputBundle that is in
-    outdir, tracking all copy operations in a DepFile that is returned with the resultant bundle.
+    Copy all the artifacts into an AssemblyInputBundle that is in outdir,
+    tracking all copy operations in a DepFile that is returned with the
+    resultant bundle.
 
     Some notes on operation:
         - <outdir> is removed and recreated anew when called.
