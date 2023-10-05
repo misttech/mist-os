@@ -29,6 +29,16 @@ func GetHostOutDirectory() (string, error) {
 	return dir, nil
 }
 
+func GetHostToolsDirectory() (string, error) {
+	hostOut, err := GetHostOutDirectory()
+	if err != nil {
+		return "", err
+	}
+
+	parent, _ := filepath.Split(hostOut)
+	return filepath.Join(parent, "host-tools"), nil
+}
+
 func DutSshKeyPath() (string, error) {
 	hostOutDir, err := GetHostOutDirectory()
 	if err != nil {

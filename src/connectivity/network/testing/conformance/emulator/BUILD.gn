@@ -12,25 +12,41 @@ if (is_linux && has_board) {
       "emulator.go",
       "emulator_test.go",
     ]
+    non_go_deps = [
+      # Add any host_test_data deps to the `conformance_emulator_non_go_deps`
+      # group rather than directly on this target so that we can avoid breaking
+      # host tests that live in an internal petal that depends on this library.
+      ":conformance_emulator_non_go_deps",
+    ]
     deps = [
       "//src/connectivity/network/testing/conformance/util",
       "//tools/emulator",
       "//tools/virtual_device:proto",
     ]
-    non_go_deps = [ ":zbi_bin" ]
     testonly = true
   }
 
-  go_test("conformance_emulator_test") {
-    library = ":emulator"
-    deps = [ "//src/connectivity/network/testing/conformance/ffx" ]
-    non_go_deps = [
+  group("conformance_emulator_non_go_deps") {
+    testonly = true
+    deps = [
+      ":zbi_bin",
       "//build/images/network-conformance:network-conformance-base-test-data",
       "//src/connectivity/network/testing/network-test-realm/ffx:ffx_net_test_realm_tool_test_data",
       "//src/developer/ffx:test_data",
       "//src/developer/ffx/plugins/component:ffx_component_tool_test_data",
+      "//src/developer/ffx/plugins/log:ffx_log_tool_test_data",
       "//src/developer/ffx/plugins/target:ffx_target_tool_test_data",
     ]
+  }
+
+  go_test("conformance_emulator_test") {
+    library = ":emulator"
+    non_go_deps = [
+      # Add any host_test_data deps to the `conformance_emulator_non_go_deps`
+      # group rather than directly on this target so that an internal petal
+      # that depends on the same libraries as this test avoids breakage.
+    ]
+    deps = [ "//src/connectivity/network/testing/conformance/ffx" ]
   }
 
   out_dir =

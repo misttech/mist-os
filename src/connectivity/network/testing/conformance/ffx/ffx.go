@@ -52,11 +52,11 @@ type FfxInstanceOptions struct {
 
 // GetFfxPath returns the absolute path to the ffx binary.
 func GetFfxPath() (string, error) {
-	hostOutDir, err := util.GetHostOutDirectory()
+	hostToolsDir, err := util.GetHostToolsDirectory()
 	if err != nil {
-		return "", fmt.Errorf("getHostOutDirectory() = %w", err)
+		return "", fmt.Errorf("GetHostToolsDirectory() = %w", err)
 	}
-	return filepath.Join(hostOutDir, "ffx_bin", "ffx"), nil
+	return filepath.Join(hostToolsDir, "ffx"), nil
 }
 
 // NewFfxInstance returns a ffxutil.FFXInstance that executes against a
