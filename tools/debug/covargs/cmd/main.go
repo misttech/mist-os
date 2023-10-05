@@ -519,6 +519,7 @@ func showCoverageData(ctx context.Context, mergedProfileFile string, covFile str
 		"show",
 		"-format", outputFormat,
 		"-instr-profile", mergedProfileFile,
+		"-show-directory-coverage",
 		"-output-dir", outputDir,
 	}
 	if compilationDir != "" {
