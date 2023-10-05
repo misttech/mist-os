@@ -343,6 +343,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/thermal/bin/temperature-cli:bootfs",
     "//src/devices/thermal/bin/thermal-cli:bootfs",
     "//src/devices/usb/bin/lsusb:bootfs",
+    "//src/diagnostics/iquery:bootfs",
     "//src/graphics/display/bin/dsiutil:bootfs",
     "//src/media/audio/tools/audio-driver-ctl:bootfs",
     "//src/security/bin/syscall-check:bootfs",
@@ -694,10 +695,6 @@ assembly_input_bundle("core_realm_eng") {
     # The fs_realm component should be available in every engineering-mode product.
     "//src/storage/fs_realm",
     "//src/storage/bin:fs_realm_tools",
-  ]
-  bootfs_files_labels = [
-    # NOTE: this might belong to a currently not-existing bootstrap_eng AIB.
-    "//src/diagnostics/iquery:bootfs",
   ]
   shell_commands = [
     {

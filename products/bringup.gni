@@ -23,6 +23,4 @@ product_bootfs_labels += [
   "//src/sys/component_manager:component_manager_bootfs_config",
 ]
 
-product_bootfs_labels += [ "//src/diagnostics/iquery" ]
-
 zedboot_product_assembly_config_label = "//products/zedboot"
