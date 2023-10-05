@@ -26,8 +26,18 @@ FUCHSIA_PLATFORMS_MAP = {
     "riscv64": "fuchsia_riscv64",
 }
 
+_REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
+_OVERRIDE_API_LEVEL_TARGET_NAME = "//fuchsia:override_fuchsia_api_level"
+
 def _update_fuchsia_api_level(settings, attr):
-    override_value = settings[FUCHSIA_API_LEVEL_TARGET_NAME]
+    # The logic for determining what API level to use is as follows. The first
+    # value that is true will be used
+    # 1. Check if a user has set the value by using the override flag
+    # 2. Check the value that is set on the fuchsia_package
+    # 3. Check the repository_default_fuchsia_api_level flag
+    # 4. fail
+
+    override_value = settings[_OVERRIDE_API_LEVEL_TARGET_NAME]
 
     # Check if we have a user provided value
     if override_value != "":
@@ -43,22 +53,26 @@ def _update_fuchsia_api_level(settings, attr):
         api_level = attr.fuchsia_api_level
         if api_level != "":
             return api_level
-
-        #TODO(b/303683945): We should fail here once users are setting their API level.
-        return str(DEFAULT_TARGET_API)
-        # fail("Packages must be built against an API level.")
-
     else:
-        # We need to return an empty value here because there are some rules whic
+        # We need to return an empty value here because there are some rules which
         # use this tranition but do not have the api level as an attribute. If we
         # return anything else here the api level setting will be set to some
         # value and we will not be able to know if this is a user's intention
         # or a misconfigured transition.
         return ""
 
+    repo_default_value = settings[_REPO_DEFAULT_API_LEVEL_TARGET_NAME]
+    if repo_default_value != "":
+        return repo_default_value
+
+    #TODO(b/303683945): We should fail here once users are setting their API level.
+    return str(DEFAULT_TARGET_API)
+    # fail("Packages must be built against an API level.")
+
 def _fuchsia_transition_impl(settings, attr):
     input_cpu = settings["//command_line_option:cpu"]
     output_cpu = NATIVE_CPU_ALIASES.get(input_cpu, None)
+
     if not output_cpu:
         fail("Unrecognized cpu %s." % input_cpu)
     fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
@@ -86,7 +100,8 @@ def _fuchsia_transition_impl(settings, attr):
 fuchsia_transition = transition(
     implementation = _fuchsia_transition_impl,
     inputs = [
-        FUCHSIA_API_LEVEL_TARGET_NAME,
+        _OVERRIDE_API_LEVEL_TARGET_NAME,
+        _REPO_DEFAULT_API_LEVEL_TARGET_NAME,
         "//command_line_option:cpu",
         "//command_line_option:copt",
     ],

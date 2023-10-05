@@ -34,7 +34,7 @@ def get_fuchsia_api_level(ctx):
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def _valid_api_levels(ctx):
-    if len(ctx.attr.valid_api_levels_for_test) > 0:
+    if hasattr(ctx.attr, "valid_api_levels_for_test") and len(ctx.attr.valid_api_levels_for_test) > 0:
         levels = ctx.attr.valid_api_levels_for_test
     else:
         levels = [entry["api_level"] for entry in VALID_TARGET_APIS]
@@ -55,10 +55,16 @@ def _fuchsia_api_level_impl(ctx):
 
     fail("ERROR: {} is not a valid API level. API level should be one of {}".format(
         raw_level,
-        _valid_api_levels(ctx) + ["HEAD"],
+        _valid_api_levels(ctx),
     ))
 
 fuchsia_api_level = rule(
+    doc = """A build configuration value containing the fuchsia api level
+
+    The fuchsia_api_level is a build configuration value that can be set from
+    the command line. This lets users define how they what api level they want
+    to use outside of a BUILD.bazel file.
+    """,
     implementation = _fuchsia_api_level_impl,
     build_setting = config.string(flag = True),
     attrs = {
@@ -69,4 +75,17 @@ fuchsia_api_level = rule(
             default = [],
         ),
     },
+)
+
+fuchsia_static_api_level = rule(
+    doc = """A build configuration value containing the fuchsia api level
+
+    The fuchsia_static_api_level is a build configuration value that cannot be
+    set from the command line. This lets us propagate the value via a transition
+    while still allowing for users to set their own flags via the command line.
+    Put another way, this is the output of a transition whereas the fuchsia_api_level
+    is the input to the transition.
+    """,
+    implementation = _fuchsia_api_level_impl,
+    build_setting = config.string(flag = False),
 )
