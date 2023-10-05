@@ -3720,10 +3720,7 @@ impl BinderDriver {
 
         let w1 = thread_state.command_queue.wait_async_fd_events(waiter, events, handler.clone());
         let w2 = proc_command_queue.waiters.wait_async_fd_events(waiter, events, handler);
-        WaitCanceler::new(move || {
-            w1.cancel();
-            w2.cancel();
-        })
+        WaitCanceler::merge(w1, w2)
     }
 }
 

@@ -247,12 +247,7 @@ impl FileOps for TimerFile {
                 signal_handler,
             )
             .unwrap(); // TODO return error
-        let timer = Arc::downgrade(&self.timer);
-        Some(WaitCanceler::new(move || {
-            if let Some(timer) = timer.upgrade() {
-                canceler.cancel(timer.as_handle_ref());
-            }
-        }))
+        Some(WaitCanceler::new_timer(Arc::downgrade(&self.timer), canceler))
     }
 
     fn query_events(

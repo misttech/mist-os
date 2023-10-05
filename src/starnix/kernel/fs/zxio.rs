@@ -77,7 +77,7 @@ pub fn zxio_wait_async(
         let observed_zxio_signals = zxio.wait_end(zx::Signals::empty());
         let observed_events = get_events_from_zxio_signals(observed_zxio_signals);
         waiter.wake_immediately(observed_events, event_handler);
-        return WaitCanceler::new(move || {});
+        return WaitCanceler::new_noop();
     }
 
     let signal_handler = SignalHandler {
@@ -89,16 +89,10 @@ pub fn zxio_wait_async(
     };
 
     // unwrap OK here as errors are only generated from misuse
-    let zxio = Arc::downgrade(zxio);
-    let canceler = waiter.wake_on_zircon_signals(&handle, signals, signal_handler).unwrap();
-    WaitCanceler::new(move || {
-        if let Some(zxio) = zxio.upgrade() {
-            let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
-            assert!(!handle.is_invalid());
-            canceler.cancel(handle);
-            zxio.wait_end(signals);
-        }
-    })
+    WaitCanceler::new_zxio(
+        Arc::downgrade(zxio),
+        waiter.wake_on_zircon_signals(&handle, signals, signal_handler).unwrap(),
+    )
 }
 
 pub fn zxio_query_events(zxio: &Arc<Zxio>) -> Result<FdEvents, Errno> {

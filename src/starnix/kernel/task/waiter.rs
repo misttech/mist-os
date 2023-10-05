@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::AsHandleRef as _;
 use fuchsia_zircon as zx;
 use starnix_sync::{EventWaitGuard, InterruptibleEvent};
 use std::{
@@ -11,7 +12,7 @@ use std::{
         Arc, Weak,
     },
 };
-use syncio::{zxio::zxio_signals_t, Zxio};
+use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
 
 use crate::{
     fs::{FdEvents, FdNumber},
@@ -128,22 +129,96 @@ pub enum WaitCallback {
     EventHandler(EventHandler),
 }
 
+struct WaitCancelerQueue {
+    wait_queue: Weak<WaitQueueImpl>,
+    waiter: WaiterRef,
+    key: WaitKey,
+}
+
+struct WaitCancelerZxio {
+    zxio: Weak<Zxio>,
+    inner: HandleWaitCanceler,
+}
+
+struct WaitCancelerTimer {
+    timer: Weak<zx::Timer>,
+    inner: HandleWaitCanceler,
+}
+
+enum WaitCancelerInner {
+    Zxio(WaitCancelerZxio),
+    Timer(WaitCancelerTimer),
+    Queue(WaitCancelerQueue),
+}
+
+const MAX_INNER_CANCELLERS: usize = 2;
+
 /// Return values for wait_async methods. Calling `cancel` will cancel any running wait.
 pub struct WaitCanceler {
-    canceler: Box<dyn Fn() + Send + Sync>,
+    cancellers: smallvec::SmallVec<[WaitCancelerInner; MAX_INNER_CANCELLERS]>,
 }
 
 impl WaitCanceler {
-    pub fn new<F>(canceler: F) -> Self
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        Self { canceler: Box::new(canceler) }
+    fn new_inner(inner: WaitCancelerInner) -> Self {
+        Self { cancellers: smallvec::smallvec![inner] }
+    }
+
+    pub fn new_noop() -> Self {
+        Self { cancellers: Default::default() }
+    }
+
+    pub fn new_zxio(zxio: Weak<Zxio>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
+    }
+
+    pub fn new_timer(timer: Weak<zx::Timer>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }))
+    }
+
+    pub fn merge(Self { mut cancellers }: Self, Self { cancellers: mut other }: Self) -> Self {
+        // Increase `MAX_INNER_CANCELLERS` if needed, or remove this assert and
+        // allow the smallvec to allocate.
+        assert!(
+            cancellers.len() + other.len() <= MAX_INNER_CANCELLERS,
+            "WaitCanceler only supports {} inner cancellers",
+            MAX_INNER_CANCELLERS
+        );
+        cancellers.append(&mut other);
+        WaitCanceler { cancellers }
     }
 
     /// Cancel the pending wait. It is valid to call this function multiple times.
     pub fn cancel(&self) {
-        (self.canceler)();
+        let Self { cancellers } = self;
+        for canceller in cancellers {
+            match canceller {
+                WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }) => {
+                    let Some(zxio) = zxio.upgrade() else { return };
+                    let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
+                    assert!(!handle.is_invalid());
+                    inner.cancel(handle);
+                    zxio.wait_end(signals);
+                }
+                WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }) => {
+                    let Some(timer) = timer.upgrade() else { return };
+                    inner.cancel(timer.as_handle_ref());
+                }
+                WaitCancelerInner::Queue(WaitCancelerQueue { wait_queue, waiter, key }) => {
+                    let Some(wait_queue) = wait_queue.upgrade() else { return };
+
+                    waiter.remove_callback(&key);
+
+                    // TODO(steveaustin) Maybe make waiters a map to avoid linear search
+                    WaitQueue::filter_waiters(&mut wait_queue.waiters.lock(), |entry| {
+                        if &entry.key == key && &entry.waiter == waiter {
+                            Retention::Drop
+                        } else {
+                            Retention::Keep
+                        }
+                    });
+                }
+            };
+        }
     }
 }
 
@@ -543,7 +618,7 @@ impl Waiter {
     /// implementations that should block forever even though a real implementation would wake up
     /// eventually.
     pub fn fake_wait(&self) -> WaitCanceler {
-        WaitCanceler::new(move || {})
+        WaitCanceler::new_noop()
     }
 
     /// Interrupt the waiter to deliver a signal. The wait operation will return EINTR, and a
@@ -764,22 +839,13 @@ impl WaitQueue {
         profile_duration!("WaitAsyncEntry");
         let key = entry.key;
         self.0.waiters.lock().push(entry);
-        let weak_self = Arc::downgrade(&self.0);
-        waiter.inner.wait_queues.lock().insert(key, weak_self.clone());
-        let waiter = waiter.weak();
-        WaitCanceler::new(move || {
-            if let Some(wait_queue) = weak_self.upgrade() {
-                waiter.remove_callback(&key);
-                // TODO(steveaustin) Maybe make waiters a map to avoid linear search
-                Self::filter_waiters(&mut wait_queue.waiters.lock(), |entry| {
-                    if entry.key == key && entry.waiter == waiter {
-                        Retention::Drop
-                    } else {
-                        Retention::Keep
-                    }
-                });
-            }
-        })
+        let wait_queue = Arc::downgrade(&self.0);
+        waiter.inner.wait_queues.lock().insert(key, wait_queue.clone());
+        WaitCanceler::new_inner(WaitCancelerInner::Queue(WaitCancelerQueue {
+            wait_queue,
+            waiter: waiter.weak(),
+            key,
+        }))
     }
 
     /// Establish a wait for the given value event.
