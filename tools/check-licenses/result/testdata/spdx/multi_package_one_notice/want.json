@@ -67,7 +67,8 @@
       "licenseId": "testing123_1",
       "extractedText": "Testing 123 1",
       "seeAlsos": [
-        "www.example.com"
+        "www.example.com",
+        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
       ]
     },
     {
@@ -75,7 +76,8 @@
       "licenseId": "testing123_2",
       "extractedText": "Testing 123 2",
       "seeAlsos": [
-        "www.example.com"
+        "www.example.com",
+        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
       ]
     },
     {
@@ -83,7 +85,8 @@
       "licenseId": "testing123_3",
       "extractedText": "Testing 123 3",
       "seeAlsos": [
-        "www.example.com"
+        "www.example.com",
+        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
       ]
     },
     {
@@ -91,7 +94,8 @@
       "licenseId": "testing123_4",
       "extractedText": "Testing 123 4",
       "seeAlsos": [
-        "www.example.com"
+        "www.example.com",
+        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
       ]
     }
   ],

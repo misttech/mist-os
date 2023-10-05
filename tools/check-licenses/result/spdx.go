@@ -103,6 +103,7 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 					ExtractedText:     string(text),
 					LicenseCrossReferences: []string{
 						l.URL(),
+						l.AttemptedFuchsiaGoogleSourceURL(),
 					},
 				}
 				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {
@@ -119,6 +120,7 @@ func generateSPDXDoc(name string, projects []*project.Project, root *project.Pro
 					ExtractedText:     string(d.Data()),
 					LicenseCrossReferences: []string{
 						d.URL(),
+						l.AttemptedFuchsiaGoogleSourceURL(),
 					},
 				}
 				if _, ok := seenOtherLicenses[ol.LicenseIdentifier]; !ok {

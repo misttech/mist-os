@@ -125,6 +125,11 @@ func (f *File) Search() error {
 // TODO(fxbug.dev/125736): Remove all setters.
 func (f *File) SetURL(url string) { f.url = url }
 
+// TODO: Remove once bazel-based license collection is enabled.
+func (f *File) AttemptedFuchsiaGoogleSourceURL() string {
+	return fmt.Sprintf("https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/%s", f.RelPath())
+}
+
 // Getters
 func (f *File) Name() string        { return f.name }
 func (f *File) AbsPath() string     { return f.absPath }

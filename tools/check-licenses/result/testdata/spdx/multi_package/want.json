@@ -67,7 +67,8 @@
       "licenseId": "LicenseRef-filedata-12345",
       "extractedText": "Example License Text for PackageA",
       "seeAlsos": [
-        "www.example.com"
+        "www.example.com",
+        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
       ]
     }
   ],
