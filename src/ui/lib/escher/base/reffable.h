@@ -7,6 +7,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <atomic>
 #include <cstdint>
 
 #include "src/lib/fxl/memory/ref_ptr.h"
@@ -14,20 +15,15 @@
 
 namespace escher {
 
-// Reffable is a non-threadsafe ref-counted base class that is suitable for use
-// with fxl::RefPtr.  It provides a virtual OnZeroRefCount() method that
-// subclasses can use to avoid immediate destruction when their ref-count
-// becomes zero.
+// Reffable is a threadsafe ref-counted base class that is suitable for use with fxl::RefPtr.
+// It provides a virtual OnZeroRefCount() method that subclasses can override to avoid immediate
+// destruction when their ref-count becomes zero.
 //
 // Use this class similarly to fxl::RefCountedThreadSafe.  For example, instead
 // of:
 //    class Foo : public RefCountedThreadSafe<Foo> { ...
 // simply say:
 //    class Foo : public Reffable { ...
-//
-// Other than thread-safety, the main difference from RefCountedThreadSafe is
-// that Reffable allows subclasses to defer destruction by overriding
-// OnZeroRefCount(); see below.
 class Reffable {
  public:
   Reffable() = default;
@@ -64,7 +60,7 @@ class Reffable {
     ++ref_count_;
   }
 
-  mutable uint32_t ref_count_ = 1;
+  mutable std::atomic_int ref_count_ = 1;
 
 #ifndef NDEBUG
   // Called by fxl::RefPtr, but only in debug builds.
