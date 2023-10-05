@@ -9,21 +9,23 @@
 #include <zxtest/zxtest.h>
 
 TEST(ThrdSetZxProcessTest, SetBasic) {
+  EXPECT_EQ(zx_process_self(), thrd_get_zx_process());
+
   zx_handle_t previous = thrd_set_zx_process(ZX_HANDLE_INVALID);
   auto reset_handle = fit::defer([previous]() { thrd_set_zx_process(previous); });
 
   EXPECT_EQ(previous, zx_process_self());
+  EXPECT_EQ(ZX_HANDLE_INVALID, thrd_get_zx_process());
 
   previous = thrd_set_zx_process(zx_process_self());
   EXPECT_EQ(previous, ZX_HANDLE_INVALID);
+  EXPECT_EQ(zx_process_self(), thrd_get_zx_process());
 }
 
 TEST(ThrdSetZxProcessTest, SetInvalidAndCreate) {
   // Create a new thread with the default process handle.
   thrd_t t1;
-  ASSERT_EQ(thrd_create(
-                &t1, [](void* arg) { return 0; }, nullptr),
-            thrd_success);
+  ASSERT_EQ(thrd_create(&t1, [](void* arg) { return 0; }, nullptr), thrd_success);
 
   int result;
   ASSERT_EQ(thrd_join(t1, &result), thrd_success);
@@ -33,7 +35,5 @@ TEST(ThrdSetZxProcessTest, SetInvalidAndCreate) {
   auto reset_handle = fit::defer([previous]() { thrd_set_zx_process(previous); });
 
   thrd_t t2;
-  ASSERT_EQ(thrd_create(
-                &t2, [](void* arg) { return 0; }, nullptr),
-            thrd_nomem);
+  ASSERT_EQ(thrd_create(&t2, [](void* arg) { return 0; }, nullptr), thrd_nomem);
 }

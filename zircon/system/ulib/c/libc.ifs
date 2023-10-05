@@ -1278,6 +1278,7 @@ Symbols:
   - { Name: thrd_equal, Type: Func, Weak: true }
   - { Name: thrd_exit, Type: Func }
   - { Name: thrd_get_zx_handle, Type: Func }
+  - { Name: thrd_get_zx_process, Type: Func }
   - { Name: thrd_join, Type: Func }
   - { Name: thrd_set_zx_process, Type: Func }
   - { Name: thrd_sleep, Type: Func }

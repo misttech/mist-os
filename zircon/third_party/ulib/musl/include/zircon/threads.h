@@ -28,6 +28,13 @@ zx_handle_t thrd_get_zx_handle(thrd_t t);
 // Returns the previously set process handle.
 zx_handle_t thrd_set_zx_process(zx_handle_t proc_handle);
 
+// Returns the same handle as thrd_set_zx_process without modifying the calling thread's process
+// handle.
+//
+// This does not transfer ownership of the current handle. The caller is responsible for only using
+// the returned handle while it remains valid.
+zx_handle_t thrd_get_zx_process(void);
+
 // Converts a threads.h-style status value to an |zx_status_t|.
 static inline zx_status_t __PURE thrd_status_to_zx_status(int thrd_status) {
   switch (thrd_status) {
