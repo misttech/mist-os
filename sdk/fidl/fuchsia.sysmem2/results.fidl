@@ -29,8 +29,15 @@ type VmoBuffer = resource table {
     /// cases that |vmo| can be un-set.
     //
     // TODO: finish deprecating / fail in sysmemm v1, remove from v2, and allow
-    // re-use of ordinal 6 because nothing actually used aux_vmo in sysmem2.
+    // re-use of ordinal because nothing actually used aux_vmo in sysmem2.
     3: aux_vmo zx.Handle:VMO;
+
+    /// This field is set iff the |vmo| is a sysmem weak VMO handle. The client
+    /// must keep |close_weak_asap| around for as long as |vmo|, and must notice
+    /// ZX_EVENTPAIR_PEER_CLOSED; if that signal occurs, the client must close
+    /// |vmo| asap. Not doing so is considered a VMO leak and in that case
+    /// sysmem will eventually complain loudly via syslog (currently 5s later).
+    4: close_weak_asap zx.Handle:EVENTPAIR;
 };
 
 const MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS uint32 = 128;

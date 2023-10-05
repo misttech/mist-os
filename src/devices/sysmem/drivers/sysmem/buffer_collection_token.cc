@@ -429,6 +429,10 @@ void BufferCollectionToken::CombinedTokenServer::GetBufferCollectionIdV2(
       completer);
 }
 
+void BufferCollectionToken::CombinedTokenServer::SetWeakV2(SetWeakV2Completer::Sync& completer) {
+  parent_.SetWeakImplV2(completer);
+}
+
 BufferCollectionToken::BufferCollectionToken(
     fbl::RefPtr<LogicalBufferCollection> logical_buffer_collection_param,
     NodeProperties* new_node_properties, const TokenServerEnd& server_end)

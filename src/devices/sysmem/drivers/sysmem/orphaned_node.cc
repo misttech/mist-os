@@ -21,6 +21,8 @@ OrphanedNode& OrphanedNode::EmplaceInTree(
       fbl::AdoptRef(new OrphanedNode(std::move(logical_buffer_collection), node_properties));
   auto orphaned_node_ptr = orphaned_node.get();
   node_properties->SetNode(orphaned_node);
+  // An OrphanedNode is always weak.
+  node_properties->SetWeak();
   return *orphaned_node_ptr;
 }
 

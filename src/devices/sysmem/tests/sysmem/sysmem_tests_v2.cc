@@ -40,6 +40,11 @@ using SharedGroupV2 = std::shared_ptr<GroupV2>;
 zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service_v2();
 zx_status_t verify_connectivity_v2(fidl::SyncClient<fuchsia_sysmem2::Allocator>& allocator);
 
+#define DBG_LINE()                  \
+  do {                              \
+    printf("line: %d\n", __LINE__); \
+  } while (0)
+
 zx::result<fidl::SyncClient<fuchsia_sysmem2::Allocator>> connect_to_sysmem_service_v2() {
   auto client_end = component::Connect<fuchsia_sysmem2::Allocator>();
   EXPECT_OK(client_end);
@@ -5649,38 +5654,381 @@ TEST(Sysmem, GetBufferCollectionId) {
   ASSERT_EQ(token_buffer_collection_id, *info.buffer_collection_id());
 }
 
-TEST(Sysmem, GetVmoInfo_FromStrongVmo) {
+TEST(Sysmem, GetVmoInfo) {
   constexpr uint32_t kBufferCount = 10;
   auto token = create_initial_token_v2();
+  auto weak_token = create_token_under_token_v2(token);
+  ASSERT_TRUE(weak_token->SetWeak().is_ok());
   auto get_buffer_collection_id_result = token->GetBufferCollectionId();
   ASSERT_TRUE(get_buffer_collection_id_result.is_ok());
   uint64_t buffer_collection_id = *get_buffer_collection_id_result->buffer_collection_id();
   auto collection = convert_token_to_collection_v2(std::move(token));
+  auto weak_collection = convert_token_to_collection_v2(std::move(weak_token));
   set_min_camping_constraints_v2(collection, kBufferCount);
+  set_min_camping_constraints_v2(weak_collection, 0);
+
   auto wait_result = collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(wait_result.is_ok());
   auto collection_info = std::move(*wait_result->buffer_collection_info());
+
+  ASSERT_TRUE(weak_collection->SetWeakOk().is_ok());
+
+  auto weak_wait_result = weak_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(weak_wait_result.is_ok());
+  auto weak_collection_info = std::move(*weak_wait_result->buffer_collection_info());
+
   auto sysmem_result = connect_to_sysmem_service_v2();
   ASSERT_TRUE(sysmem_result.is_ok());
   auto sysmem = std::move(sysmem_result.value());
   for (uint32_t buffer_index = 0; buffer_index < kBufferCount; ++buffer_index) {
-    zx::vmo dup_vmo;
+    zx::vmo dup_strong_vmo;
     ASSERT_OK(collection_info.buffers()
                   ->at(buffer_index)
                   .vmo()
                   .value()
-                  .duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo));
+                  .duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_strong_vmo));
     fuchsia_sysmem2::AllocatorGetVmoInfoRequest get_vmo_info_request;
-    get_vmo_info_request.vmo() = std::move(dup_vmo);
+    get_vmo_info_request.vmo() = std::move(dup_strong_vmo);
     auto get_vmo_info_result = sysmem->GetVmoInfo(std::move(get_vmo_info_request));
     ASSERT_TRUE(get_vmo_info_result.is_ok());
     auto vmo_info = std::move(get_vmo_info_result.value());
     ASSERT_EQ(buffer_collection_id, vmo_info.buffer_collection_id());
     ASSERT_EQ(buffer_index, vmo_info.buffer_index());
-    // TODO(b/284073556): Assert !close_weak_asap.has_value() when close_weak_asap exists
+    ASSERT_FALSE(vmo_info.close_weak_asap().has_value());
+
+    zx::vmo dup_weak_vmo;
+    ASSERT_OK(weak_collection_info.buffers()
+                  ->at(buffer_index)
+                  .vmo()
+                  .value()
+                  .duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_weak_vmo));
+    fuchsia_sysmem2::AllocatorGetVmoInfoRequest get_vmo_info_request_2;
+    get_vmo_info_request_2.vmo() = std::move(dup_weak_vmo);
+    auto weak_get_vmo_info_result = sysmem->GetVmoInfo(std::move(get_vmo_info_request_2));
+    ASSERT_TRUE(weak_get_vmo_info_result.is_ok());
+    auto weak_vmo_info = std::move(weak_get_vmo_info_result.value());
+    ASSERT_EQ(buffer_collection_id, weak_vmo_info.buffer_collection_id());
+    ASSERT_EQ(buffer_index, weak_vmo_info.buffer_index());
+    ASSERT_TRUE(weak_vmo_info.close_weak_asap().has_value());
   }
 }
 
-// TODO(b/284073556): Add GetVmoInfo_FromWeakVmo along with sysmem weak VMO CL; also assert that
-// close_weak_asap exists and that it also gets set when it should (preference not to just check
-// that koid matches since that's not guaranteed to remain matching in future).
+TEST(Sysmem, Weak_SetWeakOk_NeverSentFails) {
+  // SetWeakOk never sent means WaitForAllBuffersAllocated should fail if the collection is weak.
+  // However, since SetWeak implies SetWeakOk, to test this we have to SetWeak via a parent Node.
+  auto parent_token = create_initial_token_v2();
+  // We need at least one strong Node until allocation is done, to avoid all-weak causing zero
+  // strong VMOs causing LogicalBufferCollection failure. This node could get VMOs and then become
+  // weak without breaking this test, but that aspect is covered in a different test.
+  auto strong_child_token = create_token_under_token_v2(parent_token);
+  auto set_weak_result = parent_token->SetWeak();
+  ASSERT_TRUE(set_weak_result.is_ok());
+  auto weak_child_token = create_token_under_token_v2(parent_token);
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto weak_child_collection = convert_token_to_collection_v2(std::move(weak_child_token));
+  set_picky_constraints_v2(parent_collection, zx_system_get_page_size());
+  set_picky_constraints_v2(weak_child_collection, zx_system_get_page_size());
+  ASSERT_TRUE(parent_collection->Sync().is_ok());
+  ASSERT_TRUE(weak_child_collection->Sync().is_ok());
+  auto child_result = weak_child_collection->WaitForAllBuffersAllocated();
+  // Failure expected because SetWeakOk nor SetWeak were ever sent via child_collection, but
+  // child_collection is weak because parent was weak at the time the child was created.
+  ASSERT_FALSE(child_result.is_ok());
+  // We never did anything with strong_child_token, to verify that WaitForAllBuffersAllocated on
+  // a weak collection without SetWeakOk fails even if not all Nodes have become ready for
+  // allocation yet (failure can and should be before any actual waiting).
+}
+
+TEST(Sysmem, Weak_SetWeakOk_SentSucceeds) {
+  auto parent_token = create_initial_token_v2();
+  // We need at least one strong Node until initial allocation
+  auto strong_child_token = create_token_under_token_v2(parent_token);
+  auto set_weak_result = parent_token->SetWeak();
+  ASSERT_TRUE(set_weak_result.is_ok());
+  auto child_token = create_token_under_token_v2(parent_token);
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  auto strong_child_collection = convert_token_to_collection_v2(std::move(strong_child_token));
+  set_picky_constraints_v2(parent_collection, zx_system_get_page_size());
+  set_picky_constraints_v2(child_collection, zx_system_get_page_size());
+  set_picky_constraints_v2(strong_child_collection, zx_system_get_page_size());
+  ASSERT_TRUE(parent_collection->Sync().is_ok());
+  ASSERT_TRUE(child_collection->Sync().is_ok());
+  ASSERT_TRUE(strong_child_collection->Sync().is_ok());
+  // sending SetWeakOk as late as allowed
+  ASSERT_TRUE(child_collection->SetWeakOk().is_ok());
+  auto child_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_result.is_ok());
+}
+
+TEST(Sysmem, Weak_SetWeakOk_TooLateFails) {
+  auto token = create_initial_token_v2();
+  auto collection = convert_token_to_collection_v2(std::move(token));
+  set_picky_constraints_v2(collection, zx_system_get_page_size());
+  auto result = collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(result.is_ok());
+  // Sending SetWeakOk one-way message works, but the Sync call after doesn't, because the server
+  // fails the collection on reception of SetWeakOk since it arrives after
+  // WaitForAllBuffersAllocated.
+  ASSERT_TRUE(collection->SetWeakOk().is_ok());
+  ASSERT_FALSE(collection->Sync().is_ok());
+}
+
+TEST(Sysmem, Weak_SetWeak_SparseBufferSet) {
+  constexpr uint32_t kBufferCount = 10;
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+  auto set_weak_result = child_token->SetWeak();
+  ASSERT_TRUE(set_weak_result.is_ok());
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  set_min_camping_constraints_v2(parent_collection, 0);
+  set_min_camping_constraints_v2(child_collection, kBufferCount);
+  ASSERT_TRUE(parent_collection->Sync().is_ok());
+  ASSERT_TRUE(child_collection->Sync().is_ok());
+  auto parent_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_result.is_ok());
+  auto parent_info = std::move(parent_result->buffer_collection_info().value());
+  ASSERT_EQ(kBufferCount, parent_info.buffers()->size());
+  zx::eventpair dropped_2_client;
+  zx::eventpair dropped_2_server;
+  zx_status_t create_status = zx::eventpair::create(0, &dropped_2_client, &dropped_2_server);
+  ASSERT_EQ(ZX_OK, create_status);
+  fuchsia_sysmem2::BufferCollectionAttachLifetimeTrackingRequest request;
+  request.server_end() = std::move(dropped_2_server);
+  request.buffers_remaining() = kBufferCount - 2;
+  auto attach_result = parent_collection->AttachLifetimeTracking(std::move(request));
+  ASSERT_TRUE(attach_result.is_ok());
+  parent_info.buffers()->at(0).vmo().reset();
+  parent_info.buffers()->at(kBufferCount - 1).vmo().reset();
+  // parent_collection is a strong Node, so keeps the logical buffers alive
+  zx_signals_t pending_signals = 0;
+  zx_status_t wait_status = dropped_2_client.wait_one(
+      ZX_EVENTPAIR_PEER_CLOSED, zx::deadline_after(zx::msec(50)), &pending_signals);
+  ASSERT_EQ(ZX_ERR_TIMED_OUT, wait_status);
+  // close the parent_collection strong Node to let the first and last buffer get cleaned up in
+  // sysmem
+  auto close_result = parent_collection->Close();
+  ASSERT_TRUE(close_result.is_ok());
+  parent_collection.TakeClientEnd();
+  pending_signals = 0;
+  wait_status =
+      dropped_2_client.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite(), &pending_signals);
+  ASSERT_EQ(ZX_OK, wait_status);
+  ASSERT_TRUE(!!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED));
+  // sending SetWeakOk as late as allowed (just before WaitForAllBuffersAllocated)
+  ASSERT_TRUE(child_collection->SetWeakOk().is_ok());
+  auto child_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_result.is_ok());
+  auto child_info = std::move(child_result->buffer_collection_info().value());
+  // first and last buffer expected to be absent
+  auto& first_buffer = child_info.buffers()->at(0);
+  ASSERT_FALSE(first_buffer.vmo().has_value());
+  ASSERT_FALSE(first_buffer.close_weak_asap().has_value());
+  auto& last_buffer = child_info.buffers()->at(kBufferCount - 1);
+  ASSERT_FALSE(last_buffer.vmo().has_value());
+  ASSERT_FALSE(last_buffer.close_weak_asap().has_value());
+  // all other buffers expected to be present, along with close_weak_asap client ends
+  for (uint32_t buffer_index = 1; buffer_index < kBufferCount - 1; ++buffer_index) {
+    auto& buffer = child_info.buffers()->at(buffer_index);
+    ASSERT_TRUE(buffer.vmo().has_value());
+    ASSERT_TRUE(buffer.vmo()->is_valid());
+    ASSERT_TRUE(buffer.close_weak_asap().has_value());
+    ASSERT_TRUE(buffer.close_weak_asap()->is_valid());
+  }
+}
+
+TEST(Sysmem, Weak_ZeroStrongNodesBeforeReadyForAllocation_Fails) {
+  // In the "pass" case we won't wait anywhere near this long.
+  constexpr zx::duration kWaitDuration = zx::sec(10);
+  // The expected failure is allowed to be async, so we need to wait for the failure to happen while
+  // a weak Node is preventing allocation by not being ready yet.
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+  ASSERT_TRUE(child_token->SetWeak().is_ok());
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  ASSERT_TRUE(child_collection->Sync().is_ok());
+  ASSERT_TRUE(parent_token->Close().is_ok());
+  // Closing the last strong Node before initial allocation is expected to cause
+  // LogicalBufferCollection failure. This can be thought of as essentially equivalent to how
+  // closing the last stromg VMO causes LogicalBufferCollection failure, since at this point there
+  // can be no strong VMOs yet. The sysmem internal mechanism differs for this case so we test it
+  // separately.
+  parent_token.TakeClientEnd();
+  const zx::time start_wait = zx::clock::get_monotonic();
+  while (true) {
+    // give up after kWaitDuration
+    ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+    if (child_collection->Sync().is_ok()) {
+      // closing strong parent_token takes effect async; try again
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      continue;
+    } else {
+      // expected failure seen - pass
+      break;
+    }
+  }
+}
+
+TEST(Sysmem, Weak_CloseWeakAsap_Signaled) {
+  constexpr uint32_t kBufferCount = 10;
+  constexpr zx::duration kWaitDuration = zx::sec(10);
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  set_min_camping_constraints_v2(parent_collection, 0);
+  auto set_weak_result = child_collection->SetWeak();
+  ASSERT_TRUE(set_weak_result.is_ok());
+  set_min_camping_constraints_v2(child_collection, kBufferCount);
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto parent_info = std::move(parent_wait_result.value().buffer_collection_info().value());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+  auto child_info = std::move(child_wait_result.value().buffer_collection_info().value());
+  ASSERT_EQ(parent_info.buffers()->size(), child_info.buffers()->size());
+
+  for (uint32_t buffer_index = 0; buffer_index < parent_info.buffers()->size(); ++buffer_index) {
+    auto& parent_buffer = parent_info.buffers()->at(buffer_index);
+    EXPECT_TRUE(parent_buffer.vmo().has_value());
+    EXPECT_TRUE(parent_buffer.vmo()->is_valid());
+    // this is a strong VMO, so no close_weak_asap
+    EXPECT_FALSE(parent_buffer.close_weak_asap().has_value());
+
+    auto& child_buffer = child_info.buffers()->at(buffer_index);
+    EXPECT_TRUE(child_buffer.vmo().has_value());
+    EXPECT_TRUE(child_buffer.vmo()->is_valid());
+    // this is a weak VMO, so close_weak_asap present
+    EXPECT_TRUE(child_buffer.close_weak_asap().has_value());
+    EXPECT_TRUE(child_buffer.close_weak_asap()->is_valid());
+  }
+
+  // drop the strong parent Node, which leaves only the parent_info holding the only strong VMOs
+  ASSERT_TRUE(parent_collection->Close().is_ok());
+  parent_collection.TakeClientEnd();
+  // give a moment for LogicalBufferCollection to fail, in case it incorrectly fails at this point
+  zx::nanosleep(zx::deadline_after(zx::msec(100)));
+  // The LogicalBufferCollection isn't failed at this point
+  ASSERT_TRUE(child_collection->Sync().is_ok());
+  auto is_signaled = [&child_info](uint32_t buffer_index, int line) -> bool {
+    auto& buffer = child_info.buffers()->at(buffer_index);
+    zx_signals_t pending_signals = 0;
+    zx_status_t wait_status = buffer.close_weak_asap()->wait_one(
+        ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &pending_signals);
+    ZX_ASSERT_MSG(wait_status == ZX_OK || wait_status == ZX_ERR_TIMED_OUT,
+                  "wait_status: %d line: %d", wait_status, line);
+    return !!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED);
+  };
+  for (uint32_t buffer_index = 0; buffer_index < child_info.buffers()->size(); ++buffer_index) {
+    EXPECT_FALSE(is_signaled(buffer_index, __LINE__));
+  }
+
+  zx::eventpair sysmem_parent_vmos_gone_client;
+  zx::eventpair sysmem_parent_vmos_gone_server;
+  zx_status_t create_status =
+      zx::eventpair::create(0, &sysmem_parent_vmos_gone_client, &sysmem_parent_vmos_gone_server);
+  ASSERT_EQ(ZX_OK, create_status);
+  fuchsia_sysmem2::BufferCollectionAttachLifetimeTrackingRequest attach_request;
+  attach_request.server_end() = std::move(sysmem_parent_vmos_gone_server);
+  attach_request.buffers_remaining() = 0;
+  ASSERT_TRUE(child_collection->AttachLifetimeTracking(std::move(attach_request)).is_ok());
+
+  for (uint32_t buffer_index = 0; buffer_index < child_info.buffers()->size(); ++buffer_index) {
+    // close 1 strong VMO
+    parent_info.buffers()->at(buffer_index).vmo().reset();
+    zx::time start_wait = zx::clock::get_monotonic();
+    while (true) {
+      ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+      if (!is_signaled(buffer_index, __LINE__)) {
+        zx::nanosleep(zx::deadline_after(zx::msec(10)));
+        // not signaled yet; try again until kWaitDuration elapsed
+        continue;
+      }
+      // signaled as expected
+      break;
+    }
+    if (buffer_index < child_info.buffers()->size() - 1) {
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      // LogicalBufferCollection not failed since at least one strong VMO remains
+      ASSERT_TRUE(child_collection->Sync().is_ok());
+    }
+  }
+
+  zx::time start_wait = zx::clock::get_monotonic();
+  while (true) {
+    ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+    if (child_collection->Sync().is_ok()) {
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      continue;
+    }
+    // closing last strong VMO caused LogicalBufferCollection failure as expected
+    break;
+  }
+
+  // sysmem hasn't cleaned up all its parent VMOs yet because the weak VMOs have not yet been
+  // closed
+  zx::nanosleep(zx::deadline_after(zx::msec(10)));
+  zx_signals_t pending_signals = 0;
+  zx_status_t wait_status = sysmem_parent_vmos_gone_client.wait_one(
+      ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &pending_signals);
+  ASSERT_TRUE(wait_status == ZX_OK || wait_status == ZX_ERR_TIMED_OUT);
+  ASSERT_FALSE(!!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED));
+
+  // close all but one weak VMO
+  for (uint32_t buffer_index = 0; buffer_index < child_info.buffers()->size() - 1; ++buffer_index) {
+    auto& buffer = child_info.buffers()->at(buffer_index);
+    buffer.vmo().reset();
+  }
+
+  // sysmem hasn't cleaned up all its parent VMOs yet because the weak VMOs have not yet been
+  // closed
+  zx::nanosleep(zx::deadline_after(zx::msec(10)));
+  pending_signals = 0;
+  wait_status = sysmem_parent_vmos_gone_client.wait_one(
+      ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &pending_signals);
+  ASSERT_TRUE(wait_status == ZX_OK || wait_status == ZX_ERR_TIMED_OUT);
+  ASSERT_FALSE(!!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED));
+
+  child_info.buffers()->at(child_info.buffers()->size() - 1).vmo().reset();
+  start_wait = zx::clock::get_monotonic();
+  while (true) {
+    ASSERT_TRUE(zx::clock::get_monotonic() < start_wait + kWaitDuration);
+    pending_signals = 0;
+    wait_status = sysmem_parent_vmos_gone_client.wait_one(
+        ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &pending_signals);
+    ASSERT_TRUE(wait_status == ZX_OK || wait_status == ZX_ERR_TIMED_OUT);
+    if (!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED)) {
+      zx::nanosleep(zx::deadline_after(zx::msec(10)));
+      continue;
+    }
+    // sysmem cleaned up parent VMOs as expected
+    break;
+  }
+}
+
+TEST(Sysmem, LogWeakLeak_DoesNotCrashSysmem) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+  auto set_weak_result = child_token->SetWeak();
+  ASSERT_TRUE(set_weak_result.is_ok());
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+  set_min_camping_constraints_v2(parent_collection, 0);
+  set_min_camping_constraints_v2(child_collection, 1);
+  auto set_weak_ok_result = child_collection->SetWeakOk();
+  ASSERT_TRUE(set_weak_ok_result.is_ok());
+  auto wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(wait_result.is_ok());
+  ASSERT_EQ(1, wait_result->buffer_collection_info()->buffers()->size());
+  auto& buffer = wait_result->buffer_collection_info()->buffers()->at(0);
+  ASSERT_TRUE(buffer.vmo().has_value());
+  ASSERT_TRUE(buffer.close_weak_asap().has_value());
+  auto child_info = std::move(wait_result->buffer_collection_info().value());
+  parent_collection.TakeClientEnd();
+  // Only thing keeping LogicalBufferCollection alive is child_info.buffers()->at(0).vmo() which is
+  // a weak VMO. Sysmem will complain loudly to the log in 5 seconds.
+  zx::nanosleep(zx::deadline_after(zx::sec(6)));
+  // make sure sysmem didn't crash
+  auto extra_token = create_initial_token_v2();
+}

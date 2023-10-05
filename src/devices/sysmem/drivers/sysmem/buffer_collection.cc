@@ -263,13 +263,49 @@ void BufferCollection::V2::SetConstraints(SetConstraintsRequest& request,
 }
 
 template <typename Completer>
-bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(Completer& completer,
-                                                              trace_async_id_t* out_event_id) {
+bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(
+    bool enforce_set_constraints_before_wait, Completer& completer,
+    trace_async_id_t* out_event_id) {
   if (is_done_) {
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
              "BufferCollection::WaitForAllBuffersAllocated() when already is_done_");
     return false;
   }
+  if (!is_set_constraints_seen_) {
+    if (enforce_set_constraints_before_wait) {
+      // This is enforced for sysmem2, but not for sysmem(1), due to legacy missing check in sysmem1
+      // timeframe.
+      logical_buffer_collection().LogClientError(
+          FROM_HERE, &node_properties(),
+          "#############################################################################################");
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+               "WaitForAllBuffersAllocated before SetConstraints not permitted (in sysmem2)");
+      return false;
+    } else {
+      // TODO(b/301844809): The referenced bug has the known client(s) that trigger this log output.
+      // Currently this logs at INFO to avoid annoying test runs.
+      logical_buffer_collection().LogClientInfo(
+          FROM_HERE, &node_properties(),
+          "#############################################################################################");
+      logical_buffer_collection().LogClientInfo(
+          FROM_HERE, &node_properties(),
+          "WaitForAllBuffersAllocated before SetConstraints not permitted in sysmem2; please fix client.");
+      logical_buffer_collection().LogClientInfo(
+          FROM_HERE, &node_properties(),
+          "WaitForAllBuffersAllocated before SetConstraints - allowing because this channel is sysmem(1)");
+      logical_buffer_collection().LogClientInfo(
+          FROM_HERE, &node_properties(),
+          "#############################################################################################");
+    }
+  }
+  if (!is_weak_ok_ && node_properties().is_weak()) {
+    // If this failure happens, the client should make sure to also pay attention to close_weak_asap
+    // ZX_EVENTPAIR_PEER_CLOSED, in addition to sending SetWeakOk().
+    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+             "weak BufferCollection needs SetWeakOk before WaitForAllBuffersAllocated");
+    return false;
+  }
+  wait_for_buffers_seen_ = true;
   trace_async_id_t current_event_id = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("gfx", "BufferCollection::WaitForAllBuffersAllocated async", current_event_id,
                     "this", this, "logical_buffer_collection", &logical_buffer_collection());
@@ -283,7 +319,7 @@ void BufferCollection::V1::WaitForBuffersAllocated(
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
 
   trace_async_id_t current_event_id;
-  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(completer, &current_event_id)) {
+  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(false, completer, &current_event_id)) {
     return;
   }
 
@@ -300,7 +336,7 @@ void BufferCollection::V2::WaitForAllBuffersAllocated(
                  "logical_buffer_collection", &parent_.logical_buffer_collection());
 
   trace_async_id_t current_event_id = TRACE_NONCE();
-  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(completer, &current_event_id)) {
+  if (!parent_.CommonWaitForAllBuffersAllocatedStage1(true, completer, &current_event_id)) {
     return;
   }
 
@@ -396,6 +432,15 @@ bool BufferCollection::CommonAttachTokenStage1(uint32_t rights_attenuation_mask,
   if (rights_attenuation_mask == 0) {
     FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
              "rights_attenuation_mask of 0 is forbidden");
+    return false;
+  }
+
+  // The child created by NewChild() below will be strong not weak because of this check. Any
+  // SetWeak later on a descendant will fail a different check.
+  if (node_properties().is_weak()) {
+    // If this is needed in a real scenario, please reach out.
+    FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+             "AttachToken on weak collection not (yet?) supported");
     return false;
   }
 
@@ -508,6 +553,19 @@ void BufferCollection::V2::AttachLifetimeTracking(
                                        request.buffers_remaining().value(), completer);
 }
 
+void BufferCollection::V2::SetWeakOk(SetWeakOkCompleter::Sync& completer) {
+  if (parent_.is_done_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeakOk() when already is_done_");
+    return;
+  }
+  if (parent_.wait_for_buffers_seen_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "SetWeakOk() after WaitForAllBuffersAllocated()");
+    return;
+  }
+  parent_.is_weak_ok_ = true;
+}
+
 void BufferCollection::V1::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
   parent_.SetVerboseLoggingImpl(completer);
 }
@@ -536,6 +594,12 @@ void BufferCollection::V2::IsAlternateFor(IsAlternateForRequest& request,
 
 void BufferCollection::V2::GetBufferCollectionId(GetBufferCollectionIdCompleter::Sync& completer) {
   parent_.GetBufferCollectionIdImplV2(completer);
+}
+
+void BufferCollection::V2::SetWeak(SetWeakCompleter::Sync& completer) {
+  parent_.SetWeakImplV2(completer);
+  // SetWeak() implies SetWeakOk().
+  parent_.is_weak_ok_ = true;
 }
 
 void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }
@@ -625,8 +689,35 @@ void BufferCollection::FailSync(Location location, Completer& completer, zx_stat
 
 fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneResultForSendingV2(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
-  auto clone_result = sysmem::V2CloneBufferCollectionInfo(
-      buffer_collection_info, GetClientVmoRights(), GetClientAuxVmoRights());
+  uint32_t vmo_rights_mask = GetClientVmoRights();
+  uint32_t aux_vmo_rights_mask = GetClientAuxVmoRights();
+  ZX_DEBUG_ASSERT(has_constraints());
+  bool is_usage = constraints().usage().has_value() && IsAnyUsage(constraints().usage().value());
+  if (!is_usage || node_properties().is_weak()) {
+    // By specifying 0 for rights, the V2CloneBufferCollectionInfo() below won't dup any VMO handles
+    // (and won't create any child VMOs).
+    vmo_rights_mask = 0;
+  }
+  if (!is_usage) {
+    aux_vmo_rights_mask = 0;
+  }
+#if ZX_DEBUG_ASSERT_IMPLEMENTED
+  {
+    if (!node_properties().is_weak()) {
+      bool found_missing = false;
+      for (auto& buffer : *buffer_collection_info.buffers()) {
+        // Because this node isn't weak, this node is owning all these sysmem strong VMOs.
+        if (!buffer.vmo().has_value() || !buffer.vmo()->is_valid()) {
+          found_missing = true;
+          break;
+        }
+      }
+      ZX_DEBUG_ASSERT(!found_missing);
+    }
+  }
+#endif
+  auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, vmo_rights_mask,
+                                                          aux_vmo_rights_mask);
   if (!clone_result.is_ok()) {
     FailAsync(FROM_HERE, clone_result.error(),
               "CloneResultForSendingV1() V2CloneBufferCollectionInfo() failed - status: %d",
@@ -634,27 +725,61 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
     return fpromise::error();
   }
   auto v2_b = clone_result.take_value();
-  ZX_DEBUG_ASSERT(has_constraints());
-
-  if (!constraints().usage().has_value() || !IsAnyUsage(constraints().usage().value())) {
-    // No VMO handles should be sent to the client in this case.
-    if (v2_b.buffers().has_value()) {
-      for (auto& vmo_buffer : v2_b.buffers().value()) {
-        if (vmo_buffer.vmo().has_value()) {
-          vmo_buffer.vmo().reset();
-        }
-        if (vmo_buffer.aux_vmo().has_value()) {
-          vmo_buffer.aux_vmo().reset();
-        }
+  if (is_usage && node_properties().is_weak()) {
+    // replace no-vmo VmoBuffer(s) with VmoBuffer(s) having both a sysmem weak VMO handle and a
+    // close_weak_asap client end
+    for (uint32_t buffer_index = 0; buffer_index < buffer_collection_info.buffers()->size();
+         ++buffer_index) {
+      fuchsia_sysmem2::VmoBuffer vmo_buffer = std::move(v2_b.buffers()->at(buffer_index));
+      // If zero strong VMO handles remain, this will be success but with no VMO handle.
+      auto weak_vmo_result = logical_buffer_collection().CreateWeakVmo(
+          buffer_index, node_properties().client_debug_info());
+      if (weak_vmo_result.is_error()) {
+        FailAsync(FROM_HERE, weak_vmo_result.error_value(), "CreateWeakVmo() failed");
+        return fpromise::error();
       }
+      // This is moving std::optional<zx::vmo>; if zero strong VMO handles remain, the moved-into
+      // optional will be !has_value().
+      vmo_buffer.vmo() = std::move(weak_vmo_result.value());
+      auto close_weak_asap = logical_buffer_collection().DupCloseWeakAsapClientEnd(buffer_index);
+      if (close_weak_asap.is_error()) {
+        FailAsync(FROM_HERE, close_weak_asap.error_value(), "DupCloseWeakAsapClientEnd() failed");
+        return fpromise::error();
+      }
+      // This is moving std::optional<zx::eventpair>; if zero strong VMO handles remain, the
+      // moved-into optional will be !has_value().
+      vmo_buffer.close_weak_asap() = std::move(close_weak_asap.value());
+      // If we're giving out a sysmem weak VMO handle then we're also giving out a close_weak_asap,
+      // since any client holding a sysmem weak VMO handle needs to know when to close that handle
+      // asap.
+      ZX_DEBUG_ASSERT(vmo_buffer.vmo().has_value() == vmo_buffer.close_weak_asap().has_value());
+      // We'll move any aux_vmo separately below.
+      auto attenuated_vmo_buffer_result =
+          sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights(), 0);
+      if (attenuated_vmo_buffer_result.is_error()) {
+        FailAsync(FROM_HERE, attenuated_vmo_buffer_result.error(), "V2CloneVmoBuffer failed");
+        return fpromise::error();
+      }
+      auto& attenuated_vmo_buffer = attenuated_vmo_buffer_result.value();
+      if (vmo_buffer.aux_vmo().has_value()) {
+        // There's no need to send this throguh V2CloneVmoBuffer() a second time, so just move; this
+        // will go away once support for aux VMOs is removed.
+        attenuated_vmo_buffer.aux_vmo() = std::move(vmo_buffer.aux_vmo());
+      }
+      v2_b.buffers()->at(buffer_index) = std::move(attenuated_vmo_buffer);
     }
   }
-
   return fpromise::ok(std::move(v2_b));
 }
 
 fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneResultForSendingV1(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+  if (node_properties().is_weak()) {
+    // To avoid this failure, consider migrating to sysmem2 (a sysmem (1) token client_end can be
+    // used directly as a sysmem2 token).
+    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS, "sysmem v1 can't do weak (1)");
+    return fpromise::error();
+  }
   auto v2_result = CloneResultForSendingV2(buffer_collection_info);
   if (!v2_result.is_ok()) {
     // FailAsync() already called.
@@ -672,6 +797,12 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneR
 fpromise::result<fuchsia_sysmem::BufferCollectionInfo2>
 BufferCollection::CloneAuxBuffersResultForSendingV1(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
+  if (node_properties().is_weak()) {
+    // To avoid this failure, consider migrating to sysmem2 (any token client_end can be used as
+    // sysmem2), but be aware that aux buffers will be going away in sysmem2.
+    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS, "sysmem v1 can't do weak (2)");
+    return fpromise::error();
+  }
   auto v2_result = CloneResultForSendingV2(buffer_collection_info);
   if (!v2_result.is_ok()) {
     // FailAsync() already called.
