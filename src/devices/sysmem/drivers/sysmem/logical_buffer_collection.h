@@ -181,11 +181,6 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
       Device* parent_device, zx::channel buffer_collection_token,
       const ClientDebugInfo* client_debug_info, const char* fidl_message_name);
 
-  fit::result<zx_status_t, std::optional<zx::vmo>> CreateWeakVmo(
-      uint32_t buffer_index, const ClientDebugInfo& client_debug_info);
-  fit::result<zx_status_t, std::optional<zx::eventpair>> DupCloseWeakAsapClientEnd(
-      uint32_t buffer_index);
-
  private:
   friend class NodeProperties;
 
@@ -614,13 +609,6 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   void HandleTokenFailure(BufferCollectionToken& token, zx_status_t status);
 
-  void ComplainLoudlyAboutStillExistingWeakVmoHandles(uint32_t buffer_index);
-
-  void IncStrongNodeTally();
-  void DecStrongNodeTally();
-  void CheckForZeroStrongNodes();
-  void CheckStrongNodeCount();
-
   Device* parent_device_ = nullptr;
 
   // This owns the current tree of BufferCollectionToken, BufferCollection, OrphanedNode.  The
@@ -648,7 +636,6 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   std::optional<fuchsia_sysmem2::BufferCollectionInfo> buffer_collection_info_before_population_;
   zx_status_t allocation_result_status_ = ZX_OK;
   std::optional<fuchsia_sysmem2::BufferCollectionInfo> allocation_result_info_;
-  std::optional<fuchsia_sysmem2::BufferCollectionInfo> weak_allocation_result_info_;
 
   MemoryAllocator* memory_allocator_ = nullptr;
   std::optional<CollectionName> name_;
@@ -699,16 +686,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     void set_child_koid(zx_koid_t koid) { child_koid_ = koid; }
     [[nodiscard]] zx_koid_t child_koid() const { return child_koid_; }
 
-    void set_client_debug_info(ClientDebugInfo client_debug_info) {
-      client_debug_info_ = client_debug_info;
-    }
-    [[nodiscard]] ClientDebugInfo* get_client_debug_info() {
-      return client_debug_info_.has_value() ? &*client_debug_info_ : nullptr;
-    }
-
     uint32_t buffer_index() { return buffer_index_; }
-
-    fit::result<zx_status_t, zx::eventpair> DupCloseWeakAsapClientEnd();
 
     LogicalBuffer& GetLogicalBuffer();
 
@@ -724,19 +702,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
     zx::vmo vmo_;
     const uint32_t buffer_index_ = 0x80000000;
     zx_koid_t child_koid_{};
-    // A TrackedParentVmo can outlast a Node, so own a copy here.
-    std::optional<ClientDebugInfo> client_debug_info_;
     DoDelete do_delete_;
     async::WaitMethod<TrackedParentVmo, &TrackedParentVmo::OnZeroChildren> zero_children_wait_;
-
-    // It's convenient to hold these handles directly in the strong_parent_vmos_
-    // TrackedParentVmo(s), since the lifetimes match.
-    struct CloseWeakAsap {
-      zx::eventpair server_end;
-      zx::eventpair client_end;
-    };
-    // ~close_weak_asap_ will signal clients via ZX_EVENTPAIR_PEER_CLOSED
-    std::optional<CloseWeakAsap> close_weak_asap_;
 
     // In a later CL we'll flip the relationship between TrackedParentVmo and LogicalBuffer. Only
     // TrackedParentVmo(s) in parent_vmos_ have a value in this field.
@@ -754,40 +721,8 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   // From buffers_remaining to server_end.
   std::multimap<uint32_t, zx::eventpair> lifetime_tracking_;
 
-  // Members of a ParentVmoSet keep the LogicalBufferCollection alive, not the other way around.
-  // Having them in a member var may come in handy for debugging / complaining to the log about
-  // stragler weak VMOs.
-  //
-  // In a later CL we'll likely split up each of the ParentVmoSet(s) up per LogicalBuffer, since we
-  // always know the buffer_index (no necessary ops across indices).
-  //
-  // key is buffer_index
-  using ParentVmoMap = std::unordered_map<uint32_t, std::unique_ptr<TrackedParentVmo>>;
-  // These are the child-tracked allocator-provided VMOs (parent-most). When one of these sees
-  // ZX_VMO_ZERO_CHILDREN, we can tell the allocator to free the allocator's VMO and reclaim the
-  // space.
+  using ParentVmoMap = std::map<zx_handle_t, std::unique_ptr<TrackedParentVmo>>;
   ParentVmoMap parent_vmos_;
-  // These are under the corresponding item of parent_vmos_, and have as children all sysmem strong
-  // VMOs associated with the buffer_index. When one of these sees ZX_VMO_ZERO_CHILDREN we can ask
-  // clients to close any remaining weak VMOs by closing the server end of close_weak_asap, and we
-  // set a timer to complain loudly if the buffer_index still has any entries in
-  // tracked_sent_weak_parents_ after a while, since those essentially count as the client leaking
-  // VMOs.
-  ParentVmoMap strong_parent_vmos_;
-
-  // These are parents of each weak VMO that was sent to a client (separate parent for each).
-  //
-  // This map exists to keep TrackedParentVmo alive until all its child VMOs are gone, and to have a
-  // way to complain about specific sent child weak VMOs that still haven't closed a while after all
-  // strong VMOs of a buffer_index have closed.
-  //
-  // The TrackedParentVmo's vmo has its name set based on client debug info.
-  //
-  // The uint32_t is buffer_index.
-  using WeakParentVmos =
-      std::unordered_map<uint32_t,
-                         std::unordered_map<TrackedParentVmo*, std::unique_ptr<TrackedParentVmo>>>;
-  WeakParentVmos tracked_sent_weak_parents_;
 
   // It's nice for members containing timers to be last for destruction order purposes, but the
   // destructor also explicitly cancels timers to avoid any brittle-ness from members potentially
@@ -810,8 +745,6 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   //
   // This field helps avoid creation of extra child inspect nodes when the wait is over.
   bool waiting_for_secure_allocators_ready_ = false;
-
-  uint32_t strong_node_count_ = 0;
 };
 
 }  // namespace sysmem_driver

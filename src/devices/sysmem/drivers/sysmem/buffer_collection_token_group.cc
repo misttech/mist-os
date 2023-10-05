@@ -54,10 +54,6 @@ void BufferCollectionTokenGroup::V2::GetBufferCollectionId(
   parent_.GetBufferCollectionIdImplV2(completer);
 }
 
-void BufferCollectionTokenGroup::V2::SetWeak(SetWeakCompleter::Sync& completer) {
-  parent_.SetWeakImplV2(completer);
-}
-
 void BufferCollectionTokenGroup::V1::SetName(SetNameRequest& request,
                                              SetNameCompleter::Sync& completer) {
   parent_.SetNameImplV1(request, completer);

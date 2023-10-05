@@ -627,45 +627,6 @@ v1::VmoBuffer V1RandomVmoBuffer() {
   return r;
 }
 
-v2::VmoBuffer V2RandomVmoBuffer() {
-  v2::VmoBuffer r{};
-
-  bool vmo_present;
-  random(&vmo_present);
-  if (vmo_present) {
-    // Arbitrary is good enough - we don't need truly "random" for this.
-    zx::vmo arbitrary_vmo;
-    ZX_ASSERT(ZX_OK == zx::vmo::create(ZX_PAGE_SIZE, 0, &arbitrary_vmo));
-    r.vmo() = std::move(arbitrary_vmo);
-  }
-
-  bool aux_vmo_present;
-  random(&aux_vmo_present);
-  if (aux_vmo_present) {
-    zx::vmo arbitrary_vmo;
-    ZX_ASSERT(ZX_OK == zx::vmo::create(ZX_PAGE_SIZE, 0, &arbitrary_vmo));
-    r.aux_vmo() = std::move(arbitrary_vmo);
-  }
-
-  bool vmo_usable_start_present;
-  random(&vmo_usable_start_present);
-  if (vmo_usable_start_present) {
-    r.vmo_usable_start().emplace(0);
-    random(&r.vmo_usable_start().value());
-  }
-
-  bool close_weak_asap_present;
-  random(&close_weak_asap_present);
-  if (close_weak_asap_present) {
-    zx::eventpair event_pair_0;
-    zx::eventpair event_pair_1;
-    ZX_ASSERT(ZX_OK == zx::eventpair::create(0, &event_pair_0, &event_pair_1));
-    r.close_weak_asap() = std::move(event_pair_0);
-  }
-
-  return r;
-}
-
 v1::wire::VmoBuffer V1WireRandomVmoBuffer() {
   v1::wire::VmoBuffer r{};
   // Arbitrary is good enough - we don't need truly "random" for this.
@@ -1076,20 +1037,6 @@ TEST(SysmemVersion, VmoBuffer) {
     EXPECT_FALSE(IsEqual(*snap_1, *snap_3));
     EXPECT_TRUE(IsEqualByKoid(*snap_1, *snap_3));
     EXPECT_TRUE(IsEqualByKoid(*snap_2, *snap_3));
-  }
-}
-
-TEST(SysmemVersion, VmoBufferV2) {
-  for (uint32_t run = 0; run < kRunCount; ++run) {
-    auto v2_1 = V2RandomVmoBuffer();
-    auto v2_2_result = sysmem::V2CloneVmoBuffer(v2_1, std::numeric_limits<uint32_t>::max(),
-                                                std::numeric_limits<uint32_t>::max());
-    ASSERT_TRUE(v2_2_result.is_ok());
-    auto snap_1 = SnapMoveFrom(std::move(v2_1));
-    auto v2_2 = v2_2_result.take_value();
-    auto snap_2 = SnapMoveFrom(std::move(v2_2));
-    EXPECT_FALSE(IsEqual(*snap_1, *snap_2));
-    EXPECT_TRUE(IsEqualByKoid(*snap_1, *snap_2));
   }
 }
 

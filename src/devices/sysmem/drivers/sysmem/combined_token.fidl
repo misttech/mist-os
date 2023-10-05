@@ -148,8 +148,6 @@ closed protocol CombinedBufferCollectionToken {
     strict GetBufferCollectionIdV2() -> (table {
         1: buffer_collection_id uint64;
     });
-    @selector("fuchsia.sysmem2/Node.SetWeak")
-    strict SetWeakV2();
 
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")

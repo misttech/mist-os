@@ -150,7 +150,6 @@ class BufferCollection : public Node {
     void SetDebugTimeoutLogDeadline(SetDebugTimeoutLogDeadlineRequest& request,
                                     SetDebugTimeoutLogDeadlineCompleter::Sync& completer) override;
     void SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) override;
-    void SetWeak(SetWeakCompleter::Sync& completer) override;
 
     //
     // fuchsia.sysmem.BufferCollection interface methods (see also "compose Node" methods above)
@@ -162,7 +161,6 @@ class BufferCollection : public Node {
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
                                 AttachLifetimeTrackingCompleter::Sync& completer) override;
-    void SetWeakOk(SetWeakOkCompleter::Sync& completer) override;
 
     BufferCollection& parent_;
   };
@@ -201,8 +199,7 @@ class BufferCollection : public Node {
   bool CommonSetConstraintsStage1(Completer& completer);
 
   template <typename Completer>
-  bool CommonWaitForAllBuffersAllocatedStage1(bool enforce_set_constraints_before_wait,
-                                              Completer& completer, trace_async_id_t* out_event_id);
+  bool CommonWaitForAllBuffersAllocatedStage1(Completer& completer, trace_async_id_t* out_event_id);
 
   template <typename Completer>
   bool CommonCheckAllBuffersAllocatedStage1(Completer& completer, zx_status_t* result);
@@ -244,9 +241,6 @@ class BufferCollection : public Node {
     uint32_t buffers_remaining;
   };
   std::vector<PendingLifetimeTracking> pending_lifetime_tracking_;
-
-  bool wait_for_buffers_seen_ = false;
-  bool is_weak_ok_ = false;
 };
 
 }  // namespace sysmem_driver

@@ -1451,8 +1451,8 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
     const fuchsia_sysmem2::VmoBuffer& src, uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask) {
   fuchsia_sysmem2::VmoBuffer vmo_buffer;
   if (src.vmo().has_value()) {
-    if (src.vmo().value().get() != ZX_HANDLE_INVALID && vmo_rights_mask != 0) {
-      zx::vmo clone_vmo;
+    zx::vmo clone_vmo;
+    if (src.vmo().value().get() != ZX_HANDLE_INVALID) {
       zx_info_handle_basic_t info{};
       zx_status_t get_info_status =
           src.vmo().value().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -1466,17 +1466,17 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
         LOG(ERROR, "duplicate_status: %d", duplicate_status);
         return fpromise::error(duplicate_status);
       }
-      vmo_buffer.vmo() = std::move(clone_vmo);
     } else {
-      ZX_DEBUG_ASSERT(!vmo_buffer.vmo().has_value());
+      ZX_DEBUG_ASSERT(clone_vmo.get() == ZX_HANDLE_INVALID);
     }
+    vmo_buffer.vmo() = std::move(clone_vmo);
   }
   if (src.vmo_usable_start().has_value()) {
     vmo_buffer.vmo_usable_start() = src.vmo_usable_start().value();
   }
   if (src.aux_vmo().has_value()) {
-    if (src.aux_vmo().value().get() != ZX_HANDLE_INVALID && aux_vmo_rights_mask != 0) {
-      zx::vmo clone_vmo;
+    zx::vmo clone_vmo;
+    if (src.aux_vmo().value().get() != ZX_HANDLE_INVALID) {
       zx_info_handle_basic_t info{};
       zx_status_t get_info_status = src.aux_vmo().value().get_info(ZX_INFO_HANDLE_BASIC, &info,
                                                                    sizeof(info), nullptr, nullptr);
@@ -1490,20 +1490,10 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
         LOG(ERROR, "duplicate_status: %d", duplicate_status);
         return fpromise::error(duplicate_status);
       }
-      vmo_buffer.aux_vmo() = std::move(clone_vmo);
     } else {
-      ZX_DEBUG_ASSERT(!vmo_buffer.aux_vmo().has_value());
+      ZX_DEBUG_ASSERT(clone_vmo.get() == ZX_HANDLE_INVALID);
     }
-  }
-  if (src.close_weak_asap().has_value()) {
-    zx::eventpair clone_eventpair;
-    zx_status_t duplicate_status =
-        src.close_weak_asap().value().duplicate(ZX_RIGHT_SAME_RIGHTS, &clone_eventpair);
-    if (duplicate_status != ZX_OK) {
-      LOG(ERROR, "duplicate_status: %d", duplicate_status);
-      return fpromise::error(duplicate_status);
-    }
-    vmo_buffer.close_weak_asap() = std::move(clone_eventpair);
+    vmo_buffer.aux_vmo() = std::move(clone_vmo);
   }
   return fpromise::ok(std::move(vmo_buffer));
 }

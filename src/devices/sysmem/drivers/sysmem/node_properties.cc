@@ -25,9 +25,6 @@ NodeProperties::~NodeProperties() {
     logical_buffer_collection_->RemoveCountsForNode(*node_);
     node_->EnsureDetachedFromNodeProperties();
   }
-  if (!is_weak_) {
-    logical_buffer_collection_->DecStrongNodeTally();
-  }
   logical_buffer_collection_->UntrackNodeProperties(this);
 }
 
@@ -39,7 +36,6 @@ std::unique_ptr<NodeProperties> NodeProperties::NewRoot(
   // Set later with SetNode().
   ZX_DEBUG_ASSERT(!result->node_);
   ZX_DEBUG_ASSERT(result->children_.empty());
-  result->logical_buffer_collection_->IncStrongNodeTally();
   return result;
 }
 
@@ -61,12 +57,6 @@ NodeProperties* NodeProperties::NewChild(LogicalBufferCollection* logical_buffer
   // when creating the child, but the child starts with the same rights masked away as the parent.
   result_ptr->rights_attenuation_mask_ = rights_attenuation_mask_;
   ZX_DEBUG_ASSERT(result_ptr->error_propagation_mode_ == ErrorPropagationMode::kPropagate);
-  // The is_weak must propagate when the child is created; later changes to parent is_weak_ don't
-  // change the child's is_weak_, intentionally.
-  result_ptr->is_weak_ = is_weak_;
-  if (!is_weak_) {
-    result_ptr->logical_buffer_collection_->IncStrongNodeTally();
-  }
   return result_ptr;
 }
 
@@ -82,8 +72,6 @@ std::unique_ptr<NodeProperties> NodeProperties::NewTemporary(
   ZX_DEBUG_ASSERT(result->children_.empty());
   result->SetBufferCollectionConstraints(std::move(buffer_collection_constraints));
   result->client_debug_info().name = debug_name;
-  // just to avoid subtracting strong node tally in destructor
-  result->is_weak_ = true;
   return result;
 }
 
@@ -279,14 +267,6 @@ bool NodeProperties::visible() const {
   }
   ZX_PANIC("impossible");
   return true;
-}
-
-void NodeProperties::SetWeak() {
-  if (is_weak_) {
-    return;
-  }
-  logical_buffer_collection_->DecStrongNodeTally();
-  is_weak_ = true;
 }
 
 NodeProperties::NodeProperties(LogicalBufferCollection* logical_buffer_collection)

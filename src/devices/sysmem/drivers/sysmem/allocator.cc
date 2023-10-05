@@ -314,15 +314,6 @@ void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::
   response.buffer_collection_id() =
       logical_buffer.logical_buffer_collection().buffer_collection_id();
   response.buffer_index() = logical_buffer.buffer_index();
-  if (logical_buffer_result.is_koid_of_weak_vmo) {
-    auto dup_result = logical_buffer.logical_buffer_collection().DupCloseWeakAsapClientEnd(
-        logical_buffer.buffer_index());
-    if (dup_result.is_error()) {
-      completer.Close(dup_result.error_value());
-      return;
-    }
-    response.close_weak_asap() = std::move(dup_result.value());
-  }
   completer.Reply(fit::ok(std::move(response)));
 }
 

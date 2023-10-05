@@ -60,8 +60,6 @@ source_set("sysmem_common_srcs") {
 
     # TODO(https://fxbug.dev/113997): Fix thread unsafety and switch to
     # "//sdk/lib/component/outgoing/cpp".
-    "//sdk/lib/async_patterns/cpp",
-    "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/component/outgoing/cpp:cpp_disable_synchronization_check",
     "//sdk/lib/fidl",
     "//sdk/lib/fit",

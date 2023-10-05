@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
-#include <lib/async_patterns/cpp/task_scope.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/status.h>
@@ -463,94 +462,6 @@ fit::result<zx_status_t, BufferCollectionToken*> LogicalBufferCollection::Common
   return fit::success(token);
 }
 
-fit::result<zx_status_t, std::optional<zx::vmo>> LogicalBufferCollection::CreateWeakVmo(
-    uint32_t buffer_index, const ClientDebugInfo& client_debug_info) {
-  auto strong_parent_iter = strong_parent_vmos_.find(buffer_index);
-  if (strong_parent_iter == strong_parent_vmos_.end()) {
-    // success, but no VMO
-    return fit::ok(std::nullopt);
-  }
-  ZX_DEBUG_ASSERT(strong_parent_iter->second->vmo().is_valid());
-  // Now that we know there's at least one sysmem strong VMO outstanding for this logical buffer
-  // (buffer_index), we know it's ok (by definition) to send a weak VMO for this logical buffer.
-  // FWIW, this is the same condition that we'll use to determine whether it's ok to convert a weak
-  // sysmem VMO to a strong sysmem VMO, if that's added in future.
-  auto parent_vmos_iter = parent_vmos_.find(buffer_index);
-  ZX_DEBUG_ASSERT(parent_vmos_iter != parent_vmos_.end());
-  auto& parent_vmo = *parent_vmos_iter->second;
-  ZX_DEBUG_ASSERT(allocation_result_info_.has_value());
-  size_t rounded_size_bytes =
-      fbl::round_up(*allocation_result_info_->settings()->buffer_settings()->size_bytes(),
-                    zx_system_get_page_size());
-  zx::vmo per_sent_weak_parent;
-  zx_status_t status = parent_vmo.vmo().create_child(ZX_VMO_CHILD_SLICE, 0, rounded_size_bytes,
-                                                     &per_sent_weak_parent);
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "create_child() failed: %d", status);
-    return fit::error(status);
-  }
-  // May not actually be sent by the caller; in that case just cleans up without ever being sent.
-  auto tracked_sent_weak_parent_vmo = std::make_unique<TrackedParentVmo>(
-      fbl::RefPtr(this), std::move(per_sent_weak_parent), buffer_index,
-      [this, buffer_index](TrackedParentVmo* tracked_sent_weak_parent_vmo) mutable {
-        parent_device_->RemoveVmoKoid(tracked_sent_weak_parent_vmo->child_koid());
-        auto index_iter = tracked_sent_weak_parents_.find(buffer_index);
-        if (index_iter == tracked_sent_weak_parents_.end()) {
-          // this can happen if ~tracked_sent_weak_parent_vmo in an error path
-          return;
-        }
-        auto& buffer_set = index_iter->second;
-        buffer_set.erase(tracked_sent_weak_parent_vmo);
-        if (buffer_set.empty()) {
-          tracked_sent_weak_parents_.erase(index_iter);
-        }
-      });
-  // Makes a copy since TrackedParentVmo can outlast Node.
-  tracked_sent_weak_parent_vmo->set_client_debug_info(client_debug_info);
-  zx::vmo child_same_rights;
-  status = tracked_sent_weak_parent_vmo->vmo().create_child(ZX_VMO_CHILD_SLICE, 0,
-                                                            rounded_size_bytes, &child_same_rights);
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "create_child() (2) failed: %d", status);
-    return fit::error(status);
-  }
-  // The caller will dup the handle to attenuate handle rights, but that won't change the koid of
-  // the VMO that gets handed out, so stash that here.
-  zx_info_handle_basic_t child_info{};
-  status = child_same_rights.get_info(ZX_INFO_HANDLE_BASIC, &child_info, sizeof(child_info),
-                                      nullptr, nullptr);
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "vmo.get_info() failed: %d", status);
-    return fit::error(status);
-  }
-  tracked_sent_weak_parent_vmo->set_child_koid(child_info.koid);
-  status = tracked_sent_weak_parent_vmo->StartWait(parent_device_->dispatcher());
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "StartWait failed: %d", status);
-    return fit::error(status);
-  }
-  tracked_sent_weak_parents_[buffer_index].emplace(tracked_sent_weak_parent_vmo.get(),
-                                                   std::move(tracked_sent_weak_parent_vmo));
-  parent_device_->AddVmoKoid(child_info.koid, true, parent_vmo.GetLogicalBuffer());
-  return fit::ok(std::move(child_same_rights));
-}
-
-fit::result<zx_status_t, std::optional<zx::eventpair>>
-LogicalBufferCollection::DupCloseWeakAsapClientEnd(uint32_t buffer_index) {
-  auto parent_iter = strong_parent_vmos_.find(buffer_index);
-  if (parent_iter == strong_parent_vmos_.end()) {
-    // Success but no eventpair needed since no weak VMO will be provided from CreateWeakVmo().
-    return fit::ok(std::nullopt);
-  }
-  auto& parent = *parent_iter->second;
-  auto dup_result = parent.DupCloseWeakAsapClientEnd();
-  if (dup_result.is_error()) {
-    LogError(FROM_HERE, "DupCloseWeakAsapClientEnd() failed: %d", dup_result.error_value());
-    return dup_result.take_error();
-  }
-  return fit::ok(std::move(dup_result.value()));
-}
-
 // static
 //
 // The buffer_collection_token is the client end of the BufferCollectionToken
@@ -614,6 +525,12 @@ void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, z
   // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
   // and ZX_OK is never passed to the error handler.
   ZX_DEBUG_ASSERT(status != ZX_OK);
+
+  // The dispatcher shut down before we were able to Bind(...)
+  if (status == ZX_ERR_BAD_STATE) {
+    LogAndFailRootNode(FROM_HERE, status, "sysmem dispatcher shutting down - status: %d", status);
+    return;
+  }
 
   // We know |this| is alive because the token is alive and the token has
   // a fbl::RefPtr<LogicalBufferCollection>.  The token is alive because
@@ -755,6 +672,12 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
     // and ZX_OK is never passed to the error handler.
     ZX_DEBUG_ASSERT(status != ZX_OK);
 
+    // The dispatcher shut down before we were able to Bind(...)
+    if (status == ZX_ERR_BAD_STATE) {
+      LogAndFailRootNode(FROM_HERE, status, "sysmem dispatcher shutting down - status: %d", status);
+      return;
+    }
+
     // We know |this| is alive because the group is alive and the group has
     // a fbl::RefPtr<LogicalBufferCollection>.  The group is alive because
     // the group is still under the tree rooted at root_.
@@ -764,7 +687,7 @@ bool LogicalBufferCollection::CommonCreateBufferCollectionTokenGroupStage1(
     ZX_DEBUG_ASSERT(root_);
 
     // If not clean Close()
-    if (!(status == ZX_ERR_PEER_CLOSED && group.is_done())) {
+    if (!group.is_done()) {
       // LogAndFailDownFrom() will also remove any no-longer-needed nodes from the tree.
       //
       // A group whose error handler sees anything other than clean Close() (is_done()) implies
@@ -986,11 +909,6 @@ void LogicalBufferCollection::LogAndFailRootNode(Location location, zx_status_t 
 }
 
 void LogicalBufferCollection::FailRootNode(zx_status_t epitaph) {
-  if (!root_) {
-    // This can happen for example when we're failing due to zero strong VMOs remaining, but all
-    // Node(s) happen to already be gone so the root node was already removed.
-    return;
-  }
   FailDownFrom(root_.get(), epitaph);
 }
 
@@ -1026,11 +944,11 @@ void LogicalBufferCollection::FailDownFrom(NodeProperties* tree_to_fail, zx_stat
     //
     // Since all the token views and collection views are gone, there is no way for any client to be
     // sent the VMOs again, so we can close the handles to the VMOs here.  This is necessary in
-    // order to get ZX_VMO_ZERO_CHILDREN to happen in TrackedParentVmo(s) of parent_vmos_, but not
-    // sufficient alone (clients must also close their VMO(s)).
+    // order to get ZX_VMO_ZERO_CHILDREN to happen in TrackedParentVmo, but not sufficient alone
+    // (clients must also close their VMO(s)).
     //
-    // Clear out the result info since we won't be sending it again. This also clears out any
-    // children of strong_parent_vmos_ that LogicalBufferCollection may still be holding.
+    // Clear out the result info. This may not yet close the VMOs, since they'll still be held onto
+    // by the TableSet allocator.
     allocation_result_info_.reset();
   }
   // ~self, which will delete "this" if there are no more references to "this".
@@ -1260,14 +1178,6 @@ void LogicalBufferCollection::MaybeAllocate() {
   bool did_something;
   do {
     did_something = false;
-
-    // It is possible for this to be running just after DecStrongNodeTally() posted an async root
-    // fail, with that still pending as the last Node becomes ready for allocation and ends up here.
-    // In that case, the allocation can happen and then the buffers will shortly get deleted again,
-    // but there's no point in noticing strong_node_count_ == 0 in code here since the
-    // allocation-first vs failure-before-allocation race can happen anyway due to message delivery
-    // order at the server.
-
     // If a previous iteration of the loop failed the root_ of the LogicalBufferCollection, we'll
     // return below when we noticed that root_.connected_client_count() == 0.
     //
@@ -1974,6 +1884,12 @@ void LogicalBufferCollection::BindSharedCollectionInternal(
     // status passed to an error handler is never ZX_OK.  Clean close is
     // ZX_ERR_PEER_CLOSED.
     ZX_DEBUG_ASSERT(status != ZX_OK);
+
+    // The dispatcher shut down before we were able to Bind(...)
+    if (status == ZX_ERR_BAD_STATE) {
+      LogAndFailRootNode(FROM_HERE, status, "sysmem dispatcher shutting down - status: %d", status);
+      return;
+    }
 
     // We know collection is still alive because collection is still under root_.  We know "this"
     // is still alive because collection has a fbl::RefPtr<> to "this".
@@ -3696,10 +3612,6 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     return fpromise::error();
   }
 
-  auto complain_about_leaked_weak_timer_task_scope =
-      std::make_shared<std::optional<async_patterns::TaskScope>>();
-  complain_about_leaked_weak_timer_task_scope->emplace(parent_device_->dispatcher());
-
   // raw_vmo may itself be a child VMO of an allocator's overall contig VMO,
   // but that's an internal detail of the allocator.  The ZERO_CHILDREN signal
   // will only be set when all direct _and indirect_ child VMOs are fully
@@ -3720,9 +3632,6 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
              rounded_size_bytes, status);
     return fpromise::error();
   }
-  // Clean up in any error path until tracked_parent_vmo do_delete takes over.
-  auto delete_vmo =
-      fit::defer([allocator, &raw_parent_vmo] { allocator->Delete(std::move(raw_parent_vmo)); });
 
   zx_info_vmo_t info;
   status = raw_parent_vmo.get_info(ZX_INFO_VMO, &info, sizeof(info), nullptr, nullptr);
@@ -3791,96 +3700,38 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   // Until that happens, we can't let LogicalBufferCollection itself go away, because it needs to
   // stick around to tell allocator that the allocator's VMO can be deleted/reclaimed.
   //
-  // We let cooked_parent_vmo go away before returning from this method, since it's only purpose was
-  // to attenuate the rights of local_child_vmo.  The local_child_vmo counts as a child of
+  // We let cooked_parent_vmo go away before returning from this method, since it's only purpose
+  // was to attenuate the rights of local_child_vmo.  The local_child_vmo counts as a child of
   // raw_parent_vmo for ZX_VMO_ZERO_CHILDREN.
   //
   // The fbl::RefPtr(this) is fairly similar (in this usage) to shared_from_this().
-  //
-  // We avoid letting any duplicates of raw_parent_vmo escape this method, to ensure that this
-  // TrackedParentVmo will authoritatively know that when there are zero children of raw_parent_vmo,
-  // there are also zero duplicated handles, ensuring coherency with respect to allocator->Delete()
-  // called from this do_delete.
   auto tracked_parent_vmo = std::unique_ptr<TrackedParentVmo>(new TrackedParentVmo(
       fbl::RefPtr(this), std::move(raw_parent_vmo), index,
-      [this, allocator,
-       complain_about_leaked_weak_timer_task_scope](TrackedParentVmo* tracked_parent_vmo) mutable {
+      [this, allocator](TrackedParentVmo* tracked_parent_vmo) mutable {
         parent_device_->RemoveVmoKoid(tracked_parent_vmo->child_koid());
-        // This timer, if it was set, is cancelled now; the -> instead of . here is significant;
-        // we're intentinoally ending the TaskScope, not just this shared_ptr<> to it.
-        complain_about_leaked_weak_timer_task_scope->reset();
-        // This won't be found if tracked_parent_vmo gets destructed by sufficiently-early return
-        // from AllocateVmo.
-        auto node_handle = parent_vmos_.extract(tracked_parent_vmo->buffer_index());
+        auto node_handle = parent_vmos_.extract(tracked_parent_vmo->vmo().get());
         ZX_DEBUG_ASSERT(!node_handle || node_handle.mapped().get() == tracked_parent_vmo);
         allocator->Delete(tracked_parent_vmo->TakeVmo());
         SweepLifetimeTracking();
         // ~node_handle may delete "this".
       }));
-  // tracked_parent_vmo do_delete will take care of calling allocator->Delete(raw_parent_vmo),
-  // whether do_delete is called in an error path or later when tracked_parent_vmo sees
-  // ZX_VMO_ZERO_CHILDREN.
-  delete_vmo.cancel();
-
-  // As a child directly under raw_parent_vmo, we have the strong_only VMO which in turn is the
-  // parent of (only) all the sysmem strong VMO handles. When strong_only's do_delete runs, we know
-  // that zero sysmem strong VMO handles remain, so we can close corresponding close_weak_asap
-  // handles, signaling to clients to close all their sysmem weak VMO handles asap.
-  zx::vmo strong_only;
-  status = tracked_parent_vmo->vmo().create_child(ZX_VMO_CHILD_SLICE, 0, rounded_size_bytes,
-                                                  &strong_only);
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "zx::vmo::create_child() failed - status: %d", status);
-    return fpromise::error();
-  }
-
-  // Since strong BufferCollection client_end(s) effectively keep a strong VMO (via
-  // strong_collection_count_ not being zero yet -> keeping strong VMOs in allocation_result()), we
-  // know that this do_delete won't run until all strong BufferCollection client_end(s) are also
-  // gone (can be closed first from client_end or server_end, but either way, gone from server's
-  // point of view).
-  auto tracked_strong_parent_vmo = std::unique_ptr<TrackedParentVmo>(new TrackedParentVmo(
-      fbl::RefPtr(this), std::move(strong_only), index,
-      [this, index, complain_about_leaked_weak_timer_task_scope](
-          TrackedParentVmo* tracked_strong_parent_vmo) mutable {
-        // won't be found if tracked_strong_parent_vmo gets destructed by sufficiently-early return
-        // from AllocateVmo
-        auto node_handle = strong_parent_vmos_.extract(tracked_strong_parent_vmo->buffer_index());
-        ZX_DEBUG_ASSERT(!node_handle || node_handle.mapped().get() == tracked_strong_parent_vmo);
-        if (strong_parent_vmos_.empty()) {
-          FailRootNode(ZX_ERR_BAD_STATE);
-        }
-
-        // We know this still has_value() because node_handle in this scope has a vmo that must
-        // close before the tracked_parent_vmo do_delete can run.
-        ZX_DEBUG_ASSERT(complain_about_leaked_weak_timer_task_scope->has_value());
-        (*complain_about_leaked_weak_timer_task_scope)
-            ->PostDelayed(
-                [ref_this = fbl::RefPtr(this), index] {
-                  ref_this->ComplainLoudlyAboutStillExistingWeakVmoHandles(index);
-                },
-                zx::sec(5));
-
-        // ~node_handle may trigger tracked_parent_vmo's do_delete defined above; will signal
-        // close_weak_asap by closing server end.
-      }));
 
   zx::vmo cooked_parent_vmo;
-  status = tracked_strong_parent_vmo->vmo().duplicate(kSysmemVmoRights, &cooked_parent_vmo);
+  status = tracked_parent_vmo->vmo().duplicate(kSysmemVmoRights, &cooked_parent_vmo);
   if (status != ZX_OK) {
     LogError(FROM_HERE, "zx::object::duplicate() failed - status: %d", status);
     return fpromise::error();
   }
 
-  zx::vmo local_strong_child_vmo;
-  status = cooked_parent_vmo.create_child(ZX_VMO_CHILD_SLICE, 0, rounded_size_bytes,
-                                          &local_strong_child_vmo);
+  zx::vmo local_child_vmo;
+  status =
+      cooked_parent_vmo.create_child(ZX_VMO_CHILD_SLICE, 0, rounded_size_bytes, &local_child_vmo);
   if (status != ZX_OK) {
     LogError(FROM_HERE, "zx::vmo::create_child() failed - status: %d", status);
     return fpromise::error();
   }
 
-  zx_koid_t child_koid = fsl::GetKoid(local_strong_child_vmo.get());
+  zx_koid_t child_koid = fsl::GetKoid(local_child_vmo.get());
   if (child_koid == ZX_KOID_INVALID) {
     LogError(FROM_HERE, "fsl::GetKoid failed");
     return fpromise::error();
@@ -3890,35 +3741,25 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   TRACE_INSTANT("gfx", "Child VMO created", TRACE_SCOPE_THREAD, "koid", child_koid);
 
   // Now that we know at least one child of raw_parent_vmo exists, we can StartWait() and add to
-  // map.
+  // map.  From this point, ZX_VMO_ZERO_CHILDREN is the only way that allocator.Delete() gets
+  // called.
   status = tracked_parent_vmo->StartWait(parent_device_->dispatcher());
   if (status != ZX_OK) {
     LogError(FROM_HERE, "tracked_parent->StartWait() failed - status: %d", status);
     // ~tracked_parent_vmo calls allocator.Delete().
     return fpromise::error();
   }
-  auto emplace_parent_result = parent_vmos_.emplace(index, std::move(tracked_parent_vmo));
-  ZX_DEBUG_ASSERT(emplace_parent_result.second);
-
-  // Now that we know at least one child of tracked_strong_parent_vmo exists, we can StartWait() and
-  // add to map.
-  status = tracked_strong_parent_vmo->StartWait(parent_device_->dispatcher());
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "tracked_parent->StartWait() failed - status: %d", status);
-    // ~tracked_parent_vmo calls allocator.Delete().
-    return fpromise::error();
-  }
-  auto emplace_strong_result =
-      strong_parent_vmos_.emplace(index, std::move(tracked_strong_parent_vmo));
-  ZX_DEBUG_ASSERT(emplace_strong_result.second);
+  zx_handle_t raw_parent_vmo_handle = tracked_parent_vmo->vmo().get();
+  auto emplace_result = parent_vmos_.emplace(raw_parent_vmo_handle, std::move(tracked_parent_vmo));
+  ZX_DEBUG_ASSERT(emplace_result.second);
 
   if (name.has_value()) {
-    local_strong_child_vmo.set_property(ZX_PROP_NAME, name->c_str(), name->size());
+    local_child_vmo.set_property(ZX_PROP_NAME, name->c_str(), name->size());
   }
 
-  // ~cooked_parent_vmo here is fine, since local_strong_child_vmo counts as a child of
-  // tracked_strong_parent_vmo for ZX_VMO_ZERO_CHILDREN purposes.
-  return fpromise::ok(std::move(local_strong_child_vmo));
+  // ~cooked_parent_vmo is fine, since local_child_vmo counts as a child of raw_parent_vmo for
+  // ZX_VMO_ZERO_CHILDREN purposes.
+  return fpromise::ok(std::move(local_child_vmo));
 }
 
 void LogicalBufferCollection::CreationTimedOut(async_dispatcher_t* dispatcher,
@@ -4116,30 +3957,6 @@ const zx::vmo& LogicalBufferCollection::TrackedParentVmo::vmo() const {
   return vmo_;
 }
 
-fit::result<zx_status_t, zx::eventpair>
-LogicalBufferCollection::TrackedParentVmo::DupCloseWeakAsapClientEnd() {
-  if (!close_weak_asap_.has_value()) {
-    decltype(close_weak_asap_) local;
-    local.emplace();
-    zx_status_t create_status = zx::eventpair::create(0, &local->client_end, &local->server_end);
-    if (create_status != ZX_OK) {
-      return fit::error(create_status);
-    }
-    close_weak_asap_ = std::move(local);
-    ZX_DEBUG_ASSERT(close_weak_asap_->client_end.is_valid());
-    ZX_DEBUG_ASSERT(close_weak_asap_->server_end.is_valid());
-    // Later when ~TrackedParentVmo, ~close_weak_asap_ will signal clients via
-    // ZX_EVENTPAIR_PEER_CLOSED.
-  }
-  zx::eventpair dup_client_end;
-  zx_status_t dup_status =
-      close_weak_asap_->client_end.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_client_end);
-  if (dup_status != ZX_OK) {
-    return fit::error(dup_status);
-  }
-  return fit::ok(std::move(dup_client_end));
-}
-
 LogicalBuffer& LogicalBufferCollection::TrackedParentVmo::GetLogicalBuffer() {
   if (!logical_buffer_.has_value()) {
     logical_buffer_.emplace(*buffer_collection_, buffer_index_);
@@ -4151,8 +3968,6 @@ void LogicalBufferCollection::TrackedParentVmo::OnZeroChildren(async_dispatcher_
                                                                async::WaitBase* wait,
                                                                zx_status_t status,
                                                                const zx_packet_signal_t* signal) {
-  // child_koid_ 0 means the child is an internal VMO, not a child that was ever handed out from
-  // sysmem.
   TRACE_DURATION("gfx", "LogicalBufferCollection::TrackedParentVmo::OnZeroChildren",
                  "buffer_collection", buffer_collection_.get(), "child_koid", child_koid_);
   buffer_collection_->LogInfo(FROM_HERE,
@@ -4415,112 +4230,6 @@ void LogicalBufferCollection::LogNodeConstraints(std::vector<NodeProperties*> no
       LogConstraints(FROM_HERE, node, *node->buffer_collection_constraints());
     }
   }
-}
-
-void LogicalBufferCollection::ComplainLoudlyAboutStillExistingWeakVmoHandles(
-    uint32_t buffer_index) {
-  auto buffer_index_iter = tracked_sent_weak_parents_.find(buffer_index);
-  if (buffer_index_iter == tracked_sent_weak_parents_.end()) {
-    return;
-  }
-  auto& weak_parent_set = buffer_index_iter->second;
-  for (auto& [key, value] : weak_parent_set) {
-    const char* collection_name = name_.has_value() ? name_->name.c_str() : "Unknown";
-    auto* client_debug_info = value->get_client_debug_info();
-    ZX_DEBUG_ASSERT(client_debug_info);
-    // The client may have created a child VMO based on the handed-out VMO and closed the handed-out
-    // VMO, which still counts as failure to close the handed-out weak VMO in a timely manner; the
-    // originally-handed-out koid may or may not be useful.
-    LogError(
-        FROM_HERE,
-        "#####################################################################################");
-    LogError(FROM_HERE, "sysmem weak VMO handle still open long after close_weak_asap signalled:");
-    LogError(FROM_HERE, "  collection: 0x%" PRIx64 " %s", buffer_collection_id_, collection_name);
-    LogError(FROM_HERE, "  buffer_index: %u", buffer_index);
-    LogError(FROM_HERE, "  client: %s (id: 0x%" PRIx64 ")",
-             client_debug_info->name.size() ? client_debug_info->name.c_str() : "<empty>",
-             client_debug_info->id);
-    LogError(FROM_HERE, "  originally-handed-out koid: 0x%" PRIx64, value->child_koid());
-    LogError(
-        FROM_HERE,
-        "#####################################################################################");
-  }
-}
-
-void LogicalBufferCollection::IncStrongNodeTally() { ++strong_node_count_; }
-
-void LogicalBufferCollection::DecStrongNodeTally() {
-  ZX_DEBUG_ASSERT(strong_node_count_ >= 1);
-  --strong_node_count_;
-  CheckForZeroStrongNodes();
-}
-
-void LogicalBufferCollection::CheckForZeroStrongNodes() {
-  if (strong_node_count_ == 0) {
-    auto post_result =
-        async::PostTask(parent_device_->dispatcher(), [this, ref_this = fbl::RefPtr(this)] {
-          if (allocation_result_info_.has_value()) {
-            // Regardless of whether we'd allocated by the time of posting, we've allocated by the
-            // time of running the posted task.
-            //
-            // If we allocated by the time of posting, we may have some strong VMOs outstanding with
-            // clients, and weak nodes should continue to work until all outstanding strong VMOs are
-            // closed by clients.
-            //
-            // If we hadn't allocated by the time of posting, we can still handle this the same way,
-            // because the strong_parent_vmos_.empty() check elsewhere will take care of failing
-            // from the root_ down shortly after we reset() the vmo fields here (triggered async by
-            // ZX_VMO_ZERO_CHILDREN signal to strong_parent_vmos_).
-            for (auto& buffer : *allocation_result_info_->buffers()) {
-              // The sysmem strong VMO handles in allocation_result_info_ are logically owned by
-              // strong nodes. Once there are zero strong nodes, there can never be a strong node
-              // again, so we reset the strong VMOs here. In some cases there can still be strong
-              // VMOs outstanding, and those still prevent strong_parent_vmos_ entries from
-              // disappearing until all the outstanding strong VMO handles are closed by clients.
-              //
-              // Once all strong_parent_vmos_ entries are gone, the LogicalBufferCollection will
-              // fail from root_ down.
-              buffer.vmo().reset();
-            }
-          } else {
-            // Since we know we have zero strong VMOs outstanding (because no VMOs allocated yet),
-            // this is conceptually skipping to the root_-down fail that we'd otherwise do elsewhere
-            // upon noticing strong_parent_vmos_.empty() becoming true, since we now know that
-            // strong_parent_vmos_.empty() never became false and will remain true from this point
-            // onward.
-            //
-            // We also know in this path that we have zero weak VMOs outstanding (because no VMOs
-            // allocated yet), so there's no need to signal any close_weak_asap(s) here since no
-            // buffers are ever part of this LogicalBufferCollection, and no outstanding weak VMOs
-            // will be holding up ~LogicalBufferCollection.
-            if (!root_) {
-              // This is just avoiding any redundant log output in case the LogicalBufferCollection
-              // already failed from the root_ down already for a different reason.
-              return;
-            }
-            LogAndFailRootNode(
-                FROM_HERE, ZX_ERR_BAD_STATE,
-                "Zero strong nodes remaining before allocation; failing LogicalBufferCollection");
-          }
-          // ~ref_this
-        });
-    ZX_ASSERT(post_result == ZX_OK);
-  }
-}
-
-void LogicalBufferCollection::CheckStrongNodeCount() {
-  uint32_t strong_node_count = 0;
-  root_->BreadthFirstOrder([&strong_node_count](const NodeProperties& node_properties) {
-    if (!node_properties.is_weak()) {
-      ++strong_node_count;
-    }
-    return NodeFilterResult{.keep_node = false, .iterate_children = true};
-  });
-  if (strong_node_count != strong_node_count_) {
-    LogError(FROM_HERE, "strong_node_count: %u strong_node_count_: %u", strong_node_count,
-             strong_node_count_);
-  }
-  ZX_DEBUG_ASSERT(strong_node_count == strong_node_count_);
 }
 
 }  // namespace sysmem_driver

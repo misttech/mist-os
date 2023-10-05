@@ -404,24 +404,6 @@ class Node : public fbl::RefCounted<Node> {
     completer.Reply(std::move(response));
   }
 
-  template <class SetWeakCompleterSync>
-  void SetWeakImplV2(SetWeakCompleterSync& completer) {
-    if (is_done_) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after Close");
-      return;
-    }
-    if (ReadyForAllocation()) {
-      // BufferCollection after SetConstraints, or BufferCollectionTokenGroup after
-      // AllChildrenPresent.
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeak after ready for allocation");
-      return;
-    }
-    node_properties().SetWeak();
-    // done
-    //
-    // ~completer; one-way message; no reply
-  }
-
   void CloseChannel(zx_status_t epitaph);
 
   virtual void CloseServerBinding(zx_status_t epitaph) = 0;
