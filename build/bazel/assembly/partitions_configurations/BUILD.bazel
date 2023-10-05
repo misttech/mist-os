@@ -154,6 +154,15 @@ fuchsia_bootloader_partition(
 )
 
 fuchsia_partitions_configuration(
+    name = "arm64",
+    bootloader_partitions = [
+        ":fuchsia_esp",
+    ],
+    hardware_revision = "arm64",
+    partitions = standard_partitions,
+)
+
+fuchsia_partitions_configuration(
     name = "vim3",
     bootloader_partitions = [
         ":u_boot",

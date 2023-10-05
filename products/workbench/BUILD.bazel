@@ -53,6 +53,18 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product_bundle(
+    name = "product_bundle_eng.arm64",
+    board_name = "arm64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
+    product_image = ":assembly_eng.arm64",
+    product_name = "workbench_eng",
+    recovery = "//products/zedboot:arm64",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+    update_version_file = "@legacy_ninja_build_outputs//:build_info_version.txt",
+)
+
+fuchsia_product_bundle(
     name = "product_bundle_eng.vim3",
     board_name = "vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
@@ -81,6 +93,14 @@ fuchsia_product_image(
 )
 
 fuchsia_product_image(
+    name = "assembly_eng.arm64",
+    board_config = "//boards:arm64",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":assembly_config_eng",
+)
+
+fuchsia_product_image(
     name = "assembly_eng.vim3",
     board_config = "//boards:vim3",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
@@ -91,6 +111,11 @@ fuchsia_product_image(
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
     product_image = ":assembly_eng.x64",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.arm64",
+    product_image = ":assembly_eng.arm64",
 )
 
 fuchsia_elf_sizes(

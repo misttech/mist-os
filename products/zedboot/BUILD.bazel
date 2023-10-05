@@ -71,6 +71,7 @@ fuchsia_product_configuration(
 ) for board in [
     "x64",
     "qemu-x64",
+    "arm64",
     "vim3",
     "riscv64",
 ]]
@@ -87,6 +88,7 @@ fuchsia_product_configuration(
 ) for board in [
     "x64",
     "qemu-x64",
+    "arm64",
     "vim3",
     "riscv64",
 ]]

@@ -96,6 +96,30 @@ fuchsia_product_bundle(
 )
 
 fuchsia_product_image(
+    name = "image.arm64",
+    board_config = "//boards:arm64",
+    legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
+    platform_aibs = "//build/bazel/assembly/assembly_input_bundles:platform_eng",
+    product_config = ":product_config",
+)
+
+fuchsia_elf_sizes(
+    name = "elf_sizes.arm64",
+    product_image = ":image.arm64",
+)
+
+fuchsia_product_bundle(
+    name = "product_bundle.arm64",
+    board_name = "arm64",
+    partitions_config = "//build/bazel/assembly/partitions_configurations:arm64",
+    product_image = ":image.arm64",
+    product_name = "fuchsia",
+    recovery = "//products/zedboot:arm64",
+    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
+    update_epoch = "1",
+)
+
+fuchsia_product_image(
     name = "image.qemu-x64",
     board_config = "//boards:qemu-x64",
     legacy_aib = "//build/bazel/assembly/assembly_input_bundles:legacy_fuchsia",
