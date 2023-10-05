@@ -19,17 +19,17 @@ use net_types::{
 use netstack3_core::{
     device::{self, DeviceId},
     ip,
-    transport::tcp,
+    transport::tcp::{self, socket::TcpSocketId},
 };
 use std::{fmt, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    /// Convert a [`tcp::socket::SocketId`] into a unique integer.
+    /// Convert a [`TcpSocketId`] into a unique integer.
     ///
     /// Guarantees that no two unique `SocketId`s (even for different IP
     /// versions) will have have the same output value.
-    fn transform_id<I: Ip>(id: tcp::socket::SocketId<I>) -> usize {
+    fn transform_id<I: Ip>(id: TcpSocketId<I>) -> usize {
         let unique_for_ip_version: usize = id.into();
         2 * unique_for_ip_version
             + match I::VERSION {

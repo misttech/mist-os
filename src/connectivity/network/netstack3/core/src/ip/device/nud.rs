@@ -4898,7 +4898,7 @@ mod tests {
     >(
         net: &mut FakeNudNetwork<L>,
         local_buffers: tcp::buffer::testutil::ProvidedBuffers,
-    ) -> tcp::socket::SocketId<I> {
+    ) -> tcp::socket::TcpSocketId<I> {
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
         net.with_context("remote", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
@@ -4907,16 +4907,15 @@ mod tests {
                 non_sync_ctx,
                 tcp::buffer::testutil::ProvidedBuffers::default(),
             );
-            let bound = tcp::socket::bind(
+            tcp::socket::bind(
                 sync_ctx,
                 non_sync_ctx,
-                socket,
+                &socket,
                 Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 Some(REMOTE_PORT),
             )
             .unwrap();
-            let _listener =
-                tcp::socket::listen(sync_ctx, bound, NonZeroUsize::new(1).unwrap()).unwrap();
+            tcp::socket::listen(sync_ctx, &socket, NonZeroUsize::new(1).unwrap()).unwrap();
         });
 
         net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
@@ -4924,13 +4923,14 @@ mod tests {
             tcp::socket::connect(
                 sync_ctx,
                 non_sync_ctx,
-                socket,
+                &socket,
                 tcp::socket::SocketAddr {
                     ip: net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
                     port: REMOTE_PORT,
                 },
             )
-            .unwrap()
+            .unwrap();
+            socket
         })
     }
 
@@ -4978,7 +4978,7 @@ mod tests {
 
         // Initiate a TCP connection and make sure the SYN and resulting SYN/ACK are
         // received by each context.
-        let _: tcp::socket::SocketId<I> = bind_and_connect_sockets::<I, _>(
+        let _: tcp::socket::TcpSocketId<I> = bind_and_connect_sockets::<I, _>(
             &mut net,
             tcp::buffer::testutil::ProvidedBuffers::default(),
         );
@@ -5056,7 +5056,7 @@ mod tests {
             client_ends.0.as_ref().borrow_mut().take().unwrap();
         send.borrow_mut().extend_from_slice(b"hello");
         net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
-            tcp::socket::do_send(sync_ctx, non_sync_ctx, local_socket);
+            tcp::socket::do_send(sync_ctx, non_sync_ctx, &local_socket);
         });
         for _ in 0..2 {
             assert_eq!(

@@ -45,8 +45,8 @@ use crate::{
         socket::{
             do_send_inner, isn::IsnGenerator, Acceptor, BoundSocketState, Connection,
             HandshakeStatus, Listener, ListenerAddrState, ListenerNotifier as _,
-            ListenerSharingState, MaybeListener, NonSyncContext, SocketId, SocketState, Sockets,
-            SyncContext, TcpBindingsTypes, TcpIpTransportContext, TimerId,
+            ListenerSharingState, MaybeListener, NonSyncContext, Sockets, SyncContext,
+            TcpBindingsTypes, TcpIpTransportContext, TcpSocketId, TcpSocketState, TimerId,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
         BufferSizes, ConnectionError, Control, Mss, SocketOptions,
@@ -288,7 +288,7 @@ fn handle_incoming_packet<I, B, C, SC>(
 
 enum ConnectionIncomingSegmentDisposition<I: Ip> {
     FoundSocket,
-    ReuseCandidateForListener(SocketId<I>),
+    ReuseCandidateForListener(TcpSocketId<I>),
 }
 
 enum ListenerIncomingSegmentDisposition {
@@ -307,7 +307,7 @@ fn try_handle_incoming_for_connection<I, SC, C, B>(
     ctx: &mut C,
     sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
     conn_addr: ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, SC::WeakDeviceId>,
-    conn_id: SocketId<I>,
+    conn_id: TcpSocketId<I>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
 ) -> ConnectionIncomingSegmentDisposition<I>
@@ -327,7 +327,7 @@ where
 {
     let (conn, _, addr) = assert_matches!(
         sockets.socket_state.get_mut(conn_id.into()),
-        Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn,
+        Some(TcpSocketState::Bound(BoundSocketState::Connected(conn))) => conn,
         "invalid socket ID"
     );
 
@@ -421,7 +421,7 @@ where
                 // connection from the socketmap.
                 let (_state, _sharing, addr) = assert_matches!(
                     sockets.socket_state.entry(conn_id.into()).remove(),
-                    Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn
+                    Some(TcpSocketState::Bound(BoundSocketState::Connected(conn))) => conn
                 );
                 assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id, &addr), Ok(()));
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
@@ -446,7 +446,7 @@ where
     }
 
     // Send any enqueued data, if there is any.
-    do_send_inner(conn_id, conn, addr, ip_transport_ctx, ctx);
+    do_send_inner(&conn_id, conn, addr, ip_transport_ctx, ctx);
 
     // Enqueue the connection to the associated listener
     // socket's accept queue.
@@ -466,7 +466,7 @@ where
         });
         let Listener { pending, ready, backlog: _, buffer_sizes: _, socket_options: _, notifier } = assert_matches!(
             sockets.socket_state.get_mut(acceptor_id.into()),
-            Some(SocketState::Bound(BoundSocketState::Listener((MaybeListener::Listener(l), _sharing, _addr)))) => l,
+            Some(TcpSocketState::Bound(BoundSocketState::Listener((MaybeListener::Listener(l), _sharing, _addr)))) => l,
             "invalid socket ID"
         );
         let pos = pending
@@ -490,11 +490,11 @@ fn try_handle_incoming_for_listener<I, SC, C, B>(
     ctx: &mut C,
     sockets: &mut Sockets<I, SC::WeakDeviceId, C>,
     isn: &IsnGenerator<C::Instant>,
-    listener_id: SocketId<I>,
+    listener_id: TcpSocketId<I>,
     incoming: Segment<&[u8]>,
     incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &SC::DeviceId,
-    tw_reuse: Option<SocketId<I>>,
+    tw_reuse: Option<TcpSocketId<I>>,
     now: C::Instant,
 ) -> ListenerIncomingSegmentDisposition
 where
@@ -512,7 +512,7 @@ where
     let Sockets { port_alloc: _, socketmap, socket_state } = sockets;
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         socket_state.get(listener_id.into()),
-        Some(SocketState::Bound(BoundSocketState::Listener(l))) => l,
+        Some(TcpSocketState::Bound(BoundSocketState::Listener(l))) => l,
         "invalid socket ID"
     );
 
@@ -623,7 +623,7 @@ where
         if let Some(tw_reuse) = tw_reuse {
             let (_conn, _sharing, conn_addr) = assert_matches!(
                 socket_state.entry(tw_reuse.into()).remove(),
-                Some(SocketState::Bound(BoundSocketState::Connected(conn))) => conn
+                Some(TcpSocketState::Bound(BoundSocketState::Connected(conn))) => conn
             );
             assert_matches!(socketmap.conns_mut().remove(&tw_reuse, &conn_addr), Ok(()));
             assert_matches!(ctx.cancel_timer(TimerId::new::<I>(tw_reuse)), Some(_));
@@ -632,7 +632,7 @@ where
             ip: ConnIpAddr { local: (local_ip, local_port), remote: (remote_ip, remote_port) },
             device: bound_device,
         };
-        let conn_id = socket_state.push(SocketState::Bound(BoundSocketState::Connected((
+        let conn_id = socket_state.push(TcpSocketState::Bound(BoundSocketState::Connected((
             Connection {
                 acceptor: Some(Acceptor::Pending(listener_id)),
                 state,
@@ -645,7 +645,7 @@ where
             sharing,
             addr.clone(),
         ))));
-        let conn_id = SocketId(conn_id, IpVersionMarker::default());
+        let conn_id = TcpSocketId(conn_id, IpVersionMarker::default());
         let _entry = socketmap
             .conns_mut()
             .try_insert(addr, sharing, conn_id)
@@ -653,7 +653,7 @@ where
         assert_eq!(ctx.schedule_timer_instant(poll_send_at, TimerId::new::<I>(conn_id),), None);
         let maybe_listener = assert_matches!(
             sockets.socket_state.get_mut(listener_id.into()),
-            Some(SocketState::Bound(BoundSocketState::Listener((l, _sharing, _addr)))) => l,
+            Some(TcpSocketState::Bound(BoundSocketState::Listener((l, _sharing, _addr)))) => l,
             "invalid socket ID"
         );
 

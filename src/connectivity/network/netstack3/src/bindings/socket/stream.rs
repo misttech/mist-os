@@ -44,7 +44,7 @@ use netstack3_core::{
             set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
             with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
             ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
-            SocketAddr, SocketId, SocketInfo, TcpBindingsTypes,
+            SocketAddr, SocketInfo, TcpBindingsTypes, TcpSocketId,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -449,7 +449,7 @@ impl SendBuffer for SendBufferWithZirconSocket {
 }
 
 struct BindingData<I: IpExt> {
-    id: SocketId<I>,
+    id: TcpSocketId<I>,
     peer: zx::Socket,
     local_socket_and_watcher: Option<(Arc<zx::Socket>, NeedsDataWatcher)>,
     send_task_abort: Option<futures::channel::oneshot::Sender<()>>,
@@ -672,7 +672,7 @@ fn spawn_send_task<I: IpExt>(
     mut ctx: crate::bindings::Ctx,
     socket: Arc<zx::Socket>,
     mut watcher: NeedsDataWatcher,
-    id: SocketId<I>,
+    id: TcpSocketId<I>,
     spawner: &worker::SocketScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) -> futures::channel::oneshot::Sender<()> {
     let (sender, abort) = futures::channel::oneshot::channel();
@@ -713,7 +713,7 @@ fn spawn_send_task<I: IpExt>(
                     netstack3_core::transport::tcp::socket::do_send::<I, _>(
                         sync_ctx,
                         non_sync_ctx,
-                        id.into(),
+                        &id,
                     );
                 }
             }
@@ -749,7 +749,7 @@ where
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (addr, port) =
             addr.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?;
-        *id = bind::<I, _>(sync_ctx, non_sync_ctx, *id, addr, NonZeroU16::new(port))
+        bind::<I, _>(sync_ctx, non_sync_ctx, id, addr, NonZeroU16::new(port))
             .map_err(IntoErrno::into_errno)?;
         Ok(())
     }
@@ -770,11 +770,10 @@ where
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
         let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into());
-        let connection = connect::<I, _>(sync_ctx, non_sync_ctx, *id, SocketAddr { ip, port })
+        connect::<I, _>(sync_ctx, non_sync_ctx, id, SocketAddr { ip, port })
             .map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
-            *id = connection;
-            let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, connection, spawner);
+            let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, *id, spawner);
             assert_matches::assert_matches!(send_task_abort.replace(sender), None);
             Err(fposix::Errno::Einprogress)
         } else {
@@ -810,7 +809,7 @@ where
             NonZeroUsize::min(MAXIMUM_BACKLOG_SIZE, NonZeroUsize::max(b, MINIMUM_BACKLOG_SIZE))
         });
 
-        *id = listen::<I, _>(sync_ctx, *id, backlog).map_err(IntoErrno::into_errno)?;
+        listen::<I, _>(sync_ctx, id, backlog).map_err(IntoErrno::into_errno)?;
         Ok(())
     }
 
@@ -820,7 +819,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let fidl = match get_info::<I, _>(sync_ctx, *id) {
+        let fidl = match get_info::<I, _>(sync_ctx, id) {
             SocketInfo::Unbound(_) => return Err(fposix::Errno::Einval),
             SocketInfo::Bound(BoundInfo { addr, port, device: _ }) => {
                 (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
@@ -839,7 +838,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        match get_info::<I, _>(sync_ctx, *id) {
+        match get_info::<I, _>(sync_ctx, id) {
             SocketInfo::Unbound(_) | SocketInfo::Bound(_) => Err(fposix::Errno::Enotconn),
             SocketInfo::Connection(info) => Ok({
                 info.remote_addr
@@ -865,7 +864,7 @@ where
 
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let (accepted, addr, peer) =
-            accept::<I, _>(sync_ctx, non_sync_ctx, *id).map_err(IntoErrno::into_errno)?;
+            accept::<I, _>(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
         let addr = addr
             .try_into_fidl_with_ctx(non_sync_ctx)
             .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
@@ -892,7 +891,7 @@ where
             ctx,
         } = self;
         let sync_ctx = ctx.sync_ctx();
-        match get_socket_error(sync_ctx, *id) {
+        match get_socket_error(sync_ctx, id) {
             Some(err) => Err(err.into_errno()),
             None => Ok(()),
         }
@@ -932,7 +931,7 @@ where
             .map(|name| non_sync_ctx.devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev))
             .transpose()?;
 
-        set_device(sync_ctx, non_sync_ctx, *id, device).map_err(IntoErrno::into_errno)
+        set_device(sync_ctx, non_sync_ctx, id, device).map_err(IntoErrno::into_errno)
     }
 
     fn set_send_buffer_size(self, new_size: u64) {
@@ -943,7 +942,7 @@ where
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        set_send_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
+        set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size);
     }
 
     fn send_buffer_size(self) -> u64 {
@@ -952,7 +951,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        send_buffer_size(sync_ctx, non_sync_ctx, *id)
+        send_buffer_size(sync_ctx, non_sync_ctx, id)
             // If the socket doesn't have a send buffer (e.g. because it was shut
             // down for writing and all the data was sent to the peer), return 0.
             .unwrap_or(0)
@@ -969,7 +968,7 @@ where
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let new_size =
             usize::try_from(new_size).ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        set_receive_buffer_size(sync_ctx, non_sync_ctx, *id, new_size);
+        set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size);
     }
 
     fn receive_buffer_size(self) -> u64 {
@@ -978,7 +977,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        receive_buffer_size(sync_ctx, non_sync_ctx, *id)
+        receive_buffer_size(sync_ctx, non_sync_ctx, id)
             // If the socket doesn't have a receive buffer (e.g. because the remote
             // end signalled FIN and all data was sent to the client), return 0.
             .unwrap_or(0)
@@ -993,7 +992,7 @@ where
             ctx,
         } = self;
         let sync_ctx = ctx.sync_ctx();
-        set_reuseaddr(sync_ctx, *id, value).map_err(IntoErrno::into_errno)
+        set_reuseaddr(sync_ctx, id, value).map_err(IntoErrno::into_errno)
     }
 
     fn reuse_address(self) -> bool {
@@ -1002,7 +1001,7 @@ where
             ctx,
         } = self;
         let sync_ctx = ctx.sync_ctx();
-        reuseaddr(sync_ctx, *id)
+        reuseaddr(sync_ctx, id)
     }
 
     /// Returns a [`ControlFlow`] to indicate whether the parent stream should
@@ -1722,7 +1721,7 @@ where
             ctx,
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        with_socket_options_mut(sync_ctx, non_sync_ctx, *id, f)
+        with_socket_options_mut(sync_ctx, non_sync_ctx, id, f)
     }
 
     fn with_socket_options<R, F: FnOnce(&SocketOptions) -> R>(self, f: F) -> R {
@@ -1730,13 +1729,13 @@ where
             data: BindingData { id, peer: _, local_socket_and_watcher: _, send_task_abort: _ },
             ctx,
         } = self;
-        with_socket_options(ctx.sync_ctx(), *id, f)
+        with_socket_options(ctx.sync_ctx(), id, f)
     }
 }
 
 fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     ctx: Ctx,
-    accepted: SocketId<I>,
+    accepted: TcpSocketId<I>,
     peer: zx::Socket,
     request_stream: fposix_socket::StreamSocketRequestStream,
     local_socket: Arc<zx::Socket>,
