@@ -1392,7 +1392,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_UnknownNode) {
 // Start the root driver, and then add a child node that only binds to a base driver.
 TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
   bool base_drivers_loaded = false;
-  FakeDriverIndex driver_index(
+  FakeDriverIndex fake_driver_index(
       dispatcher(), [&base_drivers_loaded](auto args) -> zx::result<FakeDriverIndex::MatchResult> {
         if (base_drivers_loaded) {
           if (args.name().get() == "second") {
@@ -1403,7 +1403,7 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
         }
         return zx::error(ZX_ERR_NOT_FOUND);
       });
-  SetupDriverRunner(std::move(driver_index));
+  SetupDriverRunner(std::move(fake_driver_index));
 
   auto root_driver = StartRootDriver();
   ASSERT_EQ(ZX_OK, root_driver.status_value());
@@ -1432,7 +1432,10 @@ TEST_F(DriverRunnerTest, StartSecondDriver_BindOrphanToBaseDriver) {
 
   // Tell driver index to return the second driver, and wait for base drivers to load.
   base_drivers_loaded = true;
-  driver_runner().ScheduleBaseDriversBinding();
+  driver_runner().ScheduleWatchForDriverLoad();
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  driver_index().InvokeWatchDriverResponse();
   ASSERT_TRUE(RunLoopUntilIdle());
 
   // See that we don't have an orphan anymore.

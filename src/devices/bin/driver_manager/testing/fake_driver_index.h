@@ -53,8 +53,8 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
     completer.ReplySuccess(GetMatchedDriver(arena, match.value()));
   }
 
-  void WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) override {
-    completer.Reply();
+  void WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) override {
+    watch_completer_ = completer.ToAsync();
   }
 
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
@@ -85,6 +85,11 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   void AddCompositeNodeSpecMatch(std::string_view name,
                                  fuchsia_driver_index::MatchedCompositeNodeSpecInfo result) {
     spec_match_[std::string(name)] = result;
+  }
+
+  void InvokeWatchDriverResponse() {
+    ZX_ASSERT(watch_completer_.has_value());
+    watch_completer_->Reply();
   }
 
   void set_match_callback(MatchCallback match_callback) {
@@ -126,6 +131,8 @@ class FakeDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
 
   async_dispatcher_t* dispatcher_;
   MatchCallback match_callback_;
+
+  std::optional<WatchForDriverLoadCompleter::Async> watch_completer_;
 
   // Maps a MatchedCompositeNodeSpecInfo to a composite node spec topological path. This gets
   // returned when FakeDriverIndex receives an AddCompositeNodeSpec() call for a matching

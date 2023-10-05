@@ -34,6 +34,8 @@ fuchsia_structured_config_values("test_config") {
     enable_ephemeral_drivers = true
     delay_fallback_until_base_drivers_indexed = true
     bind_eager = []
+    enable_driver_load_fuzzer = false
+    driver_load_fuzzer_max_delay_ms = 0
     disabled_drivers = []
   }
 }
@@ -71,6 +73,7 @@ rustc_binary("bin") {
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
@@ -82,6 +85,7 @@ rustc_binary("bin") {
 
   sources = [
     "src/composite_node_spec_manager.rs",
+    "src/driver_loading_fuzzer.rs",
     "src/indexer.rs",
     "src/load_driver.rs",
     "src/main.rs",

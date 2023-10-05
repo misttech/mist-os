@@ -116,8 +116,9 @@ closed protocol DriverIndex {
         driver MatchedDriver;
     }) error zx.Status;
 
-    /// This function will block until base drivers are loaded.
-    strict WaitForBaseDrivers() -> ();
+    /// Hanging get function that replies when a boot or base driver is loaded
+    /// into the Driver Index.
+    strict WatchForDriverLoad() -> ();
 
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are

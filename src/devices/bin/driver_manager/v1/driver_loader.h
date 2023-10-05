@@ -40,7 +40,7 @@ class DriverLoader {
   // This will schedule a task on the async_dispatcher that will return
   // when DriverIndex has loaded the base drivers. When the task completes,
   // `callback` will be called.
-  void WaitForBaseDrivers(fit::callback<void()> callback);
+  void WatchForDrivers(fit::function<void()> on_driver_loaded);
 
   struct MatchDeviceConfig {
     // If this is non-empty, then only drivers who match this url suffix will be matched.

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::driver_loading_fuzzer::Session,
     crate::indexer::*,
     crate::load_driver::*,
     crate::resolved_driver::ResolvedDriver,
@@ -18,13 +19,13 @@ use {
     std::{
         collections::HashMap,
         collections::HashSet,
-        ops::DerefMut,
         rc::Rc,
         sync::{Arc, Mutex},
     },
 };
 
 mod composite_node_spec_manager;
+mod driver_loading_fuzzer;
 mod indexer;
 mod load_driver;
 mod match_common;
@@ -49,6 +50,35 @@ fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
 fn log_error(err: anyhow::Error) -> anyhow::Error {
     tracing::error!("{:#?}", err);
     err
+}
+
+fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) -> Rc<Indexer> {
+    if !config.enable_driver_load_fuzzer {
+        return Rc::new(Indexer::new(
+            boot_drivers,
+            BaseRepo::NotResolved,
+            config.delay_fallback_until_base_drivers_indexed,
+        ));
+    }
+
+    let indexer = Rc::new(Indexer::new(
+        vec![],
+        BaseRepo::NotResolved,
+        config.delay_fallback_until_base_drivers_indexed,
+    ));
+
+    // TODO(fxb/126225): Pass in a seed from the input, if available.
+    let (sender, receiver) = futures::channel::mpsc::unbounded::<ResolvedDriver>();
+    indexer.clone().start_driver_load(
+        receiver,
+        Session::new(
+            sender,
+            boot_drivers,
+            fuchsia_zircon::Duration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            None,
+        ),
+    );
+    indexer
 }
 
 async fn run_driver_info_iterator_server(
@@ -235,18 +265,8 @@ async fn run_index_server(
                         .or_else(ignore_peer_closed)
                         .context("error responding to MatchDriver")?;
                 }
-                DriverIndexRequest::WaitForBaseDrivers { responder } => {
-                    match indexer.base_repo.borrow_mut().deref_mut() {
-                        BaseRepo::Resolved(_) => {
-                            responder
-                                .send()
-                                .or_else(ignore_peer_closed)
-                                .context("error responding to WaitForBaseDrivers")?;
-                        }
-                        BaseRepo::NotResolved(waiters) => {
-                            waiters.push(responder);
-                        }
-                    }
+                DriverIndexRequest::WatchForDriverLoad { responder } => {
+                    indexer.watch_for_driver_load(responder);
                 }
                 DriverIndexRequest::AddCompositeNodeSpec { payload, responder } => {
                     responder
@@ -382,11 +402,8 @@ async fn main() -> Result<(), anyhow::Error> {
         }
     }
 
-    let index = Rc::new(Indexer::new(
-        drivers,
-        BaseRepo::NotResolved(std::vec![]),
-        config.delay_fallback_until_base_drivers_indexed,
-    ));
+    let index = create_and_setup_index(drivers, &config);
+
     let (res1, _) = futures::future::join(
         async {
             if should_load_base_drivers {
@@ -605,7 +622,7 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(std::vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::new();
@@ -1430,7 +1447,7 @@ mod tests {
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(std::vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let eager_drivers = HashSet::from([eager_driver_component_url.clone()]);
         let disabled_drivers = HashSet::new();
@@ -1538,7 +1555,7 @@ mod tests {
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fresolution::ResolverMarker>().unwrap();
 
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(std::vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let eager_drivers = HashSet::new();
         let disabled_drivers = HashSet::from([disabled_driver_component_url.clone()]);
@@ -1593,7 +1610,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];
-        let index = Indexer::new(boot_repo, BaseRepo::NotResolved(vec![]), true);
+        let index = Indexer::new(boot_repo, BaseRepo::NotResolved, true);
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
@@ -1628,7 +1645,7 @@ mod tests {
             package_type: DriverPackageType::Boot,
             package_hash: None,
         }];
-        let index = Indexer::new(boot_repo, BaseRepo::NotResolved(vec![]), false);
+        let index = Indexer::new(boot_repo, BaseRepo::NotResolved, false);
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
@@ -1666,7 +1683,7 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
-        let index = Rc::new(Indexer::new(drivers, BaseRepo::NotResolved(vec![]), false));
+        let index = Rc::new(Indexer::new(drivers, BaseRepo::NotResolved, false));
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
@@ -2447,7 +2464,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
         // Start our index out without any drivers.
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
@@ -2645,7 +2662,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
         // Start our index out without any drivers.
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {
@@ -2843,7 +2860,7 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
 
         // Start our index out without any drivers.
-        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved(vec![]), false));
+        let index = Rc::new(Indexer::new(std::vec![], BaseRepo::NotResolved, false));
 
         let index_task = run_index_server(index.clone(), stream).fuse();
         let test_task = async move {

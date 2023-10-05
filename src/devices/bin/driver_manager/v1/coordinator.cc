@@ -322,7 +322,7 @@ void Coordinator::LoadV1Drivers(std::string_view root_device_driver) {
   bind_driver_manager_->BindAllDevices(config);
 
   // Schedule the base drivers to load.
-  driver_loader_.WaitForBaseDrivers(
+  driver_loader_.WatchForDrivers(
       [this]() { bind_driver_manager_->BindAllDevices(DriverLoader::MatchDeviceConfig{}); });
 }
 

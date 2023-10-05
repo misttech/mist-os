@@ -29,7 +29,7 @@ void TestDriverIndex::MatchDriver(MatchDriverRequestView request,
   completers_[id.value()].push(completer.ToAsync());
 }
 
-void TestDriverIndex::WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) {
+void TestDriverIndex::WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) {
   completer.Reply();
 }
 

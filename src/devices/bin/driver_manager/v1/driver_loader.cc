@@ -46,29 +46,30 @@ const Driver* DriverLoader::UrlToDriver(const std::string& url) {
   return driver_index_drivers_[url].get();
 }
 
-void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
+void DriverLoader::WatchForDrivers(fit::function<void()> on_driver_loaded) {
   if (!driver_index_.is_valid()) {
     LOGF(ERROR, "%s: DriverIndex is not initialized", __func__);
     return;
   }
 
-  driver_index_->WaitForBaseDrivers().Then(
-      [callback = std::move(callback)](
-          fidl::WireUnownedResult<fdi::DriverIndex::WaitForBaseDrivers>& result) mutable {
+  driver_index_->WatchForDriverLoad().Then(
+      [this, on_driver_loaded = std::move(on_driver_loaded)](
+          fidl::WireUnownedResult<fdi::DriverIndex::WatchForDriverLoad>& result) mutable {
         if (!result.ok()) {
           // Since IsolatedDevmgr doesn't use the ComponentFramework, DriverIndex can be
           // closed before DriverManager during tests, which would mean we would see
           // a ZX_ERR_PEER_CLOSED.
           if (result.status() == ZX_ERR_PEER_CLOSED) {
-            LOGF(WARNING, "Connection to DriverIndex closed during WaitForBaseDrivers.");
+            LOGF(WARNING, "Connection to DriverIndex closed during WatchForDriverLoad.");
           } else {
-            LOGF(ERROR, "Failed to connect to DriverIndex: %s",
+            LOGF(ERROR, "DriverIndex::WatchForDriverLoad failed with: %s",
                  result.error().FormatDescription().c_str());
           }
-
           return;
         }
-        callback();
+
+        on_driver_loaded();
+        WatchForDrivers(std::move(on_driver_loaded));
       });
 }
 

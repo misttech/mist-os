@@ -42,7 +42,7 @@ class TestDriverIndex final : public fidl::WireServer<fuchsia_driver_index::Driv
   explicit TestDriverIndex(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   void MatchDriver(MatchDriverRequestView request, MatchDriverCompleter::Sync& completer) override;
-  void WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) override;
+  void WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) override;
   void AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request,
                             AddCompositeNodeSpecCompleter::Sync& completer) override;
   void RebindCompositeNodeSpec(RebindCompositeNodeSpecRequestView request,

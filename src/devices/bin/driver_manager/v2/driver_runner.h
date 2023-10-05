@@ -93,9 +93,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_driver_framework::Composite
   void PublishCompositeNodeManager(component::OutgoingDirectory& outgoing);
   zx::result<> StartRootDriver(std::string_view url);
 
-  // This function schedules a callback to attempt to bind all orphaned nodes against
-  // the base drivers.
-  void ScheduleBaseDriversBinding();
+  // Schedules a hanging get call that watches for a new boot/base driver in the Driver Index.
+  void ScheduleWatchForDriverLoad();
 
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
   // orphaned back to the orphan list. Tracks the result of the bindings and then when finished

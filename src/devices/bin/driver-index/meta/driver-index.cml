@@ -68,6 +68,8 @@
                 max_size: 100,
             },
         },
+        enable_driver_load_fuzzer: { type: "bool" },
+        driver_load_fuzzer_max_delay_ms: { type: "int64" },
 
         // Disable specific drivers by URL. These drivers will not be bound or loaded.
         disabled_drivers: {

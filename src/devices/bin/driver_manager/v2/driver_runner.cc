@@ -332,23 +332,23 @@ zx::result<> DriverRunner::StartRootDriver(std::string_view url) {
   return StartDriver(*root_node_, url, package);
 }
 
-void DriverRunner::ScheduleBaseDriversBinding() {
-  driver_index_->WaitForBaseDrivers().Then(
-      [this](fidl::WireUnownedResult<fdi::DriverIndex::WaitForBaseDrivers>& result) mutable {
+void DriverRunner::ScheduleWatchForDriverLoad() {
+  driver_index_->WatchForDriverLoad().Then(
+      [this](fidl::WireUnownedResult<fdi::DriverIndex::WatchForDriverLoad>& result) mutable {
         if (!result.ok()) {
-          // It's possible in tests that the test can finish before WaitForBaseDrivers
+          // It's possible in tests that the test can finish before WatchForDriverLoad
           // finishes.
           if (result.status() == ZX_ERR_PEER_CLOSED) {
-            LOGF(WARNING, "Connection to DriverIndex closed during WaitForBaseDrivers.");
+            LOGF(WARNING, "Connection to DriverIndex closed during WatchForDriverLoad.");
           } else {
-            LOGF(ERROR, "DriverIndex::WaitForBaseDrivers failed with: %s",
+            LOGF(ERROR, "DriverIndex::WatchForDriverLoad failed with: %s",
                  result.error().FormatDescription().c_str());
           }
           return;
         }
-
-        TryBindAllAvailable();
+        ScheduleWatchForDriverLoad();
       });
+  TryBindAllAvailable();
 }
 
 void DriverRunner::TryBindAllAvailable(NodeBindingInfoResultCallback result_callback) {

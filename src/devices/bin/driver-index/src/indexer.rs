@@ -4,13 +4,19 @@
 
 use {
     crate::composite_node_spec_manager::CompositeNodeSpecManager,
+    crate::driver_loading_fuzzer::Session,
     crate::match_common::{node_to_device_property, node_to_device_property_no_autobind},
     crate::resolved_driver::{DriverPackageType, ResolvedDriver},
     bind::interpreter::decode_bind_rules::DecodedRules,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_driver_development as fdd,
     fidl_fuchsia_driver_framework as fdf, fidl_fuchsia_driver_index as fdi,
+    fuchsia_async as fasync,
     fuchsia_zircon::Status,
-    std::{cell::RefCell, collections::HashMap, collections::HashSet, ops::Deref, ops::DerefMut},
+    futures::StreamExt,
+    std::{
+        cell::RefCell, collections::HashMap, collections::HashSet, ops::Deref, ops::DerefMut,
+        rc::Rc,
+    },
 };
 
 fn ignore_peer_closed(err: fidl::Error) -> Result<(), fidl::Error> {
@@ -25,11 +31,11 @@ pub enum BaseRepo {
     // We know that Base won't update so we can store these as resolved.
     Resolved(Vec<ResolvedDriver>),
     // If it's not resolved we store the clients waiting for it.
-    NotResolved(Vec<fdi::DriverIndexWaitForBaseDriversResponder>),
+    NotResolved,
 }
 
 pub struct Indexer {
-    pub boot_repo: Vec<ResolvedDriver>,
+    pub boot_repo: RefCell<Vec<ResolvedDriver>>,
 
     // |base_repo| needs to be in a RefCell because it starts out NotResolved,
     // but will eventually resolve when base packages are available.
@@ -38,6 +44,9 @@ pub struct Indexer {
     // Manages the specs. This is wrapped in a RefCell since the
     // specs are added after the driver index server has started.
     pub composite_node_spec_manager: RefCell<CompositeNodeSpecManager>,
+
+    // Clients waiting for a response when a new boot/base driver is loaded.
+    driver_load_watchers: RefCell<Vec<fdi::DriverIndexWatchForDriverLoadResponder>>,
 
     // Used to determine if the indexer should return fallback drivers that match or
     // wait until based packaged drivers are indexed.
@@ -60,13 +69,27 @@ impl Indexer {
         delay_fallback_until_base_drivers_indexed: bool,
     ) -> Indexer {
         Indexer {
-            boot_repo,
+            boot_repo: RefCell::new(boot_repo),
             base_repo: RefCell::new(base_repo),
             composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
+            driver_load_watchers: RefCell::new(vec![]),
             delay_fallback_until_base_drivers_indexed,
             ephemeral_drivers: RefCell::new(HashMap::new()),
             disabled_driver_urls: RefCell::new(HashSet::new()),
         }
+    }
+
+    pub fn start_driver_load(
+        self: Rc<Self>,
+        receiver: futures::channel::mpsc::UnboundedReceiver<ResolvedDriver>,
+        session: Session,
+    ) {
+        fasync::Task::local(async move {
+            self.handle_add_boot_driver(receiver).await;
+        })
+        .detach();
+
+        fasync::Task::local(session.run()).detach();
     }
 
     fn include_fallback_drivers(&self) -> bool {
@@ -88,6 +111,35 @@ impl Indexer {
         false
     }
 
+    pub fn watch_for_driver_load(&self, responder: fdi::DriverIndexWatchForDriverLoadResponder) {
+        self.driver_load_watchers.borrow_mut().push(responder);
+    }
+
+    pub async fn handle_add_boot_driver(
+        self: Rc<Self>,
+        mut receiver: futures::channel::mpsc::UnboundedReceiver<ResolvedDriver>,
+    ) {
+        while let Some(driver) = receiver.next().await {
+            self.boot_repo.borrow_mut().push(driver.clone());
+            tracing::info!("Loaded driver {} into the driver index", driver.component_url);
+
+            let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
+            composite_node_spec_manager.new_driver_available(driver);
+
+            self.report_driver_load();
+        }
+    }
+
+    fn report_driver_load(&self) {
+        let mut driver_load_watchers = self.driver_load_watchers.borrow_mut();
+        while let Some(watcher) = driver_load_watchers.pop() {
+            match watcher.send().or_else(ignore_peer_closed) {
+                Err(e) => tracing::error!("Error sending to base_waiter: {:?}", e),
+                Ok(_) => continue,
+            }
+        }
+    }
+
     // Create a list of all drivers (except for disabled drivers) in the following priority:
     // 1. Non-fallback boot drivers
     // 2. Non-fallback base drivers
@@ -97,10 +149,12 @@ impl Indexer {
         let base_repo = self.base_repo.borrow();
         let base_repo_iter = match base_repo.deref() {
             BaseRepo::Resolved(drivers) => drivers.iter(),
-            BaseRepo::NotResolved(_) => [].iter(),
+            BaseRepo::NotResolved => [].iter(),
         };
+
+        let boot_repo = self.boot_repo.borrow();
         let (boot_drivers, base_drivers) = if self.include_fallback_drivers() {
-            (self.boot_repo.iter(), base_repo_iter.clone())
+            (boot_repo.iter(), base_repo_iter.clone())
         } else {
             ([].iter(), [].iter())
         };
@@ -109,7 +163,7 @@ impl Indexer {
 
         let ephemeral = self.ephemeral_drivers.borrow();
 
-        self.boot_repo
+        boot_repo
             .iter()
             .filter(|&driver| !driver.fallback)
             .chain(base_repo_iter.filter(|&driver| !driver.fallback))
@@ -121,16 +175,11 @@ impl Indexer {
             .collect::<Vec<_>>()
     }
 
-    pub fn load_base_repo(&self, base_repo: BaseRepo) {
-        if let BaseRepo::NotResolved(waiters) = self.base_repo.borrow_mut().deref_mut() {
-            while let Some(waiter) = waiters.pop() {
-                match waiter.send().or_else(ignore_peer_closed) {
-                    Err(e) => tracing::error!("Error sending to base_waiter: {:?}", e),
-                    Ok(_) => continue,
-                }
-            }
+    pub fn load_base_repo(&self, base_drivers: Vec<ResolvedDriver>) {
+        if let BaseRepo::NotResolved = self.base_repo.borrow_mut().deref_mut() {
+            self.report_driver_load();
         }
-        self.base_repo.replace(base_repo);
+        self.base_repo.replace(BaseRepo::Resolved(base_drivers));
     }
 
     pub fn match_driver(&self, args: fdi::MatchDriverArgs) -> fdi::DriverIndexMatchDriverResult {
@@ -237,7 +286,7 @@ impl Indexer {
     pub fn get_driver_info(&self, driver_filter: Vec<String>) -> Vec<fdd::DriverInfo> {
         let mut driver_info = Vec::new();
 
-        for driver in &self.boot_repo {
+        for driver in self.boot_repo.borrow().iter() {
             if driver_filter.len() == 0 || driver_filter.iter().any(|f| f == &driver.get_libname())
             {
                 driver_info.push(driver.create_driver_info());
@@ -277,7 +326,7 @@ impl Indexer {
             Status::ADDRESS_UNREACHABLE.into_raw()
         })?;
 
-        for boot_driver in self.boot_repo.iter() {
+        for boot_driver in self.boot_repo.borrow().iter() {
             if boot_driver.component_url == component_url {
                 tracing::warn!("Driver being registered already exists in boot list.");
                 return Err(Status::ALREADY_EXISTS.into_raw());

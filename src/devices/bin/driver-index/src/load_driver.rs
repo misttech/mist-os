@@ -73,7 +73,7 @@ pub async fn load_base_drivers(
         let mut composite_node_spec_manager = indexer.composite_node_spec_manager.borrow_mut();
         composite_node_spec_manager.new_driver_available(resolved_driver.clone());
     }
-    indexer.load_base_repo(BaseRepo::Resolved(resolved_drivers));
+    indexer.load_base_repo(resolved_drivers);
     Ok(())
 }
 

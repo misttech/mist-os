@@ -28,7 +28,7 @@ pub enum DriverPackageType {
     Universe = 3,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResolvedDriver {
     pub component_url: url::Url,
     pub v1_driver_path: Option<String>,

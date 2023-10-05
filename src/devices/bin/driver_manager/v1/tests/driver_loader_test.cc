@@ -43,7 +43,7 @@ class FakeDriverLoaderIndex final : public fidl::WireServer<fdi::DriverIndex> {
     completer.ReplySuccess(driver.value());
   }
 
-  void WaitForBaseDrivers(WaitForBaseDriversCompleter::Sync& completer) override {
+  void WatchForDriverLoad(WatchForDriverLoadCompleter::Sync& completer) override {
     completer.Reply();
   }
 

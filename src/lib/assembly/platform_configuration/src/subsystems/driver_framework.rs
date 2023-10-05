@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use assembly_config_schema::platform_config::driver_framework_config::{
-    DriverFrameworkConfig, DriverHostCrashPolicy,
+    DriverFrameworkConfig, DriverHostCrashPolicy, TestDriverLoadConfig,
 };
 
 pub(crate) struct DriverFrameworkSubsystemConfig;
@@ -27,12 +27,19 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
 
         let delay_fallback = !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
 
+        let driver_load_config = driver_framework_config
+            .driver_load_config
+            .as_ref()
+            .unwrap_or(&TestDriverLoadConfig { enable_fuzzer: false, max_delay_ms: 0 });
+
         builder
             .package("driver-index")
             .component("meta/driver-index.cm")?
             .field("enable_ephemeral_drivers", matches!(context.build_type, BuildType::Eng))?
             .field("delay_fallback_until_base_drivers_indexed", delay_fallback)?
             .field("bind_eager", driver_framework_config.eager_drivers.clone())?
+            .field("enable_driver_load_fuzzer", driver_load_config.enable_fuzzer)?
+            .field("driver_load_fuzzer_max_delay_ms", driver_load_config.max_delay_ms)?
             .field("disabled_drivers", disabled_drivers)?;
 
         let driver_host_crash_policy = driver_framework_config
