@@ -279,6 +279,18 @@ pub fn sys_bpf(
             Ok(SUCCESS)
         }
 
+        // Obtain information about eBPF programs associated with the specified attach_type hook.
+        bpf_cmd_BPF_PROG_QUERY => {
+            let mut prog_attr: bpf_attr__bindgen_ty_10 =
+                read_attr(current_task, attr_addr, attr_size)?;
+            log_trace!("BPF_PROG_QUERY");
+            not_implemented!("Bpf::BPF_PROG_QUERY is stubbed");
+            current_task.write_memory(UserAddress::from(prog_attr.prog_ids), 1.as_bytes())?;
+            prog_attr.prog_cnt = std::mem::size_of::<u64>() as u32;
+            current_task.write_memory(attr_addr, prog_attr.as_bytes())?;
+            Ok(SUCCESS)
+        }
+
         // Pin an eBPF program or map referred by the specified bpf_fd to the provided pathname on
         // the filesystem.
         bpf_cmd_BPF_OBJ_PIN => {
