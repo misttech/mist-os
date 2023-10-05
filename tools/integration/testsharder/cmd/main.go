@@ -213,15 +213,15 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 			return fmt.Errorf("failed to read affectedTestsPath (%s): %w", flags.affectedTestsPath, err)
 		}
 		affectedTestNames := strings.Split(strings.TrimSpace(string(affectedTestBytes)), "\n")
-		if len(affectedTestNames) == 0 {
+		affectedModifiers, err := testsharder.AffectedModifiers(m.TestSpecs(), affectedTestNames, flags.affectedTestsMaxAttempts, flags.affectedTestsMultiplyThreshold)
+		if err != nil {
+			return err
+		}
+		if len(affectedModifiers) == 0 {
 			// If there are no affected tests, that means we weren't
 			// able to determine which tests were affected so we should
 			// run all tests.
 			flags.skipUnaffected = false
-		}
-		affectedModifiers, err := testsharder.AffectedModifiers(m.TestSpecs(), affectedTestNames, flags.affectedTestsMaxAttempts, flags.affectedTestsMultiplyThreshold)
-		if err != nil {
-			return err
 		}
 		// Apply affected modifiers to both multiplied and non-multiplied shards
 		// so that tests in all shards are correctly labeled as affected.
@@ -247,7 +247,7 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 	multipliedAffectedShards, nonMultipliedShards := testsharder.PartitionShards(nonMultipliedShards, multipliedAffected, "")
 
 	var skippedShards []*testsharder.Shard
-	if flags.affectedOnly {
+	if flags.affectedOnly && flags.skipUnaffected {
 		affected := func(t testsharder.Test) bool {
 			return t.Affected
 		}

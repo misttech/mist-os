@@ -380,6 +380,44 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			name: "run all tests if empty affected tests",
+			flags: testsharderFlags{
+				skipUnaffected: true,
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("affected-hermetic-test"),
+				fuchsiaTestSpec("unaffected-hermetic-test"),
+				fuchsiaTestSpec("affected-nonhermetic-test"),
+				fuchsiaTestSpec("unaffected-nonhermetic-test"),
+			},
+			testList: []build.TestListEntry{
+				testListEntry("affected-hermetic-test", true),
+				testListEntry("unaffected-hermetic-test", true),
+				testListEntry("affected-nonhermetic-test", false),
+				testListEntry("unaffected-nonhermetic-test", false),
+			},
+			affectedTests: []string{""},
+		},
+		{
+			name: "run all tests if no affected and affected only",
+			flags: testsharderFlags{
+				affectedOnly:   true,
+				skipUnaffected: true,
+			},
+			testSpecs: []build.TestSpec{
+				fuchsiaTestSpec("affected-hermetic-test"),
+				fuchsiaTestSpec("unaffected-hermetic-test"),
+				fuchsiaTestSpec("affected-nonhermetic-test"),
+				fuchsiaTestSpec("unaffected-nonhermetic-test"),
+			},
+			testList: []build.TestListEntry{
+				testListEntry("affected-hermetic-test", true),
+				testListEntry("unaffected-hermetic-test", true),
+				testListEntry("affected-nonhermetic-test", false),
+				testListEntry("unaffected-nonhermetic-test", false),
+			},
+		},
+		{
 			name: "multiply unaffected hermetic tests",
 			flags: testsharderFlags{
 				skipUnaffected: true,

@@ -90,9 +90,17 @@ func LoadTestModifiers(ctx context.Context, testSpecs []build.TestSpec, manifest
 // maxAttempts will be applied to any test that is not multiplied.
 // Tests will be considered for multiplication only if num affected tests <= multiplyThreshold.
 func AffectedModifiers(testSpecs []build.TestSpec, affectedTestNames []string, maxAttempts, multiplyThreshold int) ([]ModifierMatch, error) {
+	nameToSpec := make(map[string]build.TestSpec)
+	for _, ts := range testSpecs {
+		nameToSpec[ts.Name] = ts
+	}
 	var ret []ModifierMatch
 	if len(affectedTestNames) > multiplyThreshold {
 		for _, name := range affectedTestNames {
+			_, found := nameToSpec[name]
+			if !found {
+				continue
+			}
 			// Since we're not multiplying the tests, apply maxAttempts to them instead.
 			ret = append(ret, ModifierMatch{
 				Test: name,
@@ -105,10 +113,6 @@ func AffectedModifiers(testSpecs []build.TestSpec, affectedTestNames []string, m
 			})
 		}
 	} else {
-		nameToSpec := make(map[string]build.TestSpec)
-		for _, ts := range testSpecs {
-			nameToSpec[ts.Name] = ts
-		}
 		for _, name := range affectedTestNames {
 			spec, found := nameToSpec[name]
 			if !found {
