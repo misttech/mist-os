@@ -185,6 +185,7 @@ def fuchsia_cc_binary(
         visibility: The visibility of all generated targets.
         **cc_binary_kwargs: Arguments to forward to `cc_binary`.
     """
+
     native.cc_binary(
         name = "_%s_native" % name,
         tags = tags,

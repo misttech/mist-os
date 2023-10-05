@@ -11,20 +11,22 @@ package(default_visibility = ["//visibility:public"])
 test_suite(
     name = "tests",
     tests = [
-        ":test-driver-with-direct-srcs",
-        ":test-fuchsia-cc-driver-without-srcs",
+        ":test_driver_with_direct_srcs",
+        ":test_fuchsia_cc_driver_without_srcs",
     ],
     visibility = ["//visibility:public"],
 )
 
 driver_binary_test(
-    name = "test-fuchsia-cc-driver-without-srcs",
-    driver = ":driver-no-srcs",
+    name = "test_fuchsia_cc_driver_without_srcs",
+    driver = ":driver_no_srcs",
+    fuchsia_api_level = "15",
 )
 
 driver_binary_test(
-    name = "test-driver-with-direct-srcs",
-    driver = ":driver-with-srcs",
+    name = "test_driver_with_direct_srcs",
+    driver = ":driver_with_srcs",
+    fuchsia_api_level = "15",
 )
 
 # Test Resources
@@ -42,14 +44,14 @@ cc_library(
 )
 
 fuchsia_cc_driver(
-    name = "driver-no-srcs",
+    name = "driver_no_srcs",
     # We must include driver.cc here to properly link our symbols
     srcs = ["driver.cc"],
     deps = [":lib"],
 )
 
 fuchsia_cc_driver(
-    name = "driver-with-srcs",
+    name = "driver_with_srcs",
     srcs = [
         "driver.cc",
         "driver.h",

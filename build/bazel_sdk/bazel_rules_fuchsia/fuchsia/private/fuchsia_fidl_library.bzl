@@ -6,6 +6,7 @@
 
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
 def _gather_dependencies(deps):
     info = []
@@ -37,8 +38,7 @@ def _fidl_impl(context):
         files_argument += ["--files"] + [f.path for f in lib.files]
         inputs.extend(lib.files)
 
-    # The default Fuchsia target API level of this package
-    api_level = context.attr.target_api_level or str(sdk.default_fidl_target_api)
+    api_level = get_fuchsia_api_level(context)
 
     context.actions.run(
         executable = sdk.fidlc,
@@ -76,10 +76,6 @@ _fidl_library = rule(
             doc = "The name of the FIDL library",
             mandatory = True,
         ),
-        "target_api_level": attr.string(
-            doc = "The version of the Fuchsia platform that this FIDL library will be built for",
-            mandatory = False,
-        ),
         "srcs": attr.label_list(
             doc = "The list of .fidl source files",
             mandatory = True,
@@ -95,7 +91,7 @@ _fidl_library = rule(
             doc = "list of FIDL CC binding types that this library will generate",
             mandatory = False,
         ),
-    },
+    } | FUCHSIA_API_LEVEL_ATTRS,
     outputs = {
         # The intermediate representation of the library, to be consumed by bindings
         # generators.
@@ -105,14 +101,13 @@ _fidl_library = rule(
     },
 )
 
-def fuchsia_fidl_library(name, srcs, library = None, target_api_level = None, sdk_for_default_deps = None, cc_bindings = [], deps = [], **kwargs):
+def fuchsia_fidl_library(name, srcs, library = None, sdk_for_default_deps = None, cc_bindings = [], deps = [], **kwargs):
     """
     A FIDL library.
 
     Args:
         name: Name of the target
         library: Name of the FIDL library, defaults to the library name
-        target_api_level: The version of the Fuchsia platform that this FIDL library will be built for.
         srcs: List of source files.
         cc_bindings: list of FIDL CC binding types to generate. Each binding specified will be represented by
             a new target named {name}_{cc_binding} of type fuchsia_fidl_cc_library.
@@ -127,7 +122,6 @@ def fuchsia_fidl_library(name, srcs, library = None, target_api_level = None, sd
     _fidl_library(
         library = library,
         name = name,
-        target_api_level = target_api_level,
         srcs = srcs,
         deps = deps,
         cc_bindings = cc_bindings,

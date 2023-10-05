@@ -17,6 +17,7 @@ load(
     "FuchsiaPackageResourcesInfo",
 )
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
+load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
 def fuchsia_package(
         *,
@@ -190,8 +191,7 @@ def _build_fuchsia_package_impl(ctx):
     ffx_isolate_archive_dir = ctx.actions.declare_directory(pkg_dir + "_package_archive.ffx")
 
     # The Fuchsia target API level of this package
-    api_level = sdk.default_api_level
-    api_level_input = ["--api-level", str(api_level)]
+    api_level_input = ["--api-level", get_fuchsia_api_level(ctx)]
 
     # All of the resources that will go into the package
     package_resources = [
@@ -410,6 +410,13 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
             doc = "The list of tools included in this package",
             providers = [FuchsiaDriverToolInfo],
         ),
+        "fuchsia_api_level": attr.string(
+            doc = """The Fuchsia API level to use when building this package.
+
+            This value will be sent to the fidl compiler and cc_* rules when
+            compiling dependencies.
+            """,
+        ),
         "_fuchsia_sdk_debug_symbols": attr.label(
             doc = "Include debug symbols from @fuchsia_sdk.",
             default = "@fuchsia_sdk//:debug_symbols",
@@ -434,5 +441,5 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
-    },
+    } | FUCHSIA_API_LEVEL_ATTRS,
 )

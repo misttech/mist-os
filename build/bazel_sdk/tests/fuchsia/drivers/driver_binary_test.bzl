@@ -55,6 +55,9 @@ driver_binary_test = rule(
             executable = True,
             cfg = "exec",
         ),
+        "fuchsia_api_level": attr.string(
+            doc = "The fuchsia api level to target for this test.",
+        ),
         "_readelf": attr.label(
             default = "@fuchsia_clang//:bin/llvm-readelf",
             executable = True,

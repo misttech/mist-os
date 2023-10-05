@@ -153,7 +153,6 @@ def _cc_toolchain_config_impl(ctx):
                                 "-ffunction-sections",
                                 "-fdata-sections",
                                 "-fdiagnostics-color",
-                                "-ffuchsia-api-level=" + str(DEFAULT_CLANG_TARGET_API),
                             ],
                         ),
                     ],

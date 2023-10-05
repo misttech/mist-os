@@ -19,7 +19,6 @@ fuchsia_fidl_library(
         "cpp_driver",
     ],
     library = "{{name}}",
-    target_api_level = "HEAD",
     deps = [
         {{deps}}
     ],

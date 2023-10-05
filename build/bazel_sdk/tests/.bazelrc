@@ -12,3 +12,5 @@ build:fuchsia_riscv64 --crosstool_top=@fuchsia_clang//:toolchain
 build:fuchsia_riscv64 --cpu=riscv64
 build:fuchsia_riscv64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:fuchsia_riscv64 --copt=--debug --strip=never
+
+build --flag_alias=fuchsia_api_level=@fuchsia_sdk//fuchsia:fuchsia_api_level
