@@ -49,5 +49,6 @@ group("tests") {
   deps = [
     ":fxt_unittests",
     ":rust_test($host_toolchain)",
+    "tests",
   ]
 }
