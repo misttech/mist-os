@@ -553,15 +553,8 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		if err := jsonutil.WriteToFile(configFile, config); err != nil {
 			return err
 		}
-		// We currently don't have an easy way to get a modular SDK or modify the
-		// virtual device properties.
-		// TODO(fxbug.dev/95938): Stop rewriting files once there is a better alternative.
 		cwd, err := os.Getwd()
 		if err != nil {
-			return err
-		}
-		sdkManifestPath := filepath.Join(cwd, ffxutil.SDKManifestPath)
-		if err := rewriteSDKManifest(sdkManifestPath, t.config.Target, t.isQEMU); err != nil {
 			return err
 		}
 		tools := ffxutil.EmuTools{
@@ -617,23 +610,6 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		t.c <- err
 		os.RemoveAll(workdir)
 	}()
-	return nil
-}
-
-// rewriteSDKManifest rewrites the SDK manifest needed by `ffx emu` to only include the tools
-// we need from the SDK. That way we don't need to ensure all other files referenced by the
-// manifest exist, only the ones included in the manifest.
-func rewriteSDKManifest(manifestPath, targetCPU string, isQEMU bool) error {
-	// TODO(fxbug.dev/99321): Use the tools from the SDK once they are available for
-	// arm64. Until then, we'll have to provide our own.
-	manifest, err := ffxutil.GetFFXEmuManifest(manifestPath, targetCPU, []string{})
-	if err != nil {
-		return err
-	}
-
-	if err := jsonutil.WriteToFile(manifestPath, manifest); err != nil {
-		return fmt.Errorf("failed to modify sdk manifest: %w", err)
-	}
 	return nil
 }
 

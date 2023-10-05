@@ -72,9 +72,6 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 			return nil, err
 		}
 	}
-	if err := f.ConfigSet(ctx, "sdk.type", "in-tree"); err != nil {
-		return nil, err
-	}
 	absPath, err := filepath.Abs(sdkRoot)
 	if err != nil {
 		return nil, err
