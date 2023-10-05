@@ -22,6 +22,8 @@ use syncio::Zxio;
 
 use ext4_metadata::Metadata;
 
+const REMOTE_BUNDLE_NODE_LRU_CAPACITY: usize = 1024;
+
 /// RemoteBundle is a remote, immutable filesystem that stores additional metadata that would
 /// otherwise not be available.  The metadata exists in the "metadata.v1" file, which contains
 /// directory, symbolic link and extended attribute information.  Only the content for files are
@@ -66,7 +68,7 @@ impl RemoteBundle {
         root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
         let fs = FileSystem::new(
             kernel,
-            CacheMode::Cached,
+            CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
             RemoteBundle { metadata, root, rights },
             FileSystemOptions {
                 source: path.as_bytes().to_vec(),

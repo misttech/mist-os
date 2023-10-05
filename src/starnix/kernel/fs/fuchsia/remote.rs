@@ -210,7 +210,7 @@ impl RemoteFs {
         };
         let fs = FileSystem::new(
             kernel,
-            CacheMode::Cached,
+            CacheMode::Cached(CacheConfig::default()),
             RemoteFs { supports_open2, use_remote_ids, root_proxy },
             options,
         );

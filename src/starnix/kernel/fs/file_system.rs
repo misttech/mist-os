@@ -21,7 +21,7 @@ use crate::{
     types::{as_any::AsAny, *},
 };
 
-const LRU_CAPACITY: usize = 32;
+pub const DEFAULT_LRU_CAPACITY: usize = 32;
 
 /// A file system that can be mounted in a namespace.
 pub struct FileSystem {
@@ -89,10 +89,26 @@ impl FileSystemOptions {
     }
 }
 
+struct LruCache {
+    capacity: usize,
+    entries: Mutex<LinkedHashMap<ArcKey<DirEntry>, ()>>,
+}
+
 enum Entries {
     Permanent(Mutex<HashSet<ArcKey<DirEntry>>>),
-    Lru(Mutex<LinkedHashMap<ArcKey<DirEntry>, ()>>),
+    Lru(LruCache),
     Uncached,
+}
+
+/// Configuration for CacheMode::Cached.
+pub struct CacheConfig {
+    pub capacity: usize,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self { capacity: DEFAULT_LRU_CAPACITY }
+    }
 }
 
 pub enum CacheMode {
@@ -101,7 +117,7 @@ pub enum CacheMode {
     /// a cache and removes unused nodes from it.
     Permanent,
     /// Entries are cached.
-    Cached,
+    Cached(CacheConfig),
     /// Entries are uncached. This can be appropriate in cases where it is difficult for the
     /// filesystem to keep the cache coherent: e.g. the /proc/<pid>/task directory.
     Uncached,
@@ -126,7 +142,9 @@ impl FileSystem {
             nodes: Mutex::new(HashMap::new()),
             entries: match cache_mode {
                 CacheMode::Permanent => Entries::Permanent(Mutex::new(HashSet::new())),
-                CacheMode::Cached => Entries::Lru(Mutex::new(LinkedHashMap::new())),
+                CacheMode::Cached(CacheConfig { capacity }) => {
+                    Entries::Lru(LruCache { capacity, entries: Mutex::new(LinkedHashMap::new()) })
+                }
                 CacheMode::Uncached => Entries::Uncached,
             },
             selinux_context: OnceCell::new(),
@@ -326,8 +344,8 @@ impl FileSystem {
             Entries::Permanent(p) => {
                 p.lock().insert(ArcKey(entry.clone()));
             }
-            Entries::Lru(l) => {
-                l.lock().insert(ArcKey(entry.clone()), ());
+            Entries::Lru(LruCache { entries, .. }) => {
+                entries.lock().insert(ArcKey(entry.clone()), ());
             }
             Entries::Uncached => {}
         }
@@ -338,8 +356,8 @@ impl FileSystem {
             Entries::Permanent(p) => {
                 p.lock().remove(ArcKey::ref_cast(entry));
             }
-            Entries::Lru(l) => {
-                l.lock().remove(ArcKey::ref_cast(entry));
+            Entries::Lru(LruCache { entries, .. }) => {
+                entries.lock().remove(ArcKey::ref_cast(entry));
             }
             Entries::Uncached => {}
         };
@@ -347,8 +365,8 @@ impl FileSystem {
 
     /// Informs the cache that the entry was used.
     pub fn did_access_dir_entry(&self, entry: &DirEntryHandle) {
-        if let Entries::Lru(l) = &self.entries {
-            l.lock().get_refresh(ArcKey::ref_cast(entry));
+        if let Entries::Lru(LruCache { entries, .. }) = &self.entries {
+            entries.lock().get_refresh(ArcKey::ref_cast(entry));
         }
     }
 
@@ -360,9 +378,9 @@ impl FileSystem {
         if let Entries::Lru(l) = &self.entries {
             let mut purged = SmallVec::<[DirEntryHandle; 4]>::new();
             {
-                let mut l = l.lock();
-                while l.len() > LRU_CAPACITY {
-                    purged.push(l.pop_front().unwrap().0 .0);
+                let mut entries = l.entries.lock();
+                while entries.len() > l.capacity {
+                    purged.push(entries.pop_front().unwrap().0 .0);
                 }
             }
             // Entries will get dropped here whilst we're not holding a lock.

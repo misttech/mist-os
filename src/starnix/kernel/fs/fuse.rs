@@ -7,8 +7,8 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
-        fs_args, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode, FdEvents,
-        FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+        fs_args, CacheConfig, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode,
+        FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
         SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
@@ -101,7 +101,7 @@ pub fn new_fuse_fs(
 
     let fs = FileSystem::new(
         current_task.kernel(),
-        CacheMode::Cached,
+        CacheMode::Cached(CacheConfig::default()),
         FuseFs { connection: connection.clone(), default_permissions },
         options,
     );

@@ -27,7 +27,7 @@ impl FileSystemOps for SysFs {
 
 impl SysFs {
     pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
-        let fs = FileSystem::new(kernel, CacheMode::Cached, SysFs, options);
+        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir(b"fs", 0o755, |dir| {
