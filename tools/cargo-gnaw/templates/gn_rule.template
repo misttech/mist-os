@@ -9,4 +9,5 @@
   {aliased_deps}
   {visibility}
   {optional_testonly}
+  {applicable_licenses}
 }}

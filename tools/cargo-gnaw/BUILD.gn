@@ -48,6 +48,7 @@ if (is_host) {
     inputs = [
       "templates/gn_header.template",
       "templates/gn_import.template",
+      "templates/gn_license.template",
       "templates/gn_rule.template",
       "templates/gn_sdk_metadata_header.template",
       "templates/top_level_binary_gn_rule.template",
@@ -82,6 +83,7 @@ if (is_host) {
     inputs = [
       "templates/gn_header.template",
       "templates/gn_import.template",
+      "templates/gn_license.template",
       "templates/gn_rule.template",
       "templates/gn_sdk_metadata_header.template",
       "templates/top_level_binary_gn_rule.template",

@@ -398,6 +398,8 @@ remove_cfgs = [
 ]
 add_cfgs = []
 
+require_licenses = true
+
 # The below config data is for the targets being used by cargo-gnaw. This provides custom input that
 # is usually provided by build.rs scripts. If the build.rs script is simple enough, cargo-gnaw will
 # suggest what to put in here. if not, usually reading the build.rs script is sufficient.
@@ -746,7 +748,8 @@ rustflags = []
 
 [gn.package.zstd-sys."2.0.1+zstd.1.5.2"]
 rustflags = []
-
+# It is a fork:
+uses_fuchsia_license = true
 
 # These don't have build.rs scripts, but they rely on Cargo populating the environment variables
 #
@@ -805,6 +808,14 @@ env_vars = [ "CARGO_PKG_VERSION=\\\"0.9.0\\\"", "CARGO_PKG_NAME=\\\"unic-ucd-blo
 [gn.package.wasm-bindgen-shared."0.2.63"]
 # Do not quote, this is embedded directly in .wasm sections and is needed by wasm-bindgen.
 env_vars = [ "CARGO_PKG_VERSION=0.2.63" ]
+
+[gn.package.libm."0.2.1"]
+# It is a fork:
+uses_fuchsia_license = true
+
+[gn.package.fuchsia-cprng."0.1.1"]
+# Lives in-tree
+uses_fuchsia_license = true
 
 # These dependencies have build.rs scripts, but dummy invocations indicating they
 # do not need to be run are sufficient for our build.

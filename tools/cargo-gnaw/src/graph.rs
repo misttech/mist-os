@@ -157,6 +157,7 @@ impl<'a> GnBuildGraph<'a> {
                                     lib.name.clone().replace('-', "_"),
                                 ));
                             }
+
                             let gn_target = GnTarget::new(
                                 &node.id,
                                 &rust_target.name,

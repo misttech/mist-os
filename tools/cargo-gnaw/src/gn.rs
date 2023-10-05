@@ -327,6 +327,7 @@ pub fn write_rule<W: io::Write>(
     is_testonly: bool,
     is_test: bool,
     renamed_rule: Option<&str>,
+    scan_for_licenses: bool,
 ) -> Result<()> {
     // Generate a section for dependencies that is paramaterized on toolchain
     let mut dependencies = String::from("deps = []\n");
@@ -390,6 +391,7 @@ pub fn write_rule<W: io::Write>(
     let mut rustflags = GnField::new("rustflags");
     let mut rustenv = GnField::new("rustenv");
     let mut configs = GnField::exists("configs");
+    let mut require_licenses = false;
 
     if let Some(global_cfg) = global_target_cfgs {
         for cfg in &global_cfg.remove_cfgs {
@@ -397,6 +399,9 @@ pub fn write_rule<W: io::Write>(
         }
         for cfg in &global_cfg.add_cfgs {
             configs.add_cfg(cfg);
+        }
+        if let Some(ref require) = global_cfg.require_licenses {
+            require_licenses = *require;
         }
     }
 
@@ -416,6 +421,8 @@ pub fn write_rule<W: io::Write>(
 
     // From the gn custom configs, add flags, env vars, and visibility
     let mut visibility = vec![];
+
+    let mut uses_fuchsia_license = false;
 
     if let Some(custom_build) = custom_build {
         for (platform, cfg) in custom_build {
@@ -452,6 +459,9 @@ pub fn write_rule<W: io::Write>(
             }
             if let Some(ref vis) = cfg.visibility {
                 visibility.extend(vis.iter().map(|v| format!("  visibility += [\"{}\"]", v)));
+            }
+            if let Some(ref uses) = cfg.uses_fuchsia_license {
+                uses_fuchsia_license = *uses;
             }
         }
     }
@@ -515,18 +525,101 @@ pub fn write_rule<W: io::Write>(
 
     let optional_testonly = if is_testonly || is_test { "testonly = true" } else { "" };
 
+    let gn_rule = if let Some(renamed_rule) = renamed_rule {
+        renamed_rule.to_owned()
+    } else if is_test {
+        "executable".to_owned()
+    } else {
+        target.gn_target_type()
+    };
+
+    let mut license_files_found = false;
+    let mut applicable_licenses = GnField::new("applicable_licenses");
+    let gn_crate_name = target.name().replace('-', "_");
+
+    if scan_for_licenses {
+        // Scan for LICENSE* files in the crate's root dir.
+        // Disabled in unit tests, where package_root always fails.
+        let mut license_files = vec![];
+
+        for entry in target.package_root().read_dir_utf8().unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let file_name_lower = path.file_name().unwrap().to_lowercase();
+            if file_name_lower.starts_with("license")
+                || file_name_lower.starts_with("licence")
+                || file_name_lower.starts_with("copyright")
+            {
+                let license_file_label = format!(
+                    "//{}",
+                    path.canonicalize_utf8()
+                        .unwrap()
+                        .strip_prefix(project_root)
+                        .unwrap()
+                        .to_string()
+                );
+                license_files.push(license_file_label);
+                license_files_found = true;
+            }
+        }
+
+        if license_files_found {
+            if uses_fuchsia_license {
+                anyhow::bail!("ERROR: Crate {}.{} has license files but is set with uses_fuchsia_license = true", target.name(), target.version())
+            }
+
+            // Define a license target
+            let license_target_name = format!("{}.license", target_name);
+            // Directory iteration order is random, so sort alphabetically.
+            license_files.sort();
+            let mut license_files_param = GnField::new("license_files");
+            for entry in license_files {
+                license_files_param.add_cfg(entry);
+            }
+
+            writeln!(
+                output,
+                include_str!("../templates/gn_license.template"),
+                target_name = license_target_name,
+                public_package_name = gn_crate_name,
+                license_files = license_files_param.render_gn(),
+            )?;
+
+            applicable_licenses.add_cfg(format!(":{}", license_target_name));
+        } else if uses_fuchsia_license ||
+            // Empty crates are stubs crates authored by Fuchsia.
+            target.package_root().parent().unwrap().ends_with("third_party/rust_crates/empty")
+        {
+            applicable_licenses.add_cfg("//build/licenses:fuchsia_license");
+        } else if require_licenses {
+            anyhow::bail!(
+                "ERROR: Crate at {} must have LICENSE* or COPYRIGHT files.
+
+Make sure such files are placed at the crate's root folder.
+
+Alternatively, if the crate's license is the same as Fuchsia's,
+modify //third_party/rust_crates/Cargo.toml by adding:
+
+```
+[gn.package.{}.\"{}\"]
+uses_fuchsia_license = true
+```",
+                target.package_root(),
+                target.name(),
+                target.version()
+            );
+        }
+    }
+
     writeln!(
         output,
         include_str!("../templates/gn_rule.template"),
-        gn_rule = if let Some(renamed_rule) = renamed_rule {
-            renamed_rule.to_owned()
-        } else if is_test {
-            "executable".to_owned()
-        } else {
-            target.gn_target_type()
-        },
+        gn_rule = gn_rule,
         target_name = target_name,
-        crate_name = target.name().replace('-', "_"),
+        crate_name = gn_crate_name,
         output_name = output_name,
         root_path = root_relative_path,
         aliased_deps = aliased_deps_str,
@@ -536,6 +629,7 @@ pub fn write_rule<W: io::Write>(
         rustflags = rustflags.render_gn(),
         visibility = visibility,
         optional_testonly = optional_testonly,
+        applicable_licenses = applicable_licenses.render_gn(),
     )
     .map_err(Into::into)
 }
@@ -577,8 +671,19 @@ mod tests {
         let prefix = std::env::temp_dir();
 
         let mut output = vec![];
-        assert!(write_rule(&mut output, &target, not_prefix, None, None, None, false, false, None)
-            .is_err());
+        assert!(write_rule(
+            &mut output,
+            &target,
+            not_prefix,
+            None,
+            None,
+            None,
+            false,
+            false,
+            None,
+            false
+        )
+        .is_err());
         assert!(write_rule(
             &mut output,
             &target,
@@ -588,7 +693,8 @@ mod tests {
             None,
             false,
             false,
-            None
+            None,
+            false,
         )
         .is_ok());
     }
@@ -626,6 +732,7 @@ mod tests {
             false,
             false,
             None,
+            false,
         )
         .unwrap();
         let output = String::from_utf8(output).unwrap();
@@ -646,6 +753,8 @@ mod tests {
   visibility = [":*"]
 
   
+  applicable_licenses = []
+
 }
 
 "#
@@ -686,6 +795,7 @@ mod tests {
             false,
             false,
             None,
+            false,
         )
         .unwrap();
 
@@ -707,6 +817,8 @@ mod tests {
   visibility = [":*"]
 
   
+  applicable_licenses = []
+
 }
 
 "#
@@ -747,6 +859,7 @@ mod tests {
             false,
             false,
             Some("renamed_rule"),
+            false,
         )
         .unwrap();
         let output = String::from_utf8(output).unwrap();
@@ -767,6 +880,8 @@ mod tests {
   visibility = [":*"]
 
   
+  applicable_licenses = []
+
 }
 
 "#
