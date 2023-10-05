@@ -624,7 +624,7 @@ From //build/board.gni:11
 A list of package labels to include in the 'base' package set. Used by the
 board definition rather than the product definition.
 
-**Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config", "//src/graphics/bin/vulkan_loader"]`
+**Current value for `target_cpu = "arm64"`:** `["//src/hwinfo:default_board_config"]`
 
 From //boards/common/arm64-common.gni:29
 
@@ -1256,14 +1256,6 @@ that we want the legacy AIB packaged and archived for a given product:
 **Current value (from the default):** `false`
 
 From //build/images/fuchsia/BUILD.gn:26
-
-### cts_version
-
-The replacement of "99991231.0.1" changed the string, so this is in-tree.
-
-**Current value (from the default):** `""`
-
-From //sdk/ctf/build/internal/ctf_version.gni:18
 
 ### current_cpu
 
@@ -4535,7 +4527,7 @@ TODO(b/291953514): Enforce this by implementing an image size checker.
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:34
+From //boards/common/arm64-common.gni:31
 
 **Overridden from the default:** `0`
 
@@ -4558,7 +4550,7 @@ From //src/diagnostics/log_listener/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `16777216`
 
-From //boards/common/arm64-common.gni:35
+From //boards/common/arm64-common.gni:32
 
 **Overridden from the default:** `0`
 
@@ -5481,17 +5473,17 @@ From //src/graphics/lib/magma/gnbuild/magma.gni:22
 
 A list of binary labels to include in ZBIs built for this product.
 
-**Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "arm64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config"]`
 
-From //products/bringup.gni:26
+From //products/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
 From //build/product.gni:14
 
-**Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config", "//src/diagnostics/iquery"]`
+**Current value for `target_cpu = "x64"`:** `["//products/kernel_cmdline:kernel.oom.behavior--jobkill", "//products/kernel_cmdline:oom.reboot-timeout--low", "//src/sys/component_manager:component_manager_bootfs_config"]`
 
-From //products/bringup.gni:26
+From //products/bringup.gni:20
 
 **Overridden from the default:** `[]`
 
@@ -8964,7 +8956,7 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:28
+From //products/bringup.gni:26
 
 **Overridden from the default:** `false`
 
@@ -8972,7 +8964,7 @@ From //build/product.gni:44
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:28
+From //products/bringup.gni:26
 
 **Overridden from the default:** `false`
 
