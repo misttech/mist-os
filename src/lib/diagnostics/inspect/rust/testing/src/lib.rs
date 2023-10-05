@@ -181,7 +181,7 @@ pub async fn emit_example_inspect_data(opts: Options) -> Result<(), Error> {
         // just do `inspect_runtime::serve(inspector, &mut fs);`.
         inspect_runtime::service::spawn_tree_server_with_stream(
             inspector_clone.clone(),
-            inspect_runtime::PublishOptions::default(),
+            inspect_runtime::TreeServerSendPreference::default(),
             stream,
         )
         .detach();

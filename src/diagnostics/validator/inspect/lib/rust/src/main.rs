@@ -20,7 +20,7 @@ use {
     fuchsia_inspect::*,
     fuchsia_zircon::HandleBased,
     futures::prelude::*,
-    inspect_runtime::{service, PublishOptions},
+    inspect_runtime::{service, TreeServerSendPreference},
     std::collections::HashMap,
     std::sync::Arc,
     tracing::{error, info, warn},
@@ -91,7 +91,7 @@ impl Publisher {
                     async move {
                         service::handle_request_stream(
                             inspector_clone,
-                            PublishOptions::default(),
+                            TreeServerSendPreference::default(),
                             stream,
                         )
                         .await
@@ -543,7 +543,7 @@ async fn run_driver_service(
                 let (tree, request_stream) = create_request_stream::<TreeMarker>()?;
                 service::spawn_tree_server_with_stream(
                     actor.inspector.clone(),
-                    PublishOptions::default(),
+                    TreeServerSendPreference::default(),
                     request_stream,
                 )
                 .detach();

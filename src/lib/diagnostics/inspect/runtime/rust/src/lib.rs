@@ -72,7 +72,7 @@ impl Default for TreeServerSendPreference {
 }
 
 /// Optional settings for serving `fuchsia.inspect.Tree`
-#[derive(Default, Clone)]
+#[derive(Default)]
 pub struct PublishOptions {
     /// This specifies how the VMO should be sent over the `fuchsia.inspect.Tree` server.
     ///
@@ -115,8 +115,8 @@ impl PublishOptions {
 /// * Failing to connect to the `InspectSink` protocol
 /// * Failing to send the connection over the wire
 pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync::Task<()>> {
-    let name = options.tree_name.clone();
-    let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), options) {
+    let PublishOptions { vmo_preference, tree_name } = options;
+    let (server_task, tree) = match service::spawn_tree_server(inspector.clone(), vmo_preference) {
         Ok((task, tree)) => (task, Some(tree)),
         Err(err) => {
             error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
@@ -134,7 +134,7 @@ pub fn publish(inspector: &Inspector, options: PublishOptions) -> Option<fasync:
 
     if let Err(err) = inspect_sink.publish(InspectSinkPublishRequest {
         tree,
-        name,
+        name: tree_name,
         ..InspectSinkPublishRequest::default()
     }) {
         error!(%err, "failed to spawn the fuchsia.inspect.Tree server");
@@ -187,7 +187,7 @@ pub fn create_diagnostics_dir_with_options(
             vfs::service::host(move |stream| {
                 service::handle_request_stream(
                     inspector.clone(),
-                    options.clone(),
+                    options.vmo_preference.clone(),
                     stream
                 ).unwrap_or_else(|e| {
                     warn!(

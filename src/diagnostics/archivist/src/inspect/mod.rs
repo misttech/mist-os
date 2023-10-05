@@ -417,7 +417,7 @@ mod tests {
         fuchsia_zircon::Peered,
         futures::future::join_all,
         futures::{FutureExt, StreamExt},
-        inspect_runtime::{service, PublishOptions},
+        inspect_runtime::{service, TreeServerSendPreference},
         moniker::ExtendedMoniker,
         selectors::{self, VerboseError},
         serde_json::json,
@@ -647,7 +647,7 @@ mod tests {
     async fn read_server_formatting_tree_inspect_sink() {
         let inspector = inspector_for_reader_test();
         let (_inspect_server, tree_client) =
-            service::spawn_tree_server(inspector, PublishOptions::default()).unwrap();
+            service::spawn_tree_server(inspector, TreeServerSendPreference::default()).unwrap();
         verify_reader(InspectServiceMethod::InspectSink(tree_client)).await;
     }
 
