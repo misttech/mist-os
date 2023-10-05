@@ -579,7 +579,7 @@ struct BinderProcess {
     command_queue: Mutex<CommandQueueWithWaitQueue>,
 }
 
-type BinderProcessGuard<'a> = Guard<'a, BinderProcess, MutexGuard<'a, BinderProcessState>>;
+type BinderProcessGuard<'a> = Guard<'a, Arc<BinderProcess>, MutexGuard<'a, BinderProcessState>>;
 
 impl BinderProcess {
     #[allow(clippy::let_and_return)]

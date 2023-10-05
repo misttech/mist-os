@@ -108,9 +108,9 @@
 //! }
 //!
 //! #[allow(dead_code)]
-//! pub type FooReadGuard<'guard_lifetime> = ReadGuard<'guard_lifetime, Foo, FooMutableState>;
+//! pub type FooReadGuard<'guard_lifetime> = ReadGuard<'guard_lifetime, Arc<Foo>, FooMutableState>;
 //! #[allow(dead_code)]
-//! pub type FooWriteGuard<'guard_lifetime> = WriteGuard<'guard_lifetime, Foo, FooMutableState>;
+//! pub type FooWriteGuard<'guard_lifetime> = WriteGuard<'guard_lifetime, Arc<Foo>, FooMutableState>;
 //! #[allow(dead_code)]
 //! pub type FooStateRef<'ref_lifetime> = StateRef<'ref_lifetime, Foo, FooMutableState>;
 //! #[allow(dead_code)]
@@ -148,10 +148,7 @@
 //! }
 //! ```
 
-use std::{
-    ops::{Deref, DerefMut},
-    sync::Arc,
-};
+use std::ops::{Deref, DerefMut};
 
 use crate::lock::*;
 
@@ -163,11 +160,11 @@ macro_rules! state_accessor {
     ($base_name:ident, $field_name:ident) => {
         paste::paste! {
         #[allow(dead_code)]
-        pub fn read<'a>(self: &'a Arc<$base_name>) -> [<$base_name ReadGuard>]<'a> {
+        pub fn read<'a>(self: &'a std::sync::Arc<$base_name>) -> [<$base_name ReadGuard>]<'a> {
             crate::mutable_state::ReadGuard::new(self, self.$field_name.read())
         }
         #[allow(dead_code)]
-        pub fn write<'a>(self: &'a Arc<$base_name>) -> [<$base_name WriteGuard>]<'a> {
+        pub fn write<'a>(self: &'a std::sync::Arc<$base_name>) -> [<$base_name WriteGuard>]<'a> {
             crate::mutable_state::WriteGuard::new(self, self.$field_name.write())
         }
         }
@@ -183,19 +180,19 @@ macro_rules! state_implementation {
     }) => {
         paste::paste! {
         #[allow(dead_code)]
-        pub type [<$base_name ReadGuard>]<'guard_lifetime> = crate::mutable_state::ReadGuard<'guard_lifetime, $base_name,  $mutable_name>;
+        pub type [<$base_name ReadGuard>]<'guard_lifetime> = crate::mutable_state::ReadGuard<'guard_lifetime, std::sync::Arc<$base_name>,  $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name WriteGuard>]<'guard_lifetime> = crate::mutable_state::WriteGuard<'guard_lifetime, $base_name, $mutable_name>;
+        pub type [<$base_name WriteGuard>]<'guard_lifetime> = crate::mutable_state::WriteGuard<'guard_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name StateRef>]<'ref_lifetime> = crate::mutable_state::StateRef<'ref_lifetime, $base_name, $mutable_name>;
+        pub type [<$base_name StateRef>]<'ref_lifetime> = crate::mutable_state::StateRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
         #[allow(dead_code)]
-        pub type [<$base_name StateMutRef>]<'ref_lifetime> = crate::mutable_state::StateMutRef<'ref_lifetime, $base_name, $mutable_name>;
+        pub type [<$base_name StateMutRef>]<'ref_lifetime> = crate::mutable_state::StateMutRef<'ref_lifetime, std::sync::Arc<$base_name>, $mutable_name>;
 
-        impl<'guard, G: 'guard + std::ops::Deref<Target=$mutable_name>> crate::mutable_state::Guard<'guard, $base_name, G> {
+        impl<'guard, G: 'guard + std::ops::Deref<Target=$mutable_name>> crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
             filter_methods_macro::filter_methods!(RoMethod, $($tt)*);
         }
 
-        impl<'guard, G: 'guard + std::ops::DerefMut<Target=$mutable_name>> crate::mutable_state::Guard<'guard, $base_name, G> {
+        impl<'guard, G: 'guard + std::ops::DerefMut<Target=$mutable_name>> crate::mutable_state::Guard<'guard, std::sync::Arc<$base_name>, G> {
             filter_methods_macro::filter_methods!(RwMethod, $($tt)*);
         }
         }
@@ -203,7 +200,7 @@ macro_rules! state_implementation {
 }
 
 pub struct Guard<'a, B, G> {
-    pub base: &'a Arc<B>,
+    pub base: &'a B,
     guard: G,
 }
 pub type ReadGuard<'a, B, S> = Guard<'a, B, RwLockReadGuard<'a, S>>;
@@ -212,7 +209,7 @@ pub type StateRef<'a, B, S> = Guard<'a, B, &'a S>;
 pub type StateMutRef<'a, B, S> = Guard<'a, B, &'a mut S>;
 
 impl<'guard, B, S, G: 'guard + Deref<Target = S>> Guard<'guard, B, G> {
-    pub fn new(base: &'guard Arc<B>, guard: G) -> Self {
+    pub fn new(base: &'guard B, guard: G) -> Self {
         Self { base, guard }
     }
     pub fn as_ref(&self) -> StateRef<'_, B, S> {
@@ -246,6 +243,7 @@ pub(crate) use state_implementation;
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::sync::Arc;
 
     pub struct FooMutableState {
         y: i32,
