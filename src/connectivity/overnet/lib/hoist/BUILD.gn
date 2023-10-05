@@ -30,6 +30,10 @@ rustc_library("hoist") {
     "//src/lib/fuchsia",
     "//third_party/rust_crates:scopeguard",
   ]
+  visibility = [
+    ":*",
+    "//src/connectivity/overnet/*",
+  ]
 }
 
 group("tests") {

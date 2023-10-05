@@ -45,7 +45,7 @@ async fn create_daemon_proxy(
 /// unix socket a few times, but only running a single successful
 /// connection to completion. This function will timeout with an
 /// error after one second if no connection could be established.
-async fn run_single_ascendd_link(
+pub async fn run_single_ascendd_link(
     node: Arc<overnet_core::Router>,
     sockpath: PathBuf,
 ) -> Result<(), anyhow::Error> {

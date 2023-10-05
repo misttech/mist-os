@@ -13,7 +13,6 @@ use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
 use fuchsia_zircon_types as zx_types;
-use hoist::Hoist;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
@@ -81,12 +80,12 @@ impl EnvContext {
         };
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
-        let hoist = Hoist::new(None)?;
+        let node = overnet_core::Router::new(None)?;
         let target = ffx_target::resolve_default_target(&context).await?;
         let injector = Box::new(Injection::new(
             context.clone(),
             DaemonVersionCheck::CheckApiLevel(version_history::LATEST_VERSION.api_level),
-            hoist.clone(),
+            node,
             None,
             target,
         ));
