@@ -238,6 +238,7 @@ pub fn consumer_controls_device_descriptor() -> input_device::InputDeviceDescrip
             buttons: vec![
                 fidl_input_report::ConsumerControlButton::CameraDisable,
                 fidl_input_report::ConsumerControlButton::FactoryReset,
+                fidl_input_report::ConsumerControlButton::Function,
                 fidl_input_report::ConsumerControlButton::MicMute,
                 fidl_input_report::ConsumerControlButton::Pause,
                 fidl_input_report::ConsumerControlButton::VolumeDown,

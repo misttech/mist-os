@@ -164,6 +164,8 @@ type MediaButtonsEvent = table {
     2: mic_mute bool;
     3: pause bool;
     4: camera_disable bool;
+    @available(added=15)
+    5: power bool;
 };
 
 type InputEvent = strict union {

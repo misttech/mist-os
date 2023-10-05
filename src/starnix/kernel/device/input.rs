@@ -20,11 +20,13 @@ use crate::{
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
 use fidl::handle::fuchsia_handles::Signals;
+use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_pointer::{
     self as fuipointer, EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent,
     TouchResponse as FidlTouchResponse, TouchResponseType,
 };
+use fidl_fuchsia_ui_policy as fuipolicy;
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self, health::Reporter, NumericProperty};
@@ -63,10 +65,12 @@ impl InputDevice {
         &self,
         touch_source_proxy: fuipointer::TouchSourceProxy,
         keyboard: fuiinput::KeyboardProxy,
+        registry_proxy: fuipolicy::DeviceListenerRegistryProxy,
         view_ref: fuiviews::ViewRef,
     ) {
         self.touch_input_file.start_touch_relay(touch_source_proxy);
-        self.keyboard_input_file.start_keyboard_relay(keyboard, view_ref);
+        self.keyboard_input_file.clone().start_keyboard_relay(keyboard, view_ref);
+        self.keyboard_input_file.clone().start_buttons_relay(registry_proxy);
     }
 }
 
@@ -402,6 +406,47 @@ impl InputFile {
             })
             .expect("Failed to create thread")
     }
+
+    fn start_buttons_relay(
+        self: &Arc<Self>,
+        registry_proxy: fuipolicy::DeviceListenerRegistryProxy,
+    ) -> std::thread::JoinHandle<()> {
+        let slf = self.clone();
+        std::thread::Builder::new()
+            .name("kthread-button-relay".to_string())
+            .spawn(move || {
+                fasync::LocalExecutor::new().run_singlethreaded(async {
+                    // Create and register a listener to listen for MediaButtonsEvents from Input Pipeline.
+                    let (listener, mut listener_stream) = fidl::endpoints::create_request_stream::<
+                        fuipolicy::MediaButtonsListenerMarker,
+                    >()
+                    .unwrap();
+                    if let Err(e) = registry_proxy.register_listener(listener).await {
+                        log_warn!("Failed to register media buttons listener: {:?}", e);
+                    }
+                    while let Some(Ok(request)) = listener_stream.next().await {
+                        match request {
+                            fuipolicy::MediaButtonsListenerRequest::OnEvent {
+                                event,
+                                responder,
+                            } => {
+                                let new_events = parse_fidl_button_event(&event);
+
+                                let mut inner = slf.inner.lock();
+                                inner.events.extend(new_events);
+                                inner.waiters.notify_fd_events(FdEvents::POLLIN);
+
+                                responder
+                                    .send()
+                                    .expect("media buttons responder failed to respond");
+                            }
+                            _ => {}
+                        }
+                    }
+                })
+            })
+            .expect("Failed to create thread")
+    }
 }
 
 impl FileOps for Arc<InputFile> {
@@ -595,6 +640,7 @@ fn touch_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
 fn keyboard_key_attributes() -> BitSet<{ min_bytes(KEY_CNT) }> {
     let mut attrs = BitSet::new();
     attrs.set(BTN_MISC);
+    attrs.set(KEY_POWER);
     attrs
 }
 
@@ -669,6 +715,44 @@ fn parse_fidl_touch_event(fidl_event: &FidlTouchEvent) -> Option<TouchEvent> {
         }),
         _ => None, // TODO(https://fxbug.dev/124603): Add some inspect counters of ignored events.
     }
+}
+
+fn parse_fidl_button_event(fidl_event: &MediaButtonsEvent) -> Vec<uapi::input_event> {
+    let time = timeval_from_time(zx::Time::get_monotonic());
+    let mut events = vec![];
+    let sync_event = uapi::input_event {
+        // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
+        time,
+        type_: uapi::EV_SYN as u16,
+        code: uapi::SYN_REPORT as u16,
+        value: 0,
+    };
+    match fidl_event {
+        &MediaButtonsEvent { power: Some(true), .. } => {
+            let key_event = uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::KEY_POWER as u16,
+                value: 1,
+            };
+            events.push(key_event);
+            events.push(sync_event);
+        }
+        // Power button is released
+        &MediaButtonsEvent { power: Some(false), .. } => {
+            let key_event = uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::KEY_POWER as u16,
+                value: 0,
+            };
+            events.push(key_event);
+            events.push(sync_event);
+        }
+        _ => {}
+    }
+
+    events
 }
 
 /// Returns a FIDL response for `fidl_event`.
@@ -870,6 +954,17 @@ mod test {
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
         let relay_thread = input_file.start_keyboard_relay(keyboard_proxy, view_ref_pair.view_ref);
         (input_file, keyboard_stream, relay_thread)
+    }
+
+    fn start_button_input(
+    ) -> (Arc<InputFile>, fuipolicy::DeviceListenerRegistryRequestStream, std::thread::JoinHandle<()>)
+    {
+        let input_file = InputFile::new_keyboard();
+        let (device_registry_proxy, device_listener_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+        let relay_thread = input_file.start_buttons_relay(device_registry_proxy);
+        (input_file, device_listener_stream, relay_thread)
     }
 
     fn make_kernel_objects(
@@ -1424,6 +1519,43 @@ mod test {
         relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
         let events = read_uapi_events(keyboard_file, &file_object, &current_task);
         assert_eq!(events.len(), 0);
+    }
+
+    #[::fuchsia::test]
+    async fn sends_button_events() {
+        let (input_file, mut device_listener_stream, relay_thread) = start_button_input();
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let power_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_event).await;
+        std::mem::drop(device_listener_stream); // Close Zircon channel.
+        std::mem::drop(buttons_listener); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+        let events = read_uapi_events(input_file, &file_object, &current_task);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].value, 1);
     }
 
     #[::fuchsia::test]

@@ -9,6 +9,7 @@
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.scenic.Scenic",
             ],
             from: "#ui",

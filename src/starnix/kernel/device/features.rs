@@ -18,6 +18,7 @@ use std::sync::Arc;
 use fidl_fuchsia_sysinfo as fsysinfo;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_input3 as fuiinput;
+use fidl_fuchsia_ui_policy as fuipolicy;
 use fidl_fuchsia_ui_views as fuiviews;
 
 /// Parses and runs the features from the provided "program strvec". Some features,
@@ -89,12 +90,21 @@ pub fn run_component_features(
                 let keyboard =
                     fuchsia_component::client::connect_to_protocol::<fuiinput::KeyboardMarker>()
                         .expect("Failed to connect to keyboard");
+                let registry_proxy = fuchsia_component::client::connect_to_protocol::<
+                    fuipolicy::DeviceListenerRegistryMarker,
+                >()
+                .expect("Failed to connect to device listener registry");
                 kernel.framebuffer.start_server(
                     view_bound_protocols,
                     view_identity,
                     outgoing_dir.take().unwrap(),
                 );
-                kernel.input_device.start_relay(touch_source_proxy, keyboard, view_ref);
+                kernel.input_device.start_relay(
+                    touch_source_proxy,
+                    keyboard,
+                    registry_proxy,
+                    view_ref,
+                );
             }
             "binder" => {}
             "logd" => {}

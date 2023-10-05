@@ -68,6 +68,7 @@ workbench_platform_config = {
     "ui": {
         "enabled": True,
         "supported_input_devices": [
+            "button",
             "keyboard",
             "mouse",
             "touchscreen",

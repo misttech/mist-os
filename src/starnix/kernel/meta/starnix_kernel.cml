@@ -66,6 +66,7 @@
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.display.singleton.Info",
                 "fuchsia.ui.input3.Keyboard",
+                "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.vulkan.loader.Loader",
                 "fuchsia.wlan.wlanix.Wlanix",

@@ -694,6 +694,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.input/MediaButtonsEvent.power",
+        "ordinal": "5",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.input/MediaButtonsEvent.volume",
         "ordinal": "1",
         "type": "int8"
