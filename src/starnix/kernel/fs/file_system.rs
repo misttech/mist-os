@@ -241,30 +241,24 @@ impl FileSystem {
     /// call |create_node|.
     pub fn create_node_with_id(
         self: &Arc<Self>,
-        ops: Box<dyn FsNodeOps>,
+        ops: impl Into<Box<dyn FsNodeOps>>,
         id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
+        let ops = ops.into();
         let node = FsNode::new_uncached(ops, self, id, info);
         self.nodes.lock().insert(node.node_id, self.prepare_node_for_insertion(&node));
         node
     }
 
-    pub fn create_node_box(
-        self: &Arc<Self>,
-        ops: Box<dyn FsNodeOps>,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
-    ) -> FsNodeHandle {
-        let node_id = self.next_node_id();
-        self.create_node_with_id(ops, node_id, info(node_id))
-    }
-
     pub fn create_node(
         self: &Arc<Self>,
-        ops: impl FsNodeOps,
+        ops: impl Into<Box<dyn FsNodeOps>>,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
-        self.create_node_box(Box::new(ops), info)
+        let ops = ops.into();
+        let node_id = self.next_node_id();
+        self.create_node_with_id(ops, node_id, info(node_id))
     }
 
     /// Remove the given FsNode from the node cache.

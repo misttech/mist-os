@@ -86,7 +86,7 @@ impl FsNodeOps for CgroupDirectoryNode {
             FileMode::IFREG => Box::new(ControlGroupNode::new(self.control_group.clone())),
             _ => return error!(EACCES),
         };
-        let node = node.fs().create_node_box(ops, |id| {
+        let node = node.fs().create_node(ops, |id| {
             let mut info = FsNodeInfo::new(id, mode, owner);
             info.rdev = dev;
             info

@@ -59,7 +59,7 @@ impl FsNodeOps for SysFsDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match self.kobject().get_child(name) {
-            Some(child_kobject) => Ok(node.fs().create_node_box(
+            Some(child_kobject) => Ok(node.fs().create_node(
                 child_kobject.ops(),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),

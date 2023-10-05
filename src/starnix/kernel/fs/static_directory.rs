@@ -42,7 +42,13 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
-    pub fn entry(&mut self, name: &'static FsStr, ops: impl FsNodeOps, mode: FileMode) {
+    pub fn entry(
+        &mut self,
+        name: &'static FsStr,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        mode: FileMode,
+    ) {
+        let ops = ops.into();
         self.entry_dev(name, ops, mode, DeviceType::NONE);
     }
 
@@ -50,10 +56,11 @@ impl<'a> StaticDirectoryBuilder<'a> {
     pub fn entry_dev(
         &mut self,
         name: &'static FsStr,
-        ops: impl FsNodeOps,
+        ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
         dev: DeviceType,
     ) {
+        let ops = ops.into();
         let node = self.fs.create_node(ops, |id| {
             let mut info = FsNodeInfo::new(id, mode, self.entry_creds.clone());
             info.rdev = dev;

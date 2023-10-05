@@ -187,7 +187,7 @@ fn create_child_node(
         }
         _ => return error!(EACCES),
     };
-    let child = parent.fs().create_node_box(ops, move |id| {
+    let child = parent.fs().create_node(ops, move |id| {
         let mut info = FsNodeInfo::new(id, mode, owner);
         info.rdev = dev;
         // blksize is PAGE_SIZE for in memory node.

@@ -703,6 +703,15 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     }
 }
 
+impl<T> From<T> for Box<dyn FsNodeOps>
+where
+    T: FsNodeOps,
+{
+    fn from(ops: T) -> Box<dyn FsNodeOps> {
+        Box::new(ops)
+    }
+}
+
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
 /// You must implement [`FsNodeOps::readlink`].
 macro_rules! fs_node_impl_symlink {
@@ -936,11 +945,12 @@ impl FsNode {
     /// Create a node without inserting it into the FileSystem node cache. This is usually not what
     /// you want! Only use if you're also using get_or_create_node, like ext4.
     pub fn new_uncached(
-        ops: Box<dyn FsNodeOps>,
+        ops: impl Into<Box<dyn FsNodeOps>>,
         fs: &FileSystemHandle,
         node_id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
+        let ops = ops.into();
         Arc::new(Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info))
     }
 

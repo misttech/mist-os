@@ -225,7 +225,7 @@ impl OverlayNode {
         let parent = if upper.is_some() { None } else { Some(self.clone()) };
 
         let overlay_node = OverlayNode::new(self.fs.clone(), lower, upper, parent);
-        FsNode::new_uncached(Box::new(overlay_node), &node.fs(), info.ino, info)
+        FsNode::new_uncached(overlay_node, &node.fs(), info.ino, info)
     }
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the

@@ -251,12 +251,8 @@ impl FsNodeOps for DirectoryObject {
         let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => {
-                Ok(fs.create_node_with_id(Box::new(SymlinkObject), inode_num, info))
-            }
-            NodeInfo::Directory(_) => {
-                Ok(fs.create_node_with_id(Box::new(DirectoryObject), inode_num, info))
-            }
+            NodeInfo::Symlink(_) => Ok(fs.create_node_with_id(SymlinkObject, inode_num, info)),
+            NodeInfo::Directory(_) => Ok(fs.create_node_with_id(DirectoryObject, inode_num, info)),
             NodeInfo::File(_) => {
                 let zxio = Arc::new(
                     bundle
@@ -264,7 +260,7 @@ impl FsNodeOps for DirectoryObject {
                         .open(bundle.rights, &format!("{inode_num}"))
                         .map_err(|status| from_status_like_fdio!(status, name))?,
                 );
-                Ok(fs.create_node_with_id(Box::new(File { zxio }), inode_num, info))
+                Ok(fs.create_node_with_id(File { zxio }, inode_num, info))
             }
         }
     }

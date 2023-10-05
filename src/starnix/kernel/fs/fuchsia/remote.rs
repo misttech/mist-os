@@ -487,7 +487,7 @@ impl FsNodeOps for RemoteNode {
             node_id = zxio.attr_get().map_err(|status| from_status_like_fdio!(status, name))?.id;
         }
 
-        let ops = Box::new(RemoteNode { zxio, rights: self.rights });
+        let ops = RemoteNode { zxio, rights: self.rights };
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
@@ -716,7 +716,7 @@ impl FsNodeOps for RemoteNode {
             fs.next_node_id()
         };
         let symlink = fs.create_node_with_id(
-            Box::new(RemoteSymlink { zxio }),
+            RemoteSymlink { zxio },
             node_id,
             FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner),
         );
