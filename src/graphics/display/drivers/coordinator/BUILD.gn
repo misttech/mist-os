@@ -47,15 +47,27 @@ source_set("shared") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "capture-image.cc",
+    "capture-image.h",
+    "client-id.h",
     "client-priority.cc",
+    "client-priority.h",
     "client.cc",
+    "client.h",
     "controller.cc",
+    "controller.h",
     "display-info.cc",
+    "display-info.h",
     "eld.cc",
+    "eld.h",
     "fence.cc",
+    "fence.h",
+    "id-map.h",
     "image.cc",
+    "image.h",
     "layer.cc",
+    "layer.h",
     "migration-util.cc",
+    "migration-util.h",
   ]
   public_deps = [
     ":coordinator_bind",
