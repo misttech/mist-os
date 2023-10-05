@@ -217,7 +217,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:103
+From //boards/common/x64-common.gni:102
 
 **Overridden from the default:** `""`
 
@@ -237,7 +237,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:101
+From //boards/common/x64-common.gni:100
 
 **Overridden from the default:** `""`
 
@@ -322,7 +322,19 @@ From //build/bazel/bazel_fuchsia_sdk.gni:11
 
 ### bazel_product_bundle_board
 
-**Current value (from the default):** `false`
+**Current value for `target_cpu = "arm64"`:** `"arm64"`
+
+From //boards/arm64.gni:47
+
+**Overridden from the default:** `false`
+
+From //build/images/args.gni:205
+
+**Current value for `target_cpu = "x64"`:** `"x64"`
+
+From //boards/x64.gni:35
+
+**Overridden from the default:** `false`
 
 From //build/images/args.gni:205
 
@@ -386,7 +398,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:105
+From //boards/common/x64-common.gni:104
 
 **Overridden from the default:** `false`
 
@@ -632,7 +644,7 @@ From //boards/common/arm64-common.gni:29
 
 From //build/board.gni:29
 
-**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config", "//src/hwinfo:default_board_config"]`
+**Current value for `target_cpu = "x64"`:** `["//src/factory/factory_store_providers/config/qemu", "//src/hwinfo:default_board_config"]`
 
 From //boards/common/x64-common.gni:83
 
@@ -921,7 +933,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:109
+From //boards/common/x64-common.gni:108
 
 **Overridden from the default:** `false`
 
@@ -4513,7 +4525,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:106
 
 **Overridden from the default:** `false`
 
@@ -5305,7 +5317,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:97
+From //boards/common/x64-common.gni:96
 
 **Overridden from the default:** `[]`
 
@@ -5326,7 +5338,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:96
+From //boards/common/x64-common.gni:95
 
 **Overridden from the default:** `false`
 
@@ -8511,7 +8523,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:110
+From //boards/common/x64-common.gni:109
 
 **Overridden from the default:** `false`
 
@@ -8690,7 +8702,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:99
+From //boards/common/x64-common.gni:98
 
 **Overridden from the default:** `false`
 
