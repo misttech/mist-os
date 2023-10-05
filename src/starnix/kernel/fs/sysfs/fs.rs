@@ -63,11 +63,7 @@ impl SysFs {
         );
 
         dir.subdir(b"class", 0o755, |dir| {
-            dir.entry(
-                b"net",
-                NetstackDevicesDirectory::new_sys_class_net(kernel.netstack_devices.clone()),
-                dir_mode,
-            );
+            dir.entry(b"net", NetstackDevicesDirectory::new_sys_class_net(), dir_mode);
         });
 
         sysfs_power_directory(&mut dir, &fs, Arc::downgrade(kernel));

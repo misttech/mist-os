@@ -185,23 +185,11 @@ fn sysctl_net_diretory(fs: &FileSystemHandle, kernel: &Arc<Kernel>) -> FsNodeHan
         dir.entry(b"bpf_jit_kallsyms", StubSysctl::new_node(), file_mode);
     });
     dir.subdir(b"ipv4", 0o555, |dir| {
-        dir.entry(
-            b"neigh",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv4_neigh(devs.clone()),
-            dir_mode,
-        );
+        dir.entry(b"neigh", NetstackDevicesDirectory::new_proc_sys_net_ipv4_neigh(), dir_mode);
     });
     dir.subdir(b"ipv6", 0o555, |dir| {
-        dir.entry(
-            b"conf",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv6_conf(devs.clone()),
-            dir_mode,
-        );
-        dir.entry(
-            b"neigh",
-            NetstackDevicesDirectory::new_proc_sys_net_ipv6_neigh(devs.clone()),
-            dir_mode,
-        );
+        dir.entry(b"conf", NetstackDevicesDirectory::new_proc_sys_net_ipv6_conf(), dir_mode);
+        dir.entry(b"neigh", NetstackDevicesDirectory::new_proc_sys_net_ipv6_neigh(), dir_mode);
     });
     dir.build()
 }

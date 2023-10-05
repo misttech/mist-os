@@ -52,32 +52,28 @@ impl NetstackDevices {
 /// An implementation of a directory holding netstack interface-specific
 /// directories such as those found under `/proc/sys/net` and `/sys/class/net`.
 pub struct NetstackDevicesDirectory {
-    inner: Arc<NetstackDevices>,
     dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>,
 }
 
 impl NetstackDevicesDirectory {
-    pub fn new_proc_sys_net_ipv4_neigh(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv4_neigh))
+    pub fn new_proc_sys_net_ipv4_neigh() -> Arc<Self> {
+        Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv4_neigh))
     }
 
-    pub fn new_proc_sys_net_ipv6_conf(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_conf))
+    pub fn new_proc_sys_net_ipv6_conf() -> Arc<Self> {
+        Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_conf))
     }
 
-    pub fn new_proc_sys_net_ipv6_neigh(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_neigh))
+    pub fn new_proc_sys_net_ipv6_neigh() -> Arc<Self> {
+        Self::new(|d| d.proc_sys_net.as_ref().map(ProcSysNetDev::get_ipv6_neigh))
     }
 
-    pub fn new_sys_class_net(inner: Arc<NetstackDevices>) -> Arc<Self> {
-        Self::new(inner, |d| d.sys_class_net.as_ref())
+    pub fn new_sys_class_net() -> Arc<Self> {
+        Self::new(|d| d.sys_class_net.as_ref())
     }
 
-    fn new(
-        inner: Arc<NetstackDevices>,
-        dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>,
-    ) -> Arc<Self> {
-        Arc::new(Self { inner, dir_fn })
+    fn new(dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>) -> Arc<Self> {
+        Arc::new(Self { dir_fn })
     }
 }
 
@@ -96,10 +92,10 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
     fn lookup(
         &self,
         _node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
-        let entries = self.inner.entries.lock();
+        let entries = current_task.kernel().netstack_devices.entries.lock();
         entries.get(name).and_then(self.dir_fn).map(Arc::clone).ok_or_else(|| {
             errno!(
                 ENOENT,
@@ -132,14 +128,14 @@ impl FileOps for Arc<NetstackDevicesDirectory> {
     fn readdir(
         &self,
         file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
     ) -> Result<(), Errno> {
         emit_dotdot(file, sink)?;
 
         // Skip through the entries until the current offset is reached.
         // Subtract 2 from the offset to account for `.` and `..`.
-        let entries = self.inner.entries.lock();
+        let entries = current_task.kernel().netstack_devices.entries.lock();
         for (name, node) in entries.iter().skip(sink.offset() as usize - 2) {
             let Some(node) = (self.dir_fn)(node) else { continue };
             sink.add(
