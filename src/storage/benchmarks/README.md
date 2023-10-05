@@ -19,6 +19,8 @@ file. The benchmarks measure how long each read/write operation takes.
     it a second time.
 * **Sequential**: the reads/writes are performed sequentially from the start of the file to the end
   of the file.
+* **Sparse**: the reads/writes are performed linearly but sparsely, with large gaps where no data is
+  read/written between the accessed regions.
 * **Random**: the reads/writes are performed randomly across the entire file. Every part of the file
   is accessed exactly once.
 * **Fsync**: the fsync is performed for every write.

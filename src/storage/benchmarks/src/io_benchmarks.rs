@@ -13,11 +13,15 @@ use {
     std::{
         fs::OpenOptions,
         io::{Seek, SeekFrom, Write},
-        os::unix::io::AsRawFd,
+        os::unix::{fs::FileExt, io::AsRawFd},
     },
 };
 
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
+/// How many blocks to skip after each used block in sparse read benchmarks. This is set to thwart
+/// the effects of readahead on these benchmarks. As high as we can go while staying under the file
+/// size limit of 4GiB in minfs.
+const BLOCK_SKIP: usize = 255;
 
 /// A benchmark that measures how long `read` calls take to a file that should not already be cached
 /// in memory.
@@ -139,6 +143,48 @@ impl<T: CacheClearableFilesystem> Benchmark<T> for ReadRandomCold {
 
     fn name(&self) -> String {
         format!("ReadRandomCold/{}", self.op_size)
+    }
+}
+
+/// A benchmark that measures how long `pread` calls take to a sparse file that should not already
+/// be cached in memory. The file's sparseness is designed to defeat the gains of readahead without
+/// making an extremely large file, but will also result in testing access to many small extents.
+#[derive(Clone)]
+pub struct ReadSparseCold {
+    op_size: usize,
+    op_count: usize,
+}
+
+impl ReadSparseCold {
+    pub fn new(op_size: usize, op_count: usize) -> Self {
+        Self { op_size, op_count }
+    }
+}
+
+#[async_trait]
+impl<T: CacheClearableFilesystem> Benchmark<T> for ReadSparseCold {
+    async fn run(&self, fs: &mut T) -> Vec<OperationDuration> {
+        trace_duration!(
+            "benchmark",
+            "ReadSparseCold",
+            "op_size" => self.op_size as u64,
+            "op_count" => self.op_count as u64
+        );
+        let file_path = fs.benchmark_dir().join("file");
+
+        // Setup
+        let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
+        write_sparse_file(&mut file, self.op_size, self.op_count, BLOCK_SKIP);
+        std::mem::drop(file);
+        fs.clear_cache().await;
+
+        // Benchmark
+        let mut file = OpenOptions::new().read(true).open(&file_path).unwrap();
+        read_sparse(&mut file, self.op_size, self.op_count, BLOCK_SKIP)
+    }
+
+    fn name(&self) -> String {
+        format!("ReadSparseCold/{}", self.op_size)
     }
 }
 
@@ -398,10 +444,21 @@ impl<T: Filesystem> Benchmark<T> for WriteSequentialFsyncWarm {
     }
 }
 
-fn write_file<F: Write>(file: &mut F, op_size: usize, op_count: usize) {
+fn write_file<F: Write + FileExt>(file: &mut F, op_size: usize, op_count: usize) {
+    write_sparse_file(file, op_size, op_count, 0);
+}
+
+fn write_sparse_file<F: Write + FileExt>(
+    file: &mut F,
+    op_size: usize,
+    op_count: usize,
+    block_skip: usize,
+) {
     let data = vec![0xAB; op_size];
+    let mut offset: u64 = 0;
     for _ in 0..op_count {
-        assert_eq!(file.write(&data).unwrap(), op_size);
+        assert_eq!(file.write_at(&data, offset).unwrap(), op_size);
+        offset += (op_size * (block_skip + 1)) as u64;
     }
 }
 
@@ -418,6 +475,30 @@ fn read_sequential<F: AsRawFd>(
         trace_duration!("benchmark", "read", "op_number" => i as u64);
         let timer = OperationTimer::start();
         let result = unsafe { libc::read(fd, data.as_mut_ptr() as *mut libc::c_void, data.len()) };
+        durations.push(timer.stop());
+        assert_eq!(result, op_size as isize);
+    }
+    durations
+}
+
+/// Makes `op_count` `pread` calls to `file`, each for `op_size` bytes `block_skip` * `op_size`
+/// bytes apart.
+fn read_sparse<F: AsRawFd>(
+    file: &mut F,
+    op_size: usize,
+    op_count: usize,
+    block_skip: usize,
+) -> Vec<OperationDuration> {
+    let mut data = vec![0; op_size];
+    let mut durations = Vec::new();
+    let fd = file.as_raw_fd();
+    let sparse_offset = ((1 + block_skip) * op_size) as i64;
+    for i in 0..op_count as i64 {
+        trace_duration!("benchmark", "pread", "op_number" => i as u64);
+        let timer = OperationTimer::start();
+        let result = unsafe {
+            libc::pread(fd, data.as_mut_ptr() as *mut libc::c_void, data.len(), i * sparse_offset)
+        };
         durations.push(timer.stop());
         assert_eq!(result, op_size as isize);
     }
@@ -565,6 +646,16 @@ mod tests {
     async fn read_random_cold_test() {
         check_benchmark(
             ReadRandomCold::new(OP_SIZE, OP_COUNT),
+            OP_COUNT,
+            /*clear_cache_count=*/ 1,
+        )
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn read_sparse_cold_test() {
+        check_benchmark(
+            ReadSparseCold::new(OP_SIZE, OP_COUNT),
             OP_COUNT,
             /*clear_cache_count=*/ 1,
         )

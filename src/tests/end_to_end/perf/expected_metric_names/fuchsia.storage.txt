@@ -30,6 +30,9 @@ fuchsia.storage: ReadSequentialWarm/8192/f2fs
 fuchsia.storage: ReadSequentialWarm/8192/fxfs
 fuchsia.storage: ReadSequentialWarm/8192/memfs
 fuchsia.storage: ReadSequentialWarm/8192/minfs
+fuchsia.storage: ReadSparseCold/8192/f2fs
+fuchsia.storage: ReadSparseCold/8192/fxfs
+fuchsia.storage: ReadSparseCold/8192/minfs
 fuchsia.storage: StatPath/f2fs
 fuchsia.storage: StatPath/fxfs
 fuchsia.storage: StatPath/memfs

@@ -21,7 +21,7 @@ use {
             WalkDirectoryTreeCold, WalkDirectoryTreeWarm,
         },
         io_benchmarks::{
-            ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm,
+            ReadRandomCold, ReadRandomWarm, ReadSequentialCold, ReadSequentialWarm, ReadSparseCold,
             WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
             WriteSequentialFsyncWarm, WriteSequentialWarm,
         },
@@ -86,7 +86,11 @@ fn add_io_benchmarks(benchmark_set: &mut BenchmarkSet) {
     );
     add_benchmarks!(
         benchmark_set,
-        [ReadSequentialCold::new(OP_SIZE, OP_COUNT), ReadRandomCold::new(OP_SIZE, OP_COUNT),],
+        [
+            ReadSequentialCold::new(OP_SIZE, OP_COUNT),
+            ReadRandomCold::new(OP_SIZE, OP_COUNT),
+            ReadSparseCold::new(OP_SIZE, OP_COUNT),
+        ],
         [Fxfs, F2fs, Minfs]
     );
 }
