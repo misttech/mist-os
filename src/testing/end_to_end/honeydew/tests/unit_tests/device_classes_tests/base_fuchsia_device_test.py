@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.fuchsia_device.base_fuchsia_device.py."""
+"""Unit tests for honeydew.device_classes.base_fuchsia_device.py."""
 
 import base64
 from typing import Any, Dict
@@ -13,7 +13,7 @@ from parameterized import parameterized
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.fuchsia_device import base_fuchsia_device
+from honeydew.device_classes import base_fuchsia_device
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
@@ -44,11 +44,11 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 
 class BaseFuchsiaDeviceTests(unittest.TestCase):
-    """Unit tests for honeydew.fuchsia_device.base_fuchsia_device.py."""
+    """Unit tests for honeydew.device_classes.base_fuchsia_device.py."""
 
     @mock.patch(
         # pylint: disable=line-too-long
-        "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
+        "honeydew.device_classes.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
         set(),
     )
     @mock.patch.object(
@@ -102,7 +102,7 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
     )
     @mock.patch(
         # pylint: disable=line-too-long
-        "honeydew.fuchsia_device.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
+        "honeydew.device_classes.base_fuchsia_device.BaseFuchsiaDevice.__abstractmethods__",
         set(),
     )
     @mock.patch.object(

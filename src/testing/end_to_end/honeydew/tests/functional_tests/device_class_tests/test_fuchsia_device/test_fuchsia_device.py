@@ -13,13 +13,11 @@ from mobly import asserts
 from mobly import test_runner
 
 from honeydew import custom_types
-from honeydew.fuchsia_device.fuchsia_controller import (
+from honeydew.device_classes.fuchsia_controller import (
     fuchsia_device as fc_fuchsia_device,
 )
-from honeydew.fuchsia_device.sl4f import fuchsia_device as sl4f_fuchsia_device
-from honeydew.interfaces.device_classes import (
-    fuchsia_device as fuchsia_device_interface,
-)
+from honeydew.device_classes.sl4f import fuchsia_device as sl4f_fuchsia_device
+from honeydew.interfaces.device_classes import fuchsia_device
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -45,9 +43,7 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
               this device
         """
         super().setup_class()
-        self.device: fuchsia_device_interface.FuchsiaDevice = (
-            self.fuchsia_devices[0]
-        )
+        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
     def test_device_instance(self) -> None:
         """Test case to make sure DUT is a FuchsiaDevice"""

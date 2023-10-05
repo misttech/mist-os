@@ -10,23 +10,25 @@ if (is_host) {
   # Stable infra test groups.
   group("stable_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_emulator_tests" ]
+    public_deps = [ "test_generic_fuchsia_device:stable_sl4f_emulator_tests" ]
   }
 
   group("stable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_emulator_tests" ]
+    public_deps =
+        [ "test_generic_fuchsia_device:stable_non_sl4f_emulator_tests" ]
   }
 
   # Unstable infra test groups.
   group("unstable_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_emulator_tests" ]
+    public_deps = [ "test_generic_fuchsia_device:unstable_sl4f_emulator_tests" ]
   }
 
   group("unstable_non_sl4f_emulator_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_emulator_tests" ]
+    public_deps =
+        [ "test_generic_fuchsia_device:unstable_non_sl4f_emulator_tests" ]
   }
 
   #
@@ -36,23 +38,23 @@ if (is_host) {
   # Stable infra test groups.
   group("stable_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_nuc_tests" ]
+    public_deps = [ "test_x64:stable_sl4f_nuc_tests" ]
   }
 
   group("stable_non_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_nuc_tests" ]
+    public_deps = [ "test_x64:stable_non_sl4f_nuc_tests" ]
   }
 
   # Unstable infra test groups.
   group("unstable_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_nuc_tests" ]
+    public_deps = [ "test_x64:unstable_sl4f_nuc_tests" ]
   }
 
   group("unstable_non_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_nuc_tests" ]
+    public_deps = [ "test_x64:unstable_non_sl4f_nuc_tests" ]
   }
 
   #
@@ -62,28 +64,33 @@ if (is_host) {
   # Stable infra test groups.
   group("stable_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_sl4f_vim3_tests" ]
+    public_deps = [ "test_vim3:stable_sl4f_vim3_tests" ]
   }
 
   group("stable_non_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:stable_non_sl4f_vim3_tests" ]
+    public_deps = [ "test_vim3:stable_non_sl4f_vim3_tests" ]
   }
 
   # Unstable infra test groups.
   group("unstable_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_sl4f_vim3_tests" ]
+    public_deps = [ "test_vim3:unstable_sl4f_vim3_tests" ]
   }
 
   group("unstable_non_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:unstable_non_sl4f_vim3_tests" ]
+    public_deps = [ "test_vim3:unstable_non_sl4f_vim3_tests" ]
   }
 
-  # Group containing all of the fuchsia_device functional test cases.
+  # Group containing all of the HoneyDew device classes functional test cases.
   group("tests") {
     testonly = true
-    public_deps = [ "test_fuchsia_device:tests" ]
+    public_deps = [
+      "test_fuchsia_device:tests",
+      "test_generic_fuchsia_device:tests",
+      "test_vim3:tests",
+      "test_x64:tests",
+    ]
   }
 }

@@ -105,8 +105,7 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         )
         asserts.assert_false(
             self.device.fastboot.is_in_fastboot_mode(),
-            msg=f"{self.device.device_name} is in fastboot mode when not "
-            f"expected",
+            msg=f"{self.device.device_name} is in fastboot mode when not expected",
         )
 
 

@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.fuchsia_device.sl4f.fuchsia_device.py."""
+"""Unit tests for honeydew.device_classes.sl4f.fuchsia_device.py."""
 
 import base64
 from typing import Any, Dict
@@ -12,8 +12,8 @@ from unittest import mock
 from parameterized import parameterized
 
 from honeydew import custom_types
-from honeydew.fuchsia_device import base_fuchsia_device
-from honeydew.fuchsia_device.sl4f import fuchsia_device
+from honeydew.device_classes import base_fuchsia_device
+from honeydew.device_classes.sl4f import fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
@@ -54,7 +54,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
 
 
 class FuchsiaDeviceSL4FTests(unittest.TestCase):
-    """Unit tests for honeydew.fuchsia_device.sl4f.fuchsia_device.py."""
+    """Unit tests for honeydew.device_classes.sl4f.fuchsia_device.py."""
 
     def __init__(self, *args, **kwargs) -> None:
         self.fd_obj: fuchsia_device.FuchsiaDevice
