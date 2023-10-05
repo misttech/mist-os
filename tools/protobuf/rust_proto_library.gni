@@ -18,7 +18,8 @@ import("//build/rust/rustc_library.gni")
 #     Directories in which to search for imported proto files.
 #
 #   deps (optional, default = [])
-#     Additional rust crates for the generated library to depend on.
+#     Additional rust crates for the generated library to depend on. It is not
+#     necessary to include the prost runtime, it is included implicitly.
 #
 # Ex:
 #    rust_proto_library("vm_guest_proto") {
@@ -31,10 +32,6 @@ import("//build/rust/rustc_library.gni")
 #      include_dirs = [
 #        "//third_party/protobuf/src"
 #      ]
-#      deps = [
-#        "//third_party/rust_crates:prost",
-#        "//third_party/rust_crates:prost-types",
-#      ]
 #    }
 #
 #    rustc_binary("bin") {
@@ -42,8 +39,6 @@ import("//build/rust/rustc_library.gni")
 #      output_name = "example"
 #      deps = [
 #        ":vm_guest_proto",
-#        "//third_party/rust_crates:prost",
-#        "//third_party/rust_crates:prost-types",
 #      ]
 #      sources = [
 #        "src/main.rs",
@@ -63,10 +58,9 @@ template("rust_proto_library") {
     proto_include_dirs = rebase_path(invoker.include_dirs, root_build_dir)
   }
 
-  if (!defined(invoker.deps)) {
-    crate_deps = []
-  } else {
-    crate_deps = invoker.deps
+  crate_deps = [ "//third_party/rust_crates:prost" ]
+  if (defined(invoker.deps)) {
+    crate_deps += invoker.deps
   }
 
   target_crate_root = "${target_gen_dir}/${target_name}"

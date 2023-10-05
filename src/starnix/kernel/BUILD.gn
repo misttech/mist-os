@@ -25,7 +25,6 @@ rust_proto_library("perfetto_consumer_proto") {
   ]
   packages = [ "perfetto.protos" ]
   include_dirs = [ "//third_party/perfetto" ]
-  deps = [ "//third_party/rust_crates:prost" ]
 }
 
 group("kernel") {

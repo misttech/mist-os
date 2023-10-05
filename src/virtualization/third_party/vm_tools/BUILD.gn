@@ -43,5 +43,4 @@ proto_library("vsh_cc_proto") {
 rust_proto_library("vsh_rust_proto") {
   sources = [ "vsh.proto" ]
   packages = [ "vm_tools.vsh" ]
-  deps = [ "//third_party/rust_crates:prost" ]
 }

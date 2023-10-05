@@ -11,7 +11,6 @@ rust_proto_library("pprof_proto") {
   sources = [ "//third_party/perfetto/protos/third_party/pprof/profile.proto" ]
   packages = [ "perfetto.third_party.perftools.profiles" ]
   include_dirs = [ "//third_party/protobuf/src" ]
-  deps = [ "//third_party/rust_crates:prost" ]
 }
 
 rustc_library("pprof") {
