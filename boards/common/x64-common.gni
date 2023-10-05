@@ -83,7 +83,6 @@ board_driver_package_labels += [
 board_package_labels += [
   # The following are all config_data entries, only.
   "//src/factory/factory_store_providers/config/qemu",
-  "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish-vulkan-config",
   "//src/hwinfo:default_board_config",
 ]
 
