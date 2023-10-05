@@ -57,8 +57,23 @@ pub struct EnqueueEventHandler {
 
 #[derive(Clone)]
 pub enum EventHandler {
+    /// Does nothing.
+    ///
+    /// It is up to the waiter to synchronize itself with the notifier if
+    /// synchronization is needed.
     None,
+    /// Enqueues an event to a ready list.
+    ///
+    /// This event handler naturally synchronizes the notifier and notifee
+    /// because of the lock acquired/released when enqueuing the event.
     Enqueue(EnqueueEventHandler),
+    /// Enqueues an event to a ready list once.
+    ///
+    /// If the handler is invoked multiple times, only the first invocation
+    /// enqueues an event to the ready list.
+    ///
+    /// This event handler naturally synchronizes the notifier and notifee
+    /// because of the lock acquired/released when enqueuing the event.
     EnqueueOnce(Arc<Mutex<Option<EnqueueEventHandler>>>),
 }
 
@@ -275,6 +290,16 @@ impl WaitCallback {
     }
 }
 
+/// Specifies the ordering for atomics accessed by both the "notifier" and
+/// "notifee" (the waiter).
+///
+/// Relaxed ordering because the [`Waiter`] does not provide any synchronization
+/// between the "notifier" and the "notifee". If a notifiee needs synchronization,
+/// it needs to perform that synchronization itself.
+///
+/// See [`Waiter.wait_until`] for more details.
+const ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE: Ordering = Ordering::Relaxed;
+
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail and
 /// a Waiter should have a single owner. So the Arc is hidden inside Waiter.
@@ -356,12 +381,9 @@ impl PortWaiter {
                             // we end up with no remaining user events but a user
                             // packet sitting in the `zx::Port`.
 
-                            // We perform the `swap` with `Ordering::Acquire` so
-                            // that we synchronize ourselves with objects that
-                            // have an event ready that was enqueued with
-                            // `self.queue_events` which performs a `swap` with
-                            // `Ordering::Release` on `has_pending_user_packet`.
-                            assert!(self.has_pending_user_packet.swap(false, Ordering::Acquire));
+                            assert!(self
+                                .has_pending_user_packet
+                                .swap(false, ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE));
                         }
                         _ => return error!(EBADMSG),
                     }
@@ -466,16 +488,7 @@ impl PortWaiter {
         profile_duration!("PortWaiterHandleEvent");
 
         scopeguard::defer! {
-            // Perform the `swap` with `Ordering::Release` so that all memory
-            // writes before this point (the state of objects that are ready)
-            // are observed by the waiter when it is woken up by the received
-            // user packet.
-            //
-            // Note that we can't rely on the port write syscall since it is
-            // not performed all the time and we can't rely on the `EventHandler`
-            // either since we may not actually perform work for the event in
-            // some cases (e.g. with the `None` or `EnqueueOnce` variants).
-            if !self.has_pending_user_packet.swap(true, Ordering::Release) {
+            if !self.has_pending_user_packet.swap(true, ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE) {
                 profile_duration!("PortWaiterEnqueueUserPacket");
                 self.queue_user_packet_data(zx::sys::ZX_OK)
             }
@@ -580,6 +593,13 @@ impl Waiter {
     /// repeatedly call this function with a 0 deadline until it reports ETIMEDOUT. (This case is
     /// why a 0 deadline must not return EINTR, as previous calls to wait_until() may have
     /// accumulated state that would be lost when returning EINTR to userspace.)
+    ///
+    /// It is up to the caller (the "waiter") to make sure that it synchronizes with any object
+    /// that triggers an event (the "notifier"). This `Waiter` does not provide any synchronization
+    /// itself. Note that synchronization between the "waiter" the "notifier" may be provided by
+    /// the [`EventHandler`] used to handle an event iff the waiter observes the side-effects of
+    /// the handler (e.g. reading the ready list modified by [`EventHandler::Enqueue`] or
+    /// [`EventHandler::EnqueueOnce`]).
     pub fn wait_until(&self, current_task: &CurrentTask, deadline: zx::Time) -> Result<(), Errno> {
         self.inner.wait_until(current_task, deadline)
     }
