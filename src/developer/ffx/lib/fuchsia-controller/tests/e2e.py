@@ -20,7 +20,8 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             isolation_path = os.path.join(tmp_path, "isolate")
 
         return Context(
-            config={"sdk.root": "."}, isolate_dir=IsolateDir(dir=isolation_path)
+            config={"sdk.root": "./sdk/exported/core"},
+            isolate_dir=IsolateDir(dir=isolation_path),
         )
 
     async def test_echo_daemon(self):

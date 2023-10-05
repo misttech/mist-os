@@ -20,6 +20,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
             fuchsia_device.FuchsiaDevice
         ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]
+        self.device.set_ctx(self)
 
     @asynctest
     async def test_fuchsia_device_reboot(self) -> None:

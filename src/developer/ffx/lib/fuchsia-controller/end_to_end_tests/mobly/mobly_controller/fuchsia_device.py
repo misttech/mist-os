@@ -33,9 +33,34 @@ TIMEOUTS: Dict[str, float] = {
 
 
 class FuchsiaDevice(object):
-    def __init__(self, ctx: Context, config: Dict[str, Any]):
+    def __init__(self, config: Dict[str, Any]):
+        target = config.get("ipv6") or config.get("ipv4") or config.get("name")
+        if not target:
+            raise ValueError(
+                f"Unable to load config properly. Target has no address or name: {config}"
+            )
+        self.target = target
         self.config = config
-        self.ctx = ctx
+        self.ctx = None
+
+    def set_ctx(self, test: base_test.BaseTestClass):
+        log_dir = test.log_path
+        isolation_path = None
+        ctx_config = {
+            "sdk.root": "./sdk/exported/core",
+            "log.level": "trace",
+            "log.enabled": "true",
+        }
+        if log_dir:
+            isolation_path = os.path.join(log_dir, "isolate")
+            ctx_config["log.dir"] = log_dir
+        isolate = IsolateDir(dir=isolation_path)
+        logging.info(
+            f"Loading context, isolate_dir={isolation_path}, log_dir={log_dir}"
+        )
+        self.ctx = Context(
+            isolate_dir=isolate, target=self.target, config=ctx_config
+        )
 
     async def wait_offline(self, timeout=TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
@@ -125,22 +150,7 @@ def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
     """
     res = []
     for config in configs:
-        isolation_path = None
-        log_dir = config.get("LogPath")
-        ctx_config = {
-            "sdk.root": ".",
-        }
-        if log_dir:
-            isolation_path = os.path.join(log_dir, "isolate")
-            ctx_config["log.dir"] = log_dir
-        isolate = IsolateDir(dir=isolation_path)
-        target = config.get("ipv6") or config.get("ipv4") or config.get("name")
-        if not target:
-            raise ValueError(
-                f"Unable to load config properly. Target has no address or name: {config}"
-            )
-        ctx = Context(isolate_dir=isolate, target=target, config=ctx_config)
-        res.append(FuchsiaDevice(ctx, config))
+        res.append(FuchsiaDevice(config))
     return res
 
 
