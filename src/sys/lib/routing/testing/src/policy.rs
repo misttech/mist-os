@@ -54,6 +54,7 @@ macro_rules! instantiate_global_policy_checker_tests {
     ($fixture_impl:path, $test:ident) => {
         #[test]
         fn $test() -> Result<(), Error> {
+            let _executor = fuchsia_async::LocalExecutor::new();
             <$fixture_impl as Default>::default().$test()
         }
     };

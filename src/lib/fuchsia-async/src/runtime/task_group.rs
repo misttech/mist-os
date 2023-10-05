@@ -4,7 +4,7 @@
 
 use crate::Task;
 
-use futures::{channel::mpsc, future::BoxFuture, Future, StreamExt};
+use futures::{channel::mpsc, Future, StreamExt};
 
 /// Errors that can be returned by this crate.
 #[derive(Debug, thiserror::Error)]
@@ -20,11 +20,11 @@ enum Error {
 /// All pending tasks in the group can be awaited using [`TaskGroup::join`].
 pub struct TaskGroup {
     sink: TaskSink,
-    // A future that waits for all tasks sent on `sink` to complete.
-    // `sink` writes tasks to a channel and this future drains tasks from the channel
+    // A Task that waits for all tasks sent on `sink` to complete.
+    // `sink` writes tasks to a channel and this Task drains tasks from the channel
     // using an unbounded loop. Therefore, `sink` must be dropped to close the channel and
     // allow this future to complete.
-    done: BoxFuture<'static, ()>,
+    done: Task<()>,
 }
 
 impl TaskGroup {
@@ -35,7 +35,7 @@ impl TaskGroup {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded::<Task<()>>();
         let sink = TaskSink::new(tx);
-        let done = Box::pin(async move {
+        let done = Task::spawn(async move {
             rx.for_each_concurrent(None, |task| task).await;
         });
         Self { sink, done }

@@ -199,7 +199,7 @@ mod tests {
     };
 
     #[fuchsia::test]
-    fn test_from_decl() {
+    async fn test_from_decl() {
         let component = ComponentInstance::new_root(
             Environment::empty(),
             Arc::new(ModelContext::new_for_test()),
