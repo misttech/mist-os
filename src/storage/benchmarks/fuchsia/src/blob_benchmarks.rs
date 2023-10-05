@@ -41,22 +41,26 @@ macro_rules! open_and_get_vmo_benchmark {
             }
 
             async fn run_test(&self, pkgdir: fio::DirectoryProxy) -> Vec<OperationDuration> {
-                let timer = OperationTimer::start();
+                const SAMPLES: usize = 10;
+                let mut durations = Vec::with_capacity(SAMPLES);
+                for _ in 0..SAMPLES {
+                    let timer = OperationTimer::start();
+                    let file = {
+                        trace_duration!("benchmark", "open-file");
+                        fuchsia_fs::directory::open_file(
+                            &pkgdir,
+                            &self.resource_path,
+                            fio::OpenFlags::RIGHT_READABLE,
+                        )
+                        .await
+                        .expect("failed to open blob")
+                    };
+                    trace_duration!("benchmark", "get-vmo");
+                    let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
 
-                let file = {
-                    trace_duration!("benchmark", "open-file");
-                    fuchsia_fs::directory::open_file(
-                        &pkgdir,
-                        &self.resource_path,
-                        fio::OpenFlags::RIGHT_READABLE,
-                    )
-                    .await
-                    .expect("failed to open blob")
-                };
-                trace_duration!("benchmark", "get-vmo");
-                let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
-
-                vec![timer.stop()]
+                    durations.push(timer.stop())
+                }
+                durations
             }
         }
 
@@ -443,12 +447,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_and_get_vmo_blobfs_test() {
-        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_blobfs(), 1).await;
+        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_blobfs(), 10).await;
     }
 
     #[fuchsia::test]
     async fn open_and_get_vmo_fxblob_test() {
-        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_fxblob(), 1).await;
+        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_fxblob(), 10).await;
     }
 
     #[fuchsia::test]
