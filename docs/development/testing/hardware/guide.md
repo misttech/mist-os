@@ -258,7 +258,7 @@ details on what's supported and what's not. See
 
 Tip: If you have access to an {{ widgets.glossary_simple ('in-tree', 'in-tree')}}
 Fuchsia checkout there's a copy of `adb` that you can use at
-`//prebuilt/starnix/internal/android-image-amd64/bin/adb`.
+`//prebuilt/starnix/internal/android-image-amd64/adb`.
 
 ## List of hardware testing tools {: #tools }
 

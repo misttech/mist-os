@@ -28,7 +28,7 @@ template("adb_e2e") {
     }
 
     host_test_data("adb_bin") {
-      sources = [ "//prebuilt/starnix/internal/android-image-amd64/bin/adb" ]
+      sources = [ "//prebuilt/starnix/internal/android-image-amd64/adb" ]
       outputs = [ "$target_out_dir/{{source_file_part}}" ]
     }
   } else {
