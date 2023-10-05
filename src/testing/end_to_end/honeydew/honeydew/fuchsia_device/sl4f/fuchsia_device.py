@@ -20,7 +20,7 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
-from honeydew.device_classes import base_fuchsia_device
+from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_interface,

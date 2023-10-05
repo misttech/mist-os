@@ -3,15 +3,6 @@
 # found in the LICENSE file.
 
 if (is_host) {
-  group("tests") {
-    testonly = true
-    public_deps = [
-      "affordance_tests:tests",
-      "device_class_tests:tests",
-      "transport_tests:tests",
-    ]
-  }
-
   #
   # Emulator tests
   #
@@ -21,7 +12,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "affordance_tests:stable_sl4f_emulator_tests",
-      "device_class_tests:stable_sl4f_emulator_tests",
+      "fuchsia_device_tests:stable_sl4f_emulator_tests",
       "transport_tests:stable_sl4f_emulator_tests",
     ]
   }
@@ -30,7 +21,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "affordance_tests:stable_non_sl4f_emulator_tests",
-      "device_class_tests:stable_non_sl4f_emulator_tests",
+      "fuchsia_device_tests:stable_non_sl4f_emulator_tests",
       "transport_tests:stable_non_sl4f_emulator_tests",
     ]
   }
@@ -40,7 +31,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "affordance_tests:unstable_sl4f_emulator_tests",
-      "device_class_tests:unstable_sl4f_emulator_tests",
+      "fuchsia_device_tests:unstable_sl4f_emulator_tests",
       "transport_tests:unstable_sl4f_emulator_tests",
     ]
   }
@@ -49,7 +40,7 @@ if (is_host) {
     testonly = true
     public_deps = [
       "affordance_tests:unstable_non_sl4f_emulator_tests",
-      "device_class_tests:unstable_non_sl4f_emulator_tests",
+      "fuchsia_device_tests:unstable_non_sl4f_emulator_tests",
       "transport_tests:unstable_non_sl4f_emulator_tests",
     ]
   }
@@ -61,23 +52,23 @@ if (is_host) {
   # Stable infra test groups.
   group("stable_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:stable_sl4f_vim3_tests" ]
+    public_deps = [ "fuchsia_device_tests:stable_sl4f_vim3_tests" ]
   }
 
   group("stable_non_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:stable_non_sl4f_vim3_tests" ]
+    public_deps = [ "fuchsia_device_tests:stable_non_sl4f_vim3_tests" ]
   }
 
   # Unstable infra test groups.
   group("unstable_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:unstable_sl4f_vim3_tests" ]
+    public_deps = [ "fuchsia_device_tests:unstable_sl4f_vim3_tests" ]
   }
 
   group("unstable_non_sl4f_vim3_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:unstable_non_sl4f_vim3_tests" ]
+    public_deps = [ "fuchsia_device_tests:unstable_non_sl4f_vim3_tests" ]
   }
 
   #
@@ -87,22 +78,32 @@ if (is_host) {
   # Stable infra test groups.
   group("stable_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:stable_sl4f_nuc_tests" ]
+    public_deps = [ "fuchsia_device_tests:stable_sl4f_nuc_tests" ]
   }
 
   group("stable_non_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:stable_non_sl4f_nuc_tests" ]
+    public_deps = [ "fuchsia_device_tests:stable_non_sl4f_nuc_tests" ]
   }
 
   # Unstable infra test groups.
   group("unstable_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:unstable_sl4f_nuc_tests" ]
+    public_deps = [ "fuchsia_device_tests:unstable_sl4f_nuc_tests" ]
   }
 
   group("unstable_non_sl4f_nuc_tests") {
     testonly = true
-    public_deps = [ "device_class_tests:unstable_non_sl4f_nuc_tests" ]
+    public_deps = [ "fuchsia_device_tests:unstable_non_sl4f_nuc_tests" ]
+  }
+
+  # All of the functional tests
+  group("tests") {
+    testonly = true
+    public_deps = [
+      "affordance_tests:tests",
+      "fuchsia_device_tests:tests",
+      "transport_tests:tests",
+    ]
   }
 }

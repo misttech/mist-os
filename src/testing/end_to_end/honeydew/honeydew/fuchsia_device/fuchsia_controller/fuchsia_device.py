@@ -34,7 +34,7 @@ from honeydew.affordances.fuchsia_controller.ui import (
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy as wlan_policy_fc,
 )
-from honeydew.device_classes import base_fuchsia_device
+from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_interface,

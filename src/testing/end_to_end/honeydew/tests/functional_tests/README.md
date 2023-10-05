@@ -157,9 +157,9 @@ If a test case requires an vim3 hardware then
     $ ffx -t <vim3_device_name> target show
     ```
 
-## Device class tests
+## FuchsiaDevice tests
 
-### GenericFuchsiaDevice tests
+### X64 Emu tests
 ```shell
 $ fx set core.qemu-x64 \
     --with //src/testing/sl4f \
@@ -170,10 +170,12 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_generic_fuchsia_device:generic_fuchsia_device_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc --e2e --output
 ```
 
-### X64 tests
+### X64 NUC tests
 ```shell
 $ fx set core.x64 \
     --with //build/images/recovery:recovery-installer \
@@ -182,7 +184,9 @@ $ fx set core.x64 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_x64:x64_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_nuc_test --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc --e2e --output
 ```
 
 ### vim3 tests
@@ -193,7 +197,9 @@ $ fx set core.vim3 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/device_class_tests/test_vim3:vim3_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:vim3_test --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:vim3_test_fc --e2e --output
 ```
 
 ## Affordance tests
