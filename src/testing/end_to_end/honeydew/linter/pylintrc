@@ -84,6 +84,9 @@ disable=abstract-method,
         input-builtin,
         intern-builtin,
         invalid-str-codec,
+        # TODO(b/303493616): Line-too-long warning is disabled due to Black
+        # conflicts, re-enable it once Black resolves the issue.
+        line-too-long,
         locally-disabled,
         long-builtin,
         long-suffix,
