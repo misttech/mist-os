@@ -82,4 +82,18 @@ TYPED_TEST(LdLoadTests, LoadWithNeeded) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, BasicDep) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("basic-dep"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

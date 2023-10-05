@@ -6,6 +6,7 @@
 #define LIB_LD_STARTUP_LOAD_H_
 
 #include <lib/elfldltl/dynamic.h>
+#include <lib/elfldltl/fd.h>
 #include <lib/elfldltl/link.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/relocation.h>
@@ -204,9 +205,11 @@ struct StartupLoadModule : public StartupLoadModuleBase,
 
   decltype(auto) memory() { return loader_.memory(); }
 
-  template <typename ScratchAllocator, typename InitialExecAllocator, typename... LoaderArgs>
+  template <typename ScratchAllocator, typename InitialExecAllocator, typename GetDepFile,
+            typename... LoaderArgs>
   static void LinkModules(Diagnostics& diag, ScratchAllocator& scratch,
                           InitialExecAllocator& initial_exec, StartupLoadModule* main_executable,
+                          GetDepFile&& get_dep_file,
                           std::initializer_list<BootsrapModule> preloaded_module_list,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
     List modules = main_executable->MakeList();
@@ -214,7 +217,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
         MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
 
     LoadDeps(diag, scratch, initial_exec, modules, preloaded_modules, executable_needed_count,
-             loader_args...);
+             std::forward<GetDepFile>(get_dep_file), loader_args...);
     CheckErrors(diag);
 
     RelocateModules(diag, modules);
@@ -282,16 +285,24 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     elfldltl::DecodeDynamic(diag, memory(), dynamic_, observer);
   }
 
-  template <typename ScratchAllocator, typename InitialExecAllocator, typename... LoaderArgs>
-  static void LoadDeps(Diagnostics& diag, ScratchAllocator& scratch, InitialExecAllocator&,
-                       List& modules, List& preloaded_modules, size_t needed_count,
+  // `get_dep_file` takes a `string_view` and should return an `std::optional<File>`. `File`
+  // must meet the requirements of a File type described in lib/elfldltl/memory.h.
+  template <typename ScratchAllocator, typename InitialExecAllocator, typename GetDepFile,
+            typename... LoaderArgs>
+  static void LoadDeps(Diagnostics& diag, ScratchAllocator& scratch,
+                       InitialExecAllocator& initial_exec, List& modules, List& preloaded_modules,
+                       size_t needed_count, GetDepFile&& get_dep_file,
                        LoaderArgs&&... loader_args) {
     // Note, this assumes that ModuleList iterators are not invalidated after push_back(). This is
     // true of lists and StaticVector. No assumptions are made on the validity of the end()
     // iterator, so it is checked at every iteration.
     for (auto it = modules.begin(); it != modules.end(); it++) {
       if (!it->IsLoaded()) {
-        // TODO: we need to load this dep.
+        if (auto file = get_dep_file(it->name())) {
+          it->Load(diag, initial_exec, *file);
+        } else {
+          diag.MissingDependency(it->name().str());
+        }
       } else if (it != modules.begin()) {
         // Referenced preloaded modules can't have DT_NEEDED.
         // The third case is the main executable, which is already loaded but can;

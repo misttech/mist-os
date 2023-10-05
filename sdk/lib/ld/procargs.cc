@@ -85,6 +85,10 @@ StartupData ReadBootstrap(zx::unowned_channel bootstrap) {
       case PA_HND(PA_FD, STDERR_FILENO):
         TakeLogHandle(startup, std::move(handle));
         break;
+
+      case PA_LDSVC_LOADER:
+        startup.ldsvc.reset(handle.release());
+        break;
     }
   }
 
