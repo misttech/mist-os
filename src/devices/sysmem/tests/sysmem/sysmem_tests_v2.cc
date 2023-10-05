@@ -13,6 +13,7 @@
 #include <lib/zbi-format/graphics.h>
 #include <lib/zbitl/items/graphics.h>
 #include <lib/zx/clock.h>
+#include <zircon/threads.h>
 #include <zircon/types.h>
 
 #include <random>

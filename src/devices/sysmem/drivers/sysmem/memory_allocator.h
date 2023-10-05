@@ -44,32 +44,35 @@ class MemoryAllocator {
 
   virtual ~MemoryAllocator();
 
-  virtual zx_status_t Allocate(uint64_t size, std::optional<std::string> name,
-                               zx::vmo* parent_vmo) = 0;
-  // The callee must not create long-lived duplicate handles to child_vmo, as
-  // that would prevent ZX_VMO_ZERO_CHILDREN from being signaled on parent_vmo
-  // which would prevent Delete() from ever getting called even if all sysmem
-  // participants have closed their handles to child_vmo.  A transient
-  // short-lived duplicate handle to child_vmo is fine.
+  // size - the needed size in bytes, rounded up to a page boundaryß
   //
-  // The parent_vmo's handle value is guaranteed to remain valid (and a unique
-  // handle value) until Delete().
+  // settings - allocators may observe settings if needed, but are discouraged from looking at
+  // settings unless really needed; settings.buffer_settings.size_bytes is the logical size in bytes
+  // not rounded up to a page boundary, so most allocators will only care about `size` (first
+  // parameter).
   //
-  // The child_vmo's handle value is not guaranteed to remain valid, nor is it
-  // guaranteed to remain unique.  However, the child_vmo's koid is unique per
-  // boot, and can be used to identify whether an arbitrary VMO handle refers to
-  // the same VMO as child_vmo.  Any such tracking by koid should be cleaned up
-  // during Delete().
-  virtual zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-                                    fuchsia_sysmem2::SingleBufferSettings buffer_settings) = 0;
+  // name - a name that can be useful for debugging
+  //
+  // buffer_collection_id + buffer_index - The buffer_collection_id and buffer_index are retrievable
+  // from a sysmem-provided VMO using GetVmoInfo(). Because the sysmem-provided VMO may be a child
+  // (or grandchild) of the allocated VMO, the koid of parent_vmo is not generally retrievable from
+  // a sysmem-provide VMO derived from parent_vmo. Allocators which don't need to correlate a
+  // sysmem-provided VMO to a parent_vmo can ignore buffer_collection_id and buffer_index.
+  //
+  // parent_vmo - return the allocated VMO
+  //
+  // returns zx_status_t - the error may be useful for debugging, but the error code indicated to
+  // sysmem clients will be sanitized to ZX_ERR_NO_MEMORY.
+  virtual zx_status_t Allocate(uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+                               std::optional<std::string> name, uint64_t buffer_collection_id,
+                               uint32_t buffer_index, zx::vmo* parent_vmo) = 0;
 
-  // This also should clean up any tracking of child_vmo by child_vmo's koid.
-  // The child_vmo object itself, and all handles to it, are completely gone by
-  // this point.  Any child_vmo handle values are no longer guaranteed unique,
-  // so should not be retained beyond SetupChildVmo() above.
+  // This also should clean up any tracking of buffer_collection_id + buffer_index (the specific
+  // combination), as zero sysmem-provided VMOs exist at this point, so it's impossible for any
+  // sysmem-provided VMO to show up with the parent_vmo's buffer_collection_id + buffer_index.
   //
-  // This call takes ownership of parent_vmo, and should close parent_vmo so
-  // that the memory used by parent_vmo can be freed/reclaimed/recycled.
+  // This call takes ownership of parent_vmo, and should close parent_vmo so that the memory used by
+  // parent_vmo can be freed/reclaimed/recycled.
   virtual void Delete(zx::vmo parent_vmo) = 0;
 
   virtual zx_status_t GetPhysicalMemoryInfo(uint64_t* base, uint64_t* size) {

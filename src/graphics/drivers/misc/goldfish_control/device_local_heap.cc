@@ -38,6 +38,22 @@ fuchsia_sysmem2::wire::HeapProperties GetHeapProperties(fidl::AnyArena& allocato
 
 }  // namespace
 
+DeviceLocalHeap::Buffer::Buffer(DeviceLocalHeap& parent, zx::vmo parent_vmo, BufferKey buffer_key)
+    : parent_(parent),
+      parent_vmo_(std::move(parent_vmo)),
+      buffer_key_(buffer_key),
+      wait_deallocate_(parent_vmo_.get(), ZX_VMO_ZERO_CHILDREN, 0) {
+  wait_deallocate_.set_handler([this](async_dispatcher_t* dispatcher, async::Wait* wait,
+                                      zx_status_t status, const zx_packet_signal_t* signal) {
+    auto maybe_local_completer = std::move(maybe_delete_completer_);
+    parent_.control()->FreeBufferHandle(buffer_key_);
+    if (maybe_local_completer.has_value()) {
+      maybe_local_completer->Reply();
+    }
+  });
+  wait_deallocate_.Begin(parent_.loop()->dispatcher());
+}
+
 // static
 std::unique_ptr<DeviceLocalHeap> DeviceLocalHeap::Create(Control* control) {
   // Using `new` to access a non-public constructor.
@@ -50,31 +66,43 @@ DeviceLocalHeap::~DeviceLocalHeap() = default;
 
 void DeviceLocalHeap::AllocateVmo(AllocateVmoRequestView request,
                                   AllocateVmoCompleter::Sync& completer) {
-  zx::vmo vmo;
-  zx_status_t status = zx::vmo::create(request->size, 0, &vmo);
+  BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
+  zx::vmo parent_vmo;
+  zx_status_t status = zx::vmo::create(request->size, 0, &parent_vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] zx::vmo::create() failed - size: %lu status: %d", kTag, request->size,
-           status);
-    completer.Reply(status, zx::vmo{});
-  } else {
-    completer.Reply(ZX_OK, std::move(vmo));
+    zxlogf(ERROR, "[%s] zx::vmo::create() failed - size: %" PRIu64 " status: %d", kTag,
+           request->size, status);
+    completer.ReplyError(status);
+    return;
   }
+
+  zx::vmo child_vmo;
+  status = parent_vmo.create_child(ZX_VMO_CHILD_SLICE, 0, request->size, &child_vmo);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "[%s] vmo.create_child() failed: %d", kTag, status);
+    completer.ReplyError(status);
+    return;
+  }
+
+  control()->RegisterBufferHandle(buffer_key);
+
+  auto emplace_result = buffers_.try_emplace(
+      buffer_key, std::make_unique<Buffer>(*this, std::move(parent_vmo), buffer_key));
+  ZX_ASSERT(emplace_result.second);
+
+  completer.ReplySuccess(std::move(child_vmo));
 }
 
-void DeviceLocalHeap::CreateResource(CreateResourceRequestView request,
-                                     CreateResourceCompleter::Sync& completer) {
-  uint64_t id = control()->RegisterBufferHandle(request->vmo);
-  if (id == ZX_KOID_INVALID) {
-    completer.Reply(ZX_ERR_INVALID_ARGS, 0u);
-  } else {
-    completer.Reply(ZX_OK, id);
-  }
-}
-
-void DeviceLocalHeap::DestroyResource(DestroyResourceRequestView request,
-                                      DestroyResourceCompleter::Sync& completer) {
-  control()->FreeBufferHandle(request->id);
-  completer.Reply();
+void DeviceLocalHeap::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) {
+  BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
+  auto iter = buffers_.find(buffer_key);
+  // Since this message is only sent by sysmem, and request.vmo is a handle to the child VMO,
+  // assert.
+  ZX_ASSERT(iter != buffers_.end());
+  auto& buffer = iter->second;
+  buffer->SetDeleteCompleter(completer.ToAsync());
+  // ~request.vmo will trigger ZX_VMO_ZERO_CHILDREN which will Reply() after associated resources
+  // are deleted
 }
 
 void DeviceLocalHeap::Bind(zx::channel server_request) {

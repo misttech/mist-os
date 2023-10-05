@@ -38,7 +38,7 @@
 class SimpleDisplay;
 using DeviceType = ddk::Device<SimpleDisplay>;
 using HeapServer = fidl::WireServer<fuchsia_sysmem2::Heap>;
-
+using BufferKey = std::pair<uint64_t, uint32_t>;
 class SimpleDisplay : public DeviceType,
                       public HeapServer,
                       public ddk::DisplayControllerImplProtocol<SimpleDisplay, ddk::base_protocol> {
@@ -52,10 +52,7 @@ class SimpleDisplay : public DeviceType,
   zx_status_t Bind(const char* name, std::unique_ptr<SimpleDisplay>* controller_ptr);
 
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
-  void CreateResource(CreateResourceRequestView request,
-                      CreateResourceCompleter::Sync& completer) override;
-  void DestroyResource(DestroyResourceRequestView request,
-                       DestroyResourceCompleter::Sync& completer) override;
+  void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
 
   void DisplayControllerImplSetDisplayControllerInterface(
       const display_controller_interface_protocol_t* intf);
@@ -122,8 +119,10 @@ class SimpleDisplay : public DeviceType,
 
   async::Loop loop_;
 
-  static_assert(std::atomic<zx_koid_t>::is_always_lock_free);
-  std::atomic<zx_koid_t> framebuffer_koid_;
+  // protects only framebuffer_key_
+  fbl::Mutex framebuffer_key_mtx_;
+  std::optional<BufferKey> framebuffer_key_ TA_GUARDED(framebuffer_key_mtx_);
+
   static_assert(std::atomic<bool>::is_always_lock_free);
   std::atomic<bool> has_image_;
 

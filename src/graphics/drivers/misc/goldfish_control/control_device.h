@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.goldfish.pipe/cpp/wire.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/goldfish/control/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/io-buffer.h>
@@ -42,15 +43,16 @@ class Control : public ControlType,
 
   zx_status_t Bind();
 
-  uint64_t RegisterBufferHandle(const zx::vmo& vmo);
-  void FreeBufferHandle(uint64_t id);
+  void RegisterBufferHandle(BufferKey buffer_key);
+  void FreeBufferHandle(BufferKey buffer_key);
 
   using CreateColorBuffer2Result = fpromise::result<
       fidl::WireResponse<fuchsia_hardware_goldfish::ControlDevice::CreateColorBuffer2>,
       zx_status_t>;
 
   CreateColorBuffer2Result CreateColorBuffer2(
-      zx::vmo vmo, fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params create_params);
+      const zx::vmo& vmo, BufferKey buffer_key,
+      fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params create_params);
 
   // |fidl::WireServer<fuchsia_hardware_goldfish::ControlDevice>|
   void CreateColorBuffer2(CreateColorBuffer2RequestView request,
@@ -61,7 +63,7 @@ class Control : public ControlType,
                        zx_status_t>;
 
   CreateBuffer2Result CreateBuffer2(
-      fidl::AnyArena& allocator, zx::vmo vmo,
+      fidl::AnyArena& allocator, const zx::vmo& vmo, BufferKey buffer_key,
       fuchsia_hardware_goldfish::wire::CreateBuffer2Params create_params);
 
   // |fidl::WireServer<fuchsia_hardware_goldfish::ControlDevice>|
@@ -130,11 +132,14 @@ class Control : public ControlType,
       TA_REQ(lock_);
   zx_status_t CreateSyncKHRLocked(uint64_t* glsync_out, uint64_t* syncthread_out) TA_REQ(lock_);
 
+  fit::result<zx_status_t, BufferKey> GetBufferKeyForVmo(const zx::vmo& vmo);
+
   fbl::Mutex lock_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish_pipe::GoldfishPipe> pipe_;
   ddk::GoldfishControlProtocolClient control_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::AddressSpaceDevice> address_space_;
   fidl::WireSyncClient<fuchsia_hardware_goldfish::SyncDevice> sync_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_;
   int32_t id_ = 0;
   zx::bti bti_ TA_GUARDED(lock_);
   ddk::IoBuffer cmd_buffer_ TA_GUARDED(lock_);
@@ -149,7 +154,9 @@ class Control : public ControlType,
   fidl::WireSyncClient<fuchsia_hardware_goldfish::SyncTimeline> sync_timeline_;
 
   // TODO(fxbug.dev/3213): This should be std::unordered_map.
-  std::map<zx_koid_t, uint32_t> buffer_handles_ TA_GUARDED(lock_);
+  //
+  // buffer_collection_id, buffer_index
+  std::map<BufferKey, uint32_t> buffer_handles_ TA_GUARDED(lock_);
 
   struct BufferHandleInfo {
     fuchsia_hardware_goldfish::wire::BufferHandleType type;

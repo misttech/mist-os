@@ -71,16 +71,25 @@ class FakeBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem2:
   zx::unowned_vmo framebuffer_vmo_;
 };
 
+using BufferCollectionId = uint64_t;
+
+class FakeSysmemBase {
+ public:
+  virtual BufferCollectionId AllocBufferCollectionId() = 0;
+  virtual std::optional<std::pair<uint64_t, uint32_t>> GetFakeVmoInfo() = 0;
+};
+
 class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Allocator> {
  public:
-  explicit MockAllocator(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
-      : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
+  explicit MockAllocator(FakeSysmemBase& parent, async_dispatcher_t* dispatcher,
+                         zx::unowned_vmo framebuffer_vmo)
+      : parent_(parent), dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
     ZX_ASSERT(dispatcher_);
   }
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
                             BindSharedCollectionCompleter::Sync& completer) override {
-    auto buffer_collection_id = next_buffer_collection_id_++;
+    auto buffer_collection_id = parent_.AllocBufferCollectionId();
     active_buffer_collections_.emplace(
         buffer_collection_id,
         BufferCollection{
@@ -96,6 +105,18 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
               std::move(active_buffer_collections_.at(buffer_collection_id).token_client));
           active_buffer_collections_.erase(buffer_collection_id);
         });
+  }
+
+  void GetVmoInfo(GetVmoInfoRequestView request, GetVmoInfoCompleter::Sync& completer) override {
+    auto fake_vmo_info_result = parent_.GetFakeVmoInfo();
+    // Call SetupFakeVmoInfo() in the test before GetVmoInfo() gets called.
+    ZX_ASSERT(fake_vmo_info_result.has_value());
+    fidl::Arena arena;
+    auto response = fuchsia_sysmem2::wire::AllocatorGetVmoInfoResponse::Builder(arena);
+    response.buffer_collection_id(fake_vmo_info_result->first);
+    response.buffer_index(fake_vmo_info_result->second);
+
+    completer.ReplySuccess(response.Build());
   }
 
   std::vector<std::pair<fidl::UnownedClientEnd<fuchsia_sysmem2::BufferCollectionToken>,
@@ -131,27 +152,29 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::Alloca
     FakeBufferCollection fake_buffer_collection;
   };
 
-  using BufferCollectionId = int;
-
+  FakeSysmemBase& parent_;
   std::unordered_map<BufferCollectionId, BufferCollection> active_buffer_collections_;
   std::vector<fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>>
       inactive_buffer_collection_tokens_;
 
-  BufferCollectionId next_buffer_collection_id_ = 0;
   async_dispatcher_t* dispatcher_ = nullptr;
   zx::unowned_vmo framebuffer_vmo_;
 };
 
-class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
+class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem>,
+                   public FakeSysmemBase {
  public:
-  explicit FakeSysmem(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo)
-      : dispatcher_(dispatcher), framebuffer_vmo_(std::move(framebuffer_vmo)) {
+  explicit FakeSysmem(async_dispatcher_t* dispatcher, zx::unowned_vmo framebuffer_vmo,
+                      uint64_t first_buffer_collection_id)
+      : dispatcher_(dispatcher),
+        framebuffer_vmo_(std::move(framebuffer_vmo)),
+        next_buffer_collection_id_(first_buffer_collection_id) {
     EXPECT_TRUE(dispatcher_);
   }
 
   void ConnectServerV2(ConnectServerV2RequestView request,
                        ConnectServerV2Completer::Sync& completer) override {
-    mock_allocators_.emplace_front(dispatcher_, framebuffer_vmo_->borrow());
+    mock_allocators_.emplace_front(*this, dispatcher_, framebuffer_vmo_->borrow());
     auto it = mock_allocators_.begin();
     fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
   }
@@ -163,10 +186,21 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
+  BufferCollectionId AllocBufferCollectionId() override { return next_buffer_collection_id_++; }
+
+  std::optional<std::pair<uint64_t, uint32_t>> GetFakeVmoInfo() override { return fake_vmo_info_; }
+
+  void SetupFakeVmoInfo(uint64_t buffer_collection_id, uint32_t buffer_index) {
+    fake_vmo_info_.emplace(std::make_pair(buffer_collection_id, buffer_index));
+  }
+
  private:
+  friend class MockAllocator;
   std::list<MockAllocator> mock_allocators_;
   async_dispatcher_t* dispatcher_ = nullptr;
   zx::unowned_vmo framebuffer_vmo_ = {};
+  BufferCollectionId next_buffer_collection_id_ = 0;
+  std::optional<std::pair<uint64_t, uint32_t>> fake_vmo_info_;
 };
 
 class FakeMmio {
@@ -205,7 +239,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
 
 TEST(SimpleDisplay, ImportBufferCollection) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{});
+  FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
 
   auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
@@ -284,14 +318,15 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   constexpr uint32_t kStride = 800;
   constexpr auto kPixelFormat = fuchsia_images2::wire::PixelFormat::kBgra32;
   constexpr size_t kBytesPerPixel = 4;
+  const uint64_t kBanjoCollectionId = 1u;
+  constexpr size_t kImageBytes = uint64_t{kStride} * kHeight * kBytesPerPixel;
 
   // `framebuffer_vmo` must outlive `fake_sysmem`.
   zx::vmo framebuffer_vmo;
-  size_t kImageBytes = uint64_t{kStride} * kHeight * kBytesPerPixel;
   EXPECT_OK(zx::vmo::create(/*size=*/kImageBytes, /*options=*/0, &framebuffer_vmo));
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  FakeSysmem fake_sysmem(loop.dispatcher(), framebuffer_vmo.borrow());
+  FakeSysmem fake_sysmem(loop.dispatcher(), framebuffer_vmo.borrow(), kBanjoCollectionId);
   FakeMmio fake_mmio;
 
   loop.StartThread("sysmem loop");
@@ -308,21 +343,8 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   ASSERT_TRUE(token_endpoints.is_ok());
 
   // Import BufferCollection.
-  const uint64_t kBanjoCollectionId = 1u;
   EXPECT_OK(display.DisplayControllerImplImportBufferCollection(
       kBanjoCollectionId, token_endpoints->client.TakeChannel()));
-
-  // Import kernel framebuffer.
-  zx::vmo heap_vmo;
-  ASSERT_OK(framebuffer_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &heap_vmo));
-
-  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Heap>();
-  ASSERT_TRUE(heap_endpoints.is_ok());
-  auto& [heap_client, heap_server] = heap_endpoints.value();
-  auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
-  fidl::WireSyncClient heap{std::move(heap_client)};
-  EXPECT_OK(heap->CreateResource(std::move(heap_vmo), {}).status());
-  bind_ref.Unbind();
 
   // Set Buffer collection constraints.
   const image_t kDefaultImage = {
@@ -333,6 +355,23 @@ TEST(SimpleDisplay, ImportKernelFramebufferImage) {
   };
   EXPECT_OK(display.DisplayControllerImplSetBufferCollectionConstraints(&kDefaultImage,
                                                                         kBanjoCollectionId));
+
+  zx::result heap_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::Heap>();
+  ASSERT_TRUE(heap_endpoints.is_ok());
+  auto& [heap_client, heap_server] = heap_endpoints.value();
+  auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
+  fidl::WireSyncClient heap{std::move(heap_client)};
+
+  fidl::Arena arena;
+  // At least for now we use empty settings, because currently SimpleDisplay doesn't pay attention
+  // to any settings, so this way if that changes, this test will fail intentionally so that this
+  // test can be updated to have settings that achieve this test's goals.
+  auto settings = fuchsia_sysmem2::wire::SingleBufferSettings::Builder(arena);
+  EXPECT_OK(heap->AllocateVmo(0, settings.Build(), kBanjoCollectionId, 0).status());
+
+  bind_ref.Unbind();
+
+  fake_sysmem.SetupFakeVmoInfo(kBanjoCollectionId, 0);
 
   // Invalid import: bad collection id
   image_t invalid_image = kDefaultImage;

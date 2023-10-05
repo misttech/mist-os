@@ -22,44 +22,38 @@ ExternalMemoryAllocator::ExternalMemoryAllocator(MemoryAllocator::Owner* owner,
 
 ExternalMemoryAllocator::~ExternalMemoryAllocator() { ZX_DEBUG_ASSERT(is_empty()); }
 
-zx_status_t ExternalMemoryAllocator::Allocate(uint64_t size, std::optional<std::string> name,
+zx_status_t ExternalMemoryAllocator::Allocate(uint64_t size,
+                                              const fuchsia_sysmem2::SingleBufferSettings& settings,
+                                              std::optional<std::string> name,
+                                              uint64_t buffer_collection_id, uint32_t buffer_index,
                                               zx::vmo* parent_vmo) {
-  auto result = heap_.sync()->AllocateVmo(size);
-  if (!result.ok() || result.value().s != ZX_OK) {
-    DRIVER_ERROR("HeapAllocate() failed - status: %d status2: %d", result.status(),
-                 result.value().s);
-    // sanitize to ZX_ERR_NO_MEMORY regardless of why.
-    return ZX_ERR_NO_MEMORY;
-  }
-  zx::vmo result_vmo = std::move(result.value().vmo);
-  constexpr const char vmo_name[] = "Sysmem-external-heap";
-  result_vmo.set_property(ZX_PROP_NAME, vmo_name, sizeof(vmo_name));
-  *parent_vmo = std::move(result_vmo);
-  return ZX_OK;
-}
-
-zx_status_t ExternalMemoryAllocator::SetupChildVmo(
-    const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-    fuchsia_sysmem2::SingleBufferSettings buffer_settings) {
-  zx::vmo child_vmo_copy;
-  zx_status_t status = child_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &child_vmo_copy);
-  if (status != ZX_OK) {
-    DRIVER_ERROR("duplicate() failed - status: %d", status);
-    // sanitize to ZX_ERR_NO_MEMORY regardless of why.
-    status = ZX_ERR_NO_MEMORY;
-    return status;
-  }
-
+  ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
+  ZX_DEBUG_ASSERT_MSG(
+      fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
+      "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
+  // TODO(fxbug.dev/57690): We're currently using WireSharedClient for the combination of "shared"
+  // and sync() being available, but once we remove OnRegister we should also evaluate whether we
+  // can just use fidl::SyncClient.
   fidl::Arena arena;
-  auto result = heap_.sync()->CreateResource(std::move(child_vmo_copy),
-                                             fidl::ToWire(arena, std::move(buffer_settings)));
-  if (!result.ok() || result.value().s != ZX_OK) {
-    DRIVER_ERROR("HeapCreateResource() failed - status: %d status2: %d", result.status(),
-                 result.value().s);
+  auto allocate_result = heap_.sync()->AllocateVmo(size, fidl::ToWire(arena, settings),
+                                                   buffer_collection_id, buffer_index);
+  if (!allocate_result.ok() || !allocate_result->is_ok()) {
+    DRIVER_ERROR("Heap.AllocateVmo failed: %d %d", allocate_result.error().status(),
+                 allocate_result.ok() ? allocate_result->error_value() : ZX_ERR_INTERNAL);
     // sanitize to ZX_ERR_NO_MEMORY regardless of why.
     return ZX_ERR_NO_MEMORY;
   }
-  allocations_[parent_vmo.get()] = result.value().id;
+  zx::vmo result_vmo = std::move(allocate_result->value()->vmo);
+  fbl::String vmo_name;
+  if (name.has_value()) {
+    vmo_name = fbl::StringPrintf("sysmem-ext %s", name.value().c_str());
+  } else {
+    vmo_name = "sysmem-ext";
+  }
+  result_vmo.set_property(ZX_PROP_NAME, vmo_name.c_str(), vmo_name.length());
+  allocations_.try_emplace(result_vmo.get(), BufferKey{.buffer_collection_id = buffer_collection_id,
+                                                       .buffer_index = buffer_index});
+  *parent_vmo = std::move(result_vmo);
   return ZX_OK;
 }
 
@@ -69,18 +63,18 @@ void ExternalMemoryAllocator::Delete(zx::vmo parent_vmo) {
     DRIVER_ERROR("Invalid allocation - vmo_handle: %d", parent_vmo.get());
     return;
   }
-  auto id = it->second;
-  auto result = heap_.sync()->DestroyResource(id);
+  BufferKey buffer_key = it->second;
+  allocations_.erase(it);
+  auto result = heap_.sync()->DeleteVmo(buffer_key.buffer_collection_id, buffer_key.buffer_index,
+                                        std::move(parent_vmo));
   if (!result.ok()) {
     DRIVER_ERROR("HeapDestroyResource() failed - status: %d", result.status());
-    // fall-through - this can only fail because resource has
-    // already been destroyed.
+    // fall-through; the server also pays attention to ZX_VMO_ZERO_CHILDREN; if the server still
+    // exists/existed it'll find out that way
   }
-  allocations_.erase(it);
   if (is_empty()) {
     owner_->CheckForUnbind();
   }
-  // ~parent_vmo
 }
 
 }  // namespace sysmem_driver

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/ddk/debug.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/function.h>
@@ -34,17 +35,30 @@ class DeviceLocalHeap : public Heap {
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
 
   // |fidl::WireServer<fuchsia_sysmem2::Heap>|
-  void CreateResource(CreateResourceRequestView request,
-                      CreateResourceCompleter::Sync& completer) override;
-
-  // |fidl::WireServer<fuchsia_sysmem2::Heap>|
-  void DestroyResource(DestroyResourceRequestView request,
-                       DestroyResourceCompleter::Sync& completer) override;
+  void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
 
   // |Heap|
   void Bind(zx::channel server_request) override;
 
  private:
+  class Buffer {
+   public:
+    Buffer(DeviceLocalHeap& parent, zx::vmo parent_vmo, BufferKey buffer_key);
+    void SetDeleteCompleter(DeleteVmoCompleter::Async async_completer) {
+      maybe_delete_completer_.emplace(std::move(async_completer));
+    }
+
+   private:
+    DeviceLocalHeap& parent_;
+    zx::vmo parent_vmo_;
+    BufferKey buffer_key_;
+    async::Wait wait_deallocate_;
+    std::optional<DeleteVmoCompleter::Async> maybe_delete_completer_;
+  };
+
+  using BufferSet = std::unordered_map<BufferKey, std::unique_ptr<Buffer>, BufferKeyHash>;
+  BufferSet buffers_;
+
   // This constructor is for internal use only. Use |DeviceLocalHeap::Create()| instead.
   explicit DeviceLocalHeap(Control* control);
 };

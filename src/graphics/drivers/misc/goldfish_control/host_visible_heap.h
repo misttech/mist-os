@@ -13,6 +13,7 @@
 #include <lib/fit/function.h>
 #include <lib/zx/pmt.h>
 
+#include <functional>
 #include <memory>
 #include <unordered_map>
 
@@ -34,12 +35,7 @@ class HostVisibleHeap : public Heap {
   void AllocateVmo(AllocateVmoRequestView request, AllocateVmoCompleter::Sync& completer) override;
 
   // |fidl::WireServer<fuchsia_sysmem2::Heap>|
-  void CreateResource(CreateResourceRequestView request,
-                      CreateResourceCompleter::Sync& completer) override;
-
-  // |fidl::WireServer<fuchsia_sysmem2::Heap>|
-  void DestroyResource(DestroyResourceRequestView request,
-                       DestroyResourceCompleter::Sync& completer) override;
+  void DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) override;
 
   // |Heap|
   void Bind(zx::channel server_request) override;
@@ -49,8 +45,8 @@ class HostVisibleHeap : public Heap {
   explicit HostVisibleHeap(Control* control);
 
   // Destroy VMO and deallocate address space blocks stored in |blocks_\.
-  // |koid| is the koid of block's child VMO, i.e. the key of |blocks_|.
-  void DeallocateVmo(zx_koid_t koid);
+  // |buffer_key| is the unique ID of the logical buffer - i.e. the key of |blocks_|.
+  void DeallocateVmo(BufferKey buffer_key);
 
   // Address space block information.
   //
@@ -62,7 +58,7 @@ class HostVisibleHeap : public Heap {
   // on that signal to invoke |deallocate_callback|, and dispatch it on
   // the async |dispatcher|.
   struct Block {
-    Block(zx::vmo vmo, uint64_t paddr, fit::closure deallocate_callback,
+    Block(zx::vmo vmo, uint64_t paddr, fit::function<void(Block&)> deallocate_callback,
           async_dispatcher_t* dispatcher);
     // The parent |vmo| acquired directly from goldfish address space.
     // This is kept by |Block| to ensure that address space blocks are
@@ -72,6 +68,8 @@ class HostVisibleHeap : public Heap {
     // Physical memory address of this memory block acquired from
     // goldfish address space.
     uint64_t paddr;
+
+    std::optional<DeleteVmoCompleter::Async> maybe_delete_completer;
 
     // Since address space block is allocated at |AllocateVmo()| and it's
     // possible that the VMO can be destroyed before |CreateResource()|,
@@ -91,7 +89,7 @@ class HostVisibleHeap : public Heap {
   //
   // Key:   koid of |vmo| returned by AllocateVmo().
   // Value: Address space block info.
-  using BlockMapType = std::unordered_map<zx_koid_t, Block>;
+  using BlockMapType = std::unordered_map<BufferKey, Block, BufferKeyHash>;
   BlockMapType blocks_;
 };
 

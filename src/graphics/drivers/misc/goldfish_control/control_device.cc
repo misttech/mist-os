@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.goldfish/cpp/markers.h>
 #include <fidl/fuchsia.hardware.goldfish/cpp/wire.h>
+#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
@@ -36,17 +37,6 @@ constexpr uint32_t kClientFlags = 0;
 constexpr uint32_t VULKAN_ONLY = 1;
 
 constexpr uint32_t kInvalidBufferHandle = 0U;
-
-zx_koid_t GetKoidForVmo(const zx::vmo& vmo) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(vmo.get(), ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: zx_object_get_info() failed - status: %d", kTag, status);
-    return ZX_KOID_INVALID;
-  }
-  return info.koid;
-}
 
 }  // namespace
 
@@ -119,6 +109,34 @@ zx_status_t Control::Init() {
     return sync_client.status_value();
   }
   sync_ = fidl::WireSyncClient(std::move(sync_client.value()));
+
+  zx::result hardware_sysmem_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
+  if (hardware_sysmem_result.is_error()) {
+    zxlogf(ERROR, "%s: failed to connect to FIDL sysmem fragment: %s", kTag,
+           hardware_sysmem_result.status_string());
+    return hardware_sysmem_result.status_value();
+  }
+  auto hardware_sysmem = fidl::SyncClient(std::move(hardware_sysmem_result.value()));
+
+  // TODO(fxbug.dev/104188): Connect directly to fuchsia.sysmem2.Allocator in the first place when
+  // possible instead of bouncing through ConnectServerV2.
+  auto endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
+  if (!endpoints_result.is_ok()) {
+    zxlogf(ERROR, "%s: CreateEndpoints failed: %d", kTag, endpoints_result.error_value());
+    return endpoints_result.error_value();
+  }
+  sysmem_.Bind(std::move(endpoints_result->client));
+  ZX_ASSERT(sysmem_.is_valid());
+  fuchsia_hardware_sysmem::SysmemConnectServerV2Request connect_request;
+  connect_request.allocator_request() = std::move(endpoints_result->server);
+  auto connect_result = hardware_sysmem->ConnectServerV2(std::move(connect_request));
+  if (!connect_result.is_ok()) {
+    zxlogf(ERROR, "%s: failed to connect to FIDL sysmem2.Allocator: %s", kTag,
+           connect_result.error_value().status_string());
+    return connect_result.error_value().status();
+  }
+  ZX_ASSERT(sysmem_.is_valid());
 
   return ZX_OK;
 }
@@ -325,21 +343,15 @@ zx_status_t Control::Bind() {
   return status;
 }
 
-uint64_t Control::RegisterBufferHandle(const zx::vmo& vmo) {
-  zx_koid_t koid = GetKoidForVmo(vmo);
-  if (koid == ZX_KOID_INVALID) {
-    return static_cast<uint64_t>(ZX_KOID_INVALID);
-  }
-
+void Control::RegisterBufferHandle(BufferKey buffer_key) {
   fbl::AutoLock lock(&lock_);
-  buffer_handles_[koid] = kInvalidBufferHandle;
-  return static_cast<uint64_t>(koid);
+  buffer_handles_[buffer_key] = kInvalidBufferHandle;
 }
 
-void Control::FreeBufferHandle(uint64_t id) {
+void Control::FreeBufferHandle(BufferKey buffer_key) {
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(static_cast<zx_koid_t>(id));
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     zxlogf(ERROR, "%s: invalid key", kTag);
     return;
@@ -353,7 +365,8 @@ void Control::FreeBufferHandle(uint64_t id) {
 }
 
 Control::CreateColorBuffer2Result Control::CreateColorBuffer2(
-    zx::vmo vmo, fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params create_params) {
+    const zx::vmo& vmo, BufferKey buffer_key,
+    fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params create_params) {
   using fuchsia_hardware_goldfish::ControlDevice;
 
   // Check argument validity.
@@ -378,15 +391,9 @@ Control::CreateColorBuffer2Result Control::CreateColorBuffer2(
                  create_params.height(), "format", static_cast<uint32_t>(create_params.format()),
                  "memory_property", create_params.memory_property());
 
-  zx_koid_t koid = GetKoidForVmo(vmo);
-  if (koid == ZX_KOID_INVALID) {
-    zxlogf(ERROR, "%s: koid of VMO handle %u is invalid", kTag, vmo.get());
-    return fpromise::error(ZX_ERR_INVALID_ARGS);
-  }
-
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(koid);
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     return fpromise::ok(
         fidl::WireResponse<ControlDevice::CreateColorBuffer2>(ZX_ERR_INVALID_ARGS, -1));
@@ -448,7 +455,20 @@ Control::CreateColorBuffer2Result Control::CreateColorBuffer2(
 
 void Control::CreateColorBuffer2(CreateColorBuffer2RequestView request,
                                  CreateColorBuffer2Completer::Sync& completer) {
-  auto result = CreateColorBuffer2(std::move(request->vmo), std::move(request->create_params));
+  auto buffer_key_result = GetBufferKeyForVmo(request->vmo);
+  if (!buffer_key_result.is_ok()) {
+    zxlogf(ERROR, "%s: GetBufferKeyForVmo failed: %d", kTag, buffer_key_result.error_value());
+    if (buffer_key_result.error_value() == ZX_ERR_NOT_FOUND) {
+      completer.Reply(ZX_ERR_INVALID_ARGS, 0);
+      return;
+    }
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto& buffer_key = buffer_key_result.value();
+
+  auto result =
+      CreateColorBuffer2(std::move(request->vmo), buffer_key, std::move(request->create_params));
   if (result.is_ok()) {
     completer.Reply(result.value().res, result.value().hw_address_page_offset);
   } else {
@@ -457,7 +477,7 @@ void Control::CreateColorBuffer2(CreateColorBuffer2RequestView request,
 }
 
 Control::CreateBuffer2Result Control::CreateBuffer2(
-    fidl::AnyArena& allocator, zx::vmo vmo,
+    fidl::AnyArena& allocator, const zx::vmo& vmo, BufferKey buffer_key,
     fuchsia_hardware_goldfish::wire::CreateBuffer2Params create_params) {
   using fuchsia_hardware_goldfish::ControlDevice;
   using fuchsia_hardware_goldfish::wire::ControlDeviceCreateBuffer2Response;
@@ -480,15 +500,9 @@ Control::CreateBuffer2Result Control::CreateBuffer2(
   TRACE_DURATION("gfx", "Control::CreateBuffer2", "size", create_params.size(), "memory_property",
                  create_params.memory_property());
 
-  zx_koid_t koid = GetKoidForVmo(vmo);
-  if (koid == ZX_KOID_INVALID) {
-    zxlogf(ERROR, "%s: koid of VMO handle %u is invalid", kTag, vmo.get());
-    return fpromise::error(ZX_ERR_INVALID_ARGS);
-  }
-
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(koid);
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     return fpromise::ok(ControlDeviceCreateBuffer2Result::WithErr(ZX_ERR_INVALID_ARGS));
   }
@@ -539,18 +553,27 @@ Control::CreateBuffer2Result Control::CreateBuffer2(
 
 void Control::CreateBuffer2(CreateBuffer2RequestView request,
                             CreateBuffer2Completer::Sync& completer) {
-  fidl::Arena allocator;
-  auto result =
-      CreateBuffer2(allocator, std::move(request->vmo), std::move(request->create_params));
-  if (result.is_ok()) {
-    if (result.value().is_response()) {
-      completer.ReplySuccess(result.value().response().hw_address_page_offset);
-    } else if (result.value().is_err()) {
-      completer.ReplyError(result.value().err());
-    }
-  } else {
-    completer.Close(result.error());
+  auto buffer_key_result = GetBufferKeyForVmo(request->vmo);
+  if (!buffer_key_result.is_ok()) {
+    zxlogf(ERROR, "%s: GetBufferKeyForVmo failed: %d", kTag, buffer_key_result.error_value());
+    completer.ReplyError(ZX_ERR_INVALID_ARGS);
+    return;
   }
+  auto& buffer_key = buffer_key_result.value();
+
+  fidl::Arena allocator;
+  auto result = CreateBuffer2(allocator, std::move(request->vmo), buffer_key,
+                              std::move(request->create_params));
+  if (!result.is_ok()) {
+    completer.Close(result.error());
+    return;
+  }
+  if (result.value().is_err()) {
+    completer.ReplyError(result.value().err());
+    return;
+  }
+  ZX_ASSERT(result.value().is_response());
+  completer.ReplySuccess(result.value().response().hw_address_page_offset);
 }
 
 void Control::CreateSyncFence(CreateSyncFenceRequestView request,
@@ -567,18 +590,23 @@ void Control::GetBufferHandle(GetBufferHandleRequestView request,
                               GetBufferHandleCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "Control::FidlGetBufferHandle");
 
-  zx_koid_t koid = GetKoidForVmo(request->vmo);
-  if (koid == ZX_KOID_INVALID) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-
   uint32_t handle = kInvalidBufferHandle;
   auto handle_type = fuchsia_hardware_goldfish::wire::BufferHandleType::kInvalid;
 
+  auto buffer_key_result = GetBufferKeyForVmo(request->vmo);
+  if (!buffer_key_result.is_ok()) {
+    if (buffer_key_result.error_value() == ZX_ERR_NOT_FOUND) {
+      completer.Reply(ZX_ERR_INVALID_ARGS, handle, handle_type);
+      return;
+    }
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto& buffer_key = buffer_key_result.value();
+
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(koid);
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     completer.Reply(ZX_ERR_INVALID_ARGS, handle, handle_type);
     return;
@@ -610,16 +638,21 @@ void Control::GetBufferHandleInfo(GetBufferHandleInfoRequestView request,
 
   TRACE_DURATION("gfx", "Control::FidlGetBufferHandleInfo");
 
-  zx_koid_t koid = GetKoidForVmo(request->vmo);
-  if (koid == ZX_KOID_INVALID) {
+  auto buffer_key_result = GetBufferKeyForVmo(request->vmo);
+  if (!buffer_key_result.is_ok()) {
+    if (buffer_key_result.error_value() == ZX_ERR_NOT_FOUND) {
+      completer.ReplyError(ZX_ERR_INVALID_ARGS);
+      return;
+    }
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
   }
+  auto& buffer_key = buffer_key_result.value();
 
   uint32_t handle = kInvalidBufferHandle;
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(koid);
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
@@ -665,14 +698,15 @@ zx_status_t Control::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
 }
 
 zx_status_t Control::GoldfishControlGetColorBuffer(zx::vmo vmo, uint32_t* out_id) {
-  zx_koid_t koid = GetKoidForVmo(vmo);
-  if (koid == ZX_KOID_INVALID) {
-    return ZX_ERR_INVALID_ARGS;
+  auto buffer_key_result = GetBufferKeyForVmo(vmo);
+  if (!buffer_key_result.is_ok()) {
+    return buffer_key_result.error_value();
   }
+  auto& buffer_key = buffer_key_result.value();
 
   fbl::AutoLock lock(&lock_);
 
-  auto it = buffer_handles_.find(koid);
+  auto it = buffer_handles_.find(buffer_key);
   if (it == buffer_handles_.end()) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -948,6 +982,35 @@ void Control::RemoveHeap(Heap* heap) {
   // wait for this to end before shutting down the loop, causing an infinite
   // loop), instead we move it into a staging area for future deletion.
   removed_heaps_.push_back(heaps_.erase(*heap));
+}
+
+fit::result<zx_status_t, BufferKey> Control::GetBufferKeyForVmo(const zx::vmo& vmo) {
+  ZX_ASSERT(sysmem_.is_valid());
+  zx::vmo dup_vmo;
+  zx_status_t dup_status = vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_vmo);
+  if (dup_status != ZX_OK) {
+    zxlogf(ERROR, "%s: vmo.duplicate() failed: %d", kTag, dup_status);
+    return fit::error(dup_status);
+  }
+  fuchsia_sysmem2::AllocatorGetVmoInfoRequest request;
+  request.vmo() = std::move(dup_vmo);
+  auto get_result = sysmem_->GetVmoInfo(std::move(request));
+  if (!get_result.is_ok()) {
+    if (get_result.error_value().is_domain_error() &&
+        get_result.error_value().domain_error() == ZX_ERR_NOT_FOUND) {
+      return fit::error(ZX_ERR_NOT_FOUND);
+    }
+    zx_status_t get_vmo_info_status = get_result.error_value().is_domain_error()
+                                          ? get_result.error_value().domain_error()
+                                          : get_result.error_value().framework_error().status();
+    zxlogf(ERROR, "%s: GetVmoInfo failed: %d", kTag, get_vmo_info_status);
+    return fit::error(get_vmo_info_status);
+  }
+  auto& info = get_result.value();
+  return fit::ok(BufferKey{
+      *info.buffer_collection_id(),
+      *info.buffer_index(),
+  });
 }
 
 }  // namespace goldfish

@@ -165,14 +165,15 @@ fuchsia_hardware_goldfish::wire::CreateBuffer2Params GetCreateBuffer2Params(
 
 }  // namespace
 
-HostVisibleHeap::Block::Block(zx::vmo vmo, uint64_t paddr, fit::closure deallocate_callback,
+HostVisibleHeap::Block::Block(zx::vmo vmo, uint64_t paddr,
+                              fit::function<void(Block&)> deallocate_callback,
                               async_dispatcher_t* dispatcher)
     : vmo(std::move(vmo)),
       paddr(paddr),
       wait_deallocate(this->vmo.get(), ZX_VMO_ZERO_CHILDREN, 0u,
-                      [deallocate_callback = std::move(deallocate_callback)](
+                      [this, deallocate_callback = std::move(deallocate_callback)](
                           async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
-                          const zx_packet_signal_t* signal) { deallocate_callback(); }) {
+                          const zx_packet_signal_t* signal) { deallocate_callback(*this); }) {
   wait_deallocate.Begin(dispatcher);
 }
 
@@ -189,23 +190,27 @@ HostVisibleHeap::~HostVisibleHeap() = default;
 void HostVisibleHeap::AllocateVmo(AllocateVmoRequestView request,
                                   AllocateVmoCompleter::Sync& completer) {
   TRACE_DURATION("gfx", "HostVisibleHeap::AllocateVmo", "size", request->size);
+  BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
 
   auto result = control()->address_space_child()->AllocateBlock(request->size);
   if (!result.ok()) {
     zxlogf(ERROR, "[%s] AllocateBlock FIDL call failed: status %d", kTag, result.status());
-    completer.Reply(result.status(), zx::vmo{});
+    completer.ReplyError(result.status());
     return;
   }
   if (result.value().res != ZX_OK) {
     zxlogf(ERROR, "[%s] AllocateBlock failed: res %d", kTag, result.value().res);
-    completer.Reply(result.value().res, zx::vmo{});
+    completer.ReplyError(result.status());
     return;
   }
+
+  // Get |paddr| of the |Block| to use in Buffer create params.
+  uint64_t paddr = result.value().paddr;
 
   // We need to clean up the allocated block if |zx_vmo_create_child| or
   // |fsl::GetKoid| fails, which could happen before we create and bind the
   // |DeallocateBlock()| wait in |Block|.
-  auto cleanup_block = fit::defer([this, paddr = result.value().paddr] {
+  auto cleanup_block = fit::defer([this, paddr] {
     auto result = control()->address_space_child()->DeallocateBlock(paddr);
     if (!result.ok()) {
       zxlogf(ERROR, "[%s] DeallocateBlock FIDL call failed: status %d", kTag, result.status());
@@ -214,127 +219,57 @@ void HostVisibleHeap::AllocateVmo(AllocateVmoRequestView request,
     }
   });
 
-  zx::vmo vmo = std::move(result.value().vmo);
-  zx::vmo child;
-  zx_status_t status = vmo.create_child(ZX_VMO_CHILD_SLICE, /*offset=*/0u, request->size, &child);
+  zx::vmo parent_vmo = std::move(result.value().vmo);
+  zx::vmo child_vmo;
+  zx_status_t status =
+      parent_vmo.create_child(ZX_VMO_CHILD_SLICE, /*offset=*/0u, request->size, &child_vmo);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] zx_vmo_create_child failed: %d", kTag, status);
     completer.Close(status);
     return;
   }
 
-  zx_handle_t child_handle = child.get();
-  zx_koid_t child_koid = fsl::GetKoid(child_handle);
-  if (child_koid == ZX_KOID_INVALID) {
-    zxlogf(ERROR, "[%s] fsl::GetKoid failed: child_handle %u", kTag, child_handle);
-    completer.Close(ZX_ERR_BAD_HANDLE);
-    return;
-  }
-
-  blocks_.try_emplace(
-      child_koid, std::move(vmo), result.value().paddr,
-      [this, child_koid] { DeallocateVmo(child_koid); }, loop()->dispatcher());
-
-  cleanup_block.cancel();
-  completer.Reply(ZX_OK, std::move(child));
-}
-
-void HostVisibleHeap::DeallocateVmo(zx_koid_t koid) {
-  TRACE_DURATION("gfx", "HostVisibleHeap::DeallocateVmo");
-
-  ZX_DEBUG_ASSERT(koid != ZX_KOID_INVALID);
-  ZX_DEBUG_ASSERT(blocks_.find(koid) != blocks_.end());
-
-  uint64_t paddr = blocks_.at(koid).paddr;
-  blocks_.erase(koid);
-
-  auto result = control()->address_space_child()->DeallocateBlock(paddr);
-  if (!result.ok()) {
-    zxlogf(ERROR, "[%s] DeallocateBlock FIDL call error: status %d", kTag, result.status());
-  } else if (result.value().res != ZX_OK) {
-    zxlogf(ERROR, "[%s] DeallocateBlock failed: res %d", kTag, result.value().res);
-  }
-}
-
-void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
-                                     CreateResourceCompleter::Sync& completer) {
   using fuchsia_hardware_goldfish::wire::ColorBufferFormatType;
   using fuchsia_hardware_goldfish::wire::CreateColorBuffer2Params;
 
-  ZX_DEBUG_ASSERT(request->vmo.is_valid());
+  ZX_DEBUG_ASSERT(child_vmo.is_valid());
 
-  zx_status_t status = CheckSingleBufferSettings(request->buffer_settings);
+  status = CheckSingleBufferSettings(request->settings);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] Invalid single buffer settings", kTag);
-    completer.Reply(status, 0u);
+    completer.ReplyError(status);
     return;
   }
 
-  bool is_image = request->buffer_settings.has_image_format_constraints();
+  bool is_image = request->settings.has_image_format_constraints();
   TRACE_DURATION(
       "gfx", "HostVisibleHeap::CreateResource", "type", is_image ? "image" : "buffer",
-      "image:width",
-      is_image ? request->buffer_settings.image_format_constraints().min_size().width : 0,
-      "image:height",
-      is_image ? request->buffer_settings.image_format_constraints().min_size().height : 0,
+      "image:width", is_image ? request->settings.image_format_constraints().min_size().width : 0,
+      "image:height", is_image ? request->settings.image_format_constraints().min_size().height : 0,
       "image:format",
-      is_image ? static_cast<uint32_t>(
-                     request->buffer_settings.image_format_constraints().pixel_format())
+      is_image ? static_cast<uint32_t>(request->settings.image_format_constraints().pixel_format())
                : 0,
-      "buffer:size", is_image ? 0 : request->buffer_settings.buffer_settings().size_bytes());
-
-  // Get |paddr| of the |Block| to use in Buffer create params.
-  zx_info_vmo_t vmo_info;
-  status = request->vmo.get_info(ZX_INFO_VMO, &vmo_info, sizeof(vmo_info), nullptr, nullptr);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] zx_object_get_info failed: status %d", kTag, status);
-    completer.Close(status);
-    return;
-  }
-
-  // The |vmo| passed in to this function is the child of VMO returned by
-  // |AllocateVmo()| above. So the key should be the parent koid of |vmo|.
-  zx_koid_t vmo_parent_koid = vmo_info.parent_koid;
-  if (blocks_.find(vmo_parent_koid) == blocks_.end()) {
-    zxlogf(ERROR, "[%s] Cannot find parent VMO koid in heap: parent_koid %lu", kTag,
-           vmo_parent_koid);
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  uint64_t paddr = blocks_.at(vmo_parent_koid).paddr;
-
-  // Duplicate VMO to create ColorBuffer/Buffer.
-  zx::vmo vmo_dup;
-  status = request->vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo_dup);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "[%s] zx_handle_duplicate failed: %d", kTag, status);
-    completer.Close(status);
-    return;
-  }
+      "buffer:size", is_image ? 0 : request->settings.buffer_settings().size_bytes());
 
   // Register buffer handle for VMO.
-  uint64_t id = control()->RegisterBufferHandle(request->vmo);
-  if (id == ZX_KOID_INVALID) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
+  control()->RegisterBufferHandle(buffer_key);
 
   // If the following part fails, we need to free the ColorBuffer/Buffer
   // handle so that there is no handle/resource leakage.
-  auto cleanup_handle = fit::defer([this, id] { control()->FreeBufferHandle(id); });
+  auto cleanup_handle = fit::defer([this, buffer_key] { control()->FreeBufferHandle(buffer_key); });
 
   if (is_image) {
     fidl::Arena allocator;
     // ColorBuffer creation.
-    auto create_params = GetCreateColorBuffer2Params(allocator, request->buffer_settings, paddr);
+    auto create_params = GetCreateColorBuffer2Params(allocator, request->settings, paddr);
     if (create_params.is_error()) {
-      completer.Reply(create_params.error(), 0u);
+      completer.ReplyError(create_params.error());
       return;
     }
 
     // Create actual ColorBuffer and map physical address |paddr| to
     // address of the ColorBuffer's host memory.
-    auto result = control()->CreateColorBuffer2(std::move(vmo_dup), create_params.take_value());
+    auto result = control()->CreateColorBuffer2(child_vmo, buffer_key, create_params.take_value());
     if (result.is_error()) {
       zxlogf(ERROR, "[%s] CreateColorBuffer error: status %d", kTag, status);
       completer.Close(result.error());
@@ -342,7 +277,7 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
     }
     if (result.value().res != ZX_OK) {
       zxlogf(ERROR, "[%s] CreateColorBuffer2 failed: res = %d", kTag, result.value().res);
-      completer.Reply(result.value().res, 0u);
+      completer.ReplyError(result.value().res);
       return;
     }
 
@@ -353,11 +288,12 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
   } else {
     fidl::Arena allocator;
     // Data buffer creation.
-    auto create_params = GetCreateBuffer2Params(allocator, request->buffer_settings, paddr);
+    auto create_params = GetCreateBuffer2Params(allocator, request->settings, paddr);
 
     // Create actual data buffer and map physical address |paddr| to
     // address of the buffer's host memory.
-    auto result = control()->CreateBuffer2(allocator, std::move(vmo_dup), std::move(create_params));
+    auto result =
+        control()->CreateBuffer2(allocator, child_vmo, buffer_key, std::move(create_params));
     if (result.is_error()) {
       zxlogf(ERROR, "[%s] CreateBuffer2 error: status %d", kTag, status);
       completer.Close(result.error());
@@ -365,7 +301,7 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
     }
     if (result.value().is_err()) {
       zxlogf(ERROR, "[%s] CreateBuffer2 failed: res = %d", kTag, result.value().err());
-      completer.Reply(result.value().err(), 0u);
+      completer.ReplyError(result.value().err());
       return;
     }
 
@@ -380,7 +316,7 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
   // supporting zx_vmo_write, we map it and fill the mapped memory address
   // with zero.
   uint64_t vmo_size;
-  status = request->vmo.get_size(&vmo_size);
+  status = child_vmo.get_size(&vmo_size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] zx_vmo_get_size failed: %d", kTag, status);
     completer.Close(status);
@@ -388,9 +324,9 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
   }
 
   zx_paddr_t addr;
-  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, /*vmar_offset=*/0u,
-                                      request->vmo,
-                                      /*vmo_offset=*/0u, vmo_size, &addr);
+  status =
+      zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, /*vmar_offset=*/0u, child_vmo,
+                                 /*vmo_offset=*/0u, vmo_size, &addr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "[%s] zx_vmar_map failed: %d", kTag, status);
     completer.Close(status);
@@ -406,17 +342,57 @@ void HostVisibleHeap::CreateResource(CreateResourceRequestView request,
     return;
   }
 
-  // Everything is done, now we can cancel the cleanup auto call.
+  auto [iter, emplace_success] = blocks_.try_emplace(
+      buffer_key, std::move(parent_vmo), result.value().paddr,
+      [this, buffer_key](Block& block) {
+        auto maybe_local_completer = std::move(block.maybe_delete_completer);
+        // This destroys the color buffer associated with |id| and frees the color
+        // buffer handle |id|.
+        control()->FreeBufferHandle(buffer_key);
+        DeallocateVmo(buffer_key);
+        if (maybe_local_completer.has_value()) {
+          maybe_local_completer->Reply();
+        }
+      },
+      loop()->dispatcher());
+  ZX_ASSERT(emplace_success);
+
+  // Everything is done, now we can cancel the cleanup auto calls. The Wait completion will clean up
+  // later.
   cleanup_handle.cancel();
-  completer.Reply(ZX_OK, id);
+  cleanup_block.cancel();
+
+  completer.ReplySuccess(std::move(child_vmo));
 }
 
-void HostVisibleHeap::DestroyResource(DestroyResourceRequestView request,
-                                      DestroyResourceCompleter::Sync& completer) {
-  // This destroys the color buffer associated with |id| and frees the color
-  // buffer handle |id|.
-  control()->FreeBufferHandle(request->id);
-  completer.Reply();
+void HostVisibleHeap::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) {
+  BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
+  auto iter = blocks_.find(buffer_key);
+  // The incoming vmo is a handle to a child VMO of the parent vmo in Block, so the Block is
+  // expected to still be in blocks_. Since this message is only sent by sysmem, assert.
+  ZX_ASSERT(iter != blocks_.end());
+  auto& block = iter->second;
+  // complete async
+  block.maybe_delete_completer.emplace(completer.ToAsync());
+  // ~request.vmo will shortly trigger ZX_VMO_ZERO_CHILDREN; Block will notice and call Reply()
+}
+
+void HostVisibleHeap::DeallocateVmo(BufferKey buffer_key) {
+  TRACE_DURATION("gfx", "HostVisibleHeap::DeallocateVmo");
+
+  ZX_DEBUG_ASSERT(blocks_.find(buffer_key) != blocks_.end());
+
+  auto iter = blocks_.find(buffer_key);
+  auto& block = iter->second;
+  uint64_t paddr = block.paddr;
+  blocks_.erase(iter);
+
+  auto result = control()->address_space_child()->DeallocateBlock(paddr);
+  if (!result.ok()) {
+    zxlogf(ERROR, "[%s] DeallocateBlock FIDL call error: status %d", kTag, result.status());
+  } else if (result.value().res != ZX_OK) {
+    zxlogf(ERROR, "[%s] DeallocateBlock failed: res %d", kTag, result.value().res);
+  }
 }
 
 void HostVisibleHeap::Bind(zx::channel server_request) {

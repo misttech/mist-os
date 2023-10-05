@@ -32,58 +32,134 @@ type HeapProperties = table {
 
 /// Manages resources on a specific sysmem heap.
 closed protocol Heap {
-    /// Request a new memory allocation of `size` on heap.
-    /// For heaps which don't permit CPU access to the buffer data, this
-    /// will create a VMO with an official size, but which never has any
-    /// physical pages.  For such heaps, the VMO is effectively used as
-    /// an opaque buffer identifier.
+    /// Request a new memory allocation of `size` on heap. For heaps which don't
+    /// permit CPU access to the buffer data, this will create a VMO with an
+    /// official size, but which never has any physical pages.  For such heaps,
+    /// the VMO is effectively used as an opaque buffer identifier.
     ///
-    /// Heaps should defer allocation of any associated resources until
-    /// CreateResource(), because the caller of AllocateVmo() may simply
-    /// delete the returned VMO with no further notification to the heap.
-    /// In contrast, after CreateResource(), the caller guarantees that
-    /// DestroyResource() or heap channel closure will occur.
+    /// The `buffer_collection_id` + `buffer_index` are retreivable from any
+    /// sysmem-provided VMO that's derived from the returned `vmo` using
+    /// [`fuchsia.sysmem2.Allocator.GetVmoInfo`].
     ///
-    /// The caller guarantees that CreateResource() will be called prior
-    /// to the returned VMO or any associated child VMO being used.
+    /// The [`fuchsia.sysmem2.Heap`] server must ensure that if all handles to
+    /// `vmo` + descendents of `vmo` are closed, the [`fuchsia.sysmem2.Heap`]
+    /// server will clean up any state associated with `vmo` even in the absence
+    /// of any call to `DeleteVmo`.
+    ///
+    /// The [`fuchsia.sysmem2.Heap`] server must create `vmo` as a
+    /// ZX_VMO_CHILD_SLICE (or ZX_VMO_CHILD_REFERENCE) of a parent VMO retained
+    /// by the [`fuchsia.sysmem2.Heap`] server, with the
+    /// [`fuchsia.sysmem2.Heap`] server waiting on ZX_VMO_ZERO_CHILDREN to
+    /// trigger cleanup. The [`fuchsia.sysmem2.Heap`] server must not retain any
+    /// handles to `vmo` or descendents of `vmo` or VMAR mappings to `vmo` as
+    /// that would prevent ZX_VMO_ZERO_CHILDREN from being signaled. However,
+    /// the server is free to keep handles to the server's parent VMO, VMAR
+    /// mappings to the server's parent VMO, or similar via separate (from
+    /// `vmo`) child VMOs, as long as those can be cleaned up synchronously
+    /// during `DeleteVmo` (absent process failures).
+    ///
+    /// As long as the caller doesn't crash, the caller guarantees that
+    /// [`fuchsia.sysmem2.Heap.DeleteVmo`] will be passed `vmo` later with
+    /// ZX_VMO_ZERO_CHILDREN already signaled on `vmo`, and with `vmo` being the
+    /// only remaining handle to the VMO (assuming the heap server did not
+    /// itself retain any handle to `vmo`).
+    ///
+    /// Upon noticing ZX_VMO_ZERO_CHILDREN on the server's parent VMO, the
+    /// server should clean up any resources associated with `vmo`.
+    ///
+    /// The heap server can create any associated resources (including any
+    /// hardware-specific resources) during this call, and clean them up upon
+    /// noticing ZX_VMO_ZERO_CHILDREN on the parent VMO retained by the server.
+    ///
+    /// The [`fuchsia.sysmem2.Heap`] channel client_end closing should not
+    /// trigger any per-VMO cleanup. Instead, the ZX_VMO_ZERO_CHILDREN signal
+    /// should perform that cleanup. This way, all buffer-associated resources
+    /// stay valid until it's no longer possible for any client to be using or
+    /// referring to the buffer. The risk of cleaning up early is that a client
+    /// may still be using the buffer and/or an associated resource despite the
+    /// [`fuchsia.sysmem2.Heap`] client_end closing.
+    ///
+    /// `size`: The size in bytes, aligned up to a page boundary. In contrast,
+    /// `settings.buffer_settings.size_bytes` is the logical size in bytes and
+    /// is not rounded up to a page boundary.
+    ///
+    /// `settings`: These are the sysmem settings applicable to the buffer. A
+    /// heap is encouraged to completely ignore this parameter unless there is a
+    /// specific need to look at this parameter.
+    ///
+    /// For example, if a [`fuchsia.sysmem2.Heap`] server also allocates some
+    /// sort of internal image resource to go with the allocated VMO, the heap
+    /// server may need to look at `settings.image_format_constraints`.
+    ///
+    /// As another example, a [`fuchsia.sysmem2.Heap`] server may support both
+    /// contiguous and non-contiguous allocations, in which case the heap server
+    /// would need to look at
+    /// `settings.buffer_settings.is_physically_contiguous`.
+    ///
+    /// However, if a [`fuchsia.sysmem2.Heap`] server is allocating a buffer of
+    /// size with no dependence on settings, the [`fuchsia.sysmem2.Heap`] server
+    /// should just ignore settings (in contrast to validating settings or
+    /// similar).
+    ///
+    /// `buffer_collection_id`: This can be obtained later from a sysmem
+    /// provided VMO using [`fuchsia.sysmem2.Allocator.GetVmoInfo`], or at any
+    /// time from a [`fuchsia.sysmem2.BufferCollectionToken`],
+    /// [`fuchsia.sysmem2.BufferCollection`], or
+    /// [`fuchsia.sysmem2.BufferCollectionTokenGroup`] associated with the
+    /// logical buffer collection. However, care must be taken to avoid trying
+    /// to use [`fuchsia.sysmem2.Allocator.GetVmoInfo`] (or any other sysmem
+    /// call) on a VMO newly allocated within this call, since sysmem doesn't
+    /// know about the VMO until returned from this call. Also, any call back to
+    /// sysmem during this call will deadlock since sysmem is waiting on this
+    /// call to complete before processing
+    /// [`fuchsia.sysmem2.Allocator.GetVmoInfo`] (or any other call), so it'll
+    /// be fairly obvious that something is wrong (please remove the call to
+    /// [`fuchsia.sysmem2.Allocator.GetVmoInfo`] or similar.
+    ///
+    /// `buffer_index`: This can be obtained later from a sysmem provided VMO
+    /// using [`fuchsia.sysmem2.Allocator.GetVmoInfo`]. See also previous
+    /// paragraph re. not calling [`fuchsia.sysmem2.Allocator.GetVmoInfo`]
+    /// during this call.
     strict AllocateVmo(struct {
         size uint64;
+        settings SingleBufferSettings;
+        buffer_collection_id uint64;
+        buffer_index uint32;
     }) -> (resource struct {
-        s zx.Status;
-        vmo zx.Handle:<VMO, optional>;
-    });
+        vmo zx.Handle:<VMO>;
+    }) error zx.Status;
 
-    /// Create resources and associate heap-specific resources with the
-    /// passed-in VMO. Resources can be hardware specific and their
-    /// lifetime don't have to be tied to `vmo`. `vmo` must be a VMO
-    /// (or a direct or indirect child of a VMO) acquired through a call
-    /// to AllocateVmo method above.  If the passed-in vmo is a child VMO,
-    /// its size must match the size of the parent VMO created by
-    /// AllocateVmo().  For heaps that permit CPU access, the passed-in
-    /// VMO must not have a copy-on-write relationship with the parent
-    /// VMO, but rather a pass-through relationship. Successful return
-    /// status indicate that Heap has established a mapping between
-    /// VMO and hardware specific resources.
+    /// The server should delete the passed-in VMO and any associated resources
+    /// before responding.
     ///
-    /// The returned id must be passed to DestroyResource() later when
-    /// resources associated with VMO are no longer needed, unless the
-    /// heap channel closes first.
+    /// Sysmem guarantees that `vmo` is the only handle remaining to the VMO.
     ///
-    /// The heap must not own/keep a handle to VMO, or any derived child
-    /// VMO, or any VMAR mapping to VMO, as any of those would keep VMO
-    /// alive beyond all sysmem participant usages of the vmo; instead
-    /// the heap can get the vmo's koid for the heap's mapping.
-    strict CreateResource(resource struct {
-        vmo zx.Handle:VMO;
-        buffer_settings SingleBufferSettings;
-    }) -> (struct {
-        s zx.Status;
-        id uint64;
-    });
-
-    /// Destroy previously created resources.
-    strict DestroyResource(struct {
-        id uint64;
+    /// The call to [`fuchsia.sysmem2.Heap.DeleteVmo`] should fence the cleanup
+    /// of `vmo` and any associated resources before responding. Because the
+    /// last handle to `vmo` is passed in via
+    /// [`fuchsia.sysmem2.Heap.DeleteVmo`], the server can defer completion of
+    /// the [`fuchsia.sysmem2.Heap.DeleteVmo`] until ZX_VMO_ZERO_CHILDREN is
+    /// (very soon) triggered on the server's parent VMO due to the server
+    /// closing the passed-in `vmo`. FIDL server bindings support responding to
+    /// a request async. There is no requirement to process any other incoming
+    /// messages on this channel until [`fuchsia.sysmem2.Heap.DeleteVmo`] is
+    /// done.
+    ///
+    /// The effectiveness of sysmem's
+    /// [`fuchsia.sysmem2.BufferCollection.AttachLifetimeTracking`] mechanism
+    /// relies on resource recycling being complete before the response to this
+    /// call.
+    ///
+    /// [`fuchsia.sysmem2.Allocator.GetVmoInfo`] stops working after there are
+    /// zero outstanding sysmem-provided VMOs derived from this VMO, and before
+    /// this call starts. An attempt to call
+    /// [`fuchsia.sysmem2.Allocator.GetVmoInfo`] before responding to this call
+    /// will also deadlock due to sysmem waiting on this call to complete before
+    /// processing [`fuchsia.sysmem2.Allocator.GetVmoInfo`].
+    strict DeleteVmo(resource struct {
+        buffer_collection_id uint64;
+        buffer_index uint32;
+        vmo zx.Handle:<VMO>;
     }) -> ();
 
     /// This event is triggered when the Heap is registered. Properties

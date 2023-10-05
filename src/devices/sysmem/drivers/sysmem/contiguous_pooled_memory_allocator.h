@@ -54,10 +54,10 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   // range of VDEC from the TEE.
   zx_status_t InitPhysical(zx_paddr_t paddr);
 
-  zx_status_t Allocate(uint64_t size, std::optional<std::string> name,
-                       zx::vmo* parent_vmo) override;
-  zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-                            fuchsia_sysmem2::SingleBufferSettings buffer_settings) override;
+  zx_status_t Allocate(uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+                       std::optional<std::string> name, uint64_t buffer_collection_id,
+                       uint32_t buffer_index, zx::vmo* parent_vmo) override;
+
   void Delete(zx::vmo parent_vmo) override;
   bool is_empty() override {
     // If the contiguous VMO has been marked as secure there's no way to unmark it as secure, so

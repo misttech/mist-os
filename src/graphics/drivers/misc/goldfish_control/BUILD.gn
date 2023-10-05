@@ -18,6 +18,7 @@ common_deps = [
   "//sdk/banjo/fuchsia.hardware.goldfish.control:fuchsia.hardware.goldfish.control_banjo_cpp",
   "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
   "//sdk/fidl/fuchsia.hardware.goldfish.pipe:fuchsia.hardware.goldfish.pipe_cpp",
+  "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
   "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
   "//sdk/lib/fit-promise",
   "//sdk/lib/syslog/cpp:backend",

@@ -395,6 +395,10 @@ class Node : public fbl::RefCounted<Node> {
   template <class GetBufferCollectionIdCompleterSync,
             class Response = fuchsia_sysmem2::NodeGetBufferCollectionIdResponse>
   void GetBufferCollectionIdImplV2(GetBufferCollectionIdCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "GetBufferCollectionId after Close");
+      return;
+    }
     Response response;
     response.buffer_collection_id() = logical_buffer_collection().buffer_collection_id();
     completer.Reply(std::move(response));

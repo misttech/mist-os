@@ -3623,7 +3623,8 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   if (name_.has_value()) {
     name = fbl::StringPrintf("%s:%d", name_->name.c_str(), index).c_str();
   }
-  zx_status_t status = allocator->Allocate(rounded_size_bytes, name, &raw_parent_vmo);
+  zx_status_t status = allocator->Allocate(rounded_size_bytes, settings, name,
+                                           buffer_collection_id_, index, &raw_parent_vmo);
   if (status != ZX_OK) {
     LogError(FROM_HERE,
              "allocator.Allocate failed - size_bytes: %zu "
@@ -3749,27 +3750,9 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
     return fpromise::error();
   }
   zx_handle_t raw_parent_vmo_handle = tracked_parent_vmo->vmo().get();
-  // parent_vmo_ref is a reference to the target of a unique_ptr<>, so the target doesn't move
-  // during lifetime of the parent_vmo_ref reference
-  TrackedParentVmo& parent_vmo_ref = *tracked_parent_vmo;
   auto emplace_result = parent_vmos_.emplace(raw_parent_vmo_handle, std::move(tracked_parent_vmo));
   ZX_DEBUG_ASSERT(emplace_result.second);
 
-  // Now inform the allocator about the child VMO before we return it.
-  //
-  // We copy / clone settings to buffer_settings parameter.
-  //
-  // TODO(b/298584551): This only works if local_child_vmo is the exact VMO delivered by sysmem to
-  // clients, which will soon only work for sysmem "strong" VMOs not sysmem "weak" VMOs, so this
-  // protocol should switch to using buffer_id instead of the local_child_vmo koid.
-  status = allocator->SetupChildVmo(parent_vmo_ref.vmo(), local_child_vmo, settings);
-  if (status != ZX_OK) {
-    LogError(FROM_HERE, "allocator.SetupChildVmo() failed - status: %d", status);
-    // In this path, the ~local_child_vmo will async trigger parent_vmo_ref::OnZeroChildren()
-    // which will call allocator.Delete() via above do_delete lambda passed to
-    // ParentVmo::ParentVmo().
-    return fpromise::error();
-  }
   if (name.has_value()) {
     local_child_vmo.set_property(ZX_PROP_NAME, name->c_str(), name->size());
   }

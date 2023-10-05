@@ -6,6 +6,7 @@ composite goldfish_control_2;
 
 using fuchsia.goldfish.platform;
 using fuchsia.google.platform;
+using fuchsia.sysmem;
 
 primary node "goldfish-pipe" {
     fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.PIPE;
@@ -22,3 +23,6 @@ node "goldfish-sync" {
     fuchsia.BIND_FIDL_PROTOCOL == fuchsia.goldfish.platform.BIND_FIDL_PROTOCOL.SYNC;
 }
 
+node "sysmem" {
+    fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}

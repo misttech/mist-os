@@ -98,8 +98,13 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
     node_.CreateUint("id", id(), &properties_);
   }
 
-  zx_status_t Allocate(uint64_t size, std::optional<std::string> name,
-                       zx::vmo* parent_vmo) override {
+  zx_status_t Allocate(uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+                       std::optional<std::string> name, uint64_t buffer_collection_id,
+                       uint32_t buffer_index, zx::vmo* parent_vmo) override {
+    ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
+    ZX_DEBUG_ASSERT_MSG(
+        fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
+        "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
     zx_status_t status = zx::vmo::create(size, 0, parent_vmo);
     if (status != ZX_OK) {
       return status;
@@ -107,12 +112,6 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
     constexpr const char vmo_name[] = "Sysmem-core";
     parent_vmo->set_property(ZX_PROP_NAME, vmo_name, sizeof(vmo_name));
     return status;
-  }
-
-  zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-                            fuchsia_sysmem2::SingleBufferSettings buffer_settings) override {
-    // nothing to do here
-    return ZX_OK;
   }
 
   void Delete(zx::vmo parent_vmo) override {
@@ -149,8 +148,13 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
     node_.CreateUint("id", id(), &properties_);
   }
 
-  zx_status_t Allocate(uint64_t size, std::optional<std::string> name,
-                       zx::vmo* parent_vmo) override {
+  zx_status_t Allocate(uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+                       std::optional<std::string> name, uint64_t buffer_collection_id,
+                       uint32_t buffer_index, zx::vmo* parent_vmo) override {
+    ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
+    ZX_DEBUG_ASSERT_MSG(
+        fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
+        "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
     zx::vmo result_parent_vmo;
     // This code is unlikely to work after running for a while and physical
     // memory is more fragmented than early during boot. The
@@ -159,10 +163,8 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
     zx_status_t status =
         zx::vmo::create_contiguous(parent_device_->bti(), size, 0, &result_parent_vmo);
     if (status != ZX_OK) {
-      DRIVER_ERROR(
-          "zx::vmo::create_contiguous() failed - size_bytes: %lu "
-          "status: %d",
-          size, status);
+      DRIVER_ERROR("zx::vmo::create_contiguous() failed - size_bytes: %" PRIu64 " status: %d", size,
+                   status);
       zx_info_kmem_stats_t kmem_stats;
       status = zx_object_get_info(root_resource_->get(), ZX_INFO_KMEM_STATS, &kmem_stats,
                                   sizeof(kmem_stats), nullptr, nullptr);
@@ -180,11 +182,6 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
     constexpr const char vmo_name[] = "Sysmem-contig-core";
     result_parent_vmo.set_property(ZX_PROP_NAME, vmo_name, sizeof(vmo_name));
     *parent_vmo = std::move(result_parent_vmo);
-    return ZX_OK;
-  }
-  zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-                            fuchsia_sysmem2::SingleBufferSettings buffer_settings) override {
-    // nothing to do here
     return ZX_OK;
   }
   void Delete(zx::vmo parent_vmo) override {

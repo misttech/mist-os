@@ -425,9 +425,14 @@ zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous
   return ZX_OK;
 }
 
-zx_status_t ContiguousPooledMemoryAllocator::Allocate(uint64_t size,
-                                                      std::optional<std::string> name,
-                                                      zx::vmo* parent_vmo) {
+zx_status_t ContiguousPooledMemoryAllocator::Allocate(
+    uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+    std::optional<std::string> name, uint64_t buffer_collection_id, uint32_t buffer_index,
+    zx::vmo* parent_vmo) {
+  ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
+  ZX_DEBUG_ASSERT_MSG(
+      fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
+      "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
   if (!is_ready_) {
     LOG(ERROR, "allocation_name_: %s is not ready_, failing", allocation_name_);
     return ZX_ERR_BAD_STATE;
@@ -443,7 +448,7 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(uint64_t size,
   zx_status_t status =
       region_allocator_.GetRegion(allocation_size, zx_system_get_page_size(), region);
   if (status != ZX_OK) {
-    LOG(WARNING, "GetRegion failed (out of space?) - size: %zu status: %d", size, status);
+    LOG(WARNING, "GetRegion failed (out of space?) - size: %" PRIu64 " status: %d", size, status);
     DumpPoolStats();
     allocations_failed_property_.Add(1);
     last_allocation_failed_timestamp_ns_property_.Set(zx::clock::get_monotonic().get());
@@ -472,7 +477,7 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(uint64_t size,
   // protected_ranges_).
   status = CommitRegion(*region.get());
   if (status != ZX_OK) {
-    LOG(WARNING, "CommitRegion() failed (OOM?) - size: %zu status %d", size, status);
+    LOG(WARNING, "CommitRegion() failed (OOM?) - size: %" PRIu64 " status %d", size, status);
     commits_failed_property_.Add(1);
     last_commit_failed_timestamp_ns_property_.Set(zx::clock::get_monotonic().get());
     return status;
@@ -567,13 +572,6 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(uint64_t size,
       GetLoanableEfficiency());
 
   *parent_vmo = std::move(result_parent_vmo);
-  return ZX_OK;
-}
-
-zx_status_t ContiguousPooledMemoryAllocator::SetupChildVmo(
-    const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-    fuchsia_sysmem2::SingleBufferSettings buffer_settings) {
-  // nothing to do here
   return ZX_OK;
 }
 

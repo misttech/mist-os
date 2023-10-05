@@ -5,8 +5,10 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_EXTERNAL_MEMORY_ALLOCATOR_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_EXTERNAL_MEMORY_ALLOCATOR_H_
 
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/zx/event.h>
+
+#include <unordered_map>
 
 #include "allocator.h"
 
@@ -19,10 +21,9 @@ class ExternalMemoryAllocator : public MemoryAllocator {
 
   ~ExternalMemoryAllocator() override;
 
-  zx_status_t Allocate(uint64_t size, std::optional<std::string> name,
-                       zx::vmo* parent_vmo) override;
-  zx_status_t SetupChildVmo(const zx::vmo& parent_vmo, const zx::vmo& child_vmo,
-                            fuchsia_sysmem2::SingleBufferSettings buffer_settings) override;
+  zx_status_t Allocate(uint64_t size, const fuchsia_sysmem2::SingleBufferSettings& settings,
+                       std::optional<std::string> name, uint64_t buffer_collection_id,
+                       uint32_t buffer_index, zx::vmo* parent_vmo) override;
   void Delete(zx::vmo parent_vmo) override;
   bool is_empty() override { return allocations_.empty(); }
 
@@ -30,8 +31,11 @@ class ExternalMemoryAllocator : public MemoryAllocator {
   MemoryAllocator::Owner* owner_;
   fidl::WireSharedClient<fuchsia_sysmem2::Heap> heap_;
 
-  // From parent vmo handle to ID.
-  std::map<zx_handle_t, uint64_t> allocations_;
+  struct BufferKey {
+    uint64_t buffer_collection_id;
+    uint32_t buffer_index;
+  };
+  std::unordered_map<zx_handle_t, BufferKey> allocations_;
 
   inspect::Node node_;
   inspect::ValueList properties_;

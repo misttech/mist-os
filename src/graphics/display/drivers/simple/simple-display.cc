@@ -216,21 +216,38 @@ zx_status_t SimpleDisplay::DisplayControllerImplImportImage(
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // We only need the VMO temporarily to get the BufferKey. The BufferCollection client_end in
+  // buffer_collections_ is not SetWeakOk (and therefore is known to be strong at this point), so
+  // it's not necessary to keep this VMO for the buffer to remain alive.
   zx::vmo vmo = std::move(collection_info.buffers()[0].vmo());
 
-  zx_info_handle_basic_t import_info;
-  size_t actual, avail;
-  zx_status_t status =
-      vmo.get_info(ZX_INFO_HANDLE_BASIC, &import_info, sizeof(import_info), &actual, &avail);
-  if (status != ZX_OK) {
-    return status;
+  fidl::Arena arena;
+  auto vmo_info_result = sysmem_allocator_client_->GetVmoInfo(
+      fuchsia_sysmem2::wire::AllocatorGetVmoInfoRequest::Builder(arena)
+          .vmo(std::move(vmo))
+          .Build());
+  if (!vmo_info_result.ok()) {
+    return vmo_info_result.error().status();
   }
-  if (import_info.koid != framebuffer_koid_) {
+  if (!vmo_info_result->is_ok()) {
+    return vmo_info_result->error_value();
+  }
+  auto& vmo_info = vmo_info_result->value();
+  BufferKey buffer_key(vmo_info->buffer_collection_id(), vmo_info->buffer_index());
+
+  bool key_matched;
+  {
+    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    key_matched = framebuffer_key_.has_value() && (*framebuffer_key_ == buffer_key);
+  }
+  if (!key_matched) {
     return ZX_ERR_INVALID_ARGS;
   }
+
   if (image->width != width_ || image->height != height_) {
     return ZX_ERR_INVALID_ARGS;
   }
+
   image->handle = kImageHandle;
   return ZX_OK;
 }
@@ -369,48 +386,52 @@ void SimpleDisplay::DdkRelease() { delete this; }
 
 void SimpleDisplay::AllocateVmo(AllocateVmoRequestView request,
                                 AllocateVmoCompleter::Sync& completer) {
+  BufferKey buffer_key(request->buffer_collection_id, request->buffer_index);
+
   zx_info_handle_count handle_count;
-  size_t actual, avail;
-  zx_status_t status = framebuffer_mmio_.get_vmo()->get_info(ZX_INFO_HANDLE_COUNT, &handle_count,
-                                                             sizeof(handle_count), &actual, &avail);
+  zx_status_t status = framebuffer_mmio_.get_vmo()->get_info(
+      ZX_INFO_HANDLE_COUNT, &handle_count, sizeof(handle_count), nullptr, nullptr);
   if (status != ZX_OK) {
-    completer.Reply(status, zx::vmo{});
+    completer.ReplyError(status);
     return;
   }
   if (handle_count.handle_count != 1) {
-    completer.Reply(ZX_ERR_NO_RESOURCES, zx::vmo{});
+    completer.ReplyError(ZX_ERR_NO_RESOURCES);
     return;
   }
   zx::vmo vmo;
   status = framebuffer_mmio_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
   if (status != ZX_OK) {
-    completer.Reply(status, zx::vmo{});
-  } else {
-    completer.Reply(ZX_OK, std::move(vmo));
+    completer.ReplyError(status);
   }
-}
 
-void SimpleDisplay::CreateResource(CreateResourceRequestView request,
-                                   CreateResourceCompleter::Sync& completer) {
-  zx_info_handle_basic_t framebuffer_info;
-  size_t actual, avail;
-  zx_status_t status = request->vmo.get_info(ZX_INFO_HANDLE_BASIC, &framebuffer_info,
-                                             sizeof(framebuffer_info), &actual, &avail);
-  if (status != ZX_OK) {
-    completer.Reply(status, 0);
+  bool had_framebuffer_key;
+  {
+    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    had_framebuffer_key = framebuffer_key_.has_value();
+    if (!had_framebuffer_key) {
+      framebuffer_key_ = buffer_key;
+    }
+  }
+  if (had_framebuffer_key) {
+    completer.ReplyError(ZX_ERR_NO_RESOURCES);
     return;
   }
-  zx_koid_t expect = ZX_KOID_INVALID;
-  if (!framebuffer_koid_.compare_exchange_strong(expect, framebuffer_info.koid)) {
-    completer.Reply(ZX_ERR_NO_RESOURCES, 0);
-    return;
-  }
-  completer.Reply(ZX_OK, 0);
+
+  completer.ReplySuccess(std::move(vmo));
 }
 
-void SimpleDisplay::DestroyResource(DestroyResourceRequestView request,
-                                    DestroyResourceCompleter::Sync& completer) {
-  framebuffer_koid_ = ZX_KOID_INVALID;
+void SimpleDisplay::DeleteVmo(DeleteVmoRequestView request, DeleteVmoCompleter::Sync& completer) {
+  {
+    fbl::AutoLock lock(&framebuffer_key_mtx_);
+    framebuffer_key_.reset();
+  }
+
+  // Semantics of DeleteVmo are to recycle all resources tied to the sysmem allocation before
+  // replying, so we close the VMO handle here before replying. Even if it shares an object and
+  // pages with a VMO handle we're not closing, this helps clarify wrt semantics of DeleteVmo.
+  request->vmo.reset();
+
   completer.Reply();
 }
 
@@ -504,7 +525,6 @@ SimpleDisplay::SimpleDisplay(zx_device_t* parent,
     : DeviceType(parent),
       sysmem_(std::move(sysmem)),
       loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      framebuffer_koid_(ZX_KOID_INVALID),
       has_image_(false),
       framebuffer_mmio_(std::move(framebuffer_mmio)),
       width_(width),
