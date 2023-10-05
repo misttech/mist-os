@@ -9,6 +9,8 @@ import("//build/testing/host_test_data.gni")
 
 go_library("lib") {
   sources = [
+    "client.go",
+    "client_test.go",
     "lib.go",
     "lib_test.go",
   ]

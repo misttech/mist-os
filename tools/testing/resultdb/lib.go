@@ -92,6 +92,23 @@ func InvocationLevelArtifacts(outputRoot string, invocationArtifacts []string) m
 	return artifacts
 }
 
+func ProcessSummaries(summaries []string, tags []*resultpb.StringPair, outputRoot string) ([]*sinkpb.ReportTestResultsRequest, []string, error) {
+	var requests []*sinkpb.ReportTestResultsRequest
+	var allTestsSkipped []string
+
+	for _, summaryFile := range summaries {
+		summary, err := ParseSummary(summaryFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		testResults, testsSkipped := SummaryToResultSink(summary, tags, outputRoot)
+		requests = append(requests, createTestResultsRequests(testResults, 500)...)
+		allTestsSkipped = append(allTestsSkipped, testsSkipped...)
+	}
+
+	return requests, allTestsSkipped, nil
+}
+
 // testCaseToResultSink converts TestCaseResult defined in //tools/testing/testparser/result.go
 // to ResultSink's TestResult. A testcase will not be converted if test result cannot be
 // mapped to result_sink.Status.
@@ -287,4 +304,21 @@ func truncateString(str string, maxLength int) string {
 		byteCount = byteCount + len(string(char))
 	}
 	return str
+}
+
+// createTestResultsRequests breaks an array of resultpb.TestResult into an array of resultpb.ReportTestResultsRequest
+// chunkSize defined the number of TestResult contained in each ReportTrestResultsRequest.
+func createTestResultsRequests(results []*sinkpb.TestResult, chunkSize int) []*sinkpb.ReportTestResultsRequest {
+	totalChunks := (len(results)-1)/chunkSize + 1
+	requests := make([]*sinkpb.ReportTestResultsRequest, totalChunks)
+	for i := 0; i < totalChunks; i++ {
+		requests[i] = &sinkpb.ReportTestResultsRequest{
+			TestResults: make([]*sinkpb.TestResult, 0, chunkSize),
+		}
+	}
+	for i, result := range results {
+		requestIndex := i / chunkSize
+		requests[requestIndex].TestResults = append(requests[requestIndex].TestResults, result)
+	}
+	return requests
 }

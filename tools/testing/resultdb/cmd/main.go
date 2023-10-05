@@ -5,17 +5,13 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 
 	resultpb "go.chromium.org/luci/resultdb/proto/v1"
 	sinkpb "go.chromium.org/luci/resultdb/sink/proto/v1"
-	"golang.org/x/sync/errgroup"
-	"google.golang.org/protobuf/encoding/protojson"
 
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/testing/resultdb"
@@ -53,121 +49,29 @@ func mainImpl() error {
 	if err != nil {
 		return err
 	}
-	for _, summaryFile := range summaries {
-		summary, err := resultdb.ParseSummary(summaryFile)
-		if err != nil {
-			return err
-		}
-		testResults, testsSkipped := resultdb.SummaryToResultSink(summary, tagPairs, outputRoot)
-		// Group 500 testResults per ReportTestResultsRequest. This reduces the number of HTTP calls
-		// we make to result_sink. 500 is the maximum number of testResults allowed.
-		requests = append(requests, createTestResultsRequests(testResults, 500)...)
-		allTestsSkipped = append(allTestsSkipped, testsSkipped...)
-	}
 
-	invocationRequest := &sinkpb.ReportInvocationLevelArtifactsRequest{
-		Artifacts: resultdb.InvocationLevelArtifacts(outputRoot, invocationArtifacts),
-	}
-
-	client := &http.Client{}
-	semaphore := make(chan struct{}, 64)
-	for i := 0; i < cap(semaphore); i++ {
-		semaphore <- struct{}{}
-	}
-
-	var eg errgroup.Group
-	ctx, err := resultSinkCtx()
+	requests, allTestsSkipped, err = resultdb.ProcessSummaries(summaries, tagPairs, outputRoot)
 	if err != nil {
 		return err
 	}
 
-	for _, request := range requests {
-		testResult := protojson.Format(request)
-		<-semaphore
-		eg.Go(func() error {
-			defer func() { semaphore <- struct{}{} }()
-			return sendData(ctx, testResult, "ReportTestResults", client)
-		})
-	}
-
-	testResult := protojson.Format(invocationRequest)
-
-	<-semaphore
-	eg.Go(func() error {
-		defer func() { semaphore <- struct{}{} }()
-		return sendData(ctx, testResult, "ReportInvocationLevelArtifacts", client)
-	})
-
-	if err := eg.Wait(); err != nil {
+	client, err := resultdb.NewClient()
+	if err != nil {
 		return err
 	}
+
+	if err = client.ReportTestResults(requests); err != nil {
+		return err
+	}
+
+	if err = client.ReportInvocationLevelArtifacts(outputRoot, invocationArtifacts); err != nil {
+		return err
+	}
+
 	if len(allTestsSkipped) > 0 {
 		return fmt.Errorf("Some tests could not be uploaded due to testname exceeding byte limit %d.", resultdb.MAX_TEST_ID_SIZE_BYTES)
 	}
 	return nil
-}
-
-func sendData(ctx *ResultSinkContext, data, endpoint string, client *http.Client) error {
-	url := fmt.Sprintf("http://%s/prpc/luci.resultsink.v1.Sink/%s", ctx.ResultSinkAddr, endpoint)
-	req, err := http.NewRequest("POST", url, strings.NewReader(data))
-	if err != nil {
-		return err
-	}
-	// ResultSink HTTP authorization scheme is documented at
-	// https://fuchsia.googlesource.com/third_party/luci-go/+/HEAD/resultdb/sink/proto/v1/sink.proto#29
-	req.Header.Add("Authorization", fmt.Sprintf("ResultSink %s", ctx.AuthToken))
-	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Content-Type", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("ResultDB Http Request errored with status code %s (%d)", http.StatusText(resp.StatusCode), resp.StatusCode)
-	}
-	return nil
-}
-
-// createTestResultsRequests breaks an array of resultpb.TestResult into an array of resultpb.ReportTestResultsRequest
-// chunkSize defined the number of TestResult contained in each ReportTrestResultsRequest.
-func createTestResultsRequests(results []*sinkpb.TestResult, chunkSize int) []*sinkpb.ReportTestResultsRequest {
-	totalChunks := (len(results)-1)/chunkSize + 1
-	requests := make([]*sinkpb.ReportTestResultsRequest, totalChunks)
-	for i := 0; i < totalChunks; i++ {
-		requests[i] = &sinkpb.ReportTestResultsRequest{
-			TestResults: make([]*sinkpb.TestResult, 0, chunkSize),
-		}
-	}
-	for i, result := range results {
-		requestIndex := i / chunkSize
-		requests[requestIndex].TestResults = append(requests[requestIndex].TestResults, result)
-	}
-	return requests
-}
-
-// ResultSinkContext holds the result_sink information parsed from LUCI_CONTEXT
-type ResultSinkContext struct {
-	AuthToken      string `json:"auth_token"`
-	ResultSinkAddr string `json:"address"`
-}
-
-func resultSinkCtx() (*ResultSinkContext, error) {
-	v, ok := os.LookupEnv("LUCI_CONTEXT")
-	if !ok {
-		return nil, fmt.Errorf("LUCI_CONTEXT is not specified")
-	}
-	content, err := os.ReadFile(v)
-	if err != nil {
-		return nil, err
-	}
-	var ctx struct {
-		ResultSink ResultSinkContext `json:"result_sink"`
-	}
-	if err := json.Unmarshal(content, &ctx); err != nil {
-		return nil, err
-	}
-	return &ctx.ResultSink, nil
 }
 
 func convertTags(tags []string) ([]*resultpb.StringPair, error) {
