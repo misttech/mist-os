@@ -29,9 +29,14 @@ source_set("utils") {
     "metrics.h",
     "metrics_impl.cc",
     "metrics_impl.h",
+    "object_linker.cc",
+    "object_linker.h",
     "shader_warmup.cc",
     "shader_warmup.h",
     "task_utils.h",
+    "time.h",
+    "validate_eventpair.cc",
+    "validate_eventpair.h",
   ]
 
   defines = []
@@ -59,8 +64,11 @@ source_set("utils") {
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp:cpp_base",
     "//sdk/lib/fit",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
+    "//src/ui/scenic/lib/scenic/util",
+    "//zircon/system/public",
     "//zircon/system/ulib/zx",
   ]
 

@@ -29,8 +29,6 @@ group("tests") {
     ":focus_unittests",
     ":fuzzers",
     ":geometry_provider_unittests",
-    ":gfx_unittests",
-    ":gfx_util_unittests",
     ":input_unittests",
     ":scenic_unittests",
     ":scenic_util_tests",
@@ -183,22 +181,6 @@ fuchsia_unittest_package("flatland_renderer_unittests") {
     environments = basic_envs + magma_libvulkan_hardware_envs
   }
   test_type = "vulkan"
-}
-
-fuchsia_unittest_package("gfx_unittests") {
-  manifest = "meta/gfx_unittests.cml"
-  deps = [ "lib/gfx/tests:unittests" ] + scenic_test_deps
-  test_specs = {
-    log_settings = {
-      max_severity = "FATAL"
-    }
-    environments = basic_envs + magma_libvulkan_hardware_envs
-  }
-  test_type = "vulkan"
-}
-
-fuchsia_unittest_package("gfx_util_unittests") {
-  deps = [ "lib/gfx/util/tests:unittests" ] + scenic_test_deps
 }
 
 fuchsia_unittest_package("focus_unittests") {

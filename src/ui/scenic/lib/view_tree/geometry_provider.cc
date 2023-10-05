@@ -11,9 +11,9 @@
 
 #include <measure_tape/hlcpp/measure_tape_for_geometry.h>
 
-#include "src/ui/scenic/lib/gfx/util/time.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/math.h"
+#include "src/ui/scenic/lib/utils/time.h"
 
 namespace view_tree {
 using fuog_ViewTreeWatcher = fuchsia::ui::observation::geometry::ViewTreeWatcher;
@@ -73,7 +73,7 @@ fuog_ViewTreeSnapshotPtr GeometryProvider::ExtractObservationSnapshot(
     std::optional<zx_koid_t> endpoint_context_view,
     std::shared_ptr<const view_tree::Snapshot> snapshot) {
   auto view_tree_snapshot = fuog_ViewTreeSnapshot::New();
-  view_tree_snapshot->set_time(scenic_impl::gfx::dispatcher_clock_now());
+  view_tree_snapshot->set_time(utils::dispatcher_clock_now());
   std::vector<fuog_ViewDescriptor> views;
   bool views_exceeded = false;
 
@@ -326,7 +326,7 @@ void GeometryProvider::ProviderEndpoint::SendResponse() {
   FX_DCHECK(pending_callback_ != nullptr);
 
   fuog_WatchResponse watch_response;
-  watch_response.set_epoch_end(scenic_impl::gfx::dispatcher_clock_now());
+  watch_response.set_epoch_end(utils::dispatcher_clock_now());
 
   int64_t response_size = fuog_measure_tape::Measure(watch_response).num_bytes;
 

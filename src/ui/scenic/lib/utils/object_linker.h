@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_GFX_ENGINE_OBJECT_LINKER_H_
-#define SRC_UI_SCENIC_LIB_GFX_ENGINE_OBJECT_LINKER_H_
+#ifndef SRC_UI_SCENIC_LIB_UTILS_OBJECT_LINKER_H_
+#define SRC_UI_SCENIC_LIB_UTILS_OBJECT_LINKER_H_
 
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
@@ -23,8 +23,9 @@
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
+
+using scenic_impl::ErrorReporter;
 
 // Contains common linking functionality that operates on type-erased objects.
 // Use ObjectLinker to link objects of concrete types together.
@@ -426,7 +427,6 @@ void ObjectLinker<Export, Import>::Link<is_import>::LinkResolved(
   }
 }
 
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils
 
-#endif  // SRC_UI_SCENIC_LIB_GFX_ENGINE_OBJECT_LINKER_H_
+#endif  // SRC_UI_SCENIC_LIB_UTILS_OBJECT_LINKER_H_

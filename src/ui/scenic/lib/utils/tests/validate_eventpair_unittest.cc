@@ -2,19 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
+#include "src/ui/scenic/lib/utils/validate_eventpair.h"
 
-#include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/eventpair.h>
 
 #include <gtest/gtest.h>
 
-namespace lib_ui_gfx_util_tests {
+namespace utils::test {
 
 using fuchsia::ui::views::ViewRef;
 using fuchsia::ui::views::ViewRefControl;
-using scenic_impl::gfx::validate_eventpair;
-using scenic_impl::gfx::validate_viewref;
 
 TEST(ValidateEventpair, CorrectEventpair) {
   zx::eventpair a, b;
@@ -157,4 +154,4 @@ TEST(ValidateViewRefs, ViewRefExcessCapability) {
   EXPECT_FALSE(validate_viewref(control_ref, view_ref));
 }
 
-}  // namespace lib_ui_gfx_util_tests
+}  // namespace utils::test

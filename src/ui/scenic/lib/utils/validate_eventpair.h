@@ -1,15 +1,14 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_UI_SCENIC_LIB_GFX_UTIL_VALIDATE_EVENTPAIR_H_
-#define SRC_UI_SCENIC_LIB_GFX_UTIL_VALIDATE_EVENTPAIR_H_
+#ifndef SRC_UI_SCENIC_LIB_UTILS_VALIDATE_EVENTPAIR_H_
+#define SRC_UI_SCENIC_LIB_UTILS_VALIDATE_EVENTPAIR_H_
 
 #include <fuchsia/ui/views/cpp/fidl.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/rights.h>
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
 
 // True IFF eventpairs are valid, are peers, and have expected rights.
 bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
@@ -22,7 +21,6 @@ bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
 bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
                       const fuchsia::ui::views::ViewRef& view_ref);
 
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils
 
-#endif  // SRC_UI_SCENIC_LIB_GFX_UTIL_VALIDATE_EVENTPAIR_H_
+#endif  // SRC_UI_SCENIC_LIB_UTILS_VALIDATE_EVENTPAIR_H_

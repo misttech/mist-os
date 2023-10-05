@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_GFX_TESTS_ERROR_REPORTING_TEST_H_
-#define SRC_UI_SCENIC_LIB_GFX_TESTS_ERROR_REPORTING_TEST_H_
+#ifndef SRC_UI_SCENIC_LIB_UTILS_TESTS_ERROR_REPORTING_TEST_H_
+#define SRC_UI_SCENIC_LIB_UTILS_TESTS_ERROR_REPORTING_TEST_H_
 
 #include <lib/syslog/cpp/macros.h>
 
@@ -16,9 +16,12 @@
 #include "src/ui/scenic/lib/scenic/event_reporter.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
 namespace test {
+
+using scenic_impl::ErrorReporter;
+using scenic_impl::EventReporter;
+using scenic_impl::EventReporterWeakPtr;
 
 // Use of this macro allows us to remain consistent with gtest syntax, aiding
 // readability.
@@ -103,7 +106,6 @@ class ErrorReportingTest : public ::gtest::TestLoopFixture {
 };
 
 }  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils
 
-#endif  // SRC_UI_SCENIC_LIB_GFX_TESTS_ERROR_REPORTING_TEST_H_
+#endif  // SRC_UI_SCENIC_LIB_UTILS_TESTS_ERROR_REPORTING_TEST_H_

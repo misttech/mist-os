@@ -22,10 +22,10 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
-#include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
 #include "src/ui/scenic/lib/scheduling/id.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
+#include "src/ui/scenic/lib/utils/validate_eventpair.h"
 #include "zircon/errors.h"
 
 #include <glm/gtc/constants.hpp>
@@ -453,8 +453,8 @@ void Flatland::CreateViewHelper(
     return;
   }
 
-  if (view_identity.has_value() && !scenic_impl::gfx::validate_viewref(
-                                       view_identity->view_ref_control, view_identity->view_ref)) {
+  if (view_identity.has_value() &&
+      !utils::validate_viewref(view_identity->view_ref_control, view_identity->view_ref)) {
     error_reporter_->ERROR() << "CreateView failed, ViewIdentityOnCreation was invalid";
     ReportBadOperationError();
     return;

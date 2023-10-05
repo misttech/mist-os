@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/gfx/util/validate_eventpair.h"
+#include "src/ui/scenic/lib/utils/validate_eventpair.h"
 
 #include <lib/syslog/cpp/macros.h>
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
 
 bool validate_eventpair(const zx::eventpair& a_object, zx_rights_t a_rights,
                         const zx::eventpair& b_object, zx_rights_t b_rights) {
@@ -64,5 +63,4 @@ bool validate_viewref(const fuchsia::ui::views::ViewRefControl& control_ref,
   return false;
 }
 
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils

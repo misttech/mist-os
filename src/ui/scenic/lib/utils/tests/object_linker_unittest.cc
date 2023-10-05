@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/gfx/engine/object_linker.h"
+#include "src/ui/scenic/lib/utils/object_linker.h"
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -18,12 +18,10 @@
 #include <gtest/gtest.h>
 
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/scenic/lib/gfx/tests/error_reporting_test.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
+#include "src/ui/scenic/lib/utils/tests/error_reporting_test.h"
 
-namespace scenic_impl {
-namespace gfx {
-namespace test {
+namespace utils::test {
 
 constexpr int kExportValue = 57;
 constexpr int kImportValue = 42;
@@ -1464,6 +1462,4 @@ TEST_F(ObjectLinkerTest, ReleaseExportTokenAfterLinkResolution) {
   EXPECT_EQ(object_linker_->ExportCount(), 1u);
 }
 
-}  // namespace test
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils::test

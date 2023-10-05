@@ -28,7 +28,6 @@ executable("unittests") {
     "//src/lib/testing/loop_fixture",
     "//src/ui/scenic/lib/allocation",
     "//src/ui/scenic/lib/flatland/renderer/tests:testing_deps",
-    "//src/ui/scenic/lib/gfx/tests:testing_deps",
     "//src/ui/scenic/lib/screen_capture",
     "//src/ui/scenic/lib/utils",
     "//third_party/googletest:gmock",

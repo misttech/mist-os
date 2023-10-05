@@ -25,11 +25,11 @@
 #include "src/ui/scenic/lib/flatland/transform_graph.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 #include "src/ui/scenic/lib/flatland/uber_struct_system.h"
-#include "src/ui/scenic/lib/gfx/engine/object_linker.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 #include "src/ui/scenic/lib/scheduling/id.h"
 #include "src/ui/scenic/lib/scheduling/present2_helper.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
+#include "src/ui/scenic/lib/utils/object_linker.h"
 
 #include <glm/glm.hpp>
 #include <glm/mat3x3.hpp>

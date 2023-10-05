@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_UI_SCENIC_LIB_GFX_UTIL_TIME_H_
-#define SRC_UI_SCENIC_LIB_GFX_UTIL_TIME_H_
+#ifndef SRC_UI_SCENIC_LIB_UTILS_TIME_H_
+#define SRC_UI_SCENIC_LIB_UTILS_TIME_H_
 
 #include <lib/async/default.h>
 #include <lib/async/time.h>
 
 #include <ostream>
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
 
 // Obtain the default dispatcher's notion of timestamp "now" in Scenic. This
 // function also helps to reduce clutter and boilerplate.
@@ -34,8 +33,6 @@ inline std::ostream& operator<<(std::ostream& os, const zx::time value) {
 inline std::ostream& operator<<(std::ostream& os, const zx::duration value) {
   return os << value.get();
 }
-}  // namespace gfx
+}  // namespace utils
 
-}  // namespace scenic_impl
-
-#endif  // SRC_UI_SCENIC_LIB_GFX_UTIL_TIME_H_
+#endif  // SRC_UI_SCENIC_LIB_UTILS_TIME_H_

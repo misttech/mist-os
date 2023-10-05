@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/ui/scenic/lib/gfx/engine/object_linker.h"
+#include "src/ui/scenic/lib/utils/object_linker.h"
 
 #include <lib/async/cpp/task.h>
 #include <lib/async/cpp/wait.h>
@@ -14,8 +14,7 @@
 
 #include "src/lib/fsl/handles/object_info.h"
 
-namespace scenic_impl {
-namespace gfx {
+namespace utils {
 
 void ObjectLinkerBase::Link::LinkInvalidatedLocked(bool on_destruction) {
   if (link_invalidated_) {
@@ -313,5 +312,4 @@ zx::handle ObjectLinkerBase::ReleaseToken(zx_koid_t endpoint_id, bool is_import)
   return std::move(endpoint_iter->second.token);
 }
 
-}  // namespace gfx
-}  // namespace scenic_impl
+}  // namespace utils

@@ -25,9 +25,9 @@
 #include "src/ui/scenic/lib/flatland/transform_graph.h"
 #include "src/ui/scenic/lib/flatland/transform_handle.h"
 #include "src/ui/scenic/lib/flatland/uber_struct.h"
-#include "src/ui/scenic/lib/gfx/engine/object_linker.h"
 #include "src/ui/scenic/lib/scenic/util/error_reporter.h"
 #include "src/ui/scenic/lib/utils/dispatcher_holder.h"
+#include "src/ui/scenic/lib/utils/object_linker.h"
 
 #include <glm/glm.hpp>
 #include <glm/mat3x3.hpp>
@@ -294,7 +294,7 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
   // Linked Flatland instances only implement a small piece of link functionality. For now, directly
   // sharing link requests is a clean way to implement that functionality. This will become more
   // complicated as the Flatland API evolves.
-  using ObjectLinker = scenic_impl::gfx::ObjectLinker<LinkToParentInfo, LinkToChildInfo>;
+  using ObjectLinker = utils::ObjectLinker<LinkToParentInfo, LinkToChildInfo>;
 
   // Destruction of a LinkToChild object will trigger deregistration with the LinkSystem.
   // Deregistration is thread safe, but the user of the Link object should be confident (e.g., by
