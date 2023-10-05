@@ -140,13 +140,6 @@ TEST_P(WriteGracefulRebootReasonTest, Succeed) {
   EXPECT_EQ(contents, param.output_reason.c_str());
 
   RunLoopUntilIdle();
-
-  const auto& received_events = ReceivedCobaltEvents();
-  ASSERT_EQ(received_events.size(), 1u);
-  ASSERT_EQ(received_events[0].dimensions.size(), 1u);
-  const auto result =
-      static_cast<cobalt::RebootReasonWriteResult>(received_events[0].dimensions[0]);
-  EXPECT_EQ(result, cobalt::RebootReasonWriteResult::kSuccess);
 }
 
 }  // namespace

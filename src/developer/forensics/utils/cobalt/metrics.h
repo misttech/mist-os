@@ -93,13 +93,6 @@ enum class LastRebootReason {
       cobalt_registry::LastRebootUptimeMigratedMetricDimensionReason::RootJobTermination,
 };
 
-enum class RebootReasonWriteResult {
-  kSuccess =
-      cobalt_registry::RebootReasonPersistDurationUsecsMigratedMetricDimensionWriteResult::Success,
-  kFailure =
-      cobalt_registry::RebootReasonPersistDurationUsecsMigratedMetricDimensionWriteResult::Failure,
-};
-
 enum class PreviousBootEncodingVersion {
   kUnknown = cobalt_registry::
       PreviousBootLogCompressionRatioMigratedMetricDimensionEncodingVersion::Unknown,
@@ -128,10 +121,6 @@ inline constexpr uint32_t MetricIDForEventCode(const SnapshotVersion version) {
 
 inline constexpr uint32_t MetricIDForEventCode(const PreviousBootEncodingVersion version) {
   return cobalt_registry::kPreviousBootLogCompressionRatioMigratedMetricId;
-}
-
-inline constexpr uint32_t MetricIDForEventCode(const RebootReasonWriteResult write_result) {
-  return cobalt_registry::kRebootReasonPersistDurationUsecsMigratedMetricId;
 }
 
 inline constexpr uint32_t MetricIDForEventCode(const LastRebootReason reason) {
@@ -195,10 +184,6 @@ inline constexpr EventType EventTypeForEventCode(const SnapshotVersion version) 
 }
 
 inline constexpr EventType EventTypeForEventCode(const PreviousBootEncodingVersion version) {
-  return EventType::kInteger;
-}
-
-inline constexpr EventType EventTypeForEventCode(const RebootReasonWriteResult write_result) {
   return EventType::kInteger;
 }
 

@@ -154,8 +154,6 @@ GracefulRebootReason ToGracefulRebootReason(
 
 void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* cobalt,
                                const std::string& path) {
-  const size_t timer_id = cobalt->StartTimer();
-
   fbl::unique_fd fd(open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR));
   if (!fd.is_valid()) {
     FX_LOGS(INFO) << "Failed to open reboot reason file: " << path;
@@ -163,10 +161,7 @@ void WriteGracefulRebootReason(GracefulRebootReason reason, cobalt::Logger* coba
   }
 
   if (const std::string content = ToFileContent(reason);
-      fxl::WriteFileDescriptor(fd.get(), content.data(), content.size())) {
-    cobalt->LogElapsedTime(cobalt::RebootReasonWriteResult::kSuccess, timer_id);
-  } else {
-    cobalt->LogElapsedTime(cobalt::RebootReasonWriteResult::kFailure, timer_id);
+      !fxl::WriteFileDescriptor(fd.get(), content.data(), content.size())) {
     FX_LOGS(ERROR) << "Failed to write reboot reason '" << content << "' to " << path;
   }
 
