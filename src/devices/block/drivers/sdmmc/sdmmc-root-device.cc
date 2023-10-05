@@ -97,31 +97,12 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
 }
 
 void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
-  auto sdmmc = std::make_unique<SdmmcDevice>(parent());
-  zx_status_t st = sdmmc->Init(this);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "failed to get host info");
-    return txn.Reply(st);
-  }
-
-  zxlogf(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "",
-         sdmmc->UseDma() ? 1 : 0, (sdmmc->host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0,
-         sdmmc->host_info().max_transfer_size);
+  auto sdmmc = std::make_unique<SdmmcDevice>(this, parent());
 
   fidl::Arena arena;
   const zx::result metadata = GetMetadata(arena);
   if (metadata.is_error()) {
     return txn.Reply(metadata.status_value());
-  }
-
-  // Reset the card.
-  sdmmc->HwReset();
-
-  // No matter what state the card is in, issuing the GO_IDLE_STATE command will
-  // put the card into the idle state.
-  if ((st = sdmmc->SdmmcGoIdle()) != ZX_OK) {
-    zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed, retcode = %d", st);
-    return txn.Reply(st);
   }
 
   // Probe for SDIO first, then SD/MMC.

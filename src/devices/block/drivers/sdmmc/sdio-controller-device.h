@@ -77,9 +77,9 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   void InBandInterruptCallback();
 
   // Visible for testing.
-  zx_status_t Init() TA_EXCL(lock_) {
+  zx_status_t Init(bool try_to_use_fidl = false) TA_EXCL(lock_) {
     fbl::AutoLock _(&lock_);
-    return sdmmc_->Init();
+    return sdmmc_->Init(try_to_use_fidl);
   }
 
   zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);

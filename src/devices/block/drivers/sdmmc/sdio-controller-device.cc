@@ -60,6 +60,12 @@ namespace sdmmc {
 
 zx_status_t SdioControllerDevice::Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc,
                                          std::unique_ptr<SdioControllerDevice>* out_dev) {
+  zx_status_t status = sdmmc->Init(/*try_to_use_fidl=*/false);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to initialize SdmmcDevice: %s", zx_status_get_string(status));
+    return status;
+  }
+
   fbl::AllocChecker ac;
   out_dev->reset(new (&ac) SdioControllerDevice(parent, std::move(sdmmc)));
   if (!ac.check()) {

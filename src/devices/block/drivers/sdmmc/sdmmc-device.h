@@ -26,13 +26,18 @@ namespace sdmmc {
 // required.
 class SdmmcDevice {
  public:
-  explicit SdmmcDevice(zx_device_t* parent) : host_(parent), host_info_({}) {}
+  explicit SdmmcDevice(SdmmcRootDevice* root_device, zx_device_t* parent)
+      : root_device_(root_device), host_(parent) {}
 
-  // For testing.
-  explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host), host_info_({}) {}
+  // For testing using Banjo.
+  explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host) {}
+  // For testing using FIDL.
+  explicit SdmmcDevice(fdf::ClientEnd<fuchsia_hardware_sdmmc::Sdmmc> client_end) {
+    client_.Bind(std::move(client_end), fdf::Dispatcher::GetCurrent()->get());
+    use_fidl_ = true;
+  }
 
-  // root_device is only needed if attempting to use FIDL instead of Banjo.
-  zx_status_t Init(SdmmcRootDevice* root_device = nullptr);
+  zx_status_t Init(bool try_to_use_fidl);
 
   bool use_fidl() const { return use_fidl_; }
   const sdmmc_host_info_t& host_info() const { return host_info_; }
@@ -118,11 +123,12 @@ class SdmmcDevice {
   inline uint32_t RcaArg() const { return rca_ << 16; }
 
   bool use_fidl_ = false;
+  const SdmmcRootDevice* const root_device_ = nullptr;
   const ddk::SdmmcProtocolClient host_;
   // The FIDL client to communicate with Sdmmc device.
   fdf::WireSharedClient<fuchsia_hardware_sdmmc::Sdmmc> client_;
 
-  sdmmc_host_info_t host_info_;
+  sdmmc_host_info_t host_info_ = {};
   sdmmc_voltage_t signal_voltage_ = SDMMC_VOLTAGE_V330;
   uint16_t rca_ = 0;  // APP_CMD requires the initial RCA to be zero.
   uint32_t retries_ = 0;

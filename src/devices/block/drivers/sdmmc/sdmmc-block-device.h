@@ -143,7 +143,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
 
   // Visible for testing.
-  zx_status_t Init() { return sdmmc_->Init(); }
+  zx_status_t Init(bool try_to_use_fidl = false) { return sdmmc_->Init(try_to_use_fidl); }
   void StopWorkerThread() TA_EXCL(lock_);
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
 

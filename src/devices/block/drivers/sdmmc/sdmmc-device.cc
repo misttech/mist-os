@@ -94,11 +94,10 @@ zx::result<fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq>> BanjoToFidl
 
 namespace sdmmc {
 
-zx_status_t SdmmcDevice::Init(SdmmcRootDevice* root_device) {
-  // Prefer FIDL over Banjo.
-  if (root_device != nullptr) {
+zx_status_t SdmmcDevice::Init(bool try_to_use_fidl) {
+  if (try_to_use_fidl && root_device_ != nullptr) {
     auto client_end =
-        root_device->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
+        root_device_->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
     if (client_end.is_ok()) {
       client_.Bind(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
 
@@ -113,7 +112,26 @@ zx_status_t SdmmcDevice::Init(SdmmcRootDevice* root_device) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  return HostInfo(&host_info_);
+  zx_status_t status = HostInfo(&host_info_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to get host info: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  zxlogf(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "", UseDma() ? 1 : 0,
+         (host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0, host_info().max_transfer_size);
+
+  // Reset the card.
+  HwReset();
+
+  // No matter what state the card is in, issuing the GO_IDLE_STATE command will put the card into
+  // the idle state.
+  status = SdmmcGoIdle();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed: %s", zx_status_get_string(status));
+    return status;
+  }
+  return ZX_OK;
 }
 
 zx_status_t SdmmcDevice::Request(const sdmmc_req_t& req, uint32_t response[4], uint32_t retries,
