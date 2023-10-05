@@ -1061,27 +1061,11 @@ pub trait DiagnosticsHierarchyGetter<K: Clone> {
     fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>>;
 }
 
-pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
-    fn get_pretty_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string_pretty(&tree).expect("pretty json string")
-    }
-
-    fn get_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string(&tree).expect("pretty json string")
-    }
-}
-
 impl<K: Clone> DiagnosticsHierarchyGetter<K> for DiagnosticsHierarchy<K> {
     fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>> {
         Cow::Borrowed(self)
     }
 }
-
-impl<K: Clone + AsRef<str>, T: DiagnosticsHierarchyGetter<K>> JsonGetter<K> for T {}
 
 #[cfg(test)]
 mod tests {

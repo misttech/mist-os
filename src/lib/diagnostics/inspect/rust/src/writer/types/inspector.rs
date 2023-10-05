@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::writer::{private::InspectTypeInternal, Error, Heap, Node, State};
-use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter, JsonGetter};
+use diagnostics_hierarchy::{DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
 use inspect_format::{constants, BlockContainer, Container};
 use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
 use tracing::error;
@@ -25,9 +25,12 @@ pub struct Inspector {
 
 impl fmt::Debug for Inspector {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let result = if fmt.alternate() { self.get_pretty_json() } else { self.get_json() };
-
-        fmt.write_str(&result)
+        let tree = self.get_diagnostics_hierarchy();
+        if fmt.alternate() {
+            write!(fmt, "{:#?}", tree)
+        } else {
+            write!(fmt, "{:?}", tree)
+        }
     }
 }
 
@@ -302,12 +305,22 @@ mod tests {
         let inspector = Inspector::default();
         inspector.root().record_int("name", 5);
 
-        assert_eq!(format!("{:?}", &inspector), r#"{"root":{"name":5}}"#);
+        assert_eq!(
+            format!("{:?}", &inspector),
+            "DiagnosticsHierarchy { name: \
+            \"root\", properties: [Int(\"name\", 5)], children: [], missing: [] }"
+        );
 
-        let pretty = r#"{
-  "root": {
-    "name": 5
-  }
+        let pretty = r#"DiagnosticsHierarchy {
+    name: "root",
+    properties: [
+        Int(
+            "name",
+            5,
+        ),
+    ],
+    children: [],
+    missing: [],
 }"#;
         assert_eq!(format!("{:#?}", &inspector), pretty);
 
@@ -319,15 +332,35 @@ mod tests {
             async move { Ok(insp) }.boxed()
         });
 
-        let pretty = r#"{
-  "root": {
-    "name": 5,
-    "two": {
-      "two_child": {
-        "double": 1.0
-      }
-    }
-  }
+        let pretty = r#"DiagnosticsHierarchy {
+    name: "root",
+    properties: [
+        Int(
+            "name",
+            5,
+        ),
+    ],
+    children: [
+        DiagnosticsHierarchy {
+            name: "two",
+            properties: [],
+            children: [
+                DiagnosticsHierarchy {
+                    name: "two_child",
+                    properties: [
+                        Double(
+                            "double",
+                            1.0,
+                        ),
+                    ],
+                    children: [],
+                    missing: [],
+                },
+            ],
+            missing: [],
+        },
+    ],
+    missing: [],
 }"#;
         assert_eq!(format!("{:#?}", &inspector), pretty);
     }

@@ -24,9 +24,23 @@ use {
     },
 };
 
-pub use diagnostics_hierarchy::{
-    hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter, JsonGetter,
-};
+pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
+
+pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
+    fn get_pretty_json(&self) -> String {
+        let mut tree = self.get_diagnostics_hierarchy();
+        tree.to_mut().sort();
+        serde_json::to_string_pretty(&tree).expect("pretty json string")
+    }
+
+    fn get_json(&self) -> String {
+        let mut tree = self.get_diagnostics_hierarchy();
+        tree.to_mut().sort();
+        serde_json::to_string(&tree).expect("pretty json string")
+    }
+}
+
+impl<K: Clone + AsRef<str>, T: DiagnosticsHierarchyGetter<K>> JsonGetter<K> for T {}
 
 /// Macro to simplify creating `TreeAssertion`s. Commonly used indirectly through the second
 /// parameter of `assert_data_tree!`. See `assert_data_tree!` for more usage examples.
