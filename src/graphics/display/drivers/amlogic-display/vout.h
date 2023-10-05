@@ -68,8 +68,13 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   void DisplayConnected();
   void DisplayDisconnected();
+
+  // Vout must be of `kHdmi` type.
   bool IsDisplayModeSupported(const display_mode_t* mode);
+
+  // Vout must be of `kHdmi` type.
   zx::result<> ApplyConfiguration(const display_mode_t* mode);
+
   zx::result<> OnDisplaysChanged(added_display_info_t& info);
 
   // Required functions for I2cImpl

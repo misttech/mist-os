@@ -37,6 +37,7 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -141,6 +142,14 @@ bool GetFullHardwareResetFromKernelCommandLine(zx_device_t* device) {
 }
 
 }  // namespace
+
+bool AmlogicDisplay::IgnoreDisplayMode() const {
+  // The DSI specification doesn't support switching display modes. The display
+  // mode is provided by the peripheral supplier through side channels and
+  // should be fixed while the display device is available.
+  ZX_DEBUG_ASSERT(vout_ != nullptr);
+  return vout_->type() == VoutType::kDsi;
+}
 
 zx_status_t AmlogicDisplay::DisplayClampRgbImplSetMinimumRgb(uint8_t minimum_rgb) {
   if (fully_initialized()) {
@@ -440,7 +449,7 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }
 
-  if (!vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
+  if (!IgnoreDisplayMode() && !vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
     return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
@@ -521,13 +530,15 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
   fbl::AutoLock lock(&display_mutex_);
 
   if (display_count == 1 && display_configs[0]->layer_count) {
-    // Setting up OSD may require Vout framebuffer information, which may be
-    // changed on each ApplyConfiguration(), so we need to apply the
-    // configuration to Vout first before initializing the display and OSD.
-    zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
-    if (!apply_config_result.is_ok()) {
-      zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
-      return;
+    if (!IgnoreDisplayMode()) {
+      // Setting up OSD may require Vout framebuffer information, which may be
+      // changed on each ApplyConfiguration(), so we need to apply the
+      // configuration to Vout first before initializing the display and OSD.
+      zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
+      if (!apply_config_result.is_ok()) {
+        zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
+        return;
+      }
     }
 
     if (!fully_initialized()) {

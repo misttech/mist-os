@@ -249,6 +249,12 @@ class AmlogicDisplay
   bool fully_initialized() const { return full_init_done_.load(std::memory_order_relaxed); }
   void set_fully_initialized() { full_init_done_.store(true, std::memory_order_release); }
 
+  // If true, the driver ignores the `mode` field in the
+  // `fuchsia.hardware.display.controller/DisplayConfig` struct.
+  //
+  // `vout_` must be initialized.
+  bool IgnoreDisplayMode() const;
+
   // Zircon handles
   zx::bti bti_;
   zx::interrupt inth_;

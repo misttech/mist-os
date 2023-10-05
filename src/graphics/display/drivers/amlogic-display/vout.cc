@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <lib/device-protocol/display-panel.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include <memory>
@@ -316,47 +317,39 @@ zx::result<> Vout::PowerOn() {
 }
 
 bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
+  ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
+                      "Vout DisplayMode check is only supported for HDMI output.");
   ZX_DEBUG_ASSERT(mode != nullptr);
-  switch (type_) {
-    case VoutType::kDsi:
-      return true;
-    case VoutType::kHdmi:
-      // `cur_display_mode_` stores the most recently applied display mode,
-      // which is guaranteed to be supported. We skip the check if `mode` equals
-      // to `cur_display_mode_`.
-      // TODO(fxbug.dev/132602): This breaks the abstraction boundary between
-      // Vout and HdmiHost, the comparison should be moved to HdmiHost
-      // implementation.
-      // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
-      // We should replace `display_mode_t` (banjo type) with an internal type.
-      return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) == 0 ||
-             hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
-  }
-  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+
+  // `cur_display_mode_` stores the most recently applied display mode,
+  // which is guaranteed to be supported. We skip the check if `mode` equals
+  // to `cur_display_mode_`.
+  // TODO(fxbug.dev/132602): This breaks the abstraction boundary between
+  // Vout and HdmiHost, the comparison should be moved to HdmiHost
+  // implementation.
+  // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
+  // We should replace `display_mode_t` (banjo type) with an internal type.
+  return memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t)) == 0 ||
+         hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
 }
 
 zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
+  ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
+                      "Vout DisplayMode set is only supported for HDMI output.");
   ZX_DEBUG_ASSERT(mode != nullptr);
-  switch (type_) {
-    case VoutType::kDsi:
-      return zx::ok();
-    case VoutType::kHdmi: {
-      if (!memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t))) {
-        // No new configs
-        return zx::ok();
-      }
-
-      zx_status_t status = hdmi_.hdmi_host->ModeSet(*mode);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to set HDMI display mode: %s", zx_status_get_string(status));
-        return zx::error(status);
-      }
-
-      memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
-      return zx::ok();
-    }
+  if (!memcmp(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t))) {
+    // No new configs
+    return zx::ok();
   }
-  ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
+
+  zx_status_t status = hdmi_.hdmi_host->ModeSet(*mode);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Failed to set HDMI display mode: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
+  return zx::ok();
 }
 
 zx::result<> Vout::OnDisplaysChanged(added_display_info_t& info) {
