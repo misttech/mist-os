@@ -15,41 +15,19 @@ board_configuration_label = "//boards/vim3"
 board_name = "vim3"
 board_description = "A generic vim3 device"
 
+# Remove drivers added by arm64-common.gni that are now in the vim3 board.
+_common_bootfs_deps_to_remove = [
+  "//src/devices/bus/drivers/pci:bus-pci",
+  "//src/devices/usb/drivers/xhci",
+]
+board_bootfs_labels -= _common_bootfs_deps_to_remove
+board_zedboot_bootfs_labels -= _common_bootfs_deps_to_remove
+board_recovery_bootfs_labels -= _common_bootfs_deps_to_remove
+
+# Additional, non-driver, bootfs deps
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:vim3",
-  "//src/connectivity/ethernet/drivers/aml-ethernet",
-  "//src/connectivity/ethernet/drivers/dwmac",
-  "//src/connectivity/ethernet/drivers/realtek-8211f",
-  "//src/devices/block/drivers/aml-sdmmc",
-  "//src/devices/block/drivers/bootpart",
-  "//src/devices/board/drivers/vim3",
-  "//src/devices/clock/drivers/amlogic-clk",
-  "//src/devices/cpu/drivers/aml-cpu",
-  "//src/devices/gpio/drivers/aml-gpio",
-  "//src/devices/gpio/drivers/ti-tca6408a",
-  "//src/devices/i2c/drivers/aml-i2c",
-  "//src/devices/mcu/drivers/vim3-mcu",
-  "//src/devices/ml/drivers/aml-nna",
-  "//src/devices/power/drivers/aml-meson-power",
-  "//src/devices/power/drivers/aml-pwm-regulator",
-  "//src/devices/power/drivers/fusb302",
-  "//src/devices/pwm/drivers/aml-pwm",
-  "//src/devices/pwm/drivers/aml-pwm-init",
-  "//src/devices/registers/drivers/registers",
-  "//src/devices/serial/drivers/aml-uart",
-  "//src/devices/thermal/drivers/aml-thermal",
-  "//src/devices/usb/drivers/dwc2",
-  "//src/devices/usb/drivers/vim3-usb-phy",
-  "//src/graphics/display/drivers/aml-canvas",
-  "//src/graphics/display/drivers/aml-hdmi",
-  "//src/graphics/display/drivers/amlogic-display",
-  "//src/graphics/display/drivers/dsi-dw",
-  "//src/media/audio/drivers/aml-g12-tdm",
-  "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite",
   "//src/power/power-manager/thermal_config:vim3",
-  "//src/ui/backlight/drivers/vim3-pwm-backlight",
-  "//src/ui/input/drivers/adc-buttons",
-  "//src/ui/input/drivers/focaltech",
 ]
 
 board_bootfs_labels += _common_bootfs_deps

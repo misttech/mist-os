@@ -64,6 +64,11 @@ fuchsia_driver_component("aml-hdmi") {
   manifest = "meta/aml-hdmi.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-hdmi"
+  driver_components = [ ":aml-hdmi" ]
+}
+
 test("aml-hdmi-test-bin") {
   output_name = "aml-hdmi-test"
   sources = [

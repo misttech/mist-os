@@ -54,6 +54,11 @@ fuchsia_driver_component("dwmac") {
   manifest = "meta/dwmac.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "dwmac"
+  driver_components = [ ":dwmac" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":dwmac_bind_test" ]

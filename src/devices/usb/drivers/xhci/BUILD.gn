@@ -78,6 +78,11 @@ fuchsia_driver_component("xhci") {
   ]
 }
 
+fuchsia_driver_package("package") {
+  package_name = "xhci"
+  driver_components = [ ":xhci" ]
+}
+
 source_set("test-libs") {
   testonly = true
   public_deps = [

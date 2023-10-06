@@ -65,8 +65,12 @@ fuchsia_driver_component("aml-g12-tdm") {
   manifest = "meta/aml-g12-tdm.cml"
 }
 
-# DAI driver.
+fuchsia_driver_package("aml-g12-tdm-package") {
+  package_name = "aml-g12-tdm"
+  driver_components = [ ":aml-g12-tdm" ]
+}
 
+# DAI driver.
 driver_bind_rules("aml-g12-tdm-dai-bind") {
   rules = "aml_tdm_dai.bind"
   bind_output = "aml-g12-tdm-dai.bindbc"
@@ -157,6 +161,11 @@ fuchsia_driver_component("aml-g12-composite") {
   deps = [ ":aml-g12-composite-driver" ]
   info = "aml-g12-composite-info.json"
   manifest = "meta/aml-g12-composite.cml"
+}
+
+fuchsia_driver_package("aml-g12-composite-package") {
+  package_name = "aml-g12-composite"
+  driver_components = [ ":aml-g12-composite" ]
 }
 
 # Tests.

@@ -31,6 +31,11 @@ fuchsia_driver_component("adc-buttons") {
   manifest = "meta/adc-buttons.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "adc-buttons"
+  driver_components = [ ":adc-buttons" ]
+}
+
 source_set("common") {
   sources = [
     "adc-buttons-device.cc",

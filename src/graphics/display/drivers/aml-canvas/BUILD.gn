@@ -56,6 +56,11 @@ fuchsia_driver_component("aml-canvas") {
   manifest = "meta/aml-canvas.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-canvas"
+  driver_components = [ ":aml-canvas" ]
+}
+
 test("aml-canvas-test") {
   sources = [ "aml-canvas-test.cc" ]
   deps = [

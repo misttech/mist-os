@@ -61,6 +61,11 @@ fuchsia_driver_component("dsi-dw") {
   manifest = "meta/dsi-dw.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "dsi-dw"
+  driver_components = [ ":dsi-dw" ]
+}
+
 test("dsi-dw-test") {
   output_name = "dsi-dw-test"
   sources = [ "dsi-dw-test.cc" ]

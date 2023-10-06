@@ -55,10 +55,188 @@ board_input_bundle("main_bundle") {
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
   drivers = [
     {
+      package_target =
+          "//src/connectivity/ethernet/drivers/aml-ethernet:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-ethernet.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/ethernet/drivers/dwmac:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/dwmac.cm" ]
+    },
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/realtek-8211f:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/realtek-8211f.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/aml-sdmmc:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-sdmmc.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/bootpart:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bootpart.cm" ]
+    },
+    {
+      package_target = "//src/devices/board/drivers/vim3:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3.cm" ]
+    },
+    {
+      package_target = "//src/devices/clock/drivers/amlogic-clk:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/amlogic-clk.cm" ]
+    },
+    {
+      package_target = "//src/devices/cpu/drivers/aml-cpu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-cpu.cm" ]
+    },
+    {
+      package_target = "//src/devices/gpio/drivers/aml-gpio:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-gpio.cm" ]
+    },
+    {
+      package_target = "//src/devices/gpio/drivers/ti-tca6408a:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/ti-tca6408a.cm" ]
+    },
+    {
+      package_target = "//src/devices/i2c/drivers/aml-i2c:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-i2c.cm" ]
+    },
+    {
+      package_target = "//src/devices/mcu/drivers/vim3-mcu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-mcu.cm" ]
+    },
+    {
+      package_target = "//src/devices/ml/drivers/aml-nna:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-nna.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/aml-meson-power:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-meson-power.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/aml-pwm-regulator:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm-regulator.cm" ]
+    },
+    {
+      package_target = "//src/devices/power/drivers/fusb302:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/fusb302.cm" ]
+    },
+    {
+      package_target = "//src/devices/pwm/drivers/aml-pwm:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm.cm" ]
+    },
+    {
+      package_target = "//src/devices/pwm/drivers/aml-pwm-init:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-pwm-init.cm" ]
+    },
+    {
+      package_target = "//src/devices/registers/drivers/registers:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/registers.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/aml-uart:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-uart.cm" ]
+    },
+    {
+      package_target = "//src/devices/thermal/drivers/aml-thermal:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-thermal.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/dwc2:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/dwc2.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/vim3-usb-phy:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-usb-phy.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/aml-canvas:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-canvas.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/aml-hdmi:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-hdmi.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/amlogic-display:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/amlogic-display.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/dsi-dw:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/dsi-dw.cm" ]
+    },
+    {
       package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
-      package_set = "base"
+      package_set = "bootfs"
       driver_components = [ "meta/aml-gpu.cm" ]
     },
+    {
+      package_target =
+          "//src/media/audio/drivers/aml-g12-tdm:aml-g12-tdm-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-g12-tdm.cm" ]
+    },
+    {
+      package_target =
+          "//src/media/audio/drivers/aml-g12-tdm:aml-g12-composite-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-g12-composite.cm" ]
+    },
+    {
+      package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-pwm-backlight.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/adc-buttons:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/adc-buttons.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/focaltech:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/focaltech.cm" ]
+    },
+
+    # arm64 common drivers
+    {
+      package_target = "//src/devices/bus/drivers/pci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/xhci.cm" ]
+    },
+
+    # Base drivers
     {
       package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
       package_set = "base"

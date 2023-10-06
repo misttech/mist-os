@@ -207,6 +207,11 @@ fuchsia_driver_component("vim3") {
   manifest = "meta/vim3.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "vim3"
+  driver_components = [ ":vim3" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":vim3-bind_test" ]

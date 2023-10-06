@@ -35,6 +35,11 @@ fuchsia_driver_component("registers") {
   manifest = "meta/registers.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "registers"
+  driver_components = [ ":registers" ]
+}
+
 test("registers-test") {
   output_name = "registers-test"
   sources = [

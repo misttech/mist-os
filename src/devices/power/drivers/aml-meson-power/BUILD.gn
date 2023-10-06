@@ -50,6 +50,11 @@ fuchsia_driver_component("aml-meson-power") {
   manifest = "meta/aml-meson-power.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-meson-power"
+  driver_components = [ ":aml-meson-power" ]
+}
+
 test("aml-meson-power-test-bin") {
   output_name = "aml-meson-power-test"
   sources = [

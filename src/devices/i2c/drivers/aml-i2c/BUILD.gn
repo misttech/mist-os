@@ -55,6 +55,11 @@ fuchsia_driver_component("aml-i2c") {
   manifest = "meta/aml-i2c.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-i2c"
+  driver_components = [ ":aml-i2c" ]
+}
+
 test("aml-i2c-test-bin") {
   output_name = "aml-i2c-test"
   configs += [ "//build/config:all_source" ]

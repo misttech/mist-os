@@ -66,3 +66,8 @@ fuchsia_driver_component("qemu-arm64") {
   info = "qemu-arm64-info.json"
   manifest = "meta/qemu-arm64.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "qemu-arm64"
+  driver_components = [ ":qemu-arm64" ]
+}

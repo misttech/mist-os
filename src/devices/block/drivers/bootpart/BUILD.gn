@@ -40,6 +40,11 @@ fuchsia_driver_component("bootpart") {
   manifest = "meta/bootpart.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "bootpart"
+  driver_components = [ ":bootpart" ]
+}
+
 test("bootpart-test-bin") {
   output_name = "bootpart-test"
   sources = [

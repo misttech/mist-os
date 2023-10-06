@@ -55,6 +55,11 @@ fuchsia_driver_component("aml-sdmmc") {
   manifest = "meta/aml-sdmmc.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-sdmmc"
+  driver_components = [ ":aml-sdmmc" ]
+}
+
 test("aml-sdmmc-test-bin") {
   output_name = "aml-sdmmc-test"
   sources = [

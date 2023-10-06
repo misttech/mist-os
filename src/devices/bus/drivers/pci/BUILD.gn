@@ -154,6 +154,11 @@ if (platform_enable_user_pci) {
   }
 }
 
+fuchsia_driver_package("package") {
+  package_name = "bus-pci"
+  driver_components = [ ":bus-pci" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

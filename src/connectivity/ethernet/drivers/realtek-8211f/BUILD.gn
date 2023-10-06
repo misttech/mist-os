@@ -37,6 +37,11 @@ fuchsia_driver_component("realtek-8211f") {
   manifest = "meta/realtek-8211f.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "realtek-8211f"
+  driver_components = [ ":realtek-8211f" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":rtl8211f_bind_test" ]

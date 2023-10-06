@@ -53,6 +53,11 @@ fuchsia_driver_component("aml-cpu") {
   info = "aml-cpu-info.json"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-cpu"
+  driver_components = [ ":aml-cpu" ]
+}
+
 test("aml-cpu-test-bin") {
   sources = [
     "aml-cpu-test.cc",

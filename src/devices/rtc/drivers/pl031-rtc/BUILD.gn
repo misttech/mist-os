@@ -37,6 +37,11 @@ fuchsia_driver_component("pl031-rtc") {
   manifest = "meta/pl031-rtc.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "pl031-rtc"
+  driver_components = [ ":pl031-rtc" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":pl031_rtc_bind_test" ]

@@ -78,6 +78,11 @@ fuchsia_driver_component("focaltech") {
   manifest = "meta/focaltech.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "focaltech"
+  driver_components = [ ":focaltech" ]
+}
+
 fuchsia_driver("focaltech-sherlock-driver") {
   output_name = "focaltech-sherlock"
   configs += [

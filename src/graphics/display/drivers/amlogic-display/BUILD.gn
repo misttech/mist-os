@@ -120,6 +120,11 @@ fuchsia_driver_component("amlogic-display") {
   manifest = "meta/amlogic-display.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "amlogic-display"
+  driver_components = [ ":amlogic-display" ]
+}
+
 test("amlogic-display-test") {
   configs += [ "//build/config:all_source" ]
   sources = [

@@ -49,3 +49,8 @@ fuchsia_driver_component("acpi-arm64") {
   info = "acpi-arm64-info.json"
   manifest = "meta/acpi-arm64.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "acpi-arm64"
+  driver_components = [ ":acpi-arm64" ]
+}

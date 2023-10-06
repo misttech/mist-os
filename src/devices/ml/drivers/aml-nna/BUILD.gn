@@ -50,6 +50,11 @@ fuchsia_driver_component("aml-nna") {
   manifest = "meta/aml-nna.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-nna"
+  driver_components = [ ":aml-nna" ]
+}
+
 test("aml-nna-test-bin") {
   output_name = "aml-nna-test"
   sources = [

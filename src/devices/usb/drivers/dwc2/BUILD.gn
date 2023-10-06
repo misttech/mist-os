@@ -57,6 +57,11 @@ fuchsia_driver_component("dwc2") {
   manifest = "meta/dwc2.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "dwc2"
+  driver_components = [ ":dwc2" ]
+}
+
 test("dwc2-test-bin") {
   configs += [ "//build/config:all_source" ]
   sources = [

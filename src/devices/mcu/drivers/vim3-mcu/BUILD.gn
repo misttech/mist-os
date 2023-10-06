@@ -63,6 +63,11 @@ fuchsia_driver_component("vim3-mcu") {
   manifest = "meta/vim3-mcu.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "vim3-mcu"
+  driver_components = [ ":vim3-mcu" ]
+}
+
 test("vim3-mcu-test-bin") {
   output_name = "vim3-mcu-test"
   sources = [ "vim3-mcu-test.cc" ]

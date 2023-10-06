@@ -54,6 +54,11 @@ fuchsia_driver_component("aml-thermal") {
   manifest = "meta/aml-thermal.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-thermal"
+  driver_components = [ ":aml-thermal" ]
+}
+
 test("aml-thermal-test-bin") {
   output_name = "aml-thermal-test"
   configs += [ "//build/config:all_source" ]

@@ -71,6 +71,11 @@ fuchsia_driver_component("fusb302") {
   manifest = "meta/fusb302.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "fusb302"
+  driver_components = [ ":fusb302" ]
+}
+
 test("fusb302-test-bin") {
   sources = [
     "fusb302-controls-test.cc",

@@ -58,6 +58,11 @@ fuchsia_driver_component("aml-gpio") {
   manifest = "meta/aml-gpio.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-gpio"
+  driver_components = [ ":aml-gpio" ]
+}
+
 test("aml-gpio-test-bin") {
   output_name = "aml-gpio-test"
   sources = [

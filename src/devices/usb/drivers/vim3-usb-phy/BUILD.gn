@@ -50,6 +50,11 @@ fuchsia_driver_component("vim3-usb-phy") {
   manifest = "meta/vim3-usb-phy.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "vim3-usb-phy"
+  driver_components = [ ":vim3-usb-phy" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":vim3_usb_phy_bind_test" ]

@@ -42,6 +42,11 @@ fuchsia_driver_component("ti-tca6408a") {
   manifest = "meta/ti-tca6408a.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ti-tca6408a"
+  driver_components = [ ":ti-tca6408a" ]
+}
+
 test("ti-tca6408a-test-bin") {
   output_name = "ti-tca6408a-test"
   sources = [

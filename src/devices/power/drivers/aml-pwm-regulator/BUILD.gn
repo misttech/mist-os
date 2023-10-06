@@ -47,6 +47,11 @@ fuchsia_driver_component("aml-pwm-regulator") {
   manifest = "meta/aml-pwm-regulator.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-pwm-regulator"
+  driver_components = [ ":aml-pwm-regulator" ]
+}
+
 test("aml-pwm-regulator-test-bin") {
   output_name = "aml-pwm-regulator-test"
   sources = [

@@ -62,6 +62,11 @@ fuchsia_driver_component("vim3-pwm-backlight") {
   manifest = "meta/vim3-pwm-backlight.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "vim3-pwm-backlight"
+  driver_components = [ ":vim3-pwm-backlight" ]
+}
+
 test("vim3-pwm-backlight-test") {
   output_name = "vim3-pwm-backlight-test"
   sources = [ "vim3-pwm-backlight-test.cc" ]
