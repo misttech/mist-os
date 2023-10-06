@@ -70,7 +70,6 @@ zx_status_t sysmem_bind(void* driver_ctx, zx_device_t* parent_device) {
   // redundant (but mostly harmless) posting back to this same dispatcher for historical reasons.
   auto fidl_device =
       std::make_unique<FidlDevice>(device_ptr->zxdev(), device_ptr, device_ptr->dispatcher());
-
   status = fidl_device->Bind();
   if (status != ZX_OK) {
     DRIVER_ERROR("Bind() failed for FIDL device: %s\n", zx_status_get_string(status));

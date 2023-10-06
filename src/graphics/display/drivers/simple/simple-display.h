@@ -43,7 +43,9 @@ class SimpleDisplay : public DeviceType,
                       public HeapServer,
                       public ddk::DisplayControllerImplProtocol<SimpleDisplay, ddk::base_protocol> {
  public:
-  SimpleDisplay(zx_device_t* parent, fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem,
+  SimpleDisplay(zx_device_t* parent,
+                fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
+                fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
                 fdf::MmioBuffer framebuffer_mmio, uint32_t width, uint32_t height, uint32_t stride,
                 fuchsia_images2::wire::PixelFormat format);
   ~SimpleDisplay() = default;
@@ -103,14 +105,12 @@ class SimpleDisplay : public DeviceType,
   }
 
  private:
-  zx_status_t InitSysmemAllocatorClient();
-
   void OnPeriodicVSync();
 
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
 
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
