@@ -1369,7 +1369,9 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         let mut buf = vec![0; min_chunk_size];
         let mut index = 0;
         loop {
-            let read = self.read_memory_partial_to_slice(string.addr(), &mut buf[index..])?;
+            // This operation should never overflow: we should fail to read before that.
+            let addr = string.addr().checked_add(index).ok_or(errno!(EFAULT))?;
+            let read = self.read_memory_partial_to_slice(addr, &mut buf[index..])?;
 
             if let Some(nul_index) = memchr::memchr(b'\0', &buf[index..index + read]) {
                 buf.resize(index + nul_index, 0u8);
@@ -2651,6 +2653,35 @@ mod tests {
         // However, accessing zero bytes in unmapped memory is not an error.
         mm.write_memory(unmapped_addr, &[]).expect("failed to write no data");
         mm.read_memory_to_vec(unmapped_addr, 0).expect("failed to read no data");
+    }
+
+    #[::fuchsia::test]
+    async fn test_read_c_string_to_vec_large() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let page_size = *PAGE_SIZE;
+        let max_size = 4 * page_size as usize;
+        let addr = mm.base_addr + 10 * page_size;
+
+        assert_eq!(map_memory(&current_task, addr, max_size as u64), addr);
+
+        let mut random_data = vec![0; max_size];
+        zx::cprng_draw(&mut random_data);
+        // Remove all NUL bytes.
+        for i in 0..random_data.len() {
+            if random_data[i] == 0 {
+                random_data[i] = 1;
+            }
+        }
+        random_data[max_size - 1] = 0;
+
+        mm.write_memory(addr, &random_data).expect("failed to write test string");
+        // We should read the same value minus the last byte (NUL char).
+        assert_eq!(
+            mm.read_c_string_to_vec(UserCString::new(addr), max_size).unwrap(),
+            random_data[..max_size - 1]
+        );
     }
 
     #[::fuchsia::test]
