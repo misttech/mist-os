@@ -202,6 +202,7 @@ pub struct DeferredOpenBlob {
     kind: OpenKind,
     blob_id: BlobId,
     pkg_present: Option<SharedBoolEvent>,
+    opened_blob: std::sync::Mutex<Option<NeededBlob>>,
 }
 
 impl DeferredOpenBlob {
@@ -211,9 +212,32 @@ impl DeferredOpenBlob {
         &self,
         blob_type: fpkg::BlobType,
     ) -> Result<Option<NeededBlob>, OpenBlobError> {
-        open_blob(&self.needed_blobs, self.kind, self.blob_id, blob_type, self.pkg_present.as_ref())
-            .await
+        let opened_blob: Option<NeededBlob> =
+            self.opened_blob.lock().expect("unpoisoned lock").take();
+        match opened_blob {
+            Some(opened_blob) => Ok(Some(opened_blob)),
+            None => {
+                open_blob(
+                    &self.needed_blobs,
+                    self.kind,
+                    self.blob_id,
+                    blob_type,
+                    self.pkg_present.as_ref(),
+                )
+                .await
+            }
+        }
     }
+
+    /// Return ownership of a `NeededBlob` previously created by a call to `Self::open`.
+    /// The next call to `Self::open` will return the registered `opened_blob` instead of creating
+    /// a new one.
+    /// The `opened_blob` must have been created by the same instance of `Self` to which it is
+    /// being returned.
+    pub fn register_opened_blob(&self, opened_blob: NeededBlob) {
+        *self.opened_blob.lock().expect("unpoisoned lock") = Some(opened_blob)
+    }
+
     fn proxy_cmp_key(&self) -> u32 {
         use fidl::{endpoints::Proxy, AsHandleRef};
         self.needed_blobs.as_channel().raw_handle()
@@ -251,6 +275,7 @@ impl Get {
             kind: OpenKind::Meta,
             blob_id: self.meta_far,
             pkg_present: Some(self.pkg_present.clone()),
+            opened_blob: None.into(),
         }
     }
 
@@ -316,6 +341,7 @@ impl Get {
             kind: OpenKind::Content,
             blob_id: content_blob,
             pkg_present: None,
+            opened_blob: None.into(),
         }
     }
 

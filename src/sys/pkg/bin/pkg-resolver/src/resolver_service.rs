@@ -364,7 +364,8 @@ impl QueuedResolver {
             OpenPackage(..)
             | Cache(FetchContentBlob(..))
             | Cache(FetchMetaFar(..))
-            | Cache(Get(_)) => {
+            | Cache(Get(_))
+            | Cache(Open(_)) => {
                 // We could talk to TUF and we know there's a new version of this package,
                 // but we couldn't retrieve its blobs for some reason. Refuse to fall back to
                 // cache_packages and instead return an error for the resolve, which is consistent

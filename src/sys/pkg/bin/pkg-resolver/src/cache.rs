@@ -99,20 +99,25 @@ pub async fn cache_package<'a>(
     let blob_fetch_res = async {
         let mirrors = config.mirrors().to_vec().into();
 
-        // Fetch the meta.far.
-        let () = blob_fetcher
-            .push(
-                merkle,
-                FetchBlobContext {
-                    opener: get.make_open_meta_blob(),
-                    mirrors: Arc::clone(&mirrors),
-                    expected_len: size,
-                    parent_trace_id: trace_id,
-                },
-            )
-            .await
-            .expect("processor exists")
-            .map_err(|e| CacheError::FetchMetaFar(e, merkle))?;
+        // Only add the meta.far fetch to the queue if the meta.far is not already cached to avoid
+        // blocking resolves of fully cached packages behind in-progress resolves.
+        let meta_opener = get.make_open_meta_blob();
+        if let Some(needed_meta) = meta_opener.open(blob_fetcher.blob_type).await? {
+            let () = meta_opener.register_opened_blob(needed_meta);
+            let () = blob_fetcher
+                .push(
+                    merkle,
+                    FetchBlobContext {
+                        opener: meta_opener,
+                        mirrors: Arc::clone(&mirrors),
+                        expected_len: size,
+                        parent_trace_id: trace_id,
+                    },
+                )
+                .await
+                .expect("processor exists")
+                .map_err(|e| CacheError::FetchMetaFar(e, merkle))?;
+        }
 
         let mut fetches = FuturesUnordered::new();
         let mut missing_blobs = get.get_missing_blobs().fuse();
@@ -142,6 +147,8 @@ pub async fn cache_package<'a>(
                             (
                                 need.blob_id,
                                 FetchBlobContext {
+                                    // TODO(b/303737132) Consider checking if the blob is cached
+                                    // before adding to the queue, like is done for meta.fars.
                                     opener: get.make_open_blob(need.blob_id),
                                     mirrors: Arc::clone(&mirrors),
                                     expected_len: None,
@@ -191,6 +198,9 @@ pub enum CacheError {
 
     #[error("Get() request failed")]
     Get(#[from] pkg::cache::GetError),
+
+    #[error("opening a blob from the blobstore")]
+    Open(#[from] pkg::cache::OpenBlobError),
 }
 
 pub(crate) trait ToResolveError {
@@ -244,6 +254,7 @@ impl ToResolveError for CacheError {
             CacheError::FetchMetaFar(err, ..) => err.to_resolve_error(),
             CacheError::FetchContentBlob(err, _) => err.to_resolve_error(),
             CacheError::Get(err) => err.to_resolve_error(),
+            CacheError::Open(err) => err.to_resolve_error(),
         }
     }
 }

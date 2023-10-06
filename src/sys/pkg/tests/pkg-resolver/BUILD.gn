@@ -202,6 +202,7 @@ rustc_test("resolve_succeeds") {
   source_root = "src/resolve_succeeds.rs"
   deps = [
     ":lib",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",

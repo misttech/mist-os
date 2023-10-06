@@ -9,7 +9,7 @@ use {
     assert_matches::assert_matches,
     cobalt_sw_delivery_registry as metrics,
     diagnostics_assertions::assert_data_tree,
-    fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync,
     fuchsia_pkg_testing::{
         serve::{responder, Domain},
         Package, PackageBuilder, RepositoryBuilder,
@@ -1028,6 +1028,66 @@ async fn ota_resolver_does_not_protect_blobs_from_gc() {
         pkg.verify_contents(&resolved_pkg).await,
         Err(fuchsia_pkg_testing::VerificationError::MissingFile{path}) if path == "unprotected-blob"
     );
+
+    env.stop().await;
+}
+
+#[fuchsia::test]
+async fn resolve_of_already_cached_package_is_not_blocked_by_in_progress_blob_fetches() {
+    let env = TestEnvBuilder::new().blob_download_concurrency_limit(1).build().await;
+
+    let blocking_pkg = PackageBuilder::new("blocking-package").build().await.unwrap();
+    let already_cached_subpackage = PackageBuilder::new("already-cached-subpackage")
+        .add_resource_at(
+            "already-cached-subpackage-blob",
+            &b"already-cached-subpackage-blob-content"[..],
+        )
+        .build()
+        .await
+        .unwrap();
+    let already_cached_superpackage = PackageBuilder::new("already-cached-superpackage")
+        .add_subpackage("subpackage", &already_cached_subpackage)
+        .add_resource_at(
+            "already-cached-superpackage-blob",
+            &b"already-cached-superpackage-blob-content"[..],
+        )
+        .build()
+        .await
+        .unwrap();
+    let () = already_cached_superpackage.write_to_blobfs(&env.blobfs).await;
+
+    let repo = Arc::new(
+        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+            .add_package(&blocking_pkg)
+            .add_package(&already_cached_superpackage)
+            .build()
+            .await
+            .unwrap(),
+    );
+    let (blocker, mut blocked_fetches) = responder::BlockResponseHeaders::new();
+    let responder = responder::ForPathPrefix::new("/blobs/1/", blocker);
+    let served_repository = repo.server().response_overrider(responder).start().unwrap();
+    env.register_repo(&served_repository).await;
+
+    // Wait for the meta.far to be blocked.
+    let mut blocking_pkg_resolve =
+        std::pin::pin!(env.resolve_package("fuchsia-pkg://test/blocking-package").fuse());
+    let blocked_meta_far = blocked_fetches.next().await.unwrap();
+
+    // Already cached package should resolve even with a full blob fetch queue,
+    // and the blocking resolve should not complete.
+    futures::select_biased! {
+        _  = blocking_pkg_resolve => panic!("blocking resolve should not complete"),
+        already_cached_resolve = env
+            .resolve_package("fuchsia-pkg://test/already-cached-superpackage").fuse() => {
+            let _: (fio::DirectoryProxy, _) = already_cached_resolve.unwrap();
+        }
+    }
+
+    // Finish the blocked resolve to make sure it completes successfully and didn't get canceled by
+    // timeout.
+    let () = blocked_meta_far.unblock();
+    let _: (fio::DirectoryProxy, _) = blocking_pkg_resolve.await.unwrap();
 
     env.stop().await;
 }
