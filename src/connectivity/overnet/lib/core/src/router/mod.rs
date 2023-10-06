@@ -294,7 +294,7 @@ impl Router {
     }
 
     /// Implementation of RegisterService fidl method.
-    pub async fn register_service(
+    pub async fn register_service_legacy(
         &self,
         service_name: String,
         provider: ClientEnd<ServiceProviderMarker>,

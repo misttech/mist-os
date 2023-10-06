@@ -387,7 +387,10 @@ mod tests {
             fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>();
         let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), server);
         node2
-            .register_service(fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), client)
+            .register_service_legacy(
+                fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
+                client,
+            )
             .await
             .unwrap();
         let daemon = FakeDaemonBuilder::new().build();

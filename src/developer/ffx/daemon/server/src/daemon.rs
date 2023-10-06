@@ -801,7 +801,8 @@ impl Daemon {
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
         tracing::debug!("Starting daemon overnet server");
-        node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p)).await?;
+        node.register_service_legacy(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p))
+            .await?;
 
         tracing::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();

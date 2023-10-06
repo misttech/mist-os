@@ -468,7 +468,7 @@ mod test {
 
         let (s, p) = fidl::Channel::create();
         daemon
-            .register_service(DaemonMarker::PROTOCOL_NAME.into(), ClientEnd::new(p))
+            .register_service_legacy(DaemonMarker::PROTOCOL_NAME.into(), ClientEnd::new(p))
             .await
             .unwrap();
 

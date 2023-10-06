@@ -77,7 +77,10 @@ async fn exec_server() -> Result<(), Error> {
             .context("creating ServiceProvider async channel")?;
         let stream = ServiceProviderRequestStream::from_channel(chan);
         router
-            .register_service(rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p))
+            .register_service_legacy(
+                rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
+                ClientEnd::new(p),
+            )
             .await?;
         let sc = service.clone();
         async move {

@@ -114,7 +114,7 @@ async fn run_overnet_command(
             Ok(())
         }
         OvernetCommand::RegisterService(service_name, provider) => {
-            node.register_service(service_name, provider).await
+            node.register_service_legacy(service_name, provider).await
         }
         OvernetCommand::ConnectToService(node_id, service_name, channel) => {
             node.connect_to_service(node_id, &service_name, channel).await
