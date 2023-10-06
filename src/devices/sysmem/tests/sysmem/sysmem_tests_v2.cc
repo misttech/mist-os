@@ -353,6 +353,32 @@ void set_picky_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection
   EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 }
 
+void set_specific_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
+                                 uint32_t exact_buffer_size, uint32_t min_buffer_count_for_camping,
+                                 bool physically_contiguous_required) {
+  EXPECT_EQ(exact_buffer_size % zx_system_get_page_size(), 0);
+  v2::BufferCollectionConstraints constraints;
+  constraints.usage().emplace();
+  constraints.usage()->cpu() = v2::kCpuUsageReadOften | v2::kCpuUsageWriteOften;
+  constraints.min_buffer_count_for_camping() = min_buffer_count_for_camping;
+  constraints.buffer_memory_constraints().emplace();
+  auto& buffer_memory = constraints.buffer_memory_constraints().value();
+  buffer_memory.min_size_bytes() = exact_buffer_size;
+  // Allow a max that's just large enough to accommodate the size implied
+  // by the min frame size and PixelFormat.
+  buffer_memory.max_size_bytes() = exact_buffer_size;
+  buffer_memory.physically_contiguous_required() = physically_contiguous_required;
+  buffer_memory.secure_required() = false;
+  buffer_memory.ram_domain_supported() = false;
+  buffer_memory.cpu_domain_supported() = true;
+  buffer_memory.inaccessible_domain_supported() = false;
+  ZX_DEBUG_ASSERT(!buffer_memory.heap_permitted().has_value());
+  ZX_DEBUG_ASSERT(!constraints.image_format_constraints().has_value());
+  v2::BufferCollectionSetConstraintsRequest set_constraints_request;
+  set_constraints_request.constraints() = std::move(constraints);
+  EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
+}
+
 void set_empty_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection) {
   v2::BufferCollectionConstraints constraints;
   v2::BufferCollectionSetConstraintsRequest set_constraints_request;
@@ -6032,3 +6058,37 @@ TEST(Sysmem, LogWeakLeak_DoesNotCrashSysmem) {
   // make sure sysmem didn't crash
   auto extra_token = create_initial_token_v2();
 }
+
+// This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
+// and run this manually.
+#if 0
+TEST(Sysmem, FailAllocateVmoMidAllocate) {
+  // 1 GiB cap for now.
+  const uint64_t kMaxTotalSizeBytesPerCollection = 1ull * 1024 * 1024 * 1024;
+  // 256 MiB cap for now.
+  const uint64_t kMaxSizeBytesPerBuffer = 256ull * 1024 * 1024;
+  const uint32_t kMaxBufferCount = std::min(kMaxTotalSizeBytesPerCollection / kMaxSizeBytesPerBuffer, static_cast<uint64_t>(fuchsia_sysmem::kMaxCountBufferCollectionInfoBuffers));
+
+  std::vector<zx::vmo> keep_vmos;
+
+  while(true) {
+    auto parent_token = create_initial_token_v2();
+    auto child_token = create_token_under_token_v2(parent_token);
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+    auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+    set_specific_constraints_v2(parent_collection, kMaxSizeBytesPerBuffer, kMaxBufferCount, true);
+    set_specific_constraints_v2(child_collection, kMaxSizeBytesPerBuffer, 0, true);
+    auto wait_result = parent_collection->WaitForAllBuffersAllocated();
+    if (!wait_result.is_ok()) {
+      break;
+    }
+    auto info = std::move(*wait_result->buffer_collection_info());
+    for (auto& vmo_buffer : *info.buffers()) {
+      keep_vmos.emplace_back(std::move(*vmo_buffer.vmo()));
+    }
+  }
+
+  auto alive_token = create_initial_token_v2();
+  ASSERT_TRUE(alive_token->Sync().is_ok());
+}
+#endif
