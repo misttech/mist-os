@@ -45,7 +45,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
       "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
-      "sys/platform/05:03:13/astro-audio-pdm-in",
+      "sys/platform/05:03:13/aml_pdm/astro-audio-pdm-in",
       "sys/platform/05:03:1a/aml-secure-mem/aml-securemem",
       //"sys/platform/05:05:3/aml-uart/serial/bt-transport-uart/bcm-hci",
       "sys/platform/05:03:1d/aml-pwm-device/pwm-4/pwm-init",

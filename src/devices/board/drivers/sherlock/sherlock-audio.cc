@@ -483,14 +483,19 @@ zx_status_t Sherlock::AudioInit() {
     dev_in.metadata() = pdm_metadata;
 
     {
-      auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dev_in));
+      auto pdm_spec = fdf::CompositeNodeSpec{{
+          "aml_pdm",
+          gpio_init_parent,
+      }};
+      auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
+                                                              fidl::ToWire(fidl_arena, pdm_spec));
       if (!result.ok()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) request failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec Audio(dev_in) request failed: %s",
                result.FormatDescription().data());
         return result.status();
       }
       if (result->is_error()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(dev_in) failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec Audio(dev_in) failed: %s",
                zx_status_get_string(result->error_value()));
         return result->error_value();
       }

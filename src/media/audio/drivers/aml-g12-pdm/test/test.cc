@@ -114,7 +114,7 @@ struct AudioStreamInTest : public inspect::InspectTestHelper, public zxtest::Tes
     });
     ASSERT_NO_FATAL_FAILURE();
     fake_parent_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                                 std::move(outgoing_endpoints->client));
+                                 std::move(outgoing_endpoints->client), "pdev");
   }
 
   void TestRingBufferSize(uint8_t number_of_channels, uint32_t frames_req,

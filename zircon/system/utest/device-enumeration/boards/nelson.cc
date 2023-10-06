@@ -21,7 +21,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:05:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:0a:21/nelson-usb-phy",
       "sys/platform/05:05:12/aml_tdm/nelson-audio-i2s-out",
-      "sys/platform/05:05:13/nelson-audio-pdm-in",
+      "sys/platform/05:05:13/aml_pdm/nelson-audio-pdm-in",
       "sys/platform/00:00:29",  // registers device
 
       // XHCI driver will not be loaded if we are in USB peripheral mode.

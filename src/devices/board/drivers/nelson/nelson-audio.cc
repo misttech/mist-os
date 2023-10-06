@@ -80,7 +80,7 @@ const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
     fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
 };
 
-const std::vector<fdf::ParentSpec> kTdmDaiParents = std::vector{
+const std::vector<fdf::ParentSpec> kParentSpecGpioInit = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
 };
 
@@ -370,7 +370,7 @@ zx_status_t Nelson::AudioInit() {
 
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_out",
-        kTdmDaiParents,
+        kParentSpecGpioInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                             fidl::ToWire(fidl_arena, tdm_spec));
@@ -434,7 +434,7 @@ zx_status_t Nelson::AudioInit() {
 
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_in",
-        kTdmDaiParents,
+        kParentSpecGpioInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                             fidl::ToWire(fidl_arena, tdm_spec));
@@ -479,13 +479,19 @@ zx_status_t Nelson::AudioInit() {
     dev_in.irq() = toddr_b_irqs;
     dev_in.metadata() = pdm_metadata;
 
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dev_in));
+    auto pdm_spec = fdf::CompositeNodeSpec{{
+        "aml_pdm",
+        kParentSpecGpioInit,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
+                                                            fidl::ToWire(fidl_arena, pdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "NodeAdd Audio(dev_in) request failed: %s", result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(dev_in) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "NodeAdd Audio(dev_in) failed: %s",
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(dev_in) failed: %s",
              zx_status_get_string(result->error_value()));
       return result->error_value();
     }
