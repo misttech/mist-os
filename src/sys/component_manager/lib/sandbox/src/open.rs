@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, Convert, Directory, Remote},
+    crate::{AnyCast, Capability, Directory},
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
@@ -20,8 +20,8 @@ use {
 ///
 /// ## Open via remoting
 ///
-/// The most straightforward way to open the capability is via the [Remote] trait.
-/// [Remote::to_zx_handle] will:
+/// The most straightforward way to open the capability is via [Capability::to_zx_handle].
+/// This will:
 ///
 /// * Return a client endpoint.
 /// * Wait for someone to use the client endpoint.
@@ -52,7 +52,6 @@ use {
 /// is equivalent to two agents each opening one capability through their respective
 /// clones of the open capability.
 #[derive(Capability, Clone)]
-#[capability(try_clone = "clone")]
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -84,7 +83,7 @@ impl Open {
     ///   of the dictionary.
     ///
     /// * `open_flags` - The flags that will be used to open a new connection to this capability
-    ///   during [Remote].
+    ///   during [Capability::to_zx_handle].
     ///
     pub fn new<F>(open: F, entry_type: fio::DirentType, open_flags: fio::OpenFlags) -> Self
     where
@@ -95,11 +94,11 @@ impl Open {
 
     /// Turn the [Open] into a remote VFS node.
     ///
-    /// Both `into_remote` and [Remote::to_zx_handle] will let us open the capability:
+    /// Both `into_remote` and [Capability::to_zx_handle] will let us open the capability:
     ///
     /// * `into_remote` returns a [vfs::remote::Remote] that supports
     ///   [DirectoryEntry::open].
-    /// * [Remote::to_zx_handle] returns a client endpoint and calls
+    /// * [Capability::to_zx_handle] returns a client endpoint and calls
     ///   [DirectoryEntry::open] with the server endpoint when the client is used.
     ///
     /// `into_remote` avoids a round trip through FIDL and channels, and is used as an
@@ -127,7 +126,11 @@ impl From<Open> for Directory {
     }
 }
 
-impl Convert for Open {
+impl Capability for Open {
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
     fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());
@@ -137,9 +140,7 @@ impl Convert for Open {
         }
         Err(())
     }
-}
 
-impl Remote for Open {
     /// Opens the capability with "." path when a request comes from the returned client endpoint.
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let open_flags = self.open_flags;

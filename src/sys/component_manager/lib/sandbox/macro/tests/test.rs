@@ -4,23 +4,20 @@
 
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::BoxFuture;
-use sandbox::{AnyCapability, Capability, Convert, ErasedCapability, Handle, Remote, TryClone};
+use sandbox::{AnyCapability, Capability, ErasedCapability, Handle};
 use std::any::{Any, TypeId};
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
 /// A test-only capability that derives [Capability].
 #[derive(Capability, Debug)]
-#[capability(try_clone = "err")]
 struct TestHandle(zx::Handle);
 
-impl Remote for TestHandle {
+impl Capability for TestHandle {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         (self.0, None)
     }
-}
 
-impl Convert for TestHandle {
     fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
         assert_eq!(type_id, TypeId::of::<Handle>());
         Ok(Box::new(Handle::from(self.0)))
@@ -60,16 +57,19 @@ fn test_try_from_any_convert() {
 
 /// A cloneable capability that holds a string.
 #[derive(Capability, Clone, Debug)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
 struct TestCloneable(pub String);
 
-impl Remote for TestCloneable {
+impl Capability for TestCloneable {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         unimplemented!()
     }
+
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
 }
 
-/// Tests that the derived TryClone impl using `try_clone = "clone"` succeeds.
+/// Tests that the try_clone impl succeeds.
 #[test]
 fn test_try_clone() {
     let cap = TestCloneable("hello".to_string());
@@ -77,15 +77,14 @@ fn test_try_clone() {
     assert_eq!(clone.0, "hello".to_string());
 }
 
-/// Tests that the derived TryClone impl using `try_clone = "none"` returns an error.
+/// Tests that the default try_clone impl returns an error.
 #[test]
 fn test_try_clone_none() {
     let cap = TestHandle(zx::Handle::invalid());
     assert!(cap.try_clone().is_err());
 }
 
-/// Tests that the derived Convert impl using `convert = "try_self_only"` succeeds in converting
-/// to the `Self` type.
+/// Tests that the default try_into_capability impl succeeds in converting to the `Self` type.
 #[test]
 fn test_convert_to_self_only() {
     let cap = TestCloneable("hello".to_string());
@@ -94,8 +93,8 @@ fn test_convert_to_self_only() {
     assert_eq!(cap.0, "hello".to_string());
 }
 
-/// Tests that the derived Convert impl using `convert = "try_self_only"` returns an error
-/// when trying to convert to a non-`Self` type.
+/// Tests that the default try_into_capability impl returns an error when trying to convert to a
+/// non-`Self` type.
 #[test]
 fn test_convert_to_self_only_wrong_type() {
     let cap = TestCloneable("hello".to_string());

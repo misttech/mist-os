@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{receiver::Message, AnyCast, Capability, Remote},
+    crate::{receiver::Message, AnyCast, Capability},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -12,7 +12,6 @@ use {
 
 /// A capability that represents the sending end of a channel that transfers Zircon handles.
 #[derive(Capability, Debug)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Sender {
     inner: mpsc::UnboundedSender<Message>,
 }
@@ -38,7 +37,11 @@ impl Clone for Sender {
     }
 }
 
-impl Remote for Sender {
+impl Capability for Sender {
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (sender_client_end, sender_stream) =
             create_request_stream::<fsandbox::SenderMarker>().unwrap();

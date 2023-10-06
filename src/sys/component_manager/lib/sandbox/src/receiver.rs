@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, Remote, Sender},
+    crate::{AnyCast, Capability, Sender},
     derivative::Derivative,
     fidl::endpoints::{create_proxy, Proxy},
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
@@ -29,7 +29,6 @@ pub enum Message {
 // TODO(fxbug.dev/298112397): Does Receiver need to implement Clone? If not, we could remove the Arc around the Mutex
 #[derive(Capability, Clone, Derivative)]
 #[derivative(Debug)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Receiver {
     inner: Arc<Mutex<Peekable<mpsc::UnboundedReceiver<Message>>>>,
     sender: mpsc::UnboundedSender<Message>,
@@ -62,7 +61,11 @@ impl Receiver {
     }
 }
 
-impl Remote for Receiver {
+impl Capability for Receiver {
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (receiver_proxy, receiver_server) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
         let fut = async move {

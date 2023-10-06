@@ -4,7 +4,7 @@
 
 use fuchsia_zircon as zx;
 use futures::future::BoxFuture;
-use sandbox::{AnyCapability, AnyCast, Capability, Convert, Remote, TryClone};
+use sandbox::{AnyCapability, AnyCast, Capability};
 
 /// A capability that contains an Option of a capability.
 #[derive(Capability, Debug)]
@@ -30,25 +30,21 @@ impl Optional {
     }
 }
 
-impl Remote for Optional {
+impl Capability for Optional {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         match self.0 {
             None => (zx::Handle::invalid(), None),
             Some(cap) => cap.to_zx_handle(),
         }
     }
-}
 
-impl TryClone for Optional {
     fn try_clone(&self) -> Result<Self, ()> {
         match &self.0 {
             None => Ok(Optional(None)),
             Some(cap) => Ok(Optional(Some(cap.try_clone()?))),
         }
     }
-}
 
-impl Convert for Optional {
     fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());

@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Error};
 use futures::{lock::Mutex, FutureExt};
-use sandbox::{AnyCapability, Data, Dict, Lazy, Optional, TryClone};
+use sandbox::{AnyCapability, Capability, Data, Dict, Lazy, Optional};
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use thiserror::Error;

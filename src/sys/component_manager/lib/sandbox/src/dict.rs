@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCapability, AnyCast, Capability, Convert, Directory, Open, Remote, TryClone},
+    crate::{AnyCapability, AnyCast, Capability, Directory, Open},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -134,19 +134,6 @@ impl Dict {
     }
 }
 
-impl Remote for Dict {
-    fn to_zx_handle(mut self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        let (dict_client_end, dict_stream) =
-            create_request_stream::<fsandbox::DictMarker>().unwrap();
-
-        let fut = async move {
-            self.serve_dict(dict_stream).await.expect("failed to serve Dict");
-        };
-
-        (dict_client_end.into_handle(), Some(fut.boxed()))
-    }
-}
-
 impl TryInto<Open> for Dict {
     type Error = TryIntoOpenError;
 
@@ -200,7 +187,18 @@ pub enum TryIntoOpenError {
     ValueDoesNotSupportOpen,
 }
 
-impl TryClone for Dict {
+impl Capability for Dict {
+    fn to_zx_handle(mut self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+        let (dict_client_end, dict_stream) =
+            create_request_stream::<fsandbox::DictMarker>().unwrap();
+
+        let fut = async move {
+            self.serve_dict(dict_stream).await.expect("failed to serve Dict");
+        };
+
+        (dict_client_end.into_handle(), Some(fut.boxed()))
+    }
+
     fn try_clone(&self) -> Result<Self, ()> {
         let entries: BTreeMap<Key, AnyCapability> = self
             .entries
@@ -211,9 +209,7 @@ impl TryClone for Dict {
             .collect();
         Ok(Self { entries, not_found: self.not_found.clone() })
     }
-}
 
-impl Convert for Dict {
     fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());

@@ -1,12 +1,11 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{AnyCast, Capability, Remote};
+use crate::{AnyCast, Capability};
 use fuchsia_zircon as zx;
 use std::fmt::Debug;
 
 #[derive(Capability, Debug, Clone, Default)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Data<T: Debug + Clone + Send + Sync + 'static> {
     pub value: T,
 }
@@ -17,7 +16,11 @@ impl<T: Debug + Clone + Send + Sync + 'static> Data<T> {
     }
 }
 
-impl<T: Debug + Clone + Send + Sync + 'static> Remote for Data<T> {
+impl<T: Debug + Clone + Send + Sync + 'static> Capability for Data<T> {
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
     fn to_zx_handle(self) -> (zx::Handle, Option<futures::future::BoxFuture<'static, ()>>) {
         todo!("we may want to expose a FIDL or VMO to read and write data")
     }
@@ -26,7 +29,7 @@ impl<T: Debug + Clone + Send + Sync + 'static> Remote for Data<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AnyCapability, TryClone};
+    use crate::AnyCapability;
 
     #[test]
     fn try_from_any_into_self() {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, Remote},
+    crate::{AnyCast, Capability},
     core::fmt,
     fidl::endpoints::ClientEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -14,7 +14,6 @@ use {
 ///
 /// The directory may optionally be backed by a future that serves its contents.
 #[derive(Capability)]
-#[capability(try_clone = "err", convert = "to_self_only")]
 pub struct Directory {
     client_end: ClientEnd<fio::DirectoryMarker>,
 
@@ -51,7 +50,7 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Directory {
     }
 }
 
-impl Remote for Directory {
+impl Capability for Directory {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         (self.client_end.into(), self.future.into_inner().unwrap())
     }

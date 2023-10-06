@@ -8,7 +8,7 @@ use {
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
     lazy_static::lazy_static,
-    sandbox::{Dict, Message, Receiver, Sender, TryClone},
+    sandbox::{Capability, Dict, Message, Receiver, Sender},
     tracing::warn,
 };
 

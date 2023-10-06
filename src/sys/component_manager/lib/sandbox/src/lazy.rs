@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyCapability, Capability, Remote};
+use crate::{AnyCapability, Capability};
 use anyhow::Result;
 use fuchsia_zircon as zx;
 use futures::{future::BoxFuture, FutureExt};
@@ -14,7 +14,6 @@ use std::sync::Arc;
 /// multiple capabilities for a single Lazy. This means the Lazy is cloneable, and clones call
 /// the same function.
 #[derive(Capability, Clone)]
-#[capability(try_clone = "clone", convert = "to_self_only")]
 pub struct Lazy(Arc<dyn Fn() -> BoxFuture<'static, Result<AnyCapability>> + Send + Sync>);
 
 impl Lazy {
@@ -57,10 +56,13 @@ impl std::fmt::Debug for Lazy {
     }
 }
 
-impl Remote for Lazy {
+impl Capability for Lazy {
+    fn try_clone(&self) -> Result<Self, ()> {
+        Ok(self.clone())
+    }
+
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        // TODO(b/298112397): Implement Remote for Lazy
-        todo!("TODO(b/298112397): Implement Remote for Lazy")
+        todo!("TODO(fxbug.dev/298112397): Implement to_zx_handle for Lazy")
     }
 }
 
@@ -69,7 +71,6 @@ impl Remote for Lazy {
 /// The inner function that generates the capability can only be called once, consuming
 /// the LazyOnce.
 #[derive(Capability)]
-#[capability(try_clone = "err", convert = "to_self_only")]
 pub struct LazyOnce(Box<dyn FnOnce() -> BoxFuture<'static, Result<AnyCapability>> + Send + Sync>);
 
 impl LazyOnce {
@@ -92,10 +93,9 @@ impl std::fmt::Debug for LazyOnce {
     }
 }
 
-impl Remote for LazyOnce {
+impl Capability for LazyOnce {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        // TODO(b/298112397): Implement Remote for LazyOnce
-        todo!("TODO(b/298112397): Implement Remote for LazyOnce")
+        todo!("TODO(fxbug.dev/298112397): Implement to_zx_handle for LazyOnce")
     }
 }
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{Capability, Convert, Handle, Remote, TryClone},
+    crate::{Capability, Handle},
     crate_local::{BoxConvert, BoxRemote, TryCloneAny},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
@@ -43,7 +43,7 @@ pub(crate) mod crate_local {
         fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>);
     }
 
-    impl<T: Remote> BoxRemote for T {
+    impl<T: Capability> BoxRemote for T {
         #[inline]
         fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
             (*self).to_zx_handle()
@@ -55,7 +55,7 @@ pub(crate) mod crate_local {
         fn try_into_capability(self: Box<Self>, type_id: TypeId) -> Result<Box<dyn Any>, ()>;
     }
 
-    impl<T: Convert> BoxConvert for T {
+    impl<T: Capability> BoxConvert for T {
         #[inline]
         fn try_into_capability(self: Box<Self>, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
             (*self).try_into_capability(type_id)
@@ -68,7 +68,7 @@ pub(crate) mod crate_local {
         fn try_clone_any(&self) -> Result<AnyCapability, ()>;
     }
 
-    impl<T: Capability + TryClone + 'static> TryCloneAny for T {
+    impl<T: Capability + 'static> TryCloneAny for T {
         fn try_clone_any(&self) -> Result<AnyCapability, ()> {
             let clone = self.try_clone()?;
             let any: AnyCapability = Box::new(clone);
@@ -80,23 +80,18 @@ pub(crate) mod crate_local {
 /// Trait object that holds any kind of capability.
 pub type AnyCapability = Box<dyn ErasedCapability>;
 
-impl Capability for AnyCapability {}
-
-impl Remote for AnyCapability {
+impl Capability for AnyCapability {
     #[inline]
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         self.to_zx_handle()
     }
-}
 
-impl Convert for AnyCapability {
     #[inline]
     fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
         self.try_into_capability(type_id)
     }
-}
 
-impl TryClone for AnyCapability {
+    #[inline]
     fn try_clone(&self) -> Result<Self, ()> {
         Ok(self.as_ref().try_clone_any()?)
     }
@@ -132,23 +127,20 @@ impl<T: Any> AnyCast for T {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AnyCapability, Capability, Convert, Handle, Remote, TryClone};
+    use crate::{AnyCapability, Capability, Handle};
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::future::BoxFuture;
     use std::any::TypeId;
 
     /// A test-only capability that holds a Zicron handle.
     #[derive(Capability, Debug)]
-    #[capability(try_clone = "err")]
     struct TestHandle(zx::Handle);
 
-    impl Remote for TestHandle {
+    impl Capability for TestHandle {
         fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
             (self.0, None)
         }
-    }
 
-    impl Convert for TestHandle {
         fn try_into_capability(
             self,
             type_id: std::any::TypeId,
@@ -160,8 +152,8 @@ mod tests {
 
     /// Tests that [AnyCapability] can be converted to a zx handle.
     ///
-    /// This exercises that the [Remote] implementation delegates to the the underlying
-    /// Capability's [Remote] through [BoxRemote].
+    /// This exercises that the [Capability::to_zx_handle] implementation delegates to the
+    /// underlying Capability's [to_zx_handle] through [BoxRemote].
     #[test]
     fn test_any_remote() {
         let event = zx::Event::create();
@@ -169,7 +161,7 @@ mod tests {
 
         let cap = TestHandle(event.into());
         let any: AnyCapability = Box::new(cap);
-        let (handle, fut) = <AnyCapability as Remote>::to_zx_handle(any);
+        let (handle, fut) = <AnyCapability as Capability>::to_zx_handle(any);
 
         assert_eq!(handle.get_koid().unwrap(), expected_koid);
         assert!(fut.is_none());
@@ -177,8 +169,8 @@ mod tests {
 
     /// Tests that AnyCapability can be converted to another capability.
     ///
-    /// This exercises that the [Convert] implementation delegates to the the underlying
-    /// Capability's [Convert] through [BoxConvert].
+    /// This exercises that the [convert] implementation delegates to the the underlying
+    /// Capability's [convert] through [BoxConvert].
     #[test]
     fn test_any_convert() {
         let event = zx::Event::create();
@@ -187,7 +179,7 @@ mod tests {
         let cap = TestHandle(event.into());
         let any: AnyCapability = Box::new(cap);
 
-        let cap = <AnyCapability as Convert>::try_into_capability(any, TypeId::of::<Handle>())
+        let cap = <AnyCapability as Capability>::try_into_capability(any, TypeId::of::<Handle>())
             .expect("failed to convert")
             .downcast::<Handle>()
             .unwrap();
@@ -196,25 +188,28 @@ mod tests {
 
     /// A cloneable capability that holds a string.
     #[derive(Capability, Clone, Debug)]
-    #[capability(try_clone = "clone", convert = "to_self_only")]
     struct TestCloneable(pub String);
 
-    impl Remote for TestCloneable {
+    impl Capability for TestCloneable {
         fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
             unimplemented!()
+        }
+
+        fn try_clone(&self) -> Result<Self, ()> {
+            Ok(self.clone())
         }
     }
 
     /// Tests that an AnyCapability that holds a cloneable capability can be cloned.
     ///
-    /// This exercises that the [TryClone] implementation delegates to the the underlying
-    /// Capability's [TryClone] through [TryCloneAny].
+    /// This exercises that the [try_clone] implementation delegates to the the underlying
+    /// Capability's [try_clone] through [TryCloneAny].
     #[test]
     fn test_any_try_clone() {
         let cap = TestCloneable("hello".to_string());
         let any: AnyCapability = Box::new(cap);
 
-        let any_clone = <AnyCapability as TryClone>::try_clone(&any).expect("failed to clone");
+        let any_clone = <AnyCapability as Capability>::try_clone(&any).expect("failed to clone");
         let clone = any_clone.into_any().downcast::<TestCloneable>().unwrap();
 
         assert_eq!(clone.0, "hello".to_string());

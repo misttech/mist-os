@@ -9,7 +9,7 @@ use futures::{
     FutureExt, StreamExt,
 };
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
-use sandbox::{AnyCapability, Dict, Directory, Remote};
+use sandbox::{AnyCapability, Capability, Dict, Directory};
 use thiserror::Error;
 
 /// A builder object for assembling a program's incoming namespace.
