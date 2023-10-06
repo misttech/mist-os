@@ -138,7 +138,7 @@ const CONFIG_GLOB: &str = "/config/data/*.persist";
 
 fn try_insert_items(config: &mut Config, config_text: &str) -> Result<(), Error> {
     let items = serde_json5::from_str::<Vec<TaggedPersist>>(config_text)?;
-    for item in items.into_iter() {
+    for item in items {
         let TaggedPersist { tag, service_name, selectors, max_bytes, min_seconds_between_fetch } =
             item;
         let tag = Tag::new(tag)?;

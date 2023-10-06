@@ -19,11 +19,14 @@ rustc_library("lib") {
 
   deps = [
     ":persistence-component-config",
-    "//src/diagnostics/lib/inspect-fetcher",
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/diagnostics/lib/persistence:lib",
     "//src/diagnostics/persistence/fidl:persist_rust",
+    "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/reader/rust",
+    "//src/lib/diagnostics/selectors",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
@@ -35,23 +38,25 @@ rustc_library("lib") {
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
   ]
 
   sources = [
     "src/constants.rs",
+    "src/fetcher.rs",
     "src/file_handler.rs",
     "src/inspect_server.rs",
     "src/lib.rs",
     "src/persist_server.rs",
+    "src/scheduler.rs",
   ]
 
   test_deps = [
+    "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde_json5",
-    "//third_party/rust_crates:test-case",
   ]
 }
 

@@ -2,15 +2,89 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Error},
-    glob::glob,
-    std::fs,
-    tracing::{info, warn},
-};
+use anyhow::{format_err, Error};
+use glob::glob;
+use persistence_config::{ServiceName, Tag};
+use serde::{ser::SerializeMap, Serialize, Serializer};
+use serde_json::Value;
+use std::{collections::HashMap, fs};
+use tracing::{info, warn};
 
 const CURRENT_PATH: &str = "/cache/current";
 const PREVIOUS_PATH: &str = "/cache/previous";
+
+pub(crate) struct PersistSchema {
+    pub timestamps: Timestamps,
+    pub payload: PersistPayload,
+}
+
+pub(crate) enum PersistPayload {
+    Data(PersistData),
+    Error(String),
+}
+
+pub(crate) struct PersistData {
+    pub data_length: usize,
+    pub entries: HashMap<String, Value>,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct Timestamps {
+    pub before_monotonic: i64,
+    pub before_utc: i64,
+    pub after_monotonic: i64,
+    pub after_utc: i64,
+}
+
+// Keys for JSON per-tag metadata to be persisted and published
+const TIMESTAMPS_KEY: &str = "@timestamps";
+const SIZE_KEY: &str = "@persist_size";
+const ERROR_KEY: &str = ":error";
+const ERROR_DESCRIPTION_KEY: &str = "description";
+
+impl Serialize for PersistSchema {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match &self.payload {
+            PersistPayload::Data(data) => {
+                let mut s = serializer.serialize_map(Some(data.entries.len() + 2))?;
+                s.serialize_entry(TIMESTAMPS_KEY, &self.timestamps)?;
+                s.serialize_entry(SIZE_KEY, &data.data_length)?;
+                for (k, v) in data.entries.iter() {
+                    s.serialize_entry(k, v)?;
+                }
+                s.end()
+            }
+            PersistPayload::Error(error) => {
+                let mut s = serializer.serialize_map(Some(2))?;
+                s.serialize_entry(TIMESTAMPS_KEY, &self.timestamps)?;
+                s.serialize_entry(ERROR_KEY, &ErrorHelper(&error))?;
+                s.end()
+            }
+        }
+    }
+}
+
+impl PersistSchema {
+    pub(crate) fn error(timestamps: Timestamps, description: String) -> Self {
+        Self { timestamps, payload: PersistPayload::Error(description) }
+    }
+}
+
+struct ErrorHelper<'a>(&'a str);
+
+impl<'a> Serialize for ErrorHelper<'a> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_map(Some(1))?;
+        s.serialize_entry(ERROR_DESCRIPTION_KEY, self.0)?;
+        s.end()
+    }
+}
 
 // Throw away stuff from two boots ago. Move stuff in the "current"
 // directory to the "previous" directory.
@@ -25,12 +99,19 @@ pub fn shuffle_at_boot() {
 }
 
 // Write a VMO's contents to the appropriate file.
-pub fn write(service_name: &str, tag: &str, data: &str) {
-    // /cache/ may be deleted any time. It's OK to try to create CURRENT_PATH if it alreay exists.
+pub(crate) fn write(service_name: &ServiceName, tag: &Tag, data: &PersistSchema) {
+    // /cache/ may be deleted any time. It's OK to try to create CURRENT_PATH if it already exists.
     let path = format!("{}/{}", CURRENT_PATH, service_name);
     fs::create_dir_all(&path)
         .map_err(|e| warn!("Could not create directory {}: {:?}", path, e))
         .ok();
+    let data = match serde_json::to_string(data) {
+        Ok(data) => data,
+        Err(e) => {
+            warn!("Could not serialize data - unexpected error {e}");
+            return;
+        }
+    };
     fs::write(&format!("{}/{}", path, tag), data)
         .map_err(|e| warn!("Could not write file {}/{}: {:?}", path, tag, e))
         .ok();

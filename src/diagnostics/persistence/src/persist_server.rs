@@ -3,108 +3,79 @@
 // found in the LICENSE file.
 
 use {
-    crate::{constants, file_handler},
-    anyhow::Error,
+    crate::{constants, Scheduler},
     fidl_fuchsia_diagnostics_persist::{
         DataPersistenceRequest, DataPersistenceRequestStream, PersistResult,
     },
-    fuchsia_async as fasync,
+    fuchsia_async::TaskGroup,
     fuchsia_component::server::{ServiceFs, ServiceObj},
-    fuchsia_zircon as zx,
-    futures::{channel::mpsc, SinkExt, StreamExt},
-    inspect_fetcher::InspectFetcher,
+    futures::StreamExt,
     parking_lot::Mutex,
-    persistence_config::{ServiceName, Tag, TagConfig},
-    serde_json::{self, json, map::Entry, Map, Value},
-    std::{collections::HashMap, sync::Arc},
-    thiserror::Error,
+    persistence_config::{ServiceName, Tag},
+    std::{collections::HashSet, iter::Iterator, sync::Arc},
     tracing::*,
 };
 
-// The capability name for the Inspect reader
-const INSPECT_SERVICE_PATH: &str = "/svc/fuchsia.diagnostics.FeedbackArchiveAccessor";
-
-// Keys for JSON per-tag metadata to be persisted and published
-const TIMESTAMPS_KEY: &str = "@timestamps";
-const SIZE_KEY: &str = "@persist_size";
-const ERROR_KEY: &str = ":error";
-const ERROR_DESCRIPTION_KEY: &str = "description";
-
-pub struct PersistServer {
+pub struct PersistServerData {
     // Service name that this persist server is hosting.
     service_name: ServiceName,
     // Mapping from a string tag to an archive reader
     // configured to fetch a specific set of selectors.
-    fetchers: HashMap<Tag, Fetcher>,
+    tags: HashSet<Tag>,
+    // Scheduler that will handle the persist requests
+    scheduler: Scheduler,
 }
+
+#[derive(Clone)]
+pub(crate) struct PersistServer(Arc<Mutex<PersistServerData>>);
 
 impl PersistServer {
     pub fn create(
         service_name: ServiceName,
-        tags: HashMap<Tag, TagConfig>,
-    ) -> Result<PersistServer, Error> {
-        let mut persisters = HashMap::new();
-        for (tag, entry) in tags.into_iter() {
-            let inspect_fetcher = InspectFetcher::create(INSPECT_SERVICE_PATH, entry.selectors)?;
-            let backoff = zx::Duration::from_seconds(entry.min_seconds_between_fetch);
-            let fetcher = Fetcher::new(FetcherArgs {
-                source: inspect_fetcher,
-                backoff,
-                max_save_length: entry.max_bytes,
-                service_name: service_name.clone(),
-                tag: tag.clone(),
-            });
-            persisters.insert(tag, fetcher);
-        }
-        Ok(PersistServer { service_name, fetchers: persisters })
-    }
-
-    async fn handle_tag(tag: &str, fetchers: &mut HashMap<Tag, Fetcher>) -> PersistResult {
-        match fetchers.get_mut(tag) {
-            None => {
-                warn!("Tag '{}' was requested but is not configured", tag);
-                PersistResult::BadName
-            }
-            Some(fetcher) => match fetcher.queue_fetch().await {
-                Ok(_) => PersistResult::Queued,
-                Err(e) => {
-                    fetchers.remove(tag);
-                    warn!("Fetcher {} removed because queuing tasks is now failing: {:?}", tag, e);
-                    PersistResult::InternalError
-                }
-            },
-        }
+        tags: Vec<Tag>,
+        scheduler: Scheduler,
+    ) -> PersistServer {
+        let tags = HashSet::from_iter(tags);
+        PersistServer(Arc::new(Mutex::new(PersistServerData { service_name, tags, scheduler })))
     }
 
     // Serve the Persist FIDL protocol.
-    pub fn launch_server(self, fs: &mut ServiceFs<ServiceObj<'static, ()>>) -> Result<(), Error> {
-        let fetchers = self
-            .fetchers
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect::<HashMap<Tag, Fetcher>>();
-
+    pub fn launch_server(
+        self,
+        task_holder: Arc<Mutex<TaskGroup>>,
+        fs: &mut ServiceFs<ServiceObj<'static, ()>>,
+    ) {
         let unique_service_name =
-            format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, self.service_name);
+            format!("{}-{}", constants::PERSIST_SERVICE_NAME_PREFIX, self.0.lock().service_name);
 
+        let this = self.clone();
         fs.dir("svc").add_fidl_service_at(
             unique_service_name,
             move |mut stream: DataPersistenceRequestStream| {
-                let mut fetchers = fetchers.clone();
-                fasync::Task::spawn(async move {
+                let this = this.clone();
+                task_holder.lock().spawn(async move {
                     while let Some(Ok(request)) = stream.next().await {
+                        let this = this.0.lock();
                         match request {
                             DataPersistenceRequest::Persist { tag, responder, .. } => {
-                                let response = Self::handle_tag(&tag, &mut fetchers).await;
+                                let response = if let Ok(tag) = Tag::new(tag) {
+                                    if this.tags.contains(&tag) {
+                                        this.scheduler.schedule(&this.service_name, vec![tag]);
+                                        PersistResult::Queued
+                                    } else {
+                                        PersistResult::BadName
+                                    }
+                                } else {
+                                    PersistResult::BadName
+                                };
                                 responder.send(response).unwrap_or_else(|err| {
                                     warn!("Failed to respond {:?} to client: {}", response, err)
                                 });
                             }
                             DataPersistenceRequest::PersistTags { tags, responder, .. } => {
-                                let mut response = vec![];
-                                // TODO(fxbug.dev/130139): Change the logic to combine selectors.
-                                for tag in tags {
-                                    response.push(Self::handle_tag(&tag, &mut fetchers).await);
+                                let (response, tags) = this.validate_tags(&tags);
+                                if !tags.is_empty() {
+                                    this.scheduler.schedule(&this.service_name, tags);
                                 }
                                 responder.send(&response).unwrap_or_else(|err| {
                                     warn!("Failed to respond {:?} to client: {}", response, err)
@@ -112,438 +83,30 @@ impl PersistServer {
                             }
                         }
                     }
-                })
-                .detach();
+                });
             },
         );
-
-        Ok(())
     }
 }
 
-#[derive(Clone)]
-struct Fetcher {
-    state: Arc<Mutex<FetchState>>,
-    invoke_fetch: mpsc::Sender<()>,
-    backoff: zx::Duration,
-    service_name: String,
-    tag: String,
-}
-
-#[derive(serde::Serialize)]
-struct Timestamps {
-    before_monotonic: i64,
-    before_utc: i64,
-    after_monotonic: i64,
-    after_utc: i64,
-}
-
-fn value_type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Array(_) => "array",
-        Value::Null => "null",
-        Value::Bool(_) => "bool",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Object(_) => "object",
-    }
-}
-
-#[derive(Debug, Error)]
-enum FoldError {
-    #[error("Unable to merge existing {existing} entry with retrieved {retrieved} payload")]
-    MergeError { existing: &'static str, retrieved: &'static str },
-    #[error("Moniker {0:?} wasn't string")]
-    MonikerNotString(Value),
-}
-
-fn fold_entries(items: impl IntoIterator<Item = Value>) -> Result<Map<String, Value>, FoldError> {
-    items.into_iter().try_fold(Map::new(), |mut entries, mut item| {
-        let moniker = item["moniker"].take();
-        let payload = item["payload"].take();
-
-        // Use the "root" entry if there is one; otherwise treat the entire payload as
-        // the root.
-        let payload = match payload {
-            Value::Object(mut payload) => {
-                if let Some(root) = payload.remove("root") {
-                    root
+impl PersistServerData {
+    fn validate_tags(&self, tags: &[String]) -> (Vec<PersistResult>, Vec<Tag>) {
+        let mut response = vec![];
+        let mut good_tags = vec![];
+        for tag in tags.iter() {
+            if let Ok(tag) = Tag::new(tag.to_string()) {
+                if self.tags.contains(&tag) {
+                    response.push(PersistResult::Queued);
+                    good_tags.push(tag);
                 } else {
-                    payload.into()
+                    response.push(PersistResult::BadName);
+                    warn!("Tag '{}' was requested but is not configured", tag);
                 }
-            }
-            _ => payload,
-        };
-
-        match moniker {
-            Value::String(moniker) => match entries.entry(moniker) {
-                Entry::Occupied(mut o) => match (o.get_mut(), payload) {
-                    (Value::Object(root_map), Value::Object(payload)) => root_map.extend(payload),
-                    // Merging in Null is a no-op.
-                    (_, Value::Null) => (),
-                    // Replace Null values with new values.
-                    (map_value @ Value::Null, payload) => {
-                        *map_value = payload;
-                    }
-                    (obj, payload) => {
-                        return Err(FoldError::MergeError {
-                            existing: value_type_name(&obj),
-                            retrieved: value_type_name(&payload),
-                        });
-                    }
-                },
-                Entry::Vacant(v) => {
-                    let _ = v.insert(payload);
-                }
-            },
-            bad_moniker => return Err(FoldError::MonikerNotString(bad_moniker)),
-        };
-        Ok(entries)
-    })
-}
-
-fn string_to_save(inspect_data: &str, timestamps: &Timestamps, max_save_length: usize) -> String {
-    fn compose_error(timestamps: &Timestamps, description: String) -> Value {
-        json!({
-            TIMESTAMPS_KEY: timestamps,
-            ERROR_KEY: {
-                ERROR_DESCRIPTION_KEY: description
-            }
-        })
-    }
-
-    let json_inspect: Value = serde_json::from_str(&inspect_data).expect("parsing json failed.");
-    let json_timestamps = json!(timestamps);
-    let save_entries: Result<Map<String, Value>, Value> = match json_inspect {
-        Value::Array(items) => {
-            let entries = fold_entries(items);
-            entries.map_err(|e| compose_error(timestamps, format!("Fold error: {}", e)))
-        }
-        _ => {
-            error!("Inspect wasn't an array");
-            Err(compose_error(timestamps, "Internal error: Inspect wasn't an array".to_string()))
-        }
-    };
-    match save_entries {
-        Ok(entries) => {
-            let mut entries = Value::Object(entries);
-            let data_length = entries.to_string().len();
-            if data_length > max_save_length {
-                let error_description =
-                    format!("Data too big: {} > max length {}", data_length, max_save_length,);
-                compose_error(timestamps, error_description)
             } else {
-                // Unwrap is safe because entries was just created as a
-                // `Value::Object` above.
-                let entries_map = entries.as_object_mut().unwrap();
-                entries_map.insert(TIMESTAMPS_KEY.to_string(), json_timestamps);
-                entries_map.insert(SIZE_KEY.to_string(), data_length.into());
-                entries
+                response.push(PersistResult::BadName);
+                warn!("Tag '{}' was requested but is not a valid tag string", tag);
             }
         }
-        Err(e) => e,
-    }
-    .to_string()
-}
-
-struct FetcherArgs {
-    source: InspectFetcher,
-    backoff: zx::Duration,
-    max_save_length: usize,
-    service_name: ServiceName,
-    tag: Tag,
-}
-
-fn utc_now() -> i64 {
-    let now_utc = chrono::prelude::Utc::now(); // Consider using SystemTime::now()?
-    now_utc.timestamp() * 1_000_000_000 + now_utc.timestamp_subsec_nanos() as i64
-}
-
-impl Fetcher {
-    fn new(args: FetcherArgs) -> Self {
-        // To ensure we only do one fetch-and-write at a time, put it in a task
-        // triggered by a stream.
-        let FetcherArgs { tag, service_name, max_save_length, backoff, mut source } = args;
-        let (invoke_fetch, mut receiver) = mpsc::channel::<()>(0);
-        let tag_copy = tag.to_string();
-        let service_name_copy = service_name.to_string();
-        fasync::Task::spawn(async move {
-            loop {
-                if let Some(_) = receiver.next().await {
-                    let before_utc = utc_now();
-                    let before_monotonic = zx::Time::get_monotonic().into_nanos();
-                    source.fetch().await.ok().map(|data| {
-                        let after_utc = utc_now();
-                        let after_monotonic = zx::Time::get_monotonic().into_nanos();
-                        let timestamps =
-                            Timestamps { before_utc, before_monotonic, after_utc, after_monotonic };
-                        let save_string = string_to_save(&data, &timestamps, max_save_length);
-                        file_handler::write(&service_name_copy, &tag_copy, &save_string);
-                    });
-                } else {
-                    break;
-                }
-            }
-        })
-        .detach();
-
-        let fetcher = Fetcher {
-            invoke_fetch,
-            backoff,
-            service_name: service_name.to_string(),
-            tag: tag.to_string(),
-            state: Arc::new(Mutex::new(FetchState::LastFetched(zx::Time::INFINITE_PAST))),
-        };
-        fetcher
-    }
-
-    async fn queue_fetch(&mut self) -> Result<(), Error> {
-        let queue_task: Option<zx::Time> = {
-            let mut state = self.state.lock();
-            if let FetchState::LastFetched(x) = *state {
-                let last_fetched = x;
-                *state = FetchState::Pending;
-                Some(last_fetched)
-            } else {
-                None
-            }
-        };
-
-        match queue_task {
-            // If we're already scheduled to fetch, we don't have to do anything.
-            None => {
-                info!("Fetch requested for {} but is already queued till backoff.", self.tag);
-                Ok(())
-            }
-            Some(last_fetched) => {
-                let now = fuchsia_zircon::Time::get_monotonic();
-                let earliest_fetch_allowed_time = last_fetched + self.backoff;
-
-                if earliest_fetch_allowed_time < now {
-                    self.invoke_fetch.send(()).await?;
-                    *self.state.lock() = FetchState::LastFetched(now);
-                    Ok(())
-                } else {
-                    *self.state.lock() = FetchState::Pending;
-                    // Clone a bunch of self's attributes so we dont pull it into the async task.
-                    let state_for_async_task = self.state.clone();
-                    let mut invoker_for_async_task = self.invoke_fetch.clone();
-                    let service_name_for_async_task = self.service_name.clone();
-
-                    // Calculate only if we know earliest time allowed is greater than now to avoid overflows.
-                    let time_until_fetch_allowed = earliest_fetch_allowed_time - now;
-
-                    fasync::Task::spawn(async move {
-                        let mut periodic_timer =
-                            fasync::Interval::new(zx::Duration::from_nanos(time_until_fetch_allowed.into_nanos() as i64,));
-
-                        if let Some(()) = periodic_timer.next().await {
-                            if let Ok(_) = invoker_for_async_task.send(()).await {
-                                // use earliest_fetch_allowed_time instead of now() because we want to fetch
-                                // every N seconds without penalty for the time it took to get here.
-                                *state_for_async_task.lock() =
-                                    FetchState::LastFetched(earliest_fetch_allowed_time);
-                            } else {
-                                // TODO(cphoenix): We need to remove this dead fetcher from the persist service, but the existing
-                                // fire-forget architecture causes us to lose communication at this point.
-                                warn!("Encountered an error trying to send invoker a wakeup message for service: {}", service_name_for_async_task);
-                            }
-                        }
-                    }).detach();
-                    Ok(())
-                }
-            }
-        }
-    }
-}
-
-// FetchState stores the information needed to serve all requests with the proper backoff.
-//
-// When we receive a request to persist, we want to ensure that persist happens soon. But not too
-// soon, to avoid disk wear and performance costs. The state handling takes some thought.
-//
-// There are one of three outcomes when a request is received:
-// - If a fetch has not happened recently, do it now.
-// - If a fetch has happened recently, ensure a request is queued to happen soon:
-// - - If a request is already queued to happen soon, no additional action is needed.
-// - - If no request is pending, queue one.
-//
-// FetchState records whether a request is currently pending or not. Immediately after a request is
-// fulfilled, store the earliest time that the next request can be fulfilled.
-//
-// If a request arrives while state is Pending, do nothing (except log).
-//
-// If a request arrives before the backoff expires,
-// - Set state to Pending
-// - Spawn a task that will wait until the proper time, then serve the request and set state to
-//    LastFetched(now).
-//
-// If a request arrives after backoff expires, serve it immediately and set state to
-// LastFetched(now).
-enum FetchState {
-    Pending,
-    LastFetched(zx::Time),
-}
-
-// Todo(71350): Add unit tests for backoff-time logic.
-
-#[cfg(test)]
-mod tests {
-    use test_case::test_case;
-
-    use super::*;
-
-    const TIMESTAMPS: Timestamps =
-        Timestamps { after_monotonic: 200, after_utc: 111, before_monotonic: 100, before_utc: 110 };
-
-    const MAX_SAVE_LENGTH: usize = 1000;
-
-    #[test_case(false; "null second")]
-    #[test_case(true; "null first")]
-    fn string_to_save_ignores_null_payload(permute: bool) {
-        let mut inspect_data = [
-            json!({
-                "moniker": "core/fake-moniker",
-                "payload": {
-                    "root": {
-                        "some/inspect/path": 55,
-                    }
-                }
-            }),
-            json!(
-                {
-                    "moniker": "core/fake-moniker",
-                    "payload": {
-                        "root": null,
-                    }
-                }
-            ),
-        ];
-        if permute {
-            inspect_data.reverse();
-        }
-        let inspect_data = Value::Array(Vec::from(inspect_data));
-        let str = string_to_save(&inspect_data.to_string(), &TIMESTAMPS, MAX_SAVE_LENGTH);
-        assert_eq!(
-            serde_json::from_str::<'_, Value>(&str).unwrap(),
-            json!({
-                "@timestamps": {
-                    "after_monotonic": 200,
-                    "after_utc": 111,
-                    "before_monotonic": 100,
-                    "before_utc": 110,
-                },
-                "@persist_size": 46,
-                "core/fake-moniker": {"some/inspect/path": 55},
-            })
-        );
-    }
-
-    #[test]
-    fn string_to_save_fails_heterogenous_payload() {
-        let inspect_data = json!([
-            {
-                "moniker": "core/fake-moniker",
-                "payload": {
-                    "root": {
-                        "some/inspect/path": 55,
-                    }
-                }
-            },
-            {
-                "moniker": "core/fake-moniker",
-                "payload": {
-                    "root": 32,
-                }
-            }
-        ]);
-        let str = string_to_save(&inspect_data.to_string(), &TIMESTAMPS, MAX_SAVE_LENGTH);
-        let values = serde_json::from_str::<'_, Map<_, _>>(&str).unwrap();
-        let message = values[":error"]["description"].as_str().unwrap();
-        assert!(message.contains("Unable to merge"));
-    }
-
-    #[test]
-    fn string_to_save_merges_data() {
-        let inspect_data = json!([
-            {
-                "moniker": "core/fake-moniker",
-                "payload": {
-                    "root": {
-                        "some/inspect/path": 1,
-                        "a/duplicate/path": 2,
-                    }
-                }
-            },
-            {
-                "moniker": "core/fake-moniker",
-                "payload": {
-                    "root": {
-                        "a/duplicate/path": 3,
-                        "other/inspect/path": 4,
-                    }
-                }
-            }
-        ]);
-        let str = string_to_save(&inspect_data.to_string(), &TIMESTAMPS, MAX_SAVE_LENGTH);
-        assert_eq!(
-            serde_json::from_str::<'_, Value>(&str).unwrap(),
-            json!({
-                "@timestamps": {
-                    "after_monotonic": 200,
-                    "after_utc": 111,
-                    "before_monotonic": 100,
-                    "before_utc": 110,
-                },
-                "@persist_size": 89,
-                "core/fake-moniker": {
-                    "some/inspect/path": 1,
-                    "a/duplicate/path": 3,
-                    "other/inspect/path": 4
-                },
-            })
-        );
-    }
-
-    #[test]
-    fn string_to_save_non_root_paths() {
-        let inspect_data = json!([
-        {
-            "moniker": "core/fake-moniker",
-            "payload": {
-                "some/non-root/inspect/path": 55,
-            }
-        }, {
-            "moniker": "core/fake-moniker",
-            "payload": {
-                "other/non-root/inspect/path": 66,
-            }
-        }, {
-            "moniker": "core/fake-moniker",
-            "payload": {
-                "root": {
-                    "some/inspect/path": 34,
-                }
-            }
-        }]);
-
-        let str = string_to_save(&inspect_data.to_string(), &TIMESTAMPS, MAX_SAVE_LENGTH);
-        assert_eq!(
-            serde_json::from_str::<'_, Value>(&str).unwrap(),
-            json!({
-                "@timestamps": {
-                    "after_monotonic": 200,
-                    "after_utc": 111,
-                    "before_monotonic": 100,
-                    "before_utc": 110,
-                },
-                "@persist_size": 111,
-                "core/fake-moniker": {
-                    "some/non-root/inspect/path": 55,
-                    "other/non-root/inspect/path": 66,
-                    "some/inspect/path": 34
-                },
-            })
-        );
+        (response, good_tags)
     }
 }

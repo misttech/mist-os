@@ -134,7 +134,7 @@ size_checker_input = {
         "sampler",
         "triage-detect",
       ]
-      limit = 2608116  # 2.487 MiB
+      limit = 2708116  # 2.583 MiB
       creep_limit = 49152  # 48.0 KiB
     },
     {
@@ -258,7 +258,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       pkgs = []
-      limit = 5096354741
+      limit = 5096254741
       creep_limit = 0
     },
   ]

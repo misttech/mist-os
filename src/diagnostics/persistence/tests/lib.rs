@@ -71,7 +71,7 @@ struct TestRealm {
     inspect: SamplerTestControllerProxy,
 }
 
-/// Runs Persistene and a test component that can have its inspect properties
+/// Runs Persistence and a test component that can have its inspect properties
 /// manipulated by the test via fidl.
 #[fuchsia::test]
 async fn diagnostics_persistence_integration() {
@@ -309,7 +309,7 @@ impl TestRealm {
     }
 
     /// Ask for a tag's associated data to be persisted.
-    async fn request_persist_tags(&self, tags: &Vec<&str>) -> Vec<PersistResult> {
+    async fn request_persist_tags(&self, tags: &[&str]) -> Vec<PersistResult> {
         self.persistence
             .persist_tags(&tags.iter().map(|t| t.to_string()).collect::<Vec<String>>())
             .await
