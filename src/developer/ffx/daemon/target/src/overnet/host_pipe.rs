@@ -405,26 +405,29 @@ impl HostPipeChild {
                 // At this point, we just want to look at one line to see if it is the compatibility
                 // failure.
                 tracing::debug!("Reading stderr:  {}", l);
-                if l.contains("Unrecognized argument: --abi-revision") {
+                let err = if l.contains("Unrecognized argument: --abi-revision") {
                     // It is an older image, so use the legacy command.
                     tracing::info!("Target does not support abi compatibility check, reverting to legacy connection");
-                    ssh.kill()?;
-                    while let Ok(line) = read_ssh_line(&mut lb, &mut stderr).await {
-                        tracing::error!("SSH stderr: {line}");
-                    }
+                    PipeError::NoCompatibilityCheck
+                } else {
+                    PipeError::ConnectionFailed(format!("{:?}", l))
+                };
 
-                    if let Some(status) = ssh.try_wait()? {
-                        tracing::error!("Target pipe exited with {status}");
-                    } else {
-                        tracing::error!(
-                            "ssh child has not ended, trying one more time then ignoring it."
-                        );
-                        fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
-                        tracing::error!("ssh child status is {:?}", ssh.try_wait());
-                    }
-                    return Err(PipeError::NoCompatibilityCheck);
+                ssh.kill()?;
+                while let Ok(line) = read_ssh_line(&mut lb, &mut stderr).await {
+                    tracing::error!("SSH stderr: {line}");
                 }
-                break;
+
+                if let Some(status) = ssh.try_wait()? {
+                    tracing::error!("Target pipe exited with {status}");
+                } else {
+                    tracing::error!(
+                        "ssh child has not ended, trying one more time then ignoring it."
+                    );
+                    fuchsia_async::Timer::new(std::time::Duration::from_secs(2)).await;
+                    tracing::error!("ssh child status is {:?}", ssh.try_wait());
+                }
+                return Err(err);
             }
         }
 
