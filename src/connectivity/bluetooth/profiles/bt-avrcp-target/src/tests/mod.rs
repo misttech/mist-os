@@ -208,7 +208,7 @@ async fn handle_accept_control_requests(mut stream: SessionControlRequestStream)
 }
 
 async fn handle_reject_control_requests(mut stream: SessionControlRequestStream) {
-    while let Some(_) = stream.try_next().await.expect("Failed to serve session control") {
+    if let Some(_) = stream.try_next().await.expect("Failed to serve session control") {
         panic!("Received unexpected SessionControl request.");
     }
 }
