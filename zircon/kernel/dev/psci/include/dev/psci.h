@@ -75,7 +75,7 @@ zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry);
 int64_t psci_get_affinity_info(uint64_t mpid);
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid);
 
-void psci_system_off();
-void psci_system_reset(power_reboot_flags flags);
+zx_status_t psci_system_off();
+zx_status_t psci_system_reset(power_reboot_flags flags);
 
 #endif  // ZIRCON_KERNEL_DEV_PSCI_INCLUDE_DEV_PSCI_H_

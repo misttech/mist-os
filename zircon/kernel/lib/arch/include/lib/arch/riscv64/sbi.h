@@ -28,6 +28,7 @@ enum class RiscvSbiError : intptr_t {
   kAlreadyAvailable = -6,
   kAlreadyStarted = -7,
   kAlreadyStopped = -8,
+  kNoShmem = -9,
 };
 
 struct RiscvSbiRet {

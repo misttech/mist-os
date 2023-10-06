@@ -32,7 +32,7 @@ static constexpr uint32_t kDwDdtTorrInitValue = 0;
 // used to kick the watchdog
 static constexpr uint32_t kDwWdtCrrRestartValue = 0x76;
 
-static void as370_reboot(power_reboot_flags flags) {
+static zx_status_t as370_reboot(power_reboot_flags flags) {
   auto kWdWdt0Cr_virt = periph_paddr_to_vaddr(kDwWdt0Cr);
   auto kWdWdt0Torr_virt = periph_paddr_to_vaddr(kDwWdt0Torr);
   auto kWdWdt0Crr_virt = periph_paddr_to_vaddr(kDwWdt0Crr);
@@ -50,11 +50,12 @@ static void as370_reboot(power_reboot_flags flags) {
   }
 
   LTRACEF("failed to reset\n");
+  return ZX_ERR_BAD_STATE;
 }
 
-static void as370_shutdown() {
+static zx_status_t as370_shutdown() {
   // TODO(fxbug.dev/34477): Make this work.
-  psci_system_off();
+  return psci_system_off();
 }
 
 static const struct pdev_power_ops as370_power_ops = {

@@ -45,7 +45,7 @@ inline uint64_t modify_register_via_smc(uintptr_t phys_addr, uint32_t mask, uint
   return res.x0;
 }
 
-void motmot_reboot(power_reboot_flags flags) {
+zx_status_t motmot_reboot(power_reboot_flags flags) {
   uint64_t result;
 
   switch (flags) {
@@ -59,18 +59,19 @@ void motmot_reboot(power_reboot_flags flags) {
       result = modify_register_via_smc(SYSTEM_CONFIGURATION_REG, SWRESET_SYSTEM, SWRESET_SYSTEM);
       modify_register_via_smc(SYSTEM_CONFIGURATION_REG, SWRESET_SYSTEM, SWRESET_SYSTEM);
       dprintf(INFO, "Reboot command failed, result was %" PRIx64 ".\n", result);
-      break;
+      return ZX_ERR_BAD_STATE;
 
     default:
       dprintf(INFO, "Bad reboot flag 0x%08x\n", static_cast<uint32_t>(flags));
-      break;
+      return ZX_ERR_INVALID_ARGS;
   }
 }
 
-void motmot_shutdown() {
+zx_status_t motmot_shutdown() {
   dprintf(INFO, "Sending shutdown command via SMC\n");
   const uint64_t result = modify_register_via_smc(PAD_CTRL_PWR_HOLD_REG, PS_HOLD_CTRL_DATA, 0);
   dprintf(INFO, "Shutdown command failed, result was %" PRIx64 ".\n", result);
+  return ZX_ERR_BAD_STATE;
 }
 
 zx_status_t motmot_cpu_off() {

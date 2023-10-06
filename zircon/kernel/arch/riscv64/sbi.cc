@@ -64,10 +64,33 @@ bool sbi_extension_present(sbi_extension ext) {
 
 }  // anonymous namespace
 
+zx_status_t riscv_status_to_zx_status(arch::RiscvSbiError error) {
+  switch (error) {
+    case arch::RiscvSbiError::kSuccess:
+      return ZX_OK;
+    case arch::RiscvSbiError::kFailed:
+      return ZX_ERR_INTERNAL;
+    case arch::RiscvSbiError::kNotSupported:
+      return ZX_ERR_NOT_SUPPORTED;
+    case arch::RiscvSbiError::kInvalidParam:
+    case arch::RiscvSbiError::kInvalidAddress:
+      return ZX_ERR_INVALID_ARGS;
+    case arch::RiscvSbiError::kDenied:
+      return ZX_ERR_ACCESS_DENIED;
+    case arch::RiscvSbiError::kNoShmem:
+      return ZX_ERR_NO_RESOURCES;
+    case arch::RiscvSbiError::kAlreadyAvailable:
+    case arch::RiscvSbiError::kAlreadyStarted:
+    case arch::RiscvSbiError::kAlreadyStopped:
+    default:
+      return ZX_ERR_BAD_STATE;
+  }
+}
+
 zx::result<power_cpu_state> sbi_get_cpu_state(uint64_t hart_id) {
   arch::RiscvSbiRet ret = arch::RiscvSbi::HartGetStatus(static_cast<arch::HartId>(hart_id));
-  if (ret.error == arch::RiscvSbiError::kInvalidParam) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
+  if (ret.error != arch::RiscvSbiError::kSuccess) {
+    return zx::error(riscv_status_to_zx_status(ret.error));
   }
   switch (static_cast<arch::RiscvSbiHartState>(ret.value)) {
     case arch::RiscvSbiHartState::kStarted:
@@ -117,8 +140,8 @@ void riscv64_sbi_early_init() {
 
   // Register with the pdev power driver.
   static const pdev_power_ops sbi_ops = {
-      .reboot = [](power_reboot_flags flags) { sbi_reset(); },
-      .shutdown = []() { sbi_shutdown(); },
+      .reboot = [](power_reboot_flags flags) -> zx_status_t { return sbi_reset(); },
+      .shutdown = sbi_shutdown,
       // Null the cpu on/off with default hooks and use sbi directly for now.
       // Their api isn't expressive enough for the sbi arguments.
       .cpu_off = []() -> zx_status_t { PANIC_UNIMPLEMENTED; },
@@ -189,17 +212,14 @@ arch::RiscvSbiRet sbi_remote_sfence_vma_asid(cpu_mask_t cpu_mask, uintptr_t star
   return arch::RiscvSbi::RemoteSfenceVmaAsid(hart_mask, hart_mask_base, start, size, asid);
 }
 
-void sbi_shutdown() {
-  arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kShutdown, arch::RiscvSbiResetReason::kNone);
-
-  // If we get here the shutdown call must have failed
-  panic("SBI: failed to shutdown\n");
+zx_status_t sbi_shutdown() {
+  arch::RiscvSbiRet ret = arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kShutdown,
+                                                      arch::RiscvSbiResetReason::kNone);
+  return riscv_status_to_zx_status(ret.error);
 }
 
-void sbi_reset() {
-  arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kWarmReboot,
-                              arch::RiscvSbiResetReason::kNone);
-
-  // If we get here the reset call must have failed
-  panic("SBI: failed to reset\n");
+zx_status_t sbi_reset() {
+  arch::RiscvSbiRet ret = arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kWarmReboot,
+                                                      arch::RiscvSbiResetReason::kNone);
+  return riscv_status_to_zx_status(ret.error);
 }

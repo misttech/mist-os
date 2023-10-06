@@ -10,8 +10,8 @@
 #include <pdev/power.h>
 
 static const struct pdev_power_ops default_ops = {
-    .reboot = [](power_reboot_flags flags) {},
-    .shutdown = []() {},
+    .reboot = [](power_reboot_flags flags) -> zx_status_t { return ZX_OK; },
+    .shutdown = []() -> zx_status_t { return ZX_OK; },
     .cpu_off = []() -> zx_status_t { return ZX_OK; },
     .cpu_on = [](uint64_t mpid, paddr_t entry) -> zx_status_t { return ZX_OK; },
     .get_cpu_state = [](uint64_t hw_cpu_id) -> zx::result<power_cpu_state> {

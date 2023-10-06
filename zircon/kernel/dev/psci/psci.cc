@@ -68,8 +68,9 @@ typedef uint64_t (*psci_call_proc)(uint32_t function, uint64_t arg0, uint64_t ar
 
 static psci_call_proc do_psci_call = psci_smc_call;
 
-void psci_system_off() {
-  do_psci_call(PSCI64_SYSTEM_OFF, shutdown_args[0], shutdown_args[1], shutdown_args[2]);
+zx_status_t psci_system_off() {
+  return psci_status_to_zx_status(
+      do_psci_call(PSCI64_SYSTEM_OFF, shutdown_args[0], shutdown_args[1], shutdown_args[2]));
 }
 
 uint32_t psci_get_version() { return (uint32_t)do_psci_call(PSCI64_PSCI_VERSION, 0, 0, 0); }
@@ -106,7 +107,7 @@ uint32_t psci_get_feature(uint32_t psci_call) {
   return (uint32_t)do_psci_call(PSCI64_PSCI_FEATURES, psci_call, 0, 0);
 }
 
-void psci_system_reset(power_reboot_flags flags) {
+zx_status_t psci_system_reset(power_reboot_flags flags) {
   uint64_t* args = reboot_args;
 
   if (flags == power_reboot_flags::REBOOT_BOOTLOADER) {
@@ -117,7 +118,7 @@ void psci_system_reset(power_reboot_flags flags) {
 
   dprintf(INFO, "PSCI reboot: %#" PRIx32 " %#" PRIx64 " %#" PRIx64 " %#" PRIx64 "\n", reset_command,
           args[0], args[1], args[2]);
-  do_psci_call(reset_command, args[0], args[1], args[2]);
+  return psci_status_to_zx_status(do_psci_call(reset_command, args[0], args[1], args[2]));
 }
 
 void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
