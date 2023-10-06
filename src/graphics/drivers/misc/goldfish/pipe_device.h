@@ -76,7 +76,7 @@ class PipeDevice : public DeviceType {
     zx::event pipe_event;
   };
 
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
   acpi::Client acpi_fidl_;
   zx::interrupt irq_;
   zx::bti bti_;

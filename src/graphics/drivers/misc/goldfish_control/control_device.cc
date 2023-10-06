@@ -110,33 +110,14 @@ zx_status_t Control::Init() {
   }
   sync_ = fidl::WireSyncClient(std::move(sync_client.value()));
 
-  zx::result hardware_sysmem_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
-  if (hardware_sysmem_result.is_error()) {
-    zxlogf(ERROR, "%s: failed to connect to FIDL sysmem fragment: %s", kTag,
-           hardware_sysmem_result.status_string());
-    return hardware_sysmem_result.status_value();
+  zx::result sysmem_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+  if (sysmem_result.is_error()) {
+    zxlogf(ERROR, "%s: failed to connect to FIDL fuchsia.sysmem2.Allocator fragment: %s", kTag,
+           sysmem_result.status_string());
+    return sysmem_result.status_value();
   }
-  auto hardware_sysmem = fidl::SyncClient(std::move(hardware_sysmem_result.value()));
-
-  // TODO(fxbug.dev/104188): Connect directly to fuchsia.sysmem2.Allocator in the first place when
-  // possible instead of bouncing through ConnectServerV2.
-  auto endpoints_result = fidl::CreateEndpoints<fuchsia_sysmem2::Allocator>();
-  if (!endpoints_result.is_ok()) {
-    zxlogf(ERROR, "%s: CreateEndpoints failed: %d", kTag, endpoints_result.error_value());
-    return endpoints_result.error_value();
-  }
-  sysmem_.Bind(std::move(endpoints_result->client));
-  ZX_ASSERT(sysmem_.is_valid());
-  fuchsia_hardware_sysmem::SysmemConnectServerV2Request connect_request;
-  connect_request.allocator_request() = std::move(endpoints_result->server);
-  auto connect_result = hardware_sysmem->ConnectServerV2(std::move(connect_request));
-  if (!connect_result.is_ok()) {
-    zxlogf(ERROR, "%s: failed to connect to FIDL sysmem2.Allocator: %s", kTag,
-           connect_result.error_value().status_string());
-    return connect_result.error_value().status();
-  }
-  ZX_ASSERT(sysmem_.is_valid());
+  sysmem_ = fidl::SyncClient(std::move(sysmem_result.value()));
 
   return ZX_OK;
 }

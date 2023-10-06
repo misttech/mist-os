@@ -119,14 +119,6 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
  public:
   FakeSysmem() = default;
 
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {
-    zx_info_handle_basic_t info;
-    request->allocator_request.handle()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info),
-                                                  nullptr, nullptr);
-    request_koid_ = info.koid;
-  }
-
   void RegisterHeap(RegisterHeapRequestView request,
                     RegisterHeapCompleter::Sync& completer) override {
     if (heap_request_koids_.find(request->heap) != heap_request_koids_.end()) {
@@ -149,7 +141,6 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 
-  zx_koid_t request_koid_ = ZX_KOID_INVALID;
   std::map<uint64_t, zx_koid_t> heap_request_koids_;
 };
 
@@ -426,12 +417,7 @@ TEST_F(PipeDeviceTest, DISABLED_ConnectToSysmem) {
   dut_child_.release();
 
   zx::channel sysmem_server, sysmem_client;
-  zx_koid_t server_koid = ZX_KOID_INVALID;
   ASSERT_OK(zx::channel::create(0u, &sysmem_server, &sysmem_client));
-
-  zx_info_handle_basic_t info;
-  ASSERT_OK(sysmem_server.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
-  server_koid = info.koid;
 
   zx::bti bti;
   client_->ConnectSysmem(std::move(sysmem_server)).Then([&](auto& result) {
@@ -439,10 +425,6 @@ TEST_F(PipeDeviceTest, DISABLED_ConnectToSysmem) {
   });
   test_loop_.RunUntilIdle();
 
-  ns_.SyncCall([server_koid](IncomingNamespace* ns) {
-    ASSERT_NE(ns->fake_sysmem.request_koid_, ZX_KOID_INVALID);
-    ASSERT_EQ(ns->fake_sysmem.request_koid_, server_koid);
-  });
   ASSERT_NO_FATAL_FAILURE();
 
   for (const auto& heap : kSysmemHeaps) {

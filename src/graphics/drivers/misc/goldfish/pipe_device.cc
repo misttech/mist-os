@@ -316,17 +316,22 @@ zx_status_t PipeDevice::GetBti(zx::bti* out_bti) {
 
 zx_status_t PipeDevice::ConnectSysmem(zx::channel connection) {
   TRACE_DURATION("gfx", "PipeDevice::ConnectSysmem");
-
-  auto result =
-      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
-  return result.status();
+  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
+  // we only have the server_end here.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  auto status = device_connect_fragment_fidl_protocol(parent_, "sysmem", ServiceMember::ServiceName,
+                                                      ServiceMember::Name, connection.release());
+  if (status != ZX_OK) {
+    return status;
+  }
+  return ZX_OK;
 }
 
 zx_status_t PipeDevice::RegisterSysmemHeap(uint64_t heap, zx::channel connection) {
   TRACE_DURATION("gfx", "PipeDevice::RegisterSysmemHeap");
 
-  auto result =
-      sysmem_->RegisterHeap(heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>(std::move(connection)));
+  auto result = hardware_sysmem_->RegisterHeap(
+      heap, fidl::ClientEnd<fuchsia_sysmem2::Heap>(std::move(connection)));
   return result.status();
 }
 
@@ -365,12 +370,12 @@ int PipeDevice::IrqHandler() {
 }
 
 zx_status_t PipeDevice::ConnectToSysmem() {
-  zx::result client =
+  zx::result hardware_sysmem_result =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
-  if (client.is_error()) {
-    return client.status_value();
+  if (hardware_sysmem_result.is_error()) {
+    return hardware_sysmem_result.status_value();
   }
-  sysmem_ = fidl::WireSyncClient(std::move(*client));
+  hardware_sysmem_ = fidl::WireSyncClient(std::move(*hardware_sysmem_result));
   return ZX_OK;
 }
 

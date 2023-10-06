@@ -329,18 +329,6 @@ class FakeSysmemAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem2::
 
 class FakeHardwareSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  FakeHardwareSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  void ConnectServerV2(::fuchsia_hardware_sysmem::wire::SysmemConnectServerV2Request* request,
-                       ConnectServerV2Completer::Sync& completer) override {
-    // We know "this" will last long enough because ~sysmem_ is after ~sysmem_loop_, so no
-    // FakeSysmemAllocator code will be running by the time ~sysmem_, even though
-    // FakeSysmemAllocator is channel-owned.
-    fidl::BindServer(dispatcher_, std::move(request->allocator_request),
-                     std::make_unique<FakeSysmemAllocator>(*this));
-    // ~completer; one-way; no reply needed
-  }
-
   void AddFakeVmoInfo(const zx::vmo& vmo, BufferKey buffer_key) {
     zx_koid_t koid = fsl::GetKoid(vmo.get());
     ZX_ASSERT(koid != ZX_KOID_INVALID);
@@ -363,7 +351,6 @@ class FakeHardwareSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_s
   }
 
  private:
-  async_dispatcher_t* dispatcher_ = nullptr;
   using VmoInfoMap = std::unordered_map<zx_koid_t, BufferKey>;
   VmoInfoMap vmo_infos_;
 };
@@ -390,7 +377,7 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
         address_space_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
         sync_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
         sysmem_server_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        sysmem_(sysmem_server_loop_.dispatcher()),
+        sysmem_(hardware_sysmem_),
         outgoing_(dispatcher()) {}
 
   void SetUp() override {
@@ -437,9 +424,10 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
 
     service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
         fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem = sysmem_.bind_handler(sysmem_server_loop_.dispatcher()),
-            // specifically not filling out allocator_v1 or allocator since that's not what the
-            // driver uses (currently).
+            .sysmem = hardware_sysmem_.bind_handler(sysmem_server_loop_.dispatcher()),
+            // specifically not filling out allocator_v1 since that's not what the driver uses
+            // (currently).
+            .allocator_v2 = sysmem_.bind_handler(sysmem_server_loop_.dispatcher()),
         }));
     ASSERT_EQ(service_result.status_value(), ZX_OK);
 
@@ -498,7 +486,8 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
   FakeAddressSpace address_space_;
   FakeAddressSpaceChild address_space_child_;
   FakeSync sync_;
-  FakeHardwareSysmem sysmem_;
+  FakeHardwareSysmem hardware_sysmem_;
+  FakeSysmemAllocator sysmem_;
 
   std::shared_ptr<MockDevice> fake_parent_;
 
@@ -542,7 +531,7 @@ TEST_P(BufferTest, TestCreate2) {
 
   zx::vmo buffer_vmo;
   ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
-  sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+  hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
 
   dut_->RegisterBufferHandle(buffer_key);
   fidl::Arena allocator;
@@ -620,7 +609,7 @@ TEST_F(ControlDeviceTest, CreateBuffer2_AlreadyExists) {
   zx::vmo copy_vmo;
   ASSERT_OK(buffer_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &copy_vmo));
 
-  sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+  hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
   dut_->RegisterBufferHandle(buffer_key);
 
   fidl::Arena allocator;
@@ -651,7 +640,7 @@ TEST_F(ControlDeviceTest, CreateBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -672,7 +661,7 @@ TEST_F(ControlDeviceTest, CreateBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -739,7 +728,7 @@ TEST_P(ColorBufferTest, TestCreate) {
   zx::vmo buffer_vmo;
   ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-  sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+  hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
   dut_->RegisterBufferHandle(buffer_key);
 
   fidl::Arena allocator;
@@ -864,7 +853,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_AlreadyExists) {
 
   // The object koid is the same for both VMO handles, so GetVmoInfo() will return buffer_key for
   // both VMO handles.
-  sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+  hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
   dut_->RegisterBufferHandle(buffer_key);
 
   {
@@ -906,7 +895,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -928,7 +917,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -950,7 +939,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -972,7 +961,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -994,7 +983,7 @@ TEST_F(ControlDeviceTest, CreateColorBuffer2_InvalidArgs) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -1067,7 +1056,7 @@ TEST_F(ControlDeviceTest, GetBufferHandle_Success) {
     zx::vmo copy_vmo;
     ASSERT_OK(buffer_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &copy_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -1097,7 +1086,7 @@ TEST_F(ControlDeviceTest, GetBufferHandle_Success) {
     zx::vmo copy_vmo;
     ASSERT_OK(color_buffer_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &copy_vmo));
 
-    sysmem_.AddFakeVmoInfo(color_buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(color_buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     fidl::Arena allocator;
@@ -1160,7 +1149,7 @@ TEST_F(ControlDeviceTest, GetBufferHandle_Invalid) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     auto get_buffer_handle_result = fidl_client_->GetBufferHandle(std::move(buffer_vmo));
@@ -1196,7 +1185,7 @@ TEST_F(ControlDeviceTest, GetBufferHandleInfo_Invalid) {
     zx::vmo buffer_vmo;
     ASSERT_OK(zx::vmo::create(kSize, 0u, &buffer_vmo));
 
-    sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
+    hardware_sysmem_.AddFakeVmoInfo(buffer_vmo, buffer_key);
     dut_->RegisterBufferHandle(buffer_key);
 
     auto get_buffer_handle_info_result = fidl_client_->GetBufferHandleInfo(std::move(buffer_vmo));
