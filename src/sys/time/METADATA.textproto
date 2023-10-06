@@ -4,13 +4,12 @@
 
 last_reviewed_date: {
   year: 2023
-  month: 4
-  day: 17
+  month: 10
+  day: 6
 }
 
 trackers: {
-  monorail: {
-    project: "fuchsia"
-    component: "Time"
+  issue_tracker: {
+    component_id: 1408151
   }
 }
