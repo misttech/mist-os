@@ -32,6 +32,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fio = fuchsia_io;
+namespace fkernel = fuchsia_kernel;
 namespace fldsvc = fuchsia_ldsvc;
 namespace fdm = fuchsia_device_manager;
 
@@ -73,6 +74,18 @@ zx::result<zx::vmo> LoadVmo(fdf::Namespace& ns, const char* path,
 
 zx::result<zx::resource> GetRootResource(fdf::Namespace& ns) {
   zx::result resource = ns.Connect<fboot::RootResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result.value().resource));
+}
+
+zx::result<zx::resource> GetMmioResource(fdf::Namespace& ns) {
+  zx::result resource = ns.Connect<fkernel::MmioResource>();
   if (resource.is_error()) {
     return resource.take_error();
   }
@@ -313,6 +326,18 @@ zx_handle_t Driver::GetRootResource() {
     }
   }
   return root_resource_.get();
+}
+
+zx_handle_t Driver::GetMmioResource() {
+  if (!mmio_resource_.is_valid()) {
+    zx::result resource = ::GetMmioResource(*incoming());
+    if (resource.is_ok()) {
+      mmio_resource_ = std::move(resource.value());
+    } else {
+      FDF_LOGL(WARNING, *logger_, "Failed to get mmio_resource '%s'", resource.status_string());
+    }
+  }
+  return mmio_resource_.get();
 }
 
 bool Driver::IsRunningOnDispatcher() const {

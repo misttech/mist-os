@@ -10,6 +10,7 @@
 #include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire_test_base.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
+#include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <fidl/fuchsia.logger/cpp/wire_test_base.h>
 #include <fidl/fuchsia.scheduler/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -42,6 +43,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fio = fuchsia_io;
+namespace fkernel = fuchsia_kernel;
 namespace flogger = fuchsia_logger;
 namespace frunner = fuchsia_component_runner;
 
@@ -88,6 +90,33 @@ class TestRootResource : public fidl::testing::WireTestBase<fboot::RootResource>
   fidl::ServerBindingGroup<fboot::RootResource> bindings_;
 
   // An event is similar enough that we can pretend it's the root resource, in that we can
+  // send it over a FIDL channel.
+  zx::event fake_resource_;
+};
+
+class TestMmioResource : public fidl::testing::WireTestBase<fkernel::MmioResource> {
+ public:
+  TestMmioResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
+
+  fidl::ProtocolHandler<fkernel::MmioResource> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
+  void Get(GetCompleter::Sync& completer) override {
+    zx::event duplicate;
+    ASSERT_EQ(ZX_OK, fake_resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate));
+    completer.Reply(zx::resource(duplicate.release()));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: MmioResource::%s\n", name.data());
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::ServerBindingGroup<fkernel::MmioResource> bindings_;
+
+  // An event is similar enough that we can pretend it's the mmio resource, in that we can
   // send it over a FIDL channel.
   zx::event fake_resource_;
 };
@@ -346,6 +375,11 @@ class IncomingNamespace {
         return result.take_error();
       }
 
+      result = outgoing.AddUnmanagedProtocol<fkernel::MmioResource>(mmio_resource_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
       result = outgoing.AddUnmanagedProtocol<fboot::Items>(items_.GetHandler());
       if (result.is_error()) {
         return result.take_error();
@@ -410,6 +444,7 @@ class IncomingNamespace {
  private:
   std::unordered_map<std::string, TestDevice> devices_;
   TestRootResource root_resource_;
+  TestMmioResource mmio_resource_;
   std::optional<TestProfileProvider> profile_provider_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;

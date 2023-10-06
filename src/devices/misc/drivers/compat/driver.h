@@ -6,6 +6,7 @@
 #define SRC_DEVICES_MISC_DRIVERS_COMPAT_DRIVER_H_
 
 #include <fidl/fuchsia.boot/cpp/wire.h>
+#include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/markers.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/compat/cpp/compat.h>
@@ -43,6 +44,8 @@ class Driver : public fdf::DriverBase {
   zx::result<zx::vmo> LoadFirmware(Device* device, const char* filename, size_t* size);
 
   zx_handle_t GetRootResource();
+
+  zx_handle_t GetMmioResource();
 
   // # Threading notes
   //
@@ -134,6 +137,7 @@ class Driver : public fdf::DriverBase {
 
   // API resources.
   zx::resource root_resource_;
+  zx::resource mmio_resource_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
