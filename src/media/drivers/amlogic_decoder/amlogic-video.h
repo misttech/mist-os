@@ -223,7 +223,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   Owner* owner_ = nullptr;
   zx_device_t* parent_ = nullptr;
   ddk::PDevFidl pdev_;
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
 
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clocks_[static_cast<int>(ClockType::kMax)];

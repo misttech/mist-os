@@ -677,18 +677,14 @@ void AmlogicVideo::SwapInCurrentInstance() {
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> AmlogicVideo::ConnectToSysmem() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    DECODE_ERROR("Failed to create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.take_error();
+  auto sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+      fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_, "sysmem");
+  if (sysmem_result.is_error()) {
+    LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol: %s",
+        sysmem_result.status_string());
+    return sysmem_result.take_error();
   }
-
-  auto status = sysmem_->ConnectServer(std::move(endpoints->server));
-  if (!status.ok()) {
-    DECODE_ERROR("Failed to connect server: %s", status.status_string());
-    return zx::error(status.status());
-  }
-  return zx::ok(std::move(endpoints->client));
+  return zx::ok(std::move(*sysmem_result));
 }
 
 namespace tee_smc {
@@ -865,15 +861,23 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  zx::result sysmem_client =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          parent, "sysmem");
-  if (sysmem_client.is_error()) {
-    zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client.status_string());
-    return sysmem_client.status_value();
+  auto sysmem_result = ConnectToSysmem();
+  if (sysmem_result.is_error()) {
+    LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol (sysmem_): %s",
+        sysmem_result.status_string());
+    return sysmem_result.status_value();
   }
+  sysmem_.Bind(std::move(*sysmem_result));
 
-  sysmem_.Bind(std::move(*sysmem_client));
+  // This is a separate Allocator connection only because InternalBuffer currently wants to borrow
+  // an HLCPP client end (for now).
+  sysmem_result = ConnectToSysmem();
+  if (sysmem_result.is_error()) {
+    LOG(ERROR, "Failed to get fuchsia.sysmem.Allocator protocol (sysmem_sync_ptr_): %s",
+        sysmem_result.status_string());
+    return sysmem_result.status_value();
+  }
+  sysmem_sync_ptr_.Bind(sysmem_result->TakeChannel());
 
   zx::result canvas_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
       fuchsia_hardware_amlogiccanvas::Service::Device>(parent_, "canvas");
@@ -881,7 +885,6 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     zxlogf(ERROR, "Could not obtain aml canvas protocol %s\n", canvas_result.status_string());
     return ZX_ERR_NO_RESOURCES;
   }
-
   canvas_.Bind(std::move(canvas_result.value()));
 
   const char* CLOCK_DOS_VDEC_FRAG_NAME = "clock-dos-vdec";
@@ -1040,18 +1043,16 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return status;
   }
 
-  zx::result allocator_client = ConnectToSysmem();
-  if (allocator_client.is_error()) {
-    DECODE_ERROR("Failed to connect to sysmem: %s", allocator_client.status_string());
-    return allocator_client.status_value();
+  fidl::Arena arena;
+  fidl::StringView process_name(arena, fsl::GetCurrentProcessName());
+  auto set_debug_client_info_result =
+      sysmem_->SetDebugClientInfo(std::move(process_name), fsl::GetCurrentProcessKoid());
+  if (!set_debug_client_info_result.ok()) {
+    DECODE_ERROR("sending SetDebugClientInfo failed: %s",
+                 set_debug_client_info_result.status_string());
+    return set_debug_client_info_result.status();
   }
-  sysmem_sync_ptr_.Bind(allocator_client->TakeChannel());
-  if (!sysmem_sync_ptr_) {
-    DECODE_ERROR("ConnectToSysmem() failed");
-    status = ZX_ERR_INTERNAL;
-    return status;
-  }
-  sysmem_sync_ptr_->SetDebugClientInfo(fsl::GetCurrentProcessName(), fsl::GetCurrentProcessKoid());
+
   parser_ = std::make_unique<Parser>(this, std::move(parser_interrupt_handle_));
 
   if (is_tee_available()) {
