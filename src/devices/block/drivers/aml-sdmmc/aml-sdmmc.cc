@@ -1295,9 +1295,8 @@ zx_status_t AmlSdmmc::Bind() {
     return result.status_value();
   }
 
-  std::array offers = {
-      fuchsia_hardware_sdmmc::SdmmcService::Name,
-  };
+  // TODO(fxbug.dev/134787): Offer SdmmcService::Name to use FIDL with the sdmmc core block driver.
+  std::array<const char*, 0> offers;  // = { fuchsia_hardware_sdmmc::SdmmcService::Name, };
 
   // Note: This name can't be changed without migrating users in other repos.
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs("aml-sd-emmc")
