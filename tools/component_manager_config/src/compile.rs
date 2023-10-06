@@ -22,6 +22,48 @@ use {
     },
 };
 
+macro_rules! deep_merge_field {
+    ($target:ident, $other:expr, $field:ident) => {
+        match ($target.$field, $other.$field) {
+            (Some(left), Some(right)) => Some(left.merge(right)?),
+            (None, Some(other)) => Some(other),
+            (Some(target), None) => Some(target),
+            (None, None) => None,
+        }
+    };
+}
+
+macro_rules! merge_field {
+    ($target:ident, $other:expr, $field:ident) => {
+        match ($target.$field, $other.$field) {
+            (Some(_), Some(_)) => {
+                return Err(Error::parse(
+                    format!("Conflicting field found: {:?}", stringify!($field)),
+                    None,
+                    None,
+                ))
+            }
+            (None, Some(other)) => Some(other),
+            (Some(target), None) => Some(target),
+            (None, None) => None,
+        }
+    };
+}
+
+macro_rules! merge_vec {
+    ($target:ident, $other:expr, $field:ident) => {
+        match ($target.$field, $other.$field) {
+            (Some(mut left), Some(mut right)) => {
+                left.append(&mut right);
+                Some(left)
+            }
+            (None, Some(other)) => Some(other),
+            (Some(target), None) => Some(target),
+            (None, None) => None,
+        }
+    };
+}
+
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 struct Config {
@@ -110,6 +152,17 @@ pub struct SecurityPolicy {
     child_policy: Option<ChildPolicyAllowlists>,
 }
 
+impl SecurityPolicy {
+    fn merge(self, another: SecurityPolicy) -> Result<Self, Error> {
+        return Ok(SecurityPolicy {
+            job_policy: deep_merge_field!(self, another, job_policy),
+            capability_policy: merge_vec!(self, another, capability_policy),
+            debug_registration_policy: merge_field!(self, another, debug_registration_policy),
+            child_policy: deep_merge_field!(self, another, child_policy),
+        });
+    }
+}
+
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct JobPolicyAllowlists {
@@ -118,10 +171,28 @@ pub struct JobPolicyAllowlists {
     create_raw_processes: Option<Vec<String>>,
 }
 
+impl JobPolicyAllowlists {
+    fn merge(self, another: JobPolicyAllowlists) -> Result<Self, Error> {
+        return Ok(JobPolicyAllowlists {
+            ambient_mark_vmo_exec: merge_vec!(self, another, ambient_mark_vmo_exec),
+            main_process_critical: merge_field!(self, another, main_process_critical),
+            create_raw_processes: merge_vec!(self, another, create_raw_processes),
+        });
+    }
+}
+
 #[derive(Deserialize, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct ChildPolicyAllowlists {
     reboot_on_terminate: Option<Vec<String>>,
+}
+
+impl ChildPolicyAllowlists {
+    fn merge(self, another: ChildPolicyAllowlists) -> Result<Self, Error> {
+        return Ok(ChildPolicyAllowlists {
+            reboot_on_terminate: merge_vec!(self, another, reboot_on_terminate),
+        });
+    }
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -354,23 +425,6 @@ fn translate_debug_registration_policy(
     }
 }
 
-macro_rules! merge_field {
-    ($target:ident, $other:expr, $field:ident) => {
-        match ($target.$field, $other.$field) {
-            (Some(_), Some(_)) => {
-                return Err(Error::parse(
-                    format!("Conflicting field found: {:?}", stringify!($field)),
-                    None,
-                    None,
-                ))
-            }
-            (None, Some(other)) => Some(other),
-            (Some(target), None) => Some(target),
-            (None, None) => None,
-        }
-    };
-}
-
 impl Config {
     fn from_json_file(path: &PathBuf) -> Result<Self, Error> {
         let data = fs::read_to_string(path)?;
@@ -388,7 +442,7 @@ impl Config {
             use_builtin_process_launcher: merge_field!(self, another, use_builtin_process_launcher),
             maintain_utc_clock: merge_field!(self, another, maintain_utc_clock),
             list_children_batch_size: merge_field!(self, another, list_children_batch_size),
-            security_policy: merge_field!(self, another, security_policy),
+            security_policy: deep_merge_field!(self, another, security_policy),
             namespace_capabilities: merge_field!(self, another, namespace_capabilities),
             builtin_capabilities: merge_field!(self, another, builtin_capabilities),
             num_threads: merge_field!(self, another, num_threads),
@@ -877,6 +931,54 @@ mod tests {
         let config: component_internal::Config = unpersist(&bytes)?;
         assert_eq!(config.debug, Some(true));
         assert_eq!(config.list_children_batch_size, Some(42));
+        Ok(())
+    }
+
+    #[test]
+    fn test_deep_merge() -> Result<(), Error> {
+        let tmp_dir = TempDir::new().unwrap();
+        let output_path = tmp_dir.path().join("config");
+
+        let input_path = tmp_dir.path().join("foo.json");
+        let input = r#"{
+            security_policy: {
+                job_policy: {
+                    ambient_mark_vmo_exec: ["/foo1"],
+                    create_raw_processes: ["/foo1"],
+                },
+            },
+        }"#;
+        File::create(&input_path).unwrap().write_all(input.as_bytes()).unwrap();
+
+        let another_input_path = tmp_dir.path().join("bar.json");
+        let another_input = r#"{
+            security_policy: {
+                job_policy: {
+                    ambient_mark_vmo_exec: ["/foo2"],
+                    create_raw_processes: ["/foo2"],
+                },
+            },
+        }"#;
+        File::create(&another_input_path).unwrap().write_all(another_input.as_bytes()).unwrap();
+
+        let args =
+            Args { output: output_path.clone(), input: vec![input_path, another_input_path] };
+        compile(args)?;
+
+        let mut bytes = Vec::new();
+        File::open(output_path)?.read_to_end(&mut bytes)?;
+        let config: component_internal::Config = unpersist(&bytes)?;
+        assert_eq!(
+            config.security_policy,
+            Some(component_internal::SecurityPolicy {
+                job_policy: Some(component_internal::JobPolicyAllowlists {
+                    ambient_mark_vmo_exec: Some(vec!["/foo1".to_string(), "/foo2".to_string()]),
+                    create_raw_processes: Some(vec!["/foo1".to_string(), "/foo2".to_string()]),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })
+        );
         Ok(())
     }
 
