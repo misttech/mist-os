@@ -24,7 +24,6 @@ pub mod test {
         collections::HashMap,
         default::Default,
         io::Write,
-        path::{Path, PathBuf},
         sync::{Arc, Mutex},
     };
 
@@ -63,24 +62,16 @@ pub mod test {
         }
     }
 
-    pub struct TestResolver {
-        manifest: PathBuf,
-    }
+    pub struct TestResolver {}
 
     impl TestResolver {
         pub fn new() -> Self {
-            let mut test = PathBuf::new();
-            test.push("./flash.json");
-            Self { manifest: test }
+            Self {}
         }
     }
 
     #[async_trait(?Send)]
     impl FileResolver for TestResolver {
-        fn manifest(&self) -> &Path {
-            self.manifest.as_path()
-        }
-
         async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
             Ok(file.to_owned())
         }

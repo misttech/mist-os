@@ -66,11 +66,6 @@ fn product_bundle_from_container_path<P: AsRef<Path>>(
 
 #[async_trait(?Send)]
 impl FileResolver for GcsResolver {
-    fn manifest(&self) -> &Path {
-        // This is not used in the get_file method so it's not needed.
-        unimplemented!()
-    }
-
     async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
         match self
             .product_bundle()

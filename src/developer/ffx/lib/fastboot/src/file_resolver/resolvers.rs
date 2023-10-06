@@ -29,14 +29,14 @@ impl EmptyResolver {
         fake.push("fake");
         Ok(Self { fake })
     }
+
+    pub fn manifest(&self) -> &Path {
+        self.fake.as_path() //should never get used
+    }
 }
 
 #[async_trait(?Send)]
 impl FileResolver for EmptyResolver {
-    fn manifest(&self) -> &Path {
-        self.fake.as_path() //should never get used
-    }
-
     async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
         if PathBuf::from(file).is_absolute() {
             Ok(file.to_string())
@@ -64,14 +64,13 @@ impl Resolver {
             })?,
         })
     }
+    pub fn manifest(&self) -> &Path {
+        self.manifest_path.as_path()
+    }
 }
 
 #[async_trait(?Send)]
 impl FileResolver for Resolver {
-    fn manifest(&self) -> &Path {
-        self.manifest_path.as_path()
-    }
-
     async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
         if PathBuf::from(file).is_absolute() {
             Ok(file.to_string())
@@ -147,14 +146,14 @@ impl ArchiveResolver {
             _ => ffx_bail!("Could not locate flash manifest in archive: {}", path.display()),
         }
     }
+
+    pub fn manifest(&self) -> &Path {
+        self.manifest_path.as_path()
+    }
 }
 
 #[async_trait(?Send)]
 impl FileResolver for ArchiveResolver {
-    fn manifest(&self) -> &Path {
-        self.manifest_path.as_path()
-    }
-
     async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
         let mut file = match self.internal_manifest_path.parent() {
             Some(p) => {
@@ -235,14 +234,14 @@ impl TarResolver {
             _ => ffx_bail!("Could not locate flash manifest in archive: {}", path.display()),
         }
     }
+
+    pub fn manifest(&self) -> &Path {
+        self.manifest_path.as_path()
+    }
 }
 
 #[async_trait(?Send)]
 impl FileResolver for TarResolver {
-    fn manifest(&self) -> &Path {
-        self.manifest_path.as_path()
-    }
-
     async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
         if let Some(p) = self.manifest().parent() {
             let mut parent = p.to_path_buf();

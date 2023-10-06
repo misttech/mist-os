@@ -31,7 +31,7 @@ use std::{
     collections::BTreeMap,
     fs::File,
     io::{BufReader, Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 use termion::{color, style};
 
@@ -56,6 +56,32 @@ pub struct Image {
 pub struct ManifestFile {
     manifest: Value,
     version: u64,
+}
+
+#[async_trait]
+pub trait ManifestResolver {
+    async fn get_manifest_path(&self) -> &Path;
+}
+
+#[async_trait]
+impl ManifestResolver for Resolver {
+    async fn get_manifest_path(&self) -> &Path {
+        self.manifest()
+    }
+}
+
+#[async_trait]
+impl ManifestResolver for TarResolver {
+    async fn get_manifest_path(&self) -> &Path {
+        self.manifest()
+    }
+}
+
+#[async_trait]
+impl ManifestResolver for ArchiveResolver {
+    async fn get_manifest_path(&self) -> &Path {
+        self.manifest()
+    }
 }
 
 pub enum FlashManifestVersion {
@@ -520,27 +546,27 @@ pub async fn from_path<W: Write, T: FastbootInterface>(
         Some(ext) => {
             if ext == "zip" {
                 let r = ArchiveResolver::new(writer, path)?;
-                load_flash_manifest(r)?.flash(writer, fastboot_interface, cmd).await
+                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             } else if ext == "tgz" || ext == "tar.gz" || ext == "tar" {
                 let r = TarResolver::new(writer, path)?;
-                load_flash_manifest(r)?.flash(writer, fastboot_interface, cmd).await
+                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             } else {
-                load_flash_manifest(Resolver::new(path)?)?
-                    .flash(writer, fastboot_interface, cmd)
-                    .await
+                let r = Resolver::new(path)?;
+                load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             }
         }
         _ => {
-            load_flash_manifest(Resolver::new(path)?)?.flash(writer, fastboot_interface, cmd).await
+            let r = Resolver::new(path)?;
+            load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
         }
     }
 }
 
-fn load_flash_manifest<F: FileResolver + Sync>(
-    file_resolver: F,
+async fn load_flash_manifest<F: ManifestResolver + FileResolver + Sync>(
+    resolver: F,
 ) -> Result<FlashManifest<impl FileResolver + Sync>> {
-    let reader = File::open(file_resolver.manifest()).map(BufReader::new)?;
-    Ok(FlashManifest { resolver: file_resolver, version: FlashManifestVersion::load(reader)? })
+    let reader = File::open(resolver.get_manifest_path().await).map(BufReader::new)?;
+    Ok(FlashManifest { resolver, version: FlashManifestVersion::load(reader)? })
 }
 
 pub struct FlashManifest<F: FileResolver + Sync> {
