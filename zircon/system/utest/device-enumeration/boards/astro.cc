@@ -28,7 +28,6 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:e/tee/optee",
-      "sys/platform/05:03:e/aml-video",
       "sys/platform/05:00:f/aml-raw_nand/nand/bl2/skip-block",
       "sys/platform/05:00:f/aml-raw_nand/nand/tpl/skip-block",
       "sys/platform/05:00:f/aml-raw_nand/nand/fts/skip-block",
@@ -42,8 +41,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
       "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
@@ -84,6 +82,15 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
 
       // Registers Device.
       "sys/platform/00:00:29",
+#ifdef include_packaged_drivers
+
+      "sys/platform/05:03:e/aml-video",
+
+      // WLAN
+      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

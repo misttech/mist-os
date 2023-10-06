@@ -17,7 +17,6 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:14/clocks",
       "sys/platform/05:00:2/aml-i2c",
       "sys/platform/05:00:2:2/aml-i2c",
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-50",
       "sys/platform/05:06:12:1/audio-pcm-out-composite-spec/vim3-audio-tdm1-out",
       "sys/platform/05:06:12:2/audio-i2s-out-composite-spec/vim3-audio-tdm1-out",
@@ -33,11 +32,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:7/aml_sd/aml-sd-emmc/sdmmc",
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
       "sys/platform/05:06:1c/aml_nna",
       "sys/platform/00:00:29",  // registers device
-      "sys/platform/05:06:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
       "sys/platform/05:06:2b/aml-hdmi",
@@ -82,6 +78,21 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-106",
 
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-24/vim3-mcu",
+
+#ifdef include_packaged_drivers
+
+      // RTC
+      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
+
+      // WLAN
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+
+      // GPU
+      "sys/platform/05:06:17/aml-gpu-composite/aml-gpu",
+
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

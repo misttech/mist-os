@@ -96,15 +96,11 @@ bringup_base = {
   cmdline_deps = [ "//build/input:bootfs" ]
 
   base_packages = []
-  base_driver_packages = [
-    "//:developer_base_driver_packages",
-    "//:legacy_base_driver_packages",
-  ]
 
-  bootfs_labels = base_driver_packages + [
-                    "//build/input:bootfs",
-                    "//:developer_base_packages",
-                  ]
+  bootfs_labels = [
+    "//build/input:bootfs",
+    "//:developer_base_packages",
+  ]
 
   _ignored = {
     import("//build/dev.gni")

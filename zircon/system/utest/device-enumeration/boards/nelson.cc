@@ -70,8 +70,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio",
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
-      "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-73/ti-ina231-mlb/ti-ina231",
@@ -93,7 +92,17 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-45/tas58xx/TAS5805m/brownout_protection",
 
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
+
+#ifdef include_packaged_drivers
+
       "sys/platform/05:05:1:2/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52811-radio/ot-radio",
+
+      // WLAN
+      "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:6/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));

@@ -133,12 +133,17 @@ _boards = [
   ],
 ]
 
+config("include_packaged_drivers") {
+  cflags = [ "-Dinclude_packaged_drivers" ]
+}
+
 foreach(board_info, _boards) {
   board = board_info[0]
   test_env = {
   }
   test_env = board_info[1]
   test("device-enumeration-test-${board}-bin") {
+    configs += [ ":include_packaged_drivers" ]
     sources = [ "boards/${board}.cc" ]
     deps = [ ":common" ]
   }

@@ -42,18 +42,10 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:00:8/sherlock-emmc/aml-sd-emmc/sdmmc/sdmmc-mmc/user/block/part-010/block",
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
-      "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
-      "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
-      "sys/platform/05:04:15/aml-mipi",
+
       "sys/platform/05:04:1c/aml_nna",
       "sys/platform/05:04:1d",  // pwm
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/gdc",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",
       "sys/platform/05:00:1c/aml_light",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp",
-      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
-      "sys/platform/05:04:e/aml-video",
       "sys/platform/05:04:23/aml-video-enc",
       "sys/platform/05:04:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:04:13/sherlock-audio-pdm-in",
@@ -62,7 +54,6 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/00:00:e/tee/optee",
       "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0",
       "sys/platform/05:04:1/aml-gpio/gpio-79/sherlock-buttons/hid-buttons",
-      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52840-radio/ot-radio",
       "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:04:1a/aml-secure-mem/aml-securemem",
@@ -96,6 +87,26 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
 
       // Touchscreen
       "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
+
+#ifdef include_packaged_drivers
+
+      "sys/platform/05:04:15/aml-mipi",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/gdc",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/ge2d",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp",
+      "sys/platform/05:04:15/aml-mipi/imx227_sensor/imx227/isp/arm-isp/camera_controller",
+
+      "sys/platform/05:04:e/aml-video",
+
+      "sys/platform/05:04:1:1/aml-gpio/gpio-50/spi-0/aml-spi-0/spi/spi-0-0/nrf52840-radio/ot-radio",
+
+      // WLAN
+      "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",
+      "sys/platform/05:00:6/sherlock-sd-emmc/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy/wlanphy",
+
+#endif
+
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
