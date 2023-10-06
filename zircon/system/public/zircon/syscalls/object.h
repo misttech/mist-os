@@ -55,7 +55,7 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_TASK_RUNTIME                __ZX_INFO_TOPIC(30u, 1)        // zx_info_task_runtime_t[1]
 #define ZX_INFO_KMEM_STATS_EXTENDED         ((zx_object_info_topic_t) 31u) // zx_info_kmem_stats_extended_t[1]
 #define ZX_INFO_VCPU                        ((zx_object_info_topic_t) 32u) // zx_info_vcpu_t[1]
-#define ZX_INFO_KMEM_STATS_COMPRESSION      ((zx_object_info_topic_t) 33u) // zx_info_kmem_stats_compression[1]
+#define ZX_INFO_KMEM_STATS_COMPRESSION      ((zx_object_info_topic_t) 33u) // zx_info_kmem_stats_compression_t[1]
 #define ZX_INFO_IOB                         ((zx_object_info_topic_t) 34u) // zx_info_iob_t[1]
 #define ZX_INFO_IOB_REGIONS                 ((zx_object_info_topic_t) 35u) // zx_iob_region_info_t[n]
 
