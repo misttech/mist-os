@@ -36,6 +36,8 @@ pub enum OperationRequest {
     GetApplicationData(HeaderSet),
     /// Request to give the payload to the upper layer application -- occurs in a PUT operation.
     PutApplicationData(Vec<u8>, HeaderSet),
+    /// Request to delete the payload in the upper layer application -- occurs in a PUT operation.
+    DeleteApplicationData(HeaderSet),
 }
 
 /// Represents a response from the upper layer application during a multi-step operation.
@@ -256,6 +258,9 @@ impl ObexServer {
             }
             Ok(OperationRequest::PutApplicationData(data, request_headers)) => {
                 self.handler.put(data, request_headers).await.map(|_| ApplicationResponse::Put)
+            }
+            Ok(OperationRequest::DeleteApplicationData(request_headers)) => {
+                self.handler.delete(request_headers).await.map(|_| ApplicationResponse::Put)
             }
             Err(e) => {
                 warn!("Internal error in operation: {e:?}");
@@ -597,6 +602,30 @@ mod tests {
         let (rec_data, rec_headers) = test_app.put_data();
         assert_eq!(rec_data, vec![1, 2, 3, 4, 5]);
         assert!(rec_headers.contains_header(&HeaderIdentifier::Name));
+
+        let expectation = |response: ResponsePacket| {
+            assert_eq!(*response.code(), ResponseCode::Ok);
+            assert!(response.headers().is_empty());
+        };
+        expect_response(&mut exec, &mut remote, expectation, OpCode::PutFinal);
+    }
+
+    #[fuchsia::test]
+    fn delete_request_accepted_by_app_success() {
+        let mut exec = fasync::TestExecutor::new();
+        let (mut obex_server, test_app, mut remote) = new_obex_server();
+        obex_server.set_connected(ConnectionStatus::Connected);
+        let server_fut = obex_server.run();
+        pin_mut!(server_fut);
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
+
+        let headers = HeaderSet::from_header(Header::name("foo.txt"));
+        let put_request = RequestPacket::new_put_final(headers);
+        send_packet(&mut remote, put_request);
+
+        // The ObexServer should receive the request and hand it to the profile. Profile accepts.
+        test_app.set_put_response(Ok(()));
+        let _ = exec.run_until_stalled(&mut server_fut).expect_pending("server active");
 
         let expectation = |response: ResponsePacket| {
             assert_eq!(*response.code(), ResponseCode::Ok);

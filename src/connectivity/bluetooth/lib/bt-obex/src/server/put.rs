@@ -14,7 +14,7 @@ use crate::server::{ApplicationResponse, OperationRequest, ServerOperation};
 #[derive(Debug)]
 enum State {
     /// Receiving informational headers and data packets.
-    Request { headers: HeaderSet, staged_data: Vec<u8> },
+    Request { headers: HeaderSet, staged_data: Option<Vec<u8>> },
     /// The final request packet has been received.
     RequestPhaseComplete,
     /// The operation is complete.
@@ -28,7 +28,7 @@ pub struct PutOperation {
 
 impl PutOperation {
     pub fn new() -> Self {
-        Self { state: State::Request { headers: HeaderSet::new(), staged_data: Vec::new() } }
+        Self { state: State::Request { headers: HeaderSet::new(), staged_data: None } }
     }
 
     #[cfg(test)]
@@ -50,7 +50,8 @@ impl ServerOperation for PutOperation {
                 // A non-final PUT request may contain a Body header specifying user data (among
                 // other informational headers).
                 if let Ok(mut data) = request_headers.remove_body(/*final= */ false) {
-                    staged_data.append(&mut data);
+                    let staged = staged_data.get_or_insert(Vec::new());
+                    staged.append(&mut data);
                 }
                 headers.try_append(request_headers)?;
                 let response =
@@ -61,13 +62,21 @@ impl ServerOperation for PutOperation {
                 // A final PUT request may contain an EndOfBody header specifying user data (among
                 // other informational headers).
                 if let Ok(mut data) = request_headers.remove_body(/*final= */ true) {
-                    staged_data.append(&mut data);
+                    let staged = staged_data.get_or_insert(Vec::new());
+                    staged.append(&mut data);
                 }
                 headers.try_append(request_headers)?;
                 let request_headers = std::mem::replace(headers, HeaderSet::new());
                 let request_data = std::mem::take(staged_data);
                 self.state = State::RequestPhaseComplete;
-                Ok(OperationRequest::PutApplicationData(request_data, request_headers))
+                // If data is provided, then we are placing data in the application. Otherwise, we
+                // are deleting data identified by the provided `request_headers`.
+                // See OBEX 1.5 Section 3.4.3.6.
+                if let Some(data) = request_data {
+                    Ok(OperationRequest::PutApplicationData(data, request_headers))
+                } else {
+                    Ok(OperationRequest::DeleteApplicationData(request_headers))
+                }
             }
             _ => Err(Error::operation(OpCode::Put, "received invalid request")),
         }
@@ -227,5 +236,24 @@ mod tests {
             operation.handle_application_response(invalid),
             Err(Error::OperationError { .. })
         );
+    }
+
+    #[fuchsia::test]
+    fn delete_request_success() {
+        let mut operation = PutOperation::new();
+
+        let headers = HeaderSet::from_header(Header::name("randomfile.txt"));
+        let request = RequestPacket::new_put_final(headers);
+        let response = operation.handle_peer_request(request).expect("valid request");
+        assert_matches!(response, OperationRequest::DeleteApplicationData(headers) if headers.contains_header(&HeaderIdentifier::Name));
+        assert!(!operation.is_complete());
+
+        // Application accepts delete request.
+        let final_response = operation
+            .handle_application_response(ApplicationResponse::accept_put())
+            .expect("valid application response");
+        assert_eq!(*final_response.code(), ResponseCode::Ok);
+        assert!(final_response.headers().is_empty());
+        assert!(operation.is_complete());
     }
 }

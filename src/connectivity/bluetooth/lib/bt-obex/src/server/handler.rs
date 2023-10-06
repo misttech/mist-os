@@ -58,6 +58,13 @@ pub trait ObexServerHandler {
     /// Returns `Err` with a rejection code and optional headers if rejected.
     async fn put(&mut self, data: Vec<u8>, headers: HeaderSet) -> ObexResult<()>;
 
+    /// A request to delete data in the local OBEX server.
+    /// `headers` are the informational headers provided by the remote OBEX client that describe
+    /// the delete request.
+    /// Returns `Ok` if accepted.
+    /// Returns `Err` with a rejection code and optional headers if rejected.
+    async fn delete(&mut self, headers: HeaderSet) -> ObexResult<()>;
+
     // TODO(fxbug.dev/125307): Add other operation types.
 }
 
@@ -149,6 +156,14 @@ pub(crate) mod test_utils {
             let mut inner = self.inner.lock();
             inner.received_put_data = Some((data, headers));
             inner
+                .put_response
+                .take()
+                .unwrap_or(Err((ResponseCode::NotImplemented, HeaderSet::new())))
+        }
+
+        async fn delete(&mut self, _headers: HeaderSet) -> ObexResult<()> {
+            self.inner
+                .lock()
                 .put_response
                 .take()
                 .unwrap_or(Err((ResponseCode::NotImplemented, HeaderSet::new())))
