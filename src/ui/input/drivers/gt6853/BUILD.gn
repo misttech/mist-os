@@ -74,7 +74,18 @@ group("common") {
 driver_bind_rules("gt6853-bind") {
   rules = "gt6853.bind"
   tests = "gt6853-bind-test.json"
-  deps = [ "//src/devices/bind/fuchsia.goodix.platform" ]
+
+  # TODO(fxb/115757): Remove this once we no longer need to generate
+  # fragments for composite bind rules.
+  disable_fragment_gen = true
+
+  deps = [
+    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
+    "//src/devices/bind/fuchsia.goodix.platform",
+    "//src/devices/bind/fuchsia.gpio",
+    "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
+  ]
 }
 
 fuchsia_driver("gt6853-module-driver") {

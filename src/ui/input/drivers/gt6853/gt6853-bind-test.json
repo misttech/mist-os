@@ -1,20 +1,42 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_COMPOSITE": "1",
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.goodix.platform.BIND_PLATFORM_DEV_DID.GT6853",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.goodix.platform.BIND_PLATFORM_DEV_VID.GOODIX"
-        },
-        "expected": "match",
-        "name": "gt6853"
+        "node": "i2c",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_I2C_BUS_ID": "fuchsia.i2c.BIND_I2C_BUS_ID.I2C_2",
+                    "fuchsia.BIND_I2C_ADDRESS": "fuchsia.goodix.platform.BIND_I2C_ADDRESS.TOUCH"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.goodix.platform.BIND_PLATFORM_DEV_DID.GT6853",
-            "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.goodix.platform.BIND_PLATFORM_DEV_VID.GOODIX",
-            "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "gt6853-abort"
+        "node": "gpio-int",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.TOUCH_INTERRUPT"
+                }
+            }
+        ]
+    },
+    {
+        "node": "gpio-reset",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE",
+                    "fuchsia.gpio.FUNCTION": "fuchsia.gpio.FUNCTION.TOUCH_RESET"
+                }
+            }
+        ]
     }
 ]

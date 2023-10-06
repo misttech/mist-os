@@ -209,20 +209,6 @@ driver_bind_rules("aml_thermal_pll_bind") {
   ]
 }
 
-driver_bind_rules("gt6853_touch_bind") {
-  rules = "bind/gt6853_touch.bind"
-  header_output = "gt6853_touch_bind.h"
-  bind_output = "gt6853_touch_bind.bc"
-  tests = "bind-tests/gt6853_touch-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.s905d3",
-    "//src/devices/bind/fuchsia.goodix.platform",
-    "//src/devices/bind/fuchsia.gpio",
-    "//src/devices/bind/fuchsia.i2c",
-    "//src/devices/bind/fuchsia.platform",
-  ]
-}
-
 driver_bind_rules("nelson_xhci_bind") {
   rules = "bind/nelson_xhci.bind"
   header_output = "nelson_xhci_bind.h"
@@ -319,7 +305,6 @@ fuchsia_driver("nelson-module-driver") {
   deps = [
     ":aml_secure_mem_bind_header",
     ":aml_thermal_pll_bind_header",
-    ":gt6853_touch_bind_header",
     ":nelson-bind",
     ":nelson_aml_sdio_bind_header",
     ":nelson_aml_video_bind_header",
@@ -359,6 +344,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
+    "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_cpp",
     "//src/devices/bind/fuchsia.power:fuchsia.power_cpp",
@@ -418,7 +404,6 @@ group("tests") {
   deps = [
     ":aml_secure_mem_bind_test",
     ":aml_thermal_pll_bind_test",
-    ":gt6853_touch_bind_test",
     ":nelson_aml_sdio_bind_test",
     ":nelson_aml_video_bind_test",
     ":nelson_aml_video_bind_test",

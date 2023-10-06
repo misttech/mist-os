@@ -9,13 +9,59 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
+
+#include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/goodix/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/i2c/cpp/bind.h>
 
 #include "nelson.h"
-#include "src/devices/board/drivers/nelson/gt6853_touch_bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
+
+namespace {
+const std::vector kI2cRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_2),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+                            bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
+};
+
+const std::vector kI2cProperties = {
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS,
+                      bind_fuchsia_goodix_platform::BIND_I2C_ADDRESS_TOUCH),
+};
+
+const std::vector kInterruptRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                            bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_4),
+};
+
+const std::vector kInterruptProperties = {
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_INTERRUPT)};
+
+const std::vector kResetRules = {
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
+                            bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_9),
+};
+
+const std::vector kResetProperties = {
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_TOUCH_RESET),
+};
+}  // namespace
 
 static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
     {{
@@ -35,20 +81,35 @@ zx_status_t Nelson::TouchInit() {
   touch_dev.did() = PDEV_DID_GOODIX_GT6853;
   touch_dev.boot_metadata() = touch_boot_metadata;
 
+  auto parents = std::vector{
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kI2cRules,
+          .properties = kI2cProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kInterruptRules,
+          .properties = kInterruptProperties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = kResetRules,
+          .properties = kResetProperties,
+      }},
+  };
+
+  auto composite_node_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "gt6853_touch", .parents = parents}};
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('TOUC');
-  auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, touch_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, gt6853_touch_fragments,
-                                               std::size(gt6853_touch_fragments)),
-      "pdev");
+  auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, touch_dev), fidl::ToWire(fidl_arena, composite_node_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Touch(touch_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Touch(touch_dev) request failed: %s",
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Touch(touch_dev) failed: %s", __func__,
+    zxlogf(ERROR, "AddCompositeNodeSpec Touch(touch_dev) failed: %s",
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
