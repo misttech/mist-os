@@ -445,6 +445,7 @@ fuchsia_structured_config_values("pkg-resolver-config") {
     blob_network_header_timeout_seconds = 30
     blob_network_body_timeout_seconds = 30
     blob_download_resumption_attempts_limit = 50
+    blob_download_concurrency_limit = 2
   }
 }
 

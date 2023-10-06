@@ -61,10 +61,6 @@ use crate::{
 // end on the same thread it starts on, resulting in invalid trace events.
 // const SERVER_THREADS: usize = 2;
 
-// Concurrency set to 2 for blob fetches to amortize memory pressure in blobfs during OTA while
-// also reducing OTA time by 20-30% on fast networks.
-const MAX_CONCURRENT_BLOB_FETCHES: usize = 2;
-
 const MAX_CONCURRENT_PACKAGE_FETCHES: usize = 5;
 
 // Each fetch_blob call emits an event, and a system update fetches about 1,000 blobs in about a
@@ -182,7 +178,7 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
 
     let (blob_fetch_queue, blob_fetcher) = crate::cache::BlobFetcher::new(
         inspector.root().create_child("blob_fetcher"),
-        MAX_CONCURRENT_BLOB_FETCHES,
+        structured_config.blob_download_concurrency_limit.into(),
         repo_manager.read().await.stats(),
         cobalt_sender.clone(),
         cache::BlobFetchParams::builder()

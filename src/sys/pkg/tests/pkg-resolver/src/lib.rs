@@ -323,6 +323,7 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     blob_network_body_timeout_seconds: Option<u32>,
     blob_download_resumption_attempts_limit: Option<u32>,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
+    blob_download_concurrency_limit: Option<u16>,
 }
 
 impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, fn() -> Mounts> {
@@ -360,6 +361,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             blob_network_body_timeout_seconds: None,
             blob_download_resumption_attempts_limit: None,
             blob_implementation: None,
+            blob_download_concurrency_limit: None,
         }
     }
 }
@@ -389,6 +391,7 @@ where
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
             blob_implementation: self.blob_implementation,
+            blob_download_concurrency_limit: self.blob_download_concurrency_limit,
         }
     }
 
@@ -420,6 +423,7 @@ where
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
             blob_implementation: Some(blobfs_ramdisk::Implementation::CppBlobfs),
+            blob_download_concurrency_limit: self.blob_download_concurrency_limit,
         }
     }
 
@@ -437,6 +441,7 @@ where
             blob_network_body_timeout_seconds: self.blob_network_body_timeout_seconds,
             blob_download_resumption_attempts_limit: self.blob_download_resumption_attempts_limit,
             blob_implementation: self.blob_implementation,
+            blob_download_concurrency_limit: self.blob_download_concurrency_limit,
         }
     }
 
@@ -461,6 +466,12 @@ where
     pub fn blob_download_resumption_attempts_limit(mut self, limit: u32) -> Self {
         assert_eq!(self.blob_download_resumption_attempts_limit, None);
         self.blob_download_resumption_attempts_limit = Some(limit);
+        self
+    }
+
+    pub fn blob_download_concurrency_limit(mut self, limit: u16) -> Self {
+        assert_eq!(self.blob_download_concurrency_limit, None);
+        self.blob_download_concurrency_limit = Some(limit);
         self
     }
 
@@ -604,6 +615,7 @@ where
             || self.blob_network_header_timeout_seconds.is_some()
             || self.blob_network_body_timeout_seconds.is_some()
             || self.blob_download_resumption_attempts_limit.is_some()
+            || self.blob_download_concurrency_limit.is_some()
         {
             builder.init_mutable_config_from_package(&pkg_resolver).await.unwrap();
             if let Some(fetch_delivery_blob) = self.fetch_delivery_blob {
@@ -667,6 +679,16 @@ where
                         &pkg_resolver,
                         "blob_download_resumption_attempts_limit",
                         blob_download_resumption_attempts_limit,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(blob_download_concurrency_limit) = self.blob_download_concurrency_limit {
+                builder
+                    .set_config_value_uint16(
+                        &pkg_resolver,
+                        "blob_download_concurrency_limit",
+                        blob_download_concurrency_limit,
                     )
                     .await
                     .unwrap();

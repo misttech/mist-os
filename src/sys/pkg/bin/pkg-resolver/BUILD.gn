@@ -216,6 +216,10 @@ structured_config_values = {
   blob_network_header_timeout_seconds = 30
   blob_network_body_timeout_seconds = 30
   blob_download_resumption_attempts_limit = 50
+
+  # 2 reduces OTA time by 20-30% on fast networks.
+  # Not set higher to avoid OOM on the most memory constrained hardware.
+  blob_download_concurrency_limit = 2
 }
 
 # LINT.ThenChange(/src/sys/pkg/tests/pkg-resolver/BUILD.gn)
