@@ -656,11 +656,23 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   struct DiffPrinter<zx::vmo, void> {
     static void PrintDiff(const LogicalBufferCollection& buffer_collection,
                           const std::string& field_name, const zx::vmo& o, const zx::vmo& n) {
-      // We don't expect to call the zx::vmo variant since !has_vmo() and !has_aux_vmo(), but if we
+      // We don't expect to call the zx::vmo variant since !has_vmo(), but if we do get here,
+      // complain + print the values regardless of what the values are or whether they differ.
+      buffer_collection.LogError(FROM_HERE,
+                                 "Why did we call zx::vmo PrintDiff? --- o%s: %u n%s: %u",
+                                 field_name.c_str(), o.get(), field_name.c_str(), n.get());
+    }
+  };
+  template <>
+  struct DiffPrinter<zx::eventpair, void> {
+    static void PrintDiff(const LogicalBufferCollection& buffer_collection,
+                          const std::string& field_name, const zx::eventpair& o,
+                          const zx::eventpair& n) {
+      // We don't expect to call the zx::eventpair variant since !has_close_weak_asap(), but if we
       // do get here, complain + print the values regardless of what the values are or whether they
       // differ.
       buffer_collection.LogError(FROM_HERE,
-                                 "Why did we call zx::vmo PrintDiff? --- o%s: %u n%s: %u",
+                                 "Why did we call zx::eventpair PrintDiff? --- o%s: %u n%s: %u",
                                  field_name.c_str(), o.get(), field_name.c_str(), n.get());
     }
   };
@@ -725,7 +737,7 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                                                  const fuchsia_sysmem2::VmoBuffer& n) const {
     PRINT_DIFF(vmo);
     PRINT_DIFF(vmo_usable_start);
-    PRINT_DIFF(aux_vmo);
+    PRINT_DIFF(close_weak_asap);
   }
 
   template <>

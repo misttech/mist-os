@@ -325,16 +325,6 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
   return fpromise::ok();
 }
 
-fpromise::result<> V2CopyFromV1BufferCollectionConstraintsAuxBuffers(
-    fuchsia_sysmem2::BufferCollectionConstraints* v2b_param,
-    const fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers& v1) {
-  ZX_DEBUG_ASSERT(v2b_param);
-  fuchsia_sysmem2::BufferCollectionConstraints& v2b = *v2b_param;
-  PROCESS_SCALAR_FIELD_V1(need_clear_aux_buffers_for_secure);
-  PROCESS_SCALAR_FIELD_V1(allow_clear_aux_buffers_for_secure);
-  return fpromise::ok();
-}
-
 fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
     fidl::AnyArena& allocator, fuchsia_sysmem2::wire::BufferCollectionConstraints* v2b_param,
     const fuchsia_sysmem::wire::BufferCollectionConstraints& v1) {
@@ -367,16 +357,6 @@ fpromise::result<> V2CopyFromV1BufferCollectionConstraintsMain(
     OK_OR_RET_ERROR(result);
     v2b.set_image_format_constraints(allocator, result.take_value());
   }
-  return fpromise::ok();
-}
-
-fpromise::result<> V2CopyFromV1BufferCollectionConstraintsAuxBuffers(
-    fidl::AnyArena& allocator, fuchsia_sysmem2::wire::BufferCollectionConstraints* v2b_param,
-    const fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers& v1) {
-  ZX_DEBUG_ASSERT(v2b_param);
-  fuchsia_sysmem2::wire::BufferCollectionConstraints& v2b = *v2b_param;
-  PROCESS_WIRE_SCALAR_FIELD_V1(need_clear_aux_buffers_for_secure);
-  PROCESS_WIRE_SCALAR_FIELD_V1(allow_clear_aux_buffers_for_secure);
   return fpromise::ok();
 }
 
@@ -588,13 +568,9 @@ V2CopyFromV1BufferMemoryConstraints(fidl::AnyArena& allocator,
   return fpromise::ok(v2b);
 }
 
-// If !v1 && !aux_buffers_v1, the result will be fit::is_ok(), but result.value().IsEmpty().
+// If !v1, the result will be fit::is_ok(), but result.value().IsEmpty().
 fpromise::result<fuchsia_sysmem2::BufferCollectionConstraints>
-V2CopyFromV1BufferCollectionConstraints(
-    const fuchsia_sysmem::BufferCollectionConstraints* v1,
-    const fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers* aux_buffers_v1) {
-  // Should be enforced by the caller.
-  ZX_DEBUG_ASSERT(v1 || !aux_buffers_v1);
+V2CopyFromV1BufferCollectionConstraints(const fuchsia_sysmem::BufferCollectionConstraints* v1) {
   fuchsia_sysmem2::BufferCollectionConstraints v2b;
 
   if (v1) {
@@ -602,31 +578,17 @@ V2CopyFromV1BufferCollectionConstraints(
     OK_OR_RET_ERROR(result);
   }
 
-  if (aux_buffers_v1) {
-    auto result = V2CopyFromV1BufferCollectionConstraintsAuxBuffers(&v2b, *aux_buffers_v1);
-    OK_OR_RET_ERROR(result);
-  }
-
   return fpromise::ok(std::move(v2b));
 }
 
-// If !v1 && !aux_buffers_v1, the result will be fit::is_ok(), but result.value().IsEmpty().
+// If !v1, the result will be fit::is_ok(), but result.value().IsEmpty().
 fpromise::result<fuchsia_sysmem2::wire::BufferCollectionConstraints>
 V2CopyFromV1BufferCollectionConstraints(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferCollectionConstraints* v1,
-    const fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers* aux_buffers_v1) {
-  // Should be enforced by the caller.
-  ZX_DEBUG_ASSERT(v1 || !aux_buffers_v1);
+    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferCollectionConstraints* v1) {
   fuchsia_sysmem2::wire::BufferCollectionConstraints v2b(allocator);
 
   if (v1) {
     auto result = V2CopyFromV1BufferCollectionConstraintsMain(allocator, &v2b, *v1);
-    OK_OR_RET_ERROR(result);
-  }
-
-  if (aux_buffers_v1) {
-    auto result =
-        V2CopyFromV1BufferCollectionConstraintsAuxBuffers(allocator, &v2b, *aux_buffers_v1);
     OK_OR_RET_ERROR(result);
   }
 
@@ -747,7 +709,6 @@ fuchsia_sysmem2::VmoBuffer V2MoveFromV1VmoBuffer(fuchsia_sysmem::VmoBuffer v1) {
     v2b.vmo() = std::move(v1.vmo());
   }
   PROCESS_SCALAR_FIELD_V1(vmo_usable_start);
-  ZX_DEBUG_ASSERT(!v2b.aux_vmo().has_value());
   return v2b;
 }
 
@@ -758,7 +719,6 @@ fuchsia_sysmem2::wire::VmoBuffer V2MoveFromV1VmoBuffer(fidl::AnyArena& allocator
     v2b.set_vmo(std::move(v1.vmo));
   }
   PROCESS_WIRE_SCALAR_FIELD_V1_WITH_ALLOCATOR(vmo_usable_start);
-  ZX_DEBUG_ASSERT(!v2b.has_aux_vmo());
   return v2b;
 }
 
@@ -806,14 +766,11 @@ fuchsia_sysmem2::wire::HeapType V2CopyFromV1HeapType(fuchsia_sysmem::wire::HeapT
   return static_cast<fuchsia_sysmem2::wire::HeapType>(fidl_underlying_cast(heap_type));
 }
 
-fpromise::result<std::pair<std::optional<fuchsia_sysmem::BufferCollectionConstraints>,
-                           std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers>>>
+fpromise::result<std::optional<fuchsia_sysmem::BufferCollectionConstraints>>
 V1CopyFromV2BufferCollectionConstraints(const fuchsia_sysmem2::BufferCollectionConstraints& v2) {
   fuchsia_sysmem::BufferCollectionConstraints v1;
   if (v2.IsEmpty()) {
-    return fpromise::ok(
-        std::pair<std::optional<fuchsia_sysmem::BufferCollectionConstraints>,
-                  std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers>>());
+    return fpromise::ok(std::optional<fuchsia_sysmem::BufferCollectionConstraints>());
   }
   if (v2.usage().has_value()) {
     v1.usage() = V1CopyFromV2BufferUsage(v2.usage().value());
@@ -856,28 +813,15 @@ V1CopyFromV2BufferCollectionConstraints(const fuchsia_sysmem2::BufferCollectionC
     }
   }
 
-  std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers> v1_aux_buffers;
-  if (v2.need_clear_aux_buffers_for_secure().has_value() ||
-      v2.allow_clear_aux_buffers_for_secure().has_value()) {
-    fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers v1;
-    PROCESS_SCALAR_FIELD_V2(need_clear_aux_buffers_for_secure);
-    PROCESS_SCALAR_FIELD_V2(allow_clear_aux_buffers_for_secure);
-    v1_aux_buffers = v1;
-  }
-
-  return fpromise::ok(std::make_pair(std::move(v1), std::move(v1_aux_buffers)));
+  return fpromise::ok(std::move(v1));
 }
 
-fpromise::result<
-    std::pair<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>,
-              std::optional<fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers>>>
+fpromise::result<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>>
 V1CopyFromV2BufferCollectionConstraints(
     const fuchsia_sysmem2::wire::BufferCollectionConstraints& v2) {
   fuchsia_sysmem::wire::BufferCollectionConstraints v1{};
   if (v2.IsEmpty()) {
-    return fpromise::ok(
-        std::pair<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>,
-                  std::optional<fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers>>());
+    return fpromise::ok(std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>());
   }
   if (v2.has_usage()) {
     v1.usage = V1CopyFromV2BufferUsage(v2.usage());
@@ -920,15 +864,7 @@ V1CopyFromV2BufferCollectionConstraints(
     }
   }
 
-  std::optional<fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers> v1_aux_buffers;
-  if (v2.has_need_clear_aux_buffers_for_secure() || v2.has_allow_clear_aux_buffers_for_secure()) {
-    fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers v1{};
-    PROCESS_WIRE_SCALAR_FIELD_V2(need_clear_aux_buffers_for_secure);
-    PROCESS_WIRE_SCALAR_FIELD_V2(allow_clear_aux_buffers_for_secure);
-    v1_aux_buffers = v1;
-  }
-
-  return fpromise::ok(std::make_pair(v1, v1_aux_buffers));
+  return fpromise::ok(v1);
 }
 
 fpromise::result<fuchsia_sysmem::BufferMemoryConstraints> V1CopyFromV2BufferMemoryConstraints(
@@ -1273,54 +1209,21 @@ fpromise::result<fuchsia_sysmem::wire::SingleBufferSettings> V1CopyFromV2SingleB
   return fpromise::ok(v1);
 }
 
-// Intentionally just consumes aux_vmo.  The implied extra handle duplications from this behavior go
-// away when all participants speak V2.  For V1 participants that need the aux_vmo, there's a
-// completely different method and struct for getting that.
 fuchsia_sysmem::VmoBuffer V1MoveFromV2VmoBuffer(fuchsia_sysmem2::VmoBuffer v2) {
   fuchsia_sysmem::VmoBuffer v1;
   if (v2.vmo().has_value()) {
     v1.vmo() = std::move(v2.vmo().value());
   }
   PROCESS_SCALAR_FIELD_V2(vmo_usable_start);
-  // ~v2 will ~aux_vmo, intentionally - see function comment above.
   return v1;
 }
 
-// Intentionally just consumes aux_vmo.  The implied extra handle duplications from this behavior go
-// away when all participants speak V2.  For V1 participants that need the aux_vmo, there's a
-// completely different method and struct for getting that.
 fuchsia_sysmem::wire::VmoBuffer V1MoveFromV2VmoBuffer(fuchsia_sysmem2::wire::VmoBuffer v2) {
   fuchsia_sysmem::wire::VmoBuffer v1;
   if (v2.has_vmo()) {
     v1.vmo = std::move(v2.vmo());
   }
   PROCESS_WIRE_SCALAR_FIELD_V2(vmo_usable_start);
-  // ~v2 will ~aux_vmo, intentionally - see function comment above.
-  return v1;
-}
-
-// Intentionally just consumes vmo (but not aux_vmo).  The implied extra handle duplications from
-// this behavior go away when all participants speak V2.
-fuchsia_sysmem::VmoBuffer V1AuxBuffersMoveFromV2VmoBuffer(fuchsia_sysmem2::VmoBuffer v2) {
-  fuchsia_sysmem::VmoBuffer v1;
-  if (v2.aux_vmo().has_value()) {
-    v1.vmo() = std::move(v2.aux_vmo().value());
-  }
-  PROCESS_SCALAR_FIELD_V2(vmo_usable_start);
-  // ~v2 will ~vmo, intentionally - see function comment above.
-  return v1;
-}
-
-// Intentionally just consumes vmo (but not aux_vmo).  The implied extra handle duplications from
-// this behavior go away when all participants speak V2.
-fuchsia_sysmem::wire::VmoBuffer V1AuxBuffersMoveFromV2VmoBuffer(
-    fuchsia_sysmem2::wire::VmoBuffer v2) {
-  fuchsia_sysmem::wire::VmoBuffer v1;
-  if (v2.has_aux_vmo()) {
-    v1.vmo = std::move(v2.aux_vmo());
-  }
-  PROCESS_WIRE_SCALAR_FIELD_V2(vmo_usable_start);
-  // ~v2 will ~vmo, intentionally - see function comment above.
   return v1;
 }
 
@@ -1372,54 +1275,6 @@ fpromise::result<fuchsia_sysmem::wire::BufferCollectionInfo2> V1MoveFromV2Buffer
   return fpromise::ok(std::move(v1));
 }
 
-fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> V1AuxBuffersMoveFromV2BufferCollectionInfo(
-    fuchsia_sysmem2::BufferCollectionInfo v2) {
-  fuchsia_sysmem::BufferCollectionInfo2 v1;
-  if (v2.buffers().has_value()) {
-    if (v2.buffers()->size() > fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers) {
-      LOG(ERROR,
-          "v2.buffers().count() > "
-          "fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers");
-      return fpromise::error();
-    }
-    v1.buffer_count() = static_cast<uint32_t>(v2.buffers()->size());
-    for (uint32_t i = 0; i < v2.buffers()->size(); ++i) {
-      v1.buffers()[i] = V1AuxBuffersMoveFromV2VmoBuffer(std::move(v2.buffers()->at(i)));
-    }
-  }
-  auto settings_result = V1CopyFromV2SingleBufferSettings(v2.settings().value());
-  if (!settings_result.is_ok()) {
-    LOG(ERROR, "!settings_result.is_ok()");
-    return fpromise::error();
-  }
-  v1.settings() = settings_result.take_value();
-  return fpromise::ok(std::move(v1));
-}
-
-fpromise::result<fuchsia_sysmem::wire::BufferCollectionInfo2>
-V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollectionInfo v2) {
-  fuchsia_sysmem::wire::BufferCollectionInfo2 v1;
-  if (v2.has_buffers()) {
-    if (v2.buffers().count() > fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers) {
-      LOG(ERROR,
-          "v2.buffers().count() > "
-          "fuchsia_sysmem::wire::kMaxCountBufferCollectionInfoBuffers");
-      return fpromise::error();
-    }
-    v1.buffer_count = static_cast<uint32_t>(v2.buffers().count());
-    for (uint32_t i = 0; i < v2.buffers().count(); ++i) {
-      v1.buffers[i] = V1AuxBuffersMoveFromV2VmoBuffer(v2.buffers()[i]);
-    }
-  }
-  auto settings_result = V1CopyFromV2SingleBufferSettings(v2.settings());
-  if (!settings_result.is_ok()) {
-    LOG(ERROR, "!settings_result.is_ok()");
-    return fpromise::error();
-  }
-  v1.settings = settings_result.take_value();
-  return fpromise::ok(std::move(v1));
-}
-
 fuchsia_sysmem2::wire::BufferMemorySettings V2CloneBufferMemorySettings(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::BufferMemorySettings& src) {
   // FIDL wire codegen doesn't have clone, but it does have conversion to/from natural types which
@@ -1448,7 +1303,7 @@ fuchsia_sysmem2::wire::SingleBufferSettings V2CloneSingleBufferSettings(
 }
 
 fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
-    const fuchsia_sysmem2::VmoBuffer& src, uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask) {
+    const fuchsia_sysmem2::VmoBuffer& src, uint32_t vmo_rights_mask) {
   fuchsia_sysmem2::VmoBuffer vmo_buffer;
   if (src.vmo().has_value()) {
     if (src.vmo().value().get() != ZX_HANDLE_INVALID && vmo_rights_mask != 0) {
@@ -1474,27 +1329,6 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
   if (src.vmo_usable_start().has_value()) {
     vmo_buffer.vmo_usable_start() = src.vmo_usable_start().value();
   }
-  if (src.aux_vmo().has_value()) {
-    if (src.aux_vmo().value().get() != ZX_HANDLE_INVALID && aux_vmo_rights_mask != 0) {
-      zx::vmo clone_vmo;
-      zx_info_handle_basic_t info{};
-      zx_status_t get_info_status = src.aux_vmo().value().get_info(ZX_INFO_HANDLE_BASIC, &info,
-                                                                   sizeof(info), nullptr, nullptr);
-      if (get_info_status != ZX_OK) {
-        LOG(ERROR, "get_info_status: %d", get_info_status);
-        return fpromise::error(get_info_status);
-      }
-      zx_status_t duplicate_status =
-          src.aux_vmo().value().duplicate(info.rights & aux_vmo_rights_mask, &clone_vmo);
-      if (duplicate_status != ZX_OK) {
-        LOG(ERROR, "duplicate_status: %d", duplicate_status);
-        return fpromise::error(duplicate_status);
-      }
-      vmo_buffer.aux_vmo() = std::move(clone_vmo);
-    } else {
-      ZX_DEBUG_ASSERT(!vmo_buffer.aux_vmo().has_value());
-    }
-  }
   if (src.close_weak_asap().has_value()) {
     zx::eventpair clone_eventpair;
     zx_status_t duplicate_status =
@@ -1510,7 +1344,7 @@ fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
 
 fpromise::result<fuchsia_sysmem2::wire::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::VmoBuffer& src,
-    uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask) {
+    uint32_t vmo_rights_mask) {
   fuchsia_sysmem2::wire::VmoBuffer vmo_buffer(allocator);
   if (src.has_vmo()) {
     zx::vmo clone_vmo;
@@ -1535,33 +1369,11 @@ fpromise::result<fuchsia_sysmem2::wire::VmoBuffer, zx_status_t> V2CloneVmoBuffer
   if (src.has_vmo_usable_start()) {
     vmo_buffer.set_vmo_usable_start(allocator, src.vmo_usable_start());
   }
-  if (src.has_aux_vmo()) {
-    zx::vmo clone_vmo;
-    if (src.aux_vmo().get() != ZX_HANDLE_INVALID) {
-      zx_info_handle_basic_t info{};
-      zx_status_t get_info_status =
-          src.aux_vmo().get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-      if (get_info_status != ZX_OK) {
-        LOG(ERROR, "get_info_status: %d", get_info_status);
-        return fpromise::error(get_info_status);
-      }
-      zx_status_t duplicate_status =
-          src.aux_vmo().duplicate(info.rights & aux_vmo_rights_mask, &clone_vmo);
-      if (duplicate_status != ZX_OK) {
-        LOG(ERROR, "duplicate_status: %d", duplicate_status);
-        return fpromise::error(duplicate_status);
-      }
-    } else {
-      ZX_DEBUG_ASSERT(clone_vmo.get() == ZX_HANDLE_INVALID);
-    }
-    vmo_buffer.set_aux_vmo(std::move(clone_vmo));
-  }
   return fpromise::ok(vmo_buffer);
 }
 
 fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBufferCollectionInfo(
-    const fuchsia_sysmem2::BufferCollectionInfo& src, uint32_t vmo_rights_mask,
-    uint32_t aux_vmo_rights_mask) {
+    const fuchsia_sysmem2::BufferCollectionInfo& src, uint32_t vmo_rights_mask) {
   fuchsia_sysmem2::BufferCollectionInfo buffer_collection_info;
   if (src.settings().has_value()) {
     // clone via generated copy
@@ -1570,8 +1382,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBuff
   if (src.buffers().has_value()) {
     buffer_collection_info.buffers().emplace(src.buffers()->size());
     for (uint32_t i = 0; i < src.buffers()->size(); ++i) {
-      auto clone_result =
-          V2CloneVmoBuffer(src.buffers()->at(i), vmo_rights_mask, aux_vmo_rights_mask);
+      auto clone_result = V2CloneVmoBuffer(src.buffers()->at(i), vmo_rights_mask);
       if (!clone_result.is_ok()) {
         return clone_result.take_error_result();
       }
@@ -1587,7 +1398,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBuff
 fpromise::result<fuchsia_sysmem2::wire::BufferCollectionInfo, zx_status_t>
 V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
                             const fuchsia_sysmem2::wire::BufferCollectionInfo& src,
-                            uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask) {
+                            uint32_t vmo_rights_mask) {
   fuchsia_sysmem2::wire::BufferCollectionInfo buffer_collection_info(allocator);
   if (src.has_settings()) {
     buffer_collection_info.set_settings(allocator,
@@ -1596,8 +1407,7 @@ V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
   if (src.has_buffers()) {
     buffer_collection_info.set_buffers(allocator, allocator, src.buffers().count());
     for (uint32_t i = 0; i < src.buffers().count(); ++i) {
-      auto clone_result =
-          V2CloneVmoBuffer(allocator, src.buffers()[i], vmo_rights_mask, aux_vmo_rights_mask);
+      auto clone_result = V2CloneVmoBuffer(allocator, src.buffers()[i], vmo_rights_mask);
       if (!clone_result.is_ok()) {
         return clone_result.take_error_result();
       }

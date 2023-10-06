@@ -129,30 +129,6 @@ void BufferCollection::V1::DeprecatedSync(DeprecatedSyncCompleter::Sync& complet
   parent_.SyncImpl(completer);
 }
 
-void BufferCollection::V1::SetConstraintsAuxBuffers(
-    SetConstraintsAuxBuffersRequest& request, SetConstraintsAuxBuffersCompleter::Sync& completer) {
-  if (parent_.is_set_constraints_aux_buffers_seen_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-                     "SetConstraintsAuxBuffers() can be called only once.");
-    return;
-  }
-  parent_.is_set_constraints_aux_buffers_seen_ = true;
-  if (parent_.is_done_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-                     "BufferCollectionToken::SetConstraintsAuxBuffers() when already is_done_");
-    return;
-  }
-  if (parent_.is_set_constraints_seen_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-                     "SetConstraintsAuxBuffers() after SetConstraints() causes failure.");
-    return;
-  }
-  ZX_DEBUG_ASSERT(!parent_.constraints_aux_buffers_.has_value());
-  parent_.constraints_aux_buffers_.emplace(std::move(request.constraints()));
-  // LogicalBufferCollection doesn't care about "clear aux buffers" constraints until the last
-  // SetConstraints(), so done for now.
-}
-
 template <typename Completer>
 bool BufferCollection::CommonSetConstraintsStage1(Completer& completer) {
   if (is_set_constraints_seen_) {
@@ -182,26 +158,14 @@ void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
   if (!request.has_constraints()) {
     // Not needed.
     local_constraints.reset();
-    if (parent_.is_set_constraints_aux_buffers_seen_) {
-      // No constraints are fine, just not aux buffers constraints without main constraints, because
-      // I can't think of any reason why we'd need to support aux buffers constraints without main
-      // constraints, so disallow at least for now.
-      parent_.FailSync(FROM_HERE, completer, ZX_ERR_NOT_SUPPORTED,
-                       "SetConstraintsAuxBuffers() && !has_constraints");
-      return;
-    }
   }
 
   ZX_DEBUG_ASSERT(!parent_.has_constraints());
-  // enforced above
-  ZX_DEBUG_ASSERT(!parent_.constraints_aux_buffers_.has_value() || local_constraints.has_value());
   ZX_DEBUG_ASSERT(request.has_constraints() == local_constraints.has_value());
 
   {  // scope result
     auto result = sysmem::V2CopyFromV1BufferCollectionConstraints(
-        local_constraints.has_value() ? &local_constraints.value() : nullptr,
-        parent_.constraints_aux_buffers_.has_value() ? &(*parent_.constraints_aux_buffers_)
-                                                     : nullptr);
+        local_constraints.has_value() ? &local_constraints.value() : nullptr);
     if (!result.is_ok()) {
       parent_.FailSync(FROM_HERE, completer, ZX_ERR_INVALID_ARGS,
                        "V2CopyFromV1BufferCollectionConstraints() failed");
@@ -210,9 +174,6 @@ void BufferCollection::V1::SetConstraints(SetConstraintsRequest& request,
     ZX_DEBUG_ASSERT(!result.value().IsEmpty() || !local_constraints.has_value());
     parent_.node_properties().SetBufferCollectionConstraints(result.take_value());
   }  // ~result
-
-  // No longer needed.
-  parent_.constraints_aux_buffers_.reset();
 
   parent_.node_properties().LogInfo(FROM_HERE, "BufferCollection::V1::SetConstraints()");
   parent_.node_properties().LogConstraints(FROM_HERE);
@@ -385,36 +346,6 @@ void BufferCollection::V2::CheckAllBuffersAllocated(
   } else {
     completer.Reply(fit::error(result));
   }
-}
-
-void BufferCollection::V1::GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) {
-  TRACE_DURATION("gfx", "BufferCollection::GetAuxBuffers", "this", this,
-                 "logical_buffer_collection", &parent_.logical_buffer_collection());
-  if (!parent_.logical_allocation_result_.has_value()) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-                     "GetAuxBuffers() called before allocation complete.");
-    return;
-  }
-  if (parent_.logical_allocation_result_->status != ZX_OK) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-                     "GetAuxBuffers() called after allocation failure.");
-    // We're failing async - no need to fail sync.
-    return;
-  }
-  ZX_DEBUG_ASSERT(parent_.logical_allocation_result_->buffer_collection_info);
-  auto v1_result = parent_.CloneAuxBuffersResultForSendingV1(
-      *parent_.logical_allocation_result_->buffer_collection_info);
-  if (!v1_result.is_ok()) {
-    // Close to avoid assert.
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_INTERNAL,
-                     "CloneAuxBuffersResultForSendingV1() failed.");
-    return;
-  }
-  auto v1 = v1_result.take_value();
-  fuchsia_sysmem::BufferCollectionGetAuxBuffersResponse response;
-  response.status() = parent_.logical_allocation_result_->status;
-  response.buffer_collection_info_aux_buffers() = std::move(v1);
-  completer.Reply(std::move(response));
 }
 
 template <typename Completer>
@@ -690,16 +621,12 @@ void BufferCollection::FailSync(Location location, Completer& completer, zx_stat
 fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneResultForSendingV2(
     const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
   uint32_t vmo_rights_mask = GetClientVmoRights();
-  uint32_t aux_vmo_rights_mask = GetClientAuxVmoRights();
   ZX_DEBUG_ASSERT(has_constraints());
   bool is_usage = constraints().usage().has_value() && IsAnyUsage(constraints().usage().value());
   if (!is_usage || node_properties().is_weak()) {
     // By specifying 0 for rights, the V2CloneBufferCollectionInfo() below won't dup any VMO handles
     // (and won't create any child VMOs).
     vmo_rights_mask = 0;
-  }
-  if (!is_usage) {
-    aux_vmo_rights_mask = 0;
   }
 #if ZX_DEBUG_ASSERT_IMPLEMENTED
   {
@@ -716,8 +643,7 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
     }
   }
 #endif
-  auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, vmo_rights_mask,
-                                                          aux_vmo_rights_mask);
+  auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, vmo_rights_mask);
   if (!clone_result.is_ok()) {
     FailAsync(FROM_HERE, clone_result.error(),
               "CloneResultForSendingV1() V2CloneBufferCollectionInfo() failed - status: %d",
@@ -755,17 +681,12 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       ZX_DEBUG_ASSERT(vmo_buffer.vmo().has_value() == vmo_buffer.close_weak_asap().has_value());
       // We'll move any aux_vmo separately below.
       auto attenuated_vmo_buffer_result =
-          sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights(), 0);
+          sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights());
       if (attenuated_vmo_buffer_result.is_error()) {
         FailAsync(FROM_HERE, attenuated_vmo_buffer_result.error(), "V2CloneVmoBuffer failed");
         return fpromise::error();
       }
       auto& attenuated_vmo_buffer = attenuated_vmo_buffer_result.value();
-      if (vmo_buffer.aux_vmo().has_value()) {
-        // There's no need to send this throguh V2CloneVmoBuffer() a second time, so just move; this
-        // will go away once support for aux VMOs is removed.
-        attenuated_vmo_buffer.aux_vmo() = std::move(vmo_buffer.aux_vmo());
-      }
       v2_b.buffers()->at(buffer_index) = std::move(attenuated_vmo_buffer);
     }
   }
@@ -792,29 +713,6 @@ fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> BufferCollection::CloneR
     return fpromise::error();
   }
   return v1_result;
-}
-
-fpromise::result<fuchsia_sysmem::BufferCollectionInfo2>
-BufferCollection::CloneAuxBuffersResultForSendingV1(
-    const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info) {
-  if (node_properties().is_weak()) {
-    // To avoid this failure, consider migrating to sysmem2 (any token client_end can be used as
-    // sysmem2), but be aware that aux buffers will be going away in sysmem2.
-    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS, "sysmem v1 can't do weak (2)");
-    return fpromise::error();
-  }
-  auto v2_result = CloneResultForSendingV2(buffer_collection_info);
-  if (!v2_result.is_ok()) {
-    // FailAsync() already called.
-    return fpromise::error();
-  }
-  auto v1_result = sysmem::V1AuxBuffersMoveFromV2BufferCollectionInfo(v2_result.take_value());
-  if (!v1_result.is_ok()) {
-    FailAsync(FROM_HERE, ZX_ERR_INVALID_ARGS,
-              "CloneResultForSendingV1() V1MoveFromV2BufferCollectionInfo() failed");
-    return fpromise::error();
-  }
-  return fpromise::ok(v1_result.take_value());
 }
 
 void BufferCollection::OnBuffersAllocated(const AllocationResult& allocation_result) {
@@ -891,11 +789,6 @@ uint32_t BufferCollection::GetClientVmoRights() {
       // parameter so that initiator and participant can distribute the token
       // and remove any unnecessary/unintended rights along the way.
       node_properties().rights_attenuation_mask();
-}
-
-uint32_t BufferCollection::GetClientAuxVmoRights() {
-  // At least for now.
-  return GetClientVmoRights();
 }
 
 void BufferCollection::MaybeCompleteWaitForBuffersAllocated() {

@@ -18,19 +18,9 @@ type VmoBuffer = resource table {
     /// BufferMemorySettings.size_bytes before the end of the VMO.
     2: vmo_usable_start uint64;
 
-    /// In some cases, we have a physically separate aux buffer that is a
-    /// logical shadow of the main buffer.  The main use case so far is DRM L1
-    /// where we can have a clear aux buffer that has meaningful bytes only for
-    /// the portions of the input which are clear (not protected).  The
-    /// protected portions will be set to a byte value that will prevent start
-    /// code emulation (0xFF will work for most video formats).
-    ///
-    /// |aux_vmo| will be un-set if there are no aux buffers, or in the same
-    /// cases that |vmo| can be un-set.
-    //
-    // TODO: finish deprecating / fail in sysmemm v1, remove from v2, and allow
-    // re-use of ordinal because nothing actually used aux_vmo in sysmem2.
-    3: aux_vmo zx.Handle:VMO;
+    /// This ordinal is ok to re-use in sysmem2; nothing ever actually used this
+    /// ordinal for anything (aux_vmo never used in sysmem2).
+    3: reserved;
 
     /// This field is set iff the |vmo| is a sysmem weak VMO handle. The client
     /// must keep |close_weak_asap| around for as long as |vmo|, and must notice

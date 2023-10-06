@@ -67,7 +67,7 @@ closed protocol Node {
     /// On a BufferCollectionToken channel:
     ///
     /// Normally a participant will convert a BufferCollectionToken into a
-    /// BufferCollection view, but a particpant is also free to Close() the
+    /// BufferCollection view, but a participant is also free to Close() the
     /// token (and then close the channel immediately or shortly later in
     /// response to server closing its end), which avoids causing logical buffer
     /// collection failure.  Normally an unexpected token channel close will
@@ -674,45 +674,11 @@ closed protocol BufferCollection {
     strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
-
-    /// Deprecated
-    ///
-    /// Optionally sent before SetConstraints() to set constraints related to
-    /// clear (not encrypted, not in protected/secure memory) aux buffers.  This
-    /// is only valid when sent before SetConstraints().  Invalid settings may
-    /// not result in channel closure until SetConstraints() is received by
-    /// sysmem.
-    @available(added=7, deprecated=9)
+    @available(added=7, deprecated=9, removed=HEAD)
     strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
-
-    /// Deprecated
-    ///
-    /// Allows getting any aux buffers allocated after using
-    /// SetConstraintsAuxBuffers().
-    ///
-    /// Sending this message is not permitted until WaitForBuffersAllocated()
-    /// completes.
-    ///
-    /// On failure, status will be a failing status and
-    /// buffer_collection_info_aux_buffers won't be filled out, and won't have
-    /// any handles.
-    ///
-    /// On success, status will be ZX_OK, and buffer_count will be the same as
-    /// the main buffer_count from WaitForBuffersAllocated().
-    ///
-    /// If a participant specified "allow_clear_aux_buffers_for_secure" true but
-    /// "need_clear_aux_buffers_for_secure" false (or not set), the participant
-    /// can determine if aux buffers were allocated by looking at buffer[0].vmo.
-    /// If buffer 0 has no vmo, aux VMOs were not allocated.  The resulting
-    /// status will still be ZX_OK in this case, and buffer_count will still be
-    /// filled out to match the main buffer_count.
-    ///
-    /// It's legal for a participant that set
-    /// "allow_clear_aux_buffers_for_secure" false to call GetAuxBuffers(), in
-    /// which case buffer[0].vmo will not be set.
-    @available(added=7, deprecated=9)
+    @available(added=7, deprecated=9, removed=HEAD)
     strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;

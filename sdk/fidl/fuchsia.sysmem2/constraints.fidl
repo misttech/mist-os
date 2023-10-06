@@ -122,7 +122,7 @@ type BufferCollectionConstraints = table {
     /// is permitted. Entries in the list must have unique pixel_formats.
     ///
     /// When aggregating, only pixel formats that are specified by all
-    /// particpants with non-zero image_format_constraints_count (and non-Null)
+    /// participants with non-zero image_format_constraints_count (and non-Null)
     /// BufferCollectionConstraints) are retained.
     ///
     /// Un-set means no image format constraints.  set but zero length is an
@@ -130,29 +130,10 @@ type BufferCollectionConstraints = table {
     8: image_format_constraints
             vector<ImageFormatConstraints>:MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS;
 
-    /// If true, a secure heap may only be selected if all participants with
-    /// BufferMemoryConstraints specify allow_clear_aux_buffers_for_secure.  If
-    /// "need" is true, "allow" must also be true.
-    ///
-    /// If false (or unset), the participant can still work, potentially even
-    /// with secure memory (depending on supported heaps), without clear aux
-    /// buffers.
-    9: need_clear_aux_buffers_for_secure bool;
-
-    /// If true, the participant will use clear aux buffers, if they are
-    /// allocated, as appropriate to the participant's role.  If the participant
-    /// is a writer, then the participant writer will populate the clear aux
-    /// buffers with the clear (not-encrypted, not-DRM-protected) bytes, and
-    /// fill protected bytes with data that does not emulate start codes, such
-    /// as 0xFF.
-    ///
-    /// If un-set, then allow_clear_aux_buffers_for_secure is true iff the
-    /// participant specifies usage which is read-only.
-    ///
-    /// If un-set from a participant with write usage, or false, the buffer
-    /// collection won't be able to allocate if any participant specifies
-    /// need_clear_aux_buffers_for_secure true.
-   10: allow_clear_aux_buffers_for_secure bool;
+    // Was need_clear_aux_buffers_for_secure.
+    9: reserved;
+    // Was allow_clear_aux_buffers_for_secure.
+   10: reserved;
 };
 
 /// Known heap types.

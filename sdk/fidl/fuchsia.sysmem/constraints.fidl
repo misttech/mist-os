@@ -106,13 +106,14 @@ type BufferCollectionConstraints = struct {
     /// is permitted. Entries in the list must have unique pixel_formats.
     ///
     /// When aggregating, only pixel formats that are specified by all
-    /// particpants with non-zero image_format_constraints_count (and non-Null)
+    /// participants with non-zero image_format_constraints_count (and non-Null)
     /// BufferCollectionConstraints) are retained.
     image_format_constraints_count uint32;
     image_format_constraints
             array<ImageFormatConstraints, MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS>;
 };
 
+@available(added=7, deprecated=9, removed=HEAD)
 type BufferCollectionConstraintsAuxBuffers = struct {
     /// If true, a secure heap may only be selected if all participants with
     /// BufferMemoryConstraints specify allow_clear_aux_buffers_for_secure.  If

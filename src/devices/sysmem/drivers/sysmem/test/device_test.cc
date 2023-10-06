@@ -443,9 +443,8 @@ TEST_F(FakeDdkSysmem, TeardownLeak) {
   collection = {};
 }
 
-// Check that there are no circular references from a VMO to the logical buffer collection, even
-// when aux buffers are checked for.
-TEST_F(FakeDdkSysmem, AuxBufferLeak) {
+// Check that there are no circular references from a VMO to the logical buffer collection.
+TEST_F(FakeDdkSysmem, BufferLeak) {
   auto collection_client = AllocateNonSharedCollection();
 
   fuchsia_sysmem::BufferCollectionConstraints constraints;
@@ -468,13 +467,6 @@ TEST_F(FakeDdkSysmem, AuxBufferLeak) {
     result.value().buffer_collection_info.buffers[i].vmo.reset();
   }
 
-  fidl::WireResult aux_result = collection->GetAuxBuffers();
-
-  EXPECT_OK(aux_result);
-  EXPECT_OK(aux_result.value().status);
-  EXPECT_EQ(1u, aux_result.value().buffer_collection_info_aux_buffers.buffer_count);
-  EXPECT_EQ(ZX_HANDLE_INVALID,
-            aux_result.value().buffer_collection_info_aux_buffers.buffers[0].vmo);
   collection = {};
 
   // Poll until all buffer collections are deleted.

@@ -80,16 +80,17 @@ const videoUsageCapture uint32 = 8;
 // encoded access units.  The decryptor output may be in secure memory (controlled separately via
 // secure_required).
 //
-// TODO(fxbug.dev/34192): Overhaul usage so we can add usage categories without breaking client struct init
-// code repeatedly.  For now, this value is in the "video" category but to some degree isn't really
-// video; this usage can be used for the output of any secure decryptor.  Also, other usages should
-// include input vs. output as those are separate buffer collections and are really separate usages.
+// TODO(fxbug.dev/34192): Overhaul usage so we can add usage categories without breaking client
+// struct init code repeatedly.  For now, this value is in the "video" category but to some degree
+// isn't really video; this usage can be used for the output of any secure decryptor.  Also, other
+// usages should include input vs. output as those are separate buffer collections and are really
+// separate usages.
 //
 // We have this as a separate usage because each participant that needs VMO handles needs to specify
 // a usage that isn't nonUsage, and the decryptor output participant shouldn't be specifying
 // videoUsageHwDecoder because the decryptor isn't the decoder.
 const videoUsageDecryptorOutput uint32 = 16;
 // This usage is for a HW video decoder's internal buffers that aren't shared with other
-// particpants.  These are allocated via sysmem because sysmem pre-reserves contiguous SYSTEM_RAM
+// participants.  These are allocated via sysmem because sysmem pre-reserves contiguous SYSTEM_RAM
 // as appropriate, and is the only way to allocate secure memory.
 const videoUsageHwDecoderInternal uint32 = 32;

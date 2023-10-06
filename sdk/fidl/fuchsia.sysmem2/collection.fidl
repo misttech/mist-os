@@ -72,7 +72,7 @@ closed protocol Node {
     /// On a `BufferCollectionToken` channel:
     ///
     /// Normally a participant will convert a `BufferCollectionToken` into a
-    /// `BufferCollection` view, but a particpant is also free to `Close` the
+    /// `BufferCollection` view, but a participant is also free to `Close` the
     /// token (and then close the channel immediately or shortly later in
     /// response to server closing its end), which avoids causing logical buffer
     /// collection failure.  Normally an unexpected token channel close will

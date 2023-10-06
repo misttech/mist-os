@@ -417,7 +417,7 @@ void set_min_camping_constraints_v2(fidl::SyncClient<v2::BufferCollection>& coll
 bool Equal(const v2::BufferCollectionInfo& lhs, const v2::BufferCollectionInfo& rhs) {
   // Clone both.
   auto clone = [](const v2::BufferCollectionInfo& v) -> v2::BufferCollectionInfo {
-    auto clone_result = sysmem::V2CloneBufferCollectionInfo(v, 0, 0);
+    auto clone_result = sysmem::V2CloneBufferCollectionInfo(v, 0);
     ZX_ASSERT(clone_result.is_ok());
     return clone_result.take_value();
   };

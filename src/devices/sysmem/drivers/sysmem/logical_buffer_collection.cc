@@ -84,8 +84,6 @@ const std::unordered_map<sysmem::FidlUnderlyingTypeOrType_t<fuchsia_images2::Col
         {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kRec2100), 2},
         {sysmem::fidl_underlying_cast(fuchsia_images2::ColorSpace::kPassthrough), 9}};
 
-constexpr uint32_t kNeedAuxVmoAlso = 1;
-
 template <typename T>
 bool IsNonZeroPowerOf2(T value) {
   static_assert(std::is_integral_v<T>);
@@ -1517,7 +1515,7 @@ LogicalBufferCollection::TryAllocate(std::vector<NodeProperties*> nodes) {
   // non-linearized copy is for easier logging of diffs if an AttachToken() sequence fails due to
   // mismatched BufferCollectionInfo.
   ZX_DEBUG_ASSERT(!buffer_collection_info_before_population_.has_value());
-  auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, 0, 0);
+  auto clone_result = sysmem::V2CloneBufferCollectionInfo(buffer_collection_info, 0);
   if (!clone_result.is_ok()) {
     ZX_DEBUG_ASSERT(clone_result.error() != ZX_OK);
     ZX_DEBUG_ASSERT(clone_result.error() != ZX_ERR_NOT_SUPPORTED);
@@ -1657,11 +1655,6 @@ zx_status_t LogicalBufferCollection::TryLateLogicalAllocation(std::vector<NodePr
     existing_constraints.image_format_constraints()->at(0) =
         existing.settings()->image_format_constraints().value();
   }
-  if (existing.buffers()->at(0).vmo_usable_start().has_value() &&
-      existing.buffers()->at(0).vmo_usable_start().value() & kNeedAuxVmoAlso) {
-    existing_constraints.need_clear_aux_buffers_for_secure().emplace(true);
-  }
-  existing_constraints.allow_clear_aux_buffers_for_secure().emplace(true);
 
   if (is_verbose_logging()) {
     LogInfo(FROM_HERE, "constraints from initial allocation:");
@@ -1736,7 +1729,7 @@ zx::result<bool> LogicalBufferCollection::CompareBufferCollectionInfo(
   // Clone both.
   auto clone = [this](fuchsia_sysmem2::BufferCollectionInfo& v)
       -> zx::result<fuchsia_sysmem2::BufferCollectionInfo> {
-    auto clone_result = sysmem::V2CloneBufferCollectionInfo(v, 0, 0);
+    auto clone_result = sysmem::V2CloneBufferCollectionInfo(v, 0);
     if (!clone_result.is_ok()) {
       ZX_DEBUG_ASSERT(clone_result.error() != ZX_OK);
       ZX_DEBUG_ASSERT(clone_result.error() != ZX_ERR_NOT_SUPPORTED);
@@ -2157,7 +2150,7 @@ LogicalBufferCollection::CombineConstraints(ConstraintsList* constraints_list) {
   // This also enforces that at least one participant must specify non-empty constraints.
   if (!IsMinBufferSizeSpecifiedByAnyParticipant(*constraints_list)) {
     // Too unconstrained...  We refuse to allocate buffers without any min size
-    // bounds from any participant.  At least one particpant must provide
+    // bounds from any participant.  At least one participant must provide
     // some form of size bounds (in terms of buffer size bounds or in terms
     // of image size bounds).
     LogError(FROM_HERE,
@@ -2303,9 +2296,6 @@ bool LogicalBufferCollection::CheckSanitizeBufferCollectionConstraints(
   FIELD_DEFAULT_SET(constraints, buffer_memory_constraints);
   ZX_DEBUG_ASSERT(constraints.buffer_memory_constraints().has_value());
   FIELD_DEFAULT_SET_VECTOR(constraints, image_format_constraints, InitialCapacityOrZero(stage, 64));
-  FIELD_DEFAULT_FALSE(constraints, need_clear_aux_buffers_for_secure);
-  FIELD_DEFAULT(constraints, allow_clear_aux_buffers_for_secure,
-                !IsWriteUsage(constraints.usage().value()));
   if (!CheckSanitizeBufferUsage(stage, constraints.usage().value())) {
     LogError(FROM_HERE, "CheckSanitizeBufferUsage() failed");
     return false;
@@ -2766,15 +2756,6 @@ bool LogicalBufferCollection::AccumulateConstraintBufferCollection(
       ZX_DEBUG_ASSERT(!acc->image_format_constraints()->empty());
     }
   }
-
-  acc->need_clear_aux_buffers_for_secure().emplace(
-      acc->need_clear_aux_buffers_for_secure().value() ||
-      c.need_clear_aux_buffers_for_secure().value());
-  acc->allow_clear_aux_buffers_for_secure().emplace(
-      acc->allow_clear_aux_buffers_for_secure().value() &&
-      c.allow_clear_aux_buffers_for_secure().value());
-  // We check for consistency of these later only if we're actually attempting to allocate secure
-  // buffers.
 
   // acc->image_format_constraints().count() == 0 is allowed here, when all
   // participants had image_format_constraints().count() == 0.
@@ -3271,15 +3252,6 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   // checked previously
   ZX_DEBUG_ASSERT(IsSecurePermitted(buffer_constraints) || !*buffer_constraints.secure_required());
   buffer_settings.is_secure() = *buffer_constraints.secure_required();
-  if (*buffer_settings.is_secure()) {
-    if (*constraints.need_clear_aux_buffers_for_secure() &&
-        !*constraints.allow_clear_aux_buffers_for_secure()) {
-      LogError(
-          FROM_HERE,
-          "is_secure && need_clear_aux_buffers_for_secure && !allow_clear_aux_buffers_for_secure");
-      return fpromise::error(ZX_ERR_NOT_SUPPORTED);
-    }
-  }
 
   auto result_get_heap = GetHeap(buffer_constraints, parent_device_);
   if (!result_get_heap.is_ok()) {
@@ -3483,9 +3455,6 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
   for (uint32_t i = 0; i < result.buffers()->size(); ++i) {
     fuchsia_sysmem2::VmoBuffer vmo_buffer;
     vmo_buffer.vmo_usable_start() = 0ul;
-    if (*buffer_settings.is_secure() && *constraints.need_clear_aux_buffers_for_secure()) {
-      *vmo_buffer.vmo_usable_start() |= kNeedAuxVmoAlso;
-    }
     result.buffers()->at(i) = std::move(vmo_buffer);
   }
 
@@ -3553,25 +3522,6 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
   inspect_node_.CreateUint("allocation_timestamp_ns", zx::clock::get_monotonic().get(),
                            &vmo_properties_);
 
-  // Get memory allocator for aux buffers, if needed.
-  MemoryAllocator* maybe_aux_allocator = nullptr;
-  std::optional<fuchsia_sysmem2::SingleBufferSettings> maybe_aux_settings;
-  ZX_DEBUG_ASSERT(
-      !!(*result.buffers()->at(0).vmo_usable_start() & kNeedAuxVmoAlso) ==
-      (*buffer_settings.is_secure() && *constraints.need_clear_aux_buffers_for_secure()));
-  if (*result.buffers()->at(0).vmo_usable_start() & kNeedAuxVmoAlso) {
-    maybe_aux_settings.emplace();
-    maybe_aux_settings->buffer_settings().emplace();
-    auto& aux_buffer_settings = *maybe_aux_settings->buffer_settings();
-    aux_buffer_settings.size_bytes() = *buffer_settings.size_bytes();
-    aux_buffer_settings.is_physically_contiguous() = false;
-    aux_buffer_settings.is_secure() = false;
-    aux_buffer_settings.coherency_domain() = fuchsia_sysmem2::CoherencyDomain::kCpu;
-    aux_buffer_settings.heap() = fuchsia_sysmem2::HeapType::kSystemRam;
-    maybe_aux_allocator = parent_device_->GetAllocator(aux_buffer_settings);
-    ZX_DEBUG_ASSERT(maybe_aux_allocator);
-  }
-
   ZX_DEBUG_ASSERT(*buffer_settings.size_bytes() <= parent_device_->settings().max_allocation_size);
 
   auto cleanup_buffers = fit::defer([this] { ClearBuffers(); });
@@ -3585,19 +3535,8 @@ LogicalBufferCollection::Allocate(const fuchsia_sysmem2::BufferCollectionConstra
     zx::vmo vmo = allocate_result.take_value();
     auto& vmo_buffer = result.buffers()->at(i);
     vmo_buffer.vmo() = std::move(vmo);
-    if (maybe_aux_allocator) {
-      ZX_DEBUG_ASSERT(maybe_aux_settings.has_value());
-      auto aux_allocate_result = AllocateVmo(maybe_aux_allocator, maybe_aux_settings.value(), i);
-      if (!aux_allocate_result.is_ok()) {
-        LogError(FROM_HERE, "AllocateVmo() failed (aux)");
-        return fpromise::error(ZX_ERR_NO_MEMORY);
-      }
-      zx::vmo aux_vmo = aux_allocate_result.take_value();
-      vmo_buffer.aux_vmo() = std::move(aux_vmo);
-    }
     ZX_DEBUG_ASSERT(vmo_buffer.vmo_usable_start().has_value());
-    // In case kNeedAuxVmoAlso was set.
-    vmo_buffer.vmo_usable_start() = 0;
+    ZX_DEBUG_ASSERT(*vmo_buffer.vmo_usable_start() == 0);
   }
   vmo_count_property_ = inspect_node_.CreateUint("vmo_count", result.buffers()->size());
   // Make sure we have sufficient barrier after allocating/clearing/flushing any VMO newly allocated

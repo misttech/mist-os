@@ -121,9 +121,6 @@ class BufferCollection : public Node {
                         SetConstraintsCompleter::Sync& completer) override;
     void WaitForBuffersAllocated(WaitForBuffersAllocatedCompleter::Sync& completer) override;
     void CheckBuffersAllocated(CheckBuffersAllocatedCompleter::Sync& completer) override;
-    void SetConstraintsAuxBuffers(SetConstraintsAuxBuffersRequest& request,
-                                  SetConstraintsAuxBuffersCompleter::Sync& completer) override;
-    void GetAuxBuffers(GetAuxBuffersCompleter::Sync& completer) override;
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
                                 AttachLifetimeTrackingCompleter::Sync& completer) override;
@@ -178,7 +175,6 @@ class BufferCollection : public Node {
   uint32_t GetUsageBasedRightsAttenuation();
 
   uint32_t GetClientVmoRights();
-  uint32_t GetClientAuxVmoRights();
   void MaybeCompleteWaitForBuffersAllocated();
   void MaybeFlushPendingLifetimeTracking();
 
@@ -193,8 +189,6 @@ class BufferCollection : public Node {
       const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info);
 
   fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> CloneResultForSendingV1(
-      const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info);
-  fpromise::result<fuchsia_sysmem::BufferCollectionInfo2> CloneAuxBuffersResultForSendingV1(
       const fuchsia_sysmem2::BufferCollectionInfo& buffer_collection_info);
 
   template <typename Completer>
@@ -218,13 +212,8 @@ class BufferCollection : public Node {
   std::optional<V1> v1_server_;
   std::optional<V2> v2_server_;
 
-  // Temporarily holds fuchsia.sysmem.BufferCollectionConstraintsAuxBuffers until SetConstraints()
-  // arrives.
-  std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers> constraints_aux_buffers_;
-
   // FIDL protocol enforcement.
   bool is_set_constraints_seen_ = false;
-  bool is_set_constraints_aux_buffers_seen_ = false;
 
   std::list<std::pair</*async_id*/ uint64_t, V1::WaitForBuffersAllocatedCompleter::Async>>
       pending_wait_for_buffers_allocated_v1_;

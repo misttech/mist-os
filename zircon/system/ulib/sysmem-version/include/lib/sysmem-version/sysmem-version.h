@@ -228,13 +228,10 @@ V2CopyFromV1BufferMemoryConstraints(fidl::AnyArena& allocator,
                                     const fuchsia_sysmem::wire::BufferMemoryConstraints& v1);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::BufferCollectionConstraints>
-V2CopyFromV1BufferCollectionConstraints(
-    const fuchsia_sysmem::BufferCollectionConstraints* v1,
-    const fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers* aux_buffers_v1);
+V2CopyFromV1BufferCollectionConstraints(const fuchsia_sysmem::BufferCollectionConstraints* v1);
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::wire::BufferCollectionConstraints>
 V2CopyFromV1BufferCollectionConstraints(
-    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferCollectionConstraints* v1,
-    const fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers* aux_buffers_v1);
+    fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferCollectionConstraints* v1);
 
 [[nodiscard]] fpromise::result<fuchsia_images2::ImageFormat> V2CopyFromV1ImageFormat(
     const fuchsia_sysmem::ImageFormat2& v1);
@@ -268,13 +265,9 @@ V2MoveFromV1BufferCollectionInfo(fidl::AnyArena& allocator,
 
 [[nodiscard]] fuchsia_sysmem::wire::HeapType V1CopyFromV2HeapType(
     fuchsia_sysmem2::wire::HeapType heap_type);
-[[nodiscard]] fpromise::result<
-    std::pair<std::optional<fuchsia_sysmem::BufferCollectionConstraints>,
-              std::optional<fuchsia_sysmem::BufferCollectionConstraintsAuxBuffers>>>
+[[nodiscard]] fpromise::result<std::optional<fuchsia_sysmem::BufferCollectionConstraints>>
 V1CopyFromV2BufferCollectionConstraints(const fuchsia_sysmem2::BufferCollectionConstraints& v2);
-[[nodiscard]] fpromise::result<
-    std::pair<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>,
-              std::optional<fuchsia_sysmem::wire::BufferCollectionConstraintsAuxBuffers>>>
+[[nodiscard]] fpromise::result<std::optional<fuchsia_sysmem::wire::BufferCollectionConstraints>>
 V1CopyFromV2BufferCollectionConstraints(
     const fuchsia_sysmem2::wire::BufferCollectionConstraints& v2);
 
@@ -329,20 +322,10 @@ V1CopyFromV2SingleBufferSettings(const fuchsia_sysmem2::wire::SingleBufferSettin
 [[nodiscard]] fuchsia_sysmem::wire::VmoBuffer V1MoveFromV2VmoBuffer(
     fuchsia_sysmem2::wire::VmoBuffer v2);
 
-[[nodiscard]] fuchsia_sysmem::VmoBuffer V1AuxBuffersMoveFromV2VmoBuffer(
-    fuchsia_sysmem2::VmoBuffer v2);
-[[nodiscard]] fuchsia_sysmem::wire::VmoBuffer V1AuxBuffersMoveFromV2VmoBuffer(
-    fuchsia_sysmem2::wire::VmoBuffer v2);
-
 [[nodiscard]] fpromise::result<fuchsia_sysmem::BufferCollectionInfo2>
 V1MoveFromV2BufferCollectionInfo(fuchsia_sysmem2::BufferCollectionInfo v2);
 [[nodiscard]] fpromise::result<fuchsia_sysmem::wire::BufferCollectionInfo2>
 V1MoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollectionInfo v2);
-
-[[nodiscard]] fpromise::result<fuchsia_sysmem::BufferCollectionInfo2>
-V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::BufferCollectionInfo v2);
-[[nodiscard]] fpromise::result<fuchsia_sysmem::wire::BufferCollectionInfo2>
-V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollectionInfo v2);
 
 ///////////
 // V2 Clone
@@ -359,18 +342,17 @@ V1AuxBuffersMoveFromV2BufferCollectionInfo(fuchsia_sysmem2::wire::BufferCollecti
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::SingleBufferSettings& src);
 
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
-    const fuchsia_sysmem2::VmoBuffer& src, uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask);
+    const fuchsia_sysmem2::VmoBuffer& src, uint32_t vmo_rights_mask);
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::wire::VmoBuffer, zx_status_t> V2CloneVmoBuffer(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::VmoBuffer& src,
-    uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask);
+    uint32_t vmo_rights_mask);
 
 fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, zx_status_t> V2CloneBufferCollectionInfo(
-    const fuchsia_sysmem2::BufferCollectionInfo& src, uint32_t vmo_rights_mask,
-    uint32_t aux_vmo_rights_mask);
+    const fuchsia_sysmem2::BufferCollectionInfo& src, uint32_t vmo_rights_mask);
 [[nodiscard]] fpromise::result<fuchsia_sysmem2::wire::BufferCollectionInfo, zx_status_t>
 V2CloneBufferCollectionInfo(fidl::AnyArena& allocator,
                             const fuchsia_sysmem2::wire::BufferCollectionInfo& src,
-                            uint32_t vmo_rights_mask, uint32_t aux_vmo_rights_mask);
+                            uint32_t vmo_rights_mask);
 
 [[nodiscard]] fuchsia_sysmem2::wire::CoherencyDomainSupport V2CloneCoherencyDomainSuppoort(
     fidl::AnyArena& allocator, const fuchsia_sysmem2::wire::CoherencyDomainSupport& src);
