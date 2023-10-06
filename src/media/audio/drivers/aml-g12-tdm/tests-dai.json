@@ -1,31 +1,29 @@
 [
-  {
-    "name": "Protocol",
-    "expected": "abort",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
+    {
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DAI_OUT",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2"
+                }
+            }
+        ]
+    },
+    {
+        "node": "gpio-init",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_INIT_STEP": "fuchsia.gpio.BIND_INIT_STEP.GPIO"
+                }
+            }
+        ]
     }
-  },
-
-  {
-    "name": "AmlG12TdmAstroDai",
-    "expected": "match",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
-      "fuchsia.BIND_PLATFORM_DEV_PID": "3",
-      "fuchsia.BIND_PLATFORM_DEV_DID": "0x2A"
-    }
-  },
-
-  {
-    "name": "AmlG12TdmSherlockDai",
-    "expected": "match",
-    "device": {
-      "fuchsia.BIND_PROTOCOL": "fuchsia.platform.BIND_PROTOCOL.DEVICE",
-      "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC",
-      "fuchsia.BIND_PLATFORM_DEV_PID": "4",
-      "fuchsia.BIND_PLATFORM_DEV_DID": "0x29"
-    }
-  }
 ]

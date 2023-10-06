@@ -149,11 +149,11 @@ zx_status_t Sherlock::AudioInit() {
   const auto gpio_init_props = std::vector{
       fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
+  const auto gpio_init_parent = std::vector{
+      fdf::ParentSpec{{gpio_init_rules, gpio_init_props}},
+  };
 
-  sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
-      .bind_rules = gpio_init_rules,
-      .properties = gpio_init_props,
-  }});
+  sherlock_tdm_i2s_parents.push_back(gpio_init_parent[0]);
 
   // Add a spec for the enable audio GPIO pin.
   auto enable_audio_gpio_rules = std::vector{
@@ -414,14 +414,19 @@ zx_status_t Sherlock::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
 
     {
-      auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+      auto tdm_spec = fdf::CompositeNodeSpec{{
+          "aml_tdm_dai_out",
+          gpio_init_parent,
+      }};
+      auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                              fidl::ToWire(fidl_arena, tdm_spec));
       if (!result.ok()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) request failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec(tdm_dev) request failed: %s",
                result.FormatDescription().data());
         return result.status();
       }
       if (result->is_error()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec(tdm_dev) failed: %s",
                zx_status_get_string(result->error_value()));
         return result->error_value();
       }
@@ -541,14 +546,19 @@ zx_status_t Sherlock::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
 
     {
-      auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+      auto tdm_spec = fdf::CompositeNodeSpec{{
+          "aml_tdm_dai_in",
+          gpio_init_parent,
+      }};
+      auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                              fidl::ToWire(fidl_arena, tdm_spec));
       if (!result.ok()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) request failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec(tdm_dev) request failed: %s",
                result.FormatDescription().data());
         return result.status();
       }
       if (result->is_error()) {
-        zxlogf(ERROR, "%s: NodeAdd Audio(tdm_dev) failed: %s", __func__,
+        zxlogf(ERROR, "AddCompositeNodeSpec(tdm_dev) failed: %s",
                zx_status_get_string(result->error_value()));
         return result->error_value();
       }

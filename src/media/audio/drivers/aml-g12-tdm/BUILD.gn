@@ -73,6 +73,7 @@ driver_bind_rules("aml-g12-tdm-dai-bind") {
   tests = "tests-dai.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }

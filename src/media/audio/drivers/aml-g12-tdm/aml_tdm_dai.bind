@@ -2,17 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-using fuchsia.platform;
-using fuchsia.amlogic.platform;
+composite aml_tdm_dai;
 
-fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
-fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
-accept fuchsia.BIND_PLATFORM_DEV_DID {
- 0x29, // PDEV_DID_AMLOGIC_DAI_OUT
- 0x2A, // PDEV_DID_AMLOGIC_DAI_IN
+using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.platform;
+
+primary node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
+  accept fuchsia.BIND_PLATFORM_DEV_DID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DAI_OUT,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DAI_IN,
+  }
+  accept fuchsia.BIND_PLATFORM_DEV_PID {
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D2,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.T931,
+    fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
+  }
 }
-accept fuchsia.BIND_PLATFORM_DEV_PID {
-  3, // PDEV_PID_AMLOGIC_S905D2
-  4, // PDEV_PID_AMLOGIC_T931
-  5, // PDEV_PID_AMLOGIC_S905D3
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

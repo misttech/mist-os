@@ -80,6 +80,10 @@ const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
     fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
 };
 
+const std::vector<fdf::ParentSpec> kTdmDaiParents = std::vector{
+    fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+};
+
 // Codec composite node specifications.
 const ddk::BindRule kOutI2cRules[] = {
     ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
@@ -363,13 +367,21 @@ zx_status_t Nelson::AudioInit() {
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = pcm_out_btis;
     tdm_dev.metadata() = tdm_metadata;
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+
+    auto tdm_spec = fdf::CompositeNodeSpec{{
+        "aml_tdm_dai_out",
+        kTdmDaiParents,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                            fidl::ToWire(fidl_arena, tdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "NodeAdd request failed: %s", result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "NodeAdd failed: %s", zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) failed: %s",
+             zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
@@ -420,13 +432,20 @@ zx_status_t Nelson::AudioInit() {
     tdm_dev.bti() = pcm_in_btis;
     tdm_dev.metadata() = tdm_metadata;
 
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+    auto tdm_spec = fdf::CompositeNodeSpec{{
+        "aml_tdm_dai_in",
+        kTdmDaiParents,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                            fidl::ToWire(fidl_arena, tdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "NodeAdd request failed: %s", result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) request failed: %s",
+             result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "NodeAdd failed: %s", zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "AddCompositeNodeSpec Audio(tdm_dev) failed: %s",
+             zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }

@@ -133,6 +133,10 @@ const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
     fdf::ParentSpec{{kCodecRules, kCodecProps}},
 };
 
+const std::vector<fdf::ParentSpec> kTdmDaiSpec = std::vector{
+    fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+};
+
 zx_status_t Astro::AudioInit() {
   zx_status_t status;
   fidl::Arena<> fidl_arena;
@@ -231,14 +235,18 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-out";
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_OUT;
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+    auto tdm_spec = fdf::CompositeNodeSpec{{
+        "aml_tdm_dai_out",
+        kTdmDaiSpec,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                            fidl::ToWire(fidl_arena, tdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
@@ -392,14 +400,18 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.name() = "astro-pcm-dai-in";
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_IN;
-    auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, tdm_dev));
+    auto tdm_spec = fdf::CompositeNodeSpec{{
+        "aml_tdm_dai_in",
+        kTdmDaiSpec,
+    }};
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
+                                                            fidl::ToWire(fidl_arena, tdm_spec));
     if (!result.ok()) {
-      zxlogf(ERROR, "%s: NodeAdd request failed: %s", __func__, result.FormatDescription().data());
+      zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
     }
     if (result->is_error()) {
-      zxlogf(ERROR, "%s: NodeAdd failed: %s", __func__,
-             zx_status_get_string(result->error_value()));
+      zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", zx_status_get_string(result->error_value()));
       return result->error_value();
     }
   }
