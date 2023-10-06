@@ -19,6 +19,7 @@ group("ffx") {
     ":ffx_tool($host_toolchain)",
     ":tests",
     "lib($host_toolchain)",
+    "tools($host_toolchain)",
   ]
 }
 

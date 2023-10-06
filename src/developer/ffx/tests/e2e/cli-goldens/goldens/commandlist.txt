@@ -15,7 +15,6 @@ guest
 inspect
 log
 net
-net-test-realm
 package
 platform
 power
