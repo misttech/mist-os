@@ -11,6 +11,7 @@ use {
     },
     fidl::persist,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as component_internal,
+    itertools::Itertools,
     serde::Deserialize,
     serde_json5,
     std::{
@@ -22,45 +23,46 @@ use {
     },
 };
 
+fn remove_duplicates<T: Eq + std::hash::Hash>(v: Vec<T>) -> Vec<T> {
+    <HashSet<T> as IntoIterator>::into_iter(HashSet::from_iter(v.into_iter())).into_iter().collect()
+}
+
+fn merge_option<T, F>(left: Option<T>, right: Option<T>, merge_fn: F) -> Result<Option<T>, Error>
+where
+    F: FnOnce(T, T) -> Result<T, Error>,
+{
+    match (left, right) {
+        (left @ Some(_), None) => Ok(left),
+        (None, right @ Some(_)) => Ok(right),
+        (Some(l), Some(r)) => Ok(Some(merge_fn(l, r)?)),
+        (None, None) => Ok(None),
+    }
+}
+
 macro_rules! deep_merge_field {
     ($target:ident, $other:expr, $field:ident) => {
-        match ($target.$field, $other.$field) {
-            (Some(left), Some(right)) => Some(left.merge(right)?),
-            (None, Some(other)) => Some(other),
-            (Some(target), None) => Some(target),
-            (None, None) => None,
-        }
+        merge_option($target.$field, $other.$field, |l, r| l.merge(r))?
     };
 }
 
 macro_rules! merge_field {
     ($target:ident, $other:expr, $field:ident) => {
-        match ($target.$field, $other.$field) {
-            (Some(_), Some(_)) => {
-                return Err(Error::parse(
-                    format!("Conflicting field found: {:?}", stringify!($field)),
-                    None,
-                    None,
-                ))
-            }
-            (None, Some(other)) => Some(other),
-            (Some(target), None) => Some(target),
-            (None, None) => None,
-        }
+        merge_option($target.$field, $other.$field, |_, _| {
+            Err(Error::parse(
+                format!("Conflicting field found: {:?}", stringify!($field)),
+                None,
+                None,
+            ))
+        })?
     };
 }
 
 macro_rules! merge_vec {
     ($target:ident, $other:expr, $field:ident) => {
-        match ($target.$field, $other.$field) {
-            (Some(mut left), Some(mut right)) => {
-                left.append(&mut right);
-                Some(left)
-            }
-            (None, Some(other)) => Some(other),
-            (Some(target), None) => Some(target),
-            (None, None) => None,
-        }
+        merge_option($target.$field, $other.$field, |mut l, mut r| {
+            l.append(&mut r);
+            Ok(l)
+        })?
     };
 }
 
@@ -156,7 +158,11 @@ impl SecurityPolicy {
     fn merge(self, another: SecurityPolicy) -> Result<Self, Error> {
         return Ok(SecurityPolicy {
             job_policy: deep_merge_field!(self, another, job_policy),
-            capability_policy: merge_vec!(self, another, capability_policy),
+            capability_policy: merge_option(
+                self.capability_policy,
+                another.capability_policy,
+                CapabilityAllowlistEntry::merge_vecs,
+            )?,
             debug_registration_policy: merge_field!(self, another, debug_registration_policy),
             child_policy: deep_merge_field!(self, another, child_policy),
         });
@@ -195,7 +201,7 @@ impl ChildPolicyAllowlists {
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 #[serde(rename_all = "lowercase")]
 pub enum CapabilityTypeName {
     Directory,
@@ -249,7 +255,7 @@ impl Into<component_internal::AllowlistedDebugRegistration> for DebugRegistratio
     }
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq, Hash, Eq, Ord, PartialOrd)]
 #[serde(rename_all = "lowercase")]
 pub enum CapabilityFrom {
     Capability,
@@ -269,7 +275,7 @@ impl Into<fdecl::Ref> for CapabilityFrom {
     }
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Debug, Default, PartialEq, Clone, Ord, PartialOrd, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct CapabilityAllowlistEntry {
     source_moniker: Option<String>,
@@ -277,6 +283,57 @@ pub struct CapabilityAllowlistEntry {
     source: Option<CapabilityFrom>,
     capability: Option<CapabilityTypeName>,
     target_monikers: Option<Vec<String>>,
+}
+
+impl CapabilityAllowlistEntry {
+    fn merge_vecs(
+        some: Vec<CapabilityAllowlistEntry>,
+        another: Vec<CapabilityAllowlistEntry>,
+    ) -> Result<Vec<CapabilityAllowlistEntry>, Error> {
+        #[derive(Hash, Eq, PartialEq)]
+        struct Source {
+            source_moniker: Option<String>,
+            source_name: Option<String>,
+            source: Option<CapabilityFrom>,
+            capability: Option<CapabilityTypeName>,
+        }
+        Ok(some
+            .into_iter()
+            .chain(another.into_iter())
+            .map(|mut entry| {
+                (
+                    Source {
+                        source_moniker: entry.source_moniker.take(),
+                        source_name: entry.source_name.take(),
+                        source: entry.source.take(),
+                        capability: entry.capability.take(),
+                    },
+                    entry.target_monikers,
+                )
+            })
+            .into_grouping_map()
+            .fold_first(|accumulated, _key, item| {
+                {
+                    merge_option(accumulated, item, |mut l, mut r| {
+                        l.append(&mut r);
+                        Ok(l)
+                    })
+                }
+                .unwrap()
+            })
+            .into_iter()
+            .map(|(mut key, values)| CapabilityAllowlistEntry {
+                source_moniker: key.source_moniker.take(),
+                source_name: key.source_name.take(),
+                source: key.source.take(),
+                capability: key.capability.take(),
+                target_monikers: match values {
+                    Some(v) => Some(remove_duplicates(v)),
+                    None => None,
+                },
+            })
+            .collect())
+    }
 }
 
 #[derive(Deserialize, Debug, Default)]
@@ -988,5 +1045,103 @@ mod tests {
             root_component_url: "not quite a valid Url",
         }"#;
         assert_matches!(compile_str(input), Err(Error::Parse { .. }));
+    }
+
+    #[test]
+    fn test_capability_allowlist_merging() {
+        let left = vec![
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker1".into()),
+                source_name: Some("name1".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target1".into()]),
+            },
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker2".into()),
+                source_name: Some("name2".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target2".into()]),
+            },
+        ];
+
+        let right = vec![
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker2".into()),
+                source_name: Some("name2".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target3".into()]),
+            },
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker1".into()),
+                source_name: Some("name1".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target4".into()]),
+            },
+        ];
+
+        let expected_combine = vec![
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker1".into()),
+                source_name: Some("name1".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target1".into(), "target4".into()]),
+            },
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker2".into()),
+                source_name: Some("name2".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target2".into(), "target3".into()]),
+            },
+        ];
+
+        let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
+        combined.sort();
+        for entry in &mut combined {
+            if let Some(moniker) = entry.target_monikers.as_mut() {
+                moniker.sort();
+            }
+        }
+
+        assert_eq!(combined, expected_combine);
+    }
+
+    #[test]
+    fn test_capability_allowlist_merging_no_dups() {
+        let left = vec![
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker1".into()),
+                source_name: Some("name1".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target1".into()]),
+            },
+            CapabilityAllowlistEntry {
+                source_moniker: Some("moniker2".into()),
+                source_name: Some("name2".into()),
+                source: Some(CapabilityFrom::Capability),
+                capability: Some(CapabilityTypeName::Protocol),
+                target_monikers: Some(vec!["target2".into()]),
+            },
+        ];
+
+        let right = left.clone();
+
+        let expected_combine = left.clone();
+
+        let mut combined = CapabilityAllowlistEntry::merge_vecs(left, right).unwrap();
+        combined.sort();
+        for entry in &mut combined {
+            if let Some(moniker) = entry.target_monikers.as_mut() {
+                moniker.sort();
+            }
+        }
+
+        assert_eq!(combined, expected_combine);
     }
 }
