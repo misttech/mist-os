@@ -133,6 +133,8 @@ zx_status_t ThreadDispatcher::set_name(const char* name, size_t len) {
     return ZX_ERR_BAD_STATE;
   }
   core_thread_->set_name({name, len});
+  KTRACE_KERNEL_OBJECT("kernel:meta", get_koid(), ZX_OBJ_TYPE_THREAD, (fxt::StringRef{name, len}),
+                       ("process", ktrace::Koid(process()->get_koid())));
   return ZX_OK;
 }
 

@@ -257,6 +257,7 @@ zx_status_t ProcessDispatcher::get_name(char (&out_name)[ZX_MAX_NAME_LEN]) const
 }
 
 zx_status_t ProcessDispatcher::set_name(const char* name, size_t len) {
+  KTRACE_KERNEL_OBJECT("kernel:meta", get_koid(), ZX_OBJ_TYPE_PROCESS, (fxt::StringRef{name, len}));
   return name_.set(name, len);
 }
 
