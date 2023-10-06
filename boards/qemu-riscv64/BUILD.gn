@@ -10,6 +10,8 @@ board_configuration("qemu-riscv64") {
     "fuchsia::network_require_netstack3",
   ]
 
+  input_bundles = [ "//boards/riscv64:main_bundle" ]
+
   filesystems = {
     fvm = {
       slice_size = 8388608
