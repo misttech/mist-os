@@ -680,8 +680,7 @@ impl<I: Ip> SocketMapAddrStateUpdateSharingSpec for ListenerAddrState<I> {
                                 false => Ok(()), // no-op
                                 true => {
                                     let _: TcpSocketId<_> = bound.swap_remove(index);
-                                    let bound = bound.take();
-                                    *self = Self::Shared { bound, listener: Some(id) };
+                                    *listener = Some(id);
                                     Ok(())
                                 }
                             }
@@ -2175,7 +2174,7 @@ trait AccessBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: fmt::Debug + Takeable,
+        P: fmt::Debug,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,
@@ -2193,7 +2192,7 @@ impl AccessBufferSize for SendBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: fmt::Debug + Takeable,
+        P: fmt::Debug,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,
@@ -2217,7 +2216,7 @@ impl AccessBufferSize for ReceiveBufferSize {
         Instant: crate::Instant + 'static,
         S: SendBuffer,
         R: ReceiveBuffer,
-        P: fmt::Debug + Takeable,
+        P: fmt::Debug,
     >(
         state: &mut State<Instant, R, S, P>,
         new_size: usize,

@@ -19,6 +19,7 @@ use const_unwrap::const_unwrap_option;
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use packet_formats::utils::NonZeroDuration;
+use replace_with::{replace_with, replace_with_and};
 
 use crate::{
     ip::icmp::IcmpErrorCode,
@@ -336,39 +337,32 @@ pub(crate) struct SynSent<I, ActiveOpen> {
 
 /// Dispositions of [`SynSent::on_segment`].
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
-enum SynSentOnSegmentDisposition<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> {
-    SendAckAndEnterEstablished(Segment<()>, Established<I, R, S>),
+enum SynSentOnSegmentDisposition<I: Instant, ActiveOpen> {
+    SendAckAndEnterEstablished(Established<I, (), ()>),
     SendSynAckAndEnterSynRcvd(Segment<()>, SynRcvd<I, ActiveOpen>),
     SendRstAndEnterClosed(Segment<()>, Closed<Option<ConnectionError>>),
     EnterClosed(Closed<Option<ConnectionError>>),
     Ignore,
 }
 
-impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
+impl<I: Instant + 'static, ActiveOpen> SynSent<I, ActiveOpen> {
     /// Processes an incoming segment in the SYN-SENT state.
     ///
     /// Transitions to ESTABLSHED if the incoming segment is a proper SYN-ACK.
     /// Transitions to SYN-RCVD if the incoming segment is a SYN. Otherwise,
     /// the segment is dropped or an RST is generated.
-    fn on_segment<
-        R: ReceiveBuffer,
-        S: SendBuffer,
-        BP: BufferProvider<R, S, ActiveOpen = ActiveOpen>,
-    >(
-        &mut self,
+    fn on_segment(
+        &self,
         Segment { seq: seg_seq, ack: seg_ack, wnd: seg_wnd, contents, options }: Segment<
             impl Payload,
         >,
         now: I,
-    ) -> SynSentOnSegmentDisposition<I, R, S, BP::ActiveOpen>
-    where
-        ActiveOpen: IntoBuffers<R, S>,
-    {
+    ) -> SynSentOnSegmentDisposition<I, ActiveOpen> {
         let SynSent {
             iss,
             timestamp: syn_sent_ts,
             retrans_timer: RetransTimer { user_timeout_until, remaining_retries: _, at: _, rto: _ },
-            ref mut active_open,
+            active_open: _,
             buffer_sizes,
             device_mss,
             default_mss,
@@ -449,13 +443,11 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                             if let Some(syn_sent_ts) = syn_sent_ts {
                                 rtt_estimator.sample(now.duration_since(syn_sent_ts));
                             }
-                            let (rcv_buffer, snd_buffer) =
-                                active_open.take().into_buffers(buffer_sizes);
                             let (rcv_wnd_scale, snd_wnd_scale) = options
                                 .window_scale
                                 .map(|snd_wnd_scale| (rcv_wnd_scale, snd_wnd_scale))
                                 .unwrap_or_default();
-                            let mut established = Established {
+                            let established = Established {
                                 snd: Send {
                                     nxt: iss + 1,
                                     max: iss + 1,
@@ -464,7 +456,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     wnd: seg_wnd << WindowScale::default(),
                                     wl1: seg_seq,
                                     wl2: seg_ack,
-                                    buffer: snd_buffer,
+                                    buffer: (),
                                     last_seq_ts: None,
                                     rtt_estimator,
                                     timer: None,
@@ -473,7 +465,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     wnd_max: seg_wnd << WindowScale::default(),
                                 },
                                 rcv: Recv {
-                                    buffer: rcv_buffer,
+                                    buffer: (),
                                     assembler: Assembler::new(irs + 1),
                                     timer: None,
                                     mss: smss,
@@ -481,15 +473,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                     last_window_update: (irs + 1, buffer_sizes.rwnd()),
                                 },
                             };
-                            let ack_seg = Segment::ack(
-                                established.snd.nxt,
-                                established.rcv.nxt(),
-                                established.rcv.select_window() >> rcv_wnd_scale,
-                            );
-                            SynSentOnSegmentDisposition::SendAckAndEnterEstablished(
-                                ack_seg,
-                                established,
-                            )
+                            SynSentOnSegmentDisposition::SendAckAndEnterEstablished(established)
                         } else {
                             SynSentOnSegmentDisposition::Ignore
                         }
@@ -529,7 +513,8 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                         user_timeout_until.duration_since(now),
                                         DEFAULT_MAX_SYNACK_RETRIES,
                                     ),
-                                    simultaneous_open: Some(active_open.take()),
+                                    // This should be set to active_open by the caller:
+                                    simultaneous_open: None,
                                     buffer_sizes,
                                     smss,
                                     rcv_wnd_scale,
@@ -642,13 +627,48 @@ struct Send<I, S, const FIN_QUEUED: bool> {
     wnd_max: WindowSize,
     wl1: SeqNum,
     wl2: SeqNum,
-    buffer: S,
     // The last sequence number sent out and its timestamp when sent.
     last_seq_ts: Option<(SeqNum, I)>,
     rtt_estimator: Estimator,
     timer: Option<SendTimer<I>>,
     #[derivative(PartialEq = "ignore")]
     congestion_control: CongestionControl<I>,
+    buffer: S,
+}
+
+impl<I> Send<I, (), false> {
+    fn with_buffer<S>(self, buffer: S) -> Send<I, S, false> {
+        let Self {
+            nxt,
+            max,
+            una,
+            wnd,
+            wnd_scale,
+            wnd_max,
+            wl1,
+            wl2,
+            last_seq_ts,
+            rtt_estimator,
+            timer,
+            congestion_control,
+            buffer: _,
+        } = self;
+        Send {
+            nxt,
+            max,
+            una,
+            wnd,
+            wnd_scale,
+            wnd_max,
+            wl1,
+            wl2,
+            last_seq_ts,
+            rtt_estimator,
+            timer,
+            congestion_control,
+            buffer,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -774,12 +794,19 @@ impl<I: Instant> ReceiveTimer<I> {
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 struct Recv<I, R> {
-    buffer: R,
     assembler: Assembler,
     timer: Option<ReceiveTimer<I>>,
     mss: Mss,
     wnd_scale: WindowScale,
     last_window_update: (SeqNum, WindowSize),
+    buffer: R,
+}
+
+impl<I> Recv<I, ()> {
+    fn with_buffer<R>(self, buffer: R) -> Recv<I, R> {
+        let Self { assembler, timer, mss, wnd_scale, last_window_update, buffer: _ } = self;
+        Recv { assembler, timer, mss, wnd_scale, last_window_update, buffer }
+    }
 }
 
 impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
@@ -1554,7 +1581,7 @@ pub(crate) trait BufferProvider<R: ReceiveBuffer, S: SendBuffer> {
 
     /// An object that is needed to initiate a connection which will be
     /// later used to create buffers once the connection is established.
-    type ActiveOpen: Takeable + IntoBuffers<R, S>;
+    type ActiveOpen: IntoBuffers<R, S>;
 
     /// Creates new send and receive buffers and an object that needs to be
     /// vended to the application.
@@ -1563,8 +1590,8 @@ pub(crate) trait BufferProvider<R: ReceiveBuffer, S: SendBuffer> {
 
 /// Allows the implementor to be replaced by an empty value. The semantics is
 /// similar to [`core::mem::take`], except that for some types it is not
-/// sensible to implement [`Default`] for the target type. This trait allows
-/// taking ownership of a struct field, which is useful in state transitions.
+/// sensible to implement [`Default`] for the target type. This can be useful
+/// in state transitions, but `replace_with` might be a better choice.
 pub trait Takeable {
     /// Replaces `self` with an implementor-defined "empty" value.
     fn take(&mut self) -> Self;
@@ -1576,7 +1603,7 @@ impl<T: Default> Takeable for T {
     }
 }
 
-impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + Takeable>
+impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
     State<I, R, S, ActiveOpen>
 {
     /// Processes an incoming segment and advances the state machine.
@@ -1647,19 +1674,43 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     }
                 }
                 State::SynSent(synsent) => {
-                    return match synsent.on_segment::<_, _, BP>(incoming, now) {
-                        SynSentOnSegmentDisposition::SendAckAndEnterEstablished(
-                            ack,
-                            established,
-                        ) => {
-                            *self = State::Established(established);
-                            Some(ack)
+                    return match synsent.on_segment(incoming, now) {
+                        SynSentOnSegmentDisposition::SendAckAndEnterEstablished(established) => {
+                            replace_with_and(self, |this| {
+                                assert_matches!(this, State::SynSent(SynSent {
+                                    active_open,
+                                    buffer_sizes,
+                                    rcv_wnd_scale,
+                                    ..
+                                }) => {
+                                    let (rcv_buffer, snd_buffer) =
+                                        active_open.into_buffers(buffer_sizes);
+                                    let mut established = Established {
+                                        snd: established.snd.with_buffer(snd_buffer),
+                                        rcv: established.rcv.with_buffer(rcv_buffer),
+                                    };
+                                    let ack = Some(Segment::ack(
+                                        established.snd.nxt,
+                                        established.rcv.nxt(),
+                                        established.rcv.select_window() >> rcv_wnd_scale,
+                                    ));
+                                    (State::Established(established), ack)
+                                })
+                            })
                         }
                         SynSentOnSegmentDisposition::SendSynAckAndEnterSynRcvd(
                             syn_ack,
-                            syn_rcvd,
+                            mut syn_rcvd,
                         ) => {
-                            *self = State::SynRcvd(syn_rcvd);
+                            replace_with(self, |this| {
+                                assert_matches!(this, State::SynSent(SynSent {
+                                    active_open,
+                                    ..
+                                }) => {
+                                    assert_matches!(syn_rcvd.simultaneous_open.replace(active_open), None);
+                                    State::SynRcvd(syn_rcvd)
+                                })
+                            });
                             Some(syn_ack)
                         }
                         SynSentOnSegmentDisposition::SendRstAndEnterClosed(rst, closed) => {
@@ -2390,8 +2441,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 // longer exists - it is as if the initial SYN is lost. The
                 // following check makes sure we only proceed if we were
                 // actively opened, i.e., initiated by `connect`.
-                let active_open = simultaneous_open.as_mut().ok_or(CloseError::NoConnection)?;
-                let (rcv_buffer, snd_buffer) = active_open.take().into_buffers(*buffer_sizes);
+                let (rcv_buffer, snd_buffer) = simultaneous_open
+                    .take()
+                    .ok_or(CloseError::NoConnection)?
+                    .into_buffers(*buffer_sizes);
                 // Note: `Send` in `FinWait1` always has a FIN queued.
                 // Since we don't support sending data when connection
                 // isn't established, so enter FIN-WAIT-1 immediately.
@@ -2966,7 +3019,7 @@ mod test {
                 DEFAULT_USER_TIMEOUT - RTT,
                 DEFAULT_MAX_SYNACK_RETRIES
             ),
-            simultaneous_open: Some(()),
+            simultaneous_open: None,
             buffer_sizes: BufferSizes::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
@@ -2991,8 +3044,8 @@ mod test {
     fn segment_arrives_when_syn_sent(
         incoming: Segment<()>,
         delay: Duration,
-    ) -> SynSentOnSegmentDisposition<FakeInstant, NullBuffer, NullBuffer, ()> {
-        let mut syn_sent = SynSent {
+    ) -> SynSentOnSegmentDisposition<FakeInstant, ()> {
+        let syn_sent = SynSent {
             iss: ISS_1,
             timestamp: Some(FakeInstant::default()),
             retrans_timer: RetransTimer::new(
@@ -3007,7 +3060,7 @@ mod test {
             device_mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             rcv_wnd_scale: WindowScale::default(),
         };
-        syn_sent.on_segment::<_, _, ClientlessBufferProvider>(incoming, FakeInstant::from(delay))
+        syn_sent.on_segment(incoming, FakeInstant::from(delay))
     }
 
     #[test_case(Segment::rst(ISS_2) => ListenOnSegmentDisposition::Ignore; "ignore RST")]
