@@ -148,6 +148,7 @@ struct WaitCancelerQueue {
     wait_queue: Weak<WaitQueueImpl>,
     waiter: WaiterRef,
     key: WaitKey,
+    waiter_key: u64,
 }
 
 struct WaitCancelerZxio {
@@ -218,19 +219,15 @@ impl WaitCanceler {
                     let Some(timer) = timer.upgrade() else { return };
                     inner.cancel(timer.as_handle_ref());
                 }
-                WaitCancelerInner::Queue(WaitCancelerQueue { wait_queue, waiter, key }) => {
+                WaitCancelerInner::Queue(WaitCancelerQueue {
+                    wait_queue,
+                    waiter,
+                    key,
+                    waiter_key,
+                }) => {
                     let Some(wait_queue) = wait_queue.upgrade() else { return };
-
                     waiter.remove_callback(&key);
-
-                    // TODO(steveaustin) Maybe make waiters a map to avoid linear search
-                    WaitQueue::filter_waiters(&mut wait_queue.waiters.lock(), |entry| {
-                        if &entry.key == key && &entry.waiter == waiter {
-                            Retention::Drop
-                        } else {
-                            Retention::Keep
-                        }
-                    });
+                    wait_queue.waiters.lock().remove(&waiter_key);
                 }
             };
         }
@@ -658,7 +655,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.waiters.lock().retain(|entry| entry.waiter != *self)
+                wait_queue.waiters.lock().retain(|_waiter_key, entry| entry.waiter != *self)
             }
         }
     }
@@ -685,7 +682,7 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.waiters.lock().retain(|entry| entry.waiter != self.event)
+                wait_queue.waiters.lock().retain(|_waiter_key, entry| entry.waiter != self.event)
             }
         }
     }
@@ -827,10 +824,12 @@ pub struct WaitQueue(Arc<WaitQueueImpl>);
 
 #[derive(Default, Debug)]
 struct WaitQueueImpl {
+    /// Used to get the next key value for use in the waiters map.
+    next_waiter_key: AtomicU64,
     /// The list of waiters.
     ///
     /// The WaiterImpl.wait_queues lock is nested inside this lock.
-    waiters: Mutex<Vec<WaitEntry>>,
+    waiters: Mutex<HashMap<u64, WaitEntry>>,
 }
 
 /// An entry in a WaitQueue.
@@ -847,6 +846,21 @@ struct WaitEntry {
 }
 
 impl WaitQueue {
+    fn add_waiter(&self, entry: WaitEntry) -> u64 {
+        let inner = &self.0;
+        let next_waiter_key = inner.next_waiter_key.fetch_add(1, Ordering::Relaxed);
+        // Note that after the `fetch_add` but before this check, another thread
+        // could have also performed a `fetch_add` op and got a key value that
+        // looks OK even though it was the result of an arithmetic overflow. We
+        // can't protect that thread but the assertion below should terminate the
+        // program anyways. Note that even if we were able to perform this function
+        // in a (theoretical) single CPU cycle on a single 4 GHz CPU, it would
+        // take more than 136 years to overflow.
+        assert_ne!(next_waiter_key, u64::MAX, "next_waiter_key overflowed");
+        assert!(inner.waiters.lock().insert(next_waiter_key, entry).is_none());
+        next_waiter_key
+    }
+
     /// Establish a wait for the given entry.
     ///
     /// The waiter will be notified when an event matching the entry occurs.
@@ -857,14 +871,14 @@ impl WaitQueue {
     /// Returns a `WaitCanceler` that can be used to cancel the wait.
     fn wait_async_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
         profile_duration!("WaitAsyncEntry");
+
         let key = entry.key;
-        self.0.waiters.lock().push(entry);
-        let wait_queue = Arc::downgrade(&self.0);
-        waiter.inner.wait_queues.lock().insert(key, wait_queue.clone());
+        let waiter_key = self.add_waiter(entry);
         WaitCanceler::new_inner(WaitCancelerInner::Queue(WaitCancelerQueue {
-            wait_queue,
+            wait_queue: Arc::downgrade(&self.0),
             waiter: waiter.weak(),
             key,
+            waiter_key,
         }))
     }
 
@@ -917,7 +931,7 @@ impl WaitQueue {
             key: Default::default(),
         };
         waiter.wait_queues.push(Arc::downgrade(&self.0));
-        self.0.waiters.lock().push(entry);
+        self.add_waiter(entry);
     }
 
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
@@ -944,12 +958,12 @@ impl WaitQueue {
         self.notify_events_count(WaitEvents::Value(value), usize::MAX);
     }
 
-    pub fn notify_count(&self, limit: usize) {
+    pub fn notify_unordered_count(&self, limit: usize) {
         self.notify_events_count(WaitEvents::All, limit);
     }
 
     pub fn notify_all(&self) {
-        self.notify_count(usize::MAX);
+        self.notify_unordered_count(usize::MAX);
     }
 
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
@@ -966,10 +980,10 @@ impl WaitQueue {
     }
 
     fn filter_waiters(
-        waiters: &mut Vec<WaitEntry>,
+        waiters: &mut HashMap<u64, WaitEntry>,
         mut filter: impl FnMut(&WaitEntry) -> Retention,
     ) {
-        waiters.retain(move |entry| match filter(entry) {
+        waiters.retain(move |_waiter_key, entry| match filter(entry) {
             Retention::Keep => true,
             Retention::Drop => {
                 entry.waiter.will_remove_from_wait_queue(&entry.key);
@@ -1115,27 +1129,22 @@ mod tests {
         let (_kernel, current_task) = create_kernel_and_task();
         let queue = WaitQueue::default();
 
-        let waiter0 = Waiter::new();
-        let waiter1 = Waiter::new();
-        let waiter2 = Waiter::new();
+        let waiters = <[Waiter; 3]>::default();
+        waiters.iter().for_each(|w| {
+            queue.wait_async(w);
+        });
 
-        queue.wait_async(&waiter0);
-        queue.wait_async(&waiter1);
-        queue.wait_async(&waiter2);
+        let woken = || {
+            waiters.iter().filter(|w| w.wait_until(&current_task, zx::Time::ZERO).is_ok()).count()
+        };
 
-        queue.notify_count(2);
-        assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_ok());
-        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_ok());
-        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_err());
+        const INITIAL_NOTIFY_COUNT: usize = 2;
+        let total_waiters = waiters.len();
+        queue.notify_unordered_count(INITIAL_NOTIFY_COUNT);
+        assert_eq!(INITIAL_NOTIFY_COUNT, woken());
 
+        // Only the remaining (unnotified) waiters should be notified.
         queue.notify_all();
-        assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_ok());
-
-        queue.notify_count(3);
-        assert!(waiter0.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
-        assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_err());
+        assert_eq!(total_waiters - INITIAL_NOTIFY_COUNT, woken());
     }
 }

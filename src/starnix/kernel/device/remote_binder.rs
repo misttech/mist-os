@@ -428,7 +428,7 @@ impl RemoteBinderHandleState {
             remote_binder_connection.interrupt();
         }
         // Interrupt a single task to handle the request.
-        self.waiters.notify_count(1);
+        self.waiters.notify_unordered_count(1);
     }
 
     /// Called when a task starts waiting.
