@@ -18,14 +18,14 @@ pub mod kw {
     syn::custom_keyword!(panics);
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TestCaseExpression {
     _token: Token![=>],
     pub extra_keywords: HashSet<Modifier>,
     pub result: TestCaseResult,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum TestCaseResult {
     // test_case(a, b, c => keywords)
     Empty,
@@ -49,7 +49,7 @@ impl Parse for TestCaseExpression {
         let extra_keywords = parse_kws(input);
 
         if input.parse::<kw::matches>().is_ok() {
-            let pattern = input.parse()?;
+            let pattern = Pat::parse_single(input)?;
             let guard = if input.peek(If) {
                 let _if_kw: If = input.parse()?;
                 let guard: Box<Expr> = input.parse()?;

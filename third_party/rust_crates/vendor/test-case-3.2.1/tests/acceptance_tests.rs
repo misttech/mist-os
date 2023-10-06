@@ -44,19 +44,11 @@ fn sanitize_lines(s: String) -> String {
     let mut s = s
         .lines()
         .filter(|line| {
-            !line.contains("note")
-                && !line.contains("error: build failed") // For mac builds
-                && !line.contains("error: process didn't exit successfully") // For windows builds
-                && !line.contains("waiting")
-                && !line.contains("Finished")
-                && !line.contains("Compiling")
-                && !line.contains("termination value with a non-zero status code")
-                && !line.contains("Running unittests")
-                && !line.contains("Running target")
-                && !line.contains("Downloaded")
-                && !line.contains("Downloading")
-                && !line.contains("Updating")
-                && !line.is_empty()
+            (line.starts_with("test") // For general test output
+                || line.contains("panicked at") // For panic messages
+                || line.starts_with("error:") // For validating red paths
+                || line.starts_with("error[")) // For validating red paths
+                && !line.contains("process didn't exit successfully") // for Windows
         })
         .map(|line| line.replace('\\', "/"))
         .map(|line| line.replace(".exe", ""))
@@ -104,6 +96,11 @@ fn cases_support_basic_features() {
 }
 
 #[test]
+fn matrices_support_basic_features() {
+    run_acceptance_test!("matrices_support_basic_features")
+}
+
+#[test]
 fn cases_support_complex_assertions() {
     run_acceptance_test!("cases_support_complex_assertions")
 }
@@ -141,4 +138,14 @@ fn cases_can_use_regex() {
 #[test]
 fn features_produce_human_readable_errors() {
     run_acceptance_test!("features_produce_human_readable_errors")
+}
+
+#[test]
+fn allow_stays_on_fn() {
+    run_acceptance_test!("allow_stays_on_fn")
+}
+
+#[test]
+fn matrices_compilation_errors() {
+    run_acceptance_test!("matrices_compilation_errors")
 }

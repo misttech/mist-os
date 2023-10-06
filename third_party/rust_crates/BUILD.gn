@@ -937,7 +937,7 @@ group("termtree") {
 }
 
 group("test-case") {
-  public_deps = [ ":test-case-v3_1_0" ]
+  public_deps = [ ":test-case-v3_2_1" ]
 }
 
 group("textwrap") {
@@ -14549,6 +14549,7 @@ rust_library("syn-v2_0_23") {
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
+    "--cfg=feature=\"extra-traits\"",
     "--cfg=feature=\"full\"",
     "--cfg=feature=\"parsing\"",
     "--cfg=feature=\"printing\"",
@@ -14870,45 +14871,45 @@ rust_library("termtree-v0_4_1") {
   applicable_licenses = [ ":termtree-v0_4_1.license" ]
 }
 
-license("test-case-v3_1_0.license") {
+license("test-case-v3_2_1.license") {
   public_package_name = "test_case"
-  license_files = [ "//third_party/rust_crates/vendor/test-case-3.1.0/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/test-case-3.2.1/LICENSE" ]
 }
 
-rust_library("test-case-v3_1_0") {
+rust_library("test-case-v3_2_1") {
   crate_name = "test_case"
-  crate_root = "//third_party/rust_crates/vendor/test-case-3.1.0/src/lib.rs"
-  output_name = "test_case-7ba36a2effab90bf"
+  crate_root = "//third_party/rust_crates/vendor/test-case-3.2.1/src/lib.rs"
+  output_name = "test_case-be136360dfea9f8e"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":test-case-macros-v3_1_0($host_toolchain)" ]
+  deps += [ ":test-case-macros-v3_2_1($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=7ba36a2effab90bf",
-    "-Cextra-filename=-7ba36a2effab90bf",
+    "-Cmetadata=be136360dfea9f8e",
+    "-Cextra-filename=-be136360dfea9f8e",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":test-case-v3_1_0.license" ]
+  applicable_licenses = [ ":test-case-v3_2_1.license" ]
 }
 
-license("test-case-core-v3_1_0.license") {
+license("test-case-core-v3_2_1.license") {
   public_package_name = "test_case_core"
   license_files =
-      [ "//third_party/rust_crates/vendor/test-case-core-3.1.0/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/test-case-core-3.2.1/LICENSE" ]
 }
 
-rust_library("test-case-core-v3_1_0") {
+rust_library("test-case-core-v3_2_1") {
   crate_name = "test_case_core"
   crate_root =
-      "//third_party/rust_crates/vendor/test-case-core-3.1.0/src/lib.rs"
-  output_name = "test_case_core-e6a9b92f1d6038ce"
+      "//third_party/rust_crates/vendor/test-case-core-3.2.1/src/lib.rs"
+  output_name = "test_case_core-9ab37c64893682ce"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14916,54 +14917,54 @@ rust_library("test-case-core-v3_1_0") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
+  deps += [ ":syn-v2_0_23" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=e6a9b92f1d6038ce",
-    "-Cextra-filename=-e6a9b92f1d6038ce",
+    "-Cmetadata=9ab37c64893682ce",
+    "-Cextra-filename=-9ab37c64893682ce",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":test-case-core-v3_1_0.license" ]
+  applicable_licenses = [ ":test-case-core-v3_2_1.license" ]
 }
 
-license("test-case-macros-v3_1_0.license") {
+license("test-case-macros-v3_2_1.license") {
   public_package_name = "test_case_macros"
   license_files =
-      [ "//third_party/rust_crates/vendor/test-case-macros-3.1.0/LICENSE" ]
+      [ "//third_party/rust_crates/vendor/test-case-macros-3.2.1/LICENSE" ]
 }
 
-rust_proc_macro("test-case-macros-v3_1_0") {
+rust_proc_macro("test-case-macros-v3_2_1") {
   crate_name = "test_case_macros"
   crate_root =
-      "//third_party/rust_crates/vendor/test-case-macros-3.1.0/src/lib.rs"
-  output_name = "test_case_macros-b3a199aff94bc52e"
+      "//third_party/rust_crates/vendor/test-case-macros-3.2.1/src/lib.rs"
+  output_name = "test_case_macros-941f368c4dcd5cb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v1_0_98" ]
-  deps += [ ":test-case-core-v3_1_0" ]
+  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":test-case-core-v3_2_1" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=b3a199aff94bc52e",
-    "-Cextra-filename=-b3a199aff94bc52e",
+    "-Cmetadata=941f368c4dcd5cb",
+    "-Cextra-filename=-941f368c4dcd5cb",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":test-case-macros-v3_1_0.license" ]
+  applicable_licenses = [ ":test-case-macros-v3_2_1.license" ]
 }
 
 license("textwrap-v0_11_0.license") {

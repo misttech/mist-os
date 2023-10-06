@@ -864,7 +864,7 @@ mod tests {
         "/pkg/data/longdir.img",
         {
             let mut hash = HashMap::new();
-            for i in 1...1000 {
+            for i in 1..=1000 {
                 hash.insert(i.to_string(), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string());
             }
             hash
