@@ -635,7 +635,7 @@ async fn query_recv_loop(
 // the return path is likely not viable. In particular this filters out multicast that QEMU SLIRP
 // has invalidly pumped onto the network that would cause us to attempt to connect to the host
 // machine as if it was a Fuchsia target.
-fn contains_source_address<B: zerocopy::ByteSlice + Clone>(
+fn contains_source_address<B: zerocopy::ByteSlice + Copy>(
     addr: &SocketAddr,
     msg: &dns::Message<B>,
 ) -> bool {
@@ -655,14 +655,14 @@ fn contains_source_address<B: zerocopy::ByteSlice + Clone>(
     false
 }
 
-fn contains_txt_response<B: zerocopy::ByteSlice + Clone>(m: &dns::Message<B>) -> bool {
+fn contains_txt_response<B: zerocopy::ByteSlice + Copy>(m: &dns::Message<B>) -> bool {
     m.answers.iter().any(|a| a.rtype == dns::Type::Txt)
 }
-fn is_fuchsia_response<B: zerocopy::ByteSlice + Clone>(m: &dns::Message<B>) -> bool {
+fn is_fuchsia_response<B: zerocopy::ByteSlice + Copy>(m: &dns::Message<B>) -> bool {
     m.answers.iter().any(|a| a.domain == "_fuchsia._udp.local")
 }
 
-fn is_fastboot_response<B: zerocopy::ByteSlice + Clone>(
+fn is_fastboot_response<B: zerocopy::ByteSlice + Copy>(
     m: &dns::Message<B>,
 ) -> Option<ffx::FastbootInterface> {
     if m.answers.is_empty() {

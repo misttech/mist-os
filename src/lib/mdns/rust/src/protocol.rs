@@ -78,8 +78,7 @@ impl<B: ByteSlice + Clone> BufferView<B> for BufferViewWrapper<B> {
 
 impl<B: ByteSlice> AsRef<[u8]> for BufferViewWrapper<B> {
     fn as_ref(&self) -> &[u8] {
-        #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-        self.0.as_ref().clone().as_ref()
+        &self.0
     }
 }
 
@@ -240,8 +239,8 @@ pub struct Question<B: ByteSlice> {
     pub unicast: bool,
 }
 
-impl<B: ByteSlice + Clone> Question<B> {
-    fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<&B>) -> Result<Self, ParseError> {
+impl<B: ByteSlice + Copy> Question<B> {
+    fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<B>) -> Result<Self, ParseError> {
         let domain = Domain::parse(buffer, parent)?;
         let qtype = buffer.take_obj_front::<U16>().ok_or(ParseError::Malformed)?;
         let class_and_ucast = buffer.take_obj_front::<U16>().ok_or(ParseError::Malformed)?;
@@ -251,13 +250,13 @@ impl<B: ByteSlice + Clone> Question<B> {
     }
 }
 
-impl<B: ByteSlice + Clone> Display for Question<B> {
+impl<B: ByteSlice + Copy> Display for Question<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Clone> Debug for Question<B> {
+impl<B: ByteSlice + Copy> Debug for Question<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -312,10 +311,10 @@ pub struct SrvRecord<B: ByteSlice> {
     domain: Domain<B>,
 }
 
-impl<B: ByteSlice + Clone> SrvRecord<B> {
+impl<B: ByteSlice + Copy> SrvRecord<B> {
     fn parse<BV: BufferView<B>>(
         buffer: &mut BV,
-        parent: Option<&B>,
+        parent: Option<B>,
         len_limit: u16,
     ) -> Result<Self, ParseError> {
         let priority = buffer.take_obj_front::<U16>().ok_or(ParseError::Malformed)?.get();
@@ -397,13 +396,13 @@ pub struct Record<B: ByteSlice> {
     pub rdata: RData<B>,
 }
 
-impl<B: ByteSlice + Clone> Display for Record<B> {
+impl<B: ByteSlice + Copy> Display for Record<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Clone> Debug for Record<B> {
+impl<B: ByteSlice + Copy> Debug for Record<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}: type {:?}, class {:?}", self.domain, self.rtype, self.class)?;
         match self.rtype {
@@ -449,8 +448,8 @@ fn valid_rdata_len(r: Type, len: u16) -> Result<u16, ParseError> {
     Ok(len)
 }
 
-impl<B: ByteSlice + Clone> Record<B> {
-    fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<&B>) -> Result<Self, ParseError> {
+impl<B: ByteSlice + Copy> Record<B> {
+    fn parse<BV: BufferView<B>>(buffer: &mut BV, parent: Option<B>) -> Result<Self, ParseError> {
         let domain = Domain::parse(buffer, parent)?;
         let rtype: Type =
             buffer.take_obj_front::<U16>().ok_or(ParseError::Malformed)?.get().try_into()?;
@@ -560,11 +559,11 @@ pub struct Message<B: ByteSlice> {
     pub additional: Vec<Record<B>>,
 }
 
-impl<B: ByteSlice + Clone> Message<B> {
+impl<B: ByteSlice + Copy> Message<B> {
     #[inline]
     fn parse_records<BV: BufferView<B>>(
         buffer: &mut BV,
-        parent: Option<&B>,
+        parent: Option<B>,
         count: usize,
     ) -> Result<Vec<Record<B>>, ParseError> {
         let mut records = Vec::<Record<B>>::with_capacity(count);
@@ -575,22 +574,22 @@ impl<B: ByteSlice + Clone> Message<B> {
     }
 }
 
-impl<B: ByteSlice + Clone> ParsablePacket<B, ()> for Message<B> {
+impl<B: ByteSlice + Copy> ParsablePacket<B, ()> for Message<B> {
     type Error = ParseError;
 
     fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> Result<Self, Self::Error> {
         let body = buffer.into_rest();
-        let mut buffer = BufferViewWrapper(body.clone());
+        let mut buffer = BufferViewWrapper(body);
 
         let header = buffer.take_obj_front::<Header>().ok_or(ParseError::Malformed)?;
         let mut questions: Vec<Question<B>> = Vec::with_capacity(header.question_count());
         for _ in 0..header.question_count.get() {
-            questions.push(Question::parse(&mut buffer, Some(&body))?);
+            questions.push(Question::parse(&mut buffer, Some(body))?);
         }
-        let answers = Message::parse_records(&mut buffer, Some(&body), header.answer_count())?;
-        let authority = Message::parse_records(&mut buffer, Some(&body), header.authority_count())?;
+        let answers = Message::parse_records(&mut buffer, Some(body), header.answer_count())?;
+        let authority = Message::parse_records(&mut buffer, Some(body), header.authority_count())?;
         let additional =
-            Message::parse_records(&mut buffer, Some(&body), header.additional_count())?;
+            Message::parse_records(&mut buffer, Some(body), header.additional_count())?;
         Ok(Self { header, questions, answers, authority, additional })
     }
 
@@ -682,7 +681,7 @@ enum DomainData<B: ByteSlice> {
     Pointer(Option<B>, u16),
 }
 
-impl<B: ByteSlice + Clone> Domain<B> {
+impl<B: ByteSlice + Copy> Domain<B> {
     fn fmt_byte_slice(f: &mut Formatter<'_>, b: &B) -> std::fmt::Result {
         let mut iter = b.as_ref().iter();
         let mut idx = 0;
@@ -821,7 +820,7 @@ impl<B: ByteSlice + Clone> Domain<B> {
     /// [RFC 1035 Section 4.1.4]: https://datatracker.ietf.org/doc/html/rfc1035#section-4.1.4
     pub fn parse<BV: BufferView<B>>(
         buffer: &mut BV,
-        parent: Option<&B>,
+        parent: Option<B>,
     ) -> Result<Self, ParseError> {
         let mut fragments = Vec::<B>::new();
         let mut pointer_set = HashSet::<u16>::new();
@@ -855,19 +854,19 @@ impl<B: ByteSlice + Clone> Domain<B> {
 
 /// Implementation of PartialEq to make it possible to compare a parsed domain
 /// with the initial string that was used to construct it.
-impl<B: ByteSlice + Clone> PartialEq<&str> for Domain<B> {
+impl<B: ByteSlice + Copy> PartialEq<&str> for Domain<B> {
     fn eq(&self, other: &&str) -> bool {
         self.partial_eq_helper_str(other).or_else::<bool, _>(|_| Ok(false)).unwrap()
     }
 }
 
-impl<B: ByteSlice + Clone> Display for Domain<B> {
+impl<B: ByteSlice + Copy> Display for Domain<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl<B: ByteSlice + Clone> Debug for Domain<B> {
+impl<B: ByteSlice + Copy> Debug for Domain<B> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut iter = self.fragments.iter();
         let data = iter.next().unwrap();
@@ -1318,8 +1317,7 @@ mod tests {
     fn test_domain_bad_pointer_index() {
         let packet: Vec<u8> = vec![0u8, 0x01, 'y' as u8, 0xc0, 0x09];
         let slice: &[u8] = packet.as_ref();
-        #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-        let mut bv = BufferViewWrapper(slice.clone());
+        let mut bv = BufferViewWrapper(slice);
         bv.take_front(3).unwrap();
         assert_eq!(
             Domain::parse(&mut bv, Some(&slice)).unwrap_err(),
@@ -1336,8 +1334,7 @@ mod tests {
         ];
         let slice: &[u8] = packet.as_ref();
         {
-            #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-            let mut bv = BufferViewWrapper(slice.clone());
+            let mut bv = BufferViewWrapper(slice);
             bv.take_front(10).unwrap();
             // Prove that with parent this is valid.
             let _: Domain<_> = Domain::parse(&mut bv, Some(&slice)).expect("should succeed");
@@ -1345,8 +1342,7 @@ mod tests {
 
         {
             // Without parent the indirection is rejected.
-            #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-            let mut bv = BufferViewWrapper(slice.clone());
+            let mut bv = BufferViewWrapper(slice);
             bv.take_front(10).unwrap();
             assert_eq!(Domain::parse(&mut bv, None), Err(ParseError::BadPointerIndex(0x01)));
         }
@@ -1356,9 +1352,8 @@ mod tests {
     fn test_domain_pointer_cycles() {
         for packet in [vec![0xc0, 0x00], vec![0x02, 0x02, 0x01, 0xc0, 0x05, 0xc0, 0x03]].iter() {
             let slice: &[u8] = packet.as_ref();
-            #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-            let mut bv = BufferViewWrapper(slice.clone());
-            assert_eq!(Domain::parse(&mut bv, Some(&slice)).unwrap_err(), ParseError::PointerCycle);
+            let mut bv = BufferViewWrapper(slice);
+            assert_eq!(Domain::parse(&mut bv, Some(slice)).unwrap_err(), ParseError::PointerCycle);
         }
     }
 
@@ -1407,8 +1402,7 @@ mod tests {
         .iter()
         {
             let slice: &[u8] = test.packet.as_ref();
-            #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95085)
-            let mut bv = BufferViewWrapper(slice.clone());
+            let mut bv = BufferViewWrapper(slice);
             bv.take_front(test.parsing_offset).unwrap();
             let parsed = Domain::parse(&mut bv, Some(&slice)).unwrap();
             let mut s = String::new();
