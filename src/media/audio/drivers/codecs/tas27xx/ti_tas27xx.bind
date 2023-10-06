@@ -19,3 +19,7 @@ node "gpio" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_FAULT;
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

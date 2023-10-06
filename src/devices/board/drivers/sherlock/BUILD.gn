@@ -239,6 +239,7 @@ driver_bind_rules("sherlock-woofer-bind") {
   bind_output = "sherlock-woofer-bind.bc"
   tests = "bind-tests/sherlock-woofer-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
@@ -251,6 +252,7 @@ driver_bind_rules("sherlock-tweeter-left-bind") {
   bind_output = "sherlock-tweeter-left-bind.bc"
   tests = "bind-tests/sherlock-tweeter-left-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
@@ -263,6 +265,7 @@ driver_bind_rules("sherlock-tweeter-right-bind") {
   bind_output = "sherlock-tweeter-right-bind.bc"
   tests = "bind-tests/sherlock-tweeter-right-test.json"
   deps = [
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",

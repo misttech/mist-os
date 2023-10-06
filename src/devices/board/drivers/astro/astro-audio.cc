@@ -127,6 +127,13 @@ const device_bind_prop_t kFaultGpioProps[] = {
     ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
+const ddk::BindRule kGpioInitRulesDdk[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const device_bind_prop_t kGpioInitPropsDdk[] = {
+    ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
     fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
@@ -277,6 +284,7 @@ zx_status_t Astro::AudioInit() {
     status = DdkAddCompositeNodeSpec("audio_codec_tas27xx",
                                      ddk::CompositeNodeSpec(kI2cRules, kI2cProps)
                                          .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
+                                         .AddParentSpec(kGpioInitRulesDdk, kGpioInitPropsDdk)
                                          .set_metadata(codec_metadata));
     if (status != ZX_OK) {
       zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);

@@ -108,6 +108,13 @@ const device_bind_prop_t kFaultGpioProps[] = {
     ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
+const ddk::BindRule kGpioInitRulesDdk[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const device_bind_prop_t kGpioInitPropsDdk[] = {
+    ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 zx_status_t Nelson::AudioInit() {
   zx_status_t status;
 
@@ -297,9 +304,11 @@ zx_status_t Nelson::AudioInit() {
           .length = sizeof(tas_metadata),
       },
   };
-  status = DdkAddCompositeNodeSpec("tas58xx", ddk::CompositeNodeSpec(kOutI2cRules, kOutI2cProps)
-                                                  .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
-                                                  .set_metadata(codec_metadata));
+  status =
+      DdkAddCompositeNodeSpec("tas58xx", ddk::CompositeNodeSpec(kOutI2cRules, kOutI2cProps)
+                                             .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
+                                             .AddParentSpec(kGpioInitRulesDdk, kGpioInitPropsDdk)
+                                             .set_metadata(codec_metadata));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);
     return status;
