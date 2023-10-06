@@ -171,7 +171,7 @@ template("zircon_toolchain") {
 
   _restat_cc_prefix_list = []
   if (restat_cc) {
-    if (_cxx_rbe_enable) {
+    if (!_cxx_rbe_enable) {
       # Local-only execution may use this wrapper script directly.
       _restat_cc_wrapper = [
         rebase_path(python_exe_src, root_build_dir),
