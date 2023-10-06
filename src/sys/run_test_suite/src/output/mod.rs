@@ -131,7 +131,7 @@ impl<'a> SuiteReporter<'a> {
         };
         let entity = EntityId::Case { suite, case: *case_id };
         self.reporter.new_entity(&entity, name)?;
-        Ok(CaseReporter { reporter: self.reporter.borrow(), entity, _entity_type: PhantomData })
+        Ok(CaseReporter { reporter: self.reporter, entity, _entity_type: PhantomData })
     }
 
     /// Set the tags for this suite.

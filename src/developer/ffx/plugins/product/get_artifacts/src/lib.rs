@@ -61,7 +61,7 @@ fn extract_bootloaders(
         if cmd.relative_path {
             path_relative_from(path, &cmd.product_bundle)
         } else {
-            Ok(path.clone().into())
+            Ok(path.into())
         }
     };
 
@@ -92,7 +92,7 @@ fn extract_flashing_artifacts(
         if cmd.relative_path {
             path_relative_from(path, &cmd.product_bundle)
         } else {
-            Ok(path.clone().into())
+            Ok(path.into())
         }
     };
 
@@ -143,7 +143,7 @@ fn extract_emu_artifacts(
         if cmd.relative_path {
             path_relative_from(path, &cmd.product_bundle)
         } else {
-            Ok(path.clone().into())
+            Ok(path.into())
         }
     };
 

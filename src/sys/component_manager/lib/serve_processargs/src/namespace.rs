@@ -56,10 +56,8 @@ impl NamespaceBuilder {
         // If these is no such entry, make an empty dictionary.
         let dict: &mut AnyCapability = match self.entries.get_mut(&dirname) {
             None => {
-                let (dict, fut) = make_dict_with_not_found_logging(
-                    path.dirname().clone().into(),
-                    self.not_found.clone(),
-                );
+                let (dict, fut) =
+                    make_dict_with_not_found_logging(path.dirname().into(), self.not_found.clone());
                 self.futures.push(fut);
                 self.entries.add(&dirname, Box::new(dict))?
             }

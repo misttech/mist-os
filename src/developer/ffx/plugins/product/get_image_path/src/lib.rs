@@ -50,7 +50,7 @@ fn extract_image_path(
         if cmd.relative_path {
             path_relative_from(path, &cmd.product_bundle)
         } else {
-            Ok(path.clone().into())
+            Ok(path.into())
         }
     };
 

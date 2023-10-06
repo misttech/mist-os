@@ -265,7 +265,7 @@ pub(crate) fn make_ga4_event<'a>(
 
     let params: &mut HashMap<String, GA4Value> = &mut HashMap::new();
     if let Some(s) = invoker {
-        params.insert("invoker".into(), s.clone().into());
+        params.insert("invoker".into(), s.into());
     }
     insert_if_present("label", params, label);
 
@@ -309,7 +309,7 @@ pub(crate) fn make_ga4_crash_event(
 ) -> Event {
     let params: &mut HashMap<String, GA4Value> = &mut HashMap::new();
     if let Some(s) = invoker {
-        params.insert("invoker".into(), s.clone().into());
+        params.insert("invoker".into(), s.into());
     }
     insert_if_present(
         "fatal",
@@ -345,7 +345,7 @@ pub(crate) fn make_ga4_timing_event<'a>(
         params.insert(key.into(), value.clone());
     }
     if let Some(s) = invoker {
-        params.insert("invoker".into(), s.clone().into());
+        params.insert("invoker".into(), s.into());
     }
     Event::new("timing".into(), Some(Params { items: None, params: params.to_owned() }))
 }

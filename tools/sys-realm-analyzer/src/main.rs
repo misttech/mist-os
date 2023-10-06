@@ -217,14 +217,12 @@ fn output_result<T: Write>(
 /// Given comma-delimited strings for processor architectures and boards,
 /// return a vector with the cross product of these lists.
 fn get_target_sets(arch_str: Option<&String>, board_str: Option<&String>) -> Vec<BuildTarget> {
-    #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95078)
     let arches = match arch_str {
-        Some(arch_str) => arch_str.split(",").map(|a| a.trim().clone()).collect(),
+        Some(arch_str) => arch_str.split(",").map(|a| a.trim()).collect(),
         None => vec![],
     };
-    #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95078)
     let boards = match board_str {
-        Some(board_str) => board_str.split(",").map(|b| b.trim().clone()).collect(),
+        Some(board_str) => board_str.split(",").map(|b| b.trim()).collect(),
         None => vec![],
     };
 
@@ -256,9 +254,8 @@ fn get_default_build_targets() -> Vec<BuildTarget> {
 /// Given a comma-delimited set of product targets, return a list of
 /// `BuildTarget`s.
 fn get_target_products(products_str: Option<&String>) -> Vec<BuildTarget> {
-    #[allow(suspicious_double_ref_op)] // TODO(fxbug.dev/95078)
     let product_strs = match products_str {
-        Some(products_str) => products_str.split(",").map(|b| b.trim().clone()).collect(),
+        Some(products_str) => products_str.split(",").map(|b| b.trim()).collect(),
         None => vec![],
     };
     let mut build_targets = vec![];
