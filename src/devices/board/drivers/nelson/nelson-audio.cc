@@ -44,6 +44,13 @@ namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 // Audio out controller composite node specifications.
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -68,6 +75,7 @@ const std::vector<fdf::NodeProperty> kOutCodecProps = std::vector{
 };
 
 const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
+    fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
     fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
     fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
 };

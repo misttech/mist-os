@@ -83,6 +83,17 @@ zx_status_t Vim3::AudioInit() {
   gpio_impl_.SetDriveStrength(A311D_GPIOA(3), kStrengthUa, nullptr);
   // GPIOA(4) is set as input, so no driver strength is set.
 
+  // Bind properties common across all devices.
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::ParentSpec> kControllerParents = std::vector{
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+  };
+
   // Output device BTPCM setup with TDM bus A.
   {
     static const std::vector<fpbus::Bti> pcm_out_btis{
@@ -118,8 +129,10 @@ zx_status_t Vim3::AudioInit() {
         }},
     };
 
-    auto builder = fuchsia_driver_framework::wire::CompositeNodeSpec::Builder(fdf_arena).name(
-        "audio-pcm-out-composite-spec");
+    const auto pcm_out_spec = fdf::CompositeNodeSpec{{
+        "audio-pcm-out-composite-spec",
+        kControllerParents,
+    }};
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "audio-pcm-out";
@@ -130,8 +143,8 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.bti() = pcm_out_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.instance_id() = tdm_instance_id++;
-    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                                builder.Build());
+    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, pcm_out_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", result.FormatDescription().data());
       return result.status();
@@ -177,8 +190,10 @@ zx_status_t Vim3::AudioInit() {
         }},
     };
 
-    auto builder = fuchsia_driver_framework::wire::CompositeNodeSpec::Builder(fdf_arena).name(
-        "audio-i2s-out-composite-spec");
+    const auto i2s_out_spec = fdf::CompositeNodeSpec{{
+        "audio-i2s-out-composite-spec",
+        kControllerParents,
+    }};
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "audio-i2s-out";
@@ -189,8 +204,8 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.bti() = i2s_out_btis;
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.instance_id() = tdm_instance_id++;
-    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                                builder.Build());
+    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, i2s_out_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", result.FormatDescription().data());
       return result.status();
@@ -236,8 +251,10 @@ zx_status_t Vim3::AudioInit() {
         }},
     };
 
-    auto builder = fuchsia_driver_framework::wire::CompositeNodeSpec::Builder(fdf_arena).name(
-        "audio-pcm-in-composite-spec");
+    const auto pcm_in_spec = fdf::CompositeNodeSpec{{
+        "audio-pcm-in-composite-spec",
+        kControllerParents,
+    }};
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "audio-pcm-in";
@@ -249,8 +266,8 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.instance_id() = tdm_instance_id++;
 
-    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                                builder.Build());
+    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, pcm_in_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", result.FormatDescription().data());
       return result.status();
@@ -296,8 +313,10 @@ zx_status_t Vim3::AudioInit() {
         }},
     };
 
-    auto builder = fuchsia_driver_framework::wire::CompositeNodeSpec::Builder(fdf_arena).name(
-        "audio-i2s-in-composite-spec");
+    const auto i2s_in_spec = fdf::CompositeNodeSpec{{
+        "audio-i2s-in-composite-spec",
+        kControllerParents,
+    }};
 
     fpbus::Node tdm_dev;
     tdm_dev.name() = "audio-i2s-in";
@@ -309,8 +328,8 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.metadata() = tdm_metadata;
     tdm_dev.instance_id() = tdm_instance_id++;
 
-    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                                builder.Build());
+    auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
+        fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, i2s_in_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec failed: %s", result.FormatDescription().data());
       return result.status();

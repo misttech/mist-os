@@ -141,7 +141,19 @@ zx_status_t Sherlock::AudioInit() {
   constexpr size_t device_name_max_length = 32;
 
   std::vector<fdf::ParentSpec> sherlock_tdm_i2s_parents;
-  sherlock_tdm_i2s_parents.reserve(4);
+  sherlock_tdm_i2s_parents.reserve(5);
+
+  const auto gpio_init_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const auto gpio_init_props = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
+  sherlock_tdm_i2s_parents.push_back(fdf::ParentSpec{{
+      .bind_rules = gpio_init_rules,
+      .properties = gpio_init_props,
+  }});
 
   // Add a spec for the enable audio GPIO pin.
   auto enable_audio_gpio_rules = std::vector{

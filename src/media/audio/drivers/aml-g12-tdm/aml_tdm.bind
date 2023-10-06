@@ -23,6 +23,10 @@ primary node "pdev" {
   }
 }
 
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
 optional node "gpio-enable" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.gpio.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.SOC_AUDIO_ENABLE;
