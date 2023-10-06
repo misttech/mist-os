@@ -395,6 +395,8 @@ zx_handle_t get_root_resource(zx_device_t* dev);
 
 zx_handle_t get_mmio_resource(zx_device_t* dev);
 
+zx_handle_t get_power_resource(zx_device_t* dev);
+
 zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* device, const char* path,
                                       zx_handle_t* fw, size_t* size);
 

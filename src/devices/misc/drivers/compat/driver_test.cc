@@ -121,6 +121,33 @@ class TestMmioResource : public fidl::testing::WireTestBase<fkernel::MmioResourc
   zx::event fake_resource_;
 };
 
+class TestPowerResource : public fidl::testing::WireTestBase<fkernel::PowerResource> {
+ public:
+  TestPowerResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
+
+  fidl::ProtocolHandler<fkernel::PowerResource> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
+  void Get(GetCompleter::Sync& completer) override {
+    zx::event duplicate;
+    ASSERT_EQ(ZX_OK, fake_resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate));
+    completer.Reply(zx::resource(duplicate.release()));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: PowerResource::%s\n", name.data());
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::ServerBindingGroup<fkernel::PowerResource> bindings_;
+
+  // An event is similar enough that we can pretend it's the power resource, in that we can
+  // send it over a FIDL channel.
+  zx::event fake_resource_;
+};
+
 class TestItems : public fidl::testing::WireTestBase<fboot::Items> {
  public:
   fidl::ProtocolHandler<fboot::Items> GetHandler() {
@@ -380,6 +407,11 @@ class IncomingNamespace {
         return result.take_error();
       }
 
+      result = outgoing.AddUnmanagedProtocol<fkernel::PowerResource>(power_resource_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
       result = outgoing.AddUnmanagedProtocol<fboot::Items>(items_.GetHandler());
       if (result.is_error()) {
         return result.take_error();
@@ -445,6 +477,7 @@ class IncomingNamespace {
   std::unordered_map<std::string, TestDevice> devices_;
   TestRootResource root_resource_;
   TestMmioResource mmio_resource_;
+  TestPowerResource power_resource_;
   std::optional<TestProfileProvider> profile_provider_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;

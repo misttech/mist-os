@@ -47,6 +47,8 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetMmioResource();
 
+  zx_handle_t GetPowerResource();
+
   // # Threading notes
   //
   // If this method is not called from a task running on |dispatcher|,
@@ -138,6 +140,7 @@ class Driver : public fdf::DriverBase {
   // API resources.
   zx::resource root_resource_;
   zx::resource mmio_resource_;
+  zx::resource power_resource_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
