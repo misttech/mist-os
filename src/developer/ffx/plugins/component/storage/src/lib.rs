@@ -4,7 +4,8 @@
 
 use async_trait::async_trait;
 use component_debug::cli::{
-    storage_copy_cmd, storage_delete_cmd, storage_list_cmd, storage_make_directory_cmd,
+    storage_copy_cmd, storage_delete_all_cmd, storage_delete_cmd, storage_list_cmd,
+    storage_make_directory_cmd,
 };
 use errors::FfxError;
 use ffx_component::rcs::connect_to_realm_query;
@@ -64,6 +65,15 @@ impl FfxMain for StorageTool {
                     self.cmd.provider,
                     self.cmd.capability,
                     make_dir_args.path,
+                    realm_query,
+                )
+                .await
+            }
+            SubCommandEnum::DeleteAll(delete_all_args) => {
+                storage_delete_all_cmd(
+                    self.cmd.provider,
+                    self.cmd.capability,
+                    delete_all_args.moniker,
                     realm_query,
                 )
                 .await

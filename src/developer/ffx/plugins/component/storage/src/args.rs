@@ -31,6 +31,7 @@ pub enum SubCommandEnum {
     Delete(DeleteArgs),
     List(ListArgs),
     MakeDirectory(MakeDirectoryArgs),
+    DeleteAll(DeleteAllArgs),
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -131,4 +132,21 @@ pub struct DeleteArgs {
     #[argh(positional)]
     /// the path of the file to be deleted
     pub path: String,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "delete-all",
+    description = "Delete the contents of the storage for a specific component.",
+    example = "To delete the contents of the storage for a component with moniker `foo`:
+
+    $ ffx component storage delete-all foo
+
+Note: although unusual, the user may specify internal instance IDs in the moniker such as `foo:0/bar:2`."
+)]
+pub struct DeleteAllArgs {
+    #[argh(positional)]
+    /// the moniker for the specific component to delete storage
+    pub moniker: String,
 }

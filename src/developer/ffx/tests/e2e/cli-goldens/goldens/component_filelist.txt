@@ -19,6 +19,7 @@ ffx/component/start.golden
 ffx/component/stop.golden
 ffx/component/storage.golden
 ffx/component/storage/copy.golden
+ffx/component/storage/delete-all.golden
 ffx/component/storage/delete.golden
 ffx/component/storage/list.golden
 ffx/component/storage/make-directory.golden

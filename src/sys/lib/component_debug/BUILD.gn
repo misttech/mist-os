@@ -103,6 +103,7 @@ rustc_library("component_debug") {
     "src/route.rs",
     "src/storage/copy.rs",
     "src/storage/delete.rs",
+    "src/storage/delete_all.rs",
     "src/storage/list.rs",
     "src/storage/make_directory.rs",
     "src/storage/mod.rs",
