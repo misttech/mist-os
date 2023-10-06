@@ -176,17 +176,17 @@ function check-for-package-server {
 
     # Warn if it is using the wrong repository.
     if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files")" ]]; then
-      fx-warn "WARNING: It looks like 'fx serve' is running in a different workspace."
-      fx-warn "WARNING: You probably need to stop that one and start a new one here with \"fx serve\""
+      fx-warn "It looks like 'fx serve' is running in a different workspace."
+      fx-warn "You probably need to stop that one and start a new one here with \"fx serve\""
     fi
 
     # Warn if incremental is enabled for this shell, but the server is not auto publishing packages.
     if is_feature_enabled "incremental"; then
       # Regex terminates with a space to avoid matching the -persist option.
       if [[ -z "$(pgrep -f "pm serve .*${FUCHSIA_BUILD_DIR}/amber-files .*-p ")" ]]; then
-        fx-warn "WARNING: Incremental build is enabled, but it looks like incremental build is disabled for 'fx serve'."
-        fx-warn "WARNING: You probably need to stop 'fx serve', and restart it with incremental build enabled."
-        fx-warn "WARNING: You can enable incremental build in the shell running 'fx serve' with 'export FUCHSIA_DISABLED_incremental=0'"
+        fx-warn "Incremental build is enabled, but it looks like incremental build is disabled for 'fx serve'."
+        fx-warn "You probably need to stop 'fx serve', and restart it with incremental build enabled."
+        fx-warn "You can enable incremental build in the shell running 'fx serve' with 'export FUCHSIA_DISABLED_incremental=0'"
       fi
     fi
   else
@@ -216,8 +216,8 @@ function check-for-package-server {
     fi
 
     if [[ "${ffx_port}" -eq 0 ]]; then
-      fx-warn "WARNING: The server is configured to listen on a random port."
-      fx-warn "WARNING: We can't determine which port this is, so assuming it's running."
+      fx-warn "The server is configured to listen on a random port."
+      fx-warn "We can't determine which port this is, so assuming it's running."
     else
       if ! is-listening-on-port "${ffx_port}"; then
         fx-error "It looks like the ffx package server is not running."

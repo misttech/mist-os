@@ -5,6 +5,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import shlex
 import sys
@@ -31,7 +32,11 @@ class PackageDiffs:
 
     @classmethod
     def snapshot(cls, repo: Path) -> Dict[str, str]:
-        targets = json.loads((repo / "repository" / "targets.json").read_text())
+        repo_targets = repo / "repository" / "targets.json"
+        # New empty repositories do not have targets.json.
+        if not repo_targets.is_file():
+            return {}
+        targets = json.loads(repo_targets.read_text())
         return {
             (package[:-2] if package.endswith("/0") else package): props[
                 "custom"
@@ -77,6 +82,8 @@ def fx_command(*command: str) -> List[str]:
                 str(
                     (Path(__file__).parent.parent / "lib" / "vars.sh").resolve()
                 ),
+                "&&",
+                "cd $FUCHSIA_DIR",
                 "&&",
                 "fx-config-read",
                 "&&",
@@ -174,13 +181,15 @@ def main() -> int:
         Terminal.warn("No packages were updated.")
 
     # Check if package server is running.
-    if subprocess.run(
+    subprocess.run(
         shlex.join(fx_command("is-package-server-running")),
         shell=True,
-        capture_output=True,
-    ).returncode:
-        Terminal.warn("Looks like the package server is not running.")
-        Terminal.warn('You probably need to run "fx serve".')
+        env=os.environ
+        | {
+            # Suppress extra warning message about incremental package serving.
+            "FUCHSIA_DISABLED_incremental": "1",
+        },
+    )
 
     return 0
 
