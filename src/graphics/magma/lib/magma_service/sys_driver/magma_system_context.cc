@@ -100,7 +100,6 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
                             semaphore_ids[i]);
     msd_semaphores[i] = semaphore->msd_semaphore();
     // This is used to connect with command submission in
-    // src/ui/scenic/lib/gfx/engine/engine.cc and
     // src/ui/scenic/lib/flatland/renderer/vk_renderer.cc, so it uses the koid.
     TRACE_FLOW_END("gfx", "semaphore", semaphore->global_id());
   }
