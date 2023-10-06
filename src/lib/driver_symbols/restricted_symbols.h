@@ -41,6 +41,7 @@ const std::set<std::string> kCreateThreadSymbolsDriversAllowlist = {
     "#meta/aml_mipicsi.cm",
     "#meta/amlogic-display.cm",
     "#meta/amlogic_h264_encoder_driver.cm",
+    "#meta/amlogic_hevc_encoder_driver.cm",
     "#meta/amlogic_video_decoder.cm",
     "#meta/aml-pl-mailbox.cm",
     "#meta/aml-ram.cm",
