@@ -317,9 +317,9 @@ void SimpleDisplay::DisplayControllerImplApplyConfiguration(
 }
 
 zx_status_t SimpleDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Allocator> can't be used here
-  // becuase it wants to create the endpoints, but in this case we have the server_end only.
-  using ServiceMember = fuchsia_hardware_sysmem::Service::Allocator;
+  // DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV2> can't be used
+  // here becuase it wants to create the endpoints, but in this case we have the server_end only.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV2;
   auto status = device_connect_fragment_fidl_protocol(parent_, "sysmem", ServiceMember::ServiceName,
                                                       ServiceMember::Name, connection.release());
   if (status != ZX_OK) {
@@ -586,7 +586,7 @@ zx_status_t bind_simple_pci_display(zx_device_t* dev, const char* name, uint32_t
   fidl::WireSyncClient hardware_sysmem{std::move(*hardware_sysmem_result)};
 
   zx::result sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::Allocator>(dev, "sysmem");
+      fuchsia_hardware_sysmem::Service::AllocatorV2>(dev, "sysmem");
   if (sysmem_result.is_error()) {
     zxlogf(ERROR, "%s: could not get fuchsia.sysmem2.Allocator protocol: %s", name,
            sysmem_result.status_string());
@@ -639,7 +639,7 @@ zx_status_t bind_simple_fidl_pci_display(zx_device_t* dev, const char* name, uin
   fidl::WireSyncClient hardware_sysmem{std::move(*hardware_sysmem_result)};
 
   zx::result sysmem_result = ddk::Device<void>::DdkConnectFragmentFidlProtocol<
-      fuchsia_hardware_sysmem::Service::Allocator>(dev, "sysmem");
+      fuchsia_hardware_sysmem::Service::AllocatorV2>(dev, "sysmem");
   if (sysmem_result.is_error()) {
     zxlogf(ERROR, "%s: could not get fuchsia.sysmem2.Allocator protocol: %s", name,
            sysmem_result.status_string());

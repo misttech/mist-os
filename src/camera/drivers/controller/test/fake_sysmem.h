@@ -26,7 +26,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
         .sysmem = sysmem_bindings_.CreateHandler(this, async_get_default_dispatcher(),
                                                  fidl::kIgnoreBindingClosure),
         .allocator_v1 = [](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {},
-        .allocator = [](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {},
+        .allocator_v2 = [](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {},
     });
   }
 

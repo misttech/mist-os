@@ -1205,7 +1205,7 @@ zx_status_t FidlDevice::Bind() {
                   LOG(INFO, "Direct connect to fuchsia_sysmem::Allocator() failed");
                 }
               },
-          .allocator =
+          .allocator_v2 =
               [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
                 zx_status_t status = sysmem_device_->CommonSysmemConnectV2(request.TakeChannel());
                 if (status != ZX_OK) {
