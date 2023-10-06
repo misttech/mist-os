@@ -18,7 +18,6 @@ icu_rustc_library("icu_data") {
   ]
 
   deps = [
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:lazy_static",

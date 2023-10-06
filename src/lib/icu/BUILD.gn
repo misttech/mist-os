@@ -6,6 +6,7 @@
 import("//build/icu/config.gni")  # icu_root, icu_flavor_major_versions
 
 import("//build/dist/resource.gni")
+import("//build/icu/icu_group.gni")
 import("//build/icu/icu_resource.gni")
 
 import("${icu_root}/version.gni")
@@ -67,15 +68,39 @@ group("data") {
   public_deps = [ "${icu_root}:icudata" ]
 }
 
-icu_resource("icudtl") {
+icu_group("icudtl") {
+  public_deps = [
+    ":icudtl_orig",
+    ":icudtl_versioned",
+  ]
+}
+
+icu_resource("icudtl_orig") {
   sources = [ "${icu_root}/common/icudtl.dat" ]
   outputs = [ "data/icudtl.dat" ]
 }
 
+icu_resource("icudtl_versioned") {
+  sources = [ "${icu_root}/common/icudtl.dat" ]
+  outputs = [ "data/icudt${icu_major_version_number}l.dat" ]
+}
+
 # TODO(fmil): Is there a way to unify with above?
-icu_resource("icudtl_root") {
+icu_group("icudtl_root") {
+  public_deps = [
+    ":icudtl_root_orig",
+    ":icudtl_root_versioned",
+  ]
+}
+
+icu_resource("icudtl_root_orig") {
   sources = [ "${icu_root}/common/icudtl.dat" ]
   outputs = [ "icudtl.dat" ]
+}
+
+icu_resource("icudtl_root_versioned") {
+  sources = [ "${icu_root}/common/icudtl.dat" ]
+  outputs = [ "icudt${icu_major_version_number}l.dat" ]
 }
 
 config("default") {
