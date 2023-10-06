@@ -56,8 +56,16 @@ int Astro::Thread() {
     return status;
   }
 
+  if ((status = ClkInit()) != ZX_OK) {
+    zxlogf(ERROR, "ClkInit failed: %d", status);
+  }
+
   if ((status = SdioInit()) != ZX_OK) {
     zxlogf(ERROR, "SdioInit failed: %d", status);
+  }
+
+  if ((status = AudioInit()) != ZX_OK) {
+    zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
@@ -93,10 +101,6 @@ int Astro::Thread() {
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "%s: RegistersInit() failed: %d", __func__, status);
     return status;
-  }
-
-  if ((status = ClkInit()) != ZX_OK) {
-    zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
   if ((status = PowerInit()) != ZX_OK) {
@@ -165,10 +169,6 @@ int Astro::Thread() {
 
   if ((status = ThermistorInit()) != ZX_OK) {
     zxlogf(ERROR, "ThermistorInit failed: %d", status);
-  }
-
-  if ((status = AudioInit()) != ZX_OK) {
-    zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
   if ((status = SecureMemInit()) != ZX_OK) {

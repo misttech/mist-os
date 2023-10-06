@@ -133,12 +133,21 @@ int Sherlock::Thread() {
     return -1;
   }
 
+  if (ClkInit() != ZX_OK) {
+    zxlogf(ERROR, "ClkInit() failed");
+    return -1;
+  }
+
   if (EmmcInit() != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed");
   }
 
   if (SdioInit() != ZX_OK) {
     zxlogf(ERROR, "SdioInit() failed");
+  }
+
+  if (AudioInit() != ZX_OK) {
+    zxlogf(ERROR, "AudioInit() failed");
   }
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
@@ -160,11 +169,6 @@ int Sherlock::Thread() {
 
   if (BoardInit() != ZX_OK) {
     zxlogf(ERROR, "BoardInit() failed");
-    return -1;
-  }
-
-  if (ClkInit() != ZX_OK) {
-    zxlogf(ERROR, "ClkInit() failed");
     return -1;
   }
 
@@ -239,10 +243,6 @@ int Sherlock::Thread() {
 
   if (ButtonsInit() != ZX_OK) {
     zxlogf(ERROR, "ButtonsInit() failed");
-  }
-
-  if (AudioInit() != ZX_OK) {
-    zxlogf(ERROR, "AudioInit() failed");
   }
 
   if (TouchInit() != ZX_OK) {

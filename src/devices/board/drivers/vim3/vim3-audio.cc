@@ -61,26 +61,34 @@ zx_status_t Vim3::AudioInit() {
     return status;
   }
 
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
+
+  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+  };
+
   // PCM pin assignments.
   constexpr uint64_t kStrengthUa = 3000;
   // TDM bus A connected to BTPCM.
-  gpio_impl_.SetAltFunction(A311D_GPIOX(11), A311D_GPIOX_11_TDMA_SCLK_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOX(10), A311D_GPIOX_10_TDMA_FS_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOX(9), A311D_GPIOX_9_TDMA_D0_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOX(8), A311D_GPIOX_8_TDMA_DIN1_FN);
-  gpio_impl_.SetDriveStrength(A311D_GPIOX(11), kStrengthUa, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOX(10), kStrengthUa, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOX(9), kStrengthUa, nullptr);
+  gpio_init_steps_.push_back({A311D_GPIOX(11), set_alt_function(A311D_GPIOX_11_TDMA_SCLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOX(10), set_alt_function(A311D_GPIOX_10_TDMA_FS_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOX(9), set_alt_function(A311D_GPIOX_9_TDMA_D0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOX(8), set_alt_function(A311D_GPIOX_8_TDMA_DIN1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOX(11), set_drive_strength(kStrengthUa)});
+  gpio_init_steps_.push_back({A311D_GPIOX(10), set_drive_strength(kStrengthUa)});
+  gpio_init_steps_.push_back({A311D_GPIOX(9), set_drive_strength(kStrengthUa)});
   // GPIOX(8) is set as input, so no driver strength is set.
 
   // TDM bus B connected to I2SB.
-  gpio_impl_.SetAltFunction(A311D_GPIOA(1), A311D_GPIOA_1_TDMB_SCLK_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOA(2), A311D_GPIOA_2_TDMB_FS_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOA(3), A311D_GPIOA_3_TDMB_D0_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOA(4), A311D_GPIOA_4_TDMB_DIN1_FN);
-  gpio_impl_.SetDriveStrength(A311D_GPIOA(1), kStrengthUa, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOA(2), kStrengthUa, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOA(3), kStrengthUa, nullptr);
+  gpio_init_steps_.push_back({A311D_GPIOA(1), set_alt_function(A311D_GPIOA_1_TDMB_SCLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOA(2), set_alt_function(A311D_GPIOA_2_TDMB_FS_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOA(3), set_alt_function(A311D_GPIOA_3_TDMB_D0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOA(4), set_alt_function(A311D_GPIOA_4_TDMB_DIN1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOA(1), set_drive_strength(kStrengthUa)});
+  gpio_init_steps_.push_back({A311D_GPIOA(2), set_drive_strength(kStrengthUa)});
+  gpio_init_steps_.push_back({A311D_GPIOA(3), set_drive_strength(kStrengthUa)});
   // GPIOA(4) is set as input, so no driver strength is set.
 
   // Bind properties common across all devices.

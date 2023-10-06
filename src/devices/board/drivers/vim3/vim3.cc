@@ -73,6 +73,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = ClkInit()) != ZX_OK) {
+    zxlogf(ERROR, "ClkInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   if ((status = EmmcInit()) != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed: %d\n", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -88,6 +93,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = AudioInit()) != ZX_OK) {
+    zxlogf(ERROR, "AudioInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -97,11 +107,6 @@ int Vim3::Thread() {
   }
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = ClkInit()) != ZX_OK) {
-    zxlogf(ERROR, "ClkInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
@@ -185,11 +190,6 @@ int Vim3::Thread() {
   }
   if ((status = VideoInit()) != ZX_OK) {
     zxlogf(ERROR, "VideoInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = AudioInit()) != ZX_OK) {
-    zxlogf(ERROR, "AudioInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

@@ -91,12 +91,20 @@ int Nelson::Thread() {
     return status;
   }
 
+  if ((status = ClkInit()) != ZX_OK) {
+    zxlogf(ERROR, "ClkInit failed: %d", status);
+  }
+
   if ((status = EmmcInit()) != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed: %d", status);
   }
 
   if ((status = SdioInit()) != ZX_OK) {
     zxlogf(ERROR, "SdioInit failed: %d", status);
+  }
+
+  if ((status = AudioInit()) != ZX_OK) {
+    zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
@@ -156,10 +164,6 @@ int Nelson::Thread() {
 
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit failed: %d", status);
-  }
-
-  if ((status = ClkInit()) != ZX_OK) {
-    zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
   if ((status = ButtonsInit()) != ZX_OK) {
@@ -224,10 +228,6 @@ int Nelson::Thread() {
 
   if ((status = ThermalInit()) != ZX_OK) {
     zxlogf(ERROR, "ThermalInit failed: %d", status);
-  }
-
-  if ((status = AudioInit()) != ZX_OK) {
-    zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
   if ((status = SecureMemInit()) != ZX_OK) {
