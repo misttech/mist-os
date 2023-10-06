@@ -102,8 +102,6 @@ zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char
     return result;
   }
 
-  const zx_koid_t pid = process->get_koid();
-
   // create the thread dispatcher
   KernelHandle<ThreadDispatcher> handle;
   zx_rights_t thread_rights;
@@ -115,9 +113,6 @@ zx_status_t sys_thread_create(zx_handle_t process_handle, user_in_ptr<const char
   if (result != ZX_OK) {
     return result;
   }
-
-  KTRACE_KERNEL_OBJECT("kernel:meta", handle.dispatcher()->get_koid(), ZX_OBJ_TYPE_THREAD, buf,
-                       ("process", ktrace::Koid(pid)));
 
   return up->MakeAndAddHandle(ktl::move(handle), thread_rights, out);
 }

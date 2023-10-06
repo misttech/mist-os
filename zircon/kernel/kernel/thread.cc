@@ -49,7 +49,6 @@
 #include <kernel/restricted.h>
 #include <kernel/scheduler.h>
 #include <kernel/stats.h>
-#include <kernel/thread.h>
 #include <kernel/thread_lock.h>
 #include <kernel/timer.h>
 #include <ktl/algorithm.h>
@@ -362,6 +361,13 @@ void Thread::Resume() {
   if (state() == THREAD_DEATH) {
     // The thread is dead, resuming it is a no-op.
     return;
+  }
+
+  // Emit the thread metadata the first time the thread is resumed so that trace
+  // events written by this thread have the correct name and process association.
+  if (state() == THREAD_INITIAL) {
+    KTRACE_KERNEL_OBJECT("kernel:meta", tid(), ZX_OBJ_TYPE_THREAD, name(),
+                         ("process", ktrace::Koid(pid())));
   }
 
   // Clear the suspend signal in case there is a pending suspend
@@ -1593,6 +1599,11 @@ void Thread::SecondaryCpuInitEarly() {
   char name[16];
   snprintf(name, sizeof(name), "cpu_init %u", arch_curr_cpu_num());
   thread_construct_first(this, name);
+
+  // Emitting the thread metadata usually happens during Thread::Resume(), however, cpu_init threads
+  // are never resumed. Emit the metadata here so that the thread name is associated with its tid.
+  KTRACE_KERNEL_OBJECT("kernel:meta", this->tid(), ZX_OBJ_TYPE_THREAD, this->name(),
+                       ("process", ktrace::Koid(this->pid())));
 }
 
 /**
