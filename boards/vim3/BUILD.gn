@@ -53,6 +53,48 @@ board_configuration("vim3") {
 
 board_input_bundle("main_bundle") {
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
+  drivers = [
+    {
+      package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
+      package_set = "base"
+      driver_components = [ "meta/aml-gpu.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3"
+      package_set = "base"
+      driver_components = [ "meta/brcmfmac.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/bluetooth/hci/vendor/broadcom"
+      package_set = "base"
+      driver_components = [ "meta/bt-hci-broadcom.cm" ]
+    },
+    {
+      package_target = "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2"
+      package_set = "base"
+      driver_components = [ "meta/libmsd_arm_dfv2.cm" ]
+    },
+    {
+      package_target = "//src/graphics/drivers/msd-vsi-vip"
+      package_set = "base"
+      driver_components = [ "meta/libmsd_vsi.cm" ]
+    },
+    {
+      package_target = "//src/devices/rtc/drivers/nxp:nxp-pkg"
+      package_set = "base"
+      driver_components = [ "meta/nxp.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/bluetooth/hci/transport/uart"
+      package_set = "base"
+      driver_components = [ "meta/bt-transport-uart.cm" ]
+    },
+    {
+      package_target = "//src/connectivity/wlan/drivers/wlanphy:wlanphy"
+      package_set = "base"
+      driver_components = [ "meta/wlanphy.cm" ]
+    },
+  ]
 }
 
 board_input_bundle("vulkan_arm_mali") {

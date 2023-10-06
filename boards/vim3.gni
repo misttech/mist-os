@@ -61,18 +61,6 @@ board_zedboot_bootfs_labels += _common_bootfs_deps
 
 board_recovery_bootfs_labels += _common_bootfs_deps
 
-board_driver_package_labels += [
-  "//src/graphics/drivers/msd-arm-mali:msd-arm-mali-dfv2",
-  "//src/graphics/drivers/aml-gpu:aml-gpu-package",
-  "//src/graphics/drivers/msd-vsi-vip",
-  "//src/media/drivers/amlogic_decoder",
-  "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:brcmfmac-vim3",
-  "//src/connectivity/wlan/drivers/wlanphy:wlanphy",
-  "//src/devices/rtc/drivers/nxp:nxp-pkg",
-  "//src/connectivity/bluetooth/hci/transport/uart",
-  "//src/connectivity/bluetooth/hci/vendor/broadcom",
-]
-
 board_package_labels += [ "//src/graphics/drivers/msd-arm-mali:msd-config" ]
 
 # Board file adds vulkan VCD that lets vulkan tests work on systems with Mali GPUs.
