@@ -22,7 +22,11 @@ source_set("common_srcs") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-canvas.cc" ]
+  sources = [
+    "aml-canvas.cc",
+    "aml-canvas.h",
+    "dmc-regs.h",
+  ]
   public_deps = [
     ":aml_canvas_bind",
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_cpp",

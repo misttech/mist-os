@@ -19,7 +19,11 @@ source_set("common_srcs") {
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "dsi-dw.cc" ]
+  sources = [
+    "dsi-dw.cc",
+    "dsi-dw.h",
+    "dw-mipi-dsi-reg.h",
+  ]
   public_deps = [
     ":dsi_dw_bind",
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",

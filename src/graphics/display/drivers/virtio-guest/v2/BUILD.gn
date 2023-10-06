@@ -33,6 +33,7 @@ source_set("common_srcs") {
     "gpu.cc",
     "gpu.h",
     "virtio-abi.cc",
+    "virtio-abi.h",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_cpp",

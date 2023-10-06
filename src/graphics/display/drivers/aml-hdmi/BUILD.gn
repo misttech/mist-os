@@ -46,7 +46,11 @@ source_set("common_srcs") {
 
 fuchsia_driver("aml-hdmi-driver") {
   output_name = "aml-hdmi"
-  sources = [ "aml-hdmi.cc" ]
+  sources = [
+    "aml-hdmi.cc",
+    "aml-hdmi.h",
+    "top-regs.h",
+  ]
   deps = [ ":common_srcs" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings

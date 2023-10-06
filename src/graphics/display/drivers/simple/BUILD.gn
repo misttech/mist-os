@@ -9,7 +9,10 @@ import("//build/test.gni")
 
 source_set("shared") {
   visibility = [ ":*" ]
-  sources = [ "simple-display.cc" ]
+  sources = [
+    "simple-display.cc",
+    "simple-display.h",
+  ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",

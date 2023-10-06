@@ -37,6 +37,7 @@ static_library("base") {
   testonly = true
   sources = [
     "base.cc",
+    "base.h",
     "fidl_client.cc",
     "fidl_client.h",
   ]

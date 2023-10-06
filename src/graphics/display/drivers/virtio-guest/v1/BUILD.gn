@@ -29,7 +29,9 @@ source_set("common_srcs") {
   configs += [ "//build/config:all_source" ]
   sources = [
     "gpu.cc",
+    "gpu.h",
     "virtio-abi.cc",
+    "virtio-abi.h",
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
