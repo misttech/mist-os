@@ -30,6 +30,8 @@ enum class PageFlag {
   kPageVmoLocked,     // Its vmo is locked to prevent mm from reclaiming it.
   kPageActive,        // It is being referenced.
   kPageColdData,      // It is under garbage collecting. It must not be inplace updated.
+  kPageCommit,        // It is logged with pre-flush and flush.
+  kPageSync,          // It is logged with flush.
   kPageFlagSize,
 };
 
@@ -45,8 +47,9 @@ struct WritebackOperation {
   bool bReclaim = false;             // If true, it is invoked for memory reclaim.
   VnodeCallback if_vnode = nullptr;  // If set, it determines which vnodes are subject to writeback.
   PageCallback if_page = nullptr;    // If set, it determines which Pages are subject to writeback.
-  NodePageCallback node_page_cb = nullptr;  // If set, the callback is executed. This callback is
-                                            // for node page only and is executed before writeback.
+  PageTaggingCallback page_cb =
+      nullptr;  // If set, it can touch every page subject to writeback before disk I/O. It is used
+                // to set flags or update footer for fsync() or checkpoint().
 };
 
 template <typename T, bool EnableAdoptionValidator = ZX_DEBUG_ASSERT_IMPLEMENTED>
@@ -105,6 +108,8 @@ class Page : public PageRefCounted<Page>,
   bool IsVmoLocked() const { return TestFlag(PageFlag::kPageVmoLocked); }
   bool IsActive() const { return TestFlag(PageFlag::kPageActive); }
   bool IsColdData() const { return TestFlag(PageFlag::kPageColdData); }
+  bool IsCommit() const { return TestFlag(PageFlag::kPageCommit); }
+  bool IsSync() const { return TestFlag(PageFlag::kPageSync); }
 
   // Each Setxxx() method atomically sets a flag and returns the previous value.
   // It is called when the first reference is made.
@@ -136,6 +141,12 @@ class Page : public PageRefCounted<Page>,
 
   bool SetUptodate();
   void ClearUptodate();
+
+  bool SetCommit();
+  void ClearCommit();
+
+  bool SetSync();
+  void ClearSync();
 
   // Set its dirty flag and increase the corresponding count of its type.
   bool SetDirty();

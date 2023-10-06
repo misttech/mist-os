@@ -75,6 +75,8 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
                       locked_page.SetDirty();
                     }
                   }
+                  page->ClearSync();
+                  page->ClearCommit();
                   page->ClearColdData();
                   page->ClearWriteback();
                 }

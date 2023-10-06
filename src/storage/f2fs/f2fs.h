@@ -311,8 +311,8 @@ class F2fs final {
 
  private:
   void StartMemoryPressureWatcher();
-  // Flush all dirty meta Pages that meet |operation|.if_page.
-  pgoff_t FlushDirtyMetaPages(WritebackOperation &operation);
+  // Flush all dirty meta Pages.
+  pgoff_t FlushDirtyMetaPages(bool is_commit);
   // Flush all dirty data Pages that meet |operation|.if_vnode and if_page.
   pgoff_t FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer = false);
 

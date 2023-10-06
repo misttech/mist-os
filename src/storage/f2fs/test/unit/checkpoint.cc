@@ -1131,40 +1131,21 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
   op.bSync = true;
   fs_->GetMetaVnode().Writeback(op);
 
-  uint32_t flush_count = 0;
-  uint32_t target_flush_count = 0;
   auto hook = [&](const block_fifo_request_t &_req, const zx::vmo *_vmo) {
-    if (_req.command.opcode == BLOCK_OPCODE_FLUSH) {
-      if (++flush_count == target_flush_count) {
-        return ZX_ERR_PEER_CLOSED;
-      }
-      return ZX_OK;
+    if (_req.command.opcode == BLOCK_OPCODE_WRITE &&
+        _req.command.flags & (BLOCK_IO_FLAG_PREFLUSH | BLOCK_IO_FLAG_FORCE_ACCESS)) {
+      return ZX_ERR_PEER_CLOSED;
     }
     return ZX_OK;
   };
 
   // Check disk peer closed exception case in DoCheckpoint()
-  {
-    flush_count = 0;
-    target_flush_count = 1;
-    DeviceTester::SetHook(fs_.get(), hook);
-    ASSERT_EQ(fs_->DoCheckpoint(false), ZX_ERR_PEER_CLOSED);
-    ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
+  DeviceTester::SetHook(fs_.get(), hook);
+  ASSERT_NE(fs_->DoCheckpoint(false), ZX_OK);
+  ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
-    DeviceTester::SetHook(fs_.get(), nullptr);
-    fs_->GetSuperblockInfo().ClearCpFlags(CpFlag::kCpErrorFlag);
-  }
-
-  {
-    flush_count = 0;
-    target_flush_count = 2;
-    DeviceTester::SetHook(fs_.get(), hook);
-    ASSERT_EQ(fs_->DoCheckpoint(false), ZX_ERR_PEER_CLOSED);
-    ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
-
-    DeviceTester::SetHook(fs_.get(), nullptr);
-    fs_->GetSuperblockInfo().ClearCpFlags(CpFlag::kCpErrorFlag);
-  }
+  DeviceTester::SetHook(fs_.get(), nullptr);
+  fs_->GetSuperblockInfo().ClearCpFlags(CpFlag::kCpErrorFlag);
 }
 
 TEST_F(CheckpointTest, ReadCompactSummaryDiskFail) {

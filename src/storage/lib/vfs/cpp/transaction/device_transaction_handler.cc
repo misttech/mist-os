@@ -56,7 +56,7 @@ zx_status_t DeviceTransactionHandler::RunRequests(
       // at the same time, so even if there's a mix of reads and writes, it doesn't make sense to
       // depend on the relative order of the operations, which is what could break with the merging
       // done by the request builder.
-      ZX_DEBUG_ASSERT(operation.type == operations[0].op.type);
+      ZX_DEBUG_ASSERT(request.command.opcode == block_requests[0].command.opcode);
 
       request.vmo_offset = BlockNumberToDevice(operation.vmo_offset);
       request.dev_offset = BlockNumberToDevice(operation.dev_offset);

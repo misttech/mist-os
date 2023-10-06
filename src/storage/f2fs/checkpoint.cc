@@ -36,9 +36,23 @@ zx_status_t F2fs::GetMetaPage(pgoff_t index, LockedPage *out) {
   return ZX_OK;
 }
 
-pgoff_t F2fs::FlushDirtyMetaPages(WritebackOperation &operation) {
-  if (superblock_info_->GetPageCount(CountType::kDirtyMeta) == 0 && !operation.bReleasePages) {
+pgoff_t F2fs::FlushDirtyMetaPages(bool is_commit) {
+  if (superblock_info_->GetPageCount(CountType::kDirtyMeta) == 0) {
     return 0;
+  }
+  WritebackOperation operation;
+  if (is_commit) {
+    operation.bSync = true;
+    operation.page_cb = [](fbl::RefPtr<Page> page, bool is_last_page) {
+      if (is_last_page) {
+        page->SetCommit();
+      }
+      return ZX_OK;
+    };
+    sync_completion_t completion;
+    ScheduleWriter(&completion);
+    ZX_ASSERT_MSG(sync_completion_wait(&completion, zx::sec(kWriteTimeOut).get()) == ZX_OK,
+                  "FlushDirtyMetaPages() timeout");
   }
   return GetMetaVnode().Writeback(operation);
 }
@@ -338,8 +352,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
 
   // Flush all the NAT/SIT pages
   while (superblock_info.GetPageCount(CountType::kDirtyMeta)) {
-    WritebackOperation op = {.bSync = false};
-    FlushDirtyMetaPages(op);
+    FlushDirtyMetaPages(false);
   }
 
   ScheduleWriter();
@@ -441,11 +454,8 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     start_blk += kNrCursegNodeType;
   }
 
-  {
-    // Write out this checkpoint pack.
-    WritebackOperation op = {.bSync = true};
-    FlushDirtyMetaPages(op);
-  }
+  // Write out this checkpoint pack.
+  FlushDirtyMetaPages(false);
 
   // Prepare the commit block.
   {
@@ -461,24 +471,11 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
 
   // Commit.
   if (!superblock_info.TestCpFlags(CpFlag::kCpErrorFlag)) {
-    ZX_ASSERT(superblock_info.GetPageCount(CountType::kWriteback) == 0);
     ZX_ASSERT(superblock_info.GetPageCount(CountType::kDirtyMeta) == 1);
-    // TODO: Use FUA when it is available.
-    if (zx_status_t ret = GetBc().Flush(); ret != ZX_OK) {
-      if (ret == ZX_ERR_UNAVAILABLE || ret == ZX_ERR_PEER_CLOSED) {
-        superblock_info.SetCpFlags(CpFlag::kCpErrorFlag);
-      }
-      return ret;
+    FlushDirtyMetaPages(true);
+    if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
+      return ZX_ERR_UNAVAILABLE;
     }
-    WritebackOperation op = {.bSync = true};
-    FlushDirtyMetaPages(op);
-    if (zx_status_t ret = GetBc().Flush(); ret != ZX_OK) {
-      if (ret == ZX_ERR_UNAVAILABLE || ret == ZX_ERR_PEER_CLOSED) {
-        superblock_info.SetCpFlags(CpFlag::kCpErrorFlag);
-      }
-      return ret;
-    }
-
     GetSegmentManager().ClearPrefreeSegments();
     superblock_info.ClearDirty();
     meta_vnode_->InvalidatePages();

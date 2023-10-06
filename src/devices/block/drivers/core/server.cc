@@ -292,7 +292,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
       // We'll be using a new BlockMsg for each sub-component.
       // Take a copy of the |oneshot_group| shared_ptr into each completer, so oneshot_group is
       // deallocated after all messages complete.
-      auto completer = [this, oneshot_group, transaction_group, do_postflush, request](
+      auto completer = [this, oneshot_group, transaction_group, do_postflush](
                            zx_status_t status, block_fifo_request_t& req) mutable {
         TRACE_DURATION("storage", "FinishTransactionGroup");
         if (req.trace_flow_id) {
@@ -305,7 +305,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
             transaction_group->Complete(postflush_status);
           };
           if (zx_status_t status =
-                  IssueFlushCommand(request, std::move(postflush_completer), /*internal_cmd=*/true);
+                  IssueFlushCommand(&req, std::move(postflush_completer), /*internal_cmd=*/true);
               status != ZX_OK) {
             zxlogf(ERROR, "ProcessReadWriteRequest: (Post)Flush command issue has failed, %s",
                    zx_status_get_string(status));
@@ -340,7 +340,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
     }
     ZX_DEBUG_ASSERT(len_remaining == 0);
   } else {
-    auto completer = [this, do_postflush, request](zx_status_t status, block_fifo_request_t& req) {
+    auto completer = [this, do_postflush](zx_status_t status, block_fifo_request_t& req) {
       TRACE_DURATION("storage", "FinishTransaction");
       if (req.trace_flow_id) {
         TRACE_FLOW_STEP("storage", "BlockOp", req.trace_flow_id);
@@ -351,7 +351,7 @@ zx_status_t Server::ProcessReadWriteRequest(block_fifo_request_t* request, bool 
           FinishTransaction(postflush_status, req.reqid, req.group);
         };
         if (zx_status_t status =
-                IssueFlushCommand(request, std::move(postflush_completer), /*internal_cmd=*/true);
+                IssueFlushCommand(&req, std::move(postflush_completer), /*internal_cmd=*/true);
             status != ZX_OK) {
           zxlogf(ERROR, "ProcessReadWriteRequest: (Post)Flush command issue failed, %s",
                  zx_status_get_string(status));

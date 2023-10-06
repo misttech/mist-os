@@ -35,8 +35,14 @@ zx::result<size_t> StorageBuffer::ReserveWriteOperation(Page &page) {
   }
 
   auto key = free_keys_.pop_front();
+  storage::OperationType type = storage::OperationType::kWrite;
+  if (page.IsCommit()) {
+    type = storage::OperationType::kWritePreflushAndFua;
+  } else if (page.IsSync()) {
+    type = storage::OperationType::kWriteFua;
+  }
   storage::Operation op = {
-      .type = storage::OperationType::kWrite,
+      .type = type,
       .vmo_offset = key->GetKey(),
       .dev_offset = page.GetBlockAddr(),
       .length = 1,

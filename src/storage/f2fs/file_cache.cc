@@ -191,6 +191,14 @@ void Page::ClearWriteback() {
   }
 }
 
+bool Page::SetCommit() { return SetFlag(PageFlag::kPageCommit); }
+
+void Page::ClearCommit() { ClearFlag(PageFlag::kPageCommit); }
+
+bool Page::SetSync() { return SetFlag(PageFlag::kPageSync); }
+
+void Page::ClearSync() { ClearFlag(PageFlag::kPageSync); }
+
 void Page::SetColdData() {
   ZX_DEBUG_ASSERT(IsLocked());
   ZX_DEBUG_ASSERT(!IsWriteback());
@@ -712,14 +720,14 @@ pgoff_t FileCache::Writeback(WritebackOperation &operation) {
     for (auto &page : pages) {
       ZX_DEBUG_ASSERT(page->IsUptodate());
       zx::result<block_t> addr_or;
+      if (operation.page_cb) {
+        // |page_cb| conducts additional process for the last page of node and meta vnodes.
+        bool is_last_page = page.get() == pages.back().get();
+        operation.page_cb(page.CopyRefPtr(), is_last_page);
+      }
       if (vnode_->IsMeta()) {
         addr_or = fs()->GetSegmentManager().GetBlockAddrForDirtyMetaPage(page, operation.bReclaim);
       } else if (vnode_->IsNode()) {
-        if (operation.node_page_cb) {
-          // If it is last dnode page, set |is_last_dnode| flag to process additional operation.
-          bool is_last_dnode = page.get() == pages.back().get();
-          operation.node_page_cb(page.CopyRefPtr(), is_last_dnode);
-        }
         addr_or = fs()->GetNodeManager().GetBlockAddrForDirtyNodePage(page, operation.bReclaim);
       } else {
         addr_or = vnode_->GetBlockAddrForDirtyDataPage(page, operation.bReclaim);
