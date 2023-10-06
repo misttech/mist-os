@@ -1021,11 +1021,11 @@ pub(crate) mod testutil {
             Box::new(self.find_devices_with_addr(addr))
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable_with_destination(
             &mut self,
             _ctx: &mut C,
-            _device: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<I::Addr>,
+            _dst: SpecifiedAddr<<I>::Addr>,
+            _device: Option<&Self::DeviceId>,
         ) {
         }
     }
@@ -1300,13 +1300,18 @@ pub(crate) mod testutil {
             TransportIpContext::<I, C>::get_default_hop_limits(self.get_mut(), device)
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable_with_destination(
             &mut self,
             ctx: &mut C,
-            device: &Self::DeviceId,
-            neighbor: SpecifiedAddr<I::Addr>,
+            dst: SpecifiedAddr<I::Addr>,
+            device: Option<&Self::DeviceId>,
         ) {
-            TransportIpContext::<I, C>::confirm_reachable(self.get_mut(), ctx, device, neighbor)
+            TransportIpContext::<I, C>::confirm_reachable_with_destination(
+                self.get_mut(),
+                ctx,
+                dst,
+                device,
+            )
         }
     }
 
@@ -1538,13 +1543,12 @@ pub(crate) mod testutil {
             Box::new(self.find_devices_with_addr::<I>(addr))
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable_with_destination(
             &mut self,
             _ctx: &mut C,
-            _device: &Self::DeviceId,
-            _neighbor: SpecifiedAddr<I::Addr>,
+            _dst: SpecifiedAddr<<I>::Addr>,
+            _device: Option<&Self::DeviceId>,
         ) {
-            unimplemented!()
         }
     }
 

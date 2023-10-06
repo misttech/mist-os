@@ -87,6 +87,7 @@ lib_deps = [
   # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
   "fakestd",
   "lock-order",
+  "macros:netstack3-macros",
   "//src/connectivity/lib/net-types",
   "//src/connectivity/lib/packet-formats",
   "//src/connectivity/network/lib/explicit",

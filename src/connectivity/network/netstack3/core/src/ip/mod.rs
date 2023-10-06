@@ -275,13 +275,16 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
     /// Otherwise the system defaults are returned.
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits;
 
-    /// Confirm transport-layer forward reachability to the specified neighbor
-    /// through the specified device.
-    fn confirm_reachable(
+    /// Confirms the provided destination is reachable.
+    ///
+    /// Implementations must retrieve the next hop given the provided
+    /// destination and confirm neighbor reachability for the resolved target
+    /// device.
+    fn confirm_reachable_with_destination(
         &mut self,
         ctx: &mut C,
-        device: &Self::DeviceId,
-        neighbor: SpecifiedAddr<I::Addr>,
+        dst: SpecifiedAddr<I::Addr>,
+        device: Option<&Self::DeviceId>,
     );
 }
 
@@ -340,17 +343,21 @@ impl<I: IpExt, B: BufferMut, C, SC: TransportIpContext<I, C> + BufferIpSocketHan
 // it. For the time being, however, we only support protocol numbers that we
 // actually use (TCP and UDP).
 
-impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMarker>
-    TransportIpContext<Ipv4, C> for SC
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<
+        I: IpExt,
+        C,
+        SC: IpDeviceContext<I, C> + IpSocketHandler<I, C> + IpStateContext<I, C> + NonTestCtxMarker,
+    > TransportIpContext<I, C> for SC
 {
     type DevicesWithAddrIter<'s> = <Vec<SC::DeviceId> as IntoIterator>::IntoIter where SC: 's;
 
     fn get_devices_with_assigned_addr(
         &mut self,
-        addr: SpecifiedAddr<Ipv4Addr>,
+        addr: SpecifiedAddr<<I as Ip>::Addr>,
     ) -> Self::DevicesWithAddrIter<'_> {
         self.with_address_statuses(addr, |it| {
-            it.filter_map(|(device, state)| is_unicast_assigned::<Ipv4>(&state).then_some(device))
+            it.filter_map(|(device, state)| is_unicast_assigned::<I>(&state).then_some(device))
                 .collect::<Vec<_>>()
         })
         .into_iter()
@@ -359,56 +366,33 @@ impl<C, SC: IpDeviceContext<Ipv4, C> + IpSocketHandler<Ipv4, C> + NonTestCtxMark
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceStateContext::<Ipv4, _>::get_hop_limit(self, device),
+                unicast: IpDeviceStateContext::<I, _>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
         }
     }
 
-    fn confirm_reachable(
+    fn confirm_reachable_with_destination(
         &mut self,
         ctx: &mut C,
-        device: &Self::DeviceId,
-        neighbor: SpecifiedAddr<<Ipv4 as Ip>::Addr>,
+        dst: SpecifiedAddr<<I as Ip>::Addr>,
+        device: Option<&Self::DeviceId>,
     ) {
-        self.confirm_reachable(ctx, device, neighbor);
-    }
-}
-
-impl<C, SC: IpDeviceContext<Ipv6, C> + IpSocketHandler<Ipv6, C> + NonTestCtxMarker>
-    TransportIpContext<Ipv6, C> for SC
-{
-    type DevicesWithAddrIter<'s> = <Vec<SC::DeviceId> as IntoIterator>::IntoIter where SC: 's;
-
-    fn get_devices_with_assigned_addr(
-        &mut self,
-        addr: SpecifiedAddr<Ipv6Addr>,
-    ) -> Self::DevicesWithAddrIter<'_> {
-        self.with_address_statuses(addr, |it| {
-            it.filter_map(|(device, state)| is_unicast_assigned::<Ipv6>(&state).then_some(device))
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
-    }
-
-    fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
-        match device {
-            Some(device) => HopLimits {
-                unicast: IpDeviceStateContext::<Ipv6, _>::get_hop_limit(self, device),
-                ..DEFAULT_HOP_LIMITS
-            },
-            None => DEFAULT_HOP_LIMITS,
+        match self
+            .with_ip_routing_table(|sync_ctx, routes| routes.lookup(sync_ctx, device, dst.get()))
+        {
+            Some(Destination { next_hop, device }) => {
+                let neighbor = match next_hop {
+                    NextHop::RemoteAsNeighbor => dst,
+                    NextHop::Gateway(gateway) => gateway,
+                };
+                self.confirm_reachable(ctx, &device, neighbor);
+            }
+            None => {
+                tracing::debug!("can't confirm {dst:?}@{device:?} as reachable: no route");
+            }
         }
-    }
-
-    fn confirm_reachable(
-        &mut self,
-        ctx: &mut C,
-        device: &Self::DeviceId,
-        neighbor: SpecifiedAddr<<Ipv6 as Ip>::Addr>,
-    ) {
-        self.confirm_reachable(ctx, device, neighbor);
     }
 }
 

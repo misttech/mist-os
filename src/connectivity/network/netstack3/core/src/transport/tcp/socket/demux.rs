@@ -26,9 +26,8 @@ use thiserror::Error;
 use crate::{
     ip::{
         socket::{DefaultSendOptions, DeviceIpSocketHandler, MmsError},
-        types::{Destination, NextHop},
         BufferIpTransportContext, BufferTransportIpContext, EitherDeviceId, IpLayerIpExt,
-        IpStateContext, TransportReceiveError,
+        TransportReceiveError,
     },
     socket::{
         address::{
@@ -180,9 +179,7 @@ fn handle_incoming_packet<I, B, C, SC>(
             ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, EmptyBuf>
-        + DeviceIpSocketHandler<I, C>
-        + IpStateContext<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     trace_duration!(ctx, "tcp::handle_incoming_packet");
 
@@ -321,9 +318,7 @@ where
             ActiveOpen = <C as TcpBindingsTypes>::ListenerNotifierOrProvidedBuffers,
             PassiveOpen = <C as TcpBindingsTypes>::ReturnedBuffers,
         >,
-    SC: BufferTransportIpContext<I, C, EmptyBuf>
-        + DeviceIpSocketHandler<I, C>
-        + IpStateContext<I, C>,
+    SC: BufferTransportIpContext<I, C, EmptyBuf> + DeviceIpSocketHandler<I, C>,
 {
     let (conn, _, addr) = assert_matches!(
         sockets.socket_state.get_mut(conn_id.into()),
@@ -375,17 +370,7 @@ where
         let remote_ip = *ip_sock.remote_ip();
         let device =
             ip_sock.device().and_then(|weak| ip_transport_ctx.upgrade_weak_device_id(weak));
-        if let Some(Destination { next_hop, device }) =
-            ip_transport_ctx.with_ip_routing_table(|sync_ctx, routes| {
-                routes.lookup(sync_ctx, device.as_ref(), remote_ip.addr())
-            })
-        {
-            let neighbor = match next_hop {
-                NextHop::RemoteAsNeighbor => remote_ip.into(),
-                NextHop::Gateway(gateway) => gateway,
-            };
-            ip_transport_ctx.confirm_reachable(ctx, &device, neighbor);
-        }
+        ip_transport_ctx.confirm_reachable_with_destination(ctx, remote_ip.into(), device.as_ref());
     };
 
     match data_acked {
