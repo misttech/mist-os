@@ -6,7 +6,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fuchsia/wlan/common/c/banjo.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 

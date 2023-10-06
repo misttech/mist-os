@@ -17,6 +17,7 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_CFG80211_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_CFG80211_H_
 
+#include <fidl/fuchsia.wlan.common/cpp/wire.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
@@ -24,7 +25,6 @@
 
 #include <atomic>
 
-#include "fuchsia/wlan/common/c/banjo.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 
 /* for brcmu_d11inf */

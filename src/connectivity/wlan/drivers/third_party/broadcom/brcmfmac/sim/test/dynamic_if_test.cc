@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <zircon/errors.h>
 

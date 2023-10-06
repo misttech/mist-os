@@ -955,10 +955,10 @@ static zx_status_t brcmf_escan_prep(
     return ZX_ERR_INVALID_ARGS;
   } else {
     for (uint32_t i = 0; i < n_channels; i++) {
-      wlan_channel_t wlan_chan;
-      wlan_chan.primary = request->channels().data()[i];
-      wlan_chan.cbw = CHANNEL_BANDWIDTH_CBW20;
-      wlan_chan.secondary80 = 0;
+      fuchsia_wlan_common::WlanChannel wlan_chan;
+      wlan_chan.primary() = request->channels().data()[i];
+      wlan_chan.cbw() = fuchsia_wlan_common::ChannelBandwidth::kCbw20;
+      wlan_chan.secondary80() = 0;
       chanspec = channel_to_chanspec(&cfg->d11inf, &wlan_chan);
       BRCMF_DBG(SCAN, "Chan : %d, Channel spec: %x", request->channels().data()[i], chanspec);
       params_le->channel_list[i] = chanspec;
@@ -3382,6 +3382,8 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
     struct net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacStartReq* req) {
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
+  fuchsia_wlan_common::WlanChannel channel(req->channel,
+                                           fuchsia_wlan_common::ChannelBandwidth::kCbw20, 0);
 
   if (brcmf_test_bit(brcmf_vif_status_bit_t::AP_CREATED, &ifp->vif->sme_state)) {
     BRCMF_ERR("AP already started");
@@ -3421,7 +3423,6 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
             FMT_SSID_BYTES(req->ssid.data.data(), req->ssid.len), req->beacon_period,
             req->dtim_period, req->channel, req->rsne_len);
 
-  wlan_channel_t channel = {};
   uint16_t chanspec = 0;
   zx_status_t status;
   bcme_status_t fw_err = BCME_OK;
@@ -3504,7 +3505,6 @@ static fuchsia_wlan_fullmac_wire::WlanStartResult brcmf_cfg80211_start_ap(
     goto fail;
   }
 
-  channel = {.primary = req->channel, .cbw = CHANNEL_BANDWIDTH_CBW20, .secondary80 = 0};
   chanspec = channel_to_chanspec(&cfg->d11inf, &channel);
   status = brcmf_fil_iovar_int_set(ifp, "chanspec", chanspec, &fw_err);
   if (status != ZX_OK) {

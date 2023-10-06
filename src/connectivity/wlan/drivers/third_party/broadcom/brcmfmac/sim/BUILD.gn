@@ -46,9 +46,7 @@ source_set("sim_common") {
     "sim_utils.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
-    "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/devices/lib/broadcom",
     "//src/lib/ddk",

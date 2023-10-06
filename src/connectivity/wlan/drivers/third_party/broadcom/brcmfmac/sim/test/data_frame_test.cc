@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/internal/c/banjo.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>

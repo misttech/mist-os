@@ -17,7 +17,6 @@
 #ifndef SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SIM_SIM_HW_H_
 #define SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_SIM_SIM_HW_H_
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <lib/async/dispatcher.h>
 #include <net/ethernet.h>
 #include <zircon/status.h>

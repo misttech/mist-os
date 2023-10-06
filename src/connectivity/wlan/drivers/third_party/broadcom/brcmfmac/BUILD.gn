@@ -153,7 +153,6 @@ source_set("core") {
   ]
   deps = [
     ":timer",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/lib/driver/component/cpp:cpp",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/inspect",
     "//src/connectivity/wlan/lib/common/cpp:common",

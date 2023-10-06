@@ -4,7 +4,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/sim/test/sim_test.h"
 
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>

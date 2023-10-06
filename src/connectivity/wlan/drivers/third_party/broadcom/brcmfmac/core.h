@@ -25,7 +25,6 @@
 #include <fidl/fuchsia.wlan.fullmac/cpp/fidl.h>
 #include <fuchsia/hardware/network/driver/c/banjo.h>
 #include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
-#include <fuchsia/wlan/common/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>

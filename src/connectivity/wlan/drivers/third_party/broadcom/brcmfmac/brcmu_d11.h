@@ -21,6 +21,8 @@
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
 #include <zircon/types.h>
 
+namespace fuchsia_wlan_common_wire = fuchsia_wlan_common::wire;
+
 /* d11 io type */
 #define BRCMU_D11N_IOTYPE 1
 #define BRCMU_D11AC_IOTYPE 2
@@ -178,9 +180,6 @@ uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
 uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf,
                              const fuchsia_wlan_common::wire::WlanChannel* ch);
 void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec,
-                         fuchsia_wlan_common::wire::WlanChannel* ch);
-
-uint16_t channel_to_chanspec(const brcmu_d11inf* d11inf, const wlan_channel_t* ch);
-void chanspec_to_channel(const brcmu_d11inf* d11_inf, uint16_t chanspec, wlan_channel_t* ch);
+                         fuchsia_wlan_common_wire::WlanChannel* ch);
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_THIRD_PARTY_BROADCOM_BRCMFMAC_BRCMU_D11_H_

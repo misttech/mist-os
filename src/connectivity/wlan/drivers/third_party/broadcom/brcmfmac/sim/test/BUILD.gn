@@ -19,7 +19,6 @@ source_set("sim_test") {
   sources = [ "sim_test.cc" ]
   public = [ "sim_test.h" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
     "//sdk/lib/fdio",
@@ -43,7 +42,6 @@ executable("active_scan_test") {
   sources = [ "active_scan_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
@@ -80,7 +78,6 @@ executable("connect_test") {
   sources = [ "connect_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
@@ -100,7 +97,6 @@ executable("auth_test") {
   sources = [ "auth_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -130,7 +126,6 @@ executable("beacon_lost_test") {
   sources = [ "beacon_lost_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/lib/common/cpp:common",
@@ -194,7 +189,6 @@ executable("channel_switch_test") {
   sources = [ "channel_switch_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
@@ -209,7 +203,6 @@ executable("crash_recovery_test") {
   sources = [ "crash_recovery_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
@@ -228,7 +221,6 @@ executable("create_softap_test") {
   sources = [ "create_softap_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
@@ -248,7 +240,6 @@ executable("data_frame_test") {
   sources = [ "data_frame_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/test:device_inspect_utils",
@@ -265,7 +256,6 @@ executable("disassoc_test") {
   sources = [ "disassoc_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//src/connectivity/wlan/lib/common/cpp:common",
   ]
@@ -281,7 +271,6 @@ executable("dynamic_if_test") {
   deps = [
     ":sim_test",
     "//sdk/banjo/fuchsia.hardware.wlanphyimpl:fuchsia.hardware.wlanphyimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -446,7 +435,6 @@ executable("mfg_test") {
   ]
   public = [ "sim_test.h" ]
   public_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
@@ -484,7 +472,6 @@ executable("passive_scan_test") {
   sources = [ "passive_scan_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-env",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
@@ -532,7 +519,6 @@ executable("scan_dwell_time_test") {
   sources = [ "scan_dwell_time_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
@@ -590,7 +576,6 @@ executable("start_ap_while_scanning_test") {
   sources = [ "start_ap_while_scanning_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-device",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
   ]
@@ -605,7 +590,6 @@ executable("timeout_test") {
   sources = [ "timeout_test.cc" ]
   deps = [
     ":sim_test",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//src/connectivity/wlan/drivers/testing/lib/sim-fake-ap",
     "//src/connectivity/wlan/lib/common/cpp:common",
     "//src/devices/lib/broadcom",
