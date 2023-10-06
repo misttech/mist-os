@@ -46,6 +46,7 @@ class GnApplicableLicensesMetadata:
     """Metadata produced by the GN `applicable_licenses` template parameter"""
 
     target_label: GnLabel
+    target_type: str
     license_labels: Tuple[GnLabel]
 
     def is_applicable_licenses_metadata_dict(dict) -> bool:
@@ -54,6 +55,7 @@ class GnApplicableLicensesMetadata:
     def from_json_dict(data) -> "GnApplicableLicensesMetadata":
         assert isinstance(data, dict)
         target_label = GnLabel.from_str(data["target_label"])
+        target_type = data["target_type"] if "target_type" in data else None
         assert (
             target_label.toolchain
         ), f"Label must have a toolchain part: {target_label}"
@@ -62,6 +64,7 @@ class GnApplicableLicensesMetadata:
 
         return GnApplicableLicensesMetadata(
             target_label=target_label,
+            target_type=target_type,
             license_labels=tuple(license_labels),
         )
 
@@ -106,7 +109,7 @@ class GnLicenseMetadataDB:
                 if application.target_label in applicable_licenses_by_target:
                     # TODO(133723): Remove once there are no more targets suffering from fxb/133723.
                     logging.warn(
-                        f"Multiple applicable_licences metadata entries for {application.target_label} ({application.action_type})"
+                        f"Multiple applicable_licences metadata entries for {application.target_label}, probably due to fxb/133723."
                     )
                     continue
                 applicable_licenses_by_target[

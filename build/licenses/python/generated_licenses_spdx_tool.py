@@ -7,10 +7,13 @@
 import argparse
 import sys
 import logging
+from file_access import FileAccess
 from spdx_writer import SpdxWriter
+from readme_fuchsia import ReadmesDB
 from collector import Collector
 from pathlib import Path
 from gn_license_metadata import GnLicenseMetadataDB
+from spdx_comparator import SpdxComparator
 
 
 def main():
@@ -48,6 +51,19 @@ def main():
         required=True,
         help="Path to the generated dep file",
     )
+    parser.add_argument(
+        "--fail-on-collector-errors",
+        type=bool,
+        default=True,
+        help="Tool will fail when encountering collector errors",
+    )
+    # TODO(132725): Remove once migration completes.
+    parser.add_argument(
+        "--compare-with-legacy-spdx",
+        type=str,
+        default=None,
+        help="The tool will compare the contents of the actual spdx output with the given legacy file",
+    )
 
     args = parser.parse_args()
 
@@ -58,38 +74,34 @@ def main():
     fuchsia_source_path = Path(args.fuchsia_source_path).expanduser()
     assert fuchsia_source_path.exists()
 
+    file_access = FileAccess(fuchsia_source_path=fuchsia_source_path)
+
+    readmes_db = ReadmesDB(file_access=file_access)
+
     # Collect licenses information
     collector = Collector(
-        fuchsia_source_path=fuchsia_source_path,
+        file_access=file_access,
         metadata_db=GnLicenseMetadataDB.from_file(
             Path(args.generated_license_metadata)
         ),
+        readmes_db=readmes_db,
     )
 
     collector.collect()
 
     if collector.errors:
-        logging.error(
-            f"Licenses collection errors: {[str(e) for e in collector.errors]}"
-        )
-        return -1
+        if args.fail_on_collector_errors:
+            collector.log_errors(log_level=logging.ERROR)
+            return -1
+        else:
+            collector.log_errors(log_level=logging.WARNING)
 
-    dep_files = []
-
-    def _license_file_reader(path: Path) -> str:
-        dep_files.append(path)
-        full_path = fuchsia_source_path / path
-        logging.debug(f"Reading {full_path}")
-        assert (
-            full_path.exists()
-        ), f"{full_path} does not exist - make sure license() target has correct values"
-        assert full_path.is_file(), f"{full_path} is not a file"
-        return full_path.read_text()
+    logging.info(f"Collection stats: {collector.stats}")
 
     # Generate an SPDX file:
     spdx_writer = SpdxWriter.create(
         root_package_name=args.spdx_root_package_name,
-        file_reader_func=_license_file_reader,
+        file_access=file_access,
     )
 
     for collected_license in collector.unique_licenses:
@@ -105,14 +117,21 @@ def main():
         f"Wrote spdx {spdx_output_path} (licenses={len(collector.unique_licenses)} size={spdx_output_path.stat().st_size})"
     )
 
+    if args.compare_with_legacy_spdx:
+        # Compare with legacy spdx file
+        comparator = SpdxComparator(
+            current_file=spdx_output_path,
+            legacy_file=Path(args.compare_with_legacy_spdx),
+        )
+        comparator.compare()
+        if comparator.found_differences():
+            comparator.log_differences(logging.ERROR)
+            return -1
+
     # Generate a GN depfile
     dep_file_path = Path(args.dep_file)
     logging.info(f"writing depfile {dep_file_path}")
-    with open(dep_file_path, "w") as dep_file:
-        dep_file.write(f"{spdx_output_path}:\\\n")
-        dep_file.write(
-            "\\\n".join([f"    {fuchsia_source_path / p}" for p in dep_files])
-        )
+    file_access.write_depfile(dep_file_path, main_entry=spdx_output_path)
 
     return 0
 

@@ -8,6 +8,7 @@ import json
 import hashlib
 import dataclasses
 from pathlib import Path
+from file_access import FileAccess
 from gn_label import GnLabel
 from typing import Callable, Dict, List, Any, Tuple
 
@@ -16,7 +17,7 @@ from typing import Callable, Dict, List, Any, Tuple
 class SpdxWriter:
     "SPDX json file writer"
 
-    file_reader_func: Callable[[Path], str]
+    file_access: FileAccess
     document_id: str
     root_package_id: str
     root_package_name: str
@@ -42,9 +43,9 @@ class SpdxWriter:
         default_factory=dict
     )
 
-    def create(root_package_name: str, file_reader_func: Callable[[Path], str]):
+    def create(root_package_name: str, file_access: FileAccess):
         writer = SpdxWriter(
-            file_reader_func=file_reader_func,
+            file_access=file_access,
             document_id="SPDXRef-DOCUMENT",
             root_package_id="SPDXRef-Package-Root",
             root_package_name=root_package_name,
@@ -100,7 +101,10 @@ class SpdxWriter:
             license_refs.append(license_ref)
 
             if license_ref not in self.license_json_by_ref:
-                license_text = self.file_reader_func(license_label.path)
+                license_text = self.file_access.read_text(license_label)
+                license_text = (
+                    license_text.strip()
+                )  # Remove trailing whitespace
                 extracted_license = {
                     "name": public_package_name,
                     "licenseId": license_ref,

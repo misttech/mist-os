@@ -4,9 +4,16 @@
 # found in the LICENSE file.
 """Tests for SpdxWriter."""
 
+
+from file_access import FileAccess
 from spdx_writer import SpdxWriter
 from gn_label import GnLabel
 import unittest
+
+
+class MockFileAccess(FileAccess):
+    def read_text(self, label: GnLabel) -> str:
+        return f"TEXT FROM {label.path}"
 
 
 class SpdxWriterTest(unittest.TestCase):
@@ -15,7 +22,7 @@ class SpdxWriterTest(unittest.TestCase):
     def setUp(self) -> None:
         self.writer = SpdxWriter.create(
             root_package_name="root pkg",
-            file_reader_func=lambda path: f"TEXT FROM {path}",
+            file_access=MockFileAccess(fuchsia_source_path="unused"),
         )
 
         return super().setUp()

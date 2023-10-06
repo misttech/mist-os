@@ -51,6 +51,7 @@ template("generated_licenses_spdx") {
   python_action(_targets.main_target) {
     forward_variables_from(invoker,
                            [
+                             "deps",
                              "testonly",
                              "visibility",
                            ])
@@ -73,6 +74,17 @@ template("generated_licenses_spdx") {
       "--dep-file",
       rebase_path(_files.generated_depfile, root_build_dir),
     ]
-    deps = [ ":${_targets.generated_metadata}" ]
+
+    if (defined(invoker.compare_with_legacy_spdx)) {
+      args += [
+        "--compare-with-legacy-spdx",
+        rebase_path(invoker.compare_with_legacy_spdx, root_build_dir),
+      ]
+    }
+
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ ":${_targets.generated_metadata}" ]
   }
 }

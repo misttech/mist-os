@@ -9,6 +9,7 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/licenses/generated_licenses_spdx.gni")
 import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
@@ -18,6 +19,10 @@ declare_args() {
   # License collection + generation for ninja targets is slow and expensive,
   # so it is turned off by default, and a placeholder is produced instead.
   generate_legacy_ninja_build_outputs_licenses_spdx = false
+
+  # Enable hermetic GN licensing pipeline.
+  # TODO(132725): Remove once migration completes.
+  generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata = false
 }
 
 # TODO(fxb/117740): We only need to cover bazel inputs that end up in the product,
@@ -38,6 +43,10 @@ _excluded_bazel_inputs = [
 
   # This is only used for `//tools/devshell:fx_publish_test`.
   "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
+
+  # Has //build/validate:non_production_tag deps:
+  "//bundles/assembly:bootstrap_userdebug",
+  "//bundles/assembly:core_realm_development_access",
 ]
 
 _excluded_bazel_inputs += eng_only_platform_aib_labels
@@ -56,6 +65,14 @@ group("all_bazel_inputs") {
 }
 
 # Collects the license data for all GN inputs and makes it available for Bazel
+# (1) This target is relatively slow.
+# (2) When developing locally, may produce inaccurate results without 'fx clean'.
+#     To avoid 'fx clean' do:
+#     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
+#       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
+#     * fxbug.dev/117694 workaround: Manually delete cached depenedency calculation:
+#       `rm out/default/project.json`
+# TODO(132725): Remove once migration completes.
 license_data("licenses_data") {
   target = "//build/bazel/licenses:all_bazel_inputs"
   out_dir = "$target_out_dir/licenses_data"
@@ -77,17 +94,30 @@ license_data("licenses_data") {
 }
 
 if (generate_legacy_ninja_build_outputs_licenses_spdx) {
-  # (1) license_data dependency above is VERY SLOW.
-  # (2) When developing locally, since license_data may produce inaccurate
-  #     results if you didn't 'fx clean'. If you want to avoid 'fx clean' do:
-  #     * fxbug.dev/84924 workaround: Manually delete the SPDX output :
-  #       `rm -rf out/default/obj/build/bazel/licenses/licenses_data/`
-  #     * fxbug.dev/117694 workaround: Manually delete cached depenedency calculation:
-  #       `rm out/default/project.json`
-  bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
-    deps = [ ":licenses_data" ]
-    sources = get_target_outputs(":licenses_data_spdx_copy")
-    outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+  if (generate_legacy_ninja_build_outputs_licenses_spdx_from_metadata) {
+    generated_licenses_spdx("spdx_from_metadata") {
+      target = ":all_bazel_inputs"
+      spdx_root_package_name = "All Bazel Inputs"
+      output = "${target_out_dir}/licenses_from_metadata.spdx.json"
+
+      # Compare the output with the legacy spdx
+      # TODO(132725): Remove once migration completes.
+      deps = [ ":licenses_data" ]
+      compare_with_legacy_spdx =
+          "${target_out_dir}/licenses_data/results.spdx.json"
+    }
+
+    bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
+      deps = [ ":spdx_from_metadata" ]
+      sources = get_target_outputs(":spdx_from_metadata")
+      outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+    }
+  } else {
+    bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
+      deps = [ ":licenses_data" ]
+      sources = get_target_outputs(":licenses_data_spdx_copy")
+      outputs = [ "legacy_ninja_build_outputs_licenses.spdx.json" ]
+    }
   }
 } else {
   # Use a placeholder instead.

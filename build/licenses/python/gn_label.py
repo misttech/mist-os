@@ -19,6 +19,8 @@ class GnLabel:
     path: Path = dataclasses.field(hash=False, compare=False)
     """The name part of the label, e.g. `baz` in `//foo/bar:baz` or `bar` for `//foo/bar`"""
     name: str = dataclasses.field(hash=False, compare=False)
+    """Whether the label has a local name, e.g. True for `//foo/bar:baz` but false for `//foo/bar/baz`"""
+    is_local_name: bool = dataclasses.field(hash=False, compare=False)
     """The toolchain part of the label, e.g. `//toolchain` in `//foo/bar(//toolchain)`"""
     toolchain: "GnLabel" = dataclasses.field(hash=False, compare=False)
 
@@ -38,22 +40,30 @@ class GnLabel:
             toolchain = None
         label = label_and_toolchain[0]
         path_and_name = label.split(":", maxsplit=1)
-        path = Path(path_and_name[0][2:])  # remove //
+        path = Path(path_and_name[0][2:])  # remove '//'
         if len(path_and_name) == 2:
             name = path_and_name[1]
+            is_local_name = True
         else:
             assert len(path_and_name) == 1
             name = str(path.name)
+            is_local_name = False
 
         return GnLabel(
             gn_str=original_str,
             name=name,
+            is_local_name=is_local_name,
             path=path,
             toolchain=toolchain,
         )
 
     def from_path(path: Path):
         """Constructs a GnLabel instance from a Path object."""
+        assert isinstance(
+            path, Path
+        ), f"Expected path of type Path but got {type(path)}"
+        if path.name == "" and path.parent.name == "":
+            return GnLabel.from_str("//")
         return GnLabel.from_str(f"//{path}")
 
     def check_type(other) -> "GnLabel":
@@ -68,6 +78,17 @@ class GnLabel:
         for v in list:
             GnLabel.check_type(v)
         return list
+
+    def parent_label(self) -> "GnLabel":
+        """Returns //foo/bar for //foo/bar/baz and //foo/bar:baz"""
+        assert self.has_parent_label(), f"{self} has no parent label"
+        if self.name == self.path.name:
+            return GnLabel.from_path(self.path.parent)
+        else:
+            return GnLabel.from_path(self.path)
+
+    def has_parent_label(self) -> bool:
+        return self.gn_str != "//"
 
     def without_toolchain(self) -> "GnLabel":
         """Removes the toolchain part of the label"""
@@ -109,17 +130,22 @@ class GnLabel:
     def create_child(self, child_path: Path) -> "GnLabel":
         """Create a child label relative to this label"""
         assert isinstance(child_path, Path)
-        assert ".." != child_path.name and ".." not in [
-            p.name for p in child_path.parents
-        ], f".. not supported but got '{child_path}'"
         return GnLabel.from_path(self.path / child_path)
 
     def create_child_from_str(self, child_path_str: str) -> "GnLabel":
         """Create a GnLabel relative to this label from a child path GN string"""
         if child_path_str.startswith("//"):
             return GnLabel.from_str(child_path_str)
+        elif child_path_str.startswith("../"):
+            assert (
+                self.has_parent_label()
+            ), f"Can't apply {child_path_str} to {self}"
+            parent_label = self.parent_label()
+            if self.is_local_name:
+                parent_label = parent_label.parent_label()
+            return parent_label.create_child_from_str(child_path_str[3:])
         else:
-            return self.create_child(Path(child_path_str))
+            return GnLabel.from_path(self.path / Path(child_path_str))
 
     def __str__(self) -> str:
         return self.gn_str
