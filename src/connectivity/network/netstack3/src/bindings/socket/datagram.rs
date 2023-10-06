@@ -19,6 +19,7 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use assert_matches::assert_matches;
+use dense_map::{DenseMap, EntryKey};
 use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
@@ -28,7 +29,6 @@ use net_types::{
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
-    data_structures::id_map::{EntryKey, IdMap},
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, SocketError},
     ip::{icmp, IpExt},
@@ -89,7 +89,7 @@ pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
 #[derive(Derivative)]
 #[derivative(Default(bound = "I: Ip"))]
 pub(crate) struct SocketCollection<I: Ip, T> {
-    received: IdMap<Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
+    received: DenseMap<Arc<CoreMutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 pub(crate) struct SocketCollectionPair<T>

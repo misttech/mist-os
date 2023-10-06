@@ -12,6 +12,7 @@ use core::{
     convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,
 };
 
+use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
     ip::{Ip, IpAddress},
@@ -19,12 +20,8 @@ use net_types::{
 };
 
 use crate::{
-    data_structures::{
-        id_map::EntryKey,
-        id_map_collection::IdMapCollectionKey,
-        socketmap::{
-            Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
-        },
+    data_structures::socketmap::{
+        Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
     },
     device,
     error::{ExistsError, NotFoundError},
@@ -403,7 +400,7 @@ impl<S: SocketMapStateSpec> SocketId<S> {
 
 // TODO(https://fxbug.dev/126141): Remove this when it is no longer used for
 // TCP socket lookup.
-impl<S: SocketMapStateSpec> IdMapCollectionKey for SocketId<S>
+impl<S: SocketMapStateSpec> DenseMapCollectionKey for SocketId<S>
 where
     S::ListenerId: EntryKey,
     S::ConnId: EntryKey,

@@ -11,9 +11,10 @@ use core::{
     hash::Hash,
     marker::PhantomData,
     num::{NonZeroU16, NonZeroU8},
-    ops::Deref as _,
+    ops::{Deref, DerefMut},
 };
 
+use dense_map::{DenseMap, Entry as DenseMapEntry, EntryKey};
 use derivative::Derivative;
 use either::Either;
 use explicit::UnreachableExt as _;
@@ -29,7 +30,6 @@ use crate::{
     algorithm::ProtocolFlowId,
     context::RngContext,
     convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter, UninstantiableConverter},
-    data_structures::id_map::{Entry as IdMapEntry, EntryKey, IdMap},
     device::{self, AnyDevice, DeviceIdContext, Id},
     error::{LocalAddressError, NotFoundError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
@@ -57,7 +57,33 @@ use crate::{
 pub(crate) type BoundSockets<I, D, A, S> = BoundSocketMap<I, D, A, S>;
 
 /// Storage of state for all datagram sockets.
-pub(crate) type SocketsState<I, D, S> = IdMap<SocketState<I, D, S>>;
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+pub(crate) struct SocketsState<I: IpExt, D: device::WeakId, S: DatagramSocketSpec>(
+    DenseMap<SocketState<I, D, S>>,
+);
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> Deref for SocketsState<I, D, S> {
+    type Target = DenseMap<SocketState<I, D, S>>;
+
+    fn deref(&self) -> &Self::Target {
+        let Self(idmap) = self;
+        idmap
+    }
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> DerefMut for SocketsState<I, D, S> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        let Self(idmap) = self;
+        idmap
+    }
+}
+
+impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketsState<I, D, S> {
+    pub(crate) fn get_socket_state(&self, id: &S::SocketId<I>) -> Option<&SocketState<I, D, S>> {
+        self.get(id.get_key_index())
+    }
+}
 
 impl<I: IpExt, NewIp: IpExt, D: device::WeakId, S: DatagramSocketSpec> GenericOverIp<NewIp>
     for SocketsState<I, D, S>
@@ -129,12 +155,6 @@ impl<I: Ip, D: Id, A: SocketMapAddrSpec, S: DatagramSocketMapSpec<I, D, A>>
         >,
     > {
         self.lookup((src_ip, src_port), (dst_ip, dst_port), device)
-    }
-}
-
-impl<I: IpExt, D: device::WeakId, S: DatagramSocketSpec> SocketsState<I, D, S> {
-    pub(crate) fn get_socket_state(&self, id: &S::SocketId<I>) -> Option<&SocketState<I, D, S>> {
-        self.get(id.get_key_index())
     }
 }
 
@@ -2089,8 +2109,8 @@ where
     }
 
     let mut entry = match state.entry(id.get_key_index()) {
-        IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-        IdMapEntry::Occupied(o) => o,
+        DenseMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+        DenseMapEntry::Occupied(o) => o,
     };
     let UnboundSocketState { device, sharing, ip_options } = match entry.get() {
         SocketState::Unbound(state) => state,
@@ -2359,8 +2379,8 @@ where
             Connected { addr: CA, sharing: CS, id: CI },
         }
         let mut entry = match state.entry(id.get_key_index()) {
-            IdMapEntry::Vacant(_) => panic!("socket ID {:?} is invalid", id),
-            IdMapEntry::Occupied(o) => o,
+            DenseMapEntry::Vacant(_) => panic!("socket ID {:?} is invalid", id),
+            DenseMapEntry::Occupied(o) => o,
         };
 
         let (local_ip, local_id, sharing, device, bound_map_socket_state, ip_options) = match entry
@@ -2609,8 +2629,8 @@ where
 {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
         let mut entry = match state.entry(id.get_key_index()) {
-            IdMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
-            IdMapEntry::Occupied(o) => o,
+            DenseMapEntry::Vacant(_) => panic!("unbound ID {:?} is invalid", id),
+            DenseMapEntry::Occupied(o) => o,
         };
         let (conn_state, sharing) = match entry.get_mut() {
             SocketState::Unbound(_)

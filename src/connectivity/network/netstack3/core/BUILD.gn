@@ -14,8 +14,6 @@ lib_sources = [
   "src/benchmarks.rs",
   "src/context.rs",
   "src/convert.rs",
-  "src/data_structures/id_map.rs",
-  "src/data_structures/id_map_collection.rs",
   "src/data_structures/mod.rs",
   "src/data_structures/ref_counted_hash_map.rs",
   "src/data_structures/socketmap.rs",
@@ -82,7 +80,7 @@ lib_sources = [
 lib_deps = [
   # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
   # remove this module.
-  "fakealloc",
+  "//src/lib/fakealloc",
 
   # TODO(https://github.com/rust-lang/rust/issues/62502): remove this module.
   "fakestd",
@@ -94,6 +92,7 @@ lib_deps = [
   "//src/connectivity/network/lib/todo_unused",
   "//src/lib/const-unwrap",
   "//src/lib/cstr",
+  "//src/lib/dense-map",
   "//src/lib/network/packet",
   "//src/lib/replace-with",
   "//third_party/rust_crates:assert_matches",
@@ -110,9 +109,9 @@ lib_deps = [
 ]
 
 lib_test_deps = [
-  "proptest-support",
   "//src/connectivity/lib/ip-test-macro",
   "//src/connectivity/lib/net-declare",
+  "//src/lib/proptest-support",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:proptest",

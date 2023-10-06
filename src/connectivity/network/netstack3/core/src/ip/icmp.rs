@@ -10,6 +10,7 @@ use core::{
     num::{NonZeroU16, NonZeroU8},
 };
 
+use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
 use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
@@ -47,7 +48,7 @@ use zerocopy::ByteSlice;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
     context::{CounterContext, InstantContext, RngContext},
-    data_structures::{id_map::EntryKey, socketmap::IterShadows as _, token_bucket::TokenBucket},
+    data_structures::{socketmap::IterShadows as _, token_bucket::TokenBucket},
     device::{FrameDestination, Id, WeakId},
     error::LocalAddressError,
     ip::{

@@ -2,21 +2,30 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Identifier map data structure.
+//! A densely packed map.
 //!
-//! Defines the [`IdMap`] data structure: A generic container mapped keyed by an
-//! internally managed pool of identifiers kept densely packed.
+//! Defines the [`DenseMap`] data structure: A generic mapped container keyed by
+//! an internally managed pool of identifiers kept densely packed.
+
+#![no_std]
+#![deny(missing_docs, unreachable_patterns)]
+
+extern crate fakealloc as alloc;
+
+pub mod collection;
+#[cfg(test)]
+mod testutil;
 
 use alloc::vec::Vec;
 use core::fmt::Debug;
 
-/// [`IdMap`]s use `usize`s for keys.
-pub(crate) type Key = usize;
+/// [`DenseMap`]s use `usize`s for keys.
+pub type Key = usize;
 
-/// IdMapEntry where all free blocks are linked together.
+/// DenseMapEntry where all free blocks are linked together.
 #[derive(PartialEq, Eq, Debug)]
 #[cfg_attr(test, derive(Clone))]
-enum IdMapEntry<T> {
+enum DenseMapEntry<T> {
     /// The Entry should either be allocated and contains a value...
     Allocated(T),
     /// Or it is not currently used and should be part of a freelist.
@@ -56,52 +65,52 @@ impl FreeList {
     }
 }
 
-impl<T> IdMapEntry<T> {
+impl<T> DenseMapEntry<T> {
     /// Returns a reference to the freelist link if the entry is free, otherwise None.
     fn as_free_or_none(&self) -> Option<&FreeListLink> {
         match self {
-            IdMapEntry::Free(link) => Some(link),
-            IdMapEntry::Allocated(_) => None,
+            DenseMapEntry::Free(link) => Some(link),
+            DenseMapEntry::Allocated(_) => None,
         }
     }
 
     /// Returns a mutable reference to the freelist link if the entry is free, otherwise None.
     fn as_free_or_none_mut(&mut self) -> Option<&mut FreeListLink> {
         match self {
-            IdMapEntry::Free(link) => Some(link),
-            IdMapEntry::Allocated(_) => None,
+            DenseMapEntry::Free(link) => Some(link),
+            DenseMapEntry::Allocated(_) => None,
         }
     }
 }
 
 /// A generic container for `T` keyed by densely packed integers.
 ///
-/// `IdMap` is a generic container keyed by `usize` that manages its own key
-/// pool. `IdMap` reuses keys that are free to keep its key pool as dense as
+/// `DenseMap` is a generic container keyed by `usize` that manages its own key
+/// pool. `DenseMap` reuses keys that are free to keep its key pool as dense as
 /// possible.
 ///
-/// The main guarantee provided by `IdMap` is that all `get` operations are
-/// provided in O(1) without the need to hash the keys. The only operations of
-/// `IdMap` that are used in the hot path are the `get` operations.
+/// The main guarantee provided by `DenseMap` is that all `get` operations are
+/// provided in O(1) without the need to hash the keys.
 ///
-/// All operations that mutate the `IdMap` are O(log(n)) average.
+/// All operations that mutate the `DenseMap` may be O(n) during resizing or
+/// compression but averages at O(1).
 ///
 /// `push` will grab the lowest free `id` and assign it to the given value,
 /// returning the assigned `id`. `insert` can be used for assigning a specific
 /// `id` to an object, and returns the previous object at that `id` if any.
 #[cfg_attr(test, derive(Clone))]
-pub struct IdMap<T> {
+pub struct DenseMap<T> {
     freelist: Option<FreeList>,
-    data: Vec<IdMapEntry<T>>,
+    data: Vec<DenseMapEntry<T>>,
 }
 
-impl<T> IdMap<T> {
-    /// Creates a new empty [`IdMap`].
+impl<T> DenseMap<T> {
+    /// Creates a new empty [`DenseMap`].
     pub fn new() -> Self {
         Self { freelist: None, data: Vec::new() }
     }
 
-    /// Returns `true` if there are no items in [`IdMap`].
+    /// Returns `true` if there are no items in [`DenseMap`].
     pub fn is_empty(&self) -> bool {
         // Because of `compress`, our map is empty if and only if the underlying
         // vector is empty. If the underlying vector is not empty but our map is
@@ -115,8 +124,8 @@ impl<T> IdMap<T> {
     /// doesn't exist.
     pub fn get(&self, key: Key) -> Option<&T> {
         self.data.get(key).and_then(|v| match v {
-            IdMapEntry::Allocated(t) => Some(t),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(t) => Some(t),
+            DenseMapEntry::Free(_) => None,
         })
     }
 
@@ -124,8 +133,8 @@ impl<T> IdMap<T> {
     /// the `key` doesn't exist.
     pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
         self.data.get_mut(key).and_then(|v| match v {
-            IdMapEntry::Allocated(t) => Some(t),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(t) => Some(t),
+            DenseMapEntry::Free(_) => None,
         })
     }
 
@@ -134,7 +143,7 @@ impl<T> IdMap<T> {
     /// Returns the removed item if it exists, or `None` otherwise.
     ///
     /// Note: the worst case complexity of `remove` is O(key) if the backing
-    /// data structure of the [`IdMap`] is too sparse.
+    /// data structure of the [`DenseMap`] is too sparse.
     pub fn remove(&mut self, key: Key) -> Option<T> {
         let r = self.remove_inner(key);
         if r.is_some() {
@@ -147,17 +156,17 @@ impl<T> IdMap<T> {
         let Self { data, freelist } = self;
         let r = data.get_mut(key).and_then(|v| {
             match v {
-                IdMapEntry::Allocated(_) => {
+                DenseMapEntry::Allocated(_) => {
                     let old_head = freelist.map(|l| l.head);
-                    let new_link = IdMapEntry::Free(FreeListLink { prev: None, next: old_head });
+                    let new_link = DenseMapEntry::Free(FreeListLink { prev: None, next: old_head });
                     match core::mem::replace(v, new_link) {
-                        IdMapEntry::Allocated(t) => Some(t),
-                        IdMapEntry::Free(_) => unreachable!("already matched"),
+                        DenseMapEntry::Allocated(t) => Some(t),
+                        DenseMapEntry::Free(_) => unreachable!("already matched"),
                     }
                 }
                 // If it is currently free, we don't want to unlink the entry and
                 // link it back at the head again.
-                IdMapEntry::Free(_) => None,
+                DenseMapEntry::Free(_) => None,
             }
         });
         if r.is_some() {
@@ -179,20 +188,20 @@ impl<T> IdMap<T> {
 
     /// Inserts `item` at `key`.
     ///
-    /// If the [`IdMap`] already contained an item indexed by `key`, `insert`
+    /// If the [`DenseMap`] already contained an item indexed by `key`, `insert`
     /// returns it, or `None` otherwise.
     ///
     /// Note: The worst case complexity of `insert` is O(key) if `key` is larger
-    /// than the number of items currently held by the [`IdMap`].
+    /// than the number of items currently held by the [`DenseMap`].
     pub fn insert(&mut self, key: Key, item: T) -> Option<T> {
         if key < self.data.len() {
-            let prev = core::mem::replace(&mut self.data[key], IdMapEntry::Allocated(item));
+            let prev = core::mem::replace(&mut self.data[key], DenseMapEntry::Allocated(item));
             match prev {
-                IdMapEntry::Free(link) => {
+                DenseMapEntry::Free(link) => {
                     self.freelist_unlink(link);
                     None
                 }
-                IdMapEntry::Allocated(t) => Some(t),
+                DenseMapEntry::Allocated(t) => Some(t),
             }
         } else {
             let start_len = self.data.len();
@@ -208,7 +217,7 @@ impl<T> IdMap<T> {
                 // These new free entries will be linked to each other, except:
                 // - the first entry's prev should point to the old tail.
                 // - the last entry's next should be None.
-                self.data.push(IdMapEntry::Free(FreeListLink {
+                self.data.push(DenseMapEntry::Free(FreeListLink {
                     prev: if idx == start_len {
                         self.freelist.map(|l| l.tail)
                     } else {
@@ -235,44 +244,44 @@ impl<T> IdMap<T> {
                 }
             }
             // And finally we insert our item into the map.
-            self.data.push(IdMapEntry::Allocated(item));
+            self.data.push(DenseMapEntry::Allocated(item));
             None
         }
     }
 
-    /// Inserts `item` into the [`IdMap`].
+    /// Inserts `item` into the [`DenseMap`].
     ///
-    /// `push` inserts a new `item` into the [`IdMap`] and returns the key value
+    /// `push` inserts a new `item` into the [`DenseMap`] and returns the key value
     /// allocated for `item`. `push` will allocate *any* key that is currently
     /// free in the internal structure, so it may return a key that was used
     /// previously but has since been removed.
     ///
     /// Note: The worst case complexity of `push` is O(n) where n is the number
-    /// of items held by the [`IdMap`]. This can happen if the internal
+    /// of items held by the [`DenseMap`]. This can happen if the internal
     /// structure gets fragmented.
     pub fn push(&mut self, item: T) -> Key {
         *self.push_entry(item).key()
     }
 
-    /// Inserts `item` into the [`IdMap`] and returns an [`OccupiedEntry`] for
+    /// Inserts `item` into the [`DenseMap`] and returns an [`OccupiedEntry`] for
     /// it.
     ///
-    /// Like [`IdMap::push`] except that it returns an entry instead of an
+    /// Like [`DenseMap::push`] except that it returns an entry instead of an
     /// index.
     pub fn push_entry(&mut self, item: T) -> OccupiedEntry<'_, usize, T> {
         self.push_with(|_: usize| item)
     }
 
-    /// Creates an `item` in the `IdMap` via functor.
+    /// Creates an `item` in the `DenseMap` via functor.
     ///
-    /// Like [`IdMap::push`] except that the item is constructed by the provided
+    /// Like [`DenseMap::push`] except that the item is constructed by the provided
     /// function, which is passed its index.
     pub fn push_with(&mut self, make_item: impl FnOnce(Key) -> T) -> OccupiedEntry<'_, usize, T> {
         if let Some(FreeList { head, .. }) = self.freelist.as_mut() {
             let ret = *head;
             let old = core::mem::replace(
                 self.data.get_mut(ret).unwrap(),
-                IdMapEntry::Allocated(make_item(ret)),
+                DenseMapEntry::Allocated(make_item(ret)),
             );
             let old_link = old
                 .as_free_or_none()
@@ -293,7 +302,7 @@ impl<T> IdMap<T> {
             // If we run out of freelist, we simply push a new entry into the
             // underlying vector.
             let key = self.data.len();
-            self.data.push(IdMapEntry::Allocated(make_item(key)));
+            self.data.push(DenseMapEntry::Allocated(make_item(key)));
             OccupiedEntry { key, id_map: self }
         }
     }
@@ -305,8 +314,8 @@ impl<T> IdMap<T> {
     fn compress(&mut self) {
         // First, find the last non-free entry.
         if let Some(idx) = self.data.iter().enumerate().rev().find_map(|(k, v)| match v {
-            IdMapEntry::Allocated(_) => Some(k),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(_) => Some(k),
+            DenseMapEntry::Free(_) => None,
         }) {
             // Remove all the trailing free entries.
             for i in idx + 1..self.data.len() {
@@ -332,7 +341,7 @@ impl<T> IdMap<T> {
         IntoIterator::into_iter(self)
     }
 
-    /// Consumes the `IdMap` and returns an iterator over the contained items
+    /// Consumes the `DenseMap` and returns an iterator over the contained items
     /// and their associated keys.
     pub fn into_iter(self) -> IntoIter<T> {
         IntoIterator::into_iter(self)
@@ -341,7 +350,7 @@ impl<T> IdMap<T> {
     /// Gets the given key's corresponding entry in the map for in-place
     /// manipulation.
     pub fn entry(&mut self, key: usize) -> Entry<'_, usize, T> {
-        if let Some(IdMapEntry::Allocated(_)) = self.data.get(key) {
+        if let Some(DenseMapEntry::Allocated(_)) = self.data.get(key) {
             Entry::Occupied(OccupiedEntry { key, id_map: self })
         } else {
             Entry::Vacant(VacantEntry { key, id_map: self })
@@ -365,7 +374,7 @@ impl<T> IdMap<T> {
         T: 'a,
     {
         (0..self.data.len()).filter_map(move |k| {
-            let ret = if let IdMapEntry::Allocated(t) = self.data.get_mut(k).unwrap() {
+            let ret = if let DenseMapEntry::Allocated(t) = self.data.get_mut(k).unwrap() {
                 match f(t) {
                     Ok(()) => None,
                     Err(err) => {
@@ -442,28 +451,28 @@ impl<T> IdMap<T> {
     }
 }
 
-impl<T> Default for IdMap<T> {
+impl<T> Default for DenseMap<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-/// An iterator over the keys and values stored in an [`IdMap`].
-pub struct IntoIter<T>(core::iter::Enumerate<alloc::vec::IntoIter<IdMapEntry<T>>>);
+/// An iterator over the keys and values stored in an [`DenseMap`].
+pub struct IntoIter<T>(core::iter::Enumerate<alloc::vec::IntoIter<DenseMapEntry<T>>>);
 
 impl<T> Iterator for IntoIter<T> {
     type Item = (Key, T);
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            IdMapEntry::Allocated(t) => Some((k, t)),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(t) => Some((k, t)),
+            DenseMapEntry::Free(_) => None,
         })
         .next()
     }
 }
 
-impl<T> IntoIterator for IdMap<T> {
+impl<T> IntoIterator for DenseMap<T> {
     type Item = (Key, T);
     type IntoIter = IntoIter<T>;
 
@@ -472,8 +481,8 @@ impl<T> IntoIterator for IdMap<T> {
     }
 }
 
-/// An iterator over the keys and values stored in an [`IdMap`].
-pub struct Iter<'s, T>(core::iter::Enumerate<core::slice::Iter<'s, IdMapEntry<T>>>);
+/// An iterator over the keys and values stored in an [`DenseMap`].
+pub struct Iter<'s, T>(core::iter::Enumerate<core::slice::Iter<'s, DenseMapEntry<T>>>);
 
 impl<'a, T> Iterator for Iter<'a, T> {
     type Item = (Key, &'a T);
@@ -481,14 +490,14 @@ impl<'a, T> Iterator for Iter<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            IdMapEntry::Allocated(t) => Some((k, t)),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(t) => Some((k, t)),
+            DenseMapEntry::Free(_) => None,
         })
         .next()
     }
 }
 
-impl<'a, T> IntoIterator for &'a IdMap<T> {
+impl<'a, T> IntoIterator for &'a DenseMap<T> {
     type Item = (Key, &'a T);
     type IntoIter = Iter<'a, T>;
 
@@ -497,8 +506,8 @@ impl<'a, T> IntoIterator for &'a IdMap<T> {
     }
 }
 
-/// An iterator over the keys and mutable values stored in an [`IdMap`].
-pub struct IterMut<'s, T>(core::iter::Enumerate<core::slice::IterMut<'s, IdMapEntry<T>>>);
+/// An iterator over the keys and mutable values stored in an [`DenseMap`].
+pub struct IterMut<'s, T>(core::iter::Enumerate<core::slice::IterMut<'s, DenseMapEntry<T>>>);
 
 impl<'a, T> Iterator for IterMut<'a, T> {
     type Item = (Key, &'a mut T);
@@ -506,14 +515,14 @@ impl<'a, T> Iterator for IterMut<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self(it) = self;
         it.filter_map(|(k, v)| match v {
-            IdMapEntry::Allocated(t) => Some((k, t)),
-            IdMapEntry::Free(_) => None,
+            DenseMapEntry::Allocated(t) => Some((k, t)),
+            DenseMapEntry::Free(_) => None,
         })
         .next()
     }
 }
 
-impl<'a, T> IntoIterator for &'a mut IdMap<T> {
+impl<'a, T> IntoIterator for &'a mut DenseMap<T> {
     type Item = (Key, &'a mut T);
     type IntoIter = IterMut<'a, T>;
 
@@ -522,7 +531,7 @@ impl<'a, T> IntoIterator for &'a mut IdMap<T> {
     }
 }
 
-/// A key providing an index into an [`IdMap`].
+/// A key providing an index into an [`DenseMap`].
 pub trait EntryKey {
     /// Returns the index for this key.
     fn get_key_index(&self) -> usize;
@@ -537,7 +546,7 @@ impl EntryKey for usize {
 /// A view into a vacant entry in a map. It is part of the [`Entry`] enum.
 pub struct VacantEntry<'a, K, T> {
     key: K,
-    id_map: &'a mut IdMap<T>,
+    id_map: &'a mut DenseMap<T>,
 }
 
 impl<'a, K, T> VacantEntry<'a, K, T> {
@@ -549,8 +558,8 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
     {
         assert!(self.id_map.insert(self.key.get_key_index(), value).is_none());
         match &mut self.id_map.data[self.key.get_key_index()] {
-            IdMapEntry::Allocated(t) => t,
-            IdMapEntry::Free(_) => unreachable!("entry is known to be vacant"),
+            DenseMapEntry::Allocated(t) => t,
+            DenseMapEntry::Free(_) => unreachable!("entry is known to be vacant"),
         }
     }
 
@@ -566,7 +575,7 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
     }
 
     /// Changes the key type of this `VacantEntry` to another key `X` that still
-    /// maps to the same index in an `IdMap`.
+    /// maps to the same index in an `DenseMap`.
     ///
     /// # Panics
     ///
@@ -588,7 +597,7 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
 /// A view into an occupied entry in a map. It is part of the [`Entry`] enum.
 pub struct OccupiedEntry<'a, K, T> {
     key: K,
-    id_map: &'a mut IdMap<T>,
+    id_map: &'a mut DenseMap<T>,
 }
 
 impl<'a, K: EntryKey, T> OccupiedEntry<'a, K, T> {
@@ -640,7 +649,7 @@ impl<'a, K: EntryKey, T> OccupiedEntry<'a, K, T> {
     }
 
     /// Changes the key type of this `OccupiedEntry` to another key `X` that
-    /// still maps to the same index in an `IdMap`.
+    /// still maps to the same index in an `DenseMap`.
     ///
     /// # Panics
     ///
@@ -729,7 +738,7 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
         }
     }
 
-    /// Remove the entry from [`IdMap`].
+    /// Remove the entry from [`DenseMap`].
     pub fn remove(self) -> Option<T> {
         match self {
             Entry::Vacant(_) => None,
@@ -744,52 +753,52 @@ mod tests {
 
     use rand::seq::SliceRandom as _;
 
-    use super::{
-        IdMapEntry::{Allocated, Free},
+    use crate::{
+        testutil::assert_empty,
+        DenseMapEntry::{Allocated, Free},
         *,
     };
-    use crate::testutil::assert_empty;
 
     // Smart constructors
-    fn free<T>(prev: usize, next: usize) -> IdMapEntry<T> {
+    fn free<T>(prev: usize, next: usize) -> DenseMapEntry<T> {
         Free(FreeListLink { prev: Some(prev), next: Some(next) })
     }
 
-    fn free_head<T>(next: usize) -> IdMapEntry<T> {
+    fn free_head<T>(next: usize) -> DenseMapEntry<T> {
         Free(FreeListLink { prev: None, next: Some(next) })
     }
 
-    fn free_tail<T>(prev: usize) -> IdMapEntry<T> {
+    fn free_tail<T>(prev: usize) -> DenseMapEntry<T> {
         Free(FreeListLink { prev: Some(prev), next: None })
     }
 
-    fn free_none<T>() -> IdMapEntry<T> {
+    fn free_none<T>() -> DenseMapEntry<T> {
         Free(FreeListLink::default())
     }
 
     #[test]
     fn test_push() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 2), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_none(), Allocated(2)]);
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(map.push(1), 0);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), Allocated(2)]);
         assert_eq!(freelist, &None);
         assert_eq!(map.push(3), 2);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), Allocated(2), Allocated(3)]);
         assert_eq!(freelist, &None);
     }
 
     #[test]
     fn test_get() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.push(1), 0);
         assert_eq!(map.insert(2, 3), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), free_none(), Allocated(3)]);
         assert_eq!(freelist, &Some(FreeList::singleton(1)));
         assert_eq!(*map.get(0).unwrap(), 1);
@@ -800,10 +809,10 @@ mod tests {
 
     #[test]
     fn test_get_mut() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.push(1), 0);
         assert_eq!(map.insert(2, 3), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), free_none(), Allocated(3)]);
         assert_eq!(freelist, &Some(FreeList::singleton(1)));
         *map.get_mut(2).unwrap() = 10;
@@ -816,7 +825,7 @@ mod tests {
 
     #[test]
     fn test_is_empty() {
-        let mut map = IdMap::<i32>::new();
+        let mut map = DenseMap::<i32>::new();
         assert!(map.is_empty());
         assert_eq!(map.push(1), 0);
         assert!(!map.is_empty());
@@ -824,31 +833,31 @@ mod tests {
 
     #[test]
     fn test_remove() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.push(1), 0);
         assert_eq!(map.push(2), 1);
         assert_eq!(map.push(3), 2);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), Allocated(2), Allocated(3)]);
         assert_eq!(freelist, &None);
         assert_eq!(map.remove(1).unwrap(), 2);
 
         assert_eq!(map.remove(1), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), free_none(), Allocated(3)]);
         assert_eq!(freelist, &Some(FreeList::singleton(1)));
     }
 
     #[test]
     fn test_remove_compress() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(0, 1), None);
         assert_eq!(map.insert(2, 3), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), free_none(), Allocated(3)]);
         assert_eq!(freelist, &Some(FreeList::singleton(1)));
         assert_eq!(map.remove(2).unwrap(), 3);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1)]);
         assert_eq!(freelist, &None);
         assert_eq!(map.remove(0).unwrap(), 1);
@@ -857,21 +866,21 @@ mod tests {
 
     #[test]
     fn test_insert() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 2), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_none(), Allocated(2)]);
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(map.insert(3, 4), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_head(2), Allocated(2), free_tail(0), Allocated(4)]);
         assert_eq!(freelist, &Some(FreeList { head: 0, tail: 2 }));
         assert_eq!(map.insert(0, 1), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), Allocated(2), free_none(), Allocated(4)]);
         assert_eq!(freelist, &Some(FreeList::singleton(2)));
         assert_eq!(map.insert(3, 5).unwrap(), 4);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(1), Allocated(2), free_none(), Allocated(5)]);
         assert_eq!(freelist, &Some(FreeList::singleton(2)));
     }
@@ -881,10 +890,10 @@ mod tests {
         // Regression test for https://fxbug.dev/89714: a sequence of inserts that creates a run of
         // free elements with size > 1 followed by removes can result in `freelist` = None even
         // though `data` contains FreeListLink entries.
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(0, 0), None);
         assert_eq!(map.insert(3, 5), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(0), free_head(2), free_tail(1), Allocated(5)]);
         assert_eq!(freelist, &Some(FreeList { head: 1, tail: 2 }));
 
@@ -893,18 +902,18 @@ mod tests {
         assert_eq!(map.remove(3), Some(5));
 
         // The remove() call compresses the list, which leaves just the 0 element.
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![Allocated(0)]);
         assert_eq!(freelist, &None);
     }
 
     #[test]
     fn test_iter() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
         assert_eq!(map.insert(6, 2), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![
@@ -929,11 +938,11 @@ mod tests {
 
     #[test]
     fn test_iter_mut() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
         assert_eq!(map.insert(6, 2), None);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![
@@ -950,7 +959,7 @@ mod tests {
         for (k, v) in map.iter_mut() {
             *v += k as u32;
         }
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![
@@ -968,7 +977,7 @@ mod tests {
 
     #[test]
     fn test_into_iter() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(map.insert(1, 0), None);
         assert_eq!(map.insert(3, 1), None);
         assert_eq!(map.insert(6, 2), None);
@@ -980,7 +989,7 @@ mod tests {
         // First, test that removed entries are actually removed, and that the
         // remaining entries are actually left there.
 
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         for i in 0..8 {
             assert_eq!(map.push(i), i);
         }
@@ -1001,7 +1010,7 @@ mod tests {
         // First, construct the iterator but then discard it, and test that
         // nothing has been modified.
         let _ = map.update_retain(f);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &old_map.data);
         assert_eq!(freelist, &old_map.freelist);
 
@@ -1035,15 +1044,15 @@ mod tests {
         assert_eq!(taken, [(5, 10, ()), (7, 14, ())]);
 
         // Make sure that the underlying vector has been compressed.
-        let IdMap { data, freelist: _ } = &map;
+        let DenseMap { data, freelist: _ } = &map;
         assert_eq!(data, &[free_tail(2), Allocated(2), free_head(0), Allocated(6),]);
     }
 
     #[test]
     fn test_entry() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         assert_eq!(*map.entry(1).or_insert(2), 2);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_none(), Allocated(2)]);
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(
@@ -1054,7 +1063,7 @@ mod tests {
                 .or_insert(5),
             10
         );
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_none(), Allocated(10)]);
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(
@@ -1065,25 +1074,25 @@ mod tests {
                 .or_insert(5),
             5
         );
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(data, &vec![free_none(), Allocated(10), Allocated(5)]);
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(*map.entry(4).or_default(), 0);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![free_head(3), Allocated(10), Allocated(5), free_tail(0), Allocated(0)]
         );
         assert_eq!(freelist, &Some(FreeList { head: 0, tail: 3 }));
         assert_eq!(*map.entry(3).or_insert_with(|| 7), 7);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![free_none(), Allocated(10), Allocated(5), Allocated(7), Allocated(0)]
         );
         assert_eq!(freelist, &Some(FreeList::singleton(0)));
         assert_eq!(*map.entry(0).or_insert(1), 1);
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![Allocated(1), Allocated(10), Allocated(5), Allocated(7), Allocated(0)]
@@ -1099,7 +1108,7 @@ mod tests {
             }
             _ => panic!("Wrong entry type, should be occupied"),
         }
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![free_none(), Allocated(10), Allocated(5), Allocated(7), Allocated(0)]
@@ -1113,7 +1122,7 @@ mod tests {
             }
             _ => panic!("Wrong entry type, should be vacant"),
         }
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_eq!(
             data,
             &vec![Allocated(4), Allocated(10), Allocated(5), Allocated(7), Allocated(0)]
@@ -1127,7 +1136,7 @@ mod tests {
         let mut rng = crate::testutil::new_rng(1234981);
         const NELEMS: usize = 1_000;
         for _ in 0..1_000 {
-            let mut map = IdMap::new();
+            let mut map = DenseMap::new();
             for i in 0..NELEMS {
                 assert_eq!(map.push(i), i);
             }
@@ -1151,21 +1160,21 @@ mod tests {
 
     #[test]
     fn test_compress_freelist() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         for i in 0..100 {
             assert_eq!(map.push(0), i);
         }
         for i in 0..100 {
             assert_eq!(map.remove(i), Some(0));
         }
-        let IdMap { data, freelist } = &map;
+        let DenseMap { data, freelist } = &map;
         assert_empty(data.iter());
         assert_eq!(freelist, &None);
     }
 
     #[test]
     fn test_insert_beyond_end_freelist() {
-        let mut map = IdMap::new();
+        let mut map = DenseMap::new();
         for i in 0..10 {
             assert_eq!(map.insert(2 * i + 1, 0), None);
         }
@@ -1177,9 +1186,9 @@ mod tests {
     #[test]
     fn test_double_free() {
         const MAX_KEY: usize = 100;
-        let mut map1 = IdMap::new();
+        let mut map1 = DenseMap::new();
         assert_eq!(map1.insert(MAX_KEY, 2), None);
-        let mut map2 = IdMap::new();
+        let mut map2 = DenseMap::new();
         assert_eq!(map2.insert(MAX_KEY, 2), None);
         for i in 0..MAX_KEY {
             assert_eq!(map1.remove(i), None);
@@ -1201,7 +1210,7 @@ mod tests {
     where
         V: Copy + core::cmp::PartialEq + core::fmt::Debug,
     {
-        fn apply(self, map: &mut IdMap<V>, source_of_truth: &mut HashMap<usize, V>) {
+        fn apply(self, map: &mut DenseMap<V>, source_of_truth: &mut HashMap<usize, V>) {
             match self {
                 Self::Get { key } => {
                     assert_eq!(
@@ -1260,9 +1269,9 @@ mod tests {
 
     /// Searches through the given data entries to identify the free list. Returns the indices of
     /// elements in the free list in order, panicking if there is any inconsistency in the list.
-    fn find_free_elements<T>(data: &[IdMapEntry<T>]) -> Vec<usize> {
+    fn find_free_elements<T>(data: &[DenseMapEntry<T>]) -> Vec<usize> {
         let head = data.iter().enumerate().find_map(|(i, e)| match e {
-            IdMapEntry::Free(link) => {
+            DenseMapEntry::Free(link) => {
                 let FreeListLink { prev, next: _ } = link;
                 if prev == &None {
                     Some((i, link))
@@ -1270,7 +1279,7 @@ mod tests {
                     None
                 }
             }
-            IdMapEntry::Allocated(_) => None,
+            DenseMapEntry::Allocated(_) => None,
         });
         let mut found = Vec::new();
         let mut next = head;
@@ -1280,8 +1289,8 @@ mod tests {
             found.push(index);
             next = link.next.map(|next_i| {
                 let next_free = match &data[next_i] {
-                    IdMapEntry::Free(f) => f,
-                    IdMapEntry::Allocated(_) => panic!("free list element is not free"),
+                    DenseMapEntry::Free(f) => f,
+                    DenseMapEntry::Allocated(_) => panic!("free list element is not free"),
                 };
                 assert_eq!(Some(index), next_free.prev, "data[{}] and data[{}]", index, next_i);
                 (next_i, next_free)
@@ -1290,10 +1299,10 @@ mod tests {
 
         // The freelist should contain all of the free data elements.
         data.iter().enumerate().for_each(|(i, e)| match e {
-            IdMapEntry::Free(_) => {
+            DenseMapEntry::Free(_) => {
                 assert!(found.contains(&i), "data[{}] is free but not in the list", i)
             }
-            IdMapEntry::Allocated(_) => (),
+            DenseMapEntry::Allocated(_) => (),
         });
         found
     }
@@ -1340,20 +1349,20 @@ mod tests {
 
         #[test]
         fn test_arbitrary_operations(operations in proptest::collection::vec(operation_strategy(), 10)) {
-            let mut map = IdMap::new();
+            let mut map = DenseMap::new();
             let mut reference = HashMap::new();
             for op in operations {
                 op.apply(&mut map, &mut reference);
 
                 // Now check the invariants that the map should be guaranteeing.
-                let IdMap {data, freelist} = &map;
+                let DenseMap {data, freelist} = &map;
 
                 match freelist {
                     None => {
                         // No freelist means all nodes are allocated.
                         data.iter().enumerate().for_each(|(i, d)| match d {
-                            IdMapEntry::Free(_) => panic!("no freelist but data[{}] is free", i),
-                            IdMapEntry::Allocated(_) => (),
+                            DenseMapEntry::Free(_) => panic!("no freelist but data[{}] is free", i),
+                            DenseMapEntry::Allocated(_) => (),
                         })
                     },
                     Some(FreeList {head, tail}) => {

@@ -2,25 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Identifier map collection data structure.
+//! A collection of [`DenseMap`]s.
 //!
-//! Defines [`IdMapCollection`], which is a generic map collection that can be
-//! keyed on [`IdMapCollectionKey`], which is a two-level key structure.
-//!
-//! Used to provide collections keyed on [`crate::DeviceId`] that match hot path
-//! performance requirements.
+//! Defines [`DenseMapCollection`], which is a generic map collection that can be
+//! keyed on [`DenseMapCollectionKey`], which is a two-level key structure.
 
 use alloc::vec::Vec;
 use core::num::NonZeroUsize;
 
-use super::id_map::{self, EntryKey, IdMap};
+use crate::{DenseMap, EntryKey};
 
-/// A key that can index items in [`IdMapCollection`].
+/// A key that can index items in [`DenseMapCollection`].
 ///
-/// An `IdMapCollectionKey` is a key with two levels: `variant` and `id`. The
+/// A `DenseMapCollectionKey` is a key with two levels: `variant` and `id`. The
 /// number of `variant`s must be fixed and known at compile time, and is
 /// typically mapped to a number of `enum` variants (nested or not).
-pub trait IdMapCollectionKey {
+pub trait DenseMapCollectionKey {
     /// The number of variants this key supports.
     const VARIANT_COUNT: NonZeroUsize;
 
@@ -38,16 +35,16 @@ pub trait IdMapCollectionKey {
 
 impl<O> EntryKey for O
 where
-    O: IdMapCollectionKey,
+    O: DenseMapCollectionKey,
 {
     fn get_key_index(&self) -> usize {
-        <O as IdMapCollectionKey>::get_id(self)
+        <O as DenseMapCollectionKey>::get_id(self)
     }
 }
 
-/// A vacant entry from an [`IdMapCollection`].
+/// A vacant entry from a [`DenseMapCollection`].
 pub struct VacantEntry<'a, K, T> {
-    entry: id_map::VacantEntry<'a, K, T>,
+    entry: crate::VacantEntry<'a, K, T>,
     count: &'a mut usize,
 }
 
@@ -75,7 +72,7 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
     }
 
     /// Changes the key type of this `VacantEntry` to another key `X` that still
-    /// maps to the same index in an `IdMap`.
+    /// maps to the same index in a `DenseMap`.
     ///
     /// # Panics
     ///
@@ -92,10 +89,10 @@ impl<'a, K, T> VacantEntry<'a, K, T> {
     }
 }
 
-/// An occupied entry from an [`IdMapCollection`].
+/// An occupied entry from a [`DenseMapCollection`].
 #[derive(Debug)]
 pub struct OccupiedEntry<'a, K, T> {
-    entry: id_map::OccupiedEntry<'a, K, T>,
+    entry: crate::OccupiedEntry<'a, K, T>,
     count: &'a mut usize,
 }
 
@@ -219,7 +216,7 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
         }
     }
 
-    /// Removes the entry from the [`IdMapCollection`].
+    /// Removes the entry from the [`DenseMapCollection`].
     ///
     /// Returns [`Some`] if the entry was occupied, otherwise [`None`].
     pub fn remove(self) -> Option<T> {
@@ -263,42 +260,42 @@ impl<I: Iterator> Iterator for SizeAugmentedIterator<I> {
 
 impl<I: Iterator> ExactSizeIterator for SizeAugmentedIterator<I> {}
 
-/// A generic collection indexed by an [`IdMapCollectionKey`].
+/// A generic collection indexed by a [`DenseMapCollectionKey`].
 ///
-/// `IdMapCollection` provides the same performance guarantees as [`IdMap`], but
+/// `DenseMapCollection` provides the same performance guarantees as [`DenseMap`], but
 /// provides a two-level keying scheme that matches the pattern used in
-/// [`crate::DeviceId`].
-pub struct IdMapCollection<K: IdMapCollectionKey, T> {
+/// [`crate::DeviceDense`].
+pub struct DenseMapCollection<K: DenseMapCollectionKey, T> {
     // TODO(brunodalbo): we define a vector container here because we can't just
     // define a fixed array length based on an associated const in
-    // IdMapCollectionKey. When rust issue #43408 gets resolved we can switch
+    // DenseMapCollectionKey. When rust issue #43408 gets resolved we can switch
     // this to use the associated const and just have a fixed length array.
-    data: Vec<IdMap<T>>,
+    data: Vec<DenseMap<T>>,
     count: usize,
     _marker: core::marker::PhantomData<K>,
 }
 
-impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
-    /// Creates a new empty `IdMapCollection`.
+impl<K: DenseMapCollectionKey, T> DenseMapCollection<K, T> {
+    /// Creates a new empty `DenseMapCollection`.
     pub fn new() -> Self {
         let mut data = Vec::new();
-        data.resize_with(K::VARIANT_COUNT.get(), IdMap::default);
+        data.resize_with(K::VARIANT_COUNT.get(), DenseMap::default);
         Self { data, count: 0, _marker: core::marker::PhantomData }
     }
 
-    fn get_map(&self, key: &K) -> &IdMap<T> {
+    fn get_map(&self, key: &K) -> &DenseMap<T> {
         &self.data[key.get_variant()]
     }
 
     fn get_entry(&mut self, key: &K) -> Entry<'_, usize, T> {
         let Self { data, count, _marker } = self;
         match data[key.get_variant()].entry(key.get_id()) {
-            id_map::Entry::Occupied(entry) => Entry::Occupied(OccupiedEntry { entry, count }),
-            id_map::Entry::Vacant(entry) => Entry::Vacant(VacantEntry { entry, count }),
+            crate::Entry::Occupied(entry) => Entry::Occupied(OccupiedEntry { entry, count }),
+            crate::Entry::Vacant(entry) => Entry::Vacant(VacantEntry { entry, count }),
         }
     }
 
-    /// Returns `true` if the `IdMapCollection` holds no items.
+    /// Returns `true` if the `DenseMapCollection` holds no items.
     pub fn is_empty(&self) -> bool {
         let Self { count, data: _, _marker } = self;
         *count == 0
@@ -331,7 +328,7 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
 
     /// Inserts `item` at `key`.
     ///
-    /// If the [`IdMapCollection`] already contained an item indexed by `key`,
+    /// If the [`DenseMapCollection`] already contained an item indexed by `key`,
     /// `insert` returns it, or `None` otherwise.
     pub fn insert(&mut self, key: &K, item: T) -> Option<T> {
         match self.get_entry(key) {
@@ -362,7 +359,7 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
     }
 
     /// Creates an iterator over the maps in variant order.
-    pub fn iter_maps(&self) -> impl Iterator<Item = &IdMap<T>> {
+    pub fn iter_maps(&self) -> impl Iterator<Item = &DenseMap<T>> {
         let Self { data, count: _, _marker } = self;
         data.iter()
     }
@@ -399,7 +396,7 @@ impl<K: IdMapCollectionKey, T> IdMapCollection<K, T> {
     }
 }
 
-impl<K: IdMapCollectionKey, T> Default for IdMapCollection<K, T> {
+impl<K: DenseMapCollectionKey, T> Default for DenseMapCollection<K, T> {
     fn default() -> Self {
         Self::new()
     }
@@ -431,7 +428,7 @@ mod tests {
         }
     }
 
-    impl IdMapCollectionKey for FakeKey {
+    impl DenseMapCollectionKey for FakeKey {
         const VARIANT_COUNT: NonZeroUsize = const_unwrap::const_unwrap_option(NonZeroUsize::new(3));
 
         fn get_variant(&self) -> usize {
@@ -447,7 +444,7 @@ mod tests {
         }
     }
 
-    type TestCollection = IdMapCollection<FakeKey, i32>;
+    type TestCollection = DenseMapCollection<FakeKey, i32>;
 
     const KEY_A: FakeKey = FakeKey::new(0, FakeVariants::A);
     const KEY_B: FakeKey = FakeKey::new(2, FakeVariants::B);
@@ -456,19 +453,19 @@ mod tests {
     #[test]
     fn test_insert_and_get() {
         let mut t = TestCollection::new();
-        let IdMapCollection { data, count, _marker } = &t;
+        let DenseMapCollection { data, count, _marker } = &t;
         assert_empty(data[0].iter());
         assert_empty(data[1].iter());
         assert_empty(data[2].iter());
         assert_eq!(count, &0);
 
         assert_eq!(t.insert(&KEY_A, 1), None);
-        let IdMapCollection { data, count, _marker } = &t;
+        let DenseMapCollection { data, count, _marker } = &t;
         assert!(!data[0].is_empty());
         assert_eq!(count, &1);
 
         assert_eq!(t.insert(&KEY_B, 2), None);
-        let IdMapCollection { data, count, _marker } = &t;
+        let DenseMapCollection { data, count, _marker } = &t;
         assert!(!data[1].is_empty());
         assert_eq!(count, &2);
 
@@ -484,7 +481,7 @@ mod tests {
         let mut t = TestCollection::new();
         assert_eq!(t.insert(&KEY_B, 15), None);
         assert_eq!(t.remove(&KEY_B).unwrap(), 15);
-        let IdMapCollection { data: _, count, _marker } = &t;
+        let DenseMapCollection { data: _, count, _marker } = &t;
         assert_eq!(count, &0);
 
         assert_eq!(t.remove(&KEY_B), None);

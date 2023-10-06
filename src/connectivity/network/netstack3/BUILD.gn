@@ -32,6 +32,7 @@ common_deps = [
   "//src/lib/const-unwrap",
   "//src/lib/cstr",
   "//src/lib/debug/rust",
+  "//src/lib/dense-map",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
   "//src/lib/diagnostics/log/rust",

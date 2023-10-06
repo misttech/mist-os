@@ -32,6 +32,7 @@ use core::{
 use lock_order::Locked;
 
 use assert_matches::assert_matches;
+use dense_map::{self, DenseMap};
 use derivative::Derivative;
 use net_types::{
     ip::{
@@ -50,10 +51,7 @@ use tracing::{debug, warn};
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl},
     context::{InstantBindingsTypes, TimerContext, TracingContext},
-    data_structures::{
-        id_map::{self, IdMap},
-        socketmap::{IterShadows as _, SocketMap},
-    },
+    data_structures::socketmap::{IterShadows as _, SocketMap},
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
@@ -850,7 +848,7 @@ pub(crate) struct Unbound<D, Extra> {
 pub(crate) struct Sockets<I: IpExt, D: WeakId, BT: TcpBindingsTypes> {
     port_alloc: PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, BT>>>,
     socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, BT>>,
-    socket_state: IdMap<TcpSocketState<I, D, BT>>,
+    socket_state: DenseMap<TcpSocketState<I, D, BT>>,
 }
 
 #[derive(Derivative)]
@@ -1205,8 +1203,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                 };
                 debug!("bind {id:?} to {addr:?}:{}", port.get());
                 let mut entry = match socket_state.entry((*id).into()) {
-                    id_map::Entry::Vacant(_) => panic!("invalid unbound ID"),
-                    id_map::Entry::Occupied(o) => o,
+                    dense_map::Entry::Vacant(_) => panic!("invalid unbound ID"),
+                    dense_map::Entry::Occupied(o) => o,
                 };
 
                 let Unbound { bound_device, buffer_sizes, socket_options, sharing, socket_extra } =
@@ -1376,8 +1374,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
             |ip_transport_ctx, isn, sockets| {
                 debug!("connect on {id:?} to {remote_ip:?}:{remote_port}");
                 let mut state_entry = match sockets.socket_state.entry((*id).into()) {
-                    id_map::Entry::Vacant(_) => panic!("invalid socket Id"),
-                    id_map::Entry::Occupied(o) => o,
+                    dense_map::Entry::Vacant(_) => panic!("invalid socket Id"),
+                    dense_map::Entry::Occupied(o) => o,
                 };
                 let (
                     local_ip,
@@ -1520,8 +1518,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         self.with_ip_transport_ctx_and_tcp_sockets_mut(
             |ip_transport_ctx, Sockets { socket_state, socketmap, port_alloc: _ }| {
                 let mut entry = match socket_state.entry(id.into()) {
-                    id_map::Entry::Vacant(_) => panic!("invalid socket ID"),
-                    id_map::Entry::Occupied(e) => e,
+                    dense_map::Entry::Vacant(_) => panic!("invalid socket ID"),
+                    dense_map::Entry::Occupied(e) => e,
                 };
                 match entry.get_mut() {
                     TcpSocketState::Unbound(_) => {
@@ -1791,8 +1789,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
     fn handle_timer(&mut self, ctx: &mut C, conn_id: &TcpSocketId<I>) {
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             let mut entry = match sockets.socket_state.entry((*conn_id).into()) {
-                id_map::Entry::Vacant(_) => panic!("invalid socket ID"),
-                id_map::Entry::Occupied(e) => e,
+                dense_map::Entry::Vacant(_) => panic!("invalid socket ID"),
+                dense_map::Entry::Occupied(e) => e,
             };
             let (conn, _sharing, addr) = assert_matches!(
                 entry.get_mut(),
@@ -2528,7 +2526,7 @@ fn connect_inner<I, SC, C>(
         IpPortSpec,
         TcpSocketSpec<I, SC::WeakDeviceId, C>,
     >,
-    mut state_entry: id_map::OccupiedEntry<'_, usize, TcpSocketState<I, SC::WeakDeviceId, C>>,
+    mut state_entry: dense_map::OccupiedEntry<'_, usize, TcpSocketState<I, SC::WeakDeviceId, C>>,
     ip_transport_ctx: &mut SC,
     ctx: &mut C,
     ip_sock: IpSock<I, SC::WeakDeviceId, DefaultSendOptions>,
@@ -3101,7 +3099,7 @@ mod tests {
             Self {
                 isn_generator: Default::default(),
                 sockets: Sockets {
-                    socket_state: IdMap::new(),
+                    socket_state: DenseMap::new(),
                     socketmap: BoundSocketMap::default(),
                     port_alloc: PortAlloc::new(&mut FakeCryptoRng::new_xorshift(0)),
                 },

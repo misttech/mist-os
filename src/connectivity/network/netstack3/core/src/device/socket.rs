@@ -7,6 +7,7 @@
 use alloc::collections::HashSet;
 use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
 
+use dense_map::{DenseMap, EntryKey};
 use derivative::Derivative;
 use lock_order::{
     lock::{LockFor, RwLockFor},
@@ -22,7 +23,6 @@ use packet_formats::{
 
 use crate::{
     context::SendFrameContext,
-    data_structures::id_map::{EntryKey, IdMap},
     device::{
         with_ethernet_state_and_sync_ctx, with_loopback_state_and_sync_ctx, AnyDevice, Device,
         DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId,
@@ -144,7 +144,7 @@ pub(crate) struct AnyDeviceSockets<Id>(HashSet<Id>);
 
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
-pub(crate) struct AllSockets<Id>(IdMap<Id>);
+pub(crate) struct AllSockets<Id>(DenseMap<Id>);
 
 #[derive(Debug)]
 struct SocketState<S, D> {
@@ -1130,7 +1130,6 @@ mod tests {
 
     use crate::{
         context::testutil::FakeSyncCtx,
-        data_structures::id_map::IdMap,
         device::{
             testutil::{FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             Id,
@@ -1223,7 +1222,7 @@ mod tests {
     struct ExternalSocketState<D>(Mutex<Vec<ReceivedFrame<D>>>);
 
     type FakeAllSockets<D> =
-        IdMap<(ExternalSocketState<D>, Target<<D as crate::device::StrongId>::Weak>)>;
+        DenseMap<(ExternalSocketState<D>, Target<<D as crate::device::StrongId>::Weak>)>;
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]

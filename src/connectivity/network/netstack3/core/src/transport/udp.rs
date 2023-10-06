@@ -15,6 +15,7 @@ use core::{
 };
 use lock_order::Locked;
 
+use dense_map::EntryKey;
 use derivative::Derivative;
 use either::Either;
 use net_types::{
@@ -30,19 +31,15 @@ use packet_formats::{
     ip::{IpProto, IpProtoExt},
     udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
 };
-use tracing::trace;
-
 use thiserror::Error;
+use tracing::trace;
 
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
     algorithm::{PortAlloc, PortAllocImpl, ProtocolFlowId},
     context::{CounterContext, InstantContext, NonTestCtxMarker, RngContext, TracingContext},
     convert::BidirectionalConverter,
-    data_structures::{
-        id_map::EntryKey,
-        socketmap::{IterShadows as _, SocketMap, Tagged},
-    },
+    data_structures::socketmap::{IterShadows as _, SocketMap, Tagged},
     device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{LocalAddressError, SocketError, ZonedAddressError},
     ip::{

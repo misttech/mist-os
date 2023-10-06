@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Support for property test usage in netstack3 core.
+//! Support for property test usage.
 
 use std::{any::Any, fmt::Debug, str::FromStr as _};
 
