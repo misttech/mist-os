@@ -9,7 +9,7 @@ use {
             PageInBlobSequentialCompressed, PageInBlobSequentialUncompressed, WriteBlob,
             WriteRealisticBlobs,
         },
-        block_devices::{FvmVolumeFactory, RamdiskFactory},
+        block_devices::FvmVolumeFactory,
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
     },
     regex::{Regex, RegexSetBuilder},
@@ -25,11 +25,12 @@ use {
             WriteRandomCold, WriteRandomWarm, WriteSequentialCold, WriteSequentialFsyncCold,
             WriteSequentialFsyncWarm, WriteSequentialWarm,
         },
-        BenchmarkSet, Filesystem as _, FilesystemConfig,
+        BenchmarkSet,
     },
 };
 
 mod blob_benchmarks;
+mod blob_loader;
 mod block_devices;
 mod filesystems;
 
@@ -55,14 +56,13 @@ struct Args {
     #[argh(switch)]
     enable_tracing: bool,
 
-    /// starts each filesystem to force the filesystem components and the benchmark component to be
-    /// loaded into blobfs. Does not run any benchmarks.
+    /// pages in all of the blobs in the package and exits. Does not run any benchmarks.
     ///
     /// When trying to collect a trace immediately after modifying a filesystem or a benchmark, the
-    /// start of the trace will be polluted with downloading the new blobs, writing the blobs to
-    /// blobfs, and then paging the blobs back in. Running the benchmark component with this flag
-    /// once before running it again with tracing enabled will remove most of the component loading
-    /// from the start of the trace.
+    /// start of the trace will be polluted with downloading the new blobs, writing the blobs, and
+    /// then paging the blobs back in. Running the benchmarks with this flag once before running
+    /// them again with tracing enabled will remove most of the blob loading from the start of the
+    /// trace.
     #[argh(switch)]
     load_blobs_for_tracing: bool,
 }
@@ -138,24 +138,12 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
     );
 }
 
-async fn load_blobs_for_tracing() {
-    let ramdisk_factory = RamdiskFactory::new(4096, 32 * 1024).await;
-    Fxfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    F2fs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    Memfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    Minfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    Blobfs.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    Fxblob.start_filesystem(&ramdisk_factory).await.shutdown().await;
-    PkgDirTest::new_fxblob().start_filesystem(&ramdisk_factory).await.shutdown().await;
-    PkgDirTest::new_blobfs().start_filesystem(&ramdisk_factory).await.shutdown().await;
-}
-
 #[fuchsia::main(logging_tags = ["storage_benchmarks"])]
 async fn main() {
     let args: Args = argh::from_env();
 
+    let _loaded_blobs = blob_loader::BlobLoader::load_blobs().await;
     if args.load_blobs_for_tracing {
-        load_blobs_for_tracing().await;
         return;
     }
 

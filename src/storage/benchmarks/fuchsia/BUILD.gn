@@ -12,6 +12,7 @@ rustc_binary("fuchsia-storage-benchmarks") {
   name = "fuchsia_storage_benchmarks"
   sources = [
     "src/blob_benchmarks.rs",
+    "src/blob_loader.rs",
     "src/block_devices.rs",
     "src/filesystems/blobfs.rs",
     "src/filesystems/f2fs.rs",
