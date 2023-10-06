@@ -35,6 +35,8 @@ template("audio_pipeline_benchmark") {
   generated_file("${package_name}-manifest-base") {
     contents = "{"
     contents += "  program: { \"binary\": \"bin/${package_name}\" },"
+    contents +=
+        "  capabilities: [{ \"protocol\": \"fuchsia.media.ProfileProvider\" }],"
     contents += "  use: ["
     contents += "      {"
     contents += "          directory: \"pkg\","
