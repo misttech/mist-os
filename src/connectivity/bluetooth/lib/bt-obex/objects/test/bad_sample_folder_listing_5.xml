@@ -1,7 +1,6 @@
-<!--Folder Listing object with invalid attribute in file element-->
+<!--Folder Listing object with invalid datetime format-->
 <?xml version = "1.0"?>
 <!DOCTYPE folder-listing SYSTEM "obex-folder-listing.dtd">
-<folder-listing>
-    <folder name="IR Inbox"/>
-    <file name="Jumar.txt" size="6672" test="this attr is invalid">Jumar Handling Guide</file>
+<folder-listing version="1.0">
+    <folder name="System" created="1996-11-03 14-15-00"/>
 </folder-listing>

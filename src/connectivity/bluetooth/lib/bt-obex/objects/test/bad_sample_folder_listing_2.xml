@@ -1,10 +1,6 @@
-<!--Folder Listing object with unsupported version-->
+<!--Folder Listing object with invalid elements-->
 <?xml version = "1.0"?>
 <!DOCTYPE folder-listing SYSTEM "obex-folder-listing.dtd">
-<folder-listing version="2.0">
-    <parent-folder/>
-    <folder name="System"/>
-    <folder name="IR Inbox"/>
-    <file name="Jumar.txt" size="6672">Jumar Handling Guide</file>
-    <file name="Obex.doc" type="application/msword">OBEX Specification v1.0</file>
+<folder-listing>
+    <random name="System"/>
 </folder-listing>
