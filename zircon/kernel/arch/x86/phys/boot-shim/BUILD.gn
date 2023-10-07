@@ -239,6 +239,7 @@ if (toolchain_environment == "kernel.phys32") {
 }
 
 test("legacy-boot-shim-tests") {
+  defines = [ "UART_ALL_DRIVERS=1" ]
   sources = [ "legacy-boot-shim-tests.cc" ]
   deps = [
     "//zircon/kernel/lib/acpi_lite",
