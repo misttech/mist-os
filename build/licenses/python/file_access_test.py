@@ -41,6 +41,21 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.file_exists(GnLabel.from_str("//baz"))
         )
 
+    def test_directory_exists(self):
+        self.assertTrue(
+            self.file_access.directory_exists(GnLabel.from_str("//"))
+        )
+        self.assertFalse(
+            self.file_access.file_exists(GnLabel.from_str("//baz"))
+        )
+
+    def test_list_directory(self):
+        children = self.file_access.list_directory(GnLabel.from_str("//"))
+        children.sort()
+        self.assertEqual(
+            children, [GnLabel.from_str("//bar"), GnLabel.from_str("//foo")]
+        )
+
     def test_read_file(self):
         self.assertEqual(
             self.file_access.read_text(GnLabel.from_str("//foo")), "FOO"
@@ -49,21 +64,29 @@ class FileAccessTest(unittest.TestCase):
             self.file_access.read_text(GnLabel.from_str("//bar")), "BAR"
         )
 
-    def test_depfile(self):
-        self.file_access.read_text(GnLabel.from_str("//foo"))
-        self.file_access.file_exists(GnLabel.from_str("//bar"))
-
+    def _assert_depfile(self, expected_content):
         depfile_path = self.temp_dir_path / "depfile"
         self.file_access.write_depfile(
             dep_file_path=depfile_path, main_entry=Path("main")
         )
-
         actual_depfile_contents = depfile_path.read_text()
-        expected_depfile_contents = f"""main:\\
-    {self.temp_dir_path}/bar\\
-    {self.temp_dir_path}/foo"""
+        self.assertEqual(actual_depfile_contents, expected_content)
 
-        self.assertEqual(actual_depfile_contents, expected_depfile_contents)
+    def test_write_depfile_after_read_text(self):
+        self.file_access.read_text(GnLabel.from_str("//foo"))
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/foo""")
+
+    def test_write_depfile_after_file_exists(self):
+        self.file_access.file_exists(GnLabel.from_str("//bar"))
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}/bar""")
+
+    def test_write_depfile_after_directory_exists(self):
+        self.file_access.directory_exists(GnLabel.from_str("//"))
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
+
+    def test_write_depfile_after_list_directory(self):
+        self.file_access.list_directory(GnLabel.from_str("//"))
+        self._assert_depfile(f"""main:\\\n    {self.temp_dir_path}""")
 
 
 if __name__ == "__main__":

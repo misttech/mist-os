@@ -34,37 +34,27 @@ if (is_host) {
   # but may require `fx set ... --with-host //build/licenses:tests`
   # on user/userdebug builds.
 
-  python_host_test("gn_label_test") {
-    main_source = "gn_label_test.py"
-    sources = common_sources
-  }
+  host_test_deps = []
 
-  python_host_test("gn_license_metadata_test") {
-    main_source = "gn_license_metadata_test.py"
-    sources = common_sources
-  }
+  foreach(test_name,
+          [
+            "gn_label_test",
+            "gn_license_metadata_test",
+            "spdx_writer_test",
+            "file_access_test",
+            "readme_fuchsia_test",
+            "collector_test",
+          ]) {
+    python_host_test(test_name) {
+      main_source = "${test_name}.py"
+      sources = common_sources
+    }
 
-  python_host_test("spdx_writer_test") {
-    main_source = "spdx_writer_test.py"
-    sources = common_sources
-  }
-
-  python_host_test("file_access_test") {
-    main_source = "file_access_test.py"
-    sources = common_sources
-  }
-
-  python_host_test("fuchsia_readme_test") {
-    main_source = "fuchsia_readme_test.py"
-    sources = common_sources
+    host_test_deps += [ ":${test_name}" ]
   }
 
   group("host_tests") {
     testonly = true
-    deps = [
-      ":gn_label_test",
-      ":gn_license_metadata_test",
-      ":spdx_writer_test",
-    ]
+    deps = host_test_deps
   }
 }

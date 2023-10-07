@@ -136,6 +136,11 @@ class GnLabel:
         """Create a GnLabel relative to this label from a child path GN string"""
         if child_path_str.startswith("//"):
             return GnLabel.from_str(child_path_str)
+        elif child_path_str.startswith(":"):
+            assert (
+                not self.is_local_name
+            ), f"Can't apply {child_path_str} to {self}"
+            return GnLabel.from_str(f"//{self.path}:{child_path_str[1:]}")
         elif child_path_str.startswith("../"):
             assert (
                 self.has_parent_label()

@@ -145,6 +145,11 @@ class GnLabelTest(unittest.TestCase):
         self.assertTrue(
             GnLabel.from_str("//third_party/golibs:foo").is_3p_golib()
         )
+        self.assertTrue(
+            GnLabel.from_str(
+                "//third_party/golibs:google.golang.org/api/transport(//build/toolchain:host_x64)"
+            ).is_3p_golib()
+        )
 
     def test_create_child_from_str(self):
         parent = GnLabel.from_str("//path1/to/foo:bar(//toolchain)")
@@ -223,6 +228,18 @@ class GnLabelTest(unittest.TestCase):
         with self.assertRaises(AssertionError) as context:
             parent.create_child_from_str("../../../../baz:qux")
         self.assertEqual("Can't apply ../baz:qux to //", str(context.exception))
+
+    def test_create_child_from_str_with_colon(self):
+        self.assertEqual(
+            GnLabel.from_str("//path/to/foo").create_child_from_str(":bar"),
+            GnLabel.from_str("//path/to/foo:bar"),
+        )
+
+        with self.assertRaises(AssertionError) as context:
+            GnLabel.from_str("//path/to/foo:bar").create_child_from_str(":baz")
+        self.assertEqual(
+            "Can't apply :baz to //path/to/foo:bar", str(context.exception)
+        )
 
     def test_gt(self):
         # Testing greater_than indirectly by sorting

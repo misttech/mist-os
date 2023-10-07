@@ -54,7 +54,7 @@ def main():
     parser.add_argument(
         "--fail-on-collector-errors",
         type=bool,
-        default=True,
+        default=False,
         help="Tool will fail when encountering collector errors",
     )
     # TODO(132725): Remove once migration completes.

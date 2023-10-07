@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 
 from pathlib import Path
-from typing import Set
+from typing import List, Set
 
 from gn_label import GnLabel
 import dataclasses
@@ -32,6 +32,24 @@ class FileAccess:
             self.visited_files.add(path)
             return True
         return False
+
+    def directory_exists(self, label: GnLabel) -> bool:
+        """Whether the directory exists and is indeed a directory"""
+        GnLabel.check_type(label)
+        path = self.fuchsia_source_path / label.path
+        if path.exists() and path.is_dir():
+            self.visited_files.add(path)
+            return True
+        return False
+
+    def list_directory(self, label: GnLabel) -> List[GnLabel]:
+        """Lists the files in a directory corresponding with `label`"""
+        GnLabel.check_type(label)
+        path = self.fuchsia_source_path / label.path
+        self.visited_files.add(path)
+        return [
+            label.create_child_from_str(child.name) for child in path.iterdir()
+        ]
 
     def write_depfile(self, dep_file_path: Path, main_entry: Path):
         if not dep_file_path.parent.exists():
