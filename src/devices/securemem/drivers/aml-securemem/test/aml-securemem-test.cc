@@ -27,11 +27,6 @@
 
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {
-    // Currently, do nothing
-  }
-
   void RegisterHeap(RegisterHeapRequestView request,
                     RegisterHeapCompleter::Sync& completer) override {
     // Currently, do nothing
