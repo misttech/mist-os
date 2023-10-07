@@ -22,6 +22,10 @@ node "sysmem" {
   fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
 }
 
+node "sysmem-fidl" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
+}
+
 node "clock-dos" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.G12B_CLK_ID.CLK_DOS;
