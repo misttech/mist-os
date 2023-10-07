@@ -5,7 +5,6 @@
 use std::ops::ControlFlow;
 
 use fidl::endpoints::{ProtocolMarker, RequestStream};
-use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fidl_fuchsia_posix_socket_raw as fpraw;
 use fuchsia_zircon as zx;
@@ -118,265 +117,239 @@ impl<'a> RequestHandler<'a> {
             fpraw::SocketRequest::Query { responder } => responder
                 .send(fpraw::SOCKET_PROTOCOL_NAME.as_bytes())
                 .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetReuseAddress { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetReuseAddress { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetError { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetBroadcast { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetBroadcast { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetSendBuffer { value_bytes: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetSendBuffer { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetReceiveBuffer { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetKeepAlive { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetKeepAlive { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetOutOfBandInline { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetOutOfBandInline { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetNoCheck { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetNoCheck { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetLinger { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetReusePort { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetReusePort { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetAcceptConn { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetBindToDevice { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetBindToDevice { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetTimestamp { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetTimestamp { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::Bind { addr: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::Connect { addr: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::Disconnect { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetSockName { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetPeerName { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::Shutdown { mode: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpTypeOfService { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpTypeOfService { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpTtl { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpTtl { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpPacketInfo { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpReceiveTypeOfService { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpReceiveTypeOfService { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpReceiveTtl { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpReceiveTtl { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpMulticastInterface { iface: _, address: _, responder } => {
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+            fpraw::SocketRequest::SetReuseAddress { value: _, responder } => {
+                respond_not_supported!(responder)
             }
-            fpraw::SocketRequest::GetIpMulticastInterface { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpMulticastTtl { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpMulticastTtl { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::AddIpMembership { membership: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::DropIpMembership { membership: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpTransparent { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpTransparent { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fpraw::SocketRequest::GetReuseAddress { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetError { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetBroadcast { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetBroadcast { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetSendBuffer { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetReceiveBuffer { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetKeepAlive { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetKeepAlive { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetOutOfBandInline { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetOutOfBandInline { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetNoCheck { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetNoCheck { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetLinger { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetReusePort { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetReusePort { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetAcceptConn { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetBindToDevice { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetBindToDevice { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetTimestamp { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetTimestamp { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::Bind { addr: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::Connect { addr: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::Disconnect { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetSockName { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetPeerName { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::Shutdown { mode: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpTypeOfService { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpTypeOfService { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpTtl { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpTtl { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetIpPacketInfo { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpPacketInfo { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpReceiveTypeOfService { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpReceiveTypeOfService { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpReceiveTtl { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpReceiveTtl { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpMulticastInterface { iface: _, address: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpMulticastInterface { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpMulticastTtl { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpMulticastTtl { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpMulticastLoopback { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpMulticastLoopback { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::AddIpMembership { membership: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::DropIpMembership { membership: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpTransparent { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpTransparent { responder } => {
+                respond_not_supported!(responder)
+            }
             fpraw::SocketRequest::SetIpReceiveOriginalDestinationAddress {
                 value: _,
                 responder,
-            } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpReceiveOriginalDestinationAddress { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::AddIpv6Membership { membership: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::DropIpv6Membership { membership: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6MulticastInterface { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6MulticastInterface { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6UnicastHops { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6ReceiveHopLimit { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6MulticastHops { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6Only { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6Only { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6ReceiveTrafficClass { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6ReceiveTrafficClass { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6TrafficClass { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6TrafficClass { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6ReceivePacketInfo { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6ReceivePacketInfo { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetOriginalDestination { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            } => respond_not_supported!(responder),
+            fpraw::SocketRequest::GetIpReceiveOriginalDestinationAddress { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::AddIpv6Membership { membership: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::DropIpv6Membership { membership: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6MulticastInterface { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6MulticastInterface { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6UnicastHops { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6UnicastHops { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6ReceiveHopLimit { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6ReceiveHopLimit { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6MulticastHops { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6MulticastHops { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6MulticastLoopback { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6MulticastLoopback { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6Only { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6Only { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetIpv6ReceiveTrafficClass { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6ReceiveTrafficClass { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6TrafficClass { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6TrafficClass { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6ReceivePacketInfo { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6ReceivePacketInfo { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetOriginalDestination { responder } => {
+                respond_not_supported!(responder)
+            }
             fpraw::SocketRequest::RecvMsg {
                 want_addr: _,
                 data_len: _,
                 want_control: _,
                 flags: _,
                 responder,
-            } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            } => respond_not_supported!(responder),
             fpraw::SocketRequest::SendMsg { addr: _, data: _, control: _, flags: _, responder } => {
-                responder
-                    .send(Err(fposix::Errno::Eopnotsupp))
-                    .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
+                respond_not_supported!(responder)
             }
-            fpraw::SocketRequest::GetInfo { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpHeaderIncluded { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpHeaderIncluded { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIcmpv6Filter { filter: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIcmpv6Filter { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fpraw::SocketRequest::GetIpv6Checksum { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fpraw::SocketRequest::GetInfo { responder } => respond_not_supported!(responder),
+            fpraw::SocketRequest::SetIpHeaderIncluded { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpHeaderIncluded { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIcmpv6Filter { filter: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIcmpv6Filter { responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::SetIpv6Checksum { config: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fpraw::SocketRequest::GetIpv6Checksum { responder } => {
+                respond_not_supported!(responder)
+            }
         }
         ControlFlow::Continue(None)
     }

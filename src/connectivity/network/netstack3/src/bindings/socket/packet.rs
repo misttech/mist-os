@@ -427,27 +427,25 @@ impl<'a> RequestHandler<'a> {
                     .send(fppacket::SOCKET_PROTOCOL_NAME.as_bytes())
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
-            fppacket::SocketRequest::SetReuseAddress { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetReuseAddress { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetError { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetBroadcast { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetBroadcast { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetSendBuffer { value_bytes: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetSendBuffer { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fppacket::SocketRequest::SetReuseAddress { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetReuseAddress { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetError { responder } => respond_not_supported!(responder),
+            fppacket::SocketRequest::SetBroadcast { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetBroadcast { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::SetSendBuffer { value_bytes: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetSendBuffer { responder } => {
+                respond_not_supported!(responder)
+            }
             fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
                 responder
                     .send(Ok(self.set_receive_buffer(value_bytes)))
@@ -458,53 +456,49 @@ impl<'a> RequestHandler<'a> {
                     .send(Ok(self.receive_buffer()))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"));
             }
-            fppacket::SocketRequest::SetKeepAlive { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetKeepAlive { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetOutOfBandInline { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetOutOfBandInline { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetNoCheck { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetNoCheck { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetKeepAlive { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::SetOutOfBandInline { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetOutOfBandInline { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::SetNoCheck { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetNoCheck { responder } => respond_not_supported!(responder),
             fppacket::SocketRequest::SetLinger { linger: _, length_secs: _, responder } => {
                 responder
                     .send(Err(fposix::Errno::Eopnotsupp))
                     .unwrap_or_else(|e| error!("failed to respond: {e:?}"))
             }
-            fppacket::SocketRequest::GetLinger { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetReusePort { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetReusePort { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetAcceptConn { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetBindToDevice { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetBindToDevice { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::SetTimestamp { value: _, responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
-            fppacket::SocketRequest::GetTimestamp { responder } => responder
-                .send(Err(fposix::Errno::Eopnotsupp))
-                .unwrap_or_else(|e| error!("failed to respond: {e:?}")),
+            fppacket::SocketRequest::GetLinger { responder } => respond_not_supported!(responder),
+            fppacket::SocketRequest::SetReusePort { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetReusePort { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetAcceptConn { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::SetBindToDevice { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetBindToDevice { responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::SetTimestamp { value: _, responder } => {
+                respond_not_supported!(responder)
+            }
+            fppacket::SocketRequest::GetTimestamp { responder } => {
+                respond_not_supported!(responder)
+            }
             fppacket::SocketRequest::Describe { responder } => {
                 responder
                     .send(self.describe())

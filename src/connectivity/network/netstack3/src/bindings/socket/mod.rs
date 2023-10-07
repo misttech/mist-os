@@ -4,13 +4,6 @@
 
 //! Socket features exposed by netstack3.
 
-pub(crate) mod datagram;
-pub(crate) mod packet;
-pub(crate) mod queue;
-pub(crate) mod raw;
-pub(crate) mod stream;
-pub(crate) mod worker;
-
 use std::{convert::Infallible as Never, num::NonZeroU64};
 
 use const_unwrap::const_unwrap_option;
@@ -47,6 +40,21 @@ use crate::bindings::{
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     Ctx, DeviceIdExt as _,
 };
+
+macro_rules! respond_not_supported {
+    ($responder:expr) => {
+        $responder
+            .send(Err(fidl_fuchsia_posix::Errno::Eopnotsupp))
+            .unwrap_or_else(|e| tracing::error!("failed to respond: {e:?}"))
+    };
+}
+
+pub(crate) mod datagram;
+pub(crate) mod packet;
+pub(crate) mod queue;
+pub(crate) mod raw;
+pub(crate) mod stream;
+pub(crate) mod worker;
 
 const ZXSIO_SIGNAL_INCOMING: zx::Signals =
     const_unwrap_option(zx::Signals::from_bits(psocket::SIGNAL_DATAGRAM_INCOMING));
