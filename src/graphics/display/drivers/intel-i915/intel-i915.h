@@ -177,10 +177,9 @@ class Controller : public DeviceType,
 
   void ResetMmioSpaceForTesting() { mmio_space_.reset(); }
 
-  zx_status_t SetAndInitSysmemForTesting(
-      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem) {
+  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
     sysmem_ = std::move(sysmem);
-    return InitSysmemAllocatorClient();
+    return ZX_OK;
   }
 
   zx_status_t InitGttForTesting(const ddk::Pci& pci, fdf::MmioBuffer buffer, uint32_t fb_offset);
@@ -282,10 +281,8 @@ class Controller : public DeviceType,
   bool gpu_released_ = false;
   bool display_released_ = false;
 
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
-
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,

@@ -29,11 +29,8 @@
 #include <zircon/types.h>
 
 #include <algorithm>
-#include <cinttypes>
-#include <cmath>
 #include <cstdlib>
 #include <cstring>
-#include <future>
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -903,7 +900,7 @@ zx_status_t Controller::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+  ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   if (!endpoints.is_ok()) {
@@ -912,7 +909,7 @@ zx_status_t Controller::DisplayControllerImplImportBufferCollection(
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
-  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+  auto bind_result = sysmem_->BindSharedCollection(
       fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
       std::move(collection_server_endpoint));
   if (!bind_result.ok()) {
@@ -1963,13 +1960,14 @@ void Controller::DisplayControllerImplApplyConfiguration(
 }
 
 zx_status_t Controller::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  auto result =
-      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
-  if (!result.ok()) {
-    zxlogf(ERROR, "Could not connect to sysmem: %s", result.status_string());
-    return result.status();
+  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
+  // we only have the server_end here.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
+  if (status != ZX_OK) {
+    return status;
   }
-
   return ZX_OK;
 }
 
@@ -2330,49 +2328,23 @@ void Controller::DdkResume(ddk::ResumeTxn txn) {
   txn.Reply(ZX_OK, DEV_POWER_STATE_D0, txn.requested_state());
 }
 
-zx_status_t Controller::InitSysmemAllocatorClient() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-  auto connect_result = sysmem_->ConnectServer(std::move(server));
-  if (!connect_result.ok()) {
-    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
-           connect_result.status_string());
-    return connect_result.status();
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
-
-  std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
-  if (!set_debug_status.ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-    return set_debug_status.status();
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t Controller::Init() {
   zxlogf(TRACE, "Binding to display controller");
 
   zx::result client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>("sysmem");
   if (client.is_error()) {
     zxlogf(ERROR, "could not get SYSMEM protocol: %s", client.status_string());
     return client.status_value();
   }
-
   sysmem_.Bind(std::move(*client));
 
-  zxlogf(TRACE, "Initializing sysmem allocator");
-  zx_status_t status = InitSysmemAllocatorClient();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Cannot initialize sysmem allocator: %s", zx_status_get_string(status));
-    return status;
+  std::string debug_name = fxl::StringPrintf("intel-i915[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
+                                                      fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    return set_debug_status.status();
   }
 
   pci_ = ddk::Pci(parent(), "pci");
@@ -2384,7 +2356,7 @@ zx_status_t Controller::Init() {
   pci_.ReadConfig16(fuchsia_hardware_pci::Config::kDeviceId, &device_id_);
   zxlogf(TRACE, "Device id %x", device_id_);
 
-  status = igd_opregion_.Init(parent(), pci_);
+  zx_status_t status = igd_opregion_.Init(parent(), pci_);
   if (status != ZX_OK) {
     if (status != ZX_ERR_NOT_SUPPORTED) {
       zxlogf(ERROR, "VBT initializaton failed: %s", zx_status_get_string(status));

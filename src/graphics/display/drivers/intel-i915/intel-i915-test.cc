@@ -210,31 +210,6 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
- public:
-  explicit FakeSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-    EXPECT_TRUE(dispatcher_);
-  }
-
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {
-    mock_allocators_.emplace_front(dispatcher_);
-    auto it = mock_allocators_.begin();
-    fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
-  }
-
-  std::list<MockAllocator>& mock_allocators() { return mock_allocators_; }
-
-  // FIDL methods
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-
- private:
-  std::list<MockAllocator> mock_allocators_;
-  async_dispatcher_t* dispatcher_ = nullptr;
-};
-
 class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
  protected:
   IntegrationTest()
@@ -263,7 +238,7 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
     zx::result service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
         fuchsia_hardware_sysmem::Service::InstanceHandler(
-            {.sysmem = sysmem_.bind_handler(dispatcher())}));
+            {.allocator_v1 = sysmem_.bind_handler(dispatcher())}));
     ASSERT_EQ(service_result.status_value(), ZX_OK);
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -296,13 +271,13 @@ class IntegrationTest : public ::testing::Test, public loop_fixture::RealLoop {
 
   MockDevice* parent() const { return parent_.get(); }
 
-  FakeSysmem* sysmem() { return &sysmem_; }
+  MockAllocator* sysmem() { return &sysmem_; }
 
  private:
   async::Loop pci_loop_;
   // Emulated parent protocols.
   pci::FakePciProtocol pci_;
-  FakeSysmem sysmem_;
+  MockAllocator sysmem_;
   component::OutgoingDirectory outgoing_;
 
   // mock-ddk parent device of the Controller under test.
@@ -319,7 +294,7 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
         display_(nullptr) {}
 
   void SetUp() override {
-    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+    auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
     ASSERT_TRUE(sysmem_endpoints.is_ok());
     auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
     fidl::BindServer(loop_.dispatcher(), std::move(sysmem_server), &sysmem_);
@@ -337,15 +312,14 @@ class FakeSysmemSingleThreadedTest : public testing::Test {
  protected:
   async::Loop loop_;
 
-  FakeSysmem sysmem_;
+  MockAllocator sysmem_;
   Controller display_;
 };
 
 using ControllerWithFakeSysmemTest = FakeSysmemSingleThreadedTest;
 
 TEST_F(ControllerWithFakeSysmemTest, ImportBufferCollection) {
-  EXPECT_EQ(sysmem_.mock_allocators().size(), 1u);
-  const MockAllocator& allocator = sysmem_.mock_allocators().front();
+  const MockAllocator& allocator = sysmem_;
 
   zx::result token1_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
@@ -435,8 +409,8 @@ TEST(IntelI915Display, ImportImage) {
   loop.StartThread("fidl-loop");
 
   // Prepare fake sysmem.
-  FakeSysmem fake_sysmem(loop.dispatcher());
-  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
+  MockAllocator fake_sysmem(loop.dispatcher());
+  auto sysmem_endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
   ASSERT_TRUE(sysmem_endpoints.is_ok());
   auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
   fidl::BindServer(loop.dispatcher(), std::move(sysmem_server), &fake_sysmem);
@@ -532,7 +506,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemRequirements) {
 
   loop_.RunUntilIdle();
 
-  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockAllocator& allocator = sysmem_;
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
   EXPECT_TRUE(collection->set_constraints_called());
@@ -558,7 +532,7 @@ TEST_F(ControllerWithFakeSysmemTest, SysmemInvalidType) {
 
   loop_.RunUntilIdle();
 
-  MockAllocator& allocator = sysmem_.mock_allocators().front();
+  MockAllocator& allocator = sysmem_;
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
   EXPECT_FALSE(collection->set_constraints_called());
@@ -656,7 +630,7 @@ TEST_F(IntegrationTest, SysmemImport) {
 
   RunLoopUntilIdle();
 
-  MockAllocator& allocator = sysmem()->mock_allocators().front();
+  MockAllocator& allocator = *sysmem();
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
   EXPECT_TRUE(collection->set_constraints_called());
@@ -691,7 +665,7 @@ TEST_F(IntegrationTest, SysmemRotated) {
 
   RunLoopUntilIdle();
 
-  MockAllocator& allocator = sysmem()->mock_allocators().front();
+  MockAllocator& allocator = *sysmem();
   MockNoCpuBufferCollection* collection = allocator.GetMostRecentBufferCollection();
   ASSERT_TRUE(collection);
   collection->set_format_modifier(fuchsia_sysmem::wire::kFormatModifierIntelI915YTiled);
