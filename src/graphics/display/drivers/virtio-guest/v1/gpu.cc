@@ -174,7 +174,7 @@ zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+  ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   if (!endpoints.is_ok()) {
@@ -183,7 +183,7 @@ zx_status_t GpuDevice::DisplayControllerImplImportBufferCollection(
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
-  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+  auto bind_result = sysmem_->BindSharedCollection(
       fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
       std::move(collection_server_endpoint));
   if (!bind_result.ok()) {
@@ -342,12 +342,14 @@ void GpuDevice::DisplayControllerImplApplyConfiguration(const display_config_t**
 }
 
 zx_status_t GpuDevice::DisplayControllerImplGetSysmemConnection(zx::channel sysmem_handle) {
-  auto result =
-      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>{std::move(sysmem_handle)});
-  if (!result.ok()) {
-    return result.status();
+  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
+  // we only have the server_end here.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, sysmem_handle.release());
+  if (status != ZX_OK) {
+    return status;
   }
-
   return ZX_OK;
 }
 
@@ -719,48 +721,24 @@ zx_status_t GpuDevice::Start() {
   return ZX_OK;
 }
 
-zx_status_t GpuDevice::InitSysmemAllocatorClient() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-  auto connect_result = sysmem_->ConnectServer(std::move(server));
-  if (!connect_result.ok()) {
-    zxlogf(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
-           connect_result.status_string());
-    return connect_result.status();
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
-
-  std::string debug_name =
-      fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
-  if (!set_debug_status.ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-  }
-
-  return ZX_OK;
-}
-
 zx_status_t GpuDevice::Init() {
   zxlogf(TRACE, "Init()");
 
-  zx::result client =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>("sysmem");
-  if (client.is_error()) {
-    zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", client.status_string());
-    return client.status_value();
+  zx::result sysmem_result =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::AllocatorV1>("sysmem");
+  if (sysmem_result.is_error()) {
+    zxlogf(ERROR, "Could not get Display SYSMEM protocol: %s", sysmem_result.status_string());
+    return sysmem_result.status_value();
   }
+  sysmem_ = fidl::WireSyncClient(std::move(*sysmem_result));
 
-  sysmem_ = fidl::WireSyncClient(std::move(*client));
-
-  zx_status_t status = InitSysmemAllocatorClient();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create sysmem Allocator client: %s", zx_status_get_string(status));
-    return status;
+  std::string debug_name =
+      fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
+  auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
+                                                      fsl::GetCurrentProcessKoid());
+  if (!set_debug_status.ok()) {
+    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
+    return set_debug_status.error().status();
   }
 
   DeviceReset();
@@ -786,7 +764,7 @@ zx_status_t GpuDevice::Init() {
   }
 
   // Allocate the main vring
-  status = vring_.Init(0, 16);
+  zx_status_t status = vring_.Init(0, 16);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to allocate vring: %s", zx_status_get_string(status));
     return status;

@@ -113,10 +113,9 @@ class GpuDevice : public Device,
 
   bool DisplayControllerImplIsCaptureCompleted() { return false; }
 
-  zx_status_t SetAndInitSysmemForTesting(
-      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem) {
+  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
     sysmem_ = std::move(sysmem);
-    return InitSysmemAllocatorClient();
+    return ZX_OK;
   }
 
  private:
@@ -168,10 +167,8 @@ class GpuDevice : public Device,
   fbl::Mutex flush_lock_;
 
   display_controller_interface_protocol_t dc_intf_ = {};
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
-
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
