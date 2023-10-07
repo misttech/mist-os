@@ -6196,7 +6196,7 @@ From //.gn:78
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_function/BUILD.gn:27
+From //third_party/pigweed/src/pw_function/function.gni:22
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/pigweed/src/pw_function:enable_dynamic_allocation"`
 
@@ -6204,7 +6204,7 @@ From //.gn:78
 
 **Overridden from the default:** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_function/BUILD.gn:27
+From //third_party/pigweed/src/pw_function/function.gni:22
 
 ### pw_log_BACKEND
 
