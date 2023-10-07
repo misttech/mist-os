@@ -293,7 +293,7 @@ impl Router {
         }
     }
 
-    /// Implementation of RegisterService fidl method.
+    /// Legacy. Do not use.
     pub async fn register_service_legacy(
         &self,
         service_name: String,
@@ -307,6 +307,19 @@ impl Router {
         &self,
         service_name: String,
         provider: Box<dyn ServiceProviderProxyInterface>,
+    ) -> Result<(), Error> {
+        self.register_service(service_name, move |chan, info| {
+            provider.connect_to_service(chan, info).map_err(Into::into)
+        })
+        .await
+    }
+
+    /// Register a service. The callback should connect the given channel to the
+    /// service in question.
+    pub async fn register_service(
+        &self,
+        service_name: String,
+        provider: impl Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send + 'static,
     ) -> Result<(), Error> {
         self.service_map().register_service(service_name, provider).await;
         Ok(())
@@ -793,33 +806,22 @@ mod tests {
     ) -> futures::channel::oneshot::Receiver<(NodeId, Channel)> {
         use parking_lot::Mutex;
         let (send, recv) = futures::channel::oneshot::channel();
-        struct TestService(
-            Mutex<Option<futures::channel::oneshot::Sender<(NodeId, Channel)>>>,
-            &'static str,
-        );
-        impl fidl_fuchsia_overnet::ServiceProviderProxyInterface for TestService {
-            fn connect_to_service(
-                &self,
-                chan: fidl::Channel,
-                connection_info: &fidl_fuchsia_overnet::ConnectionInfo,
-            ) -> std::result::Result<(), fidl::Error> {
-                println!("{} got request", self.1);
-                self.0
-                    .lock()
-                    .take()
-                    .unwrap()
-                    .send((connection_info.peer.unwrap().id.into(), chan))
-                    .unwrap();
-                println!("{} forwarded channel", self.1);
-                Ok(())
-            }
-        }
         serving_router
             .service_map()
-            .register_service(
-                service.to_string(),
-                Box::new(TestService(Mutex::new(Some(send)), service)),
-            )
+            .register_service(service.to_string(), {
+                let sender = Mutex::new(Some(send));
+                move |chan, connection_info| {
+                    println!("{} got request", service);
+                    sender
+                        .lock()
+                        .take()
+                        .unwrap()
+                        .send((connection_info.peer.unwrap().id.into(), chan))
+                        .unwrap();
+                    println!("{} forwarded channel", service);
+                    Ok(())
+                }
+            })
             .await;
         let serving_node_id = serving_router.node_id();
         println!("{} wait for service to appear @ client", service);

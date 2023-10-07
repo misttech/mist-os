@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{bail, format_err, Error};
 use fidl::Channel;
-use fidl_fuchsia_overnet::{ConnectionInfo, ServiceProviderProxyInterface};
+use fidl_fuchsia_overnet::ConnectionInfo;
 use futures::lock::Mutex;
 use std::collections::{btree_map, BTreeMap};
 
@@ -50,7 +50,8 @@ impl ListablePeerSet {
 }
 
 pub struct ServiceMapInner {
-    local_services: BTreeMap<String, Box<dyn ServiceProviderProxyInterface>>,
+    local_services:
+        BTreeMap<String, Box<dyn Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send>>,
     local_service_list: Observable<Vec<String>>,
     list_peers: Observable<Vec<ListablePeer>>,
     listable_peer_set: ListablePeerSet,
@@ -85,24 +86,27 @@ impl ServiceMap {
         chan: Channel,
         connection_info: &ConnectionInfo,
     ) -> Result<(), Error> {
-        self.inner
+        (self
+            .inner
             .lock()
             .await
             .local_services
             .get(service_name)
-            .ok_or_else(|| format_err!("Service not found: {}", service_name))?
-            .connect_to_service(chan, connection_info)?;
+            .ok_or_else(|| format_err!("Service not found: {}", service_name))?)(
+            chan,
+            connection_info,
+        )?;
         Ok(())
     }
 
     pub async fn register_service(
         &self,
         service_name: String,
-        provider: Box<dyn ServiceProviderProxyInterface>,
+        provider: impl Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send + 'static,
     ) {
         tracing::trace!("Request register_service '{}'", service_name);
         let mut inner = self.inner.lock().await;
-        if inner.local_services.insert(service_name.clone(), provider).is_none() {
+        if inner.local_services.insert(service_name.clone(), Box::new(provider)).is_none() {
             tracing::trace!("Publish new service '{}'", service_name);
             let services: Vec<String> = inner.local_services.keys().cloned().collect();
             inner.local_service_list.maybe_push(services).await;
