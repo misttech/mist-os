@@ -320,17 +320,28 @@ impl FileObject {
     }
 }
 
-bitflags! {
-    pub struct StatxFlags: u32 {
-        const AT_SYMLINK_NOFOLLOW = uapi::AT_SYMLINK_NOFOLLOW;
-        const AT_EMPTY_PATH = uapi::AT_EMPTY_PATH;
-        const AT_NO_AUTOMOUNT = uapi::AT_NO_AUTOMOUNT;
-        const AT_STATX_SYNC_AS_STAT = uapi::AT_STATX_SYNC_AS_STAT;
-        const AT_STATX_FORCE_SYNC = uapi::AT_STATX_FORCE_SYNC;
-        const AT_STATX_DONT_SYNC = uapi::AT_STATX_DONT_SYNC;
-        const STATX_ATTR_VERITY = uapi::STATX_ATTR_VERITY;
+// The inner mod is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+mod inner_flags {
+    // Part of the code for the AT_STATX_SYNC_AS_STAT case that's produced by the macro triggers the
+    // lint, but as a whole, the produced code is still correct.
+    #![allow(clippy::bad_bit_mask)] // TODO(b/303500202) Remove once addressed in bitflags.
+    use super::{bitflags, uapi};
+
+    bitflags! {
+        pub struct StatxFlags: u32 {
+            const AT_SYMLINK_NOFOLLOW = uapi::AT_SYMLINK_NOFOLLOW;
+            const AT_EMPTY_PATH = uapi::AT_EMPTY_PATH;
+            const AT_NO_AUTOMOUNT = uapi::AT_NO_AUTOMOUNT;
+            const AT_STATX_SYNC_AS_STAT = uapi::AT_STATX_SYNC_AS_STAT;
+            const AT_STATX_FORCE_SYNC = uapi::AT_STATX_FORCE_SYNC;
+            const AT_STATX_DONT_SYNC = uapi::AT_STATX_DONT_SYNC;
+            const STATX_ATTR_VERITY = uapi::STATX_ATTR_VERITY;
+        }
     }
 }
+
+pub use inner_flags::StatxFlags;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UnlinkKind {

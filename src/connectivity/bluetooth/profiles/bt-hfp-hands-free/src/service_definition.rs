@@ -21,21 +21,32 @@ const PROFILE_MAJOR_VERSION: u8 = 1;
 /// Minor Version of HFP implementation
 const PROFILE_MINOR_VERSION: u8 = 8;
 
-bitflags! {
-    struct HandsFreeFeaturesSdpAttribute: u16 {
-        const ECHO_CANCELLATION_AND_NOISE_REDUCTION = 0b0000_0001;
-        const CALL_WAITING_OR_THREE_WAY_CALLING     = 0b0000_0010;
-        const CLI_PRESENTATION_CAPABILITY           = 0b0000_0100;
-        const VOICE_RECOGNITION_ACTIVATION          = 0b0000_1000;
-        const REMOTE_VOLUME_CONTROL                 = 0b0001_0000;
-        const WIDEBAND_SPEECH                       = 0b0010_0000;
-        const ENHANCED_VOICE_RECOGNITION            = 0b0100_0000;
-        const EHANCED_VOICE_RECOGNITION_TEXT        = 0b1000_0000;
+// The inner mod is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+mod inner_attr {
+    // Part of the code for the DEFAULT case that's produced by the macro triggers the lint, but as
+    // a whole, the produced code is still correct.
+    #![allow(clippy::bad_bit_mask)] // TODO(b/303500202) Remove once addressed in bitflags.
+    use super::bitflags;
 
-        /// Defined by HFP v1.8, Table 5.1: Service Record for the HF
-        const DEFAULT = 0b0000_0000;
+    bitflags! {
+        pub(super) struct HandsFreeFeaturesSdpAttribute: u16 {
+            const ECHO_CANCELLATION_AND_NOISE_REDUCTION = 0b0000_0001;
+            const CALL_WAITING_OR_THREE_WAY_CALLING     = 0b0000_0010;
+            const CLI_PRESENTATION_CAPABILITY           = 0b0000_0100;
+            const VOICE_RECOGNITION_ACTIVATION          = 0b0000_1000;
+            const REMOTE_VOLUME_CONTROL                 = 0b0001_0000;
+            const WIDEBAND_SPEECH                       = 0b0010_0000;
+            const ENHANCED_VOICE_RECOGNITION            = 0b0100_0000;
+            const EHANCED_VOICE_RECOGNITION_TEXT        = 0b1000_0000;
+
+            /// Defined by HFP v1.8, Table 5.1: Service Record for the HF
+            const DEFAULT = 0b0000_0000;
+        }
     }
 }
+
+use inner_attr::HandsFreeFeaturesSdpAttribute;
 
 impl From<HandsFreeFeatureSupport> for HandsFreeFeaturesSdpAttribute {
     fn from(features: HandsFreeFeatureSupport) -> Self {

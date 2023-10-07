@@ -145,37 +145,49 @@ macro_rules! mode {
     };
 }
 
-bitflags::bitflags! {
-    pub struct Access: u32 {
-        const EXIST = 0;
-        const EXEC = 1;
-        const WRITE = 2;
-        const READ = 4;
-        const NOATIME = 8;
+// The inner mod is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+mod inner_access {
+    // Part of the code for the NONE cases that are produced by the macro triggers the lint, but as
+    // a whole, the produced code is still correct.
+    #![allow(clippy::bad_bit_mask)] // TODO(b/303500202) Remove once addressed in bitflags.
+    use super::OpenFlags;
 
-        // Access mask is the part of access related to the file access mode. It is
-        // exec/write/read.
-        const ACCESS_MASK = 1 | 2 | 4;
+    bitflags::bitflags! {
+        pub struct Access: u32 {
+            const EXIST = 0;
+            const EXEC = 1;
+            const WRITE = 2;
+            const READ = 4;
+            const NOATIME = 8;
+
+            // Access mask is the part of access related to the file access mode. It is
+            // exec/write/read.
+            const ACCESS_MASK = 1 | 2 | 4;
+        }
+    }
+
+    impl Access {
+        pub fn from_open_flags(flags: OpenFlags) -> Self {
+            let base_flags = match flags & OpenFlags::ACCESS_MASK {
+                OpenFlags::RDONLY => Self::READ,
+                OpenFlags::WRONLY => Self::WRITE,
+                OpenFlags::RDWR => Self::READ | Self::WRITE,
+                _ => Self::EXIST, // Nonstandard access modes can be opened but will fail to read or write.
+            };
+            let noatime =
+                if flags.contains(OpenFlags::NOATIME) { Access::NOATIME } else { Access::empty() };
+
+            base_flags | noatime
+        }
+
+        pub fn rwx_bits(&self) -> u32 {
+            self.bits & 0o7
+        }
     }
 }
-impl Access {
-    pub fn from_open_flags(flags: OpenFlags) -> Self {
-        let base_flags = match flags & OpenFlags::ACCESS_MASK {
-            OpenFlags::RDONLY => Self::READ,
-            OpenFlags::WRONLY => Self::WRITE,
-            OpenFlags::RDWR => Self::READ | Self::WRITE,
-            _ => Self::EXIST, // Nonstandard access modes can be opened but will fail to read or write.
-        };
-        let noatime =
-            if flags.contains(OpenFlags::NOATIME) { Access::NOATIME } else { Access::empty() };
 
-        base_flags | noatime
-    }
-
-    pub fn rwx_bits(&self) -> u32 {
-        self.bits & 0o7
-    }
-}
+pub use inner_access::Access;
 
 // Public re-export of macros allows them to be used like regular rust items.
 pub(crate) use mode;

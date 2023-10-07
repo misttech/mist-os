@@ -30,21 +30,32 @@ pub use zxio::{
     zxio_node_attributes_t, zxio_signals_t,
 };
 
-bitflags! {
-    // These values should match the values in sdk/lib/zxio/include/lib/zxio/types.h
-    pub struct ZxioSignals : zxio_signals_t {
-        const NONE            =      0;
-        const READABLE        = 1 << 0;
-        const WRITABLE        = 1 << 1;
-        const READ_DISABLED   = 1 << 2;
-        const WRITE_DISABLED  = 1 << 3;
-        const READ_THRESHOLD  = 1 << 4;
-        const WRITE_THRESHOLD = 1 << 5;
-        const OUT_OF_BAND     = 1 << 6;
-        const ERROR           = 1 << 7;
-        const PEER_CLOSED     = 1 << 8;
+// The inner mod is required because bitflags cannot pass the attribute through to the single
+// variant, and attributes cannot be applied to macro invocations.
+mod inner_signals {
+    // Part of the code for the NONE case that's produced by the macro triggers the lint, but as a
+    // whole, the produced code is still correct.
+    #![allow(clippy::bad_bit_mask)] // TODO(b/303500202) Remove once addressed in bitflags.
+    use super::{bitflags, zxio_signals_t};
+
+    bitflags! {
+        // These values should match the values in sdk/lib/zxio/include/lib/zxio/types.h
+        pub struct ZxioSignals : zxio_signals_t {
+            const NONE            =      0;
+            const READABLE        = 1 << 0;
+            const WRITABLE        = 1 << 1;
+            const READ_DISABLED   = 1 << 2;
+            const WRITE_DISABLED  = 1 << 3;
+            const READ_THRESHOLD  = 1 << 4;
+            const WRITE_THRESHOLD = 1 << 5;
+            const OUT_OF_BAND     = 1 << 6;
+            const ERROR           = 1 << 7;
+            const PEER_CLOSED     = 1 << 8;
+        }
     }
 }
+
+pub use inner_signals::ZxioSignals;
 
 bitflags! {
     /// The flags for shutting down sockets.
