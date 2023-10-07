@@ -21,14 +21,14 @@ use ffx_daemon_target::{
 };
 use ffx_metrics::{add_daemon_launch_event, add_daemon_metrics_event};
 use ffx_stream_util::TryStreamUtilExt;
-use fidl::{endpoints::ClientEnd, prelude::*};
+use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
     self as ffx, DaemonError, DaemonMarker, DaemonRequest, DaemonRequestStream,
     RepositoryRegistryMarker, TargetCollectionMarker, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use fidl_fuchsia_io::OpenFlags;
-use fidl_fuchsia_overnet::{Peer, ServiceProviderRequest, ServiceProviderRequestStream};
+use fidl_fuchsia_overnet::Peer;
 use fidl_fuchsia_overnet_protocol::NodeId;
 use fuchsia_async::{Task, TimeoutExt, Timer};
 use futures::{
@@ -794,15 +794,16 @@ impl Daemon {
         quit_tx: mpsc::Sender<()>,
         mut quit_rx: mpsc::Receiver<()>,
     ) -> Result<()> {
-        let (s, p) = fidl::Channel::create();
-        let chan = fidl::AsyncChannel::from_channel(s).context("failed to make async channel")?;
-        let mut stream = ServiceProviderRequestStream::from_channel(chan);
+        let (sender, mut stream) = futures::channel::mpsc::unbounded();
 
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
         tracing::debug!("Starting daemon overnet server");
-        node.register_service_legacy(DaemonMarker::PROTOCOL_NAME.to_owned(), ClientEnd::new(p))
-            .await?;
+        node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), move |chan, _| {
+            let _ = sender.unbounded_send(chan);
+            Ok(())
+        })
+        .await?;
 
         tracing::debug!("Starting daemon serve loop");
         let (break_loop_tx, mut break_loop_rx) = oneshot::channel();
@@ -810,13 +811,8 @@ impl Daemon {
 
         loop {
             futures::select! {
-                req = stream.try_next() => match req.context("error running protocol provider server")? {
-                    Some(ServiceProviderRequest::ConnectToService {
-                        chan,
-                        info: _,
-                        control_handle: _control_handle,
-                    }) =>
-                    {
+                req = stream.next() => match req {
+                    Some(chan) => {
                         tracing::trace!("Received protocol request for protocol");
                         let chan =
                             fidl::AsyncChannel::from_channel(chan).context("failed to make async channel")?;
@@ -831,8 +827,8 @@ impl Daemon {
                         })
                         .detach();
                     },
-                    o => {
-                        tracing::warn!("Received unknown message or no message on provider server: {o:?}");
+                    None => {
+                        tracing::warn!("Service was deregistered");
                         break;
                     }
                 },

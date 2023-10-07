@@ -71,13 +71,10 @@ async fn exec_server() -> Result<(), Error> {
     let (sender, receiver) = unbounded();
 
     router
-        .register_service(
-            rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
-            move |chan, _| {
-                let _ = sender.unbounded_send(chan);
-                Ok(())
-            },
-        )
+        .register_service(rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), move |chan, _| {
+            let _ = sender.unbounded_send(chan);
+            Ok(())
+        })
         .await?;
 
     let sc = Rc::clone(&service);
