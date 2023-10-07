@@ -765,8 +765,6 @@ where
     type SetupArgs = ();
     type Spawner = ();
 
-    fn setup(&mut self, _ctx: &mut Ctx, _args: (), _spawner: &worker::TaskSpawnerCollection<()>) {}
-
     fn handle_request(
         &mut self,
         ctx: &mut Ctx,

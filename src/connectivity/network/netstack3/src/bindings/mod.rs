@@ -1231,7 +1231,16 @@ impl NetstackSeed {
                             wait_group.await;
                         }
                         Service::RawSocket(socket) => {
-                            socket.serve_with(|rs| socket::raw::serve(rs)).await
+                            // Run on a separate task so socket requests are not
+                            // bound to the same thread as the main services
+                            // loop.
+                            let wait_group = fuchsia_async::Task::spawn(socket::raw::serve(
+                                netstack.ctx.clone(),
+                                socket,
+                            ))
+                            .await;
+                            // Wait for all socket tasks to finish.
+                            wait_group.await;
                         }
                         Service::RootInterfaces(root_interfaces) => {
                             root_interfaces

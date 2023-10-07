@@ -31,7 +31,6 @@
             type: "expect_failure",
             matchers: [
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.BindToDeviceReusePort/UDP",
 
                 // TODO(https://fxbug.dev/21198): Netstack3 does not support
                 // dual-stack TCP sockets yet.

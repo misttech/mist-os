@@ -64,7 +64,9 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
         ctx: &mut Ctx,
         args: Self::SetupArgs,
         spawner: &TaskSpawnerCollection<Self::Spawner>,
-    );
+    ) {
+        let _ = (ctx, args, spawner);
+    }
 
     /// Handles a single request.
     ///
@@ -227,7 +229,7 @@ impl<H: SocketWorkerHandler> SocketWorker<H> {
             let Some((request, request_stream)) = request_streams.next().await else {
                 // There are no more streams left, so there's no close responder
                 // to defer responding to.
-                break None
+                break None;
             };
             let request = match request {
                 None => {
