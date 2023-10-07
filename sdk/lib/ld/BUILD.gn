@@ -175,6 +175,7 @@ source_set("posix-header") {
 
 source_set("zircon-header") {
   public = [ "zircon.h" ]
+  public_deps = [ ":diagnostics" ]
 }
 
 shared_library("ld-startup") {
@@ -193,6 +194,7 @@ shared_library("ld-startup") {
 
   if (is_fuchsia) {
     sources += [
+      "ldsvc.cc",
       "procargs.cc",
       "zircon-startup.S",
       "zircon-startup.cc",
@@ -204,6 +206,7 @@ shared_library("ld-startup") {
       "//src/lib/llvm-profdata",
       "//src/zircon/lib/zircon",
       "//zircon/kernel/lib/arch",
+      "//zircon/system/ulib/ldmsg",
       "//zircon/system/ulib/processargs",
       "//zircon/system/ulib/zircon-internal",
       "//zircon/system/ulib/zx",

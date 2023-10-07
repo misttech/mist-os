@@ -21,17 +21,19 @@ zx_library("ldmsg") {
     "//zircon/system/ulib/c:headers",
   ]
 
-  # This code is called by the dynamic linker in early startup before
-  # fancy stacks have been set up.  So it can't rely on safe-stack or
-  # shadow-call-stack ABIs.
   configs += [
-    "//build/config:no-compiler-abi",
-
     # This library is linked into libc, which is used by libfuzzer.
     # Don't instrument it to avoid getting noise in code coverage.
     # TODO(fxbug.dev/25073): Once a cleaner solution is found, remove this.
     "//build/config/zircon:no_fuzzer",
   ]
+
+  # This code is called by the dynamic linker in early startup before
+  # fancy stacks have been set up.  So it can't rely on safe-stack or
+  # shadow-call-stack ABIs.
+  configs += [ "//build/config:no-compiler-abi" ]
+  configs -= [ "//build/config:no-compiler-abi" ]
+  configs += [ "//build/config:no-compiler-abi" ]
 }
 
 group("tests") {

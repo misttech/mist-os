@@ -8,6 +8,8 @@
 
 namespace ld::testing {
 
+constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
+
 LdLoadZirconLdsvcTestsBase::~LdLoadZirconLdsvcTestsBase() = default;
 
 void LdLoadZirconLdsvcTestsBase::LdsvcExpectConfig(std::string_view config) {
@@ -22,7 +24,9 @@ void LdLoadZirconLdsvcTestsBase::LdsvcExpectLoadObject(std::string_view name,
 }
 
 void LdLoadZirconLdsvcTestsBase::LdsvcExpectLoadObject(std::string_view name) {
-  const std::string path = std::filesystem::path("test") / "lib" / name;
+  // TODO(fxbug.dev/134897): We should add a LdsvcExpectConfig when the dynamic linker starts doing
+  // so.
+  const std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(path));
   LdsvcExpectLoadObject(name, zx::ok(std::move(vmo)));

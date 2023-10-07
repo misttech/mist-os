@@ -98,6 +98,10 @@ namespace elfldltl {
 //    UndefinedSymbol is an error used when the current linking task cannot
 //    be completed because of an undefined symbol.
 //
+// * `bool MissingDependency(std::string_view soname)`
+//
+//    MissingDependency is used when a DT_NEEDED dependency cannot be found.
+//
 // * `bool SystemError(std::string_view error, ...)`
 //
 //    SystemError is used when the system cannot fulfill an otherwise valid
@@ -286,6 +290,10 @@ class Diagnostics {
 
   constexpr bool UndefinedSymbol(std::string_view sym_name) {
     return FormatError("undefined symbol: ", sym_name);
+  }
+
+  constexpr bool MissingDependency(std::string_view soname) {
+    return SystemError("cannot open dependency: ", soname);
   }
 
  private:
