@@ -235,44 +235,30 @@ zx_status_t GpuDriver::Stage2Init() {
   return ZX_OK;
 }
 
-zx_status_t GpuDriver::InitSysmemAllocatorClient() {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    FDF_LOG(ERROR, "Cannot create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-  auto connect_result = sysmem_->ConnectServer(std::move(server));
-  if (!connect_result.ok()) {
-    FDF_LOG(ERROR, "Cannot connect to sysmem Allocator protocol: %s",
-            connect_result.status_string());
-    return connect_result.status();
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
-
-  std::string debug_name =
-      fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
-  auto set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), fsl::GetCurrentProcessKoid());
-  if (!set_debug_status.ok()) {
-    FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s", set_debug_status.status_string());
-  }
-
-  return ZX_OK;
-}
-
 void GpuDriver::Start(fdf::StartCompleter completer) {
   FDF_LOG(TRACE, "GpuDriver::Start");
 
   {
-    auto sysmem_client_end = incoming()->Connect<fuchsia_hardware_sysmem::Service::Sysmem>();
-    if (!sysmem_client_end.is_ok()) {
-      FDF_LOG(ERROR, "Error connecting to sysmem: %s", sysmem_client_end.status_string());
-      completer(sysmem_client_end.take_error());
+    auto sysmem_result = incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>();
+    if (!sysmem_result.is_ok()) {
+      FDF_LOG(ERROR, "Error connecting to sysmem: %s", sysmem_result.status_string());
+      completer(sysmem_result.take_error());
+      return;
+    }
+    auto sysmem = fidl::WireSyncClient(std::move(sysmem_result.value()));
+
+    std::string debug_name =
+        fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
+    auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
+                                                        fsl::GetCurrentProcessKoid());
+    if (!set_debug_status.ok()) {
+      FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
+              set_debug_status.status_string());
+      completer(set_debug_status.error().status());
       return;
     }
 
-    sysmem_ = fidl::WireSyncClient(std::move(sysmem_client_end.value()));
+    sysmem_ = std::move(sysmem);
   }
 
   auto pci_client_end = incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
@@ -286,12 +272,6 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
   parent_node_.Bind(std::move(node()));
 
   auto defer_teardown = fit::defer([this]() { parent_node_ = {}; });
-
-  if (zx_status_t status = InitSysmemAllocatorClient(); status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to create sysmem Allocator client: %s", zx_status_get_string(status));
-    completer(zx::error(status));
-    return;
-  }
 
   {
     // Create and initialize device

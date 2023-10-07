@@ -64,10 +64,9 @@ class GpuDriver : public fdf::DriverBase {
 
   const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
 
-  zx_status_t SetAndInitSysmemForTesting(
-      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem) {
+  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
     sysmem_ = std::move(sysmem);
-    return InitSysmemAllocatorClient();
+    return ZX_OK;
   }
 
  private:
@@ -83,13 +82,6 @@ class GpuDriver : public fdf::DriverBase {
 
   zx_status_t Stage2Init();
 
-  // Initializes the sysmem Allocator client used to import incoming buffer
-  // collection tokens.
-  //
-  // On success, returns ZX_OK and the sysmem allocator client will be open
-  // until the device is released.
-  zx_status_t InitSysmemAllocatorClient();
-
   std::unique_ptr<Device> device_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
 
@@ -101,10 +93,8 @@ class GpuDriver : public fdf::DriverBase {
 
   fbl::Mutex request_lock_;
 
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
-
   // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 };
 
 }  // namespace virtio
