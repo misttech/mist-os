@@ -246,7 +246,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
     return ZX_ERR_ALREADY_EXISTS;
   }
 
-  ZX_DEBUG_ASSERT_MSG(sysmem_allocator_client_.is_valid(), "sysmem allocator is not initialized");
+  ZX_DEBUG_ASSERT_MSG(sysmem_.is_valid(), "sysmem allocator is not initialized");
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::BufferCollection>();
   if (!endpoints.is_ok()) {
@@ -256,7 +256,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplImportBufferCollection(
   }
   auto& [collection_client_endpoint, collection_server_endpoint] = endpoints.value();
 
-  auto bind_result = sysmem_allocator_client_->BindSharedCollection(
+  auto bind_result = sysmem_->BindSharedCollection(
       fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(std::move(collection_token)),
       std::move(collection_server_endpoint));
   if (!bind_result.ok()) {
@@ -708,13 +708,14 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
 }
 
 zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
-  fidl::OneWayStatus status =
-      sysmem_->ConnectServer(fidl::ServerEnd<fuchsia_sysmem::Allocator>(std::move(connection)));
-  if (!status.ok()) {
-    zxlogf(ERROR, "Failed to connect to sysmem: %s", status.status_string());
-    return status.status();
+  // We can't use DdkConnectFragmentFidlProtocol here because it wants to create the endpoints but
+  // we only have the server_end here.
+  using ServiceMember = fuchsia_hardware_sysmem::Service::AllocatorV1;
+  zx_status_t status = device_connect_fragment_fidl_protocol(
+      parent_, "sysmem", ServiceMember::ServiceName, ServiceMember::Name, connection.release());
+  if (status != ZX_OK) {
+    return status;
   }
-
   return ZX_OK;
 }
 
@@ -1367,9 +1368,9 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
     return status;
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> sysmem_client_result =
-      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
-          parent_, "sysmem");
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> sysmem_client_result =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<
+          fuchsia_hardware_sysmem::Service::AllocatorV1>(parent_, "sysmem");
   if (sysmem_client_result.is_error()) {
     zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client_result.status_string());
     return sysmem_client_result.status_value();
@@ -1410,26 +1411,10 @@ zx_status_t AmlogicDisplay::GetCommonProtocolsAndResources() {
 
 zx_status_t AmlogicDisplay::InitializeSysmemAllocator() {
   ZX_ASSERT(sysmem_.is_valid());
-
-  zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> endpoints =
-      fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
-  if (!endpoints.is_ok()) {
-    zxlogf(ERROR, "Failed to create sysmem allocator endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  auto& [client, server] = endpoints.value();
-
-  fidl::OneWayStatus status = sysmem_->ConnectServer(std::move(endpoints->server));
-  if (!status.ok()) {
-    zxlogf(ERROR, "Failed to connect to sysmem Allocator protocol: %s", status.status_string());
-    return status.status();
-  }
-  sysmem_allocator_client_ = fidl::WireSyncClient(std::move(client));
-
   const zx_koid_t current_process_koid = fsl::GetCurrentProcessKoid();
   const std::string debug_name = fxl::StringPrintf("amlogic-display[%lu]", current_process_koid);
-  fidl::OneWayStatus set_debug_status = sysmem_allocator_client_->SetDebugClientInfo(
-      fidl::StringView::FromExternal(debug_name), current_process_koid);
+  fidl::OneWayStatus set_debug_status =
+      sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name), current_process_koid);
   if (!set_debug_status.ok()) {
     zxlogf(ERROR, "Failed to set sysmem allocator debug info: %s",
            set_debug_status.status_string());

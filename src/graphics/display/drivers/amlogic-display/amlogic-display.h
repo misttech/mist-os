@@ -159,7 +159,7 @@ class AmlogicDisplay
 
   void SetSysmemAllocatorForTesting(
       fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client) {
-    sysmem_allocator_client_ = std::move(sysmem_allocator_client);
+    sysmem_ = std::move(sysmem_allocator_client);
   }
 
  private:
@@ -270,7 +270,8 @@ class AmlogicDisplay
   // Protocol handles used in by this driver
   ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_amlogiccanvas::Device> canvas_;
-  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
+  // The sysmem allocator client used to bind incoming buffer collection tokens.
+  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 
   // Interrupts
   zx::interrupt vsync_irq_;
@@ -293,9 +294,6 @@ class AmlogicDisplay
   // Points to the next capture target image to capture displayed contents into.
   // Stores nullptr if capture is not going to be performed.
   ImageInfo* current_capture_target_image_ TA_GUARDED(capture_mutex_);
-
-  // The sysmem allocator client used to bind incoming buffer collection tokens.
-  fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_allocator_client_;
 
   // Imported sysmem buffer collections.
   std::unordered_map<display::DriverBufferCollectionId,
