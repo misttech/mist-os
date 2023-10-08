@@ -8,10 +8,7 @@ rustc_binary("bin") {
   testonly = true
   edition = "2021"
   name = "ctf_example_realm_factory"
-  sources = [
-    "src/main.rs",
-    "src/realm_factory.rs",
-  ]
+  sources = [ "src/main.rs" ]
   deps = [
     "//examples/fidl/fuchsia.examples:fuchsia.examples_rust",
     "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/fidl:test.example_rust",

@@ -30,8 +30,9 @@ TEST(FuchsiaExamplesTest, Echo) {
 
   fuchsia::testing::harness::RealmProxySyncPtr realm_proxy;
   {
-    fuchsia::testing::harness::RealmFactory_CreateRealm_Result result;
-    EXPECT_OK(realm_factory->CreateRealm(realm_proxy.NewRequest(), &result));
+    test::example::RealmFactory_CreateRealm_Result result;
+    test::example::RealmOptions options;
+    EXPECT_OK(realm_factory->CreateRealm(std::move(options), realm_proxy.NewRequest(), &result));
   }
 
   fuchsia::examples::EchoSyncPtr echo;
