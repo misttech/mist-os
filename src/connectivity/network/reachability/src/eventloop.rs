@@ -315,7 +315,6 @@ impl EventLoop {
 
         fuchsia_inspect::component::health().set_ok();
 
-        // TODO(https://fxbug.dev/124258): Create helper functions for select! branches
         loop {
             select! {
                 if_watcher_res = if_watcher_stream.try_next() => {
@@ -324,18 +323,21 @@ impl EventLoop {
                     }
                 },
                 neigh_res = neigh_watcher_stream.try_next() => {
-                    let event = neigh_res.context("neighbor stream error")?
-                                         .context("neighbor stream ended")?;
+                    let event = neigh_res
+                        .unwrap_or_else(|err| exit_with_fidl_error(err))
+                        .ok_or(anyhow!("neighbor event stream ended"))?;
                     self.neighbor_cache.process_neighbor_event(event);
                 }
                 route_v4_res = ipv4_route_event_stream.try_next() => {
-                    let event = route_v4_res.context("ipv4 route event stream error")?
-                    .context("ipv4 route event stream ended")?;
+                    let event = route_v4_res
+                        .unwrap_or_else(|err| exit_with_route_watch_error(err))
+                        .ok_or(anyhow!("ipv4 route event stream ended"))?;
                     self.handle_route_watcher_event(event);
                 }
                 route_v6_res = ipv6_route_event_stream.try_next() => {
-                    let event = route_v6_res.context("ipv6 route event stream error")?
-                    .context("ipv6 route event stream ended")?;
+                    let event = route_v6_res
+                        .unwrap_or_else(|err| exit_with_route_watch_error(err))
+                        .ok_or(anyhow!("ipv6 route event stream ended"))?;
                     self.handle_route_watcher_event(event);
                 }
                 report = report_stream.next() => {
@@ -393,32 +395,25 @@ impl EventLoop {
         &mut self,
         if_watcher_res: Result<Option<fidl_fuchsia_net_interfaces::Event>, fidl::Error>,
     ) -> Result<Option<u64>, anyhow::Error> {
-        match if_watcher_res {
-            Ok(Some(event)) => {
-                let discovered_id = self
-                    .handle_interface_watcher_event(event)
-                    .await
-                    .context("failed to handle interface watcher event")?;
-                if let Some(id) = discovered_id {
-                    if let Some(telemetry_sender) = &self.telemetry_sender {
-                        let has_default_ipv4_route = self
-                            .interface_properties
-                            .values()
-                            .any(|p| p.properties.has_default_ipv4_route);
-                        let has_default_ipv6_route = self
-                            .interface_properties
-                            .values()
-                            .any(|p| p.properties.has_default_ipv6_route);
-                        telemetry_sender.send(TelemetryEvent::NetworkConfig {
-                            has_default_ipv4_route,
-                            has_default_ipv6_route,
-                        });
-                    }
-                    return Ok(Some(id));
-                }
+        let event = if_watcher_res
+            .unwrap_or_else(|err| exit_with_fidl_error(err))
+            .ok_or(anyhow!("interface watcher stream unexpectedly ended"))?;
+        let discovered_id = self
+            .handle_interface_watcher_event(event)
+            .await
+            .context("failed to handle interface watcher event")?;
+        if let Some(id) = discovered_id {
+            if let Some(telemetry_sender) = &self.telemetry_sender {
+                let has_default_ipv4_route =
+                    self.interface_properties.values().any(|p| p.properties.has_default_ipv4_route);
+                let has_default_ipv6_route =
+                    self.interface_properties.values().any(|p| p.properties.has_default_ipv6_route);
+                telemetry_sender.send(TelemetryEvent::NetworkConfig {
+                    has_default_ipv4_route,
+                    has_default_ipv6_route,
+                });
             }
-            Ok(None) => return Err(anyhow!("interface watcher stream unexpectedly ended")),
-            Err(e) => return Err(anyhow!("interface watcher stream error: {}", e)),
+            return Ok(Some(id));
         }
         Ok(None)
     }
@@ -659,6 +654,22 @@ impl EventLoop {
     }
 }
 
+/// If we can't reach netstack via fidl, log an error and exit.
+//
+// TODO(fxbug.dev/119295): add a test that works as intended.
+fn exit_with_fidl_error(cause: fidl::Error) -> ! {
+    error!(%cause, "exiting due to fidl error");
+    std::process::exit(1);
+}
+
+/// If we can't get route events from netstack, log an error and exit.
+//
+// TODO(fxbug.dev/119295): add a test that works as intended.
+fn exit_with_route_watch_error(cause: fnet_routes_ext::WatchError) -> ! {
+    error!(%cause, "exiting due to route watch error");
+    std::process::exit(1);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -686,9 +697,6 @@ mod tests {
         let mut event_loop = create_eventloop();
 
         let event_res = Ok(None);
-        assert!(event_loop.handle_interface_watcher_result(event_res).await.is_err());
-
-        let event_res = Err(fidl::Error::Invalid);
         assert!(event_loop.handle_interface_watcher_result(event_res).await.is_err());
     }
 
