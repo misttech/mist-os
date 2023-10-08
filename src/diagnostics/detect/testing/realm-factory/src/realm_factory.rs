@@ -37,27 +37,15 @@ enum InternalError {
 }
 
 const DETECT_URL: &str = "#meta/triage-detect.cm";
-const ERR_REALM_ALREADY_CREATED: &str = "the realm has already been created";
 const ERR_EVENTS_UNAVAILABLE: &str = "you must create the realm before listening for events";
 
 pub(crate) struct RealmFactory {
-    realm_options: Option<RealmOptions>,
     events_client: Option<ClientEnd<ftest::TriageDetectEventsMarker>>,
 }
 
 impl RealmFactory {
     pub fn new() -> Self {
-        Self { events_client: None, realm_options: Some(RealmOptions::new()) }
-    }
-
-    pub fn set_realm_options(&mut self, options: ftest::RealmOptions) -> Result<(), Error> {
-        match self.realm_options {
-            None => bail!(ERR_REALM_ALREADY_CREATED),
-            Some(_) => {
-                self.realm_options.replace(RealmOptions::from(options));
-            }
-        }
-        Ok(())
+        Self { events_client: None }
     }
 
     pub fn get_events_client(
@@ -69,13 +57,10 @@ impl RealmFactory {
         }
     }
 
-    pub async fn create_realm(&mut self) -> Result<RealmInstance, Error> {
-        if self.realm_options.is_none() {
-            bail!(ERR_REALM_ALREADY_CREATED);
-        }
-
-        let opts = self.realm_options.take().unwrap();
-
+    pub async fn create_realm(
+        &mut self,
+        options: ftest::RealmOptions,
+    ) -> Result<RealmInstance, Error> {
         let (client, server) = create_endpoints::<ftest::TriageDetectEventsMarker>();
         let event_sender = TriageDetectEventSender::from(server);
         self.events_client.replace(client);
@@ -83,13 +68,14 @@ impl RealmFactory {
         let builder = RealmBuilder::new().await?;
         let detect = builder.add_child("detect", DETECT_URL, ChildOptions::new().eager()).await?;
 
+        let options = RealmOptions::from(options);
         // This is necessary because add_local_child takes a Fn rather than FnOnce, so we cannot move
-        // opts out of the local child closure below. However, it is a fatal error to call the closure
+        // options out of the local child closure below. However, it is a fatal error to call the closure
         // multiple times anyway - the mock component implementation modifies the realm options.
         let mock_fn = {
             let event_sender = event_sender.clone();
             let closure =
-                |handles| async move { serve_mocks(opts, event_sender.clone(), handles).await };
+                |handles| async move { serve_mocks(options, event_sender.clone(), handles).await };
             Arc::new(Mutex::new(Some(closure)))
         };
 
@@ -158,14 +144,14 @@ impl RealmFactory {
 }
 
 async fn serve_mocks(
-    opts: RealmOptions,
+    options: RealmOptions,
     event_sender: TriageDetectEventSender,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     let mut inspect_data = vec![];
 
     // Read the inspect data to pass to the archive accessor.
-    for contents_vmo in opts.inspect_data.into_iter() {
+    for contents_vmo in options.inspect_data.into_iter() {
         let contents = read_string_from_vmo(&contents_vmo).unwrap();
         inspect_data.push(contents);
     }
@@ -174,7 +160,7 @@ async fn serve_mocks(
     let mut fs = ServiceFs::new();
     let mut dir_config = fs.dir("config");
     let mut dir_config_data = dir_config.dir("data");
-    for config_file in opts.config_files.into_iter() {
+    for config_file in options.config_files.into_iter() {
         dir_config_data.add_vmo_file_at(config_file.0, config_file.1);
     }
 

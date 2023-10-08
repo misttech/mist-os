@@ -8,7 +8,6 @@ use fidl_fuchsia_boot as fboot;
 use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_inspect as finspect;
 use fidl_fuchsia_logger as flogger;
-use fidl_fuchsia_testing_harness::OperationError;
 use fidl_fuchsia_tracing_provider as ftracing;
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmBuilderParams, RealmInstance, Ref, Route,
@@ -18,25 +17,12 @@ const ARCHIVIST_WITH_KERNEL_LOG_URL: &str = "#meta/archivist-with-kernel-log.cm"
 
 const PUPPET_URL: &str = "#meta/puppet.cm";
 #[derive(Default)]
-pub(crate) struct ArchivistRealmFactory {
-    realm_options: Option<RealmOptions>,
-}
+pub(crate) struct ArchivistRealmFactory;
+
 impl ArchivistRealmFactory {
-    pub fn set_realm_options(&mut self, options: RealmOptions) -> Result<(), Error> {
-        match self.realm_options {
-            None => {
-                self.realm_options.replace(options);
-                Ok(())
-            }
-            Some(_) => Err(realm_proxy::Error::from(OperationError::Invalid).into()),
-        }
-    }
-    pub async fn create_realm(&mut self) -> Result<RealmInstance, Error> {
-        let Some(realm_options) = self.realm_options.take() else {
-            bail!(realm_proxy::Error::from(OperationError::Invalid));
-        };
+    pub async fn create_realm(&mut self, options: RealmOptions) -> Result<RealmInstance, Error> {
         let mut params = RealmBuilderParams::new();
-        if let Some(realm_name) = realm_options.realm_name {
+        if let Some(realm_name) = options.realm_name {
             params = params.realm_name(realm_name);
         }
         let builder = RealmBuilder::with_params(params).await?;
@@ -46,7 +32,7 @@ impl ArchivistRealmFactory {
         // https://fxbug.dev/132340 for more information.
         let test_realm = builder.add_child_realm("test", ChildOptions::new()).await?;
         let archivist_url =
-            realm_options.archivist_config.unwrap_or(ArchivistConfig::Default).component_url();
+            options.archivist_config.unwrap_or(ArchivistConfig::Default).component_url();
         let archivist =
             test_realm.add_child("archivist", archivist_url, ChildOptions::new()).await?;
         // LINT.IfChange
@@ -91,7 +77,7 @@ impl ArchivistRealmFactory {
             .await?;
 
         // Add the puppet components.
-        if let Some(puppet_decls) = realm_options.puppets {
+        if let Some(puppet_decls) = options.puppets {
             for decl in puppet_decls {
                 let from_puppet = Route::new().capability(
                     Capability::protocol::<PuppetMarker>().as_(decl.unique_protocol_alias()),

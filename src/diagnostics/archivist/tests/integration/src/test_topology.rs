@@ -34,9 +34,11 @@ impl Default for Options {
 /// before the realm is created.
 pub async fn create_realm(options: &ftest::RealmOptions) -> Result<RealmProxyClient> {
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    realm_factory.set_realm_options(&options).await?.map_err(realm_proxy::Error::OperationError)?;
     let (client, server) = create_endpoints::<fharness::RealmProxy_Marker>();
-    realm_factory.create_realm(server).await?.map_err(realm_proxy::Error::OperationError)?;
+    realm_factory
+        .create_realm(options, server)
+        .await?
+        .map_err(realm_proxy::Error::OperationError)?;
     Ok(RealmProxyClient::from(client))
 }
 

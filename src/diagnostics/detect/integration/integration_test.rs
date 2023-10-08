@@ -48,10 +48,12 @@ async fn triage_detect_test(test_data: TestData) -> Result<(), Error> {
     info!("running test case {}", test_data.name);
 
     let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
-    realm_factory.set_realm_options(test_data.realm_options).await?.map_err(OperationError)?;
     // The realm is disposed once _ignore is dropped.
     let (_ignore, realm_server) = create_endpoints::<RealmProxy_Marker>();
-    realm_factory.create_realm(realm_server).await?.map_err(OperationError)?;
+    realm_factory
+        .create_realm(test_data.realm_options, realm_server)
+        .await?
+        .map_err(OperationError)?;
 
     let event_proxy = realm_factory.get_triage_detect_events().await?.into_proxy()?;
     let mut actual_events = drain(event_proxy.take_event_stream()).await;
