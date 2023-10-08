@@ -253,7 +253,11 @@ typedef struct header_struct {
   struct header_struct* left;
   // The size of the memory area in bytes, including this header.
   // The right sentinel will have 0 in this field.
-  size_t size;
+  // A 32-bit value is used for the size to leave room for the cookie, and the
+  // maximum size of our allowed allocations fits easily within this.
+  uint32_t size;
+  // User defined cookie that can be associated with an allocation.
+  uint32_t cookie;
 } header_t;
 
 // When the heap is grown the requested internal usable size will be increased
@@ -269,6 +273,9 @@ constexpr size_t kHeapUsableGrowSize = HEAP_GROW_SIZE - kHeapGrowOverhead;
 // resulting freelist entry, so the freelist has to have a certain number of
 // buckets.
 static_assert(HEAP_GROW_SIZE <= HEAP_LARGE_ALLOC_BYTES);
+// We use a 32-byte value to store sizes, so ensure the largest allocation fits
+// inside such a value.
+static_assert(HEAP_LARGE_ALLOC_BYTES < UINT32_MAX);
 
 typedef struct free_struct {
   header_t header;
@@ -308,14 +315,14 @@ static size_t g_fill_on_alloc_threshold = 0;
 
 NO_ASAN static void dump_free(header_t* header) TA_REQ(TheHeapLock::Get()) {
   // This function accesses header->size so it has to be NO_ASAN
-  dprintf(INFO, "\t\tbase %p, end %#" PRIxPTR ", len %#zx (%zu)\n", header,
+  dprintf(INFO, "\t\tbase %p, end %#" PRIxPTR ", len %#x (%u)\n", header,
           (uintptr_t)header + header->size, header->size, header->size);
 }
 
 NO_ASAN static void cmpct_dump_locked(CmpctDumpOptions options) TA_REQ(TheHeapLock::Get()) {
   // This function accesses free_t * that are poisoned so it has to be NO_ASAN
   dprintf(INFO, "Heap dump (using cmpctmalloc):\n");
-  dprintf(INFO, "\tsize %lu, remaining %lu, (used %lu) cached free %lu\n",
+  dprintf(INFO, "\tsize %lu, remaining %lu, (used %lu) cached free %u\n",
           static_cast<unsigned long>(theheap.size), static_cast<unsigned long>(theheap.remaining),
           static_cast<unsigned long>(theheap.size - theheap.remaining),
           theheap.cached_os_alloc ? theheap.cached_os_alloc->size : 0);
@@ -464,7 +471,8 @@ NO_ASAN static bool is_start_of_os_allocation(const header_t* header) TA_REQ(The
 NO_ASAN static void create_free_area(void* address, void* left, size_t size)
     TA_REQ(TheHeapLock::Get()) {
   free_t* free_area = (free_t*)address;
-  free_area->header.size = size;
+  free_area->header.size = static_cast<uint32_t>(size);
+  free_area->header.cookie = 0;
   free_area->header.left = tag_as_free(left);
 
   int index = size_to_index_freeing(size - sizeof(header_t));
@@ -505,7 +513,8 @@ NO_ASAN static void possibly_free_to_os(header_t* left_sentinel, size_t total_si
     LTRACEF("Keeping 0x%zx-byte OS alloc @%p\n", total_size, left_sentinel);
     theheap.cached_os_alloc = left_sentinel;
     theheap.cached_os_alloc->left = NULL;
-    theheap.cached_os_alloc->size = total_size;
+    theheap.cached_os_alloc->size = static_cast<uint32_t>(total_size);
+    theheap.cached_os_alloc->cookie = 0;
   } else {
     LTRACEF("Returning 0x%zx bytes @%p to OS\n", total_size, left_sentinel);
     free_to_os(left_sentinel, total_size);
@@ -524,7 +533,7 @@ NO_ASAN static void free_memory(void* address, void* left, size_t size) TA_REQ(T
       is_end_of_os_allocation((char*)address + size)) {
     // Assert that it's safe to do a simple 2*sizeof(header_t)) below.
     ZX_DEBUG_ASSERT_MSG(((header_t*)left)->size == sizeof(header_t),
-                        "Unexpected left sentinel size %zu != header size %zu",
+                        "Unexpected left sentinel size %u != header size %zu",
                         ((header_t*)left)->size, sizeof(header_t));
     possibly_free_to_os((header_t*)left, size + 2 * sizeof(header_t));
   } else {
@@ -533,7 +542,7 @@ NO_ASAN static void free_memory(void* address, void* left, size_t size) TA_REQ(T
 }
 
 NO_ASAN static void unlink_free(free_t* free_area, int bucket) TA_REQ(TheHeapLock::Get()) {
-  ZX_ASSERT_MSG(theheap.remaining >= free_area->header.size, "%zu >= %zu\n", theheap.remaining,
+  ZX_ASSERT_MSG(theheap.remaining >= free_area->header.size, "%zu >= %u\n", theheap.remaining,
                 free_area->header.size);
   theheap.remaining -= free_area->header.size;
   free_t* next = free_area->next;
@@ -560,7 +569,8 @@ NO_ASAN static void* create_allocation_header(void* address, size_t offset, size
     TA_REQ(TheHeapLock::Get()) {
   header_t* standalone = (header_t*)((char*)address + offset);
   standalone->left = untag(left);
-  standalone->size = size;
+  standalone->size = static_cast<uint32_t>(size);
+  standalone->cookie = 0;
   return standalone + 1;
 }
 
@@ -638,7 +648,7 @@ NO_ASAN static zx_status_t heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
   header_t* os_alloc = (header_t*)theheap.cached_os_alloc;
   if (os_alloc != NULL) {
     if (os_alloc->size >= size) {
-      LTRACEF("Using saved 0x%zx-byte OS alloc @%p (>=0x%zx bytes)\n", os_alloc->size, os_alloc,
+      LTRACEF("Using saved 0x%x-byte OS alloc @%p (>=0x%zx bytes)\n", os_alloc->size, os_alloc,
               size);
       ptr = os_alloc;
       size = os_alloc->size;
@@ -649,7 +659,7 @@ NO_ASAN static zx_status_t heap_grow(size_t size) TA_REQ(TheHeapLock::Get()) {
       // allocation, in case we're holding an unusually-small block
       // that's unlikely to satisfy future calls to heap_grow().
       LTRACEF(
-          "Returning too-small saved 0x%zx-byte OS alloc @%p "
+          "Returning too-small saved 0x%x-byte OS alloc @%p "
           "(<0x%zx bytes)\n",
           os_alloc->size, os_alloc, size);
       free_to_os(os_alloc, os_alloc->size);
@@ -946,7 +956,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
     void* free = (char*)head + rounded_up;
     create_free_area(free, head, left_over);
     FixLeftPointer(right, (header_t*)free);
-    head->header.size -= left_over;
+    head->header.size -= static_cast<uint32_t>(left_over);
   } else {
     unlink_free(head, bucket);
   }
@@ -975,7 +985,7 @@ NO_ASAN void* cmpct_alloc(size_t size) {
 NO_ASAN static void cmpct_free_internal(void* payload, header_t* header)
     TA_REQ(TheHeapLock::Get()) {
   ZX_DEBUG_ASSERT(!is_tagged_as_free(header));  // Double free!
-  ZX_ASSERT_MSG(header->size > sizeof(header_t), "got %lu min %lu", header->size, sizeof(header_t));
+  ZX_ASSERT_MSG(header->size > sizeof(header_t), "got %u min %lu", header->size, sizeof(header_t));
 
 #if KERNEL_ASAN
   asan_poison_shadow(reinterpret_cast<uintptr_t>(payload), header->size - sizeof(header_t),
@@ -1017,6 +1027,16 @@ NO_ASAN static void cmpct_free_internal(void* payload, header_t* header)
   }
 }
 
+NO_ASAN void cmpct_set_cookie(void* ptr, uint32_t cookie) {
+  header_t* header = reinterpret_cast<header_t*>(ptr) - 1;
+  header->cookie = cookie;
+}
+
+NO_ASAN uint32_t cmpct_get_cookie(void* ptr) {
+  header_t* header = reinterpret_cast<header_t*>(ptr) - 1;
+  return header->cookie;
+}
+
 NO_ASAN void cmpct_free(void* payload) {
   LOCAL_TRACE_DURATION("cmpct_free", trace);
   if (payload == NULL) {
@@ -1043,7 +1063,7 @@ NO_ASAN void cmpct_sized_free(void* payload, size_t s) {
   // header->size is the size of the heap block |payload| is in, plus sizeof(header_t), plus
   // the difference between the block size and the requested allocation size. If kernel ASAN
   // is enabled, it also includes an ASAN redzone.
-  ZX_ASSERT_MSG(header->size >= s, "expected %lu got %lu", header->size, s);
+  ZX_ASSERT_MSG(static_cast<size_t>(header->size) >= s, "expected %u got %lu", header->size, s);
 #if !KERNEL_ASAN
   // Heap blocks are larger than |s| by at most:
   // 1. sizeof(header_t)
@@ -1053,7 +1073,8 @@ NO_ASAN void cmpct_sized_free(void* payload, size_t s) {
   //
   // The computation here is a conservative limit on that difference rather than a precise limit.
   const size_t max_diff = sizeof(header_t) + sizeof(free_t) + (s >> 2);
-  ZX_ASSERT_MSG((header->size - s) <= max_diff, "header->size %lu s %lu", header->size, s);
+  ZX_ASSERT_MSG((static_cast<size_t>(header->size) - s) <= max_diff, "header->size %u s %lu",
+                header->size, s);
 #endif
   return cmpct_free_internal(payload, header);
 }
@@ -1093,7 +1114,8 @@ NO_ASAN void* cmpct_memalign(size_t alignment, size_t size) {
     size_t left_over = payload - unaligned;
     create_allocation_header(header, 0, unaligned_header->size - left_over, unaligned_header);
     header_t* right = right_header(unaligned_header);
-    unaligned_header->size = left_over;
+    unaligned_header->size = static_cast<uint32_t>(left_over);
+    unaligned_header->cookie = 0;
     FixLeftPointer(right, header);
     LOCAL_TRACE_DURATION_END(trace_lock);
     guard.Release();

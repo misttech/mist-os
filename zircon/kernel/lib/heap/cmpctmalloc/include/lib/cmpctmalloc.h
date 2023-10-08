@@ -52,4 +52,10 @@ void cmpct_get_info(size_t* used_bytes, size_t* free_bytes, size_t* cached_bytes
     TA_EXCL(TheHeapLock::Get());
 void cmpct_test(void) TA_EXCL(TheHeapLock::Get());
 
+// Get and set a user defined cookie against an allocation returned from cmpct_alloc
+// or cmpct_memalign. |ptr| must be non-null and these methods are not thread
+// safe.
+void cmpct_set_cookie(void* ptr, uint32_t cookie);
+uint32_t cmpct_get_cookie(void* ptr);
+
 #endif  // ZIRCON_KERNEL_LIB_HEAP_CMPCTMALLOC_INCLUDE_LIB_CMPCTMALLOC_H_

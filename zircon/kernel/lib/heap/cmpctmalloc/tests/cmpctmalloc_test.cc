@@ -207,6 +207,20 @@ TEST_F(CmpctmallocTest, CanMemalignAndFree) {
   }
 }
 
+TEST_F(CmpctmallocTest, CookieTest) {
+  void* const p1 = cmpct_alloc(64);
+  void* const p2 = cmpct_alloc(64);
+  cmpct_set_cookie(p1, 42);
+  cmpct_set_cookie(p2, 43);
+  EXPECT_EQ(cmpct_get_cookie(p1), 42);
+  EXPECT_EQ(cmpct_get_cookie(p2), 43);
+  cmpct_free(p2);
+  void* const p3 = cmpct_alloc(64);
+  cmpct_set_cookie(p3, 44);
+  EXPECT_EQ(cmpct_get_cookie(p1), 42);
+  EXPECT_EQ(cmpct_get_cookie(p3), 44);
+}
+
 TEST_F(CmpctmallocTest, SizedFree) {
   constexpr size_t kAllocSize = 1000;
   void* const p = cmpct_alloc(kAllocSize);
