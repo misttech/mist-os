@@ -1451,6 +1451,7 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
         realm: &netemul::TestRealm<'_>,
         interface: &netemul::TestInterface<'_>,
         gateway: fnet::IpAddress,
+        gateway_interface: &netemul::TestInterface<'_>,
     ) {
         let unspecified_address = fnet_ext::IpAddress(match gateway {
             fnet::IpAddress::Ipv4(_) => std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED),
@@ -1469,9 +1470,26 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
             .await
             .expect("call add forwarding entry")
             .expect("add forwarding entry");
+
+        // Make sure that the caller passed the right interface for the gateway
+        // (otherwise the static neighbor entry we're adding is wrong) by
+        // checking that the gateway IP address is installed on the interface.
+        let gateway_iface_addrs = gateway_interface
+            .get_addrs(fnet_interfaces_ext::IncludedAddresses::OnlyAssigned)
+            .await
+            .expect("get_addrs");
+        assert!(gateway_iface_addrs.iter().any(
+            |fnet_interfaces_ext::Address { addr: fnet::Subnet { addr, .. }, .. }| {
+                addr == &gateway
+            }
+        ));
+        realm
+            .add_neighbor_entry(interface.id(), gateway, gateway_interface.mac().await)
+            .await
+            .expect("add neighbor entry");
     }
-    add_default_gateway(&client, &client_iface, client_gateway).await;
-    add_default_gateway(&server, &server_iface, server_gateway).await;
+    add_default_gateway(&client, &client_iface, client_gateway, &router_client_iface).await;
+    add_default_gateway(&server, &server_iface, server_gateway, &router_server_iface).await;
 
     async fn enable_forwarding(
         interface: &fnet_interfaces_ext::admin::Control,

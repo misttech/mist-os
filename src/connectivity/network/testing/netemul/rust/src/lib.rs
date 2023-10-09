@@ -1102,6 +1102,19 @@ impl<'a> TestInterface<'a> {
         Ok(name)
     }
 
+    /// Gets the interface's MAC address.
+    pub async fn mac(&self) -> fnet::MacAddress {
+        let (port, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::PortMarker>()
+                .expect("create_proxy");
+        self.get_port(server_end).expect("get_port");
+        let (mac_addressing, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_hardware_network::MacAddressingMarker>()
+                .expect("create_proxy");
+        port.get_mac(server_end).expect("get_mac");
+        mac_addressing.get_unicast_address().await.expect("get_unicast_address")
+    }
+
     /// Gets a stream of interface events yielded by calling watch on a new watcher.
     ///
     /// The returned watcher will only return assigned addresses.
