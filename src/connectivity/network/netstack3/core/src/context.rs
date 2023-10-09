@@ -1370,11 +1370,8 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    #[derive(Default)]
-    pub(crate) struct FakeCtxWithSyncCtx<SC, TimerId, Event: Debug, NonSyncCtxState> {
-        pub(crate) sync_ctx: SC,
-        pub(crate) non_sync_ctx: FakeNonSyncCtx<TimerId, Event, NonSyncCtxState>,
-    }
+    pub(crate) type FakeCtxWithSyncCtx<SC, TimerId, Event, NonSyncCtxState> =
+        crate::testutil::ContextPair<SC, FakeNonSyncCtx<TimerId, Event, NonSyncCtxState>>;
 
     #[cfg(test)]
     pub(crate) type FakeCtx<S, TimerId, Meta, Event, DeviceId, NonSyncCtxState> =
@@ -1437,15 +1434,6 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<SC, Id, Event: Debug, NonSyncCtxState: Default>
-        FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>
-    {
-        pub(crate) fn with_sync_ctx(sync_ctx: SC) -> Self {
-            FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: FakeNonSyncCtx::default() }
-        }
-    }
-
-    #[cfg(test)]
     #[derive(Default)]
     pub(crate) struct Wrapped<Outer, Inner> {
         pub(crate) inner: Inner,
@@ -1483,8 +1471,8 @@ pub mod testutil {
     #[derive(Derivative)]
     #[derivative(Default(bound = "S: Default"))]
     pub(crate) struct FakeSyncCtx<S, Meta, DeviceId> {
-        state: S,
-        frames: FakeFrameCtx<Meta>,
+        pub(crate) state: S,
+        pub(crate) frames: FakeFrameCtx<Meta>,
         _devices_marker: PhantomData<DeviceId>,
     }
 
@@ -1681,6 +1669,19 @@ pub mod testutil {
     impl<CtxId, RecvMeta, Ctx, Links> FakeNetwork<CtxId, RecvMeta, Ctx, Links>
     where
         CtxId: Eq + Hash + Copy + Debug,
+        Ctx: FakeNetworkContext,
+        Links: FakeNetworkLinks<Ctx::SendMeta, RecvMeta, CtxId>,
+    {
+        /// Retrieves a context named `context`.
+        pub(crate) fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Ctx {
+            self.contexts.get_mut(&context.into()).unwrap()
+        }
+    }
+
+    #[cfg(test)]
+    impl<CtxId, RecvMeta, Ctx, Links> FakeNetwork<CtxId, RecvMeta, Ctx, Links>
+    where
+        CtxId: Eq + Hash + Copy + Debug,
         Ctx: FakeNetworkContext
             + WithFakeTimerContext<Ctx::TimerId>
             + WithFakeFrameContext<Ctx::SendMeta>,
@@ -1733,11 +1734,6 @@ pub mod testutil {
             }
 
             Self { contexts, current_time: latest_time, pending_frames: BinaryHeap::new(), links }
-        }
-
-        /// Retrieves a `FakeSyncCtx` named `context`.
-        pub(crate) fn context<K: Into<CtxId>>(&mut self, context: K) -> &mut Ctx {
-            self.contexts.get_mut(&context.into()).unwrap()
         }
 
         /// Iterates over pending frames in an arbitrary order.
@@ -1949,25 +1945,21 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<CtxId, Links>
-        FakeNetwork<
-            CtxId,
-            EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
-            crate::testutil::FakeCtx,
-            Links,
-        >
+    impl<CtxId, Links, SC, C, RecvMeta>
+        FakeNetwork<CtxId, RecvMeta, crate::testutil::ContextPair<SC, C>, Links>
     where
+        crate::testutil::ContextPair<SC, C>: FakeNetworkContext,
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
-            EthernetWeakDeviceId<crate::testutil::FakeNonSyncCtx>,
-            EthernetDeviceId<crate::testutil::FakeNonSyncCtx>,
+            <crate::testutil::ContextPair<SC, C> as FakeNetworkContext>::SendMeta,
+            RecvMeta,
             CtxId,
         >,
     {
         pub(crate) fn with_context<
             K: Into<CtxId>,
             O,
-            F: FnOnce(&mut crate::testutil::FakeCtx) -> O,
+            F: FnOnce(&mut crate::testutil::ContextPair<SC, C>) -> O,
         >(
             &mut self,
             context: K,
@@ -1977,60 +1969,17 @@ pub mod testutil {
         }
 
         /// Retrieves a `FakeSyncCtx` named `context`.
-        pub(crate) fn sync_ctx<K: Into<CtxId>>(
-            &mut self,
-            context: K,
-        ) -> &mut crate::testutil::FakeSyncCtx {
-            let crate::testutil::FakeCtx { sync_ctx, non_sync_ctx: _ } = self.context(context);
+        pub(crate) fn sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut SC {
+            let crate::testutil::ContextPair { sync_ctx, non_sync_ctx: _ } = self.context(context);
             sync_ctx
         }
 
         /// Retrieves a `FakeNonSyncCtx` named `context`.
-        pub(crate) fn non_sync_ctx<K: Into<CtxId>>(
-            &mut self,
-            context: K,
-        ) -> &mut crate::testutil::FakeNonSyncCtx {
-            let crate::testutil::FakeCtx { sync_ctx: _, non_sync_ctx } = self.context(context);
+        pub(crate) fn non_sync_ctx<K: Into<CtxId>>(&mut self, context: K) -> &mut C {
+            let crate::testutil::ContextPair { sync_ctx: _, non_sync_ctx } = self.context(context);
             non_sync_ctx
         }
     }
-
-    #[cfg(test)]
-    impl<RecvMeta, SC, Id, Event, CtxId, Links, NonSyncCtxState>
-    FakeNetwork<
-        CtxId,
-        RecvMeta,
-        FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>,
-        Links,
-    >
-where
-    Id: Copy,
-    Event: Debug,
-    CtxId: Eq + Hash + Copy + Debug,
-    Links: FakeNetworkLinks<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta, RecvMeta, CtxId>,
-    FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>: FakeNetworkContext<TimerId=Id> + WithFakeFrameContext<<FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState> as FakeNetworkContext>::SendMeta>
-{
-    pub(crate) fn with_context<
-        K: Into<CtxId>,
-        O,
-        F: FnOnce(&mut FakeCtxWithSyncCtx<SC, Id, Event, NonSyncCtxState>) -> O,
-    >(
-        &mut self,
-        context: K,
-        f: F,
-    ) -> O {
-        f(self.context(context))
-    }
-
-    /// Retrieves a `FakeSyncCtx` named `context`.
-    pub(crate) fn sync_ctx<K: Into<CtxId>>(
-        &mut self,
-        context: K,
-    ) -> &mut SC {
-        let FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx: _ } = self.context(context);
-        sync_ctx
-    }
-}
 
     /// Creates a new [`FakeNetwork`] of [`Ctx`]s in a simple two-host
     /// configuration.

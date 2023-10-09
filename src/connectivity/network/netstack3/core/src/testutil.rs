@@ -89,10 +89,11 @@ use crate::{
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 
-/// Context available during the execution of the netstack.
-pub struct Ctx<NonSyncCtx: crate::NonSyncContext> {
+/// A structure holding a sync context and a non sync context.
+#[derive(Default)]
+pub struct ContextPair<SC, C> {
     /// The synchronized context.
-    pub sync_ctx: SyncCtx<NonSyncCtx>,
+    pub sync_ctx: SC,
     /// The non-synchronized context.
     // We put `non_sync_ctx` after `sync_ctx` to make sure that `sync_ctx` is
     // dropped before `non-sync_ctx` so that the existence of strongly-referenced
@@ -102,8 +103,21 @@ pub struct Ctx<NonSyncCtx: crate::NonSyncContext> {
     // Note that if strongly-referenced (device) IDs exist when dropping the
     // primary reference, the primary reference's drop impl will panic. See
     // `crate::sync::PrimaryRc::drop` for details.
-    pub non_sync_ctx: NonSyncCtx,
+    pub non_sync_ctx: C,
 }
+
+impl<SC, C> ContextPair<SC, C> {
+    #[cfg(test)]
+    pub(crate) fn with_sync_ctx(sync_ctx: SC) -> Self
+    where
+        C: Default,
+    {
+        Self { sync_ctx, non_sync_ctx: C::default() }
+    }
+}
+
+/// Context available during the execution of the netstack.
+pub type Ctx<NonSyncCtx> = ContextPair<SyncCtx<NonSyncCtx>, NonSyncCtx>;
 
 impl<NonSyncCtx: crate::NonSyncContext + Default> Default for Ctx<NonSyncCtx> {
     fn default() -> Self {
