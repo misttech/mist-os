@@ -48,7 +48,8 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
   // Static factory function.  The returned instance is unowned, since its lifecycle is managed by
   // the devhost.
   static zx_status_t Create(wlan::brcmfmac::Device* device, const char* name, wireless_dev* wdev,
-                            wlan_mac_role_t role, WlanInterface** out_interface);
+                            fuchsia_wlan_common_wire::WlanMacRole role,
+                            WlanInterface** out_interface);
 
   // Accessors.
   void set_wdev(wireless_dev* wdev);
@@ -68,9 +69,10 @@ class WlanInterface : public ddk::Device<WlanInterface, ddk::Unbindable>,
       fuchsia_wlan_common::wire::WlanMacRole
           out_supported_mac_roles_list[fuchsia_wlan_common::wire::kMaxSupportedMacRoles],
       uint8_t* out_supported_mac_roles_count);
-  static zx_status_t SetCountry(brcmf_pub* drvr, const wlan_phy_country_t* country);
+  static zx_status_t SetCountry(brcmf_pub* drvr,
+                                const fuchsia_wlan_phyimpl_wire::WlanPhyCountry* country);
   // Reads the currently configured `country` from the firmware.
-  static zx_status_t GetCountry(brcmf_pub* drvr, wlan_phy_country_t* out_country);
+  static zx_status_t GetCountry(brcmf_pub* drvr, uint8_t* cc_code);
   static zx_status_t ClearCountry(brcmf_pub* drvr);
 
   // WlanFullmacImpl implementations, dispatching FIDL requests from higher layers.

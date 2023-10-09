@@ -88,7 +88,7 @@ WlanInterface::WlanInterface(wlan::brcmfmac::Device* device,
 }
 
 zx_status_t WlanInterface::Create(wlan::brcmfmac::Device* device, const char* name,
-                                  wireless_dev* wdev, wlan_mac_role_t role,
+                                  wireless_dev* wdev, fuchsia_wlan_common_wire::WlanMacRole role,
                                   WlanInterface** out_interface) {
   std::unique_ptr<WlanInterface> interface(new WlanInterface(
       device, device->NetDev().NetDevIfcProto(), ndev_to_if(wdev->netdev)->ifidx, name));
@@ -100,14 +100,14 @@ zx_status_t WlanInterface::Create(wlan::brcmfmac::Device* device, const char* na
 
   NetworkPort::Role net_port_role;
   switch (role) {
-    case WLAN_MAC_ROLE_CLIENT:
+    case fuchsia_wlan_common_wire::WlanMacRole::kClient:
       net_port_role = NetworkPort::Role::Client;
       break;
-    case WLAN_MAC_ROLE_AP:
+    case fuchsia_wlan_common_wire::WlanMacRole::kAp:
       net_port_role = NetworkPort::Role::Ap;
       break;
     default:
-      BRCMF_ERR("Unsupported role %u", role);
+      BRCMF_ERR("Unsupported role %u", uint32_t(role));
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -213,7 +213,8 @@ zx_status_t WlanInterface::GetSupportedMacRoles(
   return ZX_OK;
 }
 
-zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr, const wlan_phy_country_t* country) {
+zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr,
+                                      const fuchsia_wlan_phyimpl_wire::WlanPhyCountry* country) {
   if (country == nullptr) {
     BRCMF_ERR("Empty country from the parameter.");
     return ZX_ERR_INVALID_ARGS;
@@ -221,8 +222,8 @@ zx_status_t WlanInterface::SetCountry(brcmf_pub* drvr, const wlan_phy_country_t*
   return brcmf_set_country(drvr, country);
 }
 
-zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, wlan_phy_country_t* out_country) {
-  return brcmf_get_country(drvr, out_country);
+zx_status_t WlanInterface::GetCountry(brcmf_pub* drvr, uint8_t* cc_code) {
+  return brcmf_get_country(drvr, cc_code);
 }
 
 zx_status_t WlanInterface::ClearCountry(brcmf_pub* drvr) { return brcmf_clear_country(drvr); }

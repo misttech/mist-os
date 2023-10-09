@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <zircon/errors.h>
 
 #include <zxtest/zxtest.h>
@@ -23,9 +22,9 @@ class PhyPsModeTest : public SimTest {
   void Init();
   void CreateInterface();
   void DeleteInterface();
-  zx_status_t SetPowerSaveMode(const wlan_common::PowerSaveType* ps_mode);
+  zx_status_t SetPowerSaveMode(const wlan_common::PowerSaveType ps_mode);
   void GetPowerSaveModeFromFirmware(uint32_t* ps_mode);
-  zx_status_t SetPowerSaveModeInFirmware(const wlan_phy_ps_mode_t* ps_mode);
+  zx_status_t SetPowerSaveModeInFirmware(const fuchsia_wlan_common_wire::PowerSaveType ps_mode);
   zx_status_t ClearCountryCode();
   uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
@@ -48,11 +47,11 @@ uint32_t PhyPsModeTest::DeviceCountByProtocolId(uint32_t proto_id) {
   return (dev_mgr_->DeviceCountByProtocolId(proto_id));
 }
 
-zx_status_t PhyPsModeTest::SetPowerSaveMode(const wlan_common::PowerSaveType* ps_mode) {
+zx_status_t PhyPsModeTest::SetPowerSaveMode(const wlan_common::PowerSaveType ps_mode) {
   fidl::Arena fidl_arena;
   auto builder =
       fuchsia_wlan_phyimpl::wire::WlanPhyImplSetPowerSaveModeRequest::Builder(fidl_arena);
-  builder.ps_mode(*ps_mode);
+  builder.ps_mode(ps_mode);
   auto result = client_.sync().buffer(test_arena_)->SetPowerSaveMode(builder.Build());
   EXPECT_TRUE(result.ok());
   if (result->is_error()) {
@@ -71,8 +70,9 @@ void PhyPsModeTest::GetPowerSaveModeFromFirmware(uint32_t* ps_mode) {
   EXPECT_EQ(status, ZX_OK);
 }
 
-zx_status_t PhyPsModeTest::SetPowerSaveModeInFirmware(const wlan_phy_ps_mode_t* ps_mode) {
-  EXPECT_NE(ps_mode, nullptr);
+zx_status_t PhyPsModeTest::SetPowerSaveModeInFirmware(
+    const fuchsia_wlan_common_wire::PowerSaveType ps_mode) {
+  // EXPECT_NE(ps_mode, nullptr);
   brcmf_simdev* sim = device_->GetSim();
   return brcmf_set_power_save_mode(sim->drvr, ps_mode);
 }
@@ -118,7 +118,7 @@ TEST_F(PhyPsModeTest, SetPowerSaveMode) {
   ASSERT_EQ(fw_ps_mode, (uint32_t)PM_OFF);
 
   // Set a valid PS mode and verify it succeeds
-  status = SetPowerSaveMode(&valid_ps_mode);
+  status = SetPowerSaveMode(valid_ps_mode);
   ASSERT_EQ(status, ZX_OK);
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
   ASSERT_EQ(fw_ps_mode, (uint32_t)PM_FAST);
@@ -140,7 +140,7 @@ TEST_F(PhyPsModeTest, CheckFWPsMode) {
   ASSERT_EQ(fw_ps_mode, (uint32_t)PM_OFF);
 
   // Set PS mode to PS_MODE_BALANCED
-  status = SetPowerSaveMode(&valid_ps_mode);
+  status = SetPowerSaveMode(valid_ps_mode);
   ASSERT_EQ(status, ZX_OK);
   // Verify that it gets set to FAST in FW
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
@@ -148,14 +148,14 @@ TEST_F(PhyPsModeTest, CheckFWPsMode) {
 
   // Set PS mode to PS_MODE_ULTRA_LOW_POWER
   valid_ps_mode = wlan_common::PowerSaveType::kPsModeUltraLowPower;
-  status = SetPowerSaveMode(&valid_ps_mode);
+  status = SetPowerSaveMode(valid_ps_mode);
   ASSERT_EQ(status, ZX_OK);
   // Verify that it gets set to FAST in FW
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
   ASSERT_EQ(fw_ps_mode, (uint32_t)PM_FAST);
   // Set PS mode to PS_MODE_LOW_POWER
   valid_ps_mode = wlan_common::PowerSaveType::kPsModeLowPower;
-  status = SetPowerSaveMode(&valid_ps_mode);
+  status = SetPowerSaveMode(valid_ps_mode);
   ASSERT_EQ(status, ZX_OK);
   // Verify that it gets set to FAST in FW
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
@@ -163,7 +163,7 @@ TEST_F(PhyPsModeTest, CheckFWPsMode) {
 
   // Set PS mode to PS_MODE_PERFORMANCE
   valid_ps_mode = wlan_common::PowerSaveType::kPsModePerformance;
-  status = SetPowerSaveMode(&valid_ps_mode);
+  status = SetPowerSaveMode(valid_ps_mode);
   ASSERT_EQ(status, ZX_OK);
   // Verify that it gets set to OFF in FW
   GetPowerSaveModeFromFirmware(&fw_ps_mode);
@@ -178,8 +178,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
 
   {
     const auto valid_ps_mode = wlan_common::PowerSaveType::kPsModeBalanced;
-    const wlan_phy_ps_mode_t valid_ps_mode_banjo = {.ps_mode = POWER_SAVE_TYPE_PS_MODE_BALANCED};
-    ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(&valid_ps_mode_banjo));
+    ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(valid_ps_mode));
     auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());
@@ -189,8 +188,7 @@ TEST_F(PhyPsModeTest, GetPowerSaveMode) {
   // Try again, just in case the first one was a default value.
   {
     const auto valid_ps_mode = wlan_common::PowerSaveType::kPsModePerformance;
-    const wlan_phy_ps_mode_t valid_ps_mode_banjo = {.ps_mode = POWER_SAVE_TYPE_PS_MODE_PERFORMANCE};
-    ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(&valid_ps_mode_banjo));
+    ASSERT_EQ(ZX_OK, SetPowerSaveModeInFirmware(valid_ps_mode));
     auto result = client_.sync().buffer(test_arena_)->GetPowerSaveMode();
     EXPECT_TRUE(result.ok());
     ASSERT_FALSE(result->is_error());

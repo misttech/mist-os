@@ -190,7 +190,8 @@ class WlanphyDeviceTest : public ::zxtest::Test,
   static constexpr fuchsia_wlan_common::wire::WlanMacRole kFakeMacRole =
       fuchsia_wlan_common::wire::WlanMacRole::kAp;
   static constexpr uint16_t kFakeIfaceId = 1;
-  static constexpr fidl::Array<uint8_t, WLANPHY_ALPHA2_LEN> kAlpha2{'W', 'W'};
+  static constexpr fidl::Array<uint8_t, fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len> kAlpha2{'W',
+                                                                                               'W'};
   static constexpr fuchsia_wlan_common::wire::PowerSaveType kFakePsMode =
       fuchsia_wlan_common::wire::PowerSaveType::kPsModePerformance;
   static constexpr ::fidl::Array<uint8_t, 6> kValidStaAddr = {1, 2, 3, 4, 5, 6};

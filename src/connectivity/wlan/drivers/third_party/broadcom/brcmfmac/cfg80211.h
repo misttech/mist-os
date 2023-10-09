@@ -35,6 +35,7 @@
 #include "workqueue.h"
 
 namespace fuchsia_wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
+namespace fuchsia_wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 // clang-format off
 
@@ -515,7 +516,7 @@ static inline struct net_device* cfg_to_ndev(struct brcmf_cfg80211_info* cfg) {
 static inline struct net_device* cfg_to_softap_ndev(struct brcmf_cfg80211_info* cfg) {
   struct brcmf_cfg80211_vif* vif;
   list_for_every_entry (&cfg->vif_list, vif, struct brcmf_cfg80211_vif, list) {
-    if (vif->wdev.iftype == WLAN_MAC_ROLE_AP) {
+    if (vif->wdev.iftype == fuchsia_wlan_common_wire::WlanMacRole::kAp) {
       return vif->wdev.netdev;
     }
   }
@@ -551,16 +552,17 @@ zx_status_t brcmf_cfg80211_attach(struct brcmf_pub* drvr);
 void brcmf_cfg80211_detach(struct brcmf_cfg80211_info* cfg);
 zx_status_t brcmf_cfg80211_up(struct net_device* ndev);
 zx_status_t brcmf_cfg80211_down(struct net_device* ndev);
-uint16_t brcmf_cfg80211_get_iftype(struct brcmf_if* ifp);
+fuchsia_wlan_common_wire::WlanMacRole brcmf_cfg80211_get_iftype(struct brcmf_if* ifp);
 const char* brcmf_cfg80211_get_iface_str(struct net_device* ndev);
 
 zx_status_t brcmf_cfg80211_add_iface(struct brcmf_pub* drvr, const char* name,
                                      struct vif_params* params,
-                                     const wlan_phy_impl_create_iface_req_t* req,
+                                     fuchsia_wlan_phyimpl_wire::WlanPhyImplCreateIfaceRequest* req,
                                      struct wireless_dev** wdev_out);
 zx_status_t brcmf_cfg80211_del_iface(struct brcmf_cfg80211_info* cfg, struct wireless_dev* wdev);
 
-zx_status_t brcmf_alloc_vif(struct brcmf_cfg80211_info* cfg, uint16_t type,
+zx_status_t brcmf_alloc_vif(struct brcmf_cfg80211_info* cfg,
+                            fuchsia_wlan_common_wire::WlanMacRole type,
                             struct brcmf_cfg80211_vif** vif_out);
 void brcmf_free_vif(struct brcmf_cfg80211_vif* vif);
 

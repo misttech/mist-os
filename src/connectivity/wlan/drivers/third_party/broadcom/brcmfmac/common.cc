@@ -233,7 +233,8 @@ zx_status_t brcmf_get_meta_data(brcmf_if* ifp, wifi_config_t* config) {
 }
 
 /* Search through the given country code table and issue the iovar */
-zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlan_phy_country_t* country) {
+zx_status_t brcmf_set_country(brcmf_pub* drvr,
+                              const fuchsia_wlan_phyimpl_wire::WlanPhyCountry* country) {
   if (country == nullptr) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -243,9 +244,10 @@ zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlan_phy_country_t* country
   struct brcmf_fil_country_le ccreq;
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
-  const unsigned char* code = country->alpha2;
+  unsigned char code[fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len];
   int i;
 
+  memcpy(code, country->alpha2().data(), fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   BRCMF_DBG(TRACE, "Enter: code=%c%c", code[0], code[1]);
   // Get Broadcom WiFi Metadata by calling the bus specific function
   err = brcmf_get_meta_data(ifp, &config);
@@ -261,7 +263,8 @@ zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlan_phy_country_t* country
       BRCMF_ERR("Failed to find ccode %c%c in table", code[0], code[1]);
       return ZX_ERR_NOT_FOUND;
     }
-    if (memcmp(config.cc_table[i].cc_abbr, code, WLANPHY_ALPHA2_LEN) == 0) {
+    if (memcmp(config.cc_table[i].cc_abbr, code, fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len) ==
+        0) {
       ccreq.rev = config.cc_table[i].cc_rev;
       break;
     }
@@ -285,18 +288,22 @@ zx_status_t brcmf_set_country(brcmf_pub* drvr, const wlan_phy_country_t* country
   }
 
   // Back up the country code for recovery.
-  memcpy(drvr->last_country_code, code, WLANPHY_ALPHA2_LEN);
+  memcpy(drvr->last_country_code, code, fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
 
   return err;
 }
 
 /* Retrieve the current country code from the firmware */
-zx_status_t brcmf_get_country(brcmf_pub* drvr, wlan_phy_country_t* out_country) {
+zx_status_t brcmf_get_country(brcmf_pub* drvr, uint8_t* cc_code) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   struct brcmf_fil_country_le ccreq;
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
 
+  if (!cc_code) {
+    BRCMF_ERR("null cc_code");
+    return ZX_ERR_INTERNAL;
+  }
   // Get country info from firmware
   memset(&ccreq, 0, sizeof(ccreq));
   err = brcmf_fil_iovar_data_get(ifp, "country", &ccreq, sizeof(ccreq), &fw_err);
@@ -309,43 +316,45 @@ zx_status_t brcmf_get_country(brcmf_pub* drvr, wlan_phy_country_t* out_country) 
   // Log out the country code settings for reference
   BRCMF_INFO("Country code get ccode %.*s, abbrev %.*s, rev %d", BRCMF_COUNTRY_BUF_SZ, ccreq.ccode,
              BRCMF_COUNTRY_BUF_SZ, ccreq.country_abbrev, ccreq.rev);
-  memcpy(out_country->alpha2, ccreq.ccode, WLANPHY_ALPHA2_LEN);
+  memcpy(cc_code, ccreq.ccode, fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   return ZX_OK;
 }
 
 /* Set firmware country code to a world-safe one, which is "WW" in brcmfmac*/
 zx_status_t brcmf_clear_country(brcmf_pub* drvr) {
-  wlan_phy_country_t country = {};
+  const auto country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2({'W', 'W'});
   zx_status_t err;
 
   BRCMF_DBG(TRACE, "Enter");
-  country.alpha2[0] = country.alpha2[1] = 'W';
 
   err = brcmf_set_country(drvr, &country);
   if (err != ZX_OK) {
-    BRCMF_ERR("Failed to reset country code to %c%c", country.alpha2[0], country.alpha2[1]);
+    BRCMF_ERR("Failed to reset country code to %c%c", country.alpha2().data()[0],
+              country.alpha2().data()[1]);
   } else {
-    BRCMF_INFO("Country code reset to default: %c%c", country.alpha2[0], country.alpha2[1]);
+    BRCMF_INFO("Country code reset to default: %c%c", country.alpha2().data()[0],
+               country.alpha2().data()[1]);
   }
 
   return err;
 }
 
 /* Set Power Save Mode On/Off */
-zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr, const wlan_phy_ps_mode_t* ps_mode) {
+zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr,
+                                      const fuchsia_wlan_common_wire::PowerSaveType ps_type) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
   uint32_t fw_ps_mode;
 
-  switch (ps_mode->ps_mode) {
+  switch (ps_type) {
       // As per Synaptics PM_FAST is the only recommended power save setting.
-    case POWER_SAVE_TYPE_PS_MODE_ULTRA_LOW_POWER:
-    case POWER_SAVE_TYPE_PS_MODE_LOW_POWER:
-    case POWER_SAVE_TYPE_PS_MODE_BALANCED:
+    case fuchsia_wlan_common_wire::PowerSaveType::kPsModeUltraLowPower:
+    case fuchsia_wlan_common_wire::PowerSaveType::kPsModeLowPower:
+    case fuchsia_wlan_common_wire::PowerSaveType::kPsModeBalanced:
       fw_ps_mode = PM_FAST;
       break;
-    case POWER_SAVE_TYPE_PS_MODE_PERFORMANCE:
+    case fuchsia_wlan_common_wire::PowerSaveType::kPsModePerformance:
       fw_ps_mode = PM_OFF;
       break;
     default:
@@ -362,7 +371,8 @@ zx_status_t brcmf_set_power_save_mode(brcmf_pub* drvr, const wlan_phy_ps_mode_t*
 }
 
 /* Get Power Save Mode from FW */
-zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr, wlan_phy_ps_mode_t* out_ps_mode) {
+zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr,
+                                      fuchsia_wlan_common_wire::PowerSaveType* out_ps_mode) {
   struct brcmf_if* ifp = brcmf_get_ifp(drvr, 0);
   zx_status_t err;
   bcme_status_t fw_err = BCME_OK;
@@ -376,19 +386,20 @@ zx_status_t brcmf_get_power_save_mode(brcmf_pub* drvr, wlan_phy_ps_mode_t* out_p
   }
   switch (fw_ps_mode) {
     case PM_OFF:
-      out_ps_mode->ps_mode = POWER_SAVE_TYPE_PS_MODE_PERFORMANCE;
+      *out_ps_mode = fuchsia_wlan_common_wire::PowerSaveType::kPsModePerformance;
       break;
     case PM_FAST:
-      out_ps_mode->ps_mode = POWER_SAVE_TYPE_PS_MODE_BALANCED;
+      *out_ps_mode = fuchsia_wlan_common_wire::PowerSaveType::kPsModeBalanced;
       break;
     case PM_MAX:
-      out_ps_mode->ps_mode = POWER_SAVE_TYPE_PS_MODE_LOW_POWER;
+      *out_ps_mode = fuchsia_wlan_common_wire::PowerSaveType::kPsModeLowPower;
       break;
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
   return ZX_OK;
 }
+
 // This function applies configured platform specific iovars to the firmware
 static void brcmf_set_init_cfg_params(brcmf_if* ifp) {
   int i;
@@ -458,7 +469,7 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
   char* ptr;
   zx_status_t err;
   bcme_status_t fw_err;
-  const wlan_phy_country_t country = {{'W', 'W'}};
+  const auto country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2({'W', 'W'});
 
   err = brcmf_set_macaddr(ifp);
   if (err != ZX_OK) {
@@ -520,9 +531,10 @@ zx_status_t brcmf_c_preinit_dcmds(struct brcmf_if* ifp) {
 
   if (drvr->drvr_resetting.load()) {
     // If it's driver recovery process, reset the country code to the one before crash.
-    const wlan_phy_country_t reset_country = {
-        {drvr->last_country_code[0], drvr->last_country_code[1]}};
-    BRCMF_INFO("Recovering country code %c%c.", reset_country.alpha2[0], reset_country.alpha2[1]);
+    const auto reset_country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2(
+        {drvr->last_country_code[0], drvr->last_country_code[1]});
+    BRCMF_INFO("Recovering country code %c%c.", reset_country.alpha2().data()[0],
+               reset_country.alpha2().data()[1]);
     brcmf_set_country(drvr, &reset_country);
   } else {
     brcmf_set_country(drvr, &country);

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
+#include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <zircon/errors.h>
 
 #include <zxtest/zxtest.h>
@@ -24,7 +24,7 @@ class CountryCodeTest : public SimTest {
   void DeleteInterface();
   zx_status_t SetCountryCode(const fuchsia_wlan_phyimpl::wire::WlanPhyCountry* country);
   void GetCountryCodeFromFirmware(brcmf_fil_country_le* ccode);
-  zx_status_t SetCountryCodeInFirmware(const wlan_phy_country_t* country);
+  zx_status_t SetCountryCodeInFirmware(const fuchsia_wlan_phyimpl_wire::WlanPhyCountry* country);
   zx_status_t ClearCountryCode();
   uint32_t DeviceCountByProtocolId(uint32_t proto_id);
 
@@ -78,7 +78,8 @@ void CountryCodeTest::GetCountryCodeFromFirmware(brcmf_fil_country_le* ccode) {
   EXPECT_EQ(status, ZX_OK);
 }
 
-zx_status_t CountryCodeTest::SetCountryCodeInFirmware(const wlan_phy_country_t* country) {
+zx_status_t CountryCodeTest::SetCountryCodeInFirmware(
+    const fuchsia_wlan_phyimpl_wire::WlanPhyCountry* country) {
   EXPECT_NE(country, nullptr);
   brcmf_simdev* sim = device_->GetSim();
   return brcmf_set_country(sim->drvr, country);
@@ -104,7 +105,7 @@ TEST_F(CountryCodeTest, SetCCode) {
 
   // Get the country code and verify that it is set to WW.
   GetCountryCodeFromFirmware(&country_code);
-  code = memcmp(country_code.ccode, "WW", WLANPHY_ALPHA2_LEN);
+  code = memcmp(country_code.ccode, "WW", fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   ASSERT_EQ(code, 0);
 
   // Set an invalid CC and verify it fails
@@ -113,13 +114,14 @@ TEST_F(CountryCodeTest, SetCCode) {
 
   // Verify that it stays with the default
   GetCountryCodeFromFirmware(&country_code);
-  code = memcmp(country_code.ccode, "WW", WLANPHY_ALPHA2_LEN);
+  code = memcmp(country_code.ccode, "WW", fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   ASSERT_EQ(code, 0);
   // Set a valid CC and verify it succeeds
   status = SetCountryCode(&valid_country);
   ASSERT_EQ(status, ZX_OK);
   GetCountryCodeFromFirmware(&country_code);
-  code = memcmp(&valid_country.alpha2(), country_code.ccode, WLANPHY_ALPHA2_LEN);
+  code = memcmp(&valid_country.alpha2(), country_code.ccode,
+                fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   ASSERT_EQ(code, 0);
 }
 
@@ -128,7 +130,7 @@ TEST_F(CountryCodeTest, GetCCode) {
   CreateInterface();
 
   {
-    const wlan_phy_country_t country = {{'W', 'W'}};
+    const auto country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2({'W', 'W'});
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
@@ -140,7 +142,7 @@ TEST_F(CountryCodeTest, GetCCode) {
 
   // Try again, just in case the first one was a default value.
   {
-    const wlan_phy_country_t country = {{'U', 'S'}};
+    const auto country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2({'U', 'S'});
     ASSERT_EQ(ZX_OK, SetCountryCodeInFirmware(&country));
     auto result = client_.sync().buffer(test_arena_)->GetCountry();
     EXPECT_TRUE(result.ok());
@@ -152,7 +154,7 @@ TEST_F(CountryCodeTest, GetCCode) {
 }
 
 TEST_F(CountryCodeTest, ClearCCode) {
-  const wlan_phy_country_t world_safe_country = {{'W', 'W'}};
+  const auto world_safe_country = fuchsia_wlan_phyimpl_wire::WlanPhyCountry::WithAlpha2({'W', 'W'});
   struct brcmf_fil_country_le country_code;
   zx_status_t status;
   uint8_t code;
@@ -163,7 +165,8 @@ TEST_F(CountryCodeTest, ClearCCode) {
   status = ClearCountryCode();
   ASSERT_EQ(status, ZX_OK);
   GetCountryCodeFromFirmware(&country_code);
-  code = memcmp(world_safe_country.alpha2, country_code.ccode, WLANPHY_ALPHA2_LEN);
+  code = memcmp(world_safe_country.alpha2().data(), country_code.ccode,
+                fuchsia_wlan_phyimpl_wire::kWlanphyAlpha2Len);
   ASSERT_EQ(code, 0);
 }
 

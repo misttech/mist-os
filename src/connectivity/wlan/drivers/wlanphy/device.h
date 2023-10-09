@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.wlan.phyimpl/cpp/wire.h>
-#include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/channel_read.h>

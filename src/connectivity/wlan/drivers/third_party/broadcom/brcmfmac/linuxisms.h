@@ -36,7 +36,7 @@
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
-
+#include <fidl/fuchsia.wlan.common/cpp/wire.h>
 typedef uint16_t __be16;
 typedef uint32_t __be32;
 typedef uint64_t __be64;
@@ -208,7 +208,7 @@ struct vif_params {
 
 struct wireless_dev {
     struct net_device* netdev;
-    uint16_t iftype;
+    fuchsia_wlan_common::wire::WlanMacRole iftype;
     uint8_t address[ETH_ALEN];
 };
 

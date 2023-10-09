@@ -5,7 +5,6 @@
 #include "device.h"
 
 #include <fidl/fuchsia.wlan.device/cpp/wire.h>
-#include <fuchsia/hardware/wlanphyimpl/c/banjo.h>
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
 #include <lib/ddk/device.h>
@@ -227,8 +226,8 @@ void Device::SetCountry(SetCountryRequestView request, SetCountryCompleter::Sync
   constexpr uint32_t kTag = 'SCNT';
   fdf::Arena fdf_arena(kTag);
 
-  auto alpha2 = ::fidl::Array<uint8_t, WLANPHY_ALPHA2_LEN>();
-  memcpy(alpha2.data(), request->req.alpha2.data(), WLANPHY_ALPHA2_LEN);
+  auto alpha2 = ::fidl::Array<uint8_t, fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len>();
+  memcpy(alpha2.data(), request->req.alpha2.data(), fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len);
 
   auto out_country = fuchsia_wlan_phyimpl::wire::WlanPhyCountry::WithAlpha2(alpha2);
   client_.buffer(fdf_arena)
@@ -279,7 +278,8 @@ void Device::GetCountry(GetCountryCompleter::Sync& completer) {
           completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
           return;
         }
-        memcpy(resp.alpha2.data(), result->value()->alpha2().data(), WLANPHY_ALPHA2_LEN);
+        memcpy(resp.alpha2.data(), result->value()->alpha2().data(),
+               fuchsia_wlan_phyimpl::wire::kWlanphyAlpha2Len);
 
         completer.ReplySuccess(resp);
       });

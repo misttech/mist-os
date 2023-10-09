@@ -16,7 +16,6 @@ wlanphy_sources = [
 
 wlanphy_deps = [
   ":wlanphy_bind",
-  "//sdk/banjo/fuchsia.hardware.wlanphyimpl:fuchsia.hardware.wlanphyimpl_banjo_cpp",
   "//sdk/fidl/fuchsia.wlan.device:fuchsia.wlan.device_cpp",
   "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
   "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",

@@ -19,6 +19,7 @@
 #include "zircon/system/ulib/sync/include/lib/sync/cpp/completion.h"
 
 namespace wlan_fullmac_wire = fuchsia_wlan_fullmac::wire;
+namespace wlan_phyimpl_wire = fuchsia_wlan_phyimpl::wire;
 
 namespace wlan::brcmfmac {
 
