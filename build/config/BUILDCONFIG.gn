@@ -689,6 +689,9 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
   #
   template("_${_target_type}_internal_wrapper") {
     target(_target_type, target_name) {
+      # Capture the target name prior to forwarding variables. See fxb/133723.
+      _target_label = get_label_info(":${target_name}", "label_with_toolchain")
+
       forward_variables_from(invoker,
                              "*",
                              [
@@ -723,8 +726,7 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
         }
         applicable_licenses = [
           {
-            target_label =
-                get_label_info(":${target_name}", "label_with_toolchain")
+            target_label = _target_label
             target_type = _target_type
             license_labels = _applicable_licenses
           },
