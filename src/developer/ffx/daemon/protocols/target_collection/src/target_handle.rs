@@ -196,6 +196,7 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async::Task;
+    use futures::StreamExt;
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
     use std::{
@@ -279,66 +280,57 @@ mod tests {
 
     fn spawn_protocol_provider(
         nodename: String,
-        server: fidl::endpoints::ServerEnd<fidl_fuchsia_overnet::ServiceProviderMarker>,
+        mut receiver: futures::channel::mpsc::UnboundedReceiver<fidl::Channel>,
     ) -> Task<()> {
         Task::local(async move {
-            let mut stream = server.into_stream().unwrap();
-            while let Ok(Some(req)) = stream.try_next().await {
-                match req {
-                    fidl_fuchsia_overnet::ServiceProviderRequest::ConnectToService {
-                        chan, ..
-                    } => {
-                        let server_end =
-                            fidl::endpoints::ServerEnd::<fidl_rcs::RemoteControlMarker>::new(chan);
-                        let mut stream = server_end.into_stream().unwrap();
-                        let nodename = nodename.clone();
-                        Task::local(async move {
-                            let mut knock_channels = Vec::new();
-                            while let Ok(Some(req)) = stream.try_next().await {
-                                match req {
-                                    fidl_rcs::RemoteControlRequest::IdentifyHost { responder } => {
-                                        let addrs = vec![fidl_fuchsia_net::Subnet {
-                                            addr: fidl_fuchsia_net::IpAddress::Ipv4(
-                                                fidl_fuchsia_net::Ipv4Address {
-                                                    addr: [192, 168, 1, 2],
-                                                },
-                                            ),
-                                            prefix_len: 24,
-                                        }];
-                                        let nodename = Some(nodename.clone());
-                                        responder
-                                            .send(Ok(&fidl_rcs::IdentifyHostResponse {
-                                                nodename,
-                                                addresses: Some(addrs),
-                                                ..Default::default()
-                                            }))
-                                            .unwrap();
-                                    }
-                                    fidl_rcs::RemoteControlRequest::OpenCapability {
-                                        moniker,
-                                        capability_set,
-                                        capability_name,
-                                        server_channel,
-                                        flags,
-                                        responder,
-                                    } => {
-                                        assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                                        assert_eq!(flags, fio::OpenFlags::empty());
-                                        assert_eq!(moniker, "/core/remote-control");
-                                        assert_eq!(
-                                            capability_name,
-                                            "fuchsia.developer.remotecontrol.RemoteControl"
-                                        );
-                                        knock_channels.push(server_channel);
-                                        responder.send(Ok(())).unwrap();
-                                    }
-                                    _ => panic!("unsupported for this test"),
-                                }
+            while let Some(chan) = receiver.next().await {
+                let server_end =
+                    fidl::endpoints::ServerEnd::<fidl_rcs::RemoteControlMarker>::new(chan);
+                let mut stream = server_end.into_stream().unwrap();
+                let nodename = nodename.clone();
+                Task::local(async move {
+                    let mut knock_channels = Vec::new();
+                    while let Ok(Some(req)) = stream.try_next().await {
+                        match req {
+                            fidl_rcs::RemoteControlRequest::IdentifyHost { responder } => {
+                                let addrs = vec![fidl_fuchsia_net::Subnet {
+                                    addr: fidl_fuchsia_net::IpAddress::Ipv4(
+                                        fidl_fuchsia_net::Ipv4Address { addr: [192, 168, 1, 2] },
+                                    ),
+                                    prefix_len: 24,
+                                }];
+                                let nodename = Some(nodename.clone());
+                                responder
+                                    .send(Ok(&fidl_rcs::IdentifyHostResponse {
+                                        nodename,
+                                        addresses: Some(addrs),
+                                        ..Default::default()
+                                    }))
+                                    .unwrap();
                             }
-                        })
-                        .detach();
+                            fidl_rcs::RemoteControlRequest::OpenCapability {
+                                moniker,
+                                capability_set,
+                                capability_name,
+                                server_channel,
+                                flags,
+                                responder,
+                            } => {
+                                assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
+                                assert_eq!(flags, fio::OpenFlags::empty());
+                                assert_eq!(moniker, "/core/remote-control");
+                                assert_eq!(
+                                    capability_name,
+                                    "fuchsia.developer.remotecontrol.RemoteControl"
+                                );
+                                knock_channels.push(server_channel);
+                                responder.send(Ok(())).unwrap();
+                            }
+                            _ => panic!("unsupported for this test"),
+                        }
                     }
-                }
+                })
+                .detach();
             }
         })
     }
@@ -386,13 +378,15 @@ mod tests {
             )
             .await
         });
-        let (client, server) =
-            fidl::endpoints::create_endpoints::<fidl_fuchsia_overnet::ServiceProviderMarker>();
-        let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), server);
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let _svc_task = spawn_protocol_provider(TEST_NODE_NAME.to_owned(), receiver);
         node2
-            .register_service_legacy(
+            .register_service(
                 fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
-                client,
+                move |chan, _| {
+                    let _ = sender.unbounded_send(chan);
+                    Ok(())
+                },
             )
             .await
             .unwrap();
