@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageResourcesInfo", "FuchsiaUnitTestComponentInfo")
-load(":utils.bzl", "make_resource_struct", "rule_variant", "rule_variants")
+load(":utils.bzl", "label_name", "make_resource_struct", "rule_variant", "rule_variants")
 
 def fuchsia_component(name, manifest, deps = None, **kwargs):
     """Creates a Fuchsia component that can be added to a package.
@@ -101,6 +101,7 @@ def _fuchsia_component_impl(ctx):
         FuchsiaComponentInfo(
             name = component_name,
             manifest = manifest,
+            label_name = label_name(str(ctx.label)),
             resources = resources,
             is_driver = ctx.attr.is_driver,
             is_test = ctx.attr._variant == "test",

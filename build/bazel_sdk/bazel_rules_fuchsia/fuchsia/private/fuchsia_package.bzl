@@ -15,6 +15,7 @@ load(
     "FuchsiaDriverToolInfo",
     "FuchsiaPackageInfo",
     "FuchsiaPackageResourcesInfo",
+    "FuchsiaPackagedComponentInfo",
 )
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
@@ -204,8 +205,7 @@ def _build_fuchsia_package_impl(ctx):
 
     # Resources that we will pass through the debug symbol stripping process
     resources_to_strip = []
-    components = []
-    drivers = []
+    packaged_components = []
 
     # Verify correctness of test vs non-test components.
     for test_component in ctx.attr.test_components:
@@ -221,10 +221,11 @@ def _build_fuchsia_package_impl(ctx):
             component_info = dep[FuchsiaComponentInfo]
             component_manifest = component_info.manifest
             component_dest = "meta/%s" % (component_manifest.basename)
-            components.append(component_dest)
 
-            if component_info.is_driver:
-                drivers.append(component_dest)
+            packaged_components.append(FuchsiaPackagedComponentInfo(
+                component_info = component_info,
+                dest = component_dest,
+            ))
 
             package_resources.append(
                 # add the component manifest
@@ -350,6 +351,10 @@ def _build_fuchsia_package_impl(ctx):
         else:
             collected_blobs[resource.dest] = resource.src.path
 
+    # TODO: Remove usages of components and drivers in favor of the packaged_components
+    components = [c.dest for c in packaged_components]
+    drivers = [c.dest for c in packaged_components if c.component_info.is_driver]
+
     return [
         DefaultInfo(files = depset(output_files), executable = stub_executable(ctx)),
         FuchsiaPackageInfo(
@@ -361,7 +366,7 @@ def _build_fuchsia_package_impl(ctx):
             drivers = drivers,
             meta_far = meta_far,
             package_resources = package_resources,
-
+            packaged_components = packaged_components,
             # TODO: Remove this field, change usages to FuchsiaDebugSymbolInfo.
             build_id_dir = get_build_id_dirs(_debug_info)[0],
         ),

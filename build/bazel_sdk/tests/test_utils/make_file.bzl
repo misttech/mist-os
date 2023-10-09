@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 def _make_file_impl(ctx):
-    f = ctx.actions.declare_file(ctx.label.name + "_" + ctx.attr.filename)
+    f = ctx.actions.declare_file(ctx.attr.filename)
     ctx.actions.write(f, ctx.attr.content)
     return DefaultInfo(files = depset([f]))
 

@@ -5,7 +5,7 @@
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_package")
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 
 ## Name Tests
 def _name_test_impl(ctx):
@@ -100,6 +100,18 @@ def _dependencies_test_impl(ctx):
         env,
         sorted(package_info.drivers),
         sorted(ctx.attr.expected_drivers),
+    )
+
+    asserts.equals(
+        env,
+        sorted([c.dest for c in package_info.packaged_components]),
+        sorted(package_info.components),
+    )
+
+    asserts.equals(
+        env,
+        sorted([c.dest for c in package_info.packaged_components if c.component_info.is_driver]),
+        sorted(package_info.drivers),
     )
 
     return analysistest.end(env)

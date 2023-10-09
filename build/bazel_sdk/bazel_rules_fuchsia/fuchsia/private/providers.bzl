@@ -24,10 +24,19 @@ FuchsiaComponentInfo = provider(
     "Contains information about a fuchsia component",
     fields = {
         "name": "name of the component",
+        "label_name": "The original label name used to build this component as a string",
         "manifest": "A file representing the compiled component manifest file",
         "resources": "any additional resources the component needs",
         "is_driver": "True if this is a driver",
         "is_test": "True if this is a test component",
+    },
+)
+
+FuchsiaPackagedComponentInfo = provider(
+    "Contains information about a fuchsia component that has been included in a package",
+    fields = {
+        "component_info": "The original FuchsiaComponentInfo provider",
+        "dest": "The install location for this component in a package (meta/foo.cm)",
     },
 )
 
@@ -118,8 +127,9 @@ FuchsiaPackageInfo = provider(
         "meta_far": "The meta.far file",
         "files": "all files that compose this package, including the manifest and meta.far",
         "build_id_dir": "Directory containing the debug symbols",
-        "components": "A list of all of the component manifest strings inclusive of driver components.",
-        "drivers": "A list of driver manifest strings.",
+        "components": "(deprecated: use packaged_components instead) A list of all of the component manifest strings inclusive of driver components.",
+        "drivers": "(deprecated: use packaged_components instead) A list of driver manifest strings.",
+        "packaged_components": "A list of all the components in the form of FuchsiaPackagedComponentInfo structs",
         "package_resources": "A list of resources added to this package",
     },
 )
