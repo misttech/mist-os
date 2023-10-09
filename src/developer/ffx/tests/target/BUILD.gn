@@ -24,10 +24,12 @@ if (is_host && target_cpu == "x64" && build_uefi_disk &&
     sources = [ "src/tests.rs" ]
 
     deps = [
+      "//src/developer/ffx/lib/isolate:lib",
       "//src/developer/ffx/testing:ffx_testing",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-async",
       "//src/lib/testing/fixture",
+      "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:futures",
     ]
 
