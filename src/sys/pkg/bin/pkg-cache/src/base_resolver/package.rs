@@ -8,13 +8,13 @@ use {
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
     futures::stream::TryStreamExt as _,
-    std::collections::HashMap,
+    std::{collections::HashMap, sync::Arc},
     tracing::error,
 };
 
 pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
-    base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {

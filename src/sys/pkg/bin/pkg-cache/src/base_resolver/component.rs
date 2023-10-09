@@ -10,14 +10,14 @@ use {
     fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg as fpkg,
     futures::stream::TryStreamExt as _,
-    std::collections::HashMap,
+    std::{collections::HashMap, sync::Arc},
     tracing::error,
     version_history::AbiRevision,
 };
 
 pub(crate) async fn serve_request_stream(
     mut stream: fcomponent_resolution::ResolverRequestStream,
-    base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
+    base_packages: Arc<HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>>,
     authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {

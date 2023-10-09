@@ -170,7 +170,8 @@ async fn main_inner() -> Result<(), Error> {
     inspector
         .root()
         .record_string("executability-restrictions", format!("{executability_restrictions:?}"));
-    let base_resolver_base_packages = base_packages.root_package_urls_and_hashes().clone();
+    let base_resolver_base_packages =
+        Arc::new(base_packages.root_package_urls_and_hashes().clone());
     let base_packages = Arc::new(base_packages);
     inspector.root().record_lazy_child("base-packages", base_packages.record_lazy_inspect());
     let package_index = Arc::new(async_lock::RwLock::new(package_index));
@@ -273,7 +274,7 @@ async fn main_inner() -> Result<(), Error> {
             .context("adding fuchsia.space/Manager to /svc")?;
     }
     {
-        let base_resolver_base_packages = base_resolver_base_packages.clone();
+        let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
         let blobfs = blobfs.clone();
         let () = svc_dir
@@ -283,7 +284,7 @@ async fn main_inner() -> Result<(), Error> {
                     move |stream: fidl_fuchsia_pkg::PackageResolverRequestStream| {
                         base_resolver::package::serve_request_stream(
                             stream,
-                            base_resolver_base_packages.clone(),
+                            Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
                             blobfs.clone(),
                         )
@@ -296,7 +297,7 @@ async fn main_inner() -> Result<(), Error> {
             .context("adding fuchsia.space/Manager to /svc")?;
     }
     {
-        let base_resolver_base_packages = base_resolver_base_packages.clone();
+        let base_resolver_base_packages = Arc::clone(&base_resolver_base_packages);
         let authenticator = authenticator.clone();
         let blobfs = blobfs.clone();
         let () = svc_dir
@@ -306,7 +307,7 @@ async fn main_inner() -> Result<(), Error> {
                     move |stream: fidl_fuchsia_component_resolution::ResolverRequestStream| {
                         base_resolver::component::serve_request_stream(
                             stream,
-                            base_resolver_base_packages.clone(),
+                            Arc::clone(&base_resolver_base_packages),
                             authenticator.clone(),
                             blobfs.clone(),
                         )
