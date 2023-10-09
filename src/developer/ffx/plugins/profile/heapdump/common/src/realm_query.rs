@@ -9,7 +9,7 @@ use fidl::{endpoints::DiscoverableProtocolMarker, Status};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
-use fidl_fuchsia_sys2::RealmQueryProxy;
+use fidl_fuchsia_sys2::{OpenDirType, RealmQueryProxy};
 
 const COLLECTOR_CAPABILITY: &str = fheapdump_client::CollectorMarker::PROTOCOL_NAME;
 
@@ -62,8 +62,9 @@ pub async fn connect_to_collector(
     let (collector_proxy, collector_server) =
         fidl::endpoints::create_proxy::<fheapdump_client::CollectorMarker>()?;
     remote_control
-        .connect_capability(
+        .open_capability(
             &moniker,
+            OpenDirType::ExposedDir,
             fheapdump_client::CollectorMarker::PROTOCOL_NAME,
             collector_server.into_channel(),
             OpenFlags::empty(),

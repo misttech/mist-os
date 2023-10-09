@@ -23,6 +23,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy};
 use fidl_fuchsia_io::OpenFlags;
+use fidl_fuchsia_sys2 as fsys;
 use future::select;
 use futures::{
     io::{AsyncRead, AsyncWrite},
@@ -586,8 +587,9 @@ impl<T: AsyncRead + AsyncWrite + Unpin> FastbootImpl<T> {
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
         self.get_remote_proxy(overnet_node)
             .await?
-            .connect_capability(
+            .open_capability(
                 ADMIN_MONIKER,
+                fsys::OpenDirType::ExposedDir,
                 AdminMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
                 OpenFlags::empty(),

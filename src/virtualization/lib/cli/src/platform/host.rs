@@ -9,6 +9,7 @@ use {
     fidl::endpoints::{create_proxy, DiscoverableProtocolMarker},
     fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
     fidl_fuchsia_io::OpenFlags,
+    fidl_fuchsia_sys2 as fsys,
     fidl_fuchsia_virtualization::{
         GuestManagerMarker, GuestManagerProxy, LinuxManagerMarker, LinuxManagerProxy,
     },
@@ -32,8 +33,9 @@ impl PlatformServices for HostPlatformServices {
         // This may fail, but we report the error when we later try to use the GuestManagerProxy.
         let _ = self
             .remote_control
-            .connect_capability(
+            .open_capability(
                 guest_type.moniker(),
+                fsys::OpenDirType::ExposedDir,
                 guest_type.guest_manager_interface(),
                 server_end.into_channel(),
                 OpenFlags::RIGHT_READABLE,
@@ -47,8 +49,9 @@ impl PlatformServices for HostPlatformServices {
         // This may fail, but we report the error when we later try to use the LinuxManagerProxy.
         let _ = self
             .remote_control
-            .connect_capability(
+            .open_capability(
                 GuestType::Termina.moniker(),
+                fsys::OpenDirType::ExposedDir,
                 LinuxManagerMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
                 OpenFlags::RIGHT_READABLE,

@@ -63,8 +63,9 @@ impl DriverConnector {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
                 .with_context(|| format!("failed to create proxy to {}", S::DEBUG_NAME))?;
             remote_control
-                .connect_capability(
+                .open_capability(
                     moniker,
+                    fsys::OpenDirType::ExposedDir,
                     capability,
                     server_end.into_channel(),
                     fio::OpenFlags::empty(),

@@ -131,9 +131,11 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = rcs_stream.try_next().await {
                 match req {
-                    RemoteControlRequest::ConnectCapability { responder, server_chan, .. } => {
+                    RemoteControlRequest::OpenCapability { responder, server_channel, .. } => {
                         fuchsia_async::Task::local(async move {
-                            let _service_chan = server_chan; // just hold the channel open to make the test succeed. No need to actually use it.
+                            // just hold the channel open to make the test succeed. No need to
+                            // actually use it.
+                            let _service_chan = server_channel;
                             std::future::pending::<()>().await;
                         })
                         .detach();

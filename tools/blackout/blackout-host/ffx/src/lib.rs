@@ -12,6 +12,7 @@ use {
     fidl_fuchsia_blackout_test as fblackout,
     fidl_fuchsia_developer_remotecontrol as fremotecontrol,
     fidl_fuchsia_io::OpenFlags,
+    fidl_fuchsia_sys2 as fsys,
     fuchsia_zircon_status::Status,
 };
 
@@ -22,8 +23,9 @@ async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
 ) -> Result<S::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()?;
     remote_control
-        .connect_capability(
+        .open_capability(
             moniker,
+            fsys::OpenDirType::ExposedDir,
             S::PROTOCOL_NAME,
             server_end.into_channel(),
             OpenFlags::empty(),

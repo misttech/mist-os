@@ -229,23 +229,24 @@ mod test {
         fn new(repo_manager: FakeRepositoryManager, engine: FakeEngine) -> RemoteControlProxy {
             let fake_rcs_proxy: RemoteControlProxy =
                 fho::testing::fake_proxy(move |req| match req {
-                    frcs::RemoteControlRequest::ConnectCapability {
+                    frcs::RemoteControlRequest::OpenCapability {
                         moniker: _,
+                        capability_set: _,
                         capability_name,
-                        server_chan,
+                        server_channel,
                         flags: _,
                         responder,
                     } => {
                         match capability_name.as_str() {
                             RepositoryManagerMarker::PROTOCOL_NAME => repo_manager.spawn(
                                 fidl::endpoints::ServerEnd::<RepositoryManagerMarker>::new(
-                                    server_chan,
+                                    server_channel,
                                 )
                                 .into_stream()
                                 .unwrap(),
                             ),
                             EngineMarker::PROTOCOL_NAME => engine.spawn(
-                                fidl::endpoints::ServerEnd::<EngineMarker>::new(server_chan)
+                                fidl::endpoints::ServerEnd::<EngineMarker>::new(server_channel)
                                     .into_stream()
                                     .unwrap(),
                             ),

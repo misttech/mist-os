@@ -27,6 +27,7 @@ use {
     fidl_fuchsia_io::OpenFlags,
     fidl_fuchsia_memory::MonitorProxy,
     fidl_fuchsia_memory_inspection::CollectorProxy,
+    fidl_fuchsia_sys2 as fsys,
     futures::AsyncReadExt,
     plugin_output::ProfileMemoryOutput,
     std::io::Write,
@@ -90,8 +91,9 @@ async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
         .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
     remote_control
-        .connect_capability(
+        .open_capability(
             moniker,
+            fsys::OpenDirType::ExposedDir,
             S::PROTOCOL_NAME,
             server_end.into_channel(),
             OpenFlags::empty(),

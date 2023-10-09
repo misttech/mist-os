@@ -213,7 +213,7 @@ async fn handle_log_settings(channel: fidl::Channel, mut scheduler: TaskSchedule
     scheduler.send_event(TestEvent::LogSettingsConnectionClosed);
 }
 
-async fn handle_connect_capability(
+async fn handle_open_capability(
     capability_name: &str,
     channel: fidl::Channel,
     scheduler: TaskScheduler,
@@ -249,16 +249,17 @@ pub async fn handle_rcs_connection(
                     }))
                     .unwrap();
             }
-            RemoteControlRequest::ConnectCapability {
+            RemoteControlRequest::OpenCapability {
                 moniker: _,
+                capability_set: _,
                 capability_name,
-                server_chan,
+                server_channel,
                 flags: _,
                 responder,
             } => {
                 let scheduler_2 = scheduler.clone();
                 scheduler.spawn(async move {
-                    handle_connect_capability(&capability_name, server_chan, scheduler_2).await
+                    handle_open_capability(&capability_name, server_channel, scheduler_2).await
                 });
                 responder.send(Ok(())).unwrap();
             }

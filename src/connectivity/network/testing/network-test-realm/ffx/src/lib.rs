@@ -15,6 +15,7 @@ use fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6;
 use fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_test_realm as fntr;
+use fidl_fuchsia_sys2 as fsys;
 use tracing::error;
 
 async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
@@ -24,8 +25,9 @@ async fn connect_to_protocol<S: fidl::endpoints::DiscoverableProtocolMarker>(
     let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
         .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
     remote_control
-        .connect_capability(
+        .open_capability(
             moniker,
+            fsys::OpenDirType::ExposedDir,
             S::PROTOCOL_NAME,
             server_end.into_channel(),
             fio::OpenFlags::empty(),

@@ -194,6 +194,7 @@ mod tests {
     use fidl::prelude::*;
     use fidl_fuchsia_developer_remotecontrol as fidl_rcs;
     use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async::Task;
     use protocols::testing::FakeDaemonBuilder;
     use rcs::RcsConnection;
@@ -313,20 +314,22 @@ mod tests {
                                             }))
                                             .unwrap();
                                     }
-                                    fidl_rcs::RemoteControlRequest::ConnectCapability {
+                                    fidl_rcs::RemoteControlRequest::OpenCapability {
                                         moniker,
+                                        capability_set,
                                         capability_name,
-                                        server_chan,
+                                        server_channel,
                                         flags,
                                         responder,
                                     } => {
+                                        assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
                                         assert_eq!(flags, fio::OpenFlags::empty());
                                         assert_eq!(moniker, "/core/remote-control");
                                         assert_eq!(
                                             capability_name,
                                             "fuchsia.developer.remotecontrol.RemoteControl"
                                         );
-                                        knock_channels.push(server_chan);
+                                        knock_channels.push(server_channel);
                                         responder.send(Ok(())).unwrap();
                                     }
                                     _ => panic!("unsupported for this test"),

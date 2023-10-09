@@ -111,8 +111,9 @@ impl HostArchiveReader {
 
                 let (client, server) = fidl::endpoints::create_endpoints::<ArchiveAccessorMarker>();
                 self.rcs_proxy
-                    .connect_capability(
+                    .open_capability(
                         &format!("/{}", moniker_and_protocol.moniker),
+                        fsys2::OpenDirType::ExposedDir,
                         &moniker_and_protocol.protocol,
                         server.into_channel(),
                         OpenFlags::empty(),

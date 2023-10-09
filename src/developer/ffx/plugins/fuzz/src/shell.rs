@@ -11,6 +11,7 @@ use {
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_fuzzer as fuzz,
     fidl_fuchsia_io::OpenFlags,
+    fidl_fuchsia_sys2 as fsys,
     fuchsia_fuzzctl::{get_corpus_type, get_fuzzer_urls, Duration, Manager, OutputSink, Writer},
     futures::{pin_mut, select, FutureExt},
     serde_json::json,
@@ -617,14 +618,15 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
             .context("failed to create proxy for fuchsia.fuzzer.Manager")?;
         let result = self
             .remote_control
-            .connect_capability(
+            .open_capability(
                 "/core/fuzz-manager",
+                fsys::OpenDirType::ExposedDir,
                 fuzz::ManagerMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
                 OpenFlags::empty(),
             )
             .await
-            .context("fuchsia.developer.remotecontrol/ConnectCapability")?;
+            .context("fuchsia.developer.remotecontrol/OpenCapability")?;
         result.map_err(|e| anyhow!("{:?}", e)).context("failed to connect to fuzz-manager")?;
         Ok(Manager::new(proxy))
     }
@@ -661,7 +663,7 @@ mod test_fixtures {
         fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _, ServerEnd},
         fidl_fuchsia_developer_remotecontrol as rcs,
         fidl_fuchsia_fuzzer::{self as fuzz, Result_ as FuzzResult},
-        fuchsia_async as fasync,
+        fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
         fuchsia_fuzzctl::Duration,
         fuchsia_fuzzctl_test::{
             create_task, serve_manager, BufferSink, FakeController, Test, TEST_URL,
@@ -808,16 +810,18 @@ mod test_fixtures {
         let mut task = None;
         while let Some(request) = stream.next().await {
             match request {
-                Ok(rcs::RemoteControlRequest::ConnectCapability {
+                Ok(rcs::RemoteControlRequest::OpenCapability {
                     moniker,
+                    capability_set,
                     capability_name,
                     flags: _,
-                    server_chan,
+                    server_channel,
                     responder,
                 }) => {
                     assert_eq!(moniker, "/core/fuzz-manager");
+                    assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
                     assert_eq!(capability_name, fuzz::ManagerMarker::PROTOCOL_NAME);
-                    let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_chan);
+                    let server_end = ServerEnd::<fuzz::ManagerMarker>::new(server_channel);
                     responder.send(Ok(()))?;
                     task =
                         Some(create_task(serve_manager(server_end, test.clone()), test.writer()));

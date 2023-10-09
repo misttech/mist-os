@@ -11,7 +11,7 @@ use fidl::{
     Channel,
 };
 use fidl_fuchsia_developer_remotecontrol::{
-    RemoteControlConnectCapabilityResponder, RemoteControlMarker, RemoteControlProxy,
+    RemoteControlMarker, RemoteControlOpenCapabilityResponder, RemoteControlProxy,
     RemoteControlRequest,
 };
 use fidl_fuchsia_diagnostics::{
@@ -20,6 +20,7 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, ArchiveAccessorRequest,
 };
+use fidl_fuchsia_sys2 as fsys;
 use futures::{AsyncWriteExt, StreamExt, TryStreamExt};
 use iquery_test_support;
 use std::sync::{Arc, Mutex};
@@ -141,17 +142,19 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                     fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
                     responder.send(Ok(())).unwrap();
                 }
-                RemoteControlRequest::ConnectCapability {
+                RemoteControlRequest::OpenCapability {
                     moniker,
+                    capability_set,
                     capability_name,
-                    server_chan,
+                    server_channel,
                     flags: _,
                     responder,
                 } => {
+                    assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
                     assert_eq!(moniker, expected_moniker);
                     assert_eq!(capability_name, expected_protocol);
                     let task =
-                        handle_remote_control_connect(responder, server_chan, accessor_proxy);
+                        handle_remote_control_connect(responder, server_channel, accessor_proxy);
                     let mut tasks = running_tasks_clone.lock().unwrap();
                     tasks.push(task);
                 }
@@ -167,7 +170,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
 }
 
 fn handle_remote_control_connect(
-    responder: RemoteControlConnectCapabilityResponder,
+    responder: RemoteControlOpenCapabilityResponder,
     service_chan: Channel,
     accessor_proxy: ArchiveAccessorProxy,
 ) -> fuchsia_async::Task<()> {

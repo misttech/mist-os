@@ -7,6 +7,7 @@ use async_lock::Mutex;
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_io::OpenFlags;
+use fidl_fuchsia_sys2 as fsys;
 use fidl_test_proxy_stress::{StressorMarker, StressorProxy};
 use fuchsia_async as fasync;
 use std::path::{Path, PathBuf};
@@ -49,8 +50,9 @@ impl LaunchedComponentConnector {
         loop {
             let (proxy, server_end) = create_proxy::<StressorMarker>()?;
             match rcs_proxy
-                .connect_capability(
+                .open_capability(
                     &moniker,
+                    fsys::OpenDirType::ExposedDir,
                     StressorMarker::PROTOCOL_NAME,
                     server_end.into_channel(),
                     OpenFlags::empty(),

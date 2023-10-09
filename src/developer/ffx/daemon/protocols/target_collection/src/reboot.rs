@@ -22,6 +22,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_hardware_power_statecontrol::{AdminMarker, AdminProxy, RebootReason};
 use fidl_fuchsia_io::OpenFlags;
+use fidl_fuchsia_sys2 as fsys;
 use futures::{try_join, TryFutureExt, TryStreamExt};
 use std::net::IpAddr;
 use std::process::Command;
@@ -81,8 +82,9 @@ impl RebootController {
             fidl::endpoints::create_proxy::<AdminMarker>().map_err(|e| anyhow!(e))?;
         self.get_remote_proxy()
             .await?
-            .connect_capability(
+            .open_capability(
                 ADMIN_MONIKER,
+                fsys::OpenDirType::ExposedDir,
                 AdminMarker::PROTOCOL_NAME,
                 server_end.into_channel(),
                 OpenFlags::empty(),
@@ -425,8 +427,8 @@ mod tests {
         fuchsia_async::Task::local(async move {
             while let Ok(Some(req)) = stream.try_next().await {
                 match req {
-                    RemoteControlRequest::ConnectCapability { server_chan, responder, .. } => {
-                        setup_admin(server_chan).unwrap();
+                    RemoteControlRequest::OpenCapability { server_channel, responder, .. } => {
+                        setup_admin(server_channel).unwrap();
                         responder.send(Ok(())).unwrap();
                     }
                     _ => assert!(false),

@@ -136,7 +136,7 @@ impl RemoteControlService {
             } => {
                 responder.send(
                     self.clone()
-                        .connect_capability(
+                        .open_capability(
                             moniker,
                             fsys::OpenDirType::ExposedDir,
                             capability_name,
@@ -157,7 +157,7 @@ impl RemoteControlService {
             } => {
                 responder.send(
                     self.clone()
-                        .connect_capability(
+                        .open_capability(
                             moniker,
                             capability_set,
                             capability_name,
@@ -419,7 +419,7 @@ impl RemoteControlService {
 
     /// Connects to a capability identified by the given moniker in the specified set of
     /// capabilities at the given capability name.
-    async fn connect_capability(
+    async fn open_capability(
         self: &Rc<Self>,
         moniker: String,
         capability_set: fsys::OpenDirType,

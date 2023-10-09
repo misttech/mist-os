@@ -7,8 +7,7 @@ use errors;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_remotecontrol::{
-    ConnectCapabilityError, IdentifyHostError, RemoteControlConnectCapabilityResult,
-    RemoteControlMarker, RemoteControlProxy,
+    ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
 use futures::{StreamExt, TryFutureExt};
@@ -160,8 +159,9 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     let knock_client = fuchsia_async::Channel::from_channel(knock_client)?;
     let knock_client = fidl::client::Client::new(knock_client, "knock_client");
     rcs_proxy
-        .connect_capability(
+        .open_capability(
             "/core/remote-control",
+            OpenDirType::ExposedDir,
             RemoteControlMarker::PROTOCOL_NAME,
             knock_remote,
             OpenFlags::empty(),
@@ -176,26 +176,6 @@ async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsEr
     }
 }
 
-/// Compatibility shim that will use [`RemoteControlProxy::connect_capability`]
-/// when `capability_set` is [`OpenDirType::ExposedDir`] or
-/// [`RemoteControlProxy::open_capability`] otherwise, since older targets may
-/// not support connecting to anything other than exposed.
-async fn open_capability(
-    proxy: &RemoteControlProxy,
-    moniker: &str,
-    capability_set: OpenDirType,
-    capability_name: &str,
-    server: fidl::Channel,
-    flags: OpenFlags,
-) -> Result<RemoteControlConnectCapabilityResult, fidl::Error> {
-    match capability_set {
-        OpenDirType::ExposedDir => {
-            proxy.connect_capability(moniker, capability_name, server, flags).await
-        }
-        _ => proxy.open_capability(moniker, capability_set, capability_name, server, flags).await,
-    }
-}
-
 pub async fn open_with_timeout_at(
     dur: Duration,
     moniker: &str,
@@ -204,15 +184,14 @@ pub async fn open_with_timeout_at(
     rcs_proxy: &RemoteControlProxy,
     server_end: fidl::Channel,
 ) -> Result<()> {
-    let connect_capability_fut = open_capability(
-        rcs_proxy,
+    let open_capability_fut = rcs_proxy.open_capability(
         moniker,
         capability_set,
         capability_name,
         server_end,
         OpenFlags::empty(),
     );
-    timeout::timeout(dur, connect_capability_fut
+    timeout::timeout(dur, open_capability_fut
         .map_ok_or_else(|e| Result::<(), anyhow::Error>::Err(anyhow::anyhow!(e)), |fidl_result| {
             fidl_result.map(|_| ()).map_err(|e| {
                     match e {

@@ -30,6 +30,7 @@ use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlPro
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_overnet::Peer;
 use fidl_fuchsia_overnet_protocol::NodeId;
+use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::{Task, TimeoutExt, Timer};
 use futures::{
     channel::{mpsc, oneshot},
@@ -242,7 +243,13 @@ impl DaemonProtocolProvider for Daemon {
 
         // TODO(awdavies): Handle these errors properly so the client knows what happened.
         rcs.proxy
-            .connect_capability(moniker, capability_name, server, OpenFlags::empty())
+            .open_capability(
+                moniker,
+                fsys::OpenDirType::ExposedDir,
+                capability_name,
+                server,
+                OpenFlags::empty(),
+            )
             .await
             .context("FIDL connection")?
             .map_err(|e| anyhow!("{:#?}", e))

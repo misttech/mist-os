@@ -21,6 +21,7 @@ use fidl_fuchsia_net_root as froot;
 use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
+use fidl_fuchsia_sys2 as fsys;
 
 const NETSTACK_MONIKER_SUFFIX: &str = "/netstack";
 const DHCPD_MONIKER_SUFFIX: &str = "/dhcpd";
@@ -49,8 +50,9 @@ impl FfxConnector<'_> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
             .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
         remote_control
-            .connect_capability(
+            .open_capability(
                 &moniker,
+                fsys::OpenDirType::ExposedDir,
                 S::PROTOCOL_NAME,
                 server_end.into_channel(),
                 fio::OpenFlags::empty(),
