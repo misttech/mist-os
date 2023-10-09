@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use ffx_e2e_emu::IsolatedEmulator;
+use futures::StreamExt;
 use tracing::info;
 
 #[fuchsia::test]
@@ -26,16 +27,12 @@ async fn override_echo_greeting_and_observe_in_logs() {
     .unwrap();
 
     info!("checking for expected log message...");
-    'log_search: loop {
-        for message in emu.logs_for_moniker(moniker).await.unwrap() {
-            if message.msg() == Some(expected_greeting) {
-                info!("found expected log message!");
-                break 'log_search;
-            }
+    let mut stream = std::pin::pin!(emu.log_stream_for_moniker(moniker).await.unwrap());
+    while let Some(message) = stream.next().await {
+        if message.unwrap().msg() == Some(expected_greeting) {
+            info!("found expected log message!");
+            break;
         }
-
-        info!("expected log message not found, retrying...");
-        std::thread::sleep(std::time::Duration::from_secs(1));
     }
     emu.stop().await;
 }
