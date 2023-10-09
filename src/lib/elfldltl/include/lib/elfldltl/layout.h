@@ -16,6 +16,9 @@
 
 namespace elfldltl {
 
+// Forward declaration; see <lib/elfldltl/abi-ptr.h>.
+struct LocalAbiTraits;
+
 // These types are parameterized by class (32-bit vs 64-bit) and data (byte
 // order).  The traditional ELF names Byte, Half, Word, Xword, and Addr are
 // used for accessor types that respect the byte order and class.  Note that
@@ -426,10 +429,10 @@ struct Elf : private Layout<Class, Data> {
   // from the original SVR4 implementation that introduced ELF that have been
   // kept compatible in other implementations historically.
 
-  template <class AbiTraits>
+  template <class AbiTraits = LocalAbiTraits>
   struct LinkMap;
 
-  template <class AbiTraits>
+  template <class AbiTraits = LocalAbiTraits>
   struct RDebug;
 };
 

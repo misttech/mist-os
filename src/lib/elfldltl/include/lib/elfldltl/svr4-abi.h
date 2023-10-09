@@ -84,6 +84,8 @@ struct Elf<Class, Data>::RDebug {
 template <ElfClass Class, ElfData Data>
 template <class AbiTraits>
 struct Elf<Class, Data>::LinkMap {
+  using ElfLayout = Elf;
+
   // This is the load bias, meaning the difference between runtime addresses in
   // this process and the link-timeaddress that they appear in this module's
   // ELF metadata (program headers, symbol table, etc.).  More precisely, it's
