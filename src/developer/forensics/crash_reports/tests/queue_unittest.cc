@@ -8,6 +8,7 @@
 #include <lib/zx/time.h>
 
 #include <memory>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -1133,7 +1134,7 @@ TEST_F(QueueTest, Check_CleansUpStrandedSnapshotsInCache) {
   snapshot.key = kAttachmentKey;
   FX_CHECK(fsl::VmoFromString("", &snapshot.value));
 
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   GetSnapshotStore()->AddSnapshot(kTestUuid, std::move(snapshot));
   ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
             ItemLocation::kCache);
@@ -1159,7 +1160,7 @@ TEST_F(QueueTest, Check_CleansUpStrandedSnapshotsInTmp) {
   snapshot.key = kAttachmentKey;
   FX_CHECK(fsl::VmoFromString("", &snapshot.value));
 
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   GetSnapshotStore()->AddSnapshot(kTestUuid, std::move(snapshot));
   ASSERT_EQ(GetSnapshotStore()->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/true),
             ItemLocation::kTmp);

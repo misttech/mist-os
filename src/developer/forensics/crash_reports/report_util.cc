@@ -290,7 +290,7 @@ AnnotationMap GetReportAnnotations(const feedback::Annotations& snapshot_annotat
 }
 
 fpromise::result<Report> MakeReport(fuchsia::feedback::CrashReport report, const ReportId report_id,
-                                    const SnapshotUuid& snapshot_uuid,
+                                    const std::string& snapshot_uuid,
                                     const feedback::Annotations& snapshot_annotations,
                                     const std::optional<timekeeper::time_utc>& current_time,
                                     Product product, const bool is_hourly_report) {

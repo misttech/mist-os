@@ -7,6 +7,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 
+#include <string>
+
 namespace forensics {
 namespace crash_reports {
 namespace {
@@ -31,7 +33,7 @@ fpromise::result<Report> Report::MakeReport(const ReportId report_id,
                                             const std::string& program_shortname,
                                             const AnnotationMap& annotations,
                                             std::map<std::string, fuchsia::mem::Buffer> attachments,
-                                            forensics::crash_reports::SnapshotUuid snapshot_uuid,
+                                            std::string snapshot_uuid,
                                             std::optional<fuchsia::mem::Buffer> minidump,
                                             const bool is_hourly_report) {
   std::map<std::string, SizedData> attachment_copies;
@@ -57,8 +59,8 @@ fpromise::result<Report> Report::MakeReport(const ReportId report_id,
 
 Report::Report(const ReportId report_id, const std::string& program_shortname,
                const AnnotationMap& annotations, std::map<std::string, SizedData> attachments,
-               forensics::crash_reports::SnapshotUuid snapshot_uuid,
-               std::optional<SizedData> minidump, const bool is_hourly_report)
+               std::string snapshot_uuid, std::optional<SizedData> minidump,
+               const bool is_hourly_report)
     : id_(report_id),
       program_shortname_(program_shortname),
       annotations_(annotations),

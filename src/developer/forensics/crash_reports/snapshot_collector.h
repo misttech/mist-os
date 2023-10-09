@@ -21,7 +21,6 @@
 #include "src/developer/forensics/crash_reports/queue.h"
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/crash_reports/snapshot_store.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/feedback_data/data_provider.h"
@@ -68,7 +67,7 @@ class SnapshotCollector {
     }
 
     // The uuid of the request's snapshot.
-    SnapshotUuid uuid;
+    std::string uuid;
 
     // Ids of pending promises associated with this request. There should be one promise for each
     // report using this snapshot request.
@@ -84,7 +83,7 @@ class SnapshotCollector {
 
   struct ReportResults {
     // The uuid of the report's snapshot.
-    SnapshotUuid uuid;
+    std::string uuid;
 
     // The annotations manually added plus annotations extracted from the report's snapshot.
     std::shared_ptr<feedback::Annotations> annotations;
@@ -95,19 +94,19 @@ class SnapshotCollector {
   bool UseLatestRequest() const;
 
   // Find the Snapshot{Request,Data} with Uuid |uuid|. If none exists, return nullptr.
-  SnapshotRequest* FindSnapshotRequest(const SnapshotUuid& uuid);
+  SnapshotRequest* FindSnapshotRequest(const std::string& uuid);
 
   // Make a call to fuchsia.feedback.DataProvider/GetSnapshot, started at |start_time|, and return
   // the Uuid of its eventual snapshot.
-  SnapshotUuid MakeNewSnapshotRequest(zx::time start_time, zx::duration timeout);
+  std::string MakeNewSnapshotRequest(zx::time start_time, zx::duration timeout);
 
   // Use |fidl_snapshot| to update all snapshot-related state with Uuid |uuid|.
-  void CompleteWithSnapshot(const SnapshotUuid& uuid, feedback::Annotations annotations,
+  void CompleteWithSnapshot(const std::string& uuid, feedback::Annotations annotations,
                             fuchsia::feedback::Attachment archive);
 
   // Retrieves the MissingSnapshot from the store and returns the combination of annotations and
   // presence annotations.
-  feedback::Annotations GetMissingSnapshotAnnotations(const SnapshotUuid& uuid);
+  feedback::Annotations GetMissingSnapshotAnnotations(const std::string& uuid);
 
   async_dispatcher_t* dispatcher_;
   std::shared_ptr<sys::ServiceDirectory> services_;

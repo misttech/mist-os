@@ -6,11 +6,11 @@
 
 #include <filesystem>
 #include <fstream>
+#include <string>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/testing/scoped_memfs_manager.h"
 #include "src/developer/forensics/utils/storage_size.h"
 #include "src/lib/files/directory.h"
@@ -24,14 +24,14 @@ class SnapshotPersistenceMetadataTest : public ::testing::Test {
   SnapshotPersistenceMetadataTest() : metadata_(tmp_dir_.path(), StorageSize::Megabytes(1)) {}
 
  protected:
-  void WriteAttachment(const SnapshotUuid& uuid, const std::string& key, const std::string& data) {
+  void WriteAttachment(const std::string& uuid, const std::string& key, const std::string& data) {
     std::filesystem::path path(tmp_dir_.path());
 
     files::CreateDirectory(path /= uuid);
     std::ofstream(path /= key) << data;
   }
 
-  std::string SnapshotPath(const SnapshotUuid& uuid) {
+  std::string SnapshotPath(const std::string& uuid) {
     return std::filesystem::path(tmp_dir_.path()) / uuid;
   }
 
@@ -75,7 +75,7 @@ TEST_F(SnapshotPersistenceMetadataTest, RecreateFromFilesystem_FailsInitially) {
 }
 
 TEST_F(SnapshotPersistenceMetadataTest, AddAndDelete) {
-  const SnapshotUuid kUuid1 = "uuid1";
+  const std::string kUuid1 = "uuid1";
   const StorageSize archive_size = StorageSize::Bytes(10);
   const StorageSize old_metadata_size = metadata().CurrentSize();
   const StorageSize old_metadata_remaining_space = metadata().RemainingSpace();

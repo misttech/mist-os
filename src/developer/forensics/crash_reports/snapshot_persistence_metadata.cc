@@ -7,9 +7,9 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <filesystem>
+#include <string>
 #include <utility>
 
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/utils/storage_size.h"
 #include "src/lib/files/directory.h"
 #include "src/lib/files/path.h"
@@ -26,7 +26,7 @@ SnapshotPersistenceMetadata::SnapshotPersistenceMetadata(std::string snapshot_st
   RecreateFromFilesystem();
 }
 
-bool SnapshotPersistenceMetadata::Contains(const SnapshotUuid& uuid) const {
+bool SnapshotPersistenceMetadata::Contains(const std::string& uuid) const {
   return snapshot_metadata_.find(uuid) != snapshot_metadata_.end();
 }
 
@@ -42,7 +42,7 @@ bool SnapshotPersistenceMetadata::RecreateFromFilesystem() {
 
   for (const auto& snapshot_dir : fs::directory_iterator(snapshot_store_root_)) {
     const auto& snapshot_path = snapshot_dir.path();
-    const SnapshotUuid uuid = snapshot_path.filename();
+    const std::string uuid = snapshot_path.filename();
 
     for (const auto& file : fs::directory_iterator(snapshot_dir)) {
       const auto& filename = file.path().filename();
@@ -85,7 +85,7 @@ StorageSize SnapshotPersistenceMetadata::RemainingSpace() const {
 
 const std::string& SnapshotPersistenceMetadata::RootDir() const { return snapshot_store_root_; }
 
-void SnapshotPersistenceMetadata::Add(const SnapshotUuid& uuid, StorageSize size,
+void SnapshotPersistenceMetadata::Add(const std::string& uuid, StorageSize size,
                                       std::string_view archive_key) {
   FX_CHECK(IsDirectoryUsable());
   current_size_ += size;
@@ -95,7 +95,7 @@ void SnapshotPersistenceMetadata::Add(const SnapshotUuid& uuid, StorageSize size
   snapshot_metadata_[uuid].snapshot_key = archive_key;
 }
 
-void SnapshotPersistenceMetadata::Delete(const SnapshotUuid& uuid) {
+void SnapshotPersistenceMetadata::Delete(const std::string& uuid) {
   FX_CHECK(IsDirectoryUsable());
   FX_CHECK(Contains(uuid)) << "Contains() should be called before any Delete()";
 
@@ -103,8 +103,8 @@ void SnapshotPersistenceMetadata::Delete(const SnapshotUuid& uuid) {
   snapshot_metadata_.erase(uuid);
 }
 
-std::vector<SnapshotUuid> SnapshotPersistenceMetadata::SnapshotUuids() const {
-  std::vector<SnapshotUuid> uuids;
+std::vector<std::string> SnapshotPersistenceMetadata::SnapshotUuids() const {
+  std::vector<std::string> uuids;
   for (const auto& [uuid, _] : snapshot_metadata_) {
     uuids.push_back(uuid);
   }
@@ -112,19 +112,19 @@ std::vector<SnapshotUuid> SnapshotPersistenceMetadata::SnapshotUuids() const {
   return uuids;
 }
 
-StorageSize SnapshotPersistenceMetadata::SnapshotSize(const SnapshotUuid& uuid) const {
+StorageSize SnapshotPersistenceMetadata::SnapshotSize(const std::string& uuid) const {
   FX_CHECK(Contains(uuid));
 
   return snapshot_metadata_.at(uuid).size;
 }
 
-std::string SnapshotPersistenceMetadata::SnapshotDirectory(const SnapshotUuid& uuid) const {
+std::string SnapshotPersistenceMetadata::SnapshotDirectory(const std::string& uuid) const {
   FX_CHECK(Contains(uuid));
 
   return snapshot_metadata_.at(uuid).dir;
 }
 
-std::string SnapshotPersistenceMetadata::SnapshotKey(const SnapshotUuid& uuid) const {
+std::string SnapshotPersistenceMetadata::SnapshotKey(const std::string& uuid) const {
   FX_CHECK(Contains(uuid));
 
   return snapshot_metadata_.at(uuid).snapshot_key;

@@ -6,6 +6,7 @@
 
 #include <fstream>
 #include <memory>
+#include <string>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -53,7 +54,7 @@ auto Vector(const std::map<K, V>& annotations) {
 }
 
 const std::string kDefaultArchiveKey = "snapshot.key";
-const SnapshotUuid kTestUuid = "test uuid";
+const std::string kTestUuid = "test uuid";
 
 class SnapshotStoreTest : public UnitTestFixture {
  public:
@@ -90,7 +91,7 @@ class SnapshotStoreTest : public UnitTestFixture {
     return snapshot;
   }
 
-  void AddDefaultSnapshot(const SnapshotUuid& uuid = kTestUuid) {
+  void AddDefaultSnapshot(const std::string& uuid = kTestUuid) {
     snapshot_store_->AddSnapshot(uuid, GetDefaultAttachment());
   }
 
@@ -146,7 +147,7 @@ TEST_F(SnapshotStoreTest, Check_ArchivesMaxSizeIsEnforced) {
   EXPECT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kMemory);
   ASSERT_TRUE(AsManaged(snapshot_store_->GetSnapshot(kTestUuid)).LockArchive());
 
-  const SnapshotUuid kTestUuid2 = kTestUuid + "2";
+  const std::string kTestUuid2 = kTestUuid + "2";
   AddDefaultSnapshot(kTestUuid2);
 
   EXPECT_FALSE(snapshot_store_->SizeLimitsExceeded());
@@ -176,7 +177,7 @@ TEST_F(SnapshotStoreTest, Check_NoGarbageCollectionIfSnapshotTooBig) {
   big_snapshot.key = kDefaultArchiveKey;
   FX_CHECK(fsl::VmoFromString("Too big for the store", &big_snapshot.value));
 
-  const SnapshotUuid kTestUuid2 = "test uuid 2";
+  const std::string kTestUuid2 = "test uuid 2";
   snapshot_store_->AddSnapshot(kTestUuid2, std::move(big_snapshot));
 
   EXPECT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kMemory);
@@ -214,7 +215,7 @@ TEST_F(SnapshotStoreTest, Check_DeleteAll) {
   ASSERT_EQ(snapshot_store_->MoveToPersistence(kTestUuid, /*only_consider_tmp=*/false),
             ItemLocation::kCache);
 
-  const SnapshotUuid kTestUuid2 = kTestUuid + "2";
+  const std::string kTestUuid2 = kTestUuid + "2";
   AddDefaultSnapshot(kTestUuid2);
 
   ASSERT_EQ(snapshot_store_->SnapshotLocation(kTestUuid), ItemLocation::kCache);
@@ -263,7 +264,7 @@ TEST_F(SnapshotStoreTest, Check_UuidForNoSnapshotUuid) {
 }
 
 TEST_F(SnapshotStoreTest, Check_DefaultToNotPersisted) {
-  const SnapshotUuid uuid("UNKNOWN");
+  const std::string uuid("UNKNOWN");
   auto snapshot = AsMissing(snapshot_store_->GetSnapshot(uuid));
   EXPECT_THAT(snapshot.PresenceAnnotations(),
               UnorderedElementsAreArray({
@@ -309,7 +310,7 @@ TEST_F(SnapshotStoreTest, Check_RemovesFromInsertionOrder) {
 
   AddDefaultSnapshot();
 
-  const SnapshotUuid kTestUuid2 = kTestUuid + "2";
+  const std::string kTestUuid2 = kTestUuid + "2";
   AddDefaultSnapshot(kTestUuid2);
 
   ASSERT_FALSE(snapshot_store_->SizeLimitsExceeded());
@@ -322,13 +323,13 @@ TEST_F(SnapshotStoreTest, Check_RemovesFromInsertionOrder) {
 
   // Trigger garbage collection twice by going over size limit. If |kTestUuid2| wasn't removed from
   // insertion_order_ (a FIFO queue), this would cause a CHECK-FAIL crash.
-  const SnapshotUuid kTestUuid3 = kTestUuid + "3";
+  const std::string kTestUuid3 = kTestUuid + "3";
   AddDefaultSnapshot(kTestUuid3);
 
-  const SnapshotUuid kTestUuid4 = kTestUuid + "4";
+  const std::string kTestUuid4 = kTestUuid + "4";
   AddDefaultSnapshot(kTestUuid4);
 
-  const SnapshotUuid kTestUuid5 = kTestUuid + "5";
+  const std::string kTestUuid5 = kTestUuid + "5";
   AddDefaultSnapshot(kTestUuid5);
 
   EXPECT_FALSE(snapshot_store_->SizeLimitsExceeded());
@@ -355,10 +356,10 @@ TEST_F(SnapshotStoreTest, Check_MoveToPersistence) {
 
   // Trigger garbage collection by going over size limit. This will verify that MoveToPersistence
   // removed |kTestUuid| from |insertion_order_|.
-  const SnapshotUuid kTestUuid2 = kTestUuid + "2";
+  const std::string kTestUuid2 = kTestUuid + "2";
   AddDefaultSnapshot(kTestUuid2);
 
-  const SnapshotUuid kTestUuid3 = kTestUuid + "3";
+  const std::string kTestUuid3 = kTestUuid + "3";
   AddDefaultSnapshot(kTestUuid3);
 
   EXPECT_TRUE(snapshot_store_->SnapshotLocation(kTestUuid).has_value());

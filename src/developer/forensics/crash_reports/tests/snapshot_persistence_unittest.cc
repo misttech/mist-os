@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <string>
 
 #include "gtest/gtest.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
@@ -38,7 +39,7 @@ constexpr const char* kSnapshotStoreTmpPath = "/tmp/snapshots";
 constexpr const char* kSnapshotStoreCachePath = "/cache/snapshots";
 
 // Returns true if filesystem read successfully.
-bool Read(const fs::path& root_dir, const SnapshotUuid& uuid, StringAttachment& archive_out) {
+bool Read(const fs::path& root_dir, const std::string& uuid, StringAttachment& archive_out) {
   const std::string path = files::JoinPath(root_dir, uuid);
   std::vector<std::string> files;
 
@@ -87,7 +88,7 @@ class SnapshotPersistenceTest : public UnitTestFixture {
     persistence_ = std::make_unique<SnapshotPersistence>(temp_root, persistent_root);
   }
 
-  bool AddArchive(const SnapshotUuid& uuid, std::string archive_value) {
+  bool AddArchive(const std::string& uuid, std::string archive_value) {
     fuchsia::feedback::Attachment snapshot;
     snapshot.key = feedback_data::kSnapshotFilename;
     FX_CHECK(fsl::VmoFromString(std::move(archive_value), &snapshot.value));
@@ -108,7 +109,7 @@ class SnapshotPersistenceTest : public UnitTestFixture {
 using SnapshotPersistenceDeathTest = SnapshotPersistenceTest;
 
 TEST_F(SnapshotPersistenceTest, Succeed_AddDefaultsToCache) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -122,7 +123,7 @@ TEST_F(SnapshotPersistenceTest, Succeed_AddDefaultsToCache) {
 }
 
 TEST_F(SnapshotPersistenceDeathTest, Check_FailDuplicateUuid) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -132,7 +133,7 @@ TEST_F(SnapshotPersistenceDeathTest, Check_FailDuplicateUuid) {
 }
 
 TEST_F(SnapshotPersistenceTest, Succeed_FallbackToTmpIfCacheFull) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   // Make /cache not have room for any archives.
@@ -150,7 +151,7 @@ TEST_F(SnapshotPersistenceTest, Succeed_FallbackToTmpIfCacheFull) {
 }
 
 TEST_F(SnapshotPersistenceTest, Succeed_FallbackToTmpIfCacheWriteFails) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   // Create a file under the cache directory where the next snapshot directory would be created.
@@ -169,7 +170,7 @@ TEST_F(SnapshotPersistenceTest, Succeed_FallbackToTmpIfCacheWriteFails) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_PersistenceFull) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   MakeNewPersistence(/*max_tmp_size=*/StorageSize::Bytes(0),
@@ -184,7 +185,7 @@ TEST_F(SnapshotPersistenceTest, Check_PersistenceFull) {
 }
 
 TEST_F(SnapshotPersistenceTest, Succeed_Get) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -197,7 +198,7 @@ TEST_F(SnapshotPersistenceTest, Succeed_Get) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_FailGet) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
 
   // Attempt to get snapshot that doesn't exist.
   const auto archive = persistence_->Get(kTestUuid);
@@ -205,7 +206,7 @@ TEST_F(SnapshotPersistenceTest, Check_FailGet) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_RebuildsMetadata) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -223,7 +224,7 @@ TEST_F(SnapshotPersistenceTest, Check_RebuildsMetadata) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_UsesTmpUntilCacheReady) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   // Use directory that |scoped_mem_fs| can create using ScopedMemFsManager::Create, but |store_|
@@ -248,7 +249,7 @@ TEST_F(SnapshotPersistenceTest, Check_UsesTmpUntilCacheReady) {
   scoped_mem_fs.Create(cache_root);
 
   // The second report should be placed under the cache directory.
-  const SnapshotUuid kTestUuid2 = "test uuid 2";
+  const std::string kTestUuid2 = "test uuid 2";
   ASSERT_TRUE(AddArchive(kTestUuid2, kArchiveValue));
 
   StringAttachment archive2;
@@ -259,7 +260,7 @@ TEST_F(SnapshotPersistenceTest, Check_UsesTmpUntilCacheReady) {
 }
 
 TEST_F(SnapshotPersistenceTest, Succeed_Delete) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -276,8 +277,8 @@ TEST_F(SnapshotPersistenceTest, Succeed_Delete) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_DeleteAll) {
-  const SnapshotUuid kTestUuid = "test uuid";
-  const SnapshotUuid kTestUuid2 = "test uuid 2";
+  const std::string kTestUuid = "test uuid";
+  const std::string kTestUuid2 = "test uuid 2";
   const std::string kArchiveValue = "snapshot.data";
 
   auto archive_size = StorageSize::Bytes(sizeof(feedback_data::kSnapshotFilename));
@@ -300,7 +301,7 @@ TEST_F(SnapshotPersistenceTest, Check_DeleteAll) {
 }
 
 TEST_F(SnapshotPersistenceTest, Succeed_MoveToTmp) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   ASSERT_TRUE(AddArchive(kTestUuid, kArchiveValue));
@@ -323,7 +324,7 @@ TEST_F(SnapshotPersistenceTest, Succeed_MoveToTmp) {
 }
 
 TEST_F(SnapshotPersistenceDeathTest, Check_FailMoveFromTmpToTmp) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   MakeNewPersistence(/*max_tmp_size=*/StorageSize::Megabytes(1),
@@ -337,7 +338,7 @@ TEST_F(SnapshotPersistenceDeathTest, Check_FailMoveFromTmpToTmp) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_AddOnlyConsiderTmp) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   fuchsia::feedback::Attachment snapshot;
@@ -359,7 +360,7 @@ TEST_F(SnapshotPersistenceTest, Check_AddOnlyConsiderTmp) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_RemovesEmptyDirectories) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string snapshot_cache_dir = files::JoinPath(GetCacheDir(), kTestUuid);
   const std::string snapshot_tmp_dir = files::JoinPath(GetTmpDir(), kTestUuid);
 
@@ -375,7 +376,7 @@ TEST_F(SnapshotPersistenceTest, Check_RemovesEmptyDirectories) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_ContainsSyncsWithFilesystem) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   fuchsia::feedback::Attachment snapshot;
@@ -398,7 +399,7 @@ TEST_F(SnapshotPersistenceTest, Check_ContainsSyncsWithFilesystem) {
 }
 
 TEST_F(SnapshotPersistenceTest, Check_SnapshotLocationSyncsWithFilesystem) {
-  const SnapshotUuid kTestUuid = "test uuid";
+  const std::string kTestUuid = "test uuid";
   const std::string kArchiveValue = "snapshot.data";
 
   fuchsia::feedback::Attachment snapshot;

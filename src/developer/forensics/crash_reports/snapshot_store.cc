@@ -5,6 +5,7 @@
 #include "src/developer/forensics/crash_reports/snapshot_store.h"
 
 #include <fstream>
+#include <string>
 #include <utility>
 
 #include "src/developer/forensics/crash_reports/constants.h"
@@ -59,7 +60,7 @@ SnapshotStore::SnapshotStore(feedback::AnnotationManager* annotation_manager,
   }
 }
 
-Snapshot SnapshotStore::GetSnapshot(const SnapshotUuid& uuid) {
+Snapshot SnapshotStore::GetSnapshot(const std::string& uuid) {
   auto BuildMissing = [this](const SpecialCaseSnapshot& special_case) {
     return MissingSnapshot(annotation_manager_->ImmediatelyAvailable(), special_case.annotations);
   };
@@ -97,18 +98,18 @@ Snapshot SnapshotStore::GetSnapshot(const SnapshotUuid& uuid) {
   return ManagedSnapshot::StoreWeak(data->archive);
 }
 
-std::vector<SnapshotUuid> SnapshotStore::GetSnapshotUuids() const {
+std::vector<std::string> SnapshotStore::GetSnapshotUuids() const {
   return persistence_.GetSnapshotUuids();
 }
 
-MissingSnapshot SnapshotStore::GetMissingSnapshot(const SnapshotUuid& uuid) {
+MissingSnapshot SnapshotStore::GetMissingSnapshot(const std::string& uuid) {
   const auto snapshot = GetSnapshot(uuid);
   FX_CHECK(std::holds_alternative<MissingSnapshot>(snapshot));
 
   return std::get<MissingSnapshot>(snapshot);
 }
 
-void SnapshotStore::DeleteSnapshot(const SnapshotUuid& uuid) {
+void SnapshotStore::DeleteSnapshot(const std::string& uuid) {
   if (persistence_.Contains(uuid)) {
     persistence_.Delete(uuid);
     return;
@@ -134,14 +135,14 @@ void SnapshotStore::DeleteAll() {
   // each iteration.
   while (data_.begin() != data_.end()) {
     // Grab copy of uuid to avoid asan failure when DeleteSnapshot erases |data_.begin()|.
-    const SnapshotUuid uuid = data_.begin()->first;
+    const std::string uuid = data_.begin()->first;
     DeleteSnapshot(uuid);
   }
 
   persistence_.DeleteAll();
 }
 
-void SnapshotStore::AddSnapshot(const SnapshotUuid& uuid, fuchsia::feedback::Attachment archive) {
+void SnapshotStore::AddSnapshot(const std::string& uuid, fuchsia::feedback::Attachment archive) {
   FX_CHECK(!SnapshotExists(uuid)) << "Duplicate snapshot uuid '" << uuid << "' added to store";
 
   auto& data = data_[uuid];
@@ -176,7 +177,7 @@ void SnapshotStore::AddSnapshot(const SnapshotUuid& uuid, fuchsia::feedback::Att
   }
 }
 
-void SnapshotStore::EnforceSizeLimits(const SnapshotUuid& uuid) {
+void SnapshotStore::EnforceSizeLimits(const std::string& uuid) {
   auto* data = FindSnapshotData(uuid);
   FX_CHECK(data);
 
@@ -188,7 +189,7 @@ void SnapshotStore::EnforceSizeLimits(const SnapshotUuid& uuid) {
   }
 }
 
-ItemLocation SnapshotStore::MoveToPersistence(const SnapshotUuid& uuid,
+ItemLocation SnapshotStore::MoveToPersistence(const std::string& uuid,
                                               const bool only_consider_tmp) {
   auto* data = FindSnapshotData(uuid);
   FX_CHECK(data);
@@ -208,9 +209,9 @@ ItemLocation SnapshotStore::MoveToPersistence(const SnapshotUuid& uuid,
   return *location;
 }
 
-void SnapshotStore::MoveToTmp(const SnapshotUuid& uuid) { return persistence_.MoveToTmp(uuid); }
+void SnapshotStore::MoveToTmp(const std::string& uuid) { return persistence_.MoveToTmp(uuid); }
 
-bool SnapshotStore::SnapshotExists(const SnapshotUuid& uuid) {
+bool SnapshotStore::SnapshotExists(const std::string& uuid) {
   if (FindSnapshotData(uuid) != nullptr) {
     return true;
   }
@@ -219,7 +220,7 @@ bool SnapshotStore::SnapshotExists(const SnapshotUuid& uuid) {
   return persistence_.Contains(uuid);
 }
 
-std::optional<ItemLocation> SnapshotStore::SnapshotLocation(const SnapshotUuid& uuid) {
+std::optional<ItemLocation> SnapshotStore::SnapshotLocation(const std::string& uuid) {
   if (FindSnapshotData(uuid) != nullptr) {
     return ItemLocation::kMemory;
   }
@@ -230,7 +231,7 @@ std::optional<ItemLocation> SnapshotStore::SnapshotLocation(const SnapshotUuid& 
 
 size_t SnapshotStore::Size() const { return data_.size(); }
 
-bool SnapshotStore::IsGarbageCollected(const SnapshotUuid& uuid) const {
+bool SnapshotStore::IsGarbageCollected(const std::string& uuid) const {
   return garbage_collected_snapshots_.find(uuid) != garbage_collected_snapshots_.end();
 }
 
@@ -245,7 +246,7 @@ void SnapshotStore::DropArchive(SnapshotData* data) {
   data->archive_size = StorageSize::Bytes(0u);
 }
 
-void SnapshotStore::RecordAsGarbageCollected(const SnapshotUuid& uuid) {
+void SnapshotStore::RecordAsGarbageCollected(const std::string& uuid) {
   if (garbage_collected_snapshots_.find(uuid) != garbage_collected_snapshots_.end()) {
     return;
   }
@@ -258,7 +259,7 @@ void SnapshotStore::RecordAsGarbageCollected(const SnapshotUuid& uuid) {
   file.close();
 }
 
-SnapshotStore::SnapshotData* SnapshotStore::FindSnapshotData(const SnapshotUuid& uuid) {
+SnapshotStore::SnapshotData* SnapshotStore::FindSnapshotData(const std::string& uuid) {
   return (data_.find(uuid) == data_.end()) ? nullptr : &(data_.at(uuid));
 }
 

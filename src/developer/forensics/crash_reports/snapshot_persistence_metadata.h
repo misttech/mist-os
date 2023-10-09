@@ -8,7 +8,6 @@
 #include <map>
 #include <string>
 
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/utils/storage_size.h"
 
 namespace forensics::crash_reports {
@@ -30,26 +29,26 @@ class SnapshotPersistenceMetadata {
   // Returns true if the directory underlying the SnapshotPersistenceMetadata can safely be used.
   bool IsDirectoryUsable() const;
 
-  bool Contains(const SnapshotUuid& uuid) const;
+  bool Contains(const std::string& uuid) const;
 
   StorageSize CurrentSize() const;
   StorageSize RemainingSpace() const;
 
   const std::string& RootDir() const;
 
-  void Add(const SnapshotUuid& uuid, StorageSize size, std::string_view archive_key);
-  void Delete(const SnapshotUuid& uuid);
+  void Add(const std::string& uuid, StorageSize size, std::string_view archive_key);
+  void Delete(const std::string& uuid);
 
-  std::vector<SnapshotUuid> SnapshotUuids() const;
+  std::vector<std::string> SnapshotUuids() const;
 
   // Returns the size of the snapshot archive.
-  StorageSize SnapshotSize(const SnapshotUuid& uuid) const;
+  StorageSize SnapshotSize(const std::string& uuid) const;
 
   // Returns the directory that contains the snapshot |uuid|.
-  std::string SnapshotDirectory(const SnapshotUuid& uuid) const;
+  std::string SnapshotDirectory(const std::string& uuid) const;
 
   // Returns the key for the snapshot |uuid|.
-  std::string SnapshotKey(const SnapshotUuid& uuid) const;
+  std::string SnapshotKey(const std::string& uuid) const;
 
  private:
   // Metadata about each snapshot including:
@@ -70,7 +69,7 @@ class SnapshotPersistenceMetadata {
 
   bool is_directory_usable_;
 
-  std::map<SnapshotUuid, SnapshotMetadata> snapshot_metadata_;
+  std::map<std::string, SnapshotMetadata> snapshot_metadata_;
 };
 
 }  // namespace forensics::crash_reports

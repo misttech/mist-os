@@ -14,7 +14,7 @@
 #include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/product.h"
 #include "src/developer/forensics/crash_reports/report.h"
-#include "src/developer/forensics/crash_reports/snapshot.h"
+#include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/lib/timekeeper/clock.h"
 
 namespace forensics {
@@ -46,7 +46,7 @@ AnnotationMap GetReportAnnotations(Product product, const AnnotationMap& annotat
 // * Some attachments are report-specific, e.g., Dart exception stack trace.
 // * Adds any attachments from |report|.
 fpromise::result<Report> MakeReport(fuchsia::feedback::CrashReport input_report, ReportId report_id,
-                                    const SnapshotUuid& snapshot_uuid,
+                                    const std::string& snapshot_uuid,
                                     const feedback::Annotations& snapshot_annotations,
                                     const std::optional<timekeeper::time_utc>& current_time,
                                     Product product, bool is_hourly_report);

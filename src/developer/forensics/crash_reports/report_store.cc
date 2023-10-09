@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <set>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -133,7 +134,7 @@ bool ReadAttachment(const std::string& path, SizedData* attachment) {
 }
 
 std::string ReadSnapshotUuid(const std::string& path) {
-  SnapshotUuid snapshot_uuid;
+  std::string snapshot_uuid;
   return (files::ReadFileToString(path, &snapshot_uuid)) ? snapshot_uuid : kNoUuidSnapshotUuid;
 }
 
@@ -324,7 +325,7 @@ std::optional<Report> ReportStore::Get(const ReportId report_id) {
 
   AnnotationMap annotations;
   std::map<std::string, SizedData> attachments;
-  SnapshotUuid snapshot_uuid;
+  std::string snapshot_uuid;
   std::optional<SizedData> minidump;
 
   for (size_t i = 0; i < attachment_files.size(); ++i) {
@@ -365,7 +366,7 @@ std::vector<ReportId> ReportStore::GetReports() const {
 
 std::vector<ReportId> ReportStore::GetCacheReports() const { return cache_metadata_.Reports(); }
 
-SnapshotUuid ReportStore::GetSnapshotUuid(const ReportId id) {
+std::string ReportStore::GetSnapshotUuid(const ReportId id) {
   if (!Contains(id)) {
     return kNoUuidSnapshotUuid;
   }

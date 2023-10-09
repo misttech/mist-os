@@ -6,12 +6,14 @@
 
 #include <lib/syslog/cpp/macros.h>
 
+#include <string>
+
 #include "src/developer/forensics/crash_reports/constants.h"
 
 namespace forensics {
 namespace crash_reports {
 
-bool IsSpecialCaseSnapshot(const SnapshotUuid& uuid) {
+bool IsSpecialCaseSnapshot(const std::string& uuid) {
   return uuid == kNoUuidSnapshotUuid || uuid == kGarbageCollectedSnapshotUuid ||
          uuid == kShutdownSnapshotUuid || uuid == kNotPersistedSnapshotUuid;
 }

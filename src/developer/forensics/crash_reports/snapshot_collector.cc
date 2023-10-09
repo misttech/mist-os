@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <memory>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "src/developer/forensics/crash_reports/constants.h"
@@ -52,7 +53,7 @@ SnapshotCollector::SnapshotCollector(async_dispatcher_t* dispatcher, timekeeper:
       queue_(queue),
       shared_request_window_(shared_request_window) {}
 
-feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const SnapshotUuid& uuid) {
+feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const std::string& uuid) {
   const auto missing_snapshot = snapshot_store_->GetMissingSnapshot(uuid);
 
   feedback::Annotations combined_annotations = missing_snapshot.Annotations();
@@ -70,7 +71,7 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const Sna
   auto GetReport =
       [fidl_report = std::move(fidl_report), report_id, current_utc_time, product,
        is_hourly_snapshot](
-          const SnapshotUuid& uuid,
+          const std::string& uuid,
           const feedback::Annotations& annotations) mutable -> ::fpromise::result<Report> {
     return MakeReport(std::move(fidl_report), report_id, uuid, annotations, current_utc_time,
                       product, is_hourly_snapshot);
@@ -85,7 +86,7 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const Sna
 
   const zx::time current_time{clock_->Now()};
 
-  SnapshotUuid uuid;
+  std::string uuid;
 
   if (UseLatestRequest()) {
     uuid = snapshot_requests_.back()->uuid;
@@ -138,8 +139,8 @@ void SnapshotCollector::Shutdown() {
   snapshot_requests_.clear();
 }
 
-SnapshotUuid SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time,
-                                                       const zx::duration timeout) {
+std::string SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time,
+                                                      const zx::duration timeout) {
   const auto uuid = uuid::Generate();
   snapshot_requests_.emplace_back(std::unique_ptr<SnapshotRequest>(new SnapshotRequest{
       .uuid = uuid,
@@ -162,7 +163,7 @@ SnapshotUuid SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time
   return uuid;
 }
 
-void SnapshotCollector::CompleteWithSnapshot(const SnapshotUuid& uuid,
+void SnapshotCollector::CompleteWithSnapshot(const std::string& uuid,
                                              feedback::Annotations annotations,
                                              fuchsia::feedback::Attachment archive) {
   // We clear snapshot_requests_ as soon as we receive the shutdown signal.
@@ -214,7 +215,7 @@ bool SnapshotCollector::UseLatestRequest() const {
 }
 
 SnapshotCollector::SnapshotRequest* SnapshotCollector::FindSnapshotRequest(
-    const SnapshotUuid& uuid) {
+    const std::string& uuid) {
   auto request = std::find_if(
       snapshot_requests_.begin(), snapshot_requests_.end(),
       [uuid](const std::unique_ptr<SnapshotRequest>& request) { return uuid == request->uuid; });

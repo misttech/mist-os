@@ -9,6 +9,7 @@
 #include <lib/async/dispatcher.h>
 
 #include <map>
+#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -21,7 +22,6 @@
 #include "src/developer/forensics/crash_reports/report_id.h"
 #include "src/developer/forensics/crash_reports/report_store.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/lib/fxl/macros.h"
 
 namespace forensics {
@@ -47,7 +47,7 @@ class Queue {
   // Note: this is needed because the Queue manages the lifetime of snapshots. Reports are added
   // asynchronously and it may be possible for the Queue to think all reports using a snapshot are
   // retired depending on how Add and Upload are ordered.
-  void AddReportUsingSnapshot(const SnapshotUuid& uuid, ReportId report);
+  void AddReportUsingSnapshot(const std::string& uuid, ReportId report);
 
   uint64_t Size() const;
   bool IsEmpty() const;
@@ -69,7 +69,7 @@ class Queue {
   // Note: |report| will be set iff it is actively being uploaded or hasn't been added to the store.
   struct PendingReport {
     explicit PendingReport(Report report, FilingResultFn callback);
-    PendingReport(ReportId report_id, SnapshotUuid snapshot_uuid, bool is_hourly_report);
+    PendingReport(ReportId report_id, std::string snapshot_uuid, bool is_hourly_report);
 
     PendingReport(const PendingReport&) = delete;
     PendingReport& operator=(const PendingReport&) = delete;
@@ -86,7 +86,7 @@ class Queue {
                           const std::optional<std::string>& report_id = std::nullopt);
 
     ReportId report_id;
-    SnapshotUuid snapshot_uuid;
+    std::string snapshot_uuid;
     bool is_hourly_report;
     std::optional<Report> report;
     FilingResultFn callback;
@@ -129,22 +129,22 @@ class Queue {
 
   // Deletes the snapshot referred to by |uuid| if there are no reports associated with the snapshot
   // in |snapshot_clients_|. Returns true if the snapshot was deleted.
-  bool DeleteSnapshotIfNoClients(const SnapshotUuid& uuid);
+  bool DeleteSnapshotIfNoClients(const std::string& uuid);
 
   // Returns the number of crash reports that use the snapshot referred to by |uuid|.
   //
   // Note: it's technically possible for this value to be too large if a report hasn't been added,
   // but its association to a snapshot has been recorded with AddSnapshotClient.
-  size_t NumReportsUsingSnapshot(const SnapshotUuid& uuid);
+  size_t NumReportsUsingSnapshot(const std::string& uuid);
 
   // Attempts to remove the risk of the snapshot for |uuid| becoming a stranded snapshot. A
   // stranded snapshot is a snapshot on disk that does not have any associated crash reports on the
   // device.
-  void PreventStrandedSnapshot(const SnapshotUuid& uuid);
+  void PreventStrandedSnapshot(const std::string& uuid);
 
   // Suggests where the snapshot for |uuid| should be stored based on the locations of crash reports
   // associated with |uuid|.
-  ItemLocation SuggestedSnapshotLocation(const SnapshotUuid& uuid);
+  ItemLocation SuggestedSnapshotLocation(const std::string& uuid);
 
   std::string ReportIdsStr(const std::deque<PendingReport>& reports) const;
 
@@ -186,7 +186,7 @@ class Queue {
   std::deque<PendingReport> blocked_reports_;
 
   // Which snapshot is associated with what reports.
-  std::map<SnapshotUuid, std::set<ReportId>> snapshot_clients_;
+  std::map<std::string, std::set<ReportId>> snapshot_clients_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(Queue);
 };

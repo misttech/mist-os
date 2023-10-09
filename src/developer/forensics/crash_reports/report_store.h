@@ -15,7 +15,6 @@
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/crash_reports/report_id.h"
 #include "src/developer/forensics/crash_reports/report_store_metadata.h"
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/crash_reports/snapshot_store.h"
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/utils/storage_size.h"
@@ -65,7 +64,7 @@ class ReportStore {
 
   std::vector<ReportId> GetReports() const;
   std::vector<ReportId> GetCacheReports() const;
-  SnapshotUuid GetSnapshotUuid(ReportId id);
+  std::string GetSnapshotUuid(ReportId id);
 
   bool Contains(ReportId id);
 

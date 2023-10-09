@@ -7,6 +7,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -95,7 +96,7 @@ SnapshotPersistence::SnapshotPersistence(const std::optional<Root>& temp_root,
   }
 }
 
-std::optional<ItemLocation> SnapshotPersistence::Add(const SnapshotUuid& uuid,
+std::optional<ItemLocation> SnapshotPersistence::Add(const std::string& uuid,
                                                      const ManagedSnapshot::Archive& archive,
                                                      StorageSize archive_size,
                                                      const bool only_consider_tmp) {
@@ -115,7 +116,7 @@ std::optional<ItemLocation> SnapshotPersistence::Add(const SnapshotUuid& uuid,
   return AddToRoot(uuid, archive, archive_size, *root_metadata);
 }
 
-std::optional<ItemLocation> SnapshotPersistence::AddToRoot(const SnapshotUuid& uuid,
+std::optional<ItemLocation> SnapshotPersistence::AddToRoot(const std::string& uuid,
                                                            const ManagedSnapshot::Archive& archive,
                                                            StorageSize archive_size,
                                                            SnapshotPersistenceMetadata& root) {
@@ -162,7 +163,7 @@ std::optional<ItemLocation> SnapshotPersistence::AddToRoot(const SnapshotUuid& u
                                                                           : ItemLocation::kTmp;
 }
 
-void SnapshotPersistence::MoveToTmp(const SnapshotUuid& uuid) {
+void SnapshotPersistence::MoveToTmp(const std::string& uuid) {
   FX_CHECK(SnapshotPersistenceEnabled()) << "Snapshot persistence not enabled";
   FX_CHECK(SnapshotLocation(uuid) == ItemLocation::kCache)
       << "MoveToTmp() will only move snapshots from /cache to /tmp";
@@ -186,7 +187,7 @@ void SnapshotPersistence::MoveToTmp(const SnapshotUuid& uuid) {
   }
 }
 
-bool SnapshotPersistence::Contains(const SnapshotUuid& uuid) {
+bool SnapshotPersistence::Contains(const std::string& uuid) {
   // This is done here because it is a natural synchronization point and any operation acting on a
   // snapshot must call Contains or SnapshotLocation in order to safely proceed.
   SyncWithFilesystem(uuid);
@@ -195,7 +196,7 @@ bool SnapshotPersistence::Contains(const SnapshotUuid& uuid) {
          (cache_metadata_.has_value() && cache_metadata_->Contains(uuid));
 }
 
-std::optional<ItemLocation> SnapshotPersistence::SnapshotLocation(const SnapshotUuid& uuid) {
+std::optional<ItemLocation> SnapshotPersistence::SnapshotLocation(const std::string& uuid) {
   // Call Contains to first sync with the filesystem.
   if (!Contains(uuid)) {
     return std::nullopt;
@@ -212,7 +213,7 @@ std::optional<ItemLocation> SnapshotPersistence::SnapshotLocation(const Snapshot
   return std::nullopt;
 }
 
-std::optional<ManagedSnapshot::Archive> SnapshotPersistence::Get(const SnapshotUuid& uuid) {
+std::optional<ManagedSnapshot::Archive> SnapshotPersistence::Get(const std::string& uuid) {
   if (!Contains(uuid)) {
     return std::nullopt;
   }
@@ -230,21 +231,21 @@ std::optional<ManagedSnapshot::Archive> SnapshotPersistence::Get(const SnapshotU
   return ManagedSnapshot::Archive(snapshot_filename, std::move(archive));
 }
 
-std::vector<SnapshotUuid> SnapshotPersistence::GetSnapshotUuids() const {
+std::vector<std::string> SnapshotPersistence::GetSnapshotUuids() const {
   if (!SnapshotPersistenceEnabled()) {
     return {};
   }
 
   auto all_uuids =
-      tmp_metadata_.has_value() ? tmp_metadata_->SnapshotUuids() : std::vector<SnapshotUuid>();
+      tmp_metadata_.has_value() ? tmp_metadata_->SnapshotUuids() : std::vector<std::string>();
   const auto cache_uuids =
-      cache_metadata_.has_value() ? cache_metadata_->SnapshotUuids() : std::vector<SnapshotUuid>();
+      cache_metadata_.has_value() ? cache_metadata_->SnapshotUuids() : std::vector<std::string>();
 
   all_uuids.insert(all_uuids.end(), cache_uuids.begin(), cache_uuids.end());
   return all_uuids;
 }
 
-bool SnapshotPersistence::Delete(const SnapshotUuid& uuid) {
+bool SnapshotPersistence::Delete(const std::string& uuid) {
   FX_CHECK(SnapshotPersistenceEnabled()) << "Snapshot persistence not enabled";
   FX_CHECK(Contains(uuid)) << "Contains() should be called before any Delete()";
 
@@ -279,7 +280,7 @@ void SnapshotPersistence::DeleteAll() {
   }
 }
 
-SnapshotPersistenceMetadata& SnapshotPersistence::RootFor(const SnapshotUuid& uuid) {
+SnapshotPersistenceMetadata& SnapshotPersistence::RootFor(const std::string& uuid) {
   FX_CHECK(SnapshotPersistenceEnabled()) << "Snapshot persistence not enabled";
 
   if (tmp_metadata_.has_value() && tmp_metadata_->Contains(uuid)) {
@@ -339,7 +340,7 @@ bool SnapshotPersistence::SnapshotPersistenceEnabled() const {
   return tmp_metadata_.has_value() || cache_metadata_.has_value();
 }
 
-void SnapshotPersistence::SyncWithFilesystem(const SnapshotUuid& uuid) {
+void SnapshotPersistence::SyncWithFilesystem(const std::string& uuid) {
   if (tmp_metadata_.has_value() && tmp_metadata_->Contains(uuid) &&
       !files::IsDirectory(tmp_metadata_->SnapshotDirectory(uuid))) {
     tmp_metadata_->Delete(uuid);

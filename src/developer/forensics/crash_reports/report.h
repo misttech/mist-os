@@ -14,7 +14,6 @@
 
 #include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/report_id.h"
-#include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/utils/sized_data.h"
 
 namespace forensics {
@@ -26,12 +25,11 @@ class Report {
   // Return fpromise::ok with a Report unless there are issues reading a fuchsia::mem::Buffer.
   static fpromise::result<Report> MakeReport(
       ReportId report_id, const std::string& program_shortname, const AnnotationMap& annotations,
-      std::map<std::string, fuchsia::mem::Buffer> attachments,
-      forensics::crash_reports::SnapshotUuid snapshot_uuid,
+      std::map<std::string, fuchsia::mem::Buffer> attachments, std::string snapshot_uuid,
       std::optional<fuchsia::mem::Buffer> minidump, bool is_hourly_report = false);
 
   Report(ReportId report_id, const std::string& program_shortname, const AnnotationMap& annotations,
-         std::map<std::string, SizedData> attachments, SnapshotUuid snapshot_uuid,
+         std::map<std::string, SizedData> attachments, std::string snapshot_uuid,
          std::optional<SizedData> minidump, bool is_hourly_report = false);
 
   ReportId Id() const { return id_; }
@@ -47,8 +45,8 @@ class Report {
   const std::optional<SizedData>& Minidump() const { return minidump_; }
   std::optional<SizedData>& Minidump() { return minidump_; }
 
-  const forensics::crash_reports::SnapshotUuid& SnapshotUuid() const { return snapshot_uuid_; }
-  forensics::crash_reports::SnapshotUuid& SnapshotUuid() { return snapshot_uuid_; }
+  const std::string& SnapshotUuid() const { return snapshot_uuid_; }
+  std::string& SnapshotUuid() { return snapshot_uuid_; }
 
   bool IsHourlyReport() const { return is_hourly_report_; }
 
@@ -57,7 +55,7 @@ class Report {
   std::string program_shortname_;
   AnnotationMap annotations_;
   std::map<std::string, SizedData> attachments_;
-  forensics::crash_reports::SnapshotUuid snapshot_uuid_;
+  std::string snapshot_uuid_;
   std::optional<SizedData> minidump_;
   bool is_hourly_report_;
 };

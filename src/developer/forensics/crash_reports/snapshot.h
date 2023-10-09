@@ -17,11 +17,9 @@
 namespace forensics {
 namespace crash_reports {
 
-using SnapshotUuid = std::string;
-
 // Returns true if |uuid| is one of the uuids for MissingSnapshots when data isn't successfully
 // collected.
-bool IsSpecialCaseSnapshot(const SnapshotUuid& uuid);
+bool IsSpecialCaseSnapshot(const std::string& uuid);
 
 // Allows for the data from a single FIDL fuchsia.feedback.Snapshot to be shared amongst many
 // clients and managed by the SnapshotStore. The SnapshotStore may drop the underlying data at

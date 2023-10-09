@@ -416,7 +416,7 @@ TEST_F(SnapshotCollectorTest, Check_ClientsAddedToQueue) {
   // Run loop until idle so Queue will finish "upload".
   RunLoopUntilIdle();
 
-  const SnapshotUuid uuid2 = report2->SnapshotUuid();
+  const std::string uuid2 = report2->SnapshotUuid();
   ASSERT_TRUE(GetSnapshotStore()->SnapshotExists(uuid2));
   queue_->Add(std::move(*report2), [](const FilingResult& result, const std::string& report_id) {});
 
