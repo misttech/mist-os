@@ -50,7 +50,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml-cpu/a311d-arm-a73",
       "sys/platform/05:06:26/aml-power-impl-composite/power-impl/pd-big-core/power-0/aml-cpu/a311d-arm-a53",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-34/fusb302",
+      "sys/platform/05:06:1/aml-gpio/gpio-93/fusb302",
 
       // USB
       "sys/platform/05:03:2d/vim3_usb_phy",
