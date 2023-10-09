@@ -66,14 +66,6 @@ class FuchsiaController:
             # "daemon.autostart" to "false".
             config["daemon.autostart"] = "false"
 
-            # Overnet, the legacy implementation has known issues and is
-            # deprecated, but at the moment it is still active by default, for
-            # compatibility reasons. It should be disabled when those
-            # compatibility concerns are not relevant. "overnet.cso" disables
-            # legacy code in favor of its modern replacement,
-            # CSO (Circuit-Switched Overnet).
-            config["overnet.cso"] = "only"
-
             self._ctx = fuchsia_controller.Context(
                 config=config, isolate_dir=isolate_dir, target=self._name
             )
