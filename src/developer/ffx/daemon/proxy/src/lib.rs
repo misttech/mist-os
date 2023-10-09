@@ -361,13 +361,12 @@ mod test {
     use ascendd;
     use async_lock::Mutex;
     use async_net::unix::UnixListener;
-    use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream};
+    use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream};
     use fidl_fuchsia_developer_ffx::{
         DaemonMarker, DaemonRequest, DaemonRequestStream, VersionInfo,
     };
-    use fidl_fuchsia_overnet::{ServiceProviderRequest, ServiceProviderRequestStream};
     use fuchsia_async::Task;
-    use futures::{AsyncReadExt, FutureExt, TryStreamExt};
+    use futures::{AsyncReadExt, FutureExt, StreamExt, TryStreamExt};
     use std::time::Duration;
     use std::{path::PathBuf, sync::Arc};
 
@@ -466,9 +465,12 @@ mod test {
         let listener = UnixListener::bind(&sockpath).unwrap();
         let local_link_task = start_socket_link(Arc::clone(&local_node), sockpath.clone());
 
-        let (s, p) = fidl::Channel::create();
+        let (sender, mut receiver) = futures::channel::mpsc::unbounded();
         daemon
-            .register_service_legacy(DaemonMarker::PROTOCOL_NAME.into(), ClientEnd::new(p))
+            .register_service(DaemonMarker::PROTOCOL_NAME.into(), move |chan, _| {
+                let _ = sender.unbounded_send(chan);
+                Ok(())
+            })
             .await
             .unwrap();
 
@@ -490,16 +492,10 @@ mod test {
             }
         });
 
-        let mut stream = ServiceProviderRequestStream::from_channel(
-            fidl::AsyncChannel::from_channel(s).unwrap(),
-        );
-
         // Now that we've completed setting up everything, return a task for the main loop
         // of the fake daemon.
         Task::local(async move {
-            while let Some(ServiceProviderRequest::ConnectToService { chan, .. }) =
-                stream.try_next().await.unwrap_or(None)
-            {
+            while let Some(chan) = receiver.next().await {
                 let link_tasks = link_tasks.clone();
                 let mut stream = DaemonRequestStream::from_channel(
                     fidl::AsyncChannel::from_channel(chan).unwrap(),
