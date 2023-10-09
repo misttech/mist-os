@@ -17,6 +17,7 @@ from honeydew.typing.wlan import DisconnectStatus
 from honeydew.typing.wlan import NetworkConfig
 from honeydew.typing.wlan import NetworkIdentifier
 from honeydew.typing.wlan import NetworkState
+from honeydew.typing.wlan import RequestStatus
 from honeydew.typing.wlan import SecurityType
 from honeydew.typing.wlan import WlanClientState
 
@@ -43,6 +44,43 @@ class WlanPolicySL4FTests(unittest.TestCase):
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj
         )
         self.sl4f_obj.reset_mock()
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "success_case",
+                    "return_value": {"result": "Acknowledged"},
+                    "expected_value": RequestStatus.ACKNOWLEDGED,
+                },
+            ),
+            (
+                {
+                    "label": "failure_case",
+                    "return_value": {"result": 123},
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    def test_connect(self, parameterized_dict) -> None:
+        """Test for WlanPolicy.connect()."""
+        self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
+
+        if not isinstance(parameterized_dict["return_value"]["result"], str):
+            with self.assertRaises(TypeError):
+                self.wlan_obj.connect(
+                    target_ssid="test", security_type=SecurityType.NONE
+                )
+        else:
+            self.assertEqual(
+                self.wlan_obj.connect(
+                    target_ssid="test", security_type=SecurityType.NONE
+                ),
+                parameterized_dict["expected_value"],
+            )
+
+        self.sl4f_obj.run.assert_called()
 
     def test_create_client_controller(self) -> None:
         """Test for WlanPolicy.create_client_controller()."""
@@ -269,12 +307,56 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
+    def test_remove_network(self) -> None:
+        """Test for WlanPolicy.remove_network()."""
+
+        self.wlan_obj.remove_network(
+            target_ssid="test", security_type=SecurityType.NONE
+        )
+
+        self.sl4f_obj.run.assert_called()
+
     def test_save_network(self) -> None:
         """Test for WlanPolicy.save_network()."""
 
         self.wlan_obj.save_network(
             target_ssid="test", security_type=SecurityType.NONE
         )
+
+        self.sl4f_obj.run.assert_called()
+
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "success_case",
+                    "return_value": {
+                        "result": ["test1", "test2", "test3"],
+                    },
+                    "expected_value": ["test1", "test2", "test3"],
+                },
+            ),
+            (
+                {
+                    "label": "failure_case",
+                    "return_value": {
+                        "result": {},
+                    },
+                },
+            ),
+        ],
+        name_func=_custom_test_name_func,
+    )
+    def test_scan_for_networks(self, parameterized_dict) -> None:
+        """Test for WlanPolicy.scan_for_networks()."""
+        self.sl4f_obj.run.return_value = parameterized_dict["return_value"]
+
+        if not isinstance(parameterized_dict["return_value"]["result"], list):
+            with self.assertRaises(TypeError):
+                self.wlan_obj.scan_for_networks()
+        else:
+            resp = self.wlan_obj.scan_for_networks()
+            self.assertEqual(resp, parameterized_dict["expected_value"])
 
         self.sl4f_obj.run.assert_called()
 

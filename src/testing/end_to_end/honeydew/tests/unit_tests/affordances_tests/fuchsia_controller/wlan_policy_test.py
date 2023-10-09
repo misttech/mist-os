@@ -23,6 +23,13 @@ class ComponentFCTests(unittest.TestCase):
 
         self.assertIsInstance(self.wlan_policy_obj, fc_wlan_policy.WlanPolicy)
 
+    def test_connect(self) -> None:
+        """Test for WlanPolicy.connect() method."""
+        with self.assertRaises(NotImplementedError):
+            self.wlan_policy_obj.connect(
+                target_ssid="test", security_type=SecurityType.NONE
+            )
+
     def test_create_client_controller(self) -> None:
         """Test for WlanPolicy.create_client_controller() method."""
         with self.assertRaises(NotImplementedError):
@@ -43,12 +50,24 @@ class ComponentFCTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.remove_all_networks()
 
+    def test_remove_network(self) -> None:
+        """Test for WlanPolicy.remove_network() method."""
+        with self.assertRaises(NotImplementedError):
+            self.wlan_policy_obj.remove_network(
+                target_ssid="test", security_type=SecurityType.NONE
+            )
+
     def test_save_network(self) -> None:
         """Test for WlanPolicy.save_network()."""
         with self.assertRaises(NotImplementedError):
             self.wlan_policy_obj.save_network(
                 target_ssid="test", security_type=SecurityType.NONE
             )
+
+    def test_scan_for_networks(self) -> None:
+        """Test for WlanPolicy.scan_for_networks() method."""
+        with self.assertRaises(NotImplementedError):
+            self.wlan_policy_obj.scan_for_networks()
 
     def test_set_new_update_listener(self) -> None:
         """Test for WlanPolicy.set_new_update_listener()."""

@@ -60,6 +60,19 @@ class DisconnectStatus(enum.StrEnum):
     CONNECTION_FAILED = "ConnectionFailed"
 
 
+class RequestStatus(enum.StrEnum):
+    """Connect request response.
+
+    Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.wlan.common/wlan_common.fidl
+    """
+
+    ACKNOWLEDGED = "Acknowledged"
+    REJECTED_NOT_SUPPORTED = "RejectedNotSupported"
+    REJECTED_INCOMPATIBLE_MODE = "RejectedIncompatibleMode"
+    REJECTED_ALREADY_IN_USE = "RejectedAlreadyInUse"
+    REJECTED_DUPLICATE_REQUEST = "RejectedDuplicateRequest"
+
+
 @dataclass
 class NetworkConfig:
     """Network information used to establish a connection.

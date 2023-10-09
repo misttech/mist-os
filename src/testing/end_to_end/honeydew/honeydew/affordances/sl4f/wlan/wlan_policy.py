@@ -16,6 +16,7 @@ from honeydew.typing.wlan import DisconnectStatus
 from honeydew.typing.wlan import NetworkConfig
 from honeydew.typing.wlan import NetworkIdentifier
 from honeydew.typing.wlan import NetworkState
+from honeydew.typing.wlan import RequestStatus
 from honeydew.typing.wlan import SecurityType
 from honeydew.typing.wlan import WlanClientState
 
@@ -29,12 +30,17 @@ def _get_str(m: Mapping[str, object], key: str) -> str:
     return val
 
 
-class Sl4fMethods(StrEnum):
+class _Sl4fMethods(StrEnum):
+    """Sl4f server commands."""
+
+    CONNECT = "wlan_policy.connect"
     CREATE_CLIENT_CONTROLLER = "wlan_policy.create_client_controller"
     GET_SAVED_NETWORKS = "wlan_policy.get_saved_networks"
     GET_UPDATE = "wlan_policy.get_update"
     REMOVE_ALL_NETWORKS = "wlan_policy.remove_all_networks"
+    REMOVE_NETWORK = "wlan_policy.remove_network"
     SAVE_NETWORK = "wlan_policy.save_network"
+    SCAN_FOR_NETWORKS = "wlan_policy.scan_for_networks"
     SET_NEW_UPDATE_LISTENER = "wlan_policy.set_new_update_listener"
     START_CLIENT_CONNECTIONS = "wlan_policy.start_client_connections"
     STOP_CLIENT_CONNECTIONS = "wlan_policy.stop_client_connections"
@@ -53,12 +59,58 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         self._sl4f: SL4F = sl4f
 
     # List all the public methods in alphabetical order
+    def connect(
+        self, target_ssid: str, security_type: SecurityType
+    ) -> RequestStatus:
+        """Triggers connection to a network.
+
+        Args:
+            target_ssid: The network to connect to. Must have been previously
+                saved in order for a successful connection to happen.
+            security_type: The security protocol of the network.
+
+        Returns:
+            A RequestStatus response to the connect request
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+            TypeError: Return value not a string.
+        """
+        method_params = {
+            "target_ssid": target_ssid,
+            "security_type": str(security_type),
+        }
+        resp: dict[str, object] = self._sl4f.run(
+            method=_Sl4fMethods.CONNECT, params=method_params
+        )
+        result: object = resp.get("result", "")
+
+        if not isinstance(result, str):
+            raise TypeError(f'Expected "result" to be str, got {type(result)}')
+
+        return RequestStatus(result)
+
     def create_client_controller(self) -> None:
-        self._sl4f.run(method=Sl4fMethods.CREATE_CLIENT_CONTROLLER)
+        """Initializes the client controller.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+
+        self._sl4f.run(method=_Sl4fMethods.CREATE_CLIENT_CONTROLLER)
 
     def get_saved_networks(self) -> list[NetworkConfig]:
+        """Gets networks saved on device.
+
+        Returns:
+            A list of NetworkConfigs.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+            TypeError: Return values not correct types.
+        """
         resp: dict[str, object] = self._sl4f.run(
-            method=Sl4fMethods.GET_SAVED_NETWORKS
+            method=_Sl4fMethods.GET_SAVED_NETWORKS
         )
         result: object = resp.get("result", [])
 
@@ -82,20 +134,33 @@ class WlanPolicy(wlan_policy.WlanPolicy):
 
         return networks
 
-    def get_update(self) -> ClientStateSummary:
+    def get_update(
+        self, timeout: float = wlan_policy.DEFAULTS["UPDATE_TIMEOUT_S"]
+    ) -> ClientStateSummary:
         """Gets one client listener update.
 
         This call will return with an update immediately the
         first time the update listener is initialized by setting a new listener
         or by creating a client controller before setting a new listener.
-        Subsequent calls will hang until there is an update.
+        Subsequent calls will hang until there is a change since the last
+        update call.
+
+        Args:
+            timeout: Timeout in seconds to wait for the get_update command to
+                return.
 
         Returns:
             An update of connection status. If there is no error, the result is
             a WlanPolicyUpdate with a structure that matches the FIDL
             ClientStateSummary struct given for updates.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+            TypeError: Return values not correct types.
         """
-        resp: dict[str, object] = self._sl4f.run(method=Sl4fMethods.GET_UPDATE)
+        resp: dict[str, object] = self._sl4f.run(
+            method=_Sl4fMethods.GET_UPDATE, timeout=timeout
+        )
         result: object = resp.get("result", {})
 
         if not isinstance(result, dict):
@@ -135,7 +200,39 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         )
 
     def remove_all_networks(self) -> None:
-        self._sl4f.run(method=Sl4fMethods.REMOVE_ALL_NETWORKS)
+        """Deletes all saved networks on the device.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        self._sl4f.run(method=_Sl4fMethods.REMOVE_ALL_NETWORKS)
+
+    def remove_network(
+        self,
+        target_ssid: str,
+        security_type: SecurityType,
+        target_pwd: str | None = None,
+    ) -> None:
+        """Removes or "forgets" a network from saved networks.
+
+        Args:
+            target_ssid: The network to remove.
+            security_type: The security protocol of the network.
+            target_pwd: The credential being saved with the network. No password
+                is equivalent to an empty string.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        if not target_pwd:
+            target_pwd = ""
+
+        method_params = {
+            "target_ssid": target_ssid,
+            "security_type": str(security_type),
+            "target_pwd": target_pwd,
+        }
+        self._sl4f.run(method=_Sl4fMethods.REMOVE_NETWORK, params=method_params)
 
     def save_network(
         self,
@@ -143,6 +240,17 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         security_type: SecurityType,
         target_pwd: str | None = None,
     ) -> None:
+        """Saves a network to the device.
+
+        Args:
+            target_ssid: The network to save.
+            security_type: The security protocol of the network.
+            target_pwd: The credential being saved with the network. No password
+                is equivalent to an empty string.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
         if not target_pwd:
             target_pwd = ""
 
@@ -151,13 +259,51 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             "security_type": str(security_type.value),
             "target_pwd": target_pwd,
         }
-        self._sl4f.run(method=Sl4fMethods.SAVE_NETWORK, params=method_params)
+        self._sl4f.run(method=_Sl4fMethods.SAVE_NETWORK, params=method_params)
+
+    def scan_for_networks(self) -> list[str]:
+        """Scans for networks.
+
+        Returns:
+            A list of network SSIDs that can be connected to.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+            TypeError: Return value not a list.
+        """
+        resp: dict[str, object] = self._sl4f.run(
+            method=_Sl4fMethods.GET_SAVED_NETWORKS
+        )
+        result: object = resp.get("result", [])
+
+        if not isinstance(result, list):
+            raise TypeError(f'Expected "result" to be list, got {type(result)}')
+
+        return result
 
     def set_new_update_listener(self) -> None:
-        self._sl4f.run(method=Sl4fMethods.SET_NEW_UPDATE_LISTENER)
+        """Sets the update listener stream of the facade to a new stream.
+        This causes updates to be reset. Intended to be used between tests so
+        that the behaviour of updates in a test is independent from previous
+        tests.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        self._sl4f.run(method=_Sl4fMethods.SET_NEW_UPDATE_LISTENER)
 
     def start_client_connections(self) -> None:
-        self._sl4f.run(method=Sl4fMethods.START_CLIENT_CONNECTIONS)
+        """Enables device to initiate connections to networks.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        self._sl4f.run(method=_Sl4fMethods.START_CLIENT_CONNECTIONS)
 
     def stop_client_connections(self) -> None:
-        self._sl4f.run(method=Sl4fMethods.STOP_CLIENT_CONNECTIONS)
+        """Disables device for initiating connections to networks.
+
+        Raises:
+            errors.Sl4fError: Sl4f run command failed.
+        """
+        self._sl4f.run(method=_Sl4fMethods.STOP_CLIENT_CONNECTIONS)

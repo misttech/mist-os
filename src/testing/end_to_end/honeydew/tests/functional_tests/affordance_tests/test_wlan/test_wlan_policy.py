@@ -18,6 +18,7 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 # TODO(b/299192230): Add test_stop_client_connections
+# TODO(b/303132287): Add test_connect and update test_scan_for_networks
 class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
     """WlanPolicy affordance tests"""
 

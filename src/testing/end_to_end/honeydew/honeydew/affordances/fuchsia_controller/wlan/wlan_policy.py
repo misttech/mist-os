@@ -7,6 +7,7 @@
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.typing.wlan import ClientStateSummary
 from honeydew.typing.wlan import NetworkConfig
+from honeydew.typing.wlan import RequestStatus
 from honeydew.typing.wlan import SecurityType
 
 
@@ -14,16 +15,31 @@ class WlanPolicy(wlan_policy.WlanPolicy):
     """WlanPolicy affordance implementation using Fuchsia-Controller."""
 
     # List all the public methods in alphabetical order
+    def connect(
+        self, target_ssid: str, security_type: SecurityType
+    ) -> RequestStatus:
+        raise NotImplementedError
+
     def create_client_controller(self) -> None:
         raise NotImplementedError
 
     def get_saved_networks(self) -> list[NetworkConfig]:
         raise NotImplementedError
 
-    def get_update(self) -> ClientStateSummary:
+    def get_update(
+        self, timeout: float = wlan_policy.DEFAULTS["UPDATE_TIMEOUT_S"]
+    ) -> ClientStateSummary:
         raise NotImplementedError
 
     def remove_all_networks(self) -> None:
+        raise NotImplementedError
+
+    def remove_network(
+        self,
+        target_ssid,
+        security_type: SecurityType,
+        target_pwd: str | None = None,
+    ) -> None:
         raise NotImplementedError
 
     def save_network(
@@ -32,6 +48,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         security_type: SecurityType,
         target_pwd: str | None = None,
     ) -> None:
+        raise NotImplementedError
+
+    def scan_for_networks(self) -> list[str]:
         raise NotImplementedError
 
     def set_new_update_listener(self) -> None:
