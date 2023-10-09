@@ -275,6 +275,8 @@ mod tests {
         fidl_fuchsia_io as fio,
         fuchsia_component::server::ServiceFs,
         routing::component_instance::ComponentInstanceInterface,
+        std::collections::HashSet,
+        vfs::pseudo_directory,
     };
 
     struct CreateStreamArgs<'a> {
@@ -285,7 +287,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn synthesize_directory_ready_builtin() {
+    async fn synthesize_directory_ready() {
         let test = setup_synthesis_test().await;
 
         let mut fs = ServiceFs::new();
@@ -303,13 +305,31 @@ mod tests {
         )
         .await;
 
-        let (event, _) = event_stream.next().await.expect("got running event");
-        match event.event.payload {
-            EventPayload::DirectoryReady { name, .. } if name == "diagnostics" => {
-                assert_eq!(event.event.target_moniker, ExtendedMoniker::ComponentManager);
-            }
-            payload => panic!("Expected running or directory ready. Got: {:?}", payload),
+        let mut instances_with_diag_dirs = HashSet::<ExtendedMoniker>::from([
+            ExtendedMoniker::ComponentManager,
+            ExtendedMoniker::from(Moniker::try_from(vec!["b"]).unwrap()),
+            ExtendedMoniker::from(Moniker::try_from(vec!["b", "c"]).unwrap()),
+            ExtendedMoniker::from(Moniker::try_from(vec!["b", "d"]).unwrap()),
+        ]);
+
+        for instance in &instances_with_diag_dirs {
+            let ExtendedMoniker::ComponentInstance(ref m) = instance else {
+                continue;
+            };
+            test.start_instance(m).await.unwrap();
         }
+
+        for _ in 0..instances_with_diag_dirs.len() {
+            let (event, _) = event_stream.next().await.unwrap();
+            match event.event.payload {
+                EventPayload::DirectoryReady { name, .. } if name == "diagnostics" => {
+                    assert!(instances_with_diag_dirs.remove(&event.event.target_moniker));
+                }
+                payload => panic!("Expected running or directory ready. Got: {:?}", payload),
+            }
+        }
+
+        assert!(instances_with_diag_dirs.is_empty());
     }
 
     async fn create_stream<'a>(test: &RoutingTest, args: CreateStreamArgs<'a>) -> EventStream {
@@ -345,15 +365,7 @@ mod tests {
             .expect("subscribe to event stream")
     }
 
-    // Sets up the following topology (all children are lazy)
-    //
-    //     a
-    //    / \
-    //   b   c
-    //  /   / \
-    // d   e   f
-    //    / \   \
-    //   g   h   i
+    /// Construct topology for the test. Puts a diagnostics directory in b, c, and d's namespaces.
     async fn setup_synthesis_test() -> RoutingTest {
         let components = vec![
             (
@@ -362,7 +374,6 @@ mod tests {
                     .directory(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
                     .add_lazy_child("b")
-                    .add_lazy_child("c")
                     .build(),
             ),
             (
@@ -370,10 +381,17 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .directory(diagnostics_decl())
                     .expose(expose_diagnostics_decl())
+                    .add_lazy_child("c")
                     .add_lazy_child("d")
                     .build(),
             ),
-            ("c", ComponentDeclBuilder::new().add_lazy_child("e").add_lazy_child("f").build()),
+            (
+                "c",
+                ComponentDeclBuilder::new()
+                    .directory(diagnostics_decl())
+                    .expose(expose_diagnostics_decl())
+                    .build(),
+            ),
             (
                 "d",
                 ComponentDeclBuilder::new()
@@ -381,33 +399,13 @@ mod tests {
                     .expose(expose_diagnostics_decl())
                     .build(),
             ),
-            (
-                "e",
-                ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
-                    .expose(expose_diagnostics_decl())
-                    .add_lazy_child("g")
-                    .add_lazy_child("h")
-                    .build(),
-            ),
-            ("f", ComponentDeclBuilder::new().add_lazy_child("i").build()),
-            (
-                "g",
-                ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
-                    .expose(expose_diagnostics_decl())
-                    .build(),
-            ),
-            ("h", ComponentDeclBuilder::new().build()),
-            (
-                "i",
-                ComponentDeclBuilder::new()
-                    .directory(diagnostics_decl())
-                    .expose(expose_diagnostics_decl())
-                    .build(),
-            ),
         ];
-        RoutingTest::new("a", components).await
+        RoutingTestBuilder::new("a", components)
+            .add_outgoing_path("b", "/diagnostics".parse().unwrap(), pseudo_directory! {})
+            .add_outgoing_path("c", "/diagnostics".parse().unwrap(), pseudo_directory! {})
+            .add_outgoing_path("d", "/diagnostics".parse().unwrap(), pseudo_directory! {})
+            .build()
+            .await
     }
 
     fn diagnostics_decl() -> DirectoryDecl {
