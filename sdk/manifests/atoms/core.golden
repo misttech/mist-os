@@ -230,6 +230,7 @@
 //src/developer/ffx:bin_sdk
 //src/devices/bin/driver_runtime:driver_runtime_sdk_manifest
 //src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_sdk
+//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_sdk
 //src/devices/bind/fuchsia.platform:fuchsia.platform_sdk
 //src/devices/bind/fuchsia:fuchsia_sdk
 //src/lib/fidl/cpp:cpp_base_sdk
