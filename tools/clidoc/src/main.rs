@@ -114,14 +114,7 @@ const ALLOW_LIST: &'static [&'static str] = &[
 // when invoking --help.
 lazy_static! {
     static ref IGNORE_ERR_CODE: HashSet<&'static str> = {
-        let h = HashSet::from([
-            "bootserver",
-            "fssh",
-            "fremote",
-            "minfs",
-            "symbolizer",
-            "zxdb",
-        ]);
+        let h = HashSet::from(["bootserver", "fssh", "fremote", "minfs", "symbolizer", "zxdb"]);
         h
     };
 }
@@ -205,8 +198,9 @@ fn run(opt: Opt) -> Result<()> {
             info!("Creating depfile at {:?} with {:?}", depfile_path, cmd_paths);
             let mut f = File::create(depfile_path).expect("Unable to create file");
             for cmd_path in cmd_paths.iter() {
-                // Documented tools live in host_x64 path of build directory
-                let p = PathBuf::from("host_x64");
+                // Documented tools live in host_$ARCH path of build directory
+                let input_path_last = input_path.file_name().expect("input path trailing element");
+                let p = PathBuf::from(input_path_last);
                 let tool = cmd_path.file_name();
                 write!(
                     f,
