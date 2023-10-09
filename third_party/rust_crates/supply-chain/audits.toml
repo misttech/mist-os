@@ -215,3 +215,9 @@ who = "David Koloski <dkoloski@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 delta = "0.1.21 -> 0.1.31"
 notes = "Reviewed on https://fxrev.dev/906816"
+
+[[audits.tracing-subscriber]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.3.1 -> 0.3.15"
+notes = "Reviewed on https://fxrev.dev/907708"
