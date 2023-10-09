@@ -20,7 +20,7 @@
 
 mod service_map;
 
-use self::service_map::{ListablePeer, ServiceMap};
+use self::service_map::ServiceMap;
 use crate::{
     future_help::{log_errors, Observer},
     handle_info::{handle_info, HandleKey, HandleType},
@@ -46,6 +46,8 @@ use std::{
     task::{Context, Poll, Waker},
     time::Duration,
 };
+
+pub use self::service_map::ListablePeer;
 
 #[derive(Debug)]
 enum PendingTransfer {
@@ -98,7 +100,7 @@ static LIST_PEERS_CALL: AtomicU64 = AtomicU64::new(0);
 
 impl ListPeersContext {
     /// Implementation of ListPeers fidl method.
-    pub async fn list_peers(&self) -> Result<Vec<fidl_fuchsia_overnet::Peer>, Error> {
+    pub async fn list_peers(&self) -> Result<Vec<ListablePeer>, Error> {
         let call_id = LIST_PEERS_CALL.fetch_add(1, Ordering::SeqCst);
         tracing::trace!(list_peers_call = call_id, "get observer");
         let mut obs = self
@@ -112,7 +114,7 @@ impl ListPeersContext {
         tracing::trace!(list_peers_call = call_id, "replace observer");
         *self.0.lock().await = Some(obs);
         tracing::trace!(list_peers_call = call_id, "return");
-        Ok(r.unwrap_or_else(Vec::new).into_iter().map(|p| p.into()).collect())
+        Ok(r.unwrap_or_else(Vec::new))
     }
 }
 
@@ -799,12 +801,9 @@ mod tests {
             if peers
                 .iter()
                 .find(move |peer| {
-                    serving_node_id == peer.id.into()
+                    serving_node_id == peer.node_id
                         && peer
-                            .description
                             .services
-                            .as_ref()
-                            .unwrap()
                             .iter()
                             .find(move |&advertised_service| advertised_service == service)
                             .is_some()

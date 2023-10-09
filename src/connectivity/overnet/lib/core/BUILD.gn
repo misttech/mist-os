@@ -9,7 +9,6 @@ import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
 
 CORE_DEPS = [
-  "//sdk/fidl/fuchsia.overnet:fuchsia.overnet_rust",
   "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
   "//src/connectivity/overnet/lib/circuit",
   "//src/lib/async-utils",

@@ -19,7 +19,7 @@ mod test_util;
 pub use coding::{decode_fidl, encode_fidl};
 pub use future_help::log_errors;
 pub use labels::{Endpoint, NodeId, NodeLinkId};
-pub use router::{AscenddClientRouting, ListPeersContext, Router};
+pub use router::{AscenddClientRouting, ListPeersContext, ListablePeer, Router};
 
 pub use test_util::NodeIdGenerator;
 

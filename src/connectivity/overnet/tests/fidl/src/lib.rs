@@ -122,15 +122,8 @@ impl Fixture {
                 peers
                     .iter()
                     .find(|peer| {
-                        node_id == peer.id.into()
-                            && peer
-                                .description
-                                .services
-                                .as_ref()
-                                .unwrap()
-                                .iter()
-                                .find(|&s| *s == service)
-                                .is_some()
+                        node_id == peer.node_id
+                            && peer.services.iter().find(|&s| *s == service).is_some()
                     })
                     .is_some()
             };

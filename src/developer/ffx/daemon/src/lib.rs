@@ -169,28 +169,20 @@ async fn find_next_daemon<'a>(
     loop {
         let peers = lpc.list_peers().await?;
         for peer in peers.iter() {
-            if peer
-                .description
-                .services
-                .as_ref()
-                .unwrap_or(&Vec::new())
-                .iter()
-                .find(|name| *name == DaemonMarker::PROTOCOL_NAME)
-                .is_none()
-            {
+            if !peer.services.iter().any(|name| *name == DaemonMarker::PROTOCOL_NAME) {
                 continue;
             }
             match exclusions {
                 Some(ref exclusions) => {
-                    if exclusions.iter().any(|n| *n == peer.id) {
+                    if exclusions.iter().any(|n| *n == peer.node_id.into()) {
                         continue;
                     }
                 }
                 None => {}
             }
-            return create_daemon_proxy(node, &mut peer.id.clone())
+            return create_daemon_proxy(node, &mut peer.node_id.into())
                 .await
-                .map(|proxy| (peer.id.clone(), proxy));
+                .map(|proxy| (peer.node_id.into(), proxy));
         }
     }
 }

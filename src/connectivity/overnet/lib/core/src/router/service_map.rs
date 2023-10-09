@@ -14,22 +14,12 @@ use std::collections::{btree_map, BTreeMap};
 /// A type that can be converted into a fidl_fuchsia_overnet::Peer
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListablePeer {
-    node_id: NodeId,
-    is_self: bool,
-    services: Vec<String>,
-}
-
-impl From<ListablePeer> for fidl_fuchsia_overnet::Peer {
-    fn from(p: ListablePeer) -> fidl_fuchsia_overnet::Peer {
-        fidl_fuchsia_overnet::Peer {
-            id: p.node_id.into(),
-            is_self: p.is_self,
-            description: fidl_fuchsia_overnet_protocol::PeerDescription {
-                services: Some(p.services),
-                ..Default::default()
-            },
-        }
-    }
+    /// Node ID of this peer.
+    pub node_id: NodeId,
+    /// Whether this peer is the node producing the list.
+    pub is_self: bool,
+    /// Services offered by this peer.
+    pub services: Vec<String>,
 }
 
 struct ListablePeerSet {
