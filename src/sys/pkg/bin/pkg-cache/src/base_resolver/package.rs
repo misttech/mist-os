@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    super::{context_authenticator::ContextAuthenticator, ResolverError},
     anyhow::{self, Context as _},
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fidl_fuchsia_pkg as fpkg,
@@ -14,7 +15,7 @@ use {
 pub(crate) async fn serve_request_stream(
     mut stream: fpkg::PackageResolverRequestStream,
     base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {
     while let Some(request) =
@@ -86,9 +87,9 @@ async fn resolve_with_context(
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+) -> Result<fpkg::ResolutionContext, ResolverError> {
     resolve_with_context_impl(
         &fuchsia_url::PackageUrl::parse(package_url)?,
         context,
@@ -105,13 +106,13 @@ pub(crate) async fn resolve_with_context_impl(
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+) -> Result<fpkg::ResolutionContext, ResolverError> {
     match package_url {
         fuchsia_url::PackageUrl::Absolute(url) => {
             if !context.bytes.is_empty() {
-                return Err(crate::ResolverError::ContextWithAbsoluteUrl);
+                return Err(ResolverError::ContextWithAbsoluteUrl);
             }
             resolve_impl(url, dir, base_packages, authenticator, blobfs).await
         }
@@ -125,9 +126,9 @@ async fn resolve(
     url: &str,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+) -> Result<fpkg::ResolutionContext, ResolverError> {
     resolve_impl(&url.parse()?, dir, base_packages, authenticator, blobfs).await
 }
 
@@ -135,13 +136,13 @@ pub(crate) async fn resolve_impl(
     url: &fuchsia_url::AbsolutePackageUrl,
     dir: ServerEnd<fio::DirectoryMarker>,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+) -> Result<fpkg::ResolutionContext, ResolverError> {
     let url_storage;
     let url = match url {
         fuchsia_url::AbsolutePackageUrl::Pinned(_) => {
-            return Err(crate::ResolverError::PackageHashNotSupported);
+            return Err(ResolverError::PackageHashNotSupported);
         }
         fuchsia_url::AbsolutePackageUrl::Unpinned(url) => {
             // TODO(fxbug.dev/53911) Remove zero-variant fallback once variant concept is removed.
@@ -162,7 +163,7 @@ pub(crate) async fn resolve_impl(
     };
     let hash = base_packages
         .get(url)
-        .ok_or_else(|| crate::ResolverError::PackageNotInBase(url.clone().into()))?;
+        .ok_or_else(|| ResolverError::PackageNotInBase(url.clone().into()))?;
     let () = package_directory::serve(
         package_directory::ExecutionScope::new(),
         blobfs.clone(),
@@ -171,7 +172,7 @@ pub(crate) async fn resolve_impl(
         dir,
     )
     .await
-    .map_err(crate::ResolverError::ServePackageDirectory)?;
+    .map_err(ResolverError::ServePackageDirectory)?;
     Ok(authenticator.create(hash))
 }
 
@@ -179,19 +180,19 @@ async fn resolve_subpackage(
     package_url: &fuchsia_url::RelativePackageUrl,
     context: fpkg::ResolutionContext,
     dir: ServerEnd<fio::DirectoryMarker>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fpkg::ResolutionContext, crate::ResolverError> {
+) -> Result<fpkg::ResolutionContext, ResolverError> {
     let super_hash = authenticator.clone().authenticate(context)?;
     let super_package = package_directory::RootDir::new(blobfs.clone(), super_hash)
         .await
-        .map_err(crate::ResolverError::CreatePackageDirectory)?;
+        .map_err(ResolverError::CreatePackageDirectory)?;
     let subpackage = *super_package
         .subpackages()
         .await?
         .subpackages()
         .get(package_url)
-        .ok_or_else(|| crate::ResolverError::SubpackageNotFound)?;
+        .ok_or_else(|| ResolverError::SubpackageNotFound)?;
     let () = package_directory::serve(
         package_directory::ExecutionScope::new(),
         blobfs.clone(),
@@ -200,7 +201,7 @@ async fn resolve_subpackage(
         dir,
     )
     .await
-    .map_err(crate::ResolverError::ServePackageDirectory)?;
+    .map_err(ResolverError::ServePackageDirectory)?;
     Ok(authenticator.create(&subpackage))
 }
 
@@ -219,11 +220,11 @@ mod tests {
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()
                 )]),
-                crate::context_authenticator::ContextAuthenticator::new(),
+                ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,
-            Err(crate::ResolverError::PackageHashNotSupported)
+            Err(ResolverError::PackageHashNotSupported)
         )
     }
 
@@ -239,11 +240,11 @@ mod tests {
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0; 32].into()
                 )]),
-                crate::context_authenticator::ContextAuthenticator::new(),
+                ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,
-            Err(crate::ResolverError::PackageHashNotSupported)
+            Err(ResolverError::PackageHashNotSupported)
         )
     }
 
@@ -262,7 +263,7 @@ mod tests {
                 "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                 *pkg.hash(),
             )]),
-            crate::context_authenticator::ContextAuthenticator::new(),
+            ContextAuthenticator::new(),
             &blobfs_client,
         )
         .await
@@ -284,11 +285,11 @@ mod tests {
                     "fuchsia-pkg://fuchsia.test/name".parse().unwrap(),
                     [0u8; 32].into()
                 )]),
-                crate::context_authenticator::ContextAuthenticator::new(),
+                ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,
-            Err(crate::ResolverError::PackageNotInBase(_))
+            Err(ResolverError::PackageNotInBase(_))
         );
     }
 }

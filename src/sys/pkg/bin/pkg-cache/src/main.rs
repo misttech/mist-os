@@ -13,12 +13,10 @@ use {
     cobalt_sw_delivery_registry as metrics,
     fidl::endpoints::DiscoverableProtocolMarker as _,
     fidl_contrib::{protocol_connector::ConnectedProtocol, ProtocolConnector},
-    fidl_fuchsia_component_decl as fcomponent_decl,
-    fidl_fuchsia_component_resolution as fcomponent_resolution, fidl_fuchsia_io as fio,
+    fidl_fuchsia_io as fio,
     fidl_fuchsia_metrics::{
         MetricEvent, MetricEventLoggerFactoryMarker, MetricEventLoggerProxy, ProjectSpec,
     },
-    fidl_fuchsia_pkg as fpkg,
     fidl_fuchsia_update::CommitStatusProviderMarker,
     fuchsia_async as fasync,
     fuchsia_async::Task,
@@ -36,13 +34,11 @@ use {
 };
 
 mod base_packages;
+mod base_resolver;
 mod cache_service;
 mod compat;
-mod component;
-mod context_authenticator;
 mod gc_service;
 mod index;
-mod package;
 mod reboot;
 mod required_blobs;
 mod retained_packages_service;
@@ -130,7 +126,7 @@ async fn main_inner() -> Result<(), Error> {
         .await
         .context("error opening blobfs")?;
 
-    let authenticator = crate::context_authenticator::ContextAuthenticator::new();
+    let authenticator = base_resolver::context_authenticator::ContextAuthenticator::new();
 
     let (system_image, executability_restrictions, base_packages, cache_packages) =
         if use_system_image {
@@ -285,7 +281,7 @@ async fn main_inner() -> Result<(), Error> {
                 fidl_fuchsia_pkg::PackageResolverMarker::PROTOCOL_NAME,
                 vfs::service::host(
                     move |stream: fidl_fuchsia_pkg::PackageResolverRequestStream| {
-                        package::serve_request_stream(
+                        base_resolver::package::serve_request_stream(
                             stream,
                             base_resolver_base_packages.clone(),
                             authenticator.clone(),
@@ -308,7 +304,7 @@ async fn main_inner() -> Result<(), Error> {
                 fidl_fuchsia_component_resolution::ResolverMarker::PROTOCOL_NAME,
                 vfs::service::host(
                     move |stream: fidl_fuchsia_component_resolution::ResolverRequestStream| {
-                        component::serve_request_stream(
+                        base_resolver::component::serve_request_stream(
                             stream,
                             base_resolver_base_packages.clone(),
                             authenticator.clone(),
@@ -384,119 +380,4 @@ async fn shell_commands_bin_dir(
     .await
     .context("serving shell-commands bin dir")?;
     Ok(client)
-}
-
-#[derive(thiserror::Error, Debug)]
-enum ResolverError {
-    #[error("invalid component URL")]
-    InvalidUrl(#[from] fuchsia_url::errors::ParseError),
-
-    #[error("component URL with package hash not supported")]
-    PackageHashNotSupported,
-
-    #[error("component not found")]
-    ComponentNotFound(#[source] mem_util::FileError),
-
-    #[error("couldn't parse component manifest")]
-    ParsingManifest(#[source] fidl::Error),
-
-    #[error("couldn't find config values")]
-    ConfigValuesNotFound(#[source] mem_util::FileError),
-
-    #[error("config source missing or invalid")]
-    InvalidConfigSource,
-
-    #[error("unsupported config source: {0:?}")]
-    UnsupportedConfigSource(fcomponent_decl::ConfigValueSource),
-
-    #[error("failed to read the manifest")]
-    ReadManifest(#[source] mem_util::DataError),
-
-    #[error("failed to create FIDL endpoints")]
-    CreateEndpoints(#[source] fidl::Error),
-
-    #[error("serve package directory")]
-    ServePackageDirectory(#[source] package_directory::Error),
-
-    #[error("create package directory")]
-    CreatePackageDirectory(#[source] package_directory::Error),
-
-    #[error("context must be empty when resolving absolute URL")]
-    ContextWithAbsoluteUrl,
-
-    #[error("subpackage name was not found in the package's subpackage list")]
-    SubpackageNotFound,
-
-    #[error("failed to read abi revision")]
-    AbiRevision(#[source] fidl_fuchsia_component_abi_ext::AbiRevisionFileError),
-
-    #[error("the package URL was not found in the base package index")]
-    PackageNotInBase(fuchsia_url::AbsolutePackageUrl),
-
-    #[error("failed to read the superpackage's subpackage manifest")]
-    ReadingSubpackageManifest(#[from] package_directory::SubpackagesError),
-
-    #[error("invalid context")]
-    InvalidContext(#[from] crate::context_authenticator::ContextAuthenticatorError),
-
-    #[error("resolve must be called with an absolute (not relative) url")]
-    AbsoluteUrlRequired,
-
-    #[error("failed to convert proxy to channel")]
-    ConvertProxyToChannel,
-}
-
-impl From<&ResolverError> for fcomponent_resolution::ResolverError {
-    fn from(err: &ResolverError) -> fcomponent_resolution::ResolverError {
-        use {fcomponent_resolution::ResolverError as ferror, ResolverError::*};
-        match err {
-            InvalidUrl(_)
-            | PackageHashNotSupported
-            | InvalidContext(_)
-            | AbsoluteUrlRequired
-            | ContextWithAbsoluteUrl => ferror::InvalidArgs,
-            ComponentNotFound(_) => ferror::ManifestNotFound,
-            ConfigValuesNotFound(_) => ferror::ConfigValuesNotFound,
-            ParsingManifest(_) | UnsupportedConfigSource(_) | InvalidConfigSource => {
-                ferror::InvalidManifest
-            }
-            ReadManifest(_)
-            | CreateEndpoints(_)
-            | ServePackageDirectory(_)
-            | CreatePackageDirectory(_)
-            | ReadingSubpackageManifest(_) => ferror::Io,
-            ConvertProxyToChannel => ferror::Internal,
-            SubpackageNotFound | PackageNotInBase(_) => ferror::PackageNotFound,
-            AbiRevision(_) => ferror::InvalidAbiRevision,
-        }
-    }
-}
-
-impl From<ResolverError> for fcomponent_resolution::ResolverError {
-    fn from(err: ResolverError) -> fcomponent_resolution::ResolverError {
-        (&err).into()
-    }
-}
-
-impl From<&ResolverError> for fpkg::ResolveError {
-    fn from(err: &ResolverError) -> fpkg::ResolveError {
-        use {fpkg::ResolveError as ferror, ResolverError::*};
-        match err {
-            InvalidUrl(_) | PackageHashNotSupported | AbsoluteUrlRequired => ferror::InvalidUrl,
-            ComponentNotFound(_)
-            | ConfigValuesNotFound(_)
-            | AbiRevision(_)
-            | ParsingManifest(_)
-            | UnsupportedConfigSource(_)
-            | InvalidConfigSource
-            | ConvertProxyToChannel => ferror::Internal,
-            ReadManifest(_)
-            | CreateEndpoints(_)
-            | ServePackageDirectory(_)
-            | CreatePackageDirectory(_)
-            | ReadingSubpackageManifest(_) => ferror::Io,
-            PackageNotInBase(_) | SubpackageNotFound => ferror::PackageNotFound,
-            ContextWithAbsoluteUrl | InvalidContext(_) => ferror::InvalidContext,
-        }
-    }
 }

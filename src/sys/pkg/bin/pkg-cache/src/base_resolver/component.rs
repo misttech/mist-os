@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    super::{context_authenticator::ContextAuthenticator, ResolverError},
     anyhow::{self, Context as _},
     fidl::endpoints::Proxy as _,
     fidl_fuchsia_component_decl as fcomponent_decl,
@@ -17,7 +18,7 @@ use {
 pub(crate) async fn serve_request_stream(
     mut stream: fcomponent_resolution::ResolverRequestStream,
     base_packages: HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: blobfs::Client,
 ) -> anyhow::Result<()> {
     while let Some(request) =
@@ -78,16 +79,16 @@ pub(crate) async fn serve_request_stream(
 async fn resolve(
     url: &str,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fcomponent_resolution::Component, crate::ResolverError> {
+) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
-        fidl::endpoints::create_proxy().map_err(crate::ResolverError::CreateEndpoints)?;
+        fidl::endpoints::create_proxy().map_err(ResolverError::CreateEndpoints)?;
     let context = super::package::resolve_impl(
         match url.package_url() {
             fuchsia_url::PackageUrl::Absolute(url) => &url,
-            fuchsia_url::PackageUrl::Relative(_) => Err(crate::ResolverError::AbsoluteUrlRequired)?,
+            fuchsia_url::PackageUrl::Relative(_) => Err(ResolverError::AbsoluteUrlRequired)?,
         },
         server_end,
         base_packages,
@@ -103,12 +104,12 @@ async fn resolve_with_context(
     url: &str,
     context: fcomponent_resolution::Context,
     base_packages: &HashMap<fuchsia_url::UnpinnedAbsolutePackageUrl, fuchsia_hash::Hash>,
-    authenticator: crate::context_authenticator::ContextAuthenticator,
+    authenticator: ContextAuthenticator,
     blobfs: &blobfs::Client,
-) -> Result<fcomponent_resolution::Component, crate::ResolverError> {
+) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
-        fidl::endpoints::create_proxy().map_err(crate::ResolverError::CreateEndpoints)?;
+        fidl::endpoints::create_proxy().map_err(ResolverError::CreateEndpoints)?;
     let context = super::package::resolve_with_context_impl(
         url.package_url(),
         fpkg::ResolutionContext { bytes: context.bytes },
@@ -126,25 +127,25 @@ async fn resolve_from_package(
     url: &fuchsia_url::ComponentUrl,
     package: fio::DirectoryProxy,
     outgoing_context: fcomponent_resolution::Context,
-) -> Result<fcomponent_resolution::Component, crate::ResolverError> {
+) -> Result<fcomponent_resolution::Component, ResolverError> {
     let data = mem_util::open_file_data(&package, &url.resource())
         .await
-        .map_err(crate::ResolverError::ComponentNotFound)?;
+        .map_err(ResolverError::ComponentNotFound)?;
     let decl: fcomponent_decl::Component = fidl::unpersist(
-        mem_util::bytes_from_data(&data).map_err(crate::ResolverError::ReadManifest)?.as_ref(),
+        mem_util::bytes_from_data(&data).map_err(ResolverError::ReadManifest)?.as_ref(),
     )
-    .map_err(crate::ResolverError::ParsingManifest)?;
+    .map_err(ResolverError::ParsingManifest)?;
     let config_values = if let Some(config_decl) = decl.config.as_ref() {
         let strategy =
-            config_decl.value_source.as_ref().ok_or(crate::ResolverError::InvalidConfigSource)?;
+            config_decl.value_source.as_ref().ok_or(ResolverError::InvalidConfigSource)?;
         let config_path = match strategy {
             fcomponent_decl::ConfigValueSource::PackagePath(path) => path,
-            other => return Err(crate::ResolverError::UnsupportedConfigSource(other.to_owned())),
+            other => return Err(ResolverError::UnsupportedConfigSource(other.to_owned())),
         };
         Some(
             mem_util::open_file_data(&package, &config_path)
                 .await
-                .map_err(crate::ResolverError::ConfigValuesNotFound)?,
+                .map_err(ResolverError::ConfigValuesNotFound)?,
         )
     } else {
         None
@@ -152,7 +153,7 @@ async fn resolve_from_package(
     let abi_revision =
         fidl_fuchsia_component_abi_ext::read_abi_revision_optional(&package, AbiRevision::PATH)
             .await
-            .map_err(crate::ResolverError::AbiRevision)?;
+            .map_err(ResolverError::AbiRevision)?;
     Ok(fcomponent_resolution::Component {
         url: Some(url.to_string()),
         resolution_context: Some(outgoing_context),
@@ -162,7 +163,7 @@ async fn resolve_from_package(
             directory: Some(
                 package
                     .into_channel()
-                    .map_err(|_| crate::ResolverError::ConvertProxyToChannel)?
+                    .map_err(|_| ResolverError::ConvertProxyToChannel)?
                     .into_zx_channel()
                     .into(),
             ),
@@ -184,11 +185,11 @@ mod tests {
             resolve(
                 "relative#meta/missing",
                 &HashMap::new(),
-                crate::context_authenticator::ContextAuthenticator::new(),
+                ContextAuthenticator::new(),
                 &blobfs::Client::new_test().0
             )
             .await,
-            Err(crate::ResolverError::AbsoluteUrlRequired)
+            Err(ResolverError::AbsoluteUrlRequired)
         )
     }
 }
