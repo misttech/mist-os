@@ -839,6 +839,9 @@
                 "AllInetTests/UdpSocketTest.TimestampIoctlNothingRead/*",
                 "AllInetTests/UdpSocketTest.TimestampIoctlPersistence/*",
 
+                // utimes_test
+                "FutimesatTest.OnNullPathWithOPath",
+
                 // wait_test - https://fxbug.dev/79451
                 "Waiters/WaitAnyChildTest.IgnoredChildRusage/*",
                 "Waiters/WaitSpecificChildTest.SiblingChildrenWNOTHREAD/0",
