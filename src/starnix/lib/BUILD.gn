@@ -5,6 +5,7 @@
 group("lib") {
   deps = [
     "linux_uapi",
+    "lock-sequence",
     "magma",
     "starnix-sync",
     "syncio",
@@ -16,6 +17,7 @@ group("tests") {
 
   deps = [
     "extended_pstate:tests",
+    "lock-sequence:tests",
     "range_map:tests",
     "starnix-sync:tests",
     "syncio:tests",
