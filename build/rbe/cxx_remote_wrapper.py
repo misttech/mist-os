@@ -201,7 +201,11 @@ class CxxRemoteAction(object):
         # This is temporary to help debug the origins of unexpected absolute
         # paths in remote depfiles.
         if self.compiler_type == cxx.Compiler.GCC and self.depfile.exists():
-            return self._verify_remote_depfile()
+            # Unfortunately, -no-canonical-prefixes was not enough to
+            # eliminate the absolute path problem, so we must rewrite
+            # the depfile ourslves.
+            # return self._verify_remote_depfile()
+            self._rewrite_remote_depfile()
 
         # TODO: if downloads were skipped, need to force-download depfile
         return 0
