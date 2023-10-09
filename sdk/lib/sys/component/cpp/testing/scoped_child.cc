@@ -132,7 +132,7 @@ void ScopedChild::Teardown(async_dispatcher_t* dispatcher, TeardownCallback call
   async_realm_proxy.set_error_handler(
       [](zx_status_t status) { ZX_PANIC("%s", zx_status_get_string(status)); });
   ZX_COMPONENT_ASSERT_STATUS_OK("sys::ServiceDirectory/Connect",
-                                svc_->Connect(async_realm_proxy.NewRequest()));
+                                svc_->Connect(async_realm_proxy.NewRequest(dispatcher)));
 
   internal::DestroyChild(
       async_realm_proxy.get(), child_ref_,
