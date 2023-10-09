@@ -522,8 +522,13 @@ async fn start(
             let exit_status: ChannelEpitaph = match proc_copy.info() {
                 Ok(zx::ProcessInfo { return_code: 0, .. }) => zx::Status::OK.try_into().unwrap(),
                 Ok(zx::ProcessInfo { return_code, .. }) => {
-                    warn!(url=%resolved_url, %return_code,
-                        "process terminated with non-zero return code");
+                    // Don't log SYSCALL_KILL codes because they are expected in the course
+                    // of normal operation. When elf_runner process a `kill` signal for
+                    // a component it makes a zx_task_kill syscall which sets this return code.
+                    if return_code != zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL {
+                        warn!(url=%resolved_url, %return_code,
+                        "process terminated with abnormal return code");
+                    }
                     fcomp::Error::InstanceDied.into()
                 }
                 Err(error) => {
