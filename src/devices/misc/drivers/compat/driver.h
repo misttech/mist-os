@@ -51,6 +51,8 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetIoportResource();
 
+  zx_handle_t GetIrqResource();
+
   // # Threading notes
   //
   // If this method is not called from a task running on |dispatcher|,
@@ -144,6 +146,7 @@ class Driver : public fdf::DriverBase {
   zx::resource mmio_resource_;
   zx::resource power_resource_;
   zx::resource ioport_resource_;
+  zx::resource irq_resource_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
