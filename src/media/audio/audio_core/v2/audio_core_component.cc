@@ -12,7 +12,6 @@
 #include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/client.h>
 
-#include "src/media/audio/audio_core/shared/pin_executable_memory.h"
 #include "src/media/audio/audio_core/shared/policy_loader.h"
 #include "src/media/audio/audio_core/shared/process_config_loader.h"
 #include "src/media/audio/audio_core/shared/profile_acquirer.h"
@@ -28,7 +27,6 @@ namespace {
 
 using ::media::audio::AcquireMemoryRole;
 using ::media::audio::ActivityDispatcherImpl;
-using ::media::audio::PinExecutableMemory;
 using ::media::audio::PolicyLoader;
 using ::media::audio::ProcessConfig;
 using ::media::audio::ProcessConfigLoader;
@@ -130,7 +128,6 @@ AudioCoreComponent::AudioCoreComponent(component::OutgoingDirectory& outgoing,
     FX_PLOGS(ERROR, result.status_value())
         << "Unable to set memory role for the audio_core process";
   }
-  PinExecutableMemory::Singleton();
 
   // TODO(fxbug.dev/98652): replace uses of this function with newer functions such as
   // component::Connect().

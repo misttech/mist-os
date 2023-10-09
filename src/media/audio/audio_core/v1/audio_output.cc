@@ -13,7 +13,6 @@
 #include <utility>
 
 #include "src/media/audio/audio_core/shared/mixer/mixer.h"
-#include "src/media/audio/audio_core/shared/pin_executable_memory.h"
 #include "src/media/audio/audio_core/v1/audio_driver.h"
 #include "src/media/audio/audio_core/v1/base_renderer.h"
 #include "src/media/audio/audio_core/v1/stage_metrics.h"
@@ -225,9 +224,6 @@ void AudioOutput::SetupMixTask(const DeviceConfig::OutputDeviceProfile& profile,
 
   // OutputPipelines must always produce float samples.
   FX_CHECK(pipeline_->format().sample_format() == fuchsia::media::AudioSampleFormat::FLOAT);
-
-  // In case the pipeline needs shared libraries, ensure those are paged in.
-  PinExecutableMemory::Singleton().Pin();
 }
 
 void AudioOutput::Cleanup() {
