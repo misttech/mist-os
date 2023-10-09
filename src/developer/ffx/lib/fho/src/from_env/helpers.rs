@@ -37,8 +37,6 @@ pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> 
 }
 
 pub async fn open_moniker<P>(
-    proxy: P,
-    server_end: ServerEnd<P::Protocol>,
     rcs: &RemoteControlProxy,
     capability_set: rcs::OpenDirType,
     moniker: &str,
@@ -48,7 +46,7 @@ where
     P: Proxy + 'static,
     P::Protocol: DiscoverableProtocolMarker,
 {
-    let protocol_name = P::Protocol::PROTOCOL_NAME; // for error messages.
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<P::Protocol>().unwrap();
     rcs::open_with_timeout::<P::Protocol>(
         timeout,
         moniker,
@@ -58,6 +56,7 @@ where
     )
     .await
     .with_user_message(|| {
+        let protocol_name = P::Protocol::PROTOCOL_NAME;
         format!("Failed to connect to protocol '{protocol_name}' at moniker '{moniker}' within {} seconds", timeout.as_secs_f64())
     })?;
     Ok(proxy)

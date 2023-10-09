@@ -39,10 +39,7 @@ where
         // time this so that we can use an appropriately shorter timeout for the attempt
         // to connect by the backup (if there is one)
         let start_time = Instant::now();
-        let (proxy, server_end) = create_proxy()?;
         let toolbox_res = open_moniker(
-            proxy,
-            server_end,
             &rcs,
             OpenDirType::NamespaceDir,
             Self::TOOLBOX_MONIKER,
@@ -55,16 +52,14 @@ where
         // message. This just avoids an indentation or having to break this out
         // into another single-use function. It's kind of a reverse `?`.
         let Some(backup) = self.backup else {
-            return toolbox_res.with_user_message(|| toolbox_error_message(protocol_name))
+            return toolbox_res.with_user_message(|| toolbox_error_message(protocol_name));
         };
         let Err(toolbox_err) = toolbox_res else { return toolbox_res };
 
         // try to connect to the moniker given instead, but don't double
         // up the timeout.
         let timeout = DEFAULT_PROXY_TIMEOUT.saturating_sub(toolbox_took);
-        let (proxy, server_end) = create_proxy()?;
-        let moniker_res =
-            open_moniker(proxy, server_end, &rcs, OpenDirType::ExposedDir, &backup, timeout).await;
+        let moniker_res = open_moniker(&rcs, OpenDirType::ExposedDir, &backup, timeout).await;
 
         // stack the errors together so we can see both of them in the log if
         // we want to and then provide an error message that indicates we tried

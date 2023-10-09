@@ -225,16 +225,7 @@ where
     type Output = P;
     async fn try_from_env_with(self, env: &FhoEnvironment) -> Result<Self::Output> {
         let rcs_instance = connect_to_rcs(&env).await?;
-        let (proxy, server_end) = create_proxy()?;
-        open_moniker(
-            proxy,
-            server_end,
-            &rcs_instance,
-            OpenDirType::ExposedDir,
-            &self.moniker,
-            self.timeout,
-        )
-        .await
+        open_moniker(&rcs_instance, OpenDirType::ExposedDir, &self.moniker, self.timeout).await
     }
 }
 
