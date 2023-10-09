@@ -11,8 +11,11 @@ use crate::{
     file_resolver::resolvers::{ArchiveResolver, Resolver, TarResolver},
     file_resolver::FileResolver,
     manifest::{
-        sdk::SdkEntries, v1::FlashManifest as FlashManifestV1,
-        v2::FlashManifest as FlashManifestV2, v3::FlashManifest as FlashManifestV3,
+        resolvers::{FlashManifestResolver, ManifestResolver},
+        sdk::SdkEntries,
+        v1::FlashManifest as FlashManifestV1,
+        v2::FlashManifest as FlashManifestV2,
+        v3::FlashManifest as FlashManifestV3,
     },
 };
 use anyhow::{anyhow, Context, Result};
@@ -31,10 +34,11 @@ use std::{
     collections::BTreeMap,
     fs::File,
     io::{BufReader, Read, Write},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use termion::{color, style};
 
+pub mod resolvers;
 pub mod sdk;
 pub mod v1;
 pub mod v2;
@@ -56,32 +60,6 @@ pub struct Image {
 pub struct ManifestFile {
     manifest: Value,
     version: u64,
-}
-
-#[async_trait]
-pub trait ManifestResolver {
-    async fn get_manifest_path(&self) -> &Path;
-}
-
-#[async_trait]
-impl ManifestResolver for Resolver {
-    async fn get_manifest_path(&self) -> &Path {
-        self.manifest()
-    }
-}
-
-#[async_trait]
-impl ManifestResolver for TarResolver {
-    async fn get_manifest_path(&self) -> &Path {
-        self.manifest()
-    }
-}
-
-#[async_trait]
-impl ManifestResolver for ArchiveResolver {
-    async fn get_manifest_path(&self) -> &Path {
-        self.manifest()
-    }
 }
 
 pub enum FlashManifestVersion {
@@ -551,12 +529,12 @@ pub async fn from_path<W: Write, T: FastbootInterface>(
                 let r = TarResolver::new(writer, path)?;
                 load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             } else {
-                let r = Resolver::new(path)?;
+                let r = FlashManifestResolver::new(path)?;
                 load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             }
         }
         _ => {
-            let r = Resolver::new(path)?;
+            let r = FlashManifestResolver::new(path)?;
             load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
         }
     }

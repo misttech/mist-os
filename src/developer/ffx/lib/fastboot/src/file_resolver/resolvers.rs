@@ -53,19 +53,20 @@ impl FileResolver for EmptyResolver {
 }
 
 pub struct Resolver {
-    manifest_path: PathBuf,
+    root_path: PathBuf,
 }
 
 impl Resolver {
     pub fn new(path: PathBuf) -> Result<Self> {
         Ok(Self {
-            manifest_path: path.canonicalize().with_context(|| {
+            root_path: path.canonicalize().with_context(|| {
                 format!("Getting absolute path of flashing manifest at {:?}", path)
             })?,
         })
     }
-    pub fn manifest(&self) -> &Path {
-        self.manifest_path.as_path()
+
+    pub fn root_path(&self) -> &Path {
+        self.root_path.as_path()
     }
 }
 
@@ -74,13 +75,13 @@ impl FileResolver for Resolver {
     async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
         if PathBuf::from(file).is_absolute() {
             Ok(file.to_string())
-        } else if let Some(p) = self.manifest().parent() {
+        } else if let Some(p) = self.root_path().parent() {
             let mut parent = p.to_path_buf();
             parent.push(file);
             if let Some(f) = parent.to_str() {
                 Ok(f.to_string())
             } else {
-                ffx_bail!("Only UTF-8 strings are currently supported in the flash manifest")
+                ffx_bail!("Only UTF-8 strings are currently supported file paths")
             }
         } else {
             bail!("Could not get file to upload");

@@ -79,6 +79,7 @@ if (is_host) {
       "src/lib.rs",
       "src/lock/mod.rs",
       "src/manifest/mod.rs",
+      "src/manifest/resolvers.rs",
       "src/manifest/sdk.rs",
       "src/manifest/v1.rs",
       "src/manifest/v2.rs",
