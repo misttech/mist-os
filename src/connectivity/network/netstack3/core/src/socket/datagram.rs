@@ -2892,14 +2892,20 @@ pub(crate) fn send_conn<
     })
 }
 
+/// An error encountered while sending a datagram packet to an alternate address.
 #[derive(Debug)]
-pub(crate) enum SendToError<SE> {
+pub enum SendToError<SE> {
+    /// The socket is not writeable.
     NotWriteable,
+    /// There was a problem with the remote address relating to its zone.
     Zone(ZonedAddressError),
+    /// An error was encountered while trying to create a temporary IP socket
+    /// to use for the send operation.
     CreateAndSend(IpSockCreateAndSendError),
-    // The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
-    // socket is not dual-stack enabled.
+    /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
+    /// socket is not dual-stack enabled.
     RemoteUnexpectedlyMapped,
+    /// The provided buffer is not vailid.
     SerializeError(SE),
 }
 

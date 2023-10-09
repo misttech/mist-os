@@ -8,6 +8,7 @@ use core::{
     convert::TryInto as _,
     fmt::Debug,
     num::{NonZeroU16, NonZeroU8},
+    ops::ControlFlow,
 };
 
 use dense_map::EntryKey;
@@ -67,8 +68,8 @@ use crate::{
     socket::{
         self,
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
-            SocketZonedIpAddr,
+            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr,
+            SocketIpAddr, SocketZonedIpAddr,
         },
         datagram::{
             self, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
@@ -3249,13 +3250,32 @@ fn receive_icmp_echo_reply<
     };
     sync_ctx.with_icmp_sockets(|sockets| {
         if let Some(id) = NonZeroU16::new(id) {
-            if let Some(conn) = sockets.socket_map.conns().get_by_addr(&ConnAddr {
-                ip: ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) },
-                device: None,
+            let mut addrs_to_search =
+                AddrVecIter::<I, SC::WeakDeviceId, IcmpAddrSpec>::without_device(
+                    ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
+                );
+            let socket = match addrs_to_search.try_for_each(|addr_vec| {
+                match addr_vec {
+                    AddrVec::Conn(c) => {
+                        if let Some(id) = sockets.socket_map.conns().get_by_addr(&c) {
+                            return ControlFlow::Break(id);
+                        }
+                    }
+                    AddrVec::Listen(l) => {
+                        if let Some(id) = sockets.socket_map.listeners().get_by_addr(&l) {
+                            return ControlFlow::Break(id);
+                        }
+                    }
+                }
+                ControlFlow::Continue(())
             }) {
+                ControlFlow::Continue(()) => None,
+                ControlFlow::Break(id) => Some(id),
+            };
+            if let Some(socket) = socket {
                 trace!("receive_icmp_echo_reply: Received echo reply for local socket");
                 ctx.receive_icmp_echo_reply(
-                    *conn,
+                    *socket,
                     src_ip.addr(),
                     dst_ip.addr(),
                     id.get(),
@@ -3326,6 +3346,18 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
         conn: SocketId<I>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>>;
+
+    /// Send an ICMP echo reply to a remote address without connecting.
+    fn send_to(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        body: B,
+    ) -> Result<
+        (),
+        either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
+    >;
 }
 
 impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStateContext>
@@ -3416,6 +3448,19 @@ impl<
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
         datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id, body)
+    }
+
+    fn send_to(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        body: B,
+    ) -> Result<
+        (),
+        either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
+    > {
+        datagram::send_to::<_, _, _, Icmp, _>(self, ctx, id, remote_ip, (), body)
     }
 }
 
@@ -3521,6 +3566,35 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     )
 }
 
+/// Sends an ICMP packet with an remote address.
+///
+/// The socket doesn't need to be connected.
+pub fn send_to<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: SocketId<I>,
+    remote_ip: SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>,
+    body: B,
+) -> Result<
+    (),
+    either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
+> {
+    let IpInvariant(result) = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((sync_ctx, ctx, body)), (remote_ip, id)),
+        |(IpInvariant((sync_ctx, ctx, body)), (remote_ip, id))| {
+            IpInvariant(BufferSocketHandler::<I, C, _>::send_to(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                id,
+                remote_ip,
+                body,
+            ))
+        }
+    );
+    result
+}
+
 /// Socket information about an ICMP socket.
 #[derive(Debug, GenericOverIp, PartialEq, Eq)]
 #[generic_over_ip(A, IpAddress)]
@@ -3593,6 +3667,7 @@ mod tests {
         udp::UdpPacketBuilder,
         utils::NonZeroDuration,
     };
+    use test_case::test_case;
 
     use super::*;
     use crate::{
@@ -4428,7 +4503,20 @@ mod tests {
         Remote,
     }
 
-    fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>(conn_type: IcmpConnectionType) {
+    enum IcmpSendType {
+        Send,
+        SendTo,
+    }
+
+    #[ip_test]
+    #[test_case(IcmpConnectionType::Local, IcmpSendType::Send)]
+    #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo)]
+    fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>(
+        conn_type: IcmpConnectionType,
+        send_type: IcmpSendType,
+    ) {
         crate::testutil::set_logger_for_test();
 
         let recv_icmp_packet_name = match I::VERSION {
@@ -4490,17 +4578,30 @@ mod tests {
 
             let conn = new_socket::<I, _>(sync_ctx);
             bind(sync_ctx, non_sync_ctx, conn, None, NonZeroU16::new(icmp_id)).unwrap();
-            connect(
-                sync_ctx,
-                non_sync_ctx,
-                conn,
-                SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
-                REMOTE_ID,
-            )
-            .unwrap();
+            match send_type {
+                IcmpSendType::Send => {
+                    connect(
+                        sync_ctx,
+                        non_sync_ctx,
+                        conn,
+                        SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
+                        REMOTE_ID,
+                    )
+                    .unwrap();
 
-            send(sync_ctx, non_sync_ctx, conn, buf).unwrap();
-
+                    send(sync_ctx, non_sync_ctx, conn, buf).unwrap();
+                }
+                IcmpSendType::SendTo => {
+                    send_to(
+                        sync_ctx,
+                        non_sync_ctx,
+                        conn,
+                        SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
+                        buf,
+                    )
+                    .unwrap();
+                }
+            }
             handle_queued_rx_packets(sync_ctx, non_sync_ctx);
 
             conn
@@ -4541,16 +4642,6 @@ mod tests {
             .into_inner()
             .into_inner();
         assert_matches!(&replies[..], [(1, body)] if *body == expected);
-    }
-
-    #[ip_test]
-    fn test_local_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>() {
-        test_icmp_connection::<I>(IcmpConnectionType::Local);
-    }
-
-    #[ip_test]
-    fn test_remote_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>() {
-        test_icmp_connection::<I>(IcmpConnectionType::Remote);
     }
 
     // Tests that only require an ICMP stack. Unlike the preceding tests, these
