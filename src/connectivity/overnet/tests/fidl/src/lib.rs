@@ -16,31 +16,6 @@ use std::sync::Arc;
 mod channel;
 mod socket;
 
-struct Service(futures::channel::mpsc::Sender<fidl::Channel>, String);
-
-impl fidl_fuchsia_overnet::ServiceProviderProxyInterface for Service {
-    fn connect_to_service(
-        &self,
-        chan: fidl::Channel,
-        _connection_info: &fidl_fuchsia_overnet::ConnectionInfo,
-    ) -> std::result::Result<(), fidl::Error> {
-        let test_name = self.1.clone();
-        tracing::info!(%test_name, "got connection {:?}", chan);
-        let mut sender = self.0.clone();
-        Task::spawn(log_errors(
-            async move {
-                tracing::info!(%test_name, "sending the thing");
-                sender.send(chan).await?;
-                tracing::info!(%test_name, "sent the thing");
-                Ok(())
-            },
-            format!("{} failed to send incoming request handle", self.1),
-        ))
-        .detach();
-        Ok(())
-    }
-}
-
 struct Fixture {
     dist_a_to_b: fidl::Channel,
     dist_b: fidl::AsyncChannel,
@@ -103,19 +78,40 @@ impl Fixture {
         let service = format!("distribute_handle_for_{}", test_name);
         let (send_handle, mut recv_handle) = futures::channel::mpsc::channel(1);
         tracing::info!(%test_name, %fixture_id, "register 2");
+        let spawn_service = &|chan,
+                              mut sender: futures::channel::mpsc::Sender<fidl::Channel>,
+                              test_name: String| {
+            tracing::info!(%test_name, "got connection {:?}", chan);
+            Task::spawn(log_errors(
+                {
+                    let test_name = test_name.clone();
+                    async move {
+                        tracing::info!(%test_name, "sending the thing");
+                        sender.send(chan).await?;
+                        tracing::info!(%test_name, "sent the thing");
+                        Ok(())
+                    }
+                },
+                format!("{test_name} failed to send incoming request handle"),
+            ))
+            .detach();
+            Ok(())
+        };
         router2
-            .register_raw_service(
-                service.clone(),
-                Box::new(Service(send_handle.clone(), test_name.clone())),
-            )
+            .register_service(service.clone(), {
+                let sender = send_handle.clone();
+                let test_name = test_name.clone();
+                move |chan, _| spawn_service(chan, sender.clone(), test_name.clone())
+            })
             .await
             .unwrap();
         tracing::info!(%test_name, %fixture_id, "register 3");
         router3
-            .register_raw_service(
-                service.clone(),
-                Box::new(Service(send_handle, test_name.clone())),
-            )
+            .register_service(service.clone(), {
+                let sender = send_handle.clone();
+                let test_name = test_name.clone();
+                move |chan, _| spawn_service(chan, sender.clone(), test_name.clone())
+            })
             .await
             .unwrap();
         // Wait til we can see both peers in the service map before progressing.

@@ -30,8 +30,8 @@ use crate::{
 };
 use anyhow::{bail, format_err, Context as _, Error};
 use async_utils::mutex_ticket::MutexTicket;
-use fidl::{endpoints::ClientEnd, AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket};
-use fidl_fuchsia_overnet::{ConnectionInfo, ServiceProviderMarker, ServiceProviderProxyInterface};
+use fidl::{AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket};
+use fidl_fuchsia_overnet::ConnectionInfo;
 use fidl_fuchsia_overnet_protocol::{
     ChannelHandle, EventPairHandle, EventPairRights, SocketHandle, SocketType, StreamId, StreamRef,
     ZirconHandle,
@@ -291,27 +291,6 @@ impl Router {
                 .new_stream(service_name, chan, self)
                 .await
         }
-    }
-
-    /// Legacy. Do not use.
-    pub async fn register_service_legacy(
-        &self,
-        service_name: String,
-        provider: ClientEnd<ServiceProviderMarker>,
-    ) -> Result<(), Error> {
-        self.register_raw_service(service_name, Box::new(provider.into_proxy()?)).await
-    }
-
-    /// Register a service without needing a FIDL channel.
-    pub async fn register_raw_service(
-        &self,
-        service_name: String,
-        provider: Box<dyn ServiceProviderProxyInterface>,
-    ) -> Result<(), Error> {
-        self.register_service(service_name, move |chan, info| {
-            provider.connect_to_service(chan, info).map_err(Into::into)
-        })
-        .await
     }
 
     /// Register a service. The callback should connect the given channel to the
