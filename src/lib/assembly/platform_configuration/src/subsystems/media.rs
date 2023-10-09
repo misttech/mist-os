@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use assembly_config_schema::platform_config::media_config::PlatformMediaConfig;
+use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct MediaSubsystem;
 impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
@@ -18,8 +18,28 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             builder.platform_bundle("audio_dev_support");
         }
 
-        if media_config.audio_device_registry_enabled {
-            builder.platform_bundle("audio_device_registry");
+        match (&media_config.audio, media_config.audio_device_registry_enabled) {
+            (None, false) => {}
+            (None, true) => {
+                builder.platform_bundle("audio_device_registry");
+            }
+            (Some(_), true) => {
+                anyhow::bail!(
+                    "Do not use both media.audio and media.audio_device_registry_enabled"
+                );
+            }
+            (Some(AudioConfig::FullStack(config)), false) => {
+                builder.platform_bundle("audio_core_routing");
+                if !config.product_provides_audio_core {
+                    builder.platform_bundle("audio_core");
+                }
+                if config.use_adc_device {
+                    builder.platform_bundle("audio_core_use_adc_device");
+                }
+            }
+            (Some(AudioConfig::PartialStack), false) => {
+                builder.platform_bundle("audio_device_registry");
+            }
         }
 
         Ok(())

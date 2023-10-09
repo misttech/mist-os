@@ -56,6 +56,9 @@ BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERD
 # Please keep sorted, it makes merge conflicts less likely vs adding to the
 # end of the list.
 USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
+    "audio_core",
+    "audio_core_routing",
+    "audio_core_use_adc_device",
     "audio_device_registry",
     "battery_manager",
     "common_minimal",
