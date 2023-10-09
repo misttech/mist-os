@@ -523,19 +523,19 @@ where
         id: SocketType::Id,
     ) -> Result<SocketStateEntry<'a, I, D, A, S, SocketType>, (InsertError, SocketType::SharingState)>
     {
-        self.try_insert_with(socket_addr, tag_state, |_addr, _sharing| id)
+        self.try_insert_with(socket_addr, tag_state, |_addr, _sharing| (id, ()))
+            .map(|(entry, ())| entry)
     }
 
-    // TODO(https://fxbug.dev/126141): remove this and inline its contents into
-    // try_insert once TCP socket IDs are not being constructed inside the
-    // make_id callback.
-    pub(crate) fn try_insert_with(
+    pub(crate) fn try_insert_with<R>(
         self,
         socket_addr: SocketType::Addr,
         tag_state: SocketType::SharingState,
-        make_id: impl FnOnce(SocketType::Addr, SocketType::SharingState) -> SocketType::Id,
-    ) -> Result<SocketStateEntry<'a, I, D, A, S, SocketType>, (InsertError, SocketType::SharingState)>
-    {
+        make_id: impl FnOnce(SocketType::Addr, SocketType::SharingState) -> (SocketType::Id, R),
+    ) -> Result<
+        (SocketStateEntry<'a, I, D, A, S, SocketType>, R),
+        (InsertError, SocketType::SharingState),
+    > {
         let Self(addr_to_state, _) = self;
         match S::check_insert_conflicts(&tag_state, &socket_addr, &addr_to_state) {
             Err(e) => return Err((e, tag_state)),
@@ -546,7 +546,7 @@ where
 
         match addr_to_state.entry(addr) {
             Entry::Occupied(mut o) => {
-                let id = o.map_mut(|bound| {
+                let (id, ret) = o.map_mut(|bound| {
                     let bound = match SocketType::from_bound_mut(bound) {
                         Some(bound) => bound,
                         None => unreachable!("found {:?} for address {:?}", bound, socket_addr),
@@ -555,23 +555,23 @@ where
                         bound, &tag_state,
                     ) {
                         Ok(v) => {
-                            let id = make_id(socket_addr, tag_state);
+                            let (id, ret) = make_id(socket_addr, tag_state);
                             v.insert(id.clone());
-                            Ok(SocketType::to_socket_id(id))
+                            Ok((SocketType::to_socket_id(id), ret))
                         }
                         Err(IncompatibleError) => Err((InsertError::Exists, tag_state)),
                     }
                 })?;
-                Ok(SocketStateEntry { id, addr_entry: o, _marker: Default::default() })
+                Ok((SocketStateEntry { id, addr_entry: o, _marker: Default::default() }, ret))
             }
             Entry::Vacant(v) => {
-                let id = make_id(socket_addr, tag_state.clone());
+                let (id, ret) = make_id(socket_addr, tag_state.clone());
                 let addr_entry = v.insert(SocketType::to_bound(SocketType::AddrState::new(
                     &tag_state,
                     id.clone(),
                 )));
                 let id = SocketType::to_socket_id(id);
-                Ok(SocketStateEntry { id, addr_entry, _marker: Default::default() })
+                Ok((SocketStateEntry { id, addr_entry, _marker: Default::default() }, ret))
             }
         }
     }
@@ -1276,7 +1276,7 @@ mod tests {
         // All of the below try_insert_with calls should fail, but more
         // importantly, they should not call the `make_id` callback (because it
         // is only called once success is certain).
-        fn is_never_called<A, B, T>(_: A, _: B) -> T {
+        fn is_never_called<A, B, T>(_: A, _: B) -> (T, ()) {
             panic!("should never be called");
         }
 
