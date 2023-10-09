@@ -9,8 +9,10 @@ import unittest
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
     bluetooth_gap as fc_bluetooth_gap,
 )
-from honeydew.custom_types import BluetoothAcceptPairing
-from honeydew.custom_types import BluetoothTransport
+from honeydew.typing import bluetooth
+
+BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
+BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
 
 class BluetoothFCTests(unittest.TestCase):
@@ -41,7 +43,7 @@ class BluetoothFCTests(unittest.TestCase):
         """Test for Bluetooth.connect_device() method."""
         with self.assertRaises(NotImplementedError):
             self.bluetooth_obj.connect_device(
-                identifier="0", transport=BluetoothTransport.CLASSIC
+                identifier="0", connection_type=BluetoothConnectionType.CLASSIC
             )
 
     def test_forget_device(self) -> None:
@@ -68,7 +70,7 @@ class BluetoothFCTests(unittest.TestCase):
         """Test for Bluetooth.pair_device() method."""
         with self.assertRaises(NotImplementedError):
             self.bluetooth_obj.pair_device(
-                identifier="0", transport=BluetoothTransport.CLASSIC
+                identifier="0", connection_type=BluetoothConnectionType.CLASSIC
             )
 
     def test_request_discovery(self) -> None:

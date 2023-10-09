@@ -13,9 +13,9 @@ from parameterized import parameterized
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as sl4f_bluetooth_avrcp,
 )
-from honeydew.custom_types import BluetoothAvrcpCommand
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import bluetooth
 
 _SAMPLE_RECEIVED_REQUESTS: Dict[str, Any] = {
     "id": "",
@@ -32,6 +32,9 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
+
+
+BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 
 
 # pylint: disable=protected-access

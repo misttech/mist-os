@@ -4,9 +4,12 @@
 # found in the LICENSE file.
 """Bluetooth affordance implementation using Fuchsia-Controller."""
 
-from honeydew.custom_types import BluetoothAcceptPairing
-from honeydew.custom_types import BluetoothTransport
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
+from honeydew.typing import bluetooth
+
+
+BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
+BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
 
 class BluetoothCommon(bluetooth_common.BluetoothCommon):
@@ -31,15 +34,13 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def connect_device(
-        self, identifier: str, transport: BluetoothTransport
+        self, identifier: str, connection_type: BluetoothConnectionType
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
-            transport:
-                1 -> Bluetooth classic transport.
-                2 -> Bluetooth LE (low energy) transport.
+            connection_type: type of bluetooth connection
         """
         raise NotImplementedError
 
@@ -79,15 +80,13 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         raise NotImplementedError
 
     def pair_device(
-        self, identifier: str, transport: BluetoothTransport
+        self, identifier: str, connection_type: BluetoothConnectionType
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
-            transport:
-                1 -> Bluetooth classic transport.
-                2 -> Bluetooth LE (low energy) transport.
+            connection_type: type of bluetooth connection
         """
         raise NotImplementedError
 

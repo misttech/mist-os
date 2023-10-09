@@ -7,8 +7,8 @@
 from enum import StrEnum
 
 from honeydew.affordances.sl4f.bluetooth import bluetooth_common
-from honeydew.custom_types import BluetoothAvrcpCommand
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
+from honeydew.typing import bluetooth
 
 
 class Sl4fMethods(StrEnum):
@@ -17,6 +17,9 @@ class Sl4fMethods(StrEnum):
     PUBLISH_MOCK_PLAYER = "media_session_facade.PublishMockPlayer"
     SEND_AVRCP_COMMAND = "avrcp_facade.AvrcpSendCommand"
     STOP_MOCK_PLAYER = "media_session_facade.StopMockPlayer"
+
+
+BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 
 
 class BluetoothAvrcp(

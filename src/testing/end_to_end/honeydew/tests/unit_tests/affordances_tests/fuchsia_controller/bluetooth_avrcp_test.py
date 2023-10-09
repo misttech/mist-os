@@ -9,7 +9,9 @@ import unittest
 from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
     bluetooth_avrcp as fc_bluetooth_avrcp,
 )
-from honeydew.custom_types import BluetoothAvrcpCommand
+from honeydew.typing import bluetooth
+
+BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 
 
 class BluetoothFCTests(unittest.TestCase):

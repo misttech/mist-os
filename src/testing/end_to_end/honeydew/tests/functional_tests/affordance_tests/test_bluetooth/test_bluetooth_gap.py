@@ -10,12 +10,14 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts
 from mobly import test_runner
 
-from honeydew.custom_types import BluetoothAcceptPairing
-from honeydew.custom_types import BluetoothTransport
 from honeydew.errors import Sl4fError
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.typing import bluetooth
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
+BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
 
 class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -48,7 +50,7 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for bluetooth.connect_device()"""
 
         identifier = "000000000"
-        transport = BluetoothTransport.CLASSIC
+        transport = BluetoothConnectionType.CLASSIC
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.bluetooth_gap.connect_device(identifier, transport)
@@ -103,7 +105,7 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for bluetooth.pair_device()"""
 
         identifier = "000000000"
-        transport = BluetoothTransport.CLASSIC
+        transport = BluetoothConnectionType.CLASSIC
         if self._is_fuchsia_controller_based_device(self.device):
             with asserts.assert_raises(NotImplementedError):
                 self.device.bluetooth_gap.pair_device(identifier, transport)

@@ -71,6 +71,7 @@ python_library("honeydew") {
     "transports/fuchsia_controller.py",
     "transports/sl4f.py",
     "transports/ssh.py",
+    "typing/bluetooth.py",
     "typing/wlan.py",
     "utils/__init__.py",
     "utils/common.py",

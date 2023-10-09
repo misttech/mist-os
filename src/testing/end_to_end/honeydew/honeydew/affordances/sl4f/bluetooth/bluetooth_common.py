@@ -6,11 +6,13 @@
 
 from enum import StrEnum
 
-from honeydew.custom_types import BluetoothAcceptPairing
-from honeydew.custom_types import BluetoothTransport
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import bluetooth
+
+BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
+BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
 
 class Sl4fMethods(StrEnum):
@@ -83,22 +85,23 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         )
 
     def connect_device(
-        self, identifier: str, transport: BluetoothTransport
+        self, identifier: str, connection_type: BluetoothConnectionType
     ) -> None:
         """Connect device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
-            transport:
-                1 -> Bluetooth classic transport.
-                2 -> Bluetooth LE (low energy) transport.
+            connection_type: type of bluetooth connection
 
         Raises:
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
             method=Sl4fMethods.CONNECT_DEVICE,
-            params={"identifier": identifier, "transport": transport.value},
+            params={
+                "identifier": identifier,
+                "transport": connection_type.value,
+            },
         )
 
     def forget_device(self, identifier: str) -> None:
@@ -167,24 +170,24 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         )
         return known_devices["result"]
 
-    # TODO(b/301499667): Update transport to bluetooth_transport
     def pair_device(
-        self, identifier: str, transport: BluetoothTransport
+        self, identifier: str, connection_type: BluetoothConnectionType
     ) -> None:
         """Pair device to target remote device via Bluetooth.
 
         Args:
             identifier: the identifier of target remote device.
-            transport:
-                1 -> Bluetooth classic transport.
-                2 -> Bluetooth LE (low energy) transport.
+            connection_type: type of bluetooth connection
 
         Raises:
             errors.Sl4fError: On failure.
         """
         self._sl4f.run(
             method=Sl4fMethods.PAIR_DEVICE,
-            params={"identifier": identifier, "transport": transport.value},
+            params={
+                "identifier": identifier,
+                "transport": connection_type.value,
+            },
         )
 
     def request_discovery(self, discovery: bool) -> None:

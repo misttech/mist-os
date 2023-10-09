@@ -5,8 +5,10 @@
 """Fuchsia-Controller implementation for Bluetooth AVRCP Profile affordance."""
 
 from honeydew.affordances.fuchsia_controller.bluetooth import bluetooth_common
-from honeydew.custom_types import BluetoothAvrcpCommand
 from honeydew.interfaces.affordances.bluetooth.profiles import bluetooth_avrcp
+from honeydew.typing import bluetooth
+
+BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 
 
 class BluetoothAvrcp(

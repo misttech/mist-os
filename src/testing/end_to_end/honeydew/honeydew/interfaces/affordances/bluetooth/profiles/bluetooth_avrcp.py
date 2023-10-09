@@ -6,8 +6,10 @@
 
 import abc
 
-from honeydew import custom_types
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
+from honeydew.typing import bluetooth
+
+BluetoothAvrcpCommand = bluetooth.BluetoothAvrcpCommand
 
 
 class BluetoothAvrcp(bluetooth_common.BluetoothCommon):
@@ -27,9 +29,7 @@ class BluetoothAvrcp(bluetooth_common.BluetoothCommon):
         """Publish the media session mock player."""
 
     @abc.abstractmethod
-    def send_avrcp_command(
-        self, command: custom_types.BluetoothAvrcpCommand
-    ) -> None:
+    def send_avrcp_command(self, command: BluetoothAvrcpCommand) -> None:
         """Send Avrcp command from the sink device."""
 
     @abc.abstractmethod

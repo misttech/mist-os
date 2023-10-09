@@ -13,10 +13,9 @@ from parameterized import parameterized
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_gap as sl4f_bluetooth_gap,
 )
-from honeydew.custom_types import BluetoothAcceptPairing
-from honeydew.custom_types import BluetoothTransport
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
+from honeydew.typing import bluetooth
 
 _SAMPLE_ADDRESS_OUTPUT: Dict[str, Any] = {
     "id": "",
@@ -53,6 +52,10 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
+
+
+BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
+BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
 
 # pylint: disable=protected-access
@@ -98,13 +101,13 @@ class BluetoothGapSL4FTests(unittest.TestCase):
             (
                 {
                     "label": "pair_classic",
-                    "transport": BluetoothTransport.CLASSIC,
+                    "transport": BluetoothConnectionType.CLASSIC,
                 },
             ),
             (
                 {
                     "label": "pair_low_energy",
-                    "transport": BluetoothTransport.LOW_ENERGY,
+                    "transport": BluetoothConnectionType.LOW_ENERGY,
                 },
             ),
         ],
@@ -115,7 +118,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         dummy_identifier = "0"
         self.bluetooth_obj.connect_device(
             identifier=dummy_identifier,
-            transport=parameterized_dict["transport"],
+            connection_type=parameterized_dict["transport"],
         )
 
         self.sl4f_obj.run.assert_called()
@@ -153,13 +156,13 @@ class BluetoothGapSL4FTests(unittest.TestCase):
             (
                 {
                     "label": "pair_classic",
-                    "transport": BluetoothTransport.CLASSIC,
+                    "transport": BluetoothConnectionType.CLASSIC,
                 },
             ),
             (
                 {
                     "label": "pair_low_energy",
-                    "transport": BluetoothTransport.LOW_ENERGY,
+                    "transport": BluetoothConnectionType.LOW_ENERGY,
                 },
             ),
         ],
@@ -170,7 +173,7 @@ class BluetoothGapSL4FTests(unittest.TestCase):
         dummy_identifier = "0"
         self.bluetooth_obj.pair_device(
             identifier=dummy_identifier,
-            transport=parameterized_dict["transport"],
+            connection_type=parameterized_dict["transport"],
         )
 
         self.sl4f_obj.run.assert_called()
