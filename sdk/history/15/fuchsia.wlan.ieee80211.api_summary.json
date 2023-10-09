@@ -160,6 +160,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.wlan.ieee80211/MAX_KEY_LEN",
+        "type": "uint8",
+        "value": "32"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.wlan.ieee80211/MAX_MESH_ID_BYTE_LEN",
         "type": "uint8",
         "value": "32"
@@ -211,6 +217,12 @@
         "name": "fuchsia.wlan.ieee80211/MAX_VHT_MPDU_BYTE_LEN_2",
         "type": "uint16",
         "value": "11454"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.wlan.ieee80211/OUI_LEN",
+        "type": "uint8",
+        "value": "3"
     },
     {
         "kind": "enum/member",
