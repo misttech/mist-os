@@ -806,7 +806,7 @@ impl Daemon {
         let mut info = build_info();
         info.build_id = Some(context.daemon_version_string()?);
         tracing::debug!("Starting daemon overnet server");
-        node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), move |chan, _| {
+        node.register_service(DaemonMarker::PROTOCOL_NAME.to_owned(), move |chan| {
             let _ = sender.unbounded_send(chan);
             Ok(())
         })

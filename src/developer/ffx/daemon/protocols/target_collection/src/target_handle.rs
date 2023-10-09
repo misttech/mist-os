@@ -383,7 +383,7 @@ mod tests {
         node2
             .register_service(
                 fidl_rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(),
-                move |chan, _| {
+                move |chan| {
                     let _ = sender.unbounded_send(chan);
                     Ok(())
                 },

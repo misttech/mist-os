@@ -71,7 +71,7 @@ async fn exec_server() -> Result<(), Error> {
     let (sender, receiver) = unbounded();
 
     router
-        .register_service(rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), move |chan, _| {
+        .register_service(rcs::RemoteControlMarker::PROTOCOL_NAME.to_owned(), move |chan| {
             let _ = sender.unbounded_send(chan);
             Ok(())
         })

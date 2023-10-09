@@ -8,7 +8,6 @@ use crate::{
 };
 use anyhow::{bail, format_err, Error};
 use fidl::Channel;
-use fidl_fuchsia_overnet::ConnectionInfo;
 use futures::lock::Mutex;
 use std::collections::{btree_map, BTreeMap};
 
@@ -50,8 +49,7 @@ impl ListablePeerSet {
 }
 
 pub struct ServiceMapInner {
-    local_services:
-        BTreeMap<String, Box<dyn Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send>>,
+    local_services: BTreeMap<String, Box<dyn Fn(fidl::Channel) -> Result<(), Error> + Send>>,
     local_service_list: Observable<Vec<String>>,
     list_peers: Observable<Vec<ListablePeer>>,
     listable_peer_set: ListablePeerSet,
@@ -80,29 +78,21 @@ impl ServiceMap {
         }
     }
 
-    pub async fn connect(
-        &self,
-        service_name: &str,
-        chan: Channel,
-        connection_info: &ConnectionInfo,
-    ) -> Result<(), Error> {
+    pub async fn connect(&self, service_name: &str, chan: Channel) -> Result<(), Error> {
         (self
             .inner
             .lock()
             .await
             .local_services
             .get(service_name)
-            .ok_or_else(|| format_err!("Service not found: {}", service_name))?)(
-            chan,
-            connection_info,
-        )?;
+            .ok_or_else(|| format_err!("Service not found: {}", service_name))?)(chan)?;
         Ok(())
     }
 
     pub async fn register_service(
         &self,
         service_name: String,
-        provider: impl Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send + 'static,
+        provider: impl Fn(fidl::Channel) -> Result<(), Error> + Send + 'static,
     ) {
         tracing::trace!("Request register_service '{}'", service_name);
         let mut inner = self.inner.lock().await;

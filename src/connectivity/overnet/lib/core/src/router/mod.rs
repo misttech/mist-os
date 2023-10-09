@@ -31,7 +31,6 @@ use crate::{
 use anyhow::{bail, format_err, Context as _, Error};
 use async_utils::mutex_ticket::MutexTicket;
 use fidl::{AsHandleRef, Channel, EventPair, Handle, HandleBased, Socket};
-use fidl_fuchsia_overnet::ConnectionInfo;
 use fidl_fuchsia_overnet_protocol::{
     ChannelHandle, EventPairHandle, EventPairRights, SocketHandle, SocketType, StreamId, StreamRef,
     ZirconHandle,
@@ -271,13 +270,7 @@ impl Router {
             "Request connect_to_service",
         );
         if is_local {
-            self.service_map()
-                .connect(
-                    service_name,
-                    chan,
-                    &ConnectionInfo { peer: Some(node_id.into()), ..Default::default() },
-                )
-                .await
+            self.service_map().connect(service_name, chan).await
         } else {
             self.client_peer(node_id)
                 .await
@@ -298,7 +291,7 @@ impl Router {
     pub async fn register_service(
         &self,
         service_name: String,
-        provider: impl Fn(fidl::Channel, &ConnectionInfo) -> Result<(), Error> + Send + 'static,
+        provider: impl Fn(fidl::Channel) -> Result<(), Error> + Send + 'static,
     ) -> Result<(), Error> {
         self.service_map().register_service(service_name, provider).await;
         Ok(())
@@ -782,21 +775,16 @@ mod tests {
         serving_router: Arc<Router>,
         client_router: Arc<Router>,
         service: &'static str,
-    ) -> futures::channel::oneshot::Receiver<(NodeId, Channel)> {
+    ) -> futures::channel::oneshot::Receiver<Channel> {
         use parking_lot::Mutex;
         let (send, recv) = futures::channel::oneshot::channel();
         serving_router
             .service_map()
             .register_service(service.to_string(), {
                 let sender = Mutex::new(Some(send));
-                move |chan, connection_info| {
+                move |chan| {
                     println!("{} got request", service);
-                    sender
-                        .lock()
-                        .take()
-                        .unwrap()
-                        .send((connection_info.peer.unwrap().id.into(), chan))
-                        .unwrap();
+                    sender.lock().take().unwrap().send(chan).unwrap();
                     println!("{} forwarded channel", service);
                     Ok(())
                 }
@@ -885,8 +873,7 @@ mod tests {
             println!("create_stream: connect to service");
             router1.connect_to_service(router2.node_id, "create_stream", p).await?;
             println!("create_stream: wait for connection");
-            let (node_id, _) = s.await?;
-            assert_eq!(node_id, router1.node_id);
+            let _ = s.await?;
             Ok(())
         })
         .await
@@ -906,8 +893,7 @@ mod tests {
             println!("send_datagram_immediately: connect to service");
             router1.connect_to_service(router2.node_id, "send_datagram_immediately", p).await?;
             println!("send_datagram_immediately: wait for connection");
-            let (node_id, s) = s.await?;
-            assert_eq!(node_id, router1.node_id);
+            let s = s.await?;
             let c = fidl::AsyncChannel::from_channel(c)?;
             let s = fidl::AsyncChannel::from_channel(s)?;
             c.write(&[1, 2, 3, 4, 5], &mut Vec::new())?;
@@ -930,8 +916,7 @@ mod tests {
             println!("ping_pong: connect to service");
             router1.connect_to_service(router2.node_id, "ping_pong", p).await?;
             println!("ping_pong: wait for connection");
-            let (node_id, s) = s.await?;
-            assert_eq!(node_id, router1.node_id);
+            let s = s.await?;
             let c = fidl::AsyncChannel::from_channel(c)?;
             let s = fidl::AsyncChannel::from_channel(s)?;
             println!("ping_pong: send ping");

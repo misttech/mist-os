@@ -13,7 +13,6 @@ use crate::{
 };
 use anyhow::{bail, format_err, Context as _, Error};
 use fidl::{Channel, HandleBased};
-use fidl_fuchsia_overnet::ConnectionInfo;
 use fidl_fuchsia_overnet_protocol::{
     ChannelHandle, ConfigRequest, ConfigResponse, ConnectToService, ConnectToServiceOptions,
     OpenTransfer, PeerDescription, PeerMessage, PeerReply, StreamId, ZirconHandle,
@@ -632,14 +631,7 @@ async fn server_conn_stream(
                         );
                         router
                             .service_map()
-                            .connect(
-                                &service_name,
-                                app_channel,
-                                &ConnectionInfo {
-                                    peer: Some(node_id.into()),
-                                    ..Default::default()
-                                },
-                            )
+                            .connect(&service_name, app_channel)
                             .map_err(RunnerError::ServiceError)
                             .await?;
                     }

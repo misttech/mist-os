@@ -467,7 +467,7 @@ mod test {
 
         let (sender, mut receiver) = futures::channel::mpsc::unbounded();
         daemon
-            .register_service(DaemonMarker::PROTOCOL_NAME.into(), move |chan, _| {
+            .register_service(DaemonMarker::PROTOCOL_NAME.into(), move |chan| {
                 let _ = sender.unbounded_send(chan);
                 Ok(())
             })

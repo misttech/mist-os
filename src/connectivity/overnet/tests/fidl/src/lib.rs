@@ -101,7 +101,7 @@ impl Fixture {
             .register_service(service.clone(), {
                 let sender = send_handle.clone();
                 let test_name = test_name.clone();
-                move |chan, _| spawn_service(chan, sender.clone(), test_name.clone())
+                move |chan| spawn_service(chan, sender.clone(), test_name.clone())
             })
             .await
             .unwrap();
@@ -110,7 +110,7 @@ impl Fixture {
             .register_service(service.clone(), {
                 let sender = send_handle.clone();
                 let test_name = test_name.clone();
-                move |chan, _| spawn_service(chan, sender.clone(), test_name.clone())
+                move |chan| spawn_service(chan, sender.clone(), test_name.clone())
             })
             .await
             .unwrap();
