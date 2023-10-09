@@ -14,10 +14,6 @@ from mobly import asserts, test_runner
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class BluetootTargetDeviceNotFound(Exception):
-    """Raised when the Bluetooth Target Device is not found."""
-
-
 class MultipleFuchsiaDevicesNotFound(Exception):
     """When there are less than two Fuchsia devices available."""
 
@@ -63,7 +59,7 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
             "Starting the Bluetooth Sample test iteration# %s", iteration
         )
         _LOGGER.info("Initializing Bluetooth and setting discoverability")
-        self.set_discoverability_on()
+        self._set_discoverability_on()
 
         address = self.receiver.bluetooth_gap.get_active_adapter_address()
 
@@ -121,23 +117,22 @@ class MultiDeviceSampleTest(fuchsia_base_test.FuchsiaBaseTest):
         return res
 
     def _verify_receiver_is_discovered(
-        self, data: dict[str, Any], reverse_hex_address: List
+        self, data: dict[str, dict[str, Any]], reverse_hex_address: List
     ) -> bool:
         """Verify if we have seen the reciever via the Bluetooth data
         Args:
             data: All known discoverable devices via Bluetooth
                 and information
             reverse_hex_address: BT address to look for
-        Raises:
-            BluetoothTargetDeviceNotFound:
-                When initiator fails to find receiver's address.
+        Returns:
+            True: If we found the broadcasting bluetooth address
         """
         for value in data.values():
             if value["address"] == reverse_hex_address:
                 return True
         return False
 
-    def set_discoverability_on(self) -> None:
+    def _set_discoverability_on(self) -> None:
         """Turns on discoverability for the devices."""
         self.initiator.bluetooth_gap.request_discovery(True)
         self.initiator.bluetooth_gap.set_discoverable(True)
