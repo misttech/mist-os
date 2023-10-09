@@ -11,7 +11,7 @@ use fidl::Channel;
 use futures::lock::Mutex;
 use std::collections::{btree_map, BTreeMap};
 
-/// A type that can be converted into a fidl_fuchsia_overnet::Peer
+/// A type that can be converted into a super::Peer
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListablePeer {
     /// Node ID of this peer.

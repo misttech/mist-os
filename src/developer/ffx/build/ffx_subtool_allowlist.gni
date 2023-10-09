@@ -57,9 +57,6 @@ ffx_subtool_fidl_allowlist = [
   "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin",
   "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack",
 
-  # used by ffx core
-  "//sdk/fidl/fuchsia.overnet:fuchsia.overnet",
-
   # used by ffx target forward
   "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol",
 
