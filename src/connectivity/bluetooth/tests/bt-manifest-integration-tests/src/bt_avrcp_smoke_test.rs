@@ -10,7 +10,7 @@ use {
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
-    futures::{channel::mpsc, SinkExt, StreamExt},
+    futures::{channel::mpsc, pending, SinkExt, StreamExt},
     realmbuilder_mock_helpers::mock_component,
     tracing::info,
 };
@@ -52,6 +52,9 @@ async fn mock_avrcp_client(
         .send(Event::PeerManagerExt(Some(peer_manager_ext_svc)))
         .await
         .expect("failed sending ack to test");
+    // TODO(fxbug.dev/303919602): pending! is a workaround to never exit this component so
+    // we don't trigger this bug, which can cause a flake.
+    pending!();
     Ok(())
 }
 

@@ -19,7 +19,7 @@ use {
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
     },
-    futures::{channel::mpsc, SinkExt, StreamExt},
+    futures::{channel::mpsc, pending, SinkExt, StreamExt},
     realmbuilder_mock_helpers::{mock_dev, provide_bt_gap_uses},
     std::sync::Arc,
     tracing::info,
@@ -130,6 +130,9 @@ async fn mock_client(
     let pairing_svc = handles.connect_to_protocol::<PairingMarker>()?;
     sender.send(Event::Pairing(Some(pairing_svc))).await.expect("failed sending ack to test");
 
+    // TODO(fxbug.dev/303919602): pending! is a workaround to never exit this component so
+    // we don't trigger this bug, which can cause a flake.
+    pending!();
     Ok(())
 }
 
