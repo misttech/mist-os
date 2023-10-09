@@ -147,7 +147,14 @@ impl Emu {
         Ok(())
     }
 
+    /// Starts an emulator. Panics if the TestContext disallows emulator usage.
     pub fn start(ctx: &crate::TestContext) -> Emu {
+        if !ctx.emulator_allowed() {
+            panic!(
+                "Attempted to start an emulator, but the passed Test Context disallows emulators"
+            );
+        }
+
         let emu_dir = TempDir::new_in(&*crate::TEMP_DIR).expect("could not create emu temp dir");
 
         let esp_blk_path = crate::ROOT_BUILD_DIR.join(env!("BOOTLOADER"));

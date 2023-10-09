@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use ffx_testing::{base_fixture, Emu, TestContext};
+use ffx_testing::{emulator_fixture, Emu, TestContext};
 use fixture::fixture;
 use fuchsia_async as _;
 use futures::{
@@ -15,7 +15,7 @@ use futures::{
 /// Test `ffx target flash` by bringing up an emulator in fastboot.
 ///
 /// The fastboot implementation used by this emulator is Gigaboot (//src/firmware/gigaboot).
-#[fixture(base_fixture)]
+#[fixture(emulator_fixture)]
 #[fuchsia::test]
 // TODO(fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]
@@ -78,7 +78,7 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
     emu.check_is_running().expect("Emulator exited unexpectedly");
 }
 
-#[fixture(base_fixture)]
+#[fixture(emulator_fixture)]
 #[fuchsia::test]
 // TODO(fxbug.dev/130252): test skipped when kernel won't fit for x86 UEFI
 #[cfg_attr(feature = "big_zircon_kernel", ignore)]

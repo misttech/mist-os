@@ -2,23 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::path::PathBuf;
-
+use anyhow::bail;
 use fuchsia_async as fasync;
 use once_cell::sync::Lazy;
+use std::env;
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 mod emu;
 
 pub use emu::Emu;
 
+const KVM_PATH: &str = "/dev/kvm";
+
 pub struct TestContext {
     isolate: ffx_isolate::Isolate,
+    emulator_allowed: bool,
 }
 
 impl TestContext {
     pub fn isolate(&self) -> &ffx_isolate::Isolate {
         &self.isolate
+    }
+
+    pub fn emulator_allowed(&self) -> bool {
+        self.emulator_allowed
     }
 }
 
@@ -42,8 +50,8 @@ static OUT_DIR: Lazy<PathBuf> = Lazy::new(|| ROOT_OUT_DIR.join("src/developer/ff
 static TEMP_DIR: Lazy<TempDir> =
     Lazy::new(|| TempDir::new().expect("could not create test harness temp dir"));
 
-/// Test fixture that handles launching and tearing down a test after execution.
-pub async fn base_fixture<F, Fut>(case_name: &str, test_fn: F)
+/// Fixture that handles launching and tearing down a test after execution.
+async fn fixture_inner<F, Fut>(case_name: &str, test_fn: F, emulator_allowed: bool)
 where
     F: FnOnce(TestContext) -> Fut + Send + 'static,
     Fut: futures::future::Future<Output = ()>,
@@ -56,7 +64,7 @@ where
     let isolate = ffx_isolate::Isolate::new_in_test(case_name, ssh_path, &test_env.context)
         .await
         .expect("create isolate");
-    let config = TestContext { isolate };
+    let config = TestContext { isolate, emulator_allowed };
 
     // Spawn a new thread so that we can catch panics from the test. To avoid blocking this thread's
     // future executor, we check completion of the test thread using a oneshot channel.
@@ -77,4 +85,74 @@ where
         Ok(()) => (),
         Err(test_err) => std::panic::resume_unwind(test_err),
     }
+}
+
+/// Test fixture that handles launching and tearing down a test after execution.
+pub async fn base_fixture<F, Fut>(case_name: &str, test_fn: F)
+where
+    F: FnOnce(TestContext) -> Fut + Send + 'static,
+    Fut: futures::future::Future<Output = ()>,
+{
+    fixture_inner(case_name, test_fn, false).await
+}
+
+/// Test fixture that handles launching and tearing down a test after execution
+/// where an emulator is expected to be used.
+pub async fn emulator_fixture<F, Fut>(case_name: &str, test_fn: F)
+where
+    F: FnOnce(TestContext) -> Fut + Send + 'static,
+    Fut: futures::future::Future<Output = ()>,
+{
+    assert_virtualization_available!();
+    fixture_inner(case_name, test_fn, true).await
+}
+
+fn check_virtualization_available() -> anyhow::Result<()> {
+    match env::consts::OS {
+        "linux" => {
+            let path = KVM_PATH.to_string();
+            match std::fs::OpenOptions::new().write(true).open(&path) {
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::PermissionDenied => {
+                        bail!(
+                                "Emulation acceleration unavailable.\n\n\
+                                        Caused by: No write permission on {}.\n\n\
+                                        To adjust permissions and enable acceleration via KVM:\n\n    \
+                                        sudo usermod -a -G kvm $USER\n\n\
+                                        You may need to reboot your machine for the permission change \
+                                        to take effect.\n",
+                                path
+                            );
+                    }
+                    std::io::ErrorKind::NotFound => {
+                        bail!(
+                            "KVM path {path} does not exist. \n\
+                                        Test requires KVM to be enabled.\n"
+                        );
+                    }
+                    _ => {
+                        bail!("Unknown error setting up acceleration: {:?}", e);
+                    }
+                },
+                Ok(_) => {
+                    // No issues with KVM acceleration
+                    Ok(())
+                }
+            }
+        }
+        "macos" => {
+            // Always assume that MacOS has HVF installed
+            Ok(())
+        }
+        other_host_os => {
+            bail!("Unsupported host Operating System: {}", other_host_os);
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! assert_virtualization_available {
+    () => {
+        check_virtualization_available().unwrap()
+    };
 }
