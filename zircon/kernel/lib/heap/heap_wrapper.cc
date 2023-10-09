@@ -47,31 +47,43 @@ static bool heap_trace = false;
 namespace {
 
 struct alloc_stat : fbl::DoublyLinkedListable<alloc_stat*> {
+  // caller and size are used to uniquely identify this stat
   void* caller;
   size_t size;
 
-  uint64_t count;
+  // Count of allocations and frees of this unique caller+size. The difference is the number of
+  // allocations that are active.
+  uint64_t alloc_count;
+  uint64_t free_count;
+  // Index of this entry in the |alloc_stat| array, we use this for when we find this from the list.
+  uint32_t index;
 };
 
-const size_t num_stats = 1024;
-size_t next_unused_stat = 0;
-alloc_stat stats[num_stats];
+constexpr uint32_t kNumStats = HEAP_COLLECT_STATS ? 1024 : 1;
+uint32_t next_unused_stat = 0;
+alloc_stat stats[kNumStats];
 
 fbl::DoublyLinkedList<alloc_stat*> stat_list;
-SpinLock stat_lock;
+DECLARE_SINGLETON_SPINLOCK(stat_lock);
 lazy_init::LazyInit<VirtualAlloc> virtual_alloc;
 
-void add_stat(void* caller, size_t size) {
+// Increments the alloc_count for the given caller+size reference and associates it with the given
+// heap_ptr, which should be the result from a cmpct_alloc call.
+void add_alloc_stat(void* caller, size_t size, void* heap_ptr) {
   if (!HEAP_COLLECT_STATS) {
     return;
   }
+  if (!heap_ptr) {
+    return;
+  }
 
-  AutoSpinLock guard(&stat_lock);
+  Guard<SpinLock, IrqSave> guard(stat_lock::Get());
 
   // look for an existing stat, bump the count and move to head if found
   for (alloc_stat& s : stat_list) {
     if (s.caller == caller && s.size == size) {
-      s.count++;
+      s.alloc_count++;
+      cmpct_set_cookie(heap_ptr, s.index);
       stat_list.erase(s);
       stat_list.push_front(&s);
       return;
@@ -79,14 +91,39 @@ void add_stat(void* caller, size_t size) {
   }
 
   // allocate a new one and add it to the list
-  if (unlikely(next_unused_stat >= num_stats))
+  if (unlikely(next_unused_stat >= kNumStats)) {
+    // Set an out of range cookie so add_free_stat will skip later.
+    cmpct_set_cookie(heap_ptr, kNumStats);
     return;
+  }
+  cmpct_set_cookie(heap_ptr, next_unused_stat);
 
-  alloc_stat* s = &stats[next_unused_stat++];
+  alloc_stat* s = &stats[next_unused_stat];
   s->caller = caller;
   s->size = size;
-  s->count = 1;
+  s->alloc_count = 1;
+  s->free_count = 0;
+  s->index = next_unused_stat;
   stat_list.push_front(s);
+  next_unused_stat++;
+}
+
+// Increments the free_count stat associated with the given heap pointer. This is the pointer
+// returned by cmpct_alloc and should have previously been given to add_alloc_stat. add_free_stat
+// must be called *before* passing the ptr to cmpct_free
+void add_free_stat(void* heap_ptr) {
+  if (!HEAP_COLLECT_STATS) {
+    return;
+  }
+  if (!heap_ptr) {
+    return;
+  }
+  uint32_t index = cmpct_get_cookie(heap_ptr);
+  if (index >= kNumStats) {
+    return;
+  }
+  Guard<SpinLock, IrqSave> guard(stat_lock::Get());
+  stats[index].free_count++;
 }
 
 void dump_stats() {
@@ -94,7 +131,7 @@ void dump_stats() {
     return;
   }
 
-  AutoSpinLock guard(&stat_lock);
+  Guard<SpinLock, IrqSave> guard(stat_lock::Get());
 
   // remove all of them from the list
   stat_list.clear();
@@ -117,10 +154,11 @@ void dump_stats() {
 
   // dump the list of stats
   for (alloc_stat& s : stat_list) {
-    printf("size %8zu count %8" PRIu64 " caller %p\n", s.size, s.count, s.caller);
+    printf("size %8zu alloc_count %8" PRIu64 " free_count %8" PRIu64 " caller %p\n", s.size,
+           s.alloc_count, s.free_count, s.caller);
   }
 
-  if (next_unused_stat >= num_stats) {
+  if (next_unused_stat >= kNumStats) {
     printf("WARNING: max number of unique records hit, some statistics were likely lost\n");
   }
 }
@@ -153,9 +191,9 @@ void* malloc(size_t size) {
 
   LTRACEF("size %zu\n", size);
 
-  add_stat(__GET_CALLER(), size);
-
   void* ptr = cmpct_alloc(size);
+  add_alloc_stat(__GET_CALLER(), size, ptr);
+
   if (unlikely(heap_trace)) {
     printf("caller %p malloc %zu -> %p\n", __GET_CALLER(), size, ptr);
   }
@@ -173,9 +211,8 @@ void* memalign(size_t alignment, size_t size) {
 
   LTRACEF("alignment %zu, size %zu\n", alignment, size);
 
-  add_stat(__GET_CALLER(), size);
-
   void* ptr = cmpct_memalign(alignment, size);
+  add_alloc_stat(__GET_CALLER(), size, ptr);
   if (unlikely(heap_trace)) {
     printf("caller %p memalign %zu, %zu -> %p\n", __GET_CALLER(), alignment, size, ptr);
   }
@@ -193,11 +230,10 @@ void* calloc(size_t count, size_t size) {
 
   LTRACEF("count %zu, size %zu\n", count, size);
 
-  add_stat(__GET_CALLER(), size);
-
   size_t realsize = count * size;
 
   void* ptr = cmpct_alloc(realsize);
+  add_alloc_stat(__GET_CALLER(), size, ptr);
   if (likely(ptr)) {
     memset(ptr, 0, realsize);
   }
@@ -214,6 +250,7 @@ void free(void* ptr) {
   if (unlikely(heap_trace)) {
     printf("caller %p free %p\n", __GET_CALLER(), ptr);
   }
+  add_free_stat(ptr);
 
   cmpct_free(ptr);
 }
@@ -225,7 +262,7 @@ void sized_free(void* ptr, size_t s) {
   if (unlikely(heap_trace)) {
     printf("caller %p free %p size %lu\n", __GET_CALLER(), ptr, s);
   }
-
+  add_free_stat(ptr);
   cmpct_sized_free(ptr, s);
 }
 
