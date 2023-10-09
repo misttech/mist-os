@@ -31,14 +31,25 @@ pub enum LogError {
     DumpWithSinceNow,
     #[error("No symbolizer configuration provided")]
     NoSymbolizerConfig,
+    #[error(transparent)]
+    LogCommandError(#[from] log_command::LogError),
+    #[error("failed to connect to RealmQuery: {:?}", error)]
+    RealmQueryConnectionFailed { error: i32 },
 }
 
 impl From<LogError> for fho::Error {
     fn from(value: LogError) -> Self {
         match value {
             LogError::DumpWithSinceNow => fho::Error::User(value.into()),
+            LogError::LogCommandError(log_command::LogError::FfxError(err)) => err.into(),
             err => fho::Error::Unexpected(err.into()),
         }
+    }
+}
+
+impl From<i32> for LogError {
+    fn from(error: i32) -> Self {
+        Self::RealmQueryConnectionFailed { error }
     }
 }
 

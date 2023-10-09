@@ -236,6 +236,14 @@
       "short": null,
       "description": "filters by tid",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--force-select",
+      "short": null,
+      "description": "if enabled, selectors will be passed directly to Archivist without any filtering. If disabled and no matching components are found, the user will be prompted to either enable this or be given a list of selectors to choose from.",
+      "hidden": false
     }
   ],
   "notes": [

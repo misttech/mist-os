@@ -10,12 +10,13 @@ use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
+use fidl_fuchsia_sys2 as fsys;
 use log_command::{
     log_formatter::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
         WriterContainer,
     },
-    LogCommand, LogSubCommand, WatchCommand,
+    InstanceGetter, LogCommand, LogSubCommand, WatchCommand,
 };
 use log_symbolizer::{LogSymbolizer, Symbolizer};
 use std::io::Write;
@@ -49,14 +50,7 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_main(
-            writer,
-            self.rcs_proxy,
-            self.target_collection,
-            self.cmd.cmd,
-            LogSymbolizer::new(),
-        )
-        .await?;
+        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd.cmd).await?;
         Ok(())
     }
 }
@@ -68,7 +62,10 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
-    log_main(writer, rcs_proxy, target_collection_proxy, cmd, LogSymbolizer::new()).await
+    let (instance_getter, server_end) = create_proxy::<fsys::RealmQueryMarker>()?;
+    rcs_proxy.root_realm_query(server_end).await??;
+    log_main(writer, rcs_proxy, target_collection_proxy, cmd, LogSymbolizer::new(), instance_getter)
+        .await
 }
 
 // Main logging event loop.
@@ -78,6 +75,7 @@ async fn log_main<W>(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
     symbolizer: impl Symbolizer,
+    instance_getter: impl InstanceGetter,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
@@ -85,7 +83,8 @@ where
     let node_name = rcs_proxy.identify_host().await??.nodename;
     let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer).await?;
+    log_loop(target_collection_proxy, target_query, cmd, formatter, symbolizer, &instance_getter)
+        .await?;
     Ok(())
 }
 
@@ -174,6 +173,7 @@ async fn log_loop<W>(
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
     symbolizer: impl Symbolizer,
+    realm_query: &impl InstanceGetter,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
@@ -209,11 +209,13 @@ where
             eprintln!("Error connecting to device, retrying in {} seconds", backoff);
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
-
         prev_timestamp = Some(connection.boot_timestamp);
-        if !cmd.select.is_empty() {
-            connection.log_settings_client.set_interest(&cmd.select).await?;
-        }
+        cmd.maybe_set_interest(
+            &connection.log_settings_client,
+            realm_query,
+            formatter.writer().is_machine(),
+        )
+        .await?;
         formatter.set_boot_timestamp(connection.boot_timestamp as i64);
         let maybe_err =
             dump_logs_from_socket(connection.log_socket, &mut formatter, &symbolizer_channel).await;
@@ -257,6 +259,7 @@ mod tests {
         TestEvent,
     };
     use assert_matches::assert_matches;
+    use async_trait::async_trait;
     use chrono::{Local, TimeZone};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use ffx_writer::{Format, TestBuffers};
@@ -266,9 +269,10 @@ mod tests {
     use futures::{future::poll_fn, Future, StreamExt};
     use log_command::{
         log_formatter::{LogData, TIMESTAMP_FORMAT},
-        parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat,
+        parse_seconds_string_as_duration, parse_time, DumpCommand, InstanceGetter, TimeFormat,
     };
     use log_symbolizer::{FakeSymbolizerForTest, NoOpSymbolizer};
+    use moniker::Moniker;
     use selectors::parse_log_interest_selector;
     use std::{
         pin::{pin, Pin},
@@ -277,6 +281,25 @@ mod tests {
     };
 
     const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world 2!\u{1b}[m\n";
+
+    #[derive(Default)]
+    struct FakeInstanceGetter {
+        output: Vec<Moniker>,
+        expected_selector: Option<String>,
+    }
+
+    #[async_trait(?Send)]
+    impl InstanceGetter for FakeInstanceGetter {
+        async fn get_monikers_from_query(
+            &self,
+            query: &str,
+        ) -> Result<Vec<Moniker>, log_command::LogError> {
+            if let Some(expected) = &self.expected_selector {
+                assert_eq!(expected, query);
+            }
+            Ok(self.output.clone())
+        }
+    }
 
     #[fuchsia::test]
     async fn symbolizer_replaces_markers_with_symbolized_logs() {
@@ -337,6 +360,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -379,6 +403,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -402,6 +427,104 @@ mod tests {
                 ),
             }
         );
+    }
+
+    #[fuchsia::test]
+    async fn logger_prints_error_if_ambiguous_selector() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            ..LogCommand::default()
+        };
+        let symbolizer = NoOpSymbolizer::new();
+        let task_manager = TaskManager::new();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut getter = FakeInstanceGetter::default();
+        getter.expected_selector = Some("ambiguous_selector".into());
+        getter.output = vec![
+            Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
+            Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
+        ];
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+            getter,
+        ));
+
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Main should return an error
+        let error = format!("{}", main_result.next().await.unwrap().unwrap_err());
+        const EXPECTED_INTEREST_ERROR: &str = r#"WARN: One or more of your selectors appears to be ambiguous
+and may not match any components on your system.
+
+If this is unintentional you can explicitly match using the
+following command:
+
+ffx log \
+	--select core/some/ambiguous_selector\\:thing/test#INFO \
+	--select core/other/ambiguous_selector\\:thing/test#INFO
+
+If this is intentional, you can disable this with
+ffx log --force-select.
+"#;
+        assert_eq!(error, EXPECTED_INTEREST_ERROR);
+    }
+
+    #[fuchsia::test]
+    async fn logger_translates_selector_if_one_match() {
+        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (target_collection_proxy, target_collection_server) =
+            create_proxy::<TargetCollectionMarker>().unwrap();
+
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            ..LogCommand::default()
+        };
+        let symbolizer = NoOpSymbolizer::new();
+        let mut task_manager = TaskManager::new();
+        let mut event_stream = task_manager.take_event_stream().unwrap();
+        let scheduler = task_manager.get_scheduler();
+        task_manager.spawn(handle_rcs_connection(rcs_server, scheduler.clone()));
+        task_manager.spawn(handle_target_collection_connection(
+            target_collection_server,
+            scheduler.clone(),
+        ));
+        let test_buffers = TestBuffers::default();
+        let mut getter = FakeInstanceGetter::default();
+        getter.expected_selector = Some("ambiguous_selector".into());
+        getter.output = vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()];
+        let mut main_result = task_manager.spawn_result(log_main(
+            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
+            rcs_proxy,
+            target_collection_proxy,
+            cmd,
+            symbolizer,
+            getter,
+        ));
+
+        // Run all tasks until exit.
+        task_manager.run().await;
+        // Main should return OK
+        main_result.next().await.unwrap().unwrap();
+
+        let severity =
+            vec![parse_log_interest_selector("core/some/ambiguous_selector#INFO").unwrap()];
+        assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
     }
 
     #[fuchsia::test]
@@ -429,6 +552,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
 
         // Run all tasks until exit.
@@ -462,6 +586,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -501,6 +626,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -541,6 +667,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -592,6 +719,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -666,6 +794,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -746,6 +875,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
 
         // Run the stream until we get the expected message.
@@ -821,6 +951,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
 
         // Run the stream until we get the expected message.
@@ -938,6 +1069,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1013,6 +1145,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1064,6 +1197,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1118,6 +1252,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1169,6 +1304,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1221,6 +1357,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1273,6 +1410,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1313,6 +1451,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1367,6 +1506,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
@@ -1422,6 +1562,7 @@ mod tests {
             target_collection_proxy,
             cmd,
             symbolizer,
+            FakeInstanceGetter::default(),
         ));
         // Run all tasks until exit.
         task_manager.run().await;
