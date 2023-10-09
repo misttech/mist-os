@@ -4445,16 +4445,16 @@ mod tests {
         const LOCAL_CTX_NAME: &str = "alice";
         const REMOTE_CTX_NAME: &str = "bob";
         let (local, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
-        let (remote, remove_device_ids) = I::FAKE_CONFIG.swap().into_builder().build();
+        let (remote, remote_device_ids) = I::FAKE_CONFIG.swap().into_builder().build();
         let mut net = crate::context::testutil::new_simple_fake_network(
             LOCAL_CTX_NAME,
             local,
             local_device_ids[0].downgrade(),
             REMOTE_CTX_NAME,
             remote,
-            remove_device_ids[0].downgrade(),
+            remote_device_ids[0].downgrade(),
         );
-        core::mem::drop((local_device_ids, remove_device_ids));
+        core::mem::drop((local_device_ids, remote_device_ids));
 
         let icmp_id = 13;
 
