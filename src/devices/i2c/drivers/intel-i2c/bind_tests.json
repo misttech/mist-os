@@ -1,79 +1,94 @@
 [
     {
-        "device": {
-            "fuchsia.BIND_PROTOCOL": "fuchsia.bluetooth.BIND_PROTOCOL.DEVICE"
-        },
-        "expected": "abort",
-        "name": "Incorrect_Protocol"
+        "node": "pci",
+        "tests": [
+            {
+                "name": "Sunrise_I2C0",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C0",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "name": "Sunrise_I2C1",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C1",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "expected": "match",
+                "name": "Wildcat_I2C0",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C0",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "expected": "match",
+                "name": "Wildcat_I2C1",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C1",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "expected": "match",
+                "name": "Sunrise_I2C2",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "expected": "match",
+                "name": "Sunrise_I2C3",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C3",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            },
+            {
+                "expected": "match",
+                "name": "Sunrise_I2C4",
+                "device": {
+                    "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C4",
+                    "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C0",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Sunrise_I2C0"
+        "node": "sysmem",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     },
     {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C1",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Sunrise_I2C1"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C0",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Wildcat_I2C0"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.WILDCAT_POINT_SERIALIO_I2C1",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Wildcat_I2C1"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C2",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Sunrise_I2C2"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C3",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Sunrise_I2C3"
-    },
-    {
-        "device": {
-            "fuchsia.BIND_PCI_DID": "fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_I2C4",
-            "fuchsia.BIND_PCI_VID": "fuchsia.pci.BIND_PCI_VID.INTEL",
-            "fuchsia.BIND_FIDL_PROTOCOL": "fuchsia.pci.BIND_FIDL_PROTOCOL.DEVICE",
-            "fuchsia.BIND_COMPOSITE": "1"
-        },
-        "expected": "match",
-        "name": "Sunrise_I2C4"
+        "node": "acpi",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.acpi.BIND_PROTOCOL.DEVICE"
+                }
+            }
+        ]
     }
 ]
