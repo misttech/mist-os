@@ -143,17 +143,10 @@ async fn get_package_status(
         return PackageStatus::Base;
     }
 
-    // TODO(fxbug.dev/134434) Remove slow lock logging when root caused.
-    let t0 = fuchsia_async::Time::now();
-    let status = match package_index.read().await.is_active(package) {
+    match package_index.read().await.is_active(package) {
         true => PackageStatus::Active,
         false => PackageStatus::Other,
-    };
-    let d = fuchsia_async::Time::now() - t0;
-    if d >= fuchsia_async::Duration::from_seconds(1) {
-        warn!("Took {} ms to acquire lock in get_package_status", d.into_millis());
     }
-    status
 }
 
 enum ExecutabilityStatus {
