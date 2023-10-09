@@ -17,7 +17,6 @@ group("drivers") {
 group("services") {
   testonly = true
   deps = [
-    "//src/media/audio/bundles:services",
     "//src/media/audio/consumer/bundles:services",
     "//src/media/codec/bundles:services",
     "//src/media/sessions/bundles:services",

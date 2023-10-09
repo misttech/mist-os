@@ -165,8 +165,11 @@ size_checker_input = {
     },
     {
       component = "Media"
-      pkgs = [ "codec_runner_intel_gen" ]
-      limit = 10485760  # 10 MiB
+      pkgs = [
+        "audio_core",
+        "codec_runner_intel_gen",
+      ]
+      limit = 12582912  # 12 MiB
       creep_limit = 428032  # 418.0 KiB
     },
     {
@@ -218,7 +221,7 @@ size_checker_input = {
         "fuzzctl",
         "run_test_suite",
       ]
-      limit = 12582912  # 12.0 MiB
+      limit = 10485760  # 10.0 MiB
       creep_limit = 122880  # 120.0 KiB
     },
     {

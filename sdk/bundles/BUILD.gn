@@ -19,7 +19,6 @@ group("core-tools") {
     "//src/connectivity:tools",
     "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
-    "//src/media/audio/bundles:services",
     "//src/media/audio/consumer/bundles:services",
     "//src/media/bundles:tools",
     "//src/media/codec/bundles:services",
