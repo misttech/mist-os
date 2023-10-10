@@ -28,6 +28,7 @@ from honeydew.utils import properties
 
 _TIMEOUTS: Dict[str, float] = {
     "SLEEP": 0.5,
+    "OFFLINE_ATTEMPT": 2,
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -350,7 +351,21 @@ class BaseFuchsiaDevice(
         start_time: float = time.time()
         end_time: float = start_time + timeout
         while time.time() < end_time:
-            if not self.ffx.is_target_connected():
+            # TODO(b/304371114): Once `ffx target wait --down` is available, use
+            # it instead of below logic which relies on `ffx target wait` to
+            # fail.
+
+            # Intentionally using OFFLINE_ATTEMPT as 2 sec.
+            # Fuchsia device may reboot quicker. So using a higher timeout such
+            # as 15sec may result in false failures.
+            # And also `ffx target wait` may take a sec or so to establish SSH
+            # connection if needed. So using anything lower than 1 sec is also
+            # not advised.
+            # 2 secs seems to be a sweet spot for knowing if device is offline
+            # or not using `ffx target wait --timeout` command
+            if not self.ffx.is_target_connected(
+                timeout=_TIMEOUTS["OFFLINE_ATTEMPT"]
+            ):
                 _LOGGER.info("%s is offline.", self.device_name)
                 break
             time.sleep(_TIMEOUTS["SLEEP"])
@@ -369,21 +384,15 @@ class BaseFuchsiaDevice(
 
         Raises:
             errors.FuchsiaDeviceError: If device is not online.
-            errors.FuchsiaControllerError: On communications failure.
-            errors.Sl4FError: On communications failure.
         """
         _LOGGER.info("Waiting for %s to go online...", self.device_name)
-        start_time: float = time.time()
-        end_time: float = start_time + timeout
-        while time.time() < end_time:
-            if self.ffx.is_target_connected():
-                _LOGGER.info("%s is online.", self.device_name)
-                break
-            time.sleep(_TIMEOUTS["SLEEP"])
-        else:
+        try:
+            self.ffx.wait_for_rcs_connection(timeout=timeout)
+            _LOGGER.info("%s is online.", self.device_name)
+        except Exception as err:  # pylint: disable=broad-except
             raise errors.FuchsiaDeviceError(
                 f"'{self.device_name}' failed to go online in {timeout}sec."
-            )
+            ) from err
 
     # List all private properties in alphabetical order
     @property

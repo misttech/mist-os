@@ -332,24 +332,29 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         self.fd_obj._on_device_boot_fns = []
 
     @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        side_effect=[False, True],
-        autospec=True,
-    )
-    @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True
     )
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
-        "_send_log_command",
+        "wait_for_online",
+        autospec=True,
+    )
+    @mock.patch.object(
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "wait_for_offline",
+        autospec=True,
+    )
+    @mock.patch.object(
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "log_message_to_device",
         autospec=True,
     )
     def test_power_cycle(
         self,
-        mock_send_log_command,
+        mock_log_message_to_device,
+        mock_wait_for_offline,
+        mock_wait_for_online,
         mock_on_device_boot,
-        mock_is_target_connected,
     ) -> None:
         """Testcase for BaseFuchsiaDevice.power_cycle()"""
         power_switch = mock.MagicMock(
@@ -357,24 +362,22 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         )
         self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
 
-        self.assertEqual(mock_send_log_command.call_count, 2)
-        self.assertEqual(mock_is_target_connected.call_count, 2)
-        power_switch.power_off.assert_called()
-        power_switch.power_on.assert_called()
+        self.assertEqual(mock_log_message_to_device.call_count, 2)
+        mock_wait_for_offline.assert_called()
+        mock_wait_for_online.assert_called()
         mock_on_device_boot.assert_called()
 
-    @mock.patch.object(
-        base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        side_effect=[False, True],
-        autospec=True,
-    )
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice, "on_device_boot", autospec=True
     )
     @mock.patch.object(
         base_fuchsia_device.BaseFuchsiaDevice,
-        "_send_log_command",
+        "wait_for_online",
+        autospec=True,
+    )
+    @mock.patch.object(
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "wait_for_offline",
         autospec=True,
     )
     @mock.patch.object(
@@ -382,19 +385,26 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         "_send_reboot_command",
         autospec=True,
     )
+    @mock.patch.object(
+        base_fuchsia_device.BaseFuchsiaDevice,
+        "log_message_to_device",
+        autospec=True,
+    )
     def test_reboot(
         self,
+        mock_log_message_to_device,
         mock_send_reboot_command,
-        mock_send_log_command,
+        mock_wait_for_offline,
+        mock_wait_for_online,
         mock_on_device_boot,
-        mock_is_target_connected,
     ) -> None:
         """Testcase for BaseFuchsiaDevice.reboot()"""
         self.fd_obj.reboot()
 
-        self.assertEqual(mock_send_log_command.call_count, 2)
-        self.assertEqual(mock_is_target_connected.call_count, 2)
+        self.assertEqual(mock_log_message_to_device.call_count, 2)
         mock_send_reboot_command.assert_called()
+        mock_wait_for_offline.assert_called()
+        mock_wait_for_online.assert_called()
         mock_on_device_boot.assert_called()
 
     def test_register_for_on_device_boot(self) -> None:
@@ -494,42 +504,35 @@ class BaseFuchsiaDeviceTests(unittest.TestCase):
         mock_time.assert_called()
         mock_sleep.assert_called()
 
-    @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        side_effect=[False, True],
+        "wait_for_rcs_connection",
         autospec=True,
     )
     def test_wait_for_online_success(
-        self, mock_ffx_is_target_connected, mock_sleep
+        self, mock_ffx_wait_for_rcs_connection
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_online() success case"""
         self.fd_obj.wait_for_online()
 
-        mock_ffx_is_target_connected.assert_called()
-        mock_sleep.assert_called()
+        mock_ffx_wait_for_rcs_connection.assert_called()
 
-    @mock.patch("time.sleep", autospec=True)
-    @mock.patch("time.time", side_effect=[0, 1, 2], autospec=True)
     @mock.patch.object(
         base_fuchsia_device.ffx_transport.FFX,
-        "is_target_connected",
-        return_value=False,
+        "wait_for_rcs_connection",
+        side_effect=errors.FuchsiaDeviceError("some error"),
         autospec=True,
     )
     def test_wait_for_online_fail(
-        self, mock_ffx_is_target_connected, mock_time, mock_sleep
+        self, mock_ffx_wait_for_rcs_connection
     ) -> None:
         """Testcase for BaseFuchsiaDevice.wait_for_online() failure case"""
         with self.assertRaisesRegex(
             errors.FuchsiaDeviceError, "failed to go online"
         ):
-            self.fd_obj.wait_for_online(timeout=2)
+            self.fd_obj.wait_for_online()
 
-        mock_ffx_is_target_connected.assert_called()
-        mock_time.assert_called()
-        mock_sleep.assert_called()
+        mock_ffx_wait_for_rcs_connection.assert_called()
 
 
 if __name__ == "__main__":

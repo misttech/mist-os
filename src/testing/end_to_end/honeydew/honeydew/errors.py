@@ -65,3 +65,7 @@ class FastbootCommandError(HoneyDewError):
 
 class SessionError(HoneyDewError):
     """Exception for errors raised by Session."""
+
+
+class DeviceNotConnectedError(HoneyDewError):
+    """Exception to be raised when device is not connected to host."""

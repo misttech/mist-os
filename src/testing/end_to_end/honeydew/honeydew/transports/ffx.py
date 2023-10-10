@@ -20,16 +20,20 @@ _FFX_CMDS: Dict[str, List[str]] = {
     "TARGET_SHOW": ["target", "show", "--json"],
     "TARGET_SSH_ADDRESS": ["target", "get-ssh-address"],
     "TARGET_LIST": ["--machine", "json", "target", "list"],
+    "TARGET_WAIT": ["target", "wait", "--timeout"],
 }
 
 _TIMEOUTS: Dict[str, float] = {
     "FFX_CLI": 10,
+    "TARGET_WAIT": 15,
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 _ISOLATE_DIR: Optional[fuchsia_controller.IsolateDir] = None
 _LOGS_DIR: Optional[str] = None
+
+_DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
 
 def setup(logs_dir: str) -> None:
@@ -143,20 +147,21 @@ class FFX:
 
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
-    def check_connection(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> None:
+    def check_connection(
+        self, timeout: float = _TIMEOUTS["TARGET_WAIT"]
+    ) -> None:
         """Checks the FFX connection from host to Fuchsia device.
 
         Args:
-            timeout: Timeout to wait for the ffx command to return.
+            timeout: How long in seconds to wait for FFX to establish the RCS
+                connection.
 
         Raises:
-            errors.FFXCommandError: If device is not connected to the host
-                according to FFX.
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
         """
-        if self.is_target_connected(timeout=timeout):
-            return
-        else:
-            raise errors.FfxCommandError(f"'{self._target}' is not connected.")
+        self.wait_for_rcs_connection(timeout=timeout)
 
     def get_target_information(
         self, timeout: float = _TIMEOUTS["FFX_CLI"]
@@ -187,7 +192,9 @@ class FFX:
             _LOGGER.debug(err, exc_info=True)
             raise
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+            raise errors.FfxCommandError(
+                f"Failed to get the target information of {self._target}"
+            ) from err
 
     def get_target_list(
         self, timeout: float = _TIMEOUTS["FFX_CLI"]
@@ -292,7 +299,9 @@ class FFX:
 
             return custom_types.TargetSshAddress(ip=ssh_ip, port=ssh_port)
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+            raise errors.FfxCommandError(
+                f"Failed to get the SSH address of {self._target}"
+            ) from err
 
     def get_target_type(self, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
         """Returns the target type.
@@ -352,37 +361,38 @@ class FFX:
         return board_entry["value"]
 
     def is_target_connected(
-        self, timeout: float = _TIMEOUTS["FFX_CLI"]
+        self, timeout: float = _TIMEOUTS["TARGET_WAIT"]
     ) -> bool:
         """Checks if target is connected to the host according to FFX.
 
-            * If device name shows up under `ffx target list` with `rcs_state`
-              set to 'Y' then treat target is online / connected.
-            * If device name does not shows up under `ffx target list` (or)
-              shows up but with `rcs_state` not set to Y then treat target is
-              offline / not-connected.
+        Returns True if FFX has successfully established RCS connection to
+        target. False, otherwise.
 
         Args:
-            timeout: Timeout to wait for the ffx command to return.
+            timeout: How long in seconds to wait for FFX to establish the RCS
+                connection.
 
         Returns:
             True if target is connected, False otherwise.
+
+        Raises:
+            errors.FfxCommandError: In case of failure to check the connection
+                status.
         """
         try:
-            target_list: List[Dict[str, Any]] = self.get_target_list(
-                timeout=timeout
-            )
+            self.wait_for_rcs_connection(timeout=timeout)
+            return True
+        except (
+            errors.DeviceNotConnectedError,
+            subprocess.TimeoutExpired,
+        ) as err:
+            _LOGGER.warning(err)
+            return False
+        # TODO(b/304289613): Return False only for DeviceNotConnectedError or
+        # may be for TimeoutExpired. Re-raise FfxCommandError exception
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.warning(err)
             return False
-
-        for target in target_list:
-            if (
-                target["nodename"] == self._target
-                and target["rcs_state"] == "Y"
-            ):
-                return True
-        return False
 
     def run(
         self,
@@ -412,7 +422,6 @@ class FFX:
             output: str = subprocess.check_output(
                 ffx_cmd, stderr=subprocess.STDOUT, timeout=timeout
             ).decode()
-
             _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
 
             return output
@@ -433,6 +442,52 @@ class FFX:
                 )
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
+
+    def wait_for_rcs_connection(
+        self, timeout: float = _TIMEOUTS["TARGET_WAIT"]
+    ):
+        """Wait until FFX is able to establish a RCS connection to the target.
+
+        Args:
+            timeout: How long in seconds to wait for FFX to establish the RCS
+                connection.
+
+        Raises:
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
+        """
+        cmd: List[str] = _FFX_CMDS["TARGET_WAIT"] + [str(timeout)]
+        ffx_cmd: List[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+
+        try:
+            _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
+            # intentionally used `subprocess.check_output` instead of `ffx.run`
+            # as this method need to look for subprocess.CalledProcessError
+            output: str = subprocess.check_output(
+                ffx_cmd,
+                stderr=subprocess.STDOUT,
+                # check_output timeout should be > rcs_connection timeout passed
+                timeout=timeout + 5,
+            ).decode()
+            _LOGGER.debug("`%s` returned: %s", " ".join(ffx_cmd), output)
+
+            return
+        except subprocess.CalledProcessError as err:
+            if _DEVICE_NOT_CONNECTED in str(err.output):
+                raise errors.DeviceNotConnectedError(
+                    f"{self._target} is not connected to host"
+                )
+            raise errors.FfxCommandError(
+                f"Failed to get check RCS connection of {self._target}"
+            ) from err
+        except subprocess.TimeoutExpired as err:
+            _LOGGER.debug(err, exc_info=True)
+            raise
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.FfxCommandError(
+                f"Failed to get check RCS connection of {self._target}"
+            ) from err
 
     # List all private methods in alphabetical order
     @staticmethod
