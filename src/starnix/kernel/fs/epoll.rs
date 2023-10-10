@@ -134,11 +134,11 @@ impl EpollFileObject {
         let events = target.query_events(current_task)?;
         if !(events & wait_object.events).is_empty() {
             self.waiter.wake_immediately(events, self.new_wait_handler(key));
-            wait_object
-                .wait_canceler
-                .as_ref()
-                .expect("canceler must have been set by `wait_on_file_edge_triggered`")
-                .cancel();
+            if let Some(wait_canceler) = wait_object.wait_canceler.take() {
+                wait_canceler.cancel();
+            } else {
+                log_warn!("wait canceler should have been set by `wait_on_file_edge_triggered`");
+            }
         }
         Ok(())
     }

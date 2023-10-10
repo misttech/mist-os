@@ -169,7 +169,12 @@ enum WaitCancelerInner {
 
 const MAX_INNER_CANCELLERS: usize = 2;
 
-/// Return values for wait_async methods. Calling `cancel` will cancel any running wait.
+/// Return values for wait_async methods.
+///
+/// Calling `cancel` will cancel any running wait.
+///
+/// Does not implement `Clone` or `Copy` so that only a single canceler exists
+/// per wait.
 pub struct WaitCanceler {
     cancellers: smallvec::SmallVec<[WaitCancelerInner; MAX_INNER_CANCELLERS]>,
 }
@@ -203,8 +208,10 @@ impl WaitCanceler {
         WaitCanceler { cancellers }
     }
 
-    /// Cancel the pending wait. It is valid to call this function multiple times.
-    pub fn cancel(&self) {
+    /// Cancel the pending wait.
+    ///
+    /// Takes `self` by value since a wait can only be canceled once.
+    pub fn cancel(self) {
         let Self { cancellers } = self;
         for canceller in cancellers {
             match canceller {
@@ -234,16 +241,22 @@ impl WaitCanceler {
     }
 }
 
-/// Return values for wait_async methods that monitor the state of a handle. Calling `cancel` will
-/// cancel any running wait.
+/// Return values for wait_async methods that monitor the state of a handle.
+///
+/// Calling `cancel` will cancel any running wait.
+///
+/// Does not implement `Clone` or `Copy` so that only a single canceler exists
+/// per wait.
 pub struct HandleWaitCanceler {
     waiter: Weak<PortWaiter>,
     key: WaitKey,
 }
 
 impl HandleWaitCanceler {
-    /// Cancel the pending wait. It is valid to call this function multiple times.
-    pub fn cancel(&self, handle: zx::HandleRef<'_>) {
+    /// Cancel the pending wait.
+    ///
+    /// Takes `self` by value since a wait can only be canceled once.
+    pub fn cancel(self, handle: zx::HandleRef<'_>) {
         let Self { waiter, key } = self;
         if let Some(waiter) = waiter.upgrade() {
             let _ = waiter.port.cancel(&handle, key.raw);
