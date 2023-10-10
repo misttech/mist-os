@@ -96,8 +96,12 @@ impl FormattedDateTimeObj {
     }
 
     fn parse_datetime(dt: String) -> Result<Self, Error> {
-        let Ok(datetime) = NaiveDateTime::parse_from_str(dt.as_str(), Self::ISO_8601_UTC_TIME_FORMAT) else {
-            return NaiveDateTime::parse_from_str(dt.as_str(), Self::ISO_8601_TIME_FORMAT).map(|t| Self::new(t)).map_err(|_| Error::InvalidData(dt));
+        let Ok(datetime) =
+            NaiveDateTime::parse_from_str(dt.as_str(), Self::ISO_8601_UTC_TIME_FORMAT)
+        else {
+            return NaiveDateTime::parse_from_str(dt.as_str(), Self::ISO_8601_TIME_FORMAT)
+                .map(|t| Self::new(t))
+                .map_err(|_| Error::InvalidData(dt));
         };
 
         // UTC timestamp.
@@ -236,7 +240,7 @@ impl File {
 impl TryFrom<XmlEvent> for File {
     type Error = Error;
     fn try_from(src: XmlEvent) -> Result<Self, Error> {
-        let XmlEvent::StartElement{ref name, ref attributes, ..} = src else {
+        let XmlEvent::StartElement { ref name, ref attributes, .. } = src else {
             return Err(Error::InvalidData(format!("{:?}", src)));
         };
         if name.local_name.as_str() != FILE_ELEM {
@@ -300,7 +304,7 @@ impl Folder {
 impl TryFrom<XmlEvent> for Folder {
     type Error = Error;
     fn try_from(src: XmlEvent) -> Result<Self, Error> {
-        let XmlEvent::StartElement{ref name, ref attributes, ..} = src else {
+        let XmlEvent::StartElement { ref name, ref attributes, .. } = src else {
             return Err(Error::InvalidData(format!("{:?}", src)));
         };
         if name.local_name.as_str() != FOLDER_ELEM {
@@ -349,7 +353,7 @@ impl FolderListing {
     // Given the XML StartElement, checks whether or not it is a valid folder
     // listing element.
     fn validate_folder_listing_element(element: XmlEvent) -> Result<(), Error> {
-        let XmlEvent::StartElement{ref name, ref attributes, ..} = element else {
+        let XmlEvent::StartElement { ref name, ref attributes, .. } = element else {
             return Err(Error::InvalidData(format!("{:?}", element)));
         };
 
@@ -425,13 +429,17 @@ impl Parser for FolderListing {
                     match name.local_name.as_str() {
                         FOLDER_LISTING_ELEM => {
                             let ParsedXmlEvent::FolderListingElement = parsed_elem else {
-                                return Err(Error::MissingData(format!("closing {FOLDER_LISTING_ELEM}")));
+                                return Err(Error::MissingData(format!(
+                                    "closing {FOLDER_LISTING_ELEM}"
+                                )));
                             };
                             finished_folder_listing = true;
                         }
                         PARENT_FOLDER_ELEM => {
                             let ParsedXmlEvent::ParentFolderElement = parsed_elem else {
-                                return Err(Error::MissingData(format!("closing {PARENT_FOLDER_ELEM}")));
+                                return Err(Error::MissingData(format!(
+                                    "closing {PARENT_FOLDER_ELEM}"
+                                )));
                             };
                             folder_listing.parent_folder = true;
                         }

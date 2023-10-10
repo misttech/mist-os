@@ -8,6 +8,20 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::{
     l2cap_connect_parameters, psm_from_protocol, Attribute, DataElement, ProtocolDescriptor, Psm,
 };
+use fuchsia_bluetooth::types::PeerId;
+
+use crate::client::ObexClient;
+use crate::error::Error;
+use crate::transport::TransportType;
+
+impl From<bredr::ConnectParameters> for TransportType {
+    fn from(src: bredr::ConnectParameters) -> TransportType {
+        match src {
+            bredr::ConnectParameters::L2cap(_) => TransportType::L2cap,
+            _ => TransportType::Rfcomm,
+        }
+    }
+}
 
 /// The Attribute ID associated with the GoepL2capPsm attribute.
 /// Defined in https://www.bluetooth.com/specifications/assigned-numbers/service-discovery
@@ -63,9 +77,9 @@ fn parse_goep_l2cap_psm_attribute(attribute: &Attribute) -> Option<Psm> {
     }
 }
 
-/// Attempts to parse a peer's service advertisement into ConnectParameters containing the L2CAP
+/// Attempt to parse an OBEX service advertisement into `ConnectParameters` containing the L2CAP
 /// PSM or RFCOMM ServerChannel associated with the service.
-/// Builds and returns the parameters on success, None otherwise.
+/// Returns the parameters on success, None if the parsing fails.
 pub fn parse_obex_search_result(
     protocol: &Vec<ProtocolDescriptor>,
     attributes: &Vec<Attribute>,
@@ -91,6 +105,24 @@ pub fn parse_obex_search_result(
 
     // Otherwise, it's RFCOMM.
     server_channel_from_protocol(protocol).map(|sc| rfcomm_connect_parameters(sc))
+}
+
+/// Attempt to connect to the peer `id` with the provided connect `parameters`.
+/// Returns an `ObexClient` connected to the remote OBEX service on success, or an Error if the
+/// connection could not be made.
+pub async fn connect_to_obex_service(
+    id: PeerId,
+    profile: &bredr::ProfileProxy,
+    parameters: bredr::ConnectParameters,
+) -> Result<ObexClient, Error> {
+    let channel = profile
+        .connect(&id.into(), &parameters)
+        .await
+        .map_err(anyhow::Error::from)?
+        .map_err(|e| anyhow::format_err!("{e:?}"))?;
+    let local = channel.try_into()?;
+    let transport_type = parameters.into();
+    Ok(ObexClient::new(local, transport_type))
 }
 
 #[cfg(test)]

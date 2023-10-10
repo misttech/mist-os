@@ -18,6 +18,7 @@ group("examples") {
     "bt-device-id-client",
     "bt-fastpair-client",
     "bt-le-battery-monitor",
+    "bt-opp-client",
   ]
 }
 

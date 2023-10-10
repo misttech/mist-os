@@ -11,7 +11,7 @@ use crate::header::{ConnectionIdentifier, Header, HeaderIdentifier, SingleRespon
 /// Maintains a collection of OBEX Headers that are sent & received in an OBEX packet.
 /// See OBEX 1.5 Section 3.4 for the ordering requirements and definitions of the supported Header
 /// types.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct HeaderSet {
     ids: BTreeMap<HeaderIdentifier, Header>,
 }
