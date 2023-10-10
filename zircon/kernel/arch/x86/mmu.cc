@@ -904,6 +904,15 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     }
 
     aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+    // If we are switching to a unified aspace, we need to mark the associated shared and
+    // restricted aspaces as active since the last check as well.
+    if (aspace->IsUnified()) {
+      X86ArchVmAspace* shared = static_cast<X86ArchVmAspace*>(aspace->pt_->get_shared_pt()->ctx());
+      X86ArchVmAspace* restricted =
+          static_cast<X86ArchVmAspace*>(aspace->pt_->get_restricted_pt()->ctx());
+      shared->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+      restricted->active_since_last_check_.store(true, ktl::memory_order_relaxed);
+    }
   } else {
     // Switching to the kernel aspace
     LTRACEF_LEVEL(3, "switching to kernel aspace, pt %#" PRIxPTR "\n", kernel_pt_phys);

@@ -473,6 +473,80 @@ static bool vmaspace_free_unaccessed_page_tables_test() {
   END_TEST;
 }
 
+// Touch mappings in both the shared and restricted region of a unified aspace and ensure we can
+// correctly harvest accessed bits.
+// TODO(https://fxbug.dev/132980): Enable on other architectures once they are supported.
+#if defined(__x86_64__)
+static bool vmaspace_unified_accessed_test() {
+  BEGIN_TEST;
+
+  AutoVmScannerDisable scanner_disable;
+
+  // Create a unified aspace.
+  constexpr vaddr_t kPrivateAspaceBase = USER_ASPACE_BASE;
+  constexpr vaddr_t kPrivateAspaceSize = PAGE_ALIGN(USER_ASPACE_SIZE / 2);
+  constexpr vaddr_t kSharedAspaceBase = kPrivateAspaceBase + kPrivateAspaceSize + PAGE_SIZE;
+  constexpr vaddr_t kSharedAspaceSize = USER_ASPACE_BASE + USER_ASPACE_SIZE - kSharedAspaceBase;
+  fbl::RefPtr<VmAspace> restricted_aspace =
+      VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User,
+                       "test restricted aspace", VmAspace::ShareOpt::None);
+  fbl::RefPtr<VmAspace> shared_aspace =
+      VmAspace::Create(kSharedAspaceBase, kSharedAspaceSize, VmAspace::Type::User,
+                       "test shared aspace", VmAspace::ShareOpt::Shared);
+  fbl::RefPtr<VmAspace> unified_aspace =
+      VmAspace::CreateUnified(shared_aspace.get(), restricted_aspace.get(), "test unified aspace");
+  auto cleanup_aspace = fit::defer([&restricted_aspace, &shared_aspace, &unified_aspace]() {
+    unified_aspace->Destroy();
+    restricted_aspace->Destroy();
+    shared_aspace->Destroy();
+  });
+
+  // Create regions of user memory that we can touch in both the shared and restricted regions.
+  constexpr uint64_t kSize = 4 * PAGE_SIZE;
+  fbl::RefPtr<VmObjectPaged> shared_vmo;
+  fbl::RefPtr<VmObjectPaged> restricted_vmo;
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize,
+                                  AttributionObject::GetKernelAttribution(), &shared_vmo));
+  ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, kSize,
+                                  AttributionObject::GetKernelAttribution(), &restricted_vmo));
+  ktl::unique_ptr<testing::UserMemory> shared_mem =
+      testing::UserMemory::CreateInAspace(shared_vmo, shared_aspace);
+  ktl::unique_ptr<testing::UserMemory> restricted_mem =
+      testing::UserMemory::CreateInAspace(restricted_vmo, restricted_aspace);
+
+  // Commit and map these regions to avoid page faults when we call `put` later on. We have to do
+  // this because the `put` function invokes a `copy_to_user` that may trigger a page fault, which
+  // the fault handler will try to resolve using the thread's current aspace. That aspace, in turn,
+  // will be the unified aspace, which cannot resolve faults.
+  constexpr uint64_t kMiddleOffset = kSize / 2;
+  EXPECT_OK(shared_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+  EXPECT_OK(restricted_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+
+  // Switch to the unified aspace.
+  VmAspace* old_aspace = Thread::Current::Get()->active_aspace();
+  vmm_set_active_aspace(unified_aspace.get());
+  auto reset_old_aspace = fit::defer([&old_aspace]() { vmm_set_active_aspace(old_aspace); });
+
+  // Touch the the shared and restricted regions via the unified aspace.
+  shared_mem->put<char>(42, kMiddleOffset);
+  restricted_mem->put<char>(42, kMiddleOffset);
+
+  // Harvest the accessed information. This should not actually unmap the pages.
+  harvest_access_bits(VmAspace::NonTerminalAction::FreeUnaccessed,
+                      VmAspace::TerminalAction::UpdateAgeAndHarvest);
+  EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, shared_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+  EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, restricted_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+
+  // Harvest the accessed bits again. This time, the pages should be unmapped.
+  harvest_access_bits(VmAspace::NonTerminalAction::FreeUnaccessed,
+                      VmAspace::TerminalAction::UpdateAgeAndHarvest);
+  EXPECT_OK(shared_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+  EXPECT_OK(restricted_mem->CommitAndMap(PAGE_SIZE, kMiddleOffset));
+
+  END_TEST;
+}
+#endif  // __x86_64__
+
 // Tests that VmMappings that are marked mergeable behave correctly.
 static bool vmaspace_merge_mapping_test() {
   BEGIN_TEST;
@@ -2365,6 +2439,9 @@ VM_UNITTEST(vmaspace_alloc_smoke_test)
 VM_UNITTEST(vmaspace_accessed_test_untagged)
 #if defined(__aarch64__)
 VM_UNITTEST(vmaspace_accessed_test_tagged)
+#endif
+#if defined(__x86_64__)
+VM_UNITTEST(vmaspace_unified_accessed_test)
 #endif
 VM_UNITTEST(vmaspace_usercopy_accessed_fault_test)
 VM_UNITTEST(vmaspace_free_unaccessed_page_tables_test)

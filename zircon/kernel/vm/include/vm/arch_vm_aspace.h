@@ -155,6 +155,10 @@ class ArchVmAspaceInterface {
   // the aspace has not been active in the mmu, since an aspace that has not been active cannot
   // generate new information.
   //
+  // Note that restricted and shared ArchVmAspace's will report that they have been active if an
+  // associated unified ArchVmAspace has been run. However, the reverse is not true; the unified
+  // ArchVmAspace will not return true if the associated shared/restricted aspaces have been run.
+  //
   // The |clear| flag controls whether the aspace having been active should be cleared or not. Not
   // clearing makes this function const and not modify any state.
   virtual bool ActiveSinceLastCheck(bool clear) = 0;

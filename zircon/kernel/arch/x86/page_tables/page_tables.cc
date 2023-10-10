@@ -1116,6 +1116,7 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
   bool unmapped = false;
   size_t ps = page_size(level);
   uint index = vaddr_to_index(level, cursor.vaddr());
+  bool always_recurse = level == PageTableLevel::PML4_L && (is_shared_ || is_restricted_);
   for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
     volatile pt_entry_t* e = table + index;
     pt_entry_t pt_val = *e;
@@ -1145,9 +1146,15 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
     bool unmap_page_table = false;
     // Remember where we are unmapping from in case we need to do a second pass to remove a PT.
     const vaddr_t unmap_vaddr = cursor.vaddr();
-    if (pt_val & X86_MMU_PG_A) {
-      // Entry is accessed, we need to recurse and check for accessed bits at the next level. We
-      // unset the AF later should we end up not unmapping the page table.
+    // We should recurse and HarvestMappings at the next level if:
+    // 1. This page table entry is in the PML4 of a shared or restricted page table. We must
+    //    always recurse in this case because entries in these page tables may have been accessed
+    //    via an associated unified page table, which in turn would not set the accessed bits on
+    //    the corresponding PML4 entries in this table.
+    // 2. The page table entry has been accessed. We unset the AF later should we end up not
+    //    unmapping the page table.
+    bool should_recurse = always_recurse || (pt_val & X86_MMU_PG_A);
+    if (should_recurse) {
       lower_unmapped = HarvestMapping(next_table, non_terminal_action, terminal_action,
                                       lower_level(level), cursor, cm);
     } else if (non_terminal_action == NonTerminalAction::FreeUnaccessed) {

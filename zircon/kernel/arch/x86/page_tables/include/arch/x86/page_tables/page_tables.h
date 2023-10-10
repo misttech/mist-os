@@ -99,6 +99,18 @@ class X86PageTableBase {
   // Returns whether this page table is unified.
   bool IsUnified() const { return is_unified_; }
 
+  // Accessors for the shared and restricted page tables on a unified page table.
+  // We can turn off thread safety analysis as these accessors should only be used on unified page
+  // tables, for which both the shared and restricted page table pointers are notionally const.
+  X86PageTableBase* get_shared_pt() TA_NO_THREAD_SAFETY_ANALYSIS {
+    DEBUG_ASSERT(is_unified_);
+    return shared_pt_;
+  }
+  X86PageTableBase* get_restricted_pt() TA_NO_THREAD_SAFETY_ANALYSIS {
+    DEBUG_ASSERT(is_unified_);
+    return referenced_pt_;
+  }
+
   zx_status_t MapPages(vaddr_t vaddr, paddr_t* phys, size_t count, uint flags,
                        ExistingEntryAction existing_action, size_t* mapped);
   zx_status_t MapPagesContiguous(vaddr_t vaddr, paddr_t paddr, const size_t count, uint flags,

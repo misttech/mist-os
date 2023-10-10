@@ -162,6 +162,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
     active_since_last_check_.store(true, ktl::memory_order_relaxed);
   }
 
+  bool IsUnified() const { return pt_->IsUnified(); }
+
   fbl::Canary<fbl::magic("VAAS")> canary_;
   IoBitmap io_bitmap_;
 
