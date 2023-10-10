@@ -1378,7 +1378,7 @@ mod tests {
 
         let (client_socket, client_addr) = create_test_socket();
         let (server_socket, server_addr) = create_test_socket();
-        let mut client = Client::<fasync::net::UdpSocket>::start(
+        let client = Client::<fasync::net::UdpSocket>::start(
             transaction_id,
             STATELESS_CLIENT_CONFIG,
             1, /* interface ID */
@@ -1400,11 +1400,17 @@ mod tests {
         .await
         .expect("failed to send test message");
 
-        // Receive non-empty DNS servers before watch.
-        let mut buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
-        // Emit aborted timer.
-        assert_matches!(client.handle_next_event(&mut buf).await, Ok(Some(())));
+        let buf = vec![0u8; MAX_UDP_DATAGRAM_SIZE];
+        let handle_client_events_fut =
+            futures::stream::try_unfold((client, buf), |(mut client, mut buf)| async {
+                client
+                    .handle_next_event(&mut buf)
+                    .await
+                    .map(|res| res.map(|()| ((), (client, buf))))
+            })
+            .try_fold((), |(), ()| futures::future::ready(Ok(())))
+            .fuse();
+        futures::pin_mut!(handle_client_events_fut);
 
         let want_servers = vec![
             create_test_dns_server(
@@ -1418,10 +1424,12 @@ mod tests {
                 0, /* zone index */
             ),
         ];
-        assert_matches!(
-            join!(client.handle_next_event(&mut buf), client_proxy.watch_servers()),
-            (Ok(Some(())), Ok(servers)) => assert_eq!(servers, want_servers)
+        let found_servers = select!(
+            status = handle_client_events_fut => panic!("client unexpectedly exited: {status:?}"),
+            found_servers = client_proxy.watch_servers() => found_servers.expect(
+                "watch servers should succeed"),
         );
+        assert_eq!(found_servers, want_servers);
     }
 
     #[fuchsia::test]
