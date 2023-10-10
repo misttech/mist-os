@@ -8,14 +8,20 @@ toc:
   section:
   - title: "cmc"
     path: /reference/tools/sdk/cmc.md
+  - title: "configc"
+    path: /reference/tools/sdk/configc.md
   - title: "fidl-format"
     path: /reference/tools/sdk/fidl-format.md
   - title: "fidlc"
     path: /reference/tools/sdk/fidlc.md
   - title: "fidlcat"
     path: /reference/tools/sdk/fidlcat.md
-  - title: "fidlgen"
-    path: /reference/tools/sdk/fidlgen.md
+  - title: "fidlgen CPP"
+    path: /reference/tools/sdk/fidlgen_cpp.md
+  - title: "fidlgen HLCPP"
+    path: /reference/tools/sdk/fidlgen_hlcpp.md
+  - title: "fidlgen Rust"
+    path: /reference/tools/sdk/fidlgen_rust.md
 - title: "Debugging commands"
   section:
   - title: "symbolizer"
@@ -32,8 +38,6 @@ toc:
     path: /reference/tools/sdk/fserve.md
   - title: "fssh"
     path: /reference/tools/sdk/fssh.md
-  - title: "fvdl"
-    path: /reference/tools/sdk/fvdl.md
   - title: "minfs"
     path: /reference/tools/sdk/minfs.md
   - title: "zbi"
