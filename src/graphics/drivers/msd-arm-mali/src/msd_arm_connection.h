@@ -80,10 +80,9 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   bool UpdateCommittedMemory(GpuMapping* mapping) override;
 
   bool AddMapping(std::unique_ptr<GpuMapping> mapping);
-  // If |atom| is a soft atom, then the first element from
-  // |signal_semaphores| will be removed and used for it.
   bool ExecuteAtom(size_t* remaining_data_size, magma_arm_mali_atom* atom,
-                   std::deque<std::shared_ptr<magma::PlatformSemaphore>>* signal_semaphores);
+                   std::vector<std::shared_ptr<magma::PlatformSemaphore>>& semaphores,
+                   std::deque<std::shared_ptr<magma::PlatformSemaphore>>* deprecated_semaphores);
 
   void SetNotificationCallback(msd::NotificationHandler* handler);
   void SendNotificationData(MsdArmAtom* atom);

@@ -197,6 +197,11 @@ class Context {
                                                   cpp20::span<Semaphore*> semaphores) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
+
+  virtual magma_status_t ExecuteInlineCommand(magma_inline_command_buffer* command,
+                                              Semaphore** semaphores) {
+    return MAGMA_STATUS_UNIMPLEMENTED;
+  }
 };
 
 class Buffer {

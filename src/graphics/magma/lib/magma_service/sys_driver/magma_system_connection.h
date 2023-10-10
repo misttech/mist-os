@@ -55,6 +55,8 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
   magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
                                          void* commands, uint64_t semaphore_count,
                                          uint64_t* semaphore_ids) override;
+  magma::Status ExecuteInlineCommands(uint32_t context_id,
+                                      std::vector<magma_inline_command_buffer> commands) override;
   MagmaSystemContext* LookupContext(uint32_t context_id);
   void SetNotificationCallback(msd::NotificationHandler*) override;
   magma::Status EnablePerformanceCounterAccess(zx::handle access_token) override;

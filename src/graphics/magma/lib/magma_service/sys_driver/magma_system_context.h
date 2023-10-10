@@ -34,6 +34,7 @@ class MagmaSystemContext {
       std::vector<magma_exec_resource> resources, std::vector<uint64_t> semaphores);
   magma::Status ExecuteImmediateCommands(uint64_t commands_size, void* commands,
                                          uint64_t semaphore_count, uint64_t* semaphore_ids);
+  magma::Status ExecuteInlineCommands(std::vector<magma_inline_command_buffer> commands);
 
  private:
   msd::Context* msd_ctx() { return msd_ctx_.get(); }

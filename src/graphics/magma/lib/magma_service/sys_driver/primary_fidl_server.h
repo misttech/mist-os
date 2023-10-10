@@ -76,6 +76,8 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
     virtual magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
                                                    void* commands, uint64_t semaphore_count,
                                                    uint64_t* semaphore_ids) = 0;
+    virtual magma::Status ExecuteInlineCommands(
+        uint32_t context_id, std::vector<magma_inline_command_buffer> commands) = 0;
     virtual magma::Status EnablePerformanceCounterAccess(zx::handle access_token) = 0;
     virtual bool IsPerformanceCounterAccessAllowed() = 0;
     virtual magma::Status EnablePerformanceCounters(const uint64_t* counters,
@@ -137,6 +139,8 @@ class PrimaryFidlServer : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
                       DestroyContextCompleter::Sync& _completer) override;
   void ExecuteImmediateCommands(ExecuteImmediateCommandsRequestView request,
                                 ExecuteImmediateCommandsCompleter::Sync& _completer) override;
+  void ExecuteInlineCommands(ExecuteInlineCommandsRequestView request,
+                             ExecuteInlineCommandsCompleter::Sync& _completer) override;
   void ExecuteCommand(ExecuteCommandRequestView request,
                       ExecuteCommandCompleter::Sync& completer) override;
   void Flush(FlushCompleter::Sync& _completer) override;

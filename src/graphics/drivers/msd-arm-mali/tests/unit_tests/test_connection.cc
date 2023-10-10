@@ -562,14 +562,17 @@ class TestConnection {
 
     magma_arm_mali_atom client_atom = {};
     client_atom.flags = kAtomFlagSemaphoreWait;
-    std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
+    std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
     size_t remaining_size = sizeof(magma_arm_mali_atom);
-    EXPECT_FALSE(connection->ExecuteAtom(&remaining_size, &client_atom, &semaphores));
+    EXPECT_FALSE(
+        connection->ExecuteAtom(&remaining_size, &client_atom, semaphores, &deprecated_semaphores));
 
     std::shared_ptr<magma::PlatformSemaphore> semaphore(magma::PlatformSemaphore::Create());
-    semaphores.push_back(semaphore);
+    deprecated_semaphores.push_back(semaphore);
     remaining_size = sizeof(magma_arm_mali_atom);
-    EXPECT_TRUE(connection->ExecuteAtom(&remaining_size, &client_atom, &semaphores));
+    EXPECT_TRUE(
+        connection->ExecuteAtom(&remaining_size, &client_atom, semaphores, &deprecated_semaphores));
 
     EXPECT_EQ(1u, owner.atoms_list().size());
     std::shared_ptr<MsdArmAtom> atom = owner.atoms_list()[0];
@@ -717,7 +720,8 @@ class TestConnection {
     good_atom.atom.atom_number = 1;
     good_atom.atom.size = sizeof(good_atom.atom);
     good_atom.atom.flags = kAtomFlagJitAddressSpaceAllocate;
-    std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
+    std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
 
     FakeConnectionOwner owner;
     {
@@ -725,7 +729,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom);
-      EXPECT_TRUE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_TRUE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
       EXPECT_EQ(0u, size);
       EXPECT_EQ(0u, owner.atoms_list().size());
       {
@@ -737,7 +742,8 @@ class TestConnection {
                   good_atom.alloc_info.va_page_count * magma::page_size());
       }
       size = sizeof(good_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
     }
     // Invalid version
     {
@@ -747,7 +753,8 @@ class TestConnection {
 
       bad_atom.alloc_info.version_number = static_cast<uint8_t>(1000);
       size_t size = sizeof(good_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
     // Invalid trim level
     {
@@ -757,7 +764,8 @@ class TestConnection {
 
       bad_atom.alloc_info.trim_level = 101;
       size_t size = sizeof(good_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Invalid size
@@ -767,7 +775,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom) - 1;
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Invalid va_pages
@@ -778,7 +787,8 @@ class TestConnection {
 
       bad_atom.alloc_info.va_page_count = (1ul << 48);
       size_t size = sizeof(good_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
   }
 
@@ -801,7 +811,8 @@ class TestConnection {
     good_atom.atom.atom_number = 1;
     good_atom.atom.size = sizeof(good_atom.atom);
     good_atom.atom.flags = kAtomFlagJitMemoryAllocate;
-    std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
 
     {
       FakeConnectionOwner owner;
@@ -809,7 +820,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom);
-      EXPECT_TRUE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_TRUE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
       EXPECT_EQ(0u, size);
       EXPECT_EQ(1u, owner.atoms_list().size());
       auto atom = owner.atoms_list()[0];
@@ -829,7 +841,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom) - 1;
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Too many trailing infos.
@@ -842,7 +855,8 @@ class TestConnection {
       bad_atom.trailer.jit_memory_info_count = 3;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Bad version
@@ -855,7 +869,8 @@ class TestConnection {
       bad_atom.info[1].version_number = 100;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Too few trailing infos.
@@ -868,7 +883,8 @@ class TestConnection {
       bad_atom.trailer.jit_memory_info_count = 0;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
   }
 
@@ -888,7 +904,8 @@ class TestConnection {
     good_atom.atom.atom_number = 1;
     good_atom.atom.size = sizeof(good_atom.atom);
     good_atom.atom.flags = kAtomFlagJitMemoryFree;
-    std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
+    std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
 
     {
       FakeConnectionOwner owner;
@@ -896,7 +913,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom);
-      EXPECT_TRUE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_TRUE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
       EXPECT_EQ(0u, size);
       EXPECT_EQ(1u, owner.atoms_list().size());
       auto atom = owner.atoms_list()[0];
@@ -916,7 +934,8 @@ class TestConnection {
       EXPECT_TRUE(connection);
 
       size_t size = sizeof(good_atom) - 1;
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &good_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &good_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Too many trailing infos.
@@ -929,7 +948,8 @@ class TestConnection {
       bad_atom.trailer.jit_memory_info_count = 3;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Bad version
@@ -942,7 +962,8 @@ class TestConnection {
       bad_atom.info[1].version_number = 100;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
 
     // Too few trailing infos.
@@ -955,7 +976,8 @@ class TestConnection {
       bad_atom.trailer.jit_memory_info_count = 0;
 
       size_t size = sizeof(bad_atom);
-      EXPECT_FALSE(connection->ExecuteAtom(&size, &bad_atom.atom, &semaphores));
+      EXPECT_FALSE(
+          connection->ExecuteAtom(&size, &bad_atom.atom, semaphores, &deprecated_semaphores));
     }
   }
 
@@ -975,10 +997,12 @@ class TestConnection {
     address_space_atom.atom.atom_number = 1;
     address_space_atom.atom.size = sizeof(address_space_atom.atom);
     address_space_atom.atom.flags = kAtomFlagJitAddressSpaceAllocate;
-    std::deque<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
+    std::deque<std::shared_ptr<magma::PlatformSemaphore>> deprecated_semaphores;
+    std::vector<std::shared_ptr<magma::PlatformSemaphore>> semaphores;
 
     size_t size = sizeof(address_space_atom);
-    EXPECT_TRUE(connection->ExecuteAtom(&size, &address_space_atom.atom, &semaphores));
+    EXPECT_TRUE(connection->ExecuteAtom(&size, &address_space_atom.atom, semaphores,
+                                        &deprecated_semaphores));
 
     *start_region_out = address_space_atom.alloc_info.address;
   }

@@ -66,9 +66,9 @@ class PlatformConnectionClient {
                                                  magma_bool_t* more_data_out) = 0;
   virtual magma_status_t ExecuteCommand(uint32_t context_id,
                                         magma_command_descriptor* descriptor) = 0;
-  virtual magma_status_t ExecuteImmediateCommands(uint32_t context_id, uint64_t command_count,
-                                                  magma_inline_command_buffer* command_buffers,
-                                                  uint64_t* messages_sent_out) = 0;
+  virtual magma_status_t ExecuteInlineCommands(uint32_t context_id, uint64_t command_count,
+                                               magma_inline_command_buffer* command_buffers,
+                                               uint64_t* messages_sent_out) = 0;
 
   virtual magma_status_t EnablePerformanceCounterAccess(
       std::unique_ptr<magma::PlatformHandle> handle) = 0;

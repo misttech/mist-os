@@ -162,6 +162,10 @@ type BufferOp = flexible enum : uint32 {
 /// The batch size used to send multiple immediate commands in a single message.
 const MAX_IMMEDIATE_COMMANDS_DATA_SIZE uint32 = 2048;
 
+/// The batch size used to send multiple inline commands in a single message.
+@available(added=15)
+const MAX_INLINE_COMMANDS_DATA_SIZE uint32 = 2048;
+
 type MapFlags = flexible bits : uint64 {
     READ = 0x1;
     WRITE = 0x2;
@@ -186,6 +190,12 @@ type CommandBuffer = struct {
 
     /// Starting offset within the resource.
     start_offset uint64;
+};
+
+@available(added=15)
+type InlineCommand = table {
+    1: data vector<uint8>:MAX;
+    2: semaphores vector<ObjectId>:MAX;
 };
 
 /// Performance counter pools contain byte ranges of buffers. Whenever a performance counter dump is
@@ -278,6 +288,15 @@ closed protocol Primary {
         context_id ContextId;
         command_data vector<uint8>:MAX_IMMEDIATE_COMMANDS_DATA_SIZE;
         semaphores vector<ObjectId>:MAX;
+    });
+
+    /// Submits a series of commands for execution on the hardware without using a command buffer.
+    /// The number of commands sent should be calculated so that the total message size is less than
+    /// MAX_INLINE_COMMANDS_DATA_SIZE.
+    @available(added=15)
+    strict ExecuteInlineCommands(struct {
+        context_id ContextId;
+        commands vector<InlineCommand>:MAX;
     });
 
     /// Incurs a round-trip to the system driver, used to ensure all previous messages have been

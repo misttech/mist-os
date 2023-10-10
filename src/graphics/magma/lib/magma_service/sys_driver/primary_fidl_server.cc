@@ -8,6 +8,7 @@
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/platform/platform_trace.h>
 #include <lib/magma/platform/zircon/zircon_platform_status.h>
+#include <lib/magma/util/utils.h>
 
 #include <optional>
 
@@ -344,6 +345,33 @@ void PrimaryFidlServer::ExecuteImmediateCommands(
   magma::Status status = delegate_->ExecuteImmediateCommands(
       request->context_id, request->command_data.count(), request->command_data.data(),
       request->semaphores.count(), request->semaphores.data());
+  if (!status)
+    SetError(&completer, status.get());
+}
+
+void PrimaryFidlServer::ExecuteInlineCommands(ExecuteInlineCommandsRequestView request,
+                                              ExecuteInlineCommandsCompleter::Sync& completer) {
+  TRACE_DURATION("magma", "PrimaryFidlServer::ExecuteInlineCommands");
+  MAGMA_DLOG("PrimaryFidlServer: ExecuteInlineCommands");
+  FlowControl();
+
+  std::vector<magma_inline_command_buffer> commands;
+  commands.reserve(request->commands.count());
+
+  for (auto& fidl_command : request->commands) {
+    if (!fidl_command.has_data() || !fidl_command.has_semaphores()) {
+      SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
+      return;
+    }
+    commands.push_back({
+        .data = fidl_command.data().data(),
+        .size = fidl_command.data().count(),
+        .semaphore_ids = fidl_command.semaphores().data(),
+        .semaphore_count = magma::to_uint32(fidl_command.semaphores().count()),
+    });
+  }
+
+  magma::Status status = delegate_->ExecuteInlineCommands(request->context_id, std::move(commands));
   if (!status)
     SetError(&completer, status.get());
 }

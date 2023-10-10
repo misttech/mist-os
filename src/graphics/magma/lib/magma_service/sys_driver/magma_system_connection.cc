@@ -104,6 +104,16 @@ magma::Status MagmaSystemConnection::ExecuteImmediateCommands(uint32_t context_i
   return context->ExecuteImmediateCommands(commands_size, commands, semaphore_count, semaphore_ids);
 }
 
+magma::Status MagmaSystemConnection::ExecuteInlineCommands(
+    uint32_t context_id, std::vector<magma_inline_command_buffer> commands) {
+  auto context = LookupContext(context_id);
+  if (!context)
+    return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,
+                          "Attempting to execute inline commands on invalid context");
+
+  return context->ExecuteInlineCommands(std::move(commands));
+}
+
 magma::Status MagmaSystemConnection::EnablePerformanceCounterAccess(zx::handle access_token) {
   uint64_t perf_count_access_token_id = owner_->perf_count_access_token_id();
   MAGMA_DASSERT(perf_count_access_token_id);

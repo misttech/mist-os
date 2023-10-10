@@ -271,14 +271,11 @@ magma_status_t PrimaryWrapper::ExecuteCommand(
   return magma::FromZxStatus(status).get();
 }
 
-magma_status_t PrimaryWrapper::ExecuteImmediateCommands(uint32_t context_id,
-                                                        ::fidl::VectorView<uint8_t> command_data,
-                                                        ::fidl::VectorView<uint64_t> semaphores) {
+magma_status_t PrimaryWrapper::ExecuteInlineCommands(
+    uint32_t context_id, ::fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand> commands) {
   std::lock_guard<std::mutex> lock(flow_control_mutex_);
   FlowControl();
-  zx_status_t status =
-      client_->ExecuteImmediateCommands(context_id, std::move(command_data), std::move(semaphores))
-          .status();
+  zx_status_t status = client_->ExecuteInlineCommands(context_id, std::move(commands)).status();
   if (status == ZX_OK) {
     UpdateFlowControl();
   }
@@ -622,10 +619,10 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
     return buffer_count;
   }
 
-  magma_status_t ExecuteImmediateCommands(uint32_t context_id, uint64_t num_buffers,
-                                          magma_inline_command_buffer* buffers,
-                                          uint64_t* messages_sent_out) override {
-    DLOG("ZirconPlatformConnectionClient: ExecuteImmediateCommands");
+  magma_status_t ExecuteInlineCommands(uint32_t context_id, uint64_t num_buffers,
+                                       magma_inline_command_buffer* buffers,
+                                       uint64_t* messages_sent_out) override {
+    DLOG("ZirconPlatformConnectionClient: ExecuteInlineCommands");
     uint64_t buffers_sent = 0;
     uint64_t messages_sent = 0;
 
@@ -634,26 +631,30 @@ class ZirconPlatformConnectionClient : public PlatformConnectionClient {
       uint64_t command_bytes = 0;
       uint32_t num_semaphores = 0;
       int buffers_to_send =
-          FitCommands(fuchsia_gpu_magma::wire::kMaxImmediateCommandsDataSize, num_buffers, buffers,
+          FitCommands(fuchsia_gpu_magma::wire::kMaxInlineCommandsDataSize, num_buffers, buffers,
                       buffers_sent, &command_bytes, &num_semaphores);
 
-      // TODO(fxbug.dev/13144): Figure out how to move command and semaphore bytes across the FIDL
-      //               interface without copying.
-      std::vector<uint8_t> command_vec;
-      command_vec.reserve(command_bytes);
-      std::vector<uint64_t> semaphore_vec;
-      semaphore_vec.reserve(num_semaphores);
+      std::vector<fuchsia_gpu_magma::wire::InlineCommand> commands;
+      commands.reserve(buffers_to_send);
 
+      fidl::Arena allocator;
       for (int i = 0; i < buffers_to_send; ++i) {
-        const auto& buffer = buffers[buffers_sent + i];
-        const auto buffer_data = static_cast<uint8_t*>(buffer.data);
-        std::copy(buffer_data, buffer_data + buffer.size, std::back_inserter(command_vec));
-        std::copy(buffer.semaphore_ids, buffer.semaphore_ids + buffer.semaphore_count,
-                  std::back_inserter(semaphore_vec));
+        magma_inline_command_buffer* buffer = &buffers[buffers_sent + i];
+
+        auto data = fidl::VectorView<uint8_t>::FromExternal(
+            reinterpret_cast<uint8_t*>(buffer->data), buffer->size);
+        auto semaphores = fidl::VectorView<uint64_t>::FromExternal(buffer->semaphore_ids,
+                                                                   buffer->semaphore_count);
+
+        auto builder = fuchsia_gpu_magma::wire::InlineCommand::Builder(allocator);
+        builder.data(std::move(data));
+        builder.semaphores(std::move(semaphores));
+        commands.push_back(builder.Build());
       }
-      magma_status_t result = client_.ExecuteImmediateCommands(
-          context_id, fidl::VectorView<uint8_t>::FromExternal(command_vec),
-          fidl::VectorView<uint64_t>::FromExternal(semaphore_vec));
+
+      magma_status_t result = client_.ExecuteInlineCommands(
+          context_id,
+          fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand>::FromExternal(commands));
       if (result != MAGMA_STATUS_OK) {
         return result;
       }

@@ -110,4 +110,33 @@ magma::Status MagmaSystemContext::ExecuteImmediateCommands(uint64_t commands_siz
       result, "ExecuteImmediateCommands: msd_context_execute_immediate_commands failed: %d",
       result);
 }
+
+magma::Status MagmaSystemContext::ExecuteInlineCommands(
+    std::vector<magma_inline_command_buffer> commands) {
+  TRACE_DURATION("magma", "MagmaSystemContext::ExecuteInlineCommands");
+
+  for (auto& command : commands) {
+    std::vector<msd::Semaphore*> msd_semaphores(command.semaphore_count);
+
+    for (uint32_t i = 0; i < command.semaphore_count; i++) {
+      auto semaphore = owner_->LookupSemaphoreForContext(command.semaphore_ids[i]);
+      if (!semaphore)
+        return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "semaphore id not found 0x%" PRIx64,
+                              command.semaphore_ids[i]);
+      msd_semaphores[i] = semaphore->msd_semaphore();
+      // This is used to connect with command submission in
+      // src/ui/scenic/lib/gfx/engine/engine.cc and
+      // src/ui/scenic/lib/flatland/renderer/vk_renderer.cc, so it uses the koid.
+      TRACE_FLOW_END("gfx", "semaphore", semaphore->global_id());
+    }
+
+    magma_status_t result = msd_ctx()->ExecuteInlineCommand(&command, msd_semaphores.data());
+    if (result != MAGMA_STATUS_OK) {
+      return MAGMA_DRET_MSG(result, "ExecuteInlineCommand failed: %d", result);
+    }
+  }
+
+  return MAGMA_STATUS_OK;
+}
+
 }  // namespace msd

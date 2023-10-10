@@ -31,9 +31,8 @@ class PrimaryWrapper : public fidl::WireAsyncEventHandler<fuchsia_gpu_magma::Pri
       ::fidl::VectorView<fuchsia_gpu_magma::wire::CommandBuffer> command_buffers,
       ::fidl::VectorView<uint64_t> wait_semaphores, ::fidl::VectorView<uint64_t> signal_semaphores,
       fuchsia_gpu_magma::wire::CommandBufferFlags flags);
-  magma_status_t ExecuteImmediateCommands(uint32_t context_id,
-                                          ::fidl::VectorView<uint8_t> command_data,
-                                          ::fidl::VectorView<uint64_t> semaphores);
+  magma_status_t ExecuteInlineCommands(
+      uint32_t context_id, ::fidl::VectorView<fuchsia_gpu_magma::wire::InlineCommand> commands);
   magma_status_t MapBuffer(uint64_t buffer_id, uint64_t hw_va, uint64_t offset, uint64_t length,
                            fuchsia_gpu_magma::wire::MapFlags flags);
   magma_status_t UnmapBuffer(uint64_t buffer_id, uint64_t hw_va);

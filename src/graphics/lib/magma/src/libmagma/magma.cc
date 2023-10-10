@@ -288,7 +288,7 @@ magma_status_t magma_connection_execute_immediate_commands(
     magma_inline_command_buffer* command_buffers) {
   uint64_t messages_sent;
   return magma::PlatformConnectionClient::cast(connection)
-      ->ExecuteImmediateCommands(context_id, command_count, command_buffers, &messages_sent);
+      ->ExecuteInlineCommands(context_id, command_count, command_buffers, &messages_sent);
 }
 
 magma_status_t magma_connection_create_semaphore(magma_connection_t connection,

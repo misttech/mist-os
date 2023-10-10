@@ -365,12 +365,13 @@ class TestPlatformConnection {
     shared_data_->test_complete = true;
   }
 
-  void TestExecuteImmediateCommands() {
-    uint8_t commands_buffer[kImmediateCommandSize * kImmediateCommandCount] = {};
+  void TestExecuteInlineCommands() {
     uint64_t semaphore_ids[]{0, 1, 2};
     magma_inline_command_buffer commands[kImmediateCommandCount];
+
     for (size_t i = 0; i < kImmediateCommandCount; i++) {
-      commands[i].data = commands_buffer;
+      commands[i].data = malloc(kImmediateCommandSize);
+      memset(commands[i].data, static_cast<uint8_t>(i), kImmediateCommandSize);
       commands[i].size = kImmediateCommandSize;
       commands[i].semaphore_count = 3;
       commands[i].semaphore_ids = semaphore_ids;
@@ -378,10 +379,14 @@ class TestPlatformConnection {
     FlowControlInit();
 
     uint64_t messages_sent = 0;
-    client_connection_->ExecuteImmediateCommands(shared_data_->test_context_id,
-                                                 kImmediateCommandCount, commands, &messages_sent);
+    client_connection_->ExecuteInlineCommands(shared_data_->test_context_id, kImmediateCommandCount,
+                                              commands, &messages_sent);
     EXPECT_EQ(client_connection_->Flush(), MAGMA_STATUS_OK);
     FlowControlCheck(messages_sent, 0);
+
+    for (size_t i = 0; i < kImmediateCommandCount; i++) {
+      free(commands[i].data);
+    }
   }
 
   void TestMultipleFlush() {
@@ -603,21 +608,28 @@ class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
   magma::Status ExecuteImmediateCommands(uint32_t context_id, uint64_t commands_size,
                                          void* commands, uint64_t semaphore_count,
                                          uint64_t* semaphores) override {
+    return MAGMA_STATUS_UNIMPLEMENTED;
+  }
+
+  magma::Status ExecuteInlineCommands(
+      uint32_t context_id, std::vector<magma_inline_command_buffer_t> commands) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
-    EXPECT_GE(2048u, commands_size);
-    uint8_t received_bytes[2048] = {};
-    EXPECT_EQ(0, memcmp(received_bytes, commands, commands_size));
-    uint64_t command_count = commands_size / kImmediateCommandSize;
-    EXPECT_EQ(3u * command_count, semaphore_count);
-    for (uint32_t i = 0; i < command_count; i++) {
-      EXPECT_EQ(0u, semaphores[0]);
-      EXPECT_EQ(1u, semaphores[1]);
-      EXPECT_EQ(2u, semaphores[2]);
-      semaphores += 3;
+
+    for (auto iter = commands.begin(); iter != commands.end(); iter++) {
+      uint8_t index = static_cast<uint8_t>(immediate_commands_executed_ +
+                                           (std::distance(commands.begin(), iter)));
+      auto& command = *iter;
+      EXPECT_EQ(kImmediateCommandSize, command.size);
+      for (size_t i = 0; i < command.size; i++) {
+        EXPECT_EQ(reinterpret_cast<uint8_t*>(command.data)[i], index);
+      }
+      EXPECT_EQ(3u, command.semaphore_count);
+      EXPECT_EQ(0u, command.semaphore_ids[0]);
+      EXPECT_EQ(1u, command.semaphore_ids[1]);
+      EXPECT_EQ(2u, command.semaphore_ids[2]);
     }
-    immediate_commands_bytes_executed_ += commands_size;
-    shared_data_->test_complete =
-        immediate_commands_bytes_executed_ == kImmediateCommandSize * kImmediateCommandCount;
+    immediate_commands_executed_ += commands.size();
+    shared_data_->test_complete = immediate_commands_executed_ == kImmediateCommandCount;
 
     // Also check thread name
     EXPECT_EQ("ConnectionThread 1", magma::PlatformThreadHelper::GetCurrentThreadName());
@@ -709,7 +721,7 @@ class TestDelegate : public msd::internal::PrimaryFidlServer::Delegate {
     return MAGMA_STATUS_OK;
   }
 
-  uint64_t immediate_commands_bytes_executed_ = 0;
+  uint64_t immediate_commands_executed_ = 0;
   std::shared_ptr<SharedData> shared_data_;
 };
 
@@ -861,10 +873,10 @@ struct CompleterContext {
 };
 }  // namespace
 
-TEST(PlatformConnection, ExecuteImmediateCommands) {
+TEST(PlatformConnection, ExecuteInlineCommands) {
   auto Test = TestPlatformConnection::Create();
   ASSERT_NE(Test, nullptr);
-  Test->TestExecuteImmediateCommands();
+  Test->TestExecuteInlineCommands();
 }
 
 TEST(PlatformConnection, MultipleFlush) {
