@@ -226,6 +226,7 @@ rustc_fuzzer("fuzz_saved_networks_manager_store") {
   deps = [
     ":lib",
     "//src/connectivity/wlan/lib/common/rust/:wlan-common",
+    "//src/connectivity/wlan/lib/stash/:wlan-stash",
     "//src/lib/fuzzing/rust:fuzz",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:futures",

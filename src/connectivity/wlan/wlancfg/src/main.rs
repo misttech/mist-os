@@ -349,7 +349,7 @@ async fn run_all_futures() -> Result<(), Error> {
     let (scan_request_sender, scan_request_receiver) =
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
-    let saved_networks = Arc::new(SavedNetworksManager::new(telemetry_sender.clone()).await?);
+    let saved_networks = Arc::new(SavedNetworksManager::new(telemetry_sender.clone()).await);
     let connection_selector = Arc::new(ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),

@@ -628,8 +628,7 @@ mod tests {
     }
 
     async fn test_setup(use_real_save_network_manager: bool) -> TestValues {
-        let real_saved_network_manager =
-            Arc::new(SavedNetworksManager::new_for_test().await.unwrap());
+        let real_saved_network_manager = Arc::new(SavedNetworksManager::new_for_test().await);
         let saved_network_manager = Arc::new(FakeSavedNetworksManager::new());
         let scan_requester = Arc::new(FakeScanRequester::new());
         let inspector = inspect::Inspector::default();

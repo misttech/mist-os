@@ -1568,9 +1568,7 @@ mod tests {
         let (client_sender, client_receiver) = mpsc::unbounded();
         let (ap_sender, ap_receiver) = mpsc::unbounded();
 
-        let saved_networks = exec
-            .run_singlethreaded(SavedNetworksManager::new_for_test())
-            .expect("failed to create saved networks manager.");
+        let saved_networks = exec.run_singlethreaded(SavedNetworksManager::new_for_test());
         let saved_networks = Arc::new(saved_networks);
         let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("phy_manager");

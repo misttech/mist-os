@@ -128,7 +128,14 @@ impl StashNode {
         let parent_key_len = self.key.len();
         let mut children = HashSet::new();
         loop {
-            let key_list = local.get_next().await?;
+            let key_list = local.get_next().await.map_err(|e| {
+                match e {
+                    fidl::Error::ClientChannelClosed { status, .. } => {
+                        format_err!("Failed to get stash data from closed channel: {}. Any networks saved this boot will probably not be persisted", status)
+                    }
+                    _ => format_err!(e)
+                }
+            })?;
             if key_list.is_empty() {
                 break;
             }

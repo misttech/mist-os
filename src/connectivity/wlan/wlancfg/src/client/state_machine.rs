@@ -1545,10 +1545,8 @@ mod tests {
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
         let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let saved_networks_manager = Arc::new(
-            exec.run_singlethreaded(SavedNetworksManager::new_for_test())
-                .expect("Failed to create saved networks manager"),
-        );
+        let saved_networks_manager =
+            Arc::new(exec.run_singlethreaded(SavedNetworksManager::new_for_test()));
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
@@ -1657,10 +1655,8 @@ mod tests {
         let (sme_proxy, sme_server) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
         let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let saved_networks_manager = Arc::new(
-            exec.run_singlethreaded(SavedNetworksManager::new_for_test())
-                .expect("Failed to create saved networks manager"),
-        );
+        let saved_networks_manager =
+            Arc::new(exec.run_singlethreaded(SavedNetworksManager::new_for_test()));
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
