@@ -226,5 +226,46 @@ TEST_F(RedactorTest, RedactedJsonStillValid) {
   )");
 }
 
+TEST_F(RedactorTest, CachePersistsAcrossTextAndJson) {
+  std::string text = R"(
+IPv4: 1.2.3.4 5.6.7.8
+IPv6: 2001::1 2001::2
+)";
+
+  std::string json = R"(
+{
+  "addresses" : {
+    "ipv4_addrs" : [
+      "5.6.7.8",
+      "1.2.3.4"
+    ],
+    "ipv6_addrs" : [
+      "2001::2",
+      "2001::1"
+    ]
+  }
+}
+  )";
+
+  EXPECT_EQ(Redact(text), R"(
+IPv4: <REDACTED-IPV4: 1> <REDACTED-IPV4: 2>
+IPv6: <REDACTED-IPV6: 3> <REDACTED-IPV6: 4>
+)");
+  EXPECT_EQ(Redact(json), R"(
+{
+  "addresses" : {
+    "ipv4_addrs" : [
+      "<REDACTED-IPV4: 2>",
+      "<REDACTED-IPV4: 1>"
+    ],
+    "ipv6_addrs" : [
+      "<REDACTED-IPV6: 4>",
+      "<REDACTED-IPV6: 3>"
+    ]
+  }
+}
+  )");
+}
+
 }  // namespace
 }  // namespace forensics
