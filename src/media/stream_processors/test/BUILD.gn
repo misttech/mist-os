@@ -541,6 +541,7 @@ fuchsia_test_component("h265-encoder-test") {
 
 fuchsia_test_package("h265-encoder-tests") {
   test_components = [ ":h265-encoder-test" ]
+  subpackages = [ "//src/media/codec:codec_factory_test" ]
   test_specs = {
     environments = [ sherlock_env ]
   }
