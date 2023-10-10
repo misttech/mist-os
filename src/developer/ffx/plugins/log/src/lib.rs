@@ -190,6 +190,7 @@ where
         let connection;
         // Linear backoff up to 10 seconds.
         let mut backoff = 0;
+        let mut last_error = None;
         loop {
             let maybe_connection = connect_to_target(
                 &target_collection_proxy,
@@ -206,7 +207,15 @@ where
             if backoff > 10 {
                 backoff = 10;
             }
-            eprintln!("Error connecting to device, retrying in {} seconds", backoff);
+            let err = format!("{}", anyhow::Error::from(maybe_connection.err().unwrap()));
+            if matches!(&last_error, Some(value) if *value == err) {
+                eprintln!("Error connecting to device, retrying in {backoff} seconds.");
+            } else {
+                eprintln!(
+                    "Error connecting to device, retrying in {backoff} seconds. Error: {err}",
+                );
+                last_error = Some(err);
+            }
             fuchsia_async::Timer::new(std::time::Duration::from_secs(backoff)).await;
         }
         prev_timestamp = Some(connection.boot_timestamp);
