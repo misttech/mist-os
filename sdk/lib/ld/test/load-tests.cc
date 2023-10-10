@@ -96,4 +96,16 @@ TYPED_TEST(LdLoadTests, BasicDep) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("passive-abi-basic"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

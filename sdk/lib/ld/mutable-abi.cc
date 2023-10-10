@@ -10,6 +10,6 @@
 // initialized at runtime.  These are in their own translation unit because the
 // stub ld.so for out-of-process dynamic linking needs only this.
 
-[[gnu::visibility("default")]] __CONSTINIT ld::abi::Abi<> ld::mutable_abi;
+[[gnu::visibility("protected")]] __CONSTINIT ld::abi::Abi<> ld::mutable_abi;
 
-[[gnu::visibility("default")]] __CONSTINIT ld::abi::Abi<>::RDebug ld::mutable_r_debug;
+[[gnu::visibility("protected")]] __CONSTINIT ld::abi::Abi<>::RDebug ld::mutable_r_debug;

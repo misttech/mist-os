@@ -120,9 +120,10 @@ class LoadModule {
   // fbl::AllocChecker that indicates whether `new` succeeded.
   template <typename... NewArgs, bool Inline = InlineModule == LoadModuleInline::kYes,
             typename = std::enable_if_t<!Inline>>
-  constexpr void NewModule(NewArgs&&... new_args) {
+  constexpr void NewModule(const char* name, NewArgs&&... new_args) {
     assert(!module_);
     module_ = new (std::forward<NewArgs>(new_args)...) Module;
+    module_->link_map.name = name;
   }
 
   LoadInfo& load_info() { return load_info_; }

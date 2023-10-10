@@ -23,6 +23,7 @@
 
 #include "allocator.h"
 #include "diagnostics.h"
+#include "mutable-abi.h"
 
 namespace ld {
 
@@ -128,15 +129,13 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     // Now the module's image is in memory!  Allocate the Module object and
     // start filling it in with pointers into the loaded image.
 
-    fbl::AllocChecker ac;
-    this->NewModule(allocator, ac);
-    CheckAlloc(diag, ac, "passive ABI module");
-
     // Though stored as std::string_view, which isn't in general guaranteed to
     // be NUL-terminated, the name always comes from a DT_NEEDED string in
     // another module's DT_STRTAB, or from an empty string literal.  So in fact
     // it is already NUL-terminated and can be used as a C string for link_map.
-    this->module().link_map.name = this->name().c_str();
+    fbl::AllocChecker ac;
+    this->NewModule(this->name().c_str(), allocator, ac);
+    CheckAlloc(diag, ac, "passive ABI module");
 
     // This fills in the vaddr bounds and phdrs fields.  Note that module.phdrs
     // might remain empty if the phdrs aren't in the load image, so keep using
@@ -223,12 +222,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     RelocateModules(diag, modules);
     CheckErrors(diag);
 
-    // TODO(mcgrathr): Populate _ld_abi.
-
-    // TODO(fxbug.dev/130483): In the future we will add these modules to the list, but without
-    // their symbols visible. For now, we just unconditionally put the remaining preloaded_modules
-    // in the list.
-    modules.splice(modules.end(), preloaded_modules);
+    PopulateLdAbi(modules, std::move(preloaded_modules));
 
     CommitModules(diag, std::move(modules));
   }
@@ -252,6 +246,13 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       preloaded_modules.push_back(m);
     }
     return preloaded_modules;
+  }
+
+  void InsertModuleInLinkMap(typename List::iterator it) {
+    auto& ins_link_map = it->module().link_map;
+    auto& this_link_map = module().link_map;
+    ins_link_map.next = &this_link_map;
+    this_link_map.prev = &ins_link_map;
   }
 
   // If `soname` is found in `preloaded_modules` it will be removed from that list and pushed into
@@ -293,21 +294,27 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                        InitialExecAllocator& initial_exec, List& modules, List& preloaded_modules,
                        size_t needed_count, GetDepFile&& get_dep_file,
                        LoaderArgs&&... loader_args) {
-    // Note, this assumes that ModuleList iterators are not invalidated after push_back(). This is
-    // true of lists and StaticVector. No assumptions are made on the validity of the end()
-    // iterator, so it is checked at every iteration.
+    // Note, this assumes that ModuleList iterators are not invalidated after push_back(), done
+    // by `EnqueueDeps`. This is true of lists and StaticVector. No assumptions are made on the
+    // validity of the end() iterator, so it is checked at every iteration.
     for (auto it = modules.begin(); it != modules.end(); it++) {
-      if (!it->IsLoaded()) {
+      const bool was_already_loaded = it->IsLoaded();
+      if (!was_already_loaded) {
         if (auto file = get_dep_file(it->name())) {
           it->Load(diag, initial_exec, *file);
+          assert(it->IsLoaded());
         } else {
           diag.MissingDependency(it->name().str());
         }
-      } else if (it != modules.begin()) {
+      }
+      if (it != modules.begin()) {
+        it->InsertModuleInLinkMap(std::prev(it));
         // Referenced preloaded modules can't have DT_NEEDED.
         // The third case is the main executable, which is already loaded but can;
         // it's always the first module in the list.
-        continue;
+        if (was_already_loaded) {
+          continue;
+        }
       }
       it->EnqueueDeps(diag, scratch, modules, preloaded_modules, needed_count, loader_args...);
     }
@@ -327,6 +334,19 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       std::move(*module).Commit();
       delete module;
     }
+  }
+
+  static void PopulateLdAbi(List& modules, List preloaded_modules) {
+    // TODO: In the future we will add these modules to the list, but without their symbols
+    // visible. For now, we just unconditionally put the remaining preloaded_modules in the
+    // list.
+    auto curr = std::prev(modules.end());
+    modules.splice(modules.end(), preloaded_modules);
+    for (auto next = std::next(curr), end = modules.end(); next != end; curr = next, next++) {
+      next->InsertModuleInLinkMap(curr);
+    }
+
+    ld::mutable_abi.loaded_modules = &modules.begin()->module();
   }
 
   Loader loader_;  // Must be initialized by constructor.

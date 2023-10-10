@@ -20,6 +20,8 @@ executables = [
   ":ld-dep.in-process",
   ":basic-dep",
   ":basic-dep.in-process",
+  ":passive-abi-basic",
+  ":passive-abi-basic.in-process",
 ]
 shlibs = [ ":ld-dep-a" ]
 modules = []
@@ -244,4 +246,10 @@ test_executable("basic-dep") {
   can_be_in_process = true
   sources = [ "basic-dep.cc" ]
   deps = [ ":ld-dep-a" ]
+}
+
+test_executable("passive-abi-basic") {
+  can_be_in_process = true
+  sources = [ "passive-abi-basic.cc" ]
+  deps = [ "../.." ]
 }
