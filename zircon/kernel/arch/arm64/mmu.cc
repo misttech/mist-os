@@ -1038,10 +1038,14 @@ zx_status_t ArmArchVmAspace::ProtectPageTable(vaddr_t vaddr_in, vaddr_t vaddr_re
         return status;
       }
     } else if (is_pte_valid(pte)) {
-      pte = (pte & ~MMU_PTE_PERMISSION_MASK) | attrs;
-      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 "\n", page_table, index, pte);
-      update_pte(&page_table[index], pte);
-      cm.FlushEntry(vaddr, true);
+      const pte_t new_pte = (pte & ~MMU_PTE_PERMISSION_MASK) | attrs;
+      LTRACEF("pte %p[%#" PRIxPTR "] = %#" PRIx64 " was %#" PRIx64 "\n", page_table, index, new_pte,
+              pte);
+      // Skip updating the page table entry if the new value is the same as before.
+      if (new_pte != pte) {
+        update_pte(&page_table[index], new_pte);
+        cm.FlushEntry(vaddr, true);
+      }
     } else {
       LTRACEF("page table entry does not exist, index %#" PRIxPTR ", %#" PRIx64 "\n", index, pte);
     }
