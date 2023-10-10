@@ -3327,7 +3327,7 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError>;
 
@@ -3373,7 +3373,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         body: B,
     ) -> Result<
         (),
@@ -3391,7 +3391,7 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError> {
         datagram::connect(self, ctx, id, remote_ip, (), remote_id)
@@ -3488,7 +3488,7 @@ impl<
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
-        remote_ip: SocketZonedIpAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         body: B,
     ) -> Result<
         (),
@@ -3518,7 +3518,7 @@ pub fn connect<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
-    remote_ip: SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     remote_id: NonZeroU16,
 ) -> Result<(), datagram::ConnectError> {
     let IpInvariant(result) = I::map_ip(
@@ -3607,7 +3607,7 @@ pub fn send_to<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: SocketId<I>,
-    remote_ip: SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     body: B,
 ) -> Result<
     (),
@@ -4674,11 +4674,10 @@ mod tests {
                         sync_ctx,
                         non_sync_ctx,
                         conn,
-                        SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
+                        Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         REMOTE_ID,
                     )
                     .unwrap();
-
                     send(sync_ctx, non_sync_ctx, conn, buf).unwrap();
                 }
                 IcmpSendType::SendTo => {
@@ -4686,7 +4685,7 @@ mod tests {
                         sync_ctx,
                         non_sync_ctx,
                         conn,
-                        SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr)),
+                        Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         buf,
                     )
                     .unwrap();
@@ -5019,7 +5018,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 conn,
-                SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip)),
+                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
                 REMOTE_ID,
             )
             .unwrap();
@@ -5327,7 +5326,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 conn,
-                SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip)),
+                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
                 REMOTE_ID,
             )
             .unwrap();
@@ -5838,9 +5837,9 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 conn,
-                SocketZonedIpAddr::from(ZonedAddr::Unzoned(
+                Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
-                )),
+                ))),
                 REMOTE_ID,
             ),
             Err(datagram::ConnectError::Ip(IpSockCreationError::Route(
@@ -5858,7 +5857,7 @@ mod tests {
             sync_ctx,
             non_sync_ctx,
             conn,
-            SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
         .unwrap();
@@ -5903,7 +5902,7 @@ mod tests {
             sync_ctx,
             non_sync_ctx,
             id,
-            SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip)),
+            Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
         .unwrap();

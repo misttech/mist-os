@@ -24,10 +24,7 @@ use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Peered as _};
 use futures::{future::FusedFuture as _, FutureExt as _, StreamExt as _};
-use net_types::{
-    ip::{IpAddress, IpVersion, Ipv4, Ipv6},
-    ZonedAddr,
-};
+use net_types::ip::{IpAddress, IpVersion, Ipv4, Ipv6};
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     ip::IpExt,
@@ -769,9 +766,7 @@ where
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
-        let ip = ip.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into());
-        connect::<I, _>(sync_ctx, non_sync_ctx, id, SocketAddr { ip, port })
-            .map_err(IntoErrno::into_errno)?;
+        connect::<I, _>(sync_ctx, non_sync_ctx, id, ip, port).map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
             let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, *id, spawner);
             assert_matches::assert_matches!(send_task_abort.replace(sender), None);

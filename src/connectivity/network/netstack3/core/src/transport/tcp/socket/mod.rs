@@ -1079,7 +1079,8 @@ pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
         &mut self,
         ctx: &mut C,
         id: &TcpSocketId<I>,
-        remote: SocketAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        remote_port: NonZeroU16,
     ) -> Result<(), ConnectError>;
 
     fn close(&mut self, ctx: &mut C, id: TcpSocketId<I>);
@@ -1368,7 +1369,8 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         &mut self,
         ctx: &mut C,
         id: &TcpSocketId<I>,
-        SocketAddr { ip: remote_ip, port: remote_port }: SocketAddr<I::Addr, Self::DeviceId>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        remote_port: NonZeroU16,
     ) -> Result<(), ConnectError> {
         self.with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut(
             |ip_transport_ctx, isn, sockets| {
@@ -1439,6 +1441,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
                         MaybeListener::Listener(_) => return Err(ConnectError::Listener),
                     },
                 };
+                let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
                 let (remote_ip, device) =
                     crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
                         remote_ip.into_inner(),
@@ -2500,7 +2503,8 @@ pub fn connect<I, C>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &TcpSocketId<I>,
-    remote: SocketAddr<I::Addr, DeviceId<C>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
+    remote_port: NonZeroU16,
 ) -> Result<(), ConnectError>
 where
     I: IpExt,
@@ -2508,12 +2512,12 @@ where
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
-        (IpInvariant((&mut sync_ctx, ctx)), id, remote),
-        |(IpInvariant((sync_ctx, ctx)), id, remote)| {
-            SocketHandler::connect(sync_ctx, ctx, id, remote)
+        (IpInvariant((&mut sync_ctx, ctx, remote_port)), id, remote_ip),
+        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+            SocketHandler::connect(sync_ctx, ctx, id, remote_ip, remote_port)
         },
-        |(IpInvariant((sync_ctx, ctx)), id, remote)| {
-            SocketHandler::connect(sync_ctx, ctx, id, remote)
+        |(IpInvariant((sync_ctx, ctx, remote_port)), id, remote_ip)| {
+            SocketHandler::connect(sync_ctx, ctx, id, remote_ip, remote_port)
         },
     )
 }
@@ -3451,10 +3455,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                    port: server_port,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                server_port,
             )
             .expect("failed to connect");
             socket
@@ -3510,10 +3512,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &client,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                        port: server_port,
-                    }
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    server_port,
                 ),
                 Ok(())
             );
@@ -3824,7 +3824,8 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &socket,
-                SocketAddr { ip: ZonedAddr::Unzoned(ll_ip).into(), port: PORT_1 },
+                Some(ZonedAddr::Unzoned(ll_ip).into()),
+                PORT_1,
             ),
             Err(ConnectError::Zone(ZonedAddressError::RequiredZoneNotProvided))
         );
@@ -3861,7 +3862,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr { ip: ZonedAddr::Unzoned(server_ip).into(), port: PORT },
+                Some(ZonedAddr::Unzoned(server_ip).into()),
+                PORT,
             )
             .expect("can connect");
             socket
@@ -3883,7 +3885,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &client_connection,
-                    SocketAddr { ip: ZonedAddr::Unzoned(server_ip).into(), port: PORT }
+                    Some(ZonedAddr::Unzoned(server_ip).into()),
+                    PORT
                 ),
                 Ok(())
             );
@@ -3953,10 +3956,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr {
-                    ip: ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap()).into(),
-                    port: PORT,
-                },
+                Some(ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap()).into()),
+                PORT,
             )
             .expect("failed to open a connection");
             socket
@@ -4006,11 +4007,10 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &client_connection,
-                    SocketAddr {
-                        ip: ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap())
-                            .into(),
-                        port: PORT,
-                    }
+                    Some(
+                        ZonedAddr::Zoned(AddrAndZone::new(server_ip, FakeDeviceId).unwrap()).into()
+                    ),
+                    PORT,
                 ),
                 Ok(())
             );
@@ -4038,10 +4038,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &conn,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                    port: PORT_1,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                PORT_1,
             )
             .expect("failed to connect");
             conn
@@ -4090,10 +4088,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &client,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                        port: PORT_1
-                    }
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    PORT_1
                 ),
                 Err(ConnectError::Aborted)
             );
@@ -4226,13 +4222,13 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &socket,
-            SocketAddr {
-                ip: ZonedAddr::Zoned(
+            Some(
+                ZonedAddr::Zoned(
                     AddrAndZone::new(ll_addr.into_specified(), MultipleDevicesId::A).unwrap(),
                 )
                 .into(),
-                port: LOCAL_PORT,
-            },
+            ),
+            LOCAL_PORT,
         )
         .expect("connect should succeed");
 
@@ -4305,8 +4301,14 @@ mod tests {
         )
         .expect("bind should succeed");
 
-        SocketHandler::connect(&mut sync_ctx, &mut non_sync_ctx, &socket, remote)
-            .expect("connect should succeed");
+        SocketHandler::connect(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &socket,
+            Some(remote.ip),
+            remote.port,
+        )
+        .expect("connect should succeed");
 
         assert_eq!(
             SocketHandler::get_info(&mut sync_ctx, &socket),
@@ -4377,10 +4379,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr {
-                    ip: ZonedAddr::Zoned(AddrAndZone::new(server_ip, device).unwrap()).into(),
-                    port: PORT_1,
-                },
+                Some(ZonedAddr::Zoned(AddrAndZone::new(server_ip, device).unwrap()).into()),
+                PORT_1,
             )
             .expect("failed to connect");
             socket
@@ -4454,8 +4454,14 @@ mod tests {
             })
         );
 
-        SocketHandler::connect(&mut sync_ctx, &mut non_sync_ctx, &socket, remote_addr)
-            .expect("connect should succeed");
+        SocketHandler::connect(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &socket,
+            Some(remote_addr.ip),
+            remote_addr.port,
+        )
+        .expect("connect should succeed");
 
         assert_eq!(
             SocketHandler::get_info(&mut sync_ctx, &socket),
@@ -4677,7 +4683,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                PORT_1,
             )
             .expect("connect should succeed");
             socket
@@ -4696,10 +4703,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &remote_connection,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                        port: PORT_1
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                    PORT_1
                 ),
                 Ok(())
             );
@@ -4713,7 +4718,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                PORT_1,
             )
             .expect("connect should succeed");
             socket
@@ -4790,10 +4796,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &socket,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                        port: PORT_1,
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                    PORT_1,
                 )
                 .expect("connect should succeed");
                 socket
@@ -4812,7 +4816,7 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &new_remote_connection,
-                    SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 },
+Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()), PORT_1 ,
                 ),
                 Ok(())
             );
@@ -4874,7 +4878,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &remote_connection,
-                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                PORT_1,
             )
             .expect("connect should succeed");
             remote_connection
@@ -5151,7 +5156,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &client,
-                SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(), port: PORT_1 },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                PORT_1,
             )
             .expect("connect should succeed");
             client
@@ -5164,10 +5170,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &client,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                        port: PORT_1
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                    PORT_1
                 ),
                 Ok(())
             );
@@ -5317,7 +5321,8 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &bound,
-            SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(), port: PORT_1 },
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+            PORT_1,
         )
         .expect("can connect");
         SocketHandler::set_reuseaddr(&mut sync_ctx, &listener, false).expect("can unset")
@@ -5396,7 +5401,8 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &connection,
-            SocketAddr { ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(), port: PORT_1 },
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+            PORT_1,
         )
         .expect("failed to create a connection socket");
         let frames = sync_ctx.inner.take_frames();
@@ -5415,10 +5421,8 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &connection,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                    port: PORT_1
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                PORT_1
             ),
             Err(ConnectError::Aborted)
         );
@@ -5529,10 +5533,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &conn,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                    port: PORT_1,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                PORT_1,
             )
             .expect("failed to connect");
         });
@@ -5612,10 +5614,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &extra_conn,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                    port: CLIENT_PORT,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                CLIENT_PORT,
             )
             .expect("failed to connect");
             extra_conn
@@ -5628,10 +5628,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &extra_conn,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                        port: CLIENT_PORT
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                    CLIENT_PORT,
                 ),
                 Ok(())
             );
@@ -5666,10 +5664,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &conn,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                    port: CLIENT_PORT,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                CLIENT_PORT,
             )
             .expect("failed to connect");
             conn
@@ -5707,10 +5703,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                SocketAddr {
-                    ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                    port: CLIENT_PORT,
-                },
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                CLIENT_PORT,
             )
             .expect("failed to connect");
             socket
@@ -5739,10 +5733,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &conn,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into(),
-                        port: CLIENT_PORT
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.local_ip).into()),
+                    CLIENT_PORT
                 ),
                 Ok(())
             );
@@ -5776,10 +5768,8 @@ mod tests {
                     sync_ctx,
                     non_sync_ctx,
                     &socket,
-                    SocketAddr {
-                        ip: ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                        port: PORT_1
-                    },
+                    Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                    PORT_1
                 ),
                 Err(ConnectError::ConnectionExists),
             )

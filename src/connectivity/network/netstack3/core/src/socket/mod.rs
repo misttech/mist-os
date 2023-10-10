@@ -16,7 +16,7 @@ use dense_map::{collection::DenseMapCollectionKey, EntryKey};
 use derivative::Derivative;
 use net_types::{
     ip::{Ip, IpAddress},
-    AddrAndZone, SpecifiedAddr, Witness as _,
+    AddrAndZone, SpecifiedAddr, Witness as _, ZonedAddr,
 };
 
 use crate::{
@@ -25,7 +25,9 @@ use crate::{
     },
     device,
     error::{ExistsError, NotFoundError},
-    socket::address::{AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr},
+    socket::address::{
+        AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketZonedIpAddr,
+    },
 };
 
 /// Describes which direction(s) of the data path should be shut down.
@@ -86,6 +88,17 @@ pub(crate) fn try_into_null_zoned<A: IpAddress>(
         return None;
     }
     AddrAndZone::new(*addr, ())
+}
+
+/// Provides a specified IP address to use in-place of an unspecified remote.
+///
+/// Concretely, this method is called during `connect()` and `send_to()` socket
+/// operations to transform an unspecified remote IP address to the loopback
+/// address. This ensures conformance with Linux and BSD.
+pub(crate) fn specify_unspecified_remote<I: Ip, Z>(
+    addr: Option<SocketZonedIpAddr<I::Addr, Z>>,
+) -> SocketZonedIpAddr<I::Addr, Z> {
+    addr.unwrap_or_else(|| ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into())
 }
 
 /// Specification for the identifiers in an [`AddrVec`].

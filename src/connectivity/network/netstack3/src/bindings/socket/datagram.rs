@@ -232,7 +232,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
-        remote_ip: SocketZonedIpAddr<I::Addr, DeviceId<C>>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError>;
 
@@ -357,7 +357,7 @@ pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
-        remote: (SocketZonedIpAddr<I::Addr, DeviceId<C>>, Self::RemoteIdentifier),
+        remote: (Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>, Self::RemoteIdentifier),
         body: B,
     ) -> Result<(), Self::SendToError>;
 }
@@ -396,7 +396,7 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
-        remote_ip: SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>,
+        remote_ip: Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
         remote_id: Self::RemoteIdentifier,
     ) -> Result<(), Self::ConnectError> {
         udp::connect(sync_ctx, ctx, id, remote_ip, remote_id)
@@ -573,7 +573,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
         ctx: &mut C,
         id: &Self::SocketId,
         (remote_ip, remote_port): (
-            SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>,
+            Option<SocketZonedIpAddr<<I as Ip>::Addr, DeviceId<C>>>,
             Self::RemoteIdentifier,
         ),
         body: B,
@@ -1355,9 +1355,6 @@ where
             sockaddr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let remote_port =
             T::RemoteIdentifier::from_u16(remote_port).ok_or(fposix::Errno::Econnrefused)?;
-        // Emulate Linux, which was emulating BSD, by treating the unspecified
-        // remote address as localhost.
-        let remote_addr = remote_addr.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into());
 
         T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
             .map_err(IntoErrno::into_errno)?;
@@ -1595,12 +1592,7 @@ where
                 let (remote_addr, port) =
                     TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, remote_addr)
                         .map_err(IntoErrno::into_errno)?;
-                // Emulate Linux, which was emulating BSD, by treating the
-                // unspecified remote address as localhost.
-                Ok((
-                    remote_addr.unwrap_or(ZonedAddr::Unzoned(I::LOOPBACK_ADDRESS).into()),
-                    T::RemoteIdentifier::from_u16(port).ok_or(fposix::Errno::Einval)?,
-                ))
+                Ok((remote_addr, T::RemoteIdentifier::from_u16(port).ok_or(fposix::Errno::Einval)?))
             })
             .transpose()?;
         let len = data.len() as i64;

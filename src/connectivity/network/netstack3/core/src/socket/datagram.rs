@@ -2363,7 +2363,7 @@ pub(crate) fn connect<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     extra: S::ConnStateExtra,
 ) -> Result<(), ConnectError>
@@ -2472,6 +2472,7 @@ where
                 }
             },
         };
+        let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
         let (remote_ip, socket_device) =
             crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
                 remote_ip.into_inner(),
@@ -2919,7 +2920,7 @@ pub(crate) fn send_to<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>>
@@ -2995,6 +2996,8 @@ where
                 ((local_ip, local_port), device, ip_options)
             }
         };
+
+        let remote_ip = crate::socket::specify_unspecified_remote::<I, _>(remote_ip);
 
         // TODO(https://fxbug.dev/21198): For now, short circuit when asked to
         // send to a mapped remote address, which prevents panics further in the
@@ -4311,7 +4314,7 @@ mod test {
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
-            ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
+            Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
             'a',
             body,
         )
@@ -4345,7 +4348,7 @@ mod test {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
-                ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
+                Some(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
                 'a',
                 body,
             ),

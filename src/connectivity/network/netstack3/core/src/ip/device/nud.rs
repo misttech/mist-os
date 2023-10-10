@@ -4924,10 +4924,8 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &socket,
-                tcp::socket::SocketAddr {
-                    ip: net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into(),
-                    port: REMOTE_PORT,
-                },
+                Some(net_types::ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip).into()),
+                REMOTE_PORT,
             )
             .unwrap();
             socket
