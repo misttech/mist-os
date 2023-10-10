@@ -282,6 +282,10 @@ impl ImageAssemblyConfigBuilder {
             }
         }
 
+        self.kernel_args
+            .try_insert_all_unique(bundle.kernel_boot_args)
+            .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
+
         Ok(())
     }
 

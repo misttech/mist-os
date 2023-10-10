@@ -49,6 +49,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    like:
 #      "no dependency provides the input <package_name>/package_manifest.json"
 #
+#  kernel_cmdline (optional: default: [])
+#    [list of strings] Kernel cmdline arguments.
+#
 #  Outputs
 #    A directory structure and manifest
 #
@@ -217,6 +220,16 @@ template("board_input_bundle") {
     }
   }
 
+  # Add any kernel boot arguments that the input bundle needs to pass to
+  # configure the drivers being used.
+  if (defined(invoker.kernel_cmdline)) {
+    foreach(kernel_arg, invoker.kernel_cmdline) {
+      creation_args += [
+        "--kernel-boot-args",
+        kernel_arg,
+      ]
+    }
+  }
   ffx_action(target_name) {
     forward_variables_from(invoker,
                            [

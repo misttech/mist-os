@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::BTreeSet;
+
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
@@ -59,6 +61,10 @@ pub struct BoardInputBundle {
     /// These are the packages to include with this bundle.
     #[file_relative_paths]
     pub packages: Vec<PackageDetails>,
+
+    /// These are kernel boot arguments that are to be passed to the kernel when
+    /// this bundle is included in the assembled system.
+    pub kernel_boot_args: BTreeSet<String>,
 }
 
 #[cfg(test)]

@@ -14,7 +14,14 @@ use ffx_assembly_args::BoardInputBundleArgs;
 use serde::{Deserialize, Serialize};
 
 pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
-    let BoardInputBundleArgs { outdir, depfile, drivers, base_packages, bootfs_packages } = args;
+    let BoardInputBundleArgs {
+        outdir,
+        depfile,
+        drivers,
+        base_packages,
+        bootfs_packages,
+        kernel_boot_args,
+    } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
 
     //========
@@ -98,12 +105,14 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     //========
     // Create the BoardInputBundle struct
 
-    let bundle = BoardInputBundle { drivers, packages }
-        // And convert all paths to be file-relative.
-        .make_paths_relative_to_file(&bundle_file_path)
-        .with_context(|| {
-            format!("Making board input bundle paths relative to: {bundle_file_path}")
-        })?;
+    let bundle = BoardInputBundle {
+        drivers,
+        packages,
+        kernel_boot_args: kernel_boot_args.into_iter().collect(),
+    }
+    // And convert all paths to be file-relative.
+    .make_paths_relative_to_file(&bundle_file_path)
+    .with_context(|| format!("Making board input bundle paths relative to: {bundle_file_path}"))?;
 
     let bundle_file = std::fs::File::create(&bundle_file_path)
         .with_context(|| format!("Failed to create bundle manifest file: {bundle_file_path}"))?;

@@ -70,6 +70,18 @@
       "short": null,
       "description": "the paths to package manifests for all packages to add to the bootfs package set.",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "kernel-boot-args"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--kernel-boot-args",
+      "short": null,
+      "description": "arguments to pass to the kernel on boot",
+      "hidden": false
     }
   ],
   "notes": [],

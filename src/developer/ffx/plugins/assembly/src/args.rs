@@ -369,4 +369,8 @@ pub struct BoardInputBundleArgs {
     /// package set.
     #[argh(option)]
     pub bootfs_packages: Vec<Utf8PathBuf>,
+
+    /// arguments to pass to the kernel on boot
+    #[argh(option)]
+    pub kernel_boot_args: Vec<String>,
 }
