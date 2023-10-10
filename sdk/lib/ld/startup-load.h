@@ -137,6 +137,10 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     this->NewModule(this->name().c_str(), allocator, ac);
     CheckAlloc(diag, ac, "passive ABI module");
 
+    // All modules allocated by StartupModule are part of the initial exec set
+    // and their symbols are inherently visible.
+    this->module().symbols_visible = true;
+
     // This fills in the vaddr bounds and phdrs fields.  Note that module.phdrs
     // might remain empty if the phdrs aren't in the load image, so keep using
     // the stack copy read from the file instead.
@@ -211,6 +215,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
                           GetDepFile&& get_dep_file,
                           std::initializer_list<BootstrapModule> preloaded_module_list,
                           size_t executable_needed_count, LoaderArgs&&... loader_args) {
+    main_executable->module().symbols_visible = true;
+
     List modules = main_executable->MakeList();
     List preloaded_modules =
         MakePreloadedList(diag, scratch, preloaded_module_list, loader_args...);
@@ -248,7 +254,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     return preloaded_modules;
   }
 
-  void InsertModuleInLinkMap(typename List::iterator it) {
+  void AddToPassiveAbi(typename List::iterator it, bool symbols_visible) {
+    module().symbols_visible = symbols_visible;
     auto& ins_link_map = it->module().link_map;
     auto& this_link_map = module().link_map;
     ins_link_map.next = &this_link_map;
@@ -307,11 +314,11 @@ struct StartupLoadModule : public StartupLoadModuleBase,
           diag.MissingDependency(it->name().str());
         }
       }
+      // The main executable is always first in the list, it is already added to the passive abi.
       if (it != modules.begin()) {
-        it->InsertModuleInLinkMap(std::prev(it));
-        // Referenced preloaded modules can't have DT_NEEDED.
-        // The third case is the main executable, which is already loaded but can;
-        // it's always the first module in the list.
+        it->AddToPassiveAbi(std::prev(it), true);
+        // Referenced preloaded modules can't have DT_NEEDED, do don't bother enqueuing their
+        // deps.
         if (was_already_loaded) {
           continue;
         }
@@ -337,13 +344,18 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   static void PopulateLdAbi(List& modules, List preloaded_modules) {
-    // TODO: In the future we will add these modules to the list, but without their symbols
-    // visible. For now, we just unconditionally put the remaining preloaded_modules in the
-    // list.
+    // We want to add the remaining modules to the list. Their symbols aren't visible for symbolic
+    // resolution, but the program can still use their functions even with no relocations resolving
+    // to their symbols. Therefore, we need to add these modules to the global module list so they
+    // can still be seen by dl_iterate_phdr for unwinding purposes. For example, TLSDESC
+    // implementation code lives in the dynamic linker and will be called as part of the TLS
+    // implementation without ever having a DT_NEEDED on ld.so. On systems other than Fuchsia it may
+    // also be possible to get code from the vDSO without an explicit DT_NEEDED, which is common on
+    // Linux.
     auto curr = std::prev(modules.end());
     modules.splice(modules.end(), preloaded_modules);
     for (auto next = std::next(curr), end = modules.end(); next != end; curr = next, next++) {
-      next->InsertModuleInLinkMap(curr);
+      next->AddToPassiveAbi(curr, false);
     }
 
     ld::mutable_abi.loaded_modules = &modules.begin()->module();

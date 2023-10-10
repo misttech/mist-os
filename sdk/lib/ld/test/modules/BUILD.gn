@@ -22,6 +22,8 @@ executables = [
   ":basic-dep.in-process",
   ":passive-abi-basic",
   ":passive-abi-basic.in-process",
+  ":symbolic-namespace",
+  ":symbolic-namespace.in-process",
 ]
 shlibs = [ ":ld-dep-a" ]
 modules = []
@@ -252,4 +254,13 @@ test_executable("passive-abi-basic") {
   can_be_in_process = true
   sources = [ "passive-abi-basic.cc" ]
   deps = [ "../.." ]
+}
+
+test_executable("symbolic-namespace") {
+  can_be_in_process = true
+  sources = [ "symbolic-namespace.cc" ]
+  deps = [
+    ":ld-dep-a",
+    "../..",
+  ]
 }

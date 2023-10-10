@@ -108,4 +108,18 @@ TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, SymbolicNamespace) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("symbolic-namespace"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

@@ -111,7 +111,10 @@ struct Abi<Elf, AbiTraits>::Module {
 
   // TODO(fxbug.dev/128502): TLS module ID
 
-  Word padding_ = 0;
+  // This is true if the module participates in symbolic resolution. If false,
+  // the module will still be part of the unwinding domain, and therefore will
+  // still be visible to dl_iterate_phdr.
+  bool symbols_visible = false;
 
   // Each and every module gets a "module ID" number that's used in symbolizer
   // markup contextual elements describing the module.  These are expected to
