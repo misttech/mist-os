@@ -4,7 +4,7 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
-load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 load("//fuchsia/private:package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 
@@ -123,8 +123,8 @@ def _fuchsia_prebuilt_package_impl(ctx):
         FuchsiaPackageInfo(
             package_manifest = rebased_package_manifest_json,
             far_file = ctx.files.archive,
-            components = ctx.attr.components,
-            drivers = ctx.attr.drivers,
+            packaged_components = [FuchsiaPackagedComponentInfo(dest = d, component_info = FuchsiaComponentInfo(is_driver = True, is_test = False)) for d in ctx.attr.drivers] +
+                                  [FuchsiaPackagedComponentInfo(dest = c, component_info = FuchsiaComponentInfo(is_driver = False, is_test = False)) for c in ctx.attr.components],
             files = output_files,
         ),
     ]

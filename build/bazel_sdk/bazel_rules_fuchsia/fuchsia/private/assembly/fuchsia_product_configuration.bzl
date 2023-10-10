@@ -10,6 +10,7 @@ load(
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 
 # Define build types
 BUILD_TYPES = struct(
@@ -73,7 +74,7 @@ def _fuchsia_product_configuration_impl(ctx):
         base_driver_details.append(
             {
                 "package": dep[FuchsiaPackageInfo].package_manifest.path,
-                "components": dep[FuchsiaPackageInfo].drivers,
+                "components": get_driver_component_manifests(dep),
             },
         )
         pkg_files += _collect_file_deps(dep)

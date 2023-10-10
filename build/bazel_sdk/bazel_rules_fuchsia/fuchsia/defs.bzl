@@ -66,6 +66,8 @@ load(
     _fuchsia_package = "fuchsia_package",
     _fuchsia_test_package = "fuchsia_test_package",
     _fuchsia_unittest_package = "fuchsia_unittest_package",
+    _get_component_manifests = "get_component_manifests",
+    _get_driver_component_manifests = "get_driver_component_manifests",
 )
 load(
     "//fuchsia/private:fuchsia_rust.bzl",
@@ -152,6 +154,8 @@ fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 fuchsia_select = _fuchsia_select
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict
+get_component_manifests = _get_component_manifests
+get_driver_component_manifests = _get_driver_component_manifests
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info

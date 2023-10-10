@@ -20,6 +20,22 @@ load(
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
+def get_driver_component_manifests(package):
+    """ Returns a list of the manifest paths for drivers in the package
+
+    Args:
+        - package: the package to parse
+    """
+    return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components if entry.component_info.is_driver]
+
+def get_component_manifests(package):
+    """ Returns a list of the manifest paths for all components in the package
+
+    Args:
+        - package: the package to parse
+    """
+    return [entry.dest for entry in package[FuchsiaPackageInfo].packaged_components]
+
 def fuchsia_package(
         *,
         name,
@@ -351,10 +367,6 @@ def _build_fuchsia_package_impl(ctx):
         else:
             collected_blobs[resource.dest] = resource.src.path
 
-    # TODO: Remove usages of components and drivers in favor of the packaged_components
-    components = [c.dest for c in packaged_components]
-    drivers = [c.dest for c in packaged_components if c.component_info.is_driver]
-
     return [
         DefaultInfo(files = depset(output_files), executable = stub_executable(ctx)),
         FuchsiaPackageInfo(
@@ -362,8 +374,6 @@ def _build_fuchsia_package_impl(ctx):
             package_manifest = output_package_manifest,
             files = [output_package_manifest, meta_far] + build_inputs,
             package_name = ctx.attr.package_name,
-            components = components,
-            drivers = drivers,
             meta_far = meta_far,
             package_resources = package_resources,
             packaged_components = packaged_components,

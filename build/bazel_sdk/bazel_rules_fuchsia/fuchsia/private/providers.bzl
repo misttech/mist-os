@@ -35,7 +35,7 @@ FuchsiaComponentInfo = provider(
 FuchsiaPackagedComponentInfo = provider(
     "Contains information about a fuchsia component that has been included in a package",
     fields = {
-        "component_info": "The original FuchsiaComponentInfo provider",
+        "component_info": "The original FuchsiaComponentInfo provider if this is built locally. Otherwise it will be empty",
         "dest": "The install location for this component in a package (meta/foo.cm)",
     },
 )
@@ -127,8 +127,6 @@ FuchsiaPackageInfo = provider(
         "meta_far": "The meta.far file",
         "files": "all files that compose this package, including the manifest and meta.far",
         "build_id_dir": "Directory containing the debug symbols",
-        "components": "(deprecated: use packaged_components instead) A list of all of the component manifest strings inclusive of driver components.",
-        "drivers": "(deprecated: use packaged_components instead) A list of driver manifest strings.",
         "packaged_components": "A list of all the components in the form of FuchsiaPackagedComponentInfo structs",
         "package_resources": "A list of resources added to this package",
     },
