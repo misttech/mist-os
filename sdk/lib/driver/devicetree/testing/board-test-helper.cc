@@ -13,6 +13,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/fit/defer.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/vfs/cpp/service.h>
@@ -154,6 +155,13 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items>,
 };
 
 }  // namespace
+
+BoardTestHelper::~BoardTestHelper() {
+  libsync::Completion teardown_complete;
+  realm_->Teardown(
+      [&](fit::result<fuchsia::component::Error> result) { teardown_complete.Signal(); });
+  teardown_complete.Wait();
+}
 
 void BoardTestHelper::SetupRealm() {
   auto realm_builder = component_testing::RealmBuilder::Create();

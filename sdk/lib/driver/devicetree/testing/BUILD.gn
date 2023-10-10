@@ -12,6 +12,7 @@ source_set("testing") {
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp:cpp-macros",
     "//sdk/lib/vfs/cpp",
+    "//zircon/system/ulib/sync:sync-cpp",
   ]
 
   public_deps = [

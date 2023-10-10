@@ -30,6 +30,8 @@ class BoardTestHelper {
                            async_dispatcher_t* dispatcher)
       : dtb_path_(std::move(dtb_path)), platform_id_(platform_id), dispatcher_(dispatcher) {}
 
+  ~BoardTestHelper();
+
   // Setup fuchsia_boot mock and driver test realm.
   void SetupRealm();
 
