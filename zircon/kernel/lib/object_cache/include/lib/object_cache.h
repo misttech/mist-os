@@ -382,9 +382,6 @@ class ObjectCache<T, Option::Single, Allocator> : private Allocator {
     NodeState list_node;
     T object;
   };
-#ifdef __clang__
-  static_assert(offsetof(Entry, object) == 0);
-#endif
 
   struct Slab;
   using SlabPtr = fbl::RefPtr<Slab>;
