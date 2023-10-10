@@ -81,7 +81,7 @@
 #define RISCV64_EXCEPTION_STORE_PAGE_FAULT 15
 
 // Byte offsets corresponding to the fields of riscv64_context_switch_frame.
-#define REGOFF(x) ((x)*8)
+#define REGOFF(x) ((x) * 8)
 #define CONTEXT_SWITCH_FRAME_OFFSET_RA REGOFF(0)
 #define CONTEXT_SWITCH_FRAME_OFFSET_TP REGOFF(1)
 #define CONTEXT_SWITCH_FRAME_OFFSET_GP REGOFF(2)
@@ -184,6 +184,8 @@ extern void riscv64_software_exception();
 void platform_irq(iframe_t* frame);
 
 void riscv64_init_percpu();
+
+#define __wfi() __asm__ volatile("wfi" ::: "memory")
 
 #endif  // __ASSEMBLER__
 

@@ -86,6 +86,6 @@ void arch_late_init_percpu() {
 
 __NO_RETURN int arch_idle_thread_routine(void*) {
   for (;;) {
-    __asm__ volatile("wfi");
+    __wfi();
   }
 }

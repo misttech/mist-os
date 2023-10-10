@@ -82,7 +82,7 @@ void riscv64_software_exception() {
     arch_disable_ints();
     mb();
     while (true) {
-      __asm__("wfi" ::: "memory");
+      __wfi();
     }
 
     reason &= ~(1u << MP_IPI_HALT);
