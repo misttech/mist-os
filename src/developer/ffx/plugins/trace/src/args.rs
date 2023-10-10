@@ -12,8 +12,9 @@ use fidl_fuchsia_tracing::BufferingMode;
 #[argh(
     subcommand,
     name = "trace",
-    description = "Tracing is a tool that allows you to collect, aggregate, and visualize diagnostic
-tracing information from both userspace processes and the Zircon kernel on a Fuchsia device.",
+    description = "Tracing is a tool that allows you to collect, aggregate, and visualize \
+diagnostic tracing information from both userspace processes and the Zircon kernel on a \
+Fuchsia device.",
     example = "
 
 [Quick Start]:
