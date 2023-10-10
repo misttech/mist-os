@@ -795,6 +795,10 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
     } else {
       type = CloneType::Snapshot;
     }
+  } else if (type == CloneType::SnapshotModified) {
+    if (!can_snapshot_modified_locked()) {
+      type = CloneType::Snapshot;
+    }
   }
 
   // All validation *must* be performed here prior to construction the VmCowPages, as the

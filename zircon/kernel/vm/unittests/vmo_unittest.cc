@@ -4140,6 +4140,36 @@ static bool vmo_snapshot_modified_test() {
   ASSERT_EQ(ZX_ERR_NOT_SUPPORTED, status, "snapshot-modified clone-slice\n");
   ASSERT_NULL(cloneslicesnapshot, "snapshot-modified clone-slice\n");
 
+  // Tests that SnapshotModified will be upgraded to Snapshot when used on an anonymous VMO.
+  fbl::RefPtr<VmObjectPaged> anon_vmo;
+  status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, alloc_size,
+                                 AttributionObject::GetKernelAttribution(), &anon_vmo);
+  ASSERT_EQ(ZX_OK, status);
+  anon_vmo->set_user_id(0x49);
+
+  fbl::RefPtr<VmObject> anon_clone;
+  status =
+      anon_vmo->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+                            true, AttributionObject::GetKernelAttribution(), &anon_clone);
+  ASSERT_OK(status);
+  anon_clone->set_user_id(0x50);
+
+  // Check that a hidden, common cow pages was made.
+  auto anon_clone_p = static_cast<VmObjectPaged*>(anon_clone.get());
+  auto anon_vmo_cow_pages = anon_vmo->DebugGetCowPages();
+  auto anon_clone_cow_pages = anon_clone_p->DebugGetCowPages();
+
+  ASSERT_EQ(anon_clone_cow_pages->DebugGetParent().get(),
+            anon_vmo_cow_pages->DebugGetParent().get());
+
+  // Snapshot-modified should also be upgraded when used on a SNAPSHOT clone.
+  fbl::RefPtr<VmObject> anon_snapshot;
+  status =
+      anon_clone->CreateClone(Resizability::NonResizable, CloneType::SnapshotModified, 0, PAGE_SIZE,
+                              true, AttributionObject::GetKernelAttribution(), &anon_snapshot);
+  ASSERT_OK(status);
+  anon_snapshot->set_user_id(0x51);
+
   END_TEST;
 }
 
