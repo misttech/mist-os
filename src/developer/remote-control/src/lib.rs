@@ -485,14 +485,14 @@ async fn connect_to_capability_at_moniker(
         })
         .await?;
 
-    let exposed_dir = open_instance_dir_root_readable(&moniker, capability_set.into(), &query)
+    let dir = open_instance_dir_root_readable(&moniker, capability_set.into(), &query)
         .map_err(|err| {
             error!(?err, "error opening exposed dir");
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         })
         .await?;
 
-    connect_to_capability_in_dir(&exposed_dir, &capability_name, server_end, flags).await?;
+    connect_to_capability_in_dir(&dir, &capability_name, server_end, flags).await?;
     Ok(())
 }
 
@@ -502,14 +502,7 @@ async fn connect_to_capability_in_dir(
     server_end: zx::Channel,
     flags: io::OpenFlags,
 ) -> Result<(), rcs::ConnectCapabilityError> {
-    // Check if capability exists in exposed dir.
-    let entries = fuchsia_fs::directory::readdir(dir)
-        .await
-        .map_err(|_| rcs::ConnectCapabilityError::CapabilityConnectFailed)?;
-    let is_capability_exposed = entries.iter().any(|e| &e.name == &capability_name);
-    if !is_capability_exposed {
-        return Err(rcs::ConnectCapabilityError::NoMatchingCapabilities);
-    }
+    check_entry_exists(dir, capability_name).await?;
 
     // Connect to the capability
     dir.open(flags, io::ModeType::empty(), capability_name, ServerEnd::new(server_end)).map_err(
@@ -518,6 +511,24 @@ async fn connect_to_capability_in_dir(
             rcs::ConnectCapabilityError::CapabilityConnectFailed
         },
     )
+}
+
+// Checks that the given directory contains an entry with the given name.
+async fn check_entry_exists(
+    dir: &io::DirectoryProxy,
+    capability_name: &str,
+) -> Result<(), rcs::ConnectCapabilityError> {
+    let mut entries = fuchsia_fs::directory::readdir_recursive(dir, None);
+    while let Some(entry) = entries
+        .try_next()
+        .await
+        .map_err(|_err| rcs::ConnectCapabilityError::CapabilityConnectFailed)?
+    {
+        if entry.name == capability_name {
+            return Ok(());
+        }
+    }
+    Err(rcs::ConnectCapabilityError::NoMatchingCapabilities)
 }
 
 #[derive(Debug)]
@@ -834,6 +845,7 @@ mod tests {
     fn setup_exposed_dir(server: ServerEnd<fio::DirectoryMarker>) {
         let mut fs = ServiceFs::new();
         fs.add_fidl_service(move |_: hwinfo::BoardRequestStream| {});
+        fs.dir("svc").add_fidl_service(move |_: hwinfo::BoardRequestStream| {});
         fs.serve_connection(server).unwrap();
         fasync::Task::spawn(fs.collect::<()>()).detach();
     }
@@ -884,6 +896,31 @@ mod tests {
                 Moniker::try_from("./core/my_component").unwrap(),
                 dir_type,
                 "fuchsia.hwinfo.Board".to_string(),
+                server,
+                io::OpenFlags::RIGHT_READABLE,
+                lifecycle,
+                query,
+            )
+            .await
+            .unwrap();
+        }
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_to_component_capability_in_subdirectory() -> Result<()> {
+        for dir_type in vec![
+            fsys::OpenDirType::ExposedDir,
+            fsys::OpenDirType::NamespaceDir,
+            fsys::OpenDirType::OutgoingDir,
+        ] {
+            let (_client, server) = zx::Channel::create();
+            let lifecycle = setup_fake_lifecycle_controller();
+            let query = setup_fake_realm_query(dir_type);
+            connect_to_capability_at_moniker(
+                Moniker::try_from("./core/my_component").unwrap(),
+                dir_type,
+                "svc/fuchsia.hwinfo.Board".to_string(),
                 server,
                 io::OpenFlags::RIGHT_READABLE,
                 lifecycle,

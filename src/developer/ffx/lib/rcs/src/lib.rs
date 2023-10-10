@@ -21,6 +21,8 @@ use timeout::{timeout, TimeoutError};
 pub use fidl_fuchsia_io::OpenFlags;
 pub use fidl_fuchsia_sys2::OpenDirType;
 
+pub mod toolbox;
+
 #[derive(Debug, Clone)]
 pub struct RcsConnection {
     pub node: Arc<overnet_core::Router>,
