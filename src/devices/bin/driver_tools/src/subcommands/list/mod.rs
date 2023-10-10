@@ -11,7 +11,12 @@ use {
     fidl_fuchsia_driver_development as fdd,
     fuchsia_driver_dev::{self, Device},
     futures::join,
-    std::{collections::HashSet, fmt::Write as OtherWrite, io::Write, iter::FromIterator},
+    std::{
+        collections::{HashMap, HashSet},
+        fmt::Write as OtherWrite,
+        io::Write,
+        iter::FromIterator,
+    },
 };
 
 pub async fn list(
@@ -73,15 +78,49 @@ pub async fn list(
     };
 
     if cmd.verbose {
+        // Query devices and create a map of drivers to devices.
+        let device_info = fuchsia_driver_dev::get_device_info(
+            &driver_development_proxy,
+            &empty,
+            /* exact_match= */ false,
+        )
+        .await?;
+
+        let mut driver_to_devices = HashMap::<String, Vec<String>>::new();
+        for device in device_info.into_iter() {
+            let device: Device = device.into();
+            let (driver, device_name) = match device {
+                Device::V1(ref info) => (&info.0.bound_driver_libname, &info.0.topological_path),
+                Device::V2(ref info) => {
+                    // DFv2 nodes do not have a bound driver libname so the
+                    // bound driver URL is selected instead.
+                    (&info.0.bound_driver_url, &info.0.moniker)
+                }
+            };
+            if let (Some(driver), Some(device_name)) = (driver, device_name) {
+                driver_to_devices
+                    .entry(driver.to_string())
+                    .and_modify(|v| v.push(device_name.to_string()))
+                    .or_insert(vec![device_name.to_string()]);
+            }
+        }
+        let driver_to_devices = driver_to_devices;
+
         for driver in driver_info {
             if let Some(name) = driver.name {
                 writeln!(writer, "{0: <10}: {1}", "Name", name)?;
             }
             if let Some(url) = driver.url {
                 writeln!(writer, "{0: <10}: {1}", "URL", url)?;
+                if let Some(devices) = driver_to_devices.get(&url) {
+                    writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
+                }
             }
             if let Some(libname) = driver.libname {
                 writeln!(writer, "{0: <10}: {1}", "Driver", libname)?;
+                if let Some(devices) = driver_to_devices.get(&libname) {
+                    writeln!(writer, "{0: <10}:\n  {1}", "Devices", devices.join("\n  "))?;
+                }
             }
             if let Some(device_categories) = driver.device_categories {
                 write!(writer, "Device Categories: [")?;
@@ -221,6 +260,26 @@ mod tests {
         Ok(())
     }
 
+    async fn run_device_info_iterator_server(
+        mut device_infos: Vec<fdd::DeviceInfo>,
+        iterator: ServerEnd<fdd::DeviceInfoIteratorMarker>,
+    ) -> Result<()> {
+        let mut iterator =
+            iterator.into_stream().context("Failed to convert iterator into a stream")?;
+        while let Some(res) = iterator.next().await {
+            let request = res.context("Failed to get request")?;
+            match request {
+                fdd::DeviceInfoIteratorRequest::GetNext { responder } => {
+                    responder
+                        .send(&device_infos)
+                        .context("Failed to send device infos to responder")?;
+                    device_infos.clear();
+                }
+            }
+        }
+        Ok(())
+    }
+
     #[fasync::run_singlethreaded(test)]
     async fn test_verbose() {
         let cmd = ListCommand::from_args(&["list"], &["--verbose"]).unwrap();
@@ -262,6 +321,23 @@ mod tests {
                 )
                 .await
                 .context("Failed to run driver info iterator server")?,
+                fdd::DriverDevelopmentRequest::GetDeviceInfo {
+                    device_filter: _,
+                    iterator,
+                    control_handle: _,
+                    exact_match: _,
+                } => run_device_info_iterator_server(
+                    vec![fdd::DeviceInfo {
+                        moniker: Some("dev.sys.foo".to_owned()),
+                        bound_driver_url: Some(
+                            "fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm".to_owned(),
+                        ),
+                        ..Default::default()
+                    }],
+                    iterator,
+                )
+                .await
+                .context("Failed to run device info iterator server")?,
                 _ => {}
             }
             Ok(())
@@ -273,6 +349,8 @@ mod tests {
             output,
             r#"Name      : foo
 URL       : fuchsia-pkg://fuchsia.com/foo-package#meta/foo.cm
+Devices   :
+  dev.sys.foo
 Driver    : foo.so
 Device Categories: [connectivity::ethernet, usb]
 Merkle Root: 0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20
