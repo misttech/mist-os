@@ -8,10 +8,10 @@ use crate::{
         fastboot_interface::FastbootInterface,
         prepare, Boot, Flash, Unlock,
     },
-    file_resolver::resolvers::{ArchiveResolver, Resolver, TarResolver},
+    file_resolver::resolvers::{Resolver, TarResolver},
     file_resolver::FileResolver,
     manifest::{
-        resolvers::{FlashManifestResolver, ManifestResolver},
+        resolvers::{ArchiveResolver, FlashManifestResolver, ManifestResolver},
         sdk::SdkEntries,
         v1::FlashManifest as FlashManifestV1,
         v2::FlashManifest as FlashManifestV2,
