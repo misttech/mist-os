@@ -7,7 +7,6 @@
 from honeydew.interfaces.affordances.bluetooth import bluetooth_common
 from honeydew.typing import bluetooth
 
-
 BluetoothAcceptPairing = bluetooth.BluetoothAcceptPairing
 BluetoothConnectionType = bluetooth.BluetoothConnectionType
 
