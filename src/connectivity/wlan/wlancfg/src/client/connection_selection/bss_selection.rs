@@ -148,7 +148,7 @@ mod test {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async as fasync, fuchsia_inspect as inspect,
         futures::channel::mpsc,
-        ieee80211_testutils::{BSSID_HASH_REGEX, BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
+        ieee80211_testutils::{BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
         rand::Rng,
         wlan_common::{assert_variant, channel, format::MacFmt, random_fidl_bss_description},
     };
@@ -401,7 +401,6 @@ mod test {
                         "0": contains {
                             score: AnyNumericProperty,
                             bssid: &*BSSID_REGEX,
-                            bssid_hash: &*BSSID_HASH_REGEX,
                             ssid: &*SSID_REGEX,
                             ssid_hash: &*SSID_HASH_REGEX,
                             rssi: AnyNumericProperty,
@@ -427,7 +426,6 @@ mod test {
                         ssid: candidates[2].network.ssid.to_string(),
                         ssid_hash: candidates[2].hasher.hash_ssid(&candidates[2].network.ssid),
                         bssid: candidates[2].bss.bssid.0.to_mac_string(),
-                        bssid_hash: candidates[2].hasher.hash_mac_addr(&candidates[2].bss.bssid.0),
                         rssi: i64::from(candidates[2].bss.rssi),
                         score: i64::from(scoring_functions::score_bss_scanned_candidate(candidates[2].clone())),
                         security_type_saved: candidates[2].saved_security_type_to_string(),

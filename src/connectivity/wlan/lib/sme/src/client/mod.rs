@@ -39,6 +39,7 @@ use {
         bss::{BssDescription, Protection as BssProtection},
         capabilities::derive_join_capabilities,
         channel::Channel,
+        format::MacFmt,
         hasher::WlanHasher,
         ie::{self, rsn::rsne, wsc},
         scan::{Compatibility, ScanResult},
@@ -600,7 +601,7 @@ impl ClientSme {
                     format!(
                         "Failed to configure protection for network {} ({}): {:?}",
                         self.context.inspect.hasher.hash_ssid(&bss_description.ssid),
-                        self.context.inspect.hasher.hash_mac_addr(&bss_description.bssid.0),
+                        bss_description.bssid.0.to_mac_string(),
                         error
                     )
                 );
@@ -691,7 +692,7 @@ impl super::Station for ClientSme {
         match event {
             fidl_mlme::MlmeEvent::OnScanResult { result } => self
                 .scan_sched
-                .on_mlme_scan_result(result, &self.context.inspect)
+                .on_mlme_scan_result(result)
                 .unwrap_or_else(|e| error!("scan result error: {:?}", e)),
             fidl_mlme::MlmeEvent::OnScanEnd { end } => {
                 match self.scan_sched.on_mlme_scan_end(end, &self.context.inspect) {

@@ -474,7 +474,7 @@ impl BssDescription {
         format!(
             "SSID: {}, BSSID: {}, Protection: {}, Pri Chan: {}, Rx dBm: {}",
             hasher.hash_ssid(&self.ssid),
-            hasher.hash_mac_addr(&self.bssid.0),
+            self.bssid.0.to_mac_string(),
             self.protection(),
             self.channel.primary,
             self.rssi_dbm,

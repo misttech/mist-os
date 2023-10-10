@@ -380,7 +380,6 @@ async fn run_all_futures() -> Result<(), Error> {
         saved_networks.clone(),
         connection_selector.clone(),
         telemetry_sender.clone(),
-        hasher,
     );
 
     let scanning_service = scan::serve_scanning_loop(

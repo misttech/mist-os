@@ -658,9 +658,7 @@ impl Associated {
             inspect_log!(context.inspect.rsn_events.lock(), {
                 rx_eapol_frame: InspectBytes(&eapol_pdu),
                 foreign_bssid: ind.src_addr.to_mac_string(),
-                foreign_bssid_hash: context.inspect.hasher.hash_mac_addr(&ind.src_addr),
                 current_bssid: self.latest_ap_state.bssid.0.to_mac_string(),
-                current_bssid_hash: context.inspect.hasher.hash_mac_addr(&self.latest_ap_state.bssid.0),
                 status: "rejected (foreign BSS)",
             });
             return Ok(self);
@@ -1260,7 +1258,6 @@ fn log_state_change(
                     to: new_state.state_name(),
                     ctx: msg,
                     bssid: bssid.0.to_mac_string(),
-                    bssid_hash: context.inspect.hasher.hash_mac_addr(&bssid.0),
                     ssid: ssid.to_string(),
                     ssid_hash: context.inspect.hasher.hash_ssid(&ssid)
                 });
@@ -1346,7 +1343,7 @@ mod tests {
         fuchsia_inspect::Inspector,
         futures::{channel::mpsc, Stream, StreamExt},
         ieee80211::Ssid,
-        ieee80211_testutils::{BSSID_HASH_REGEX, SSID_HASH_REGEX},
+        ieee80211_testutils::SSID_HASH_REGEX,
         link_state::{EstablishingRsna, LinkUp},
         std::{convert::TryFrom, sync::Arc, task::Poll},
         wlan_common::{
@@ -1428,7 +1425,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1516,7 +1512,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1611,7 +1606,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1681,7 +1675,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1743,7 +1736,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1836,7 +1828,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -2091,9 +2082,7 @@ mod tests {
                         "@time": AnyNumericProperty,
                         rx_eapol_frame: AnyBytesProperty,
                         foreign_bssid: foreign_bssid.0.to_mac_string(),
-                        foreign_bssid_hash: &*BSSID_HASH_REGEX,
                         current_bssid: bss.bssid.0.to_mac_string(),
-                        current_bssid_hash: &*BSSID_HASH_REGEX,
                         status: "rejected (foreign BSS)"
                     }
                 }
@@ -2929,7 +2918,6 @@ mod tests {
                         from: DISCONNECTING_STATE,
                         to: CONNECTING_STATE,
                         bssid: bss2.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss2.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -3412,7 +3400,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: IDLE_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     }
@@ -3450,7 +3437,6 @@ mod tests {
                         from: IDLE_STATE,
                         to: IDLE_STATE,
                         bssid: bss.bssid.0.to_mac_string(),
-                        bssid_hash: &*BSSID_HASH_REGEX,
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     }

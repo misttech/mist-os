@@ -212,7 +212,6 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         saved_networks.clone(),
         connection_selector.clone(),
         telemetry_sender.clone(),
-        hasher.clone(),
     );
     let iface_manager_service = Box::pin(iface_manager_service);
     let scan_manager_service = Box::pin(

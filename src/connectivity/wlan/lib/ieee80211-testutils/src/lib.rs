@@ -10,8 +10,6 @@ use regex::Regex;
 lazy_static! {
     pub static ref BSSID_REGEX: Regex =
         Regex::new(r#"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"#).unwrap();
-    pub static ref BSSID_HASH_REGEX: Regex =
-        Regex::new(r#"^(?:[0-9a-fA-F]{2}:){3}[0-9a-fA-F]*$"#).unwrap();
     pub static ref SSID_REGEX: Regex = Regex::new(r#"^<ssid-[0-9a-fA-F]{0,64}>$"#).unwrap();
     pub static ref SSID_HASH_REGEX: Regex = Regex::new(r#"^[0-9a-fA-F]*$"#).unwrap();
 }

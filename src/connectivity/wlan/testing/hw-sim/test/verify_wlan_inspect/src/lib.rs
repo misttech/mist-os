@@ -170,7 +170,6 @@ async fn verify_wlan_inspect() {
                             status_str: "connected",
                             connected_to: contains {
                                 bssid: BSSID.0.to_mac_string(),
-                                bssid_hash: AnyProperty,
                                 ssid: AP_SSID.to_string(),
                                 ssid_hash: AnyProperty,
                                 wsc: {
@@ -244,7 +243,6 @@ async fn verify_wlan_inspect() {
                             status_str: "idle",
                             prev_connected_to: contains {
                                 bssid: BSSID.0.to_mac_string(),
-                                bssid_hash: AnyProperty,
                                 ssid: AP_SSID.to_string(),
                                 ssid_hash: AnyProperty,
                                 wsc: {

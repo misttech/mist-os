@@ -278,15 +278,8 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
   return fxl::StringPrintf("%s<REDACTED-MAC: %d>", oui.c_str(), id);
 }
 
-std::string RedactMacNoHash(RedactionIdCache& _cache, const std::string& match) {
-  const std::string oui = GetOui(match);
-  return fxl::StringPrintf("%s<REDACTED-MAC>", oui.c_str());
-}
-
 }  // namespace
 
 Replacer ReplaceMac() { return FunctionBasedReplacer(kMacPattern, RedactMac); }
-
-Replacer ReplaceMacNoHash() { return FunctionBasedReplacer(kMacPattern, RedactMacNoHash); }
 
 }  // namespace forensics

@@ -4,7 +4,7 @@
 
 use {
     bssl_sys::SHA256_DIGEST_LENGTH,
-    ieee80211::{MacAddr, Ssid},
+    ieee80211::Ssid,
     mundane::{
         hash::{Digest, Sha256},
         hmac::hmac,
@@ -27,16 +27,6 @@ impl WlanHasher {
 
     pub fn hash(&self, bytes: &[u8]) -> [u8; SHA256_DIGEST_LENGTH as usize] {
         hmac::<Sha256>(&self.hash_key, bytes).bytes()
-    }
-
-    pub fn hash_mac_addr(&self, mac_addr: &MacAddr) -> String {
-        format!(
-            "{:02x}:{:02x}:{:02x}:{}",
-            mac_addr[0],
-            mac_addr[1],
-            mac_addr[2],
-            hex::encode(truncate_sha256_digest_to_8_bytes(&self.hash(&mac_addr[3..6])))
-        )
     }
 
     pub fn hash_ssid(&self, ssid: &Ssid) -> String {
@@ -73,15 +63,6 @@ mod tests {
         // A different hash key should not get the same result for same bytes
         // with very high probability.
         assert_ne!(hasher_x.hash(&[0xa]), hasher_y.hash(&[0xa]));
-    }
-
-    #[test]
-    fn test_hash_mac_addr() {
-        let hasher = WlanHasher::new(HASH_KEY_X);
-        let mac_addr = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66];
-        let hashed_str = hasher.hash_mac_addr(&mac_addr);
-        assert!(hashed_str.starts_with("11:22:33:"));
-        assert_ne!(hashed_str, "11:22:33:44:55:66");
     }
 
     #[test]

@@ -39,7 +39,7 @@ use {
     },
     std::{convert::Infallible, fmt::Debug, sync::Arc, unimplemented},
     tracing::{debug, error, info, warn},
-    wlan_common::hasher::WlanHasher,
+    wlan_common::format::MacFmt,
 };
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
@@ -152,7 +152,6 @@ pub(crate) struct IfaceManagerService {
     stats_sender: ConnectionStatsSender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
     defect_sender: mpsc::UnboundedSender<Defect>,
-    hasher: WlanHasher,
 }
 
 impl IfaceManagerService {
@@ -165,7 +164,6 @@ impl IfaceManagerService {
         telemetry_sender: TelemetrySender,
         stats_sender: ConnectionStatsSender,
         defect_sender: mpsc::UnboundedSender<Defect>,
-        hasher: WlanHasher,
     ) -> Self {
         IfaceManagerService {
             phy_manager: phy_manager.clone(),
@@ -181,7 +179,6 @@ impl IfaceManagerService {
             telemetry_sender,
             stats_sender,
             defect_sender,
-            hasher,
         }
     }
 
@@ -1040,10 +1037,7 @@ async fn handle_bss_selection_results_for_connect_request(
                 target: scanned_candidate,
                 reason: request.reason,
             };
-            info!(
-                "Starting connection to {}",
-                iface_manager.hasher.hash_mac_addr(&selection.target.bss.bssid.0)
-            );
+            info!("Starting connection to {}", selection.target.bss.bssid.0.to_mac_string(),);
             let _ = iface_manager.connect(selection).await;
         }
         None => {
@@ -1512,7 +1506,10 @@ mod tests {
         pin_utils::pin_mut,
         std::convert::TryFrom,
         test_case::test_case,
-        wlan_common::{assert_variant, channel::Cbw, random_fidl_bss_description, RadioConfig},
+        wlan_common::{
+            assert_variant, channel::Cbw, hasher::WlanHasher, random_fidl_bss_description,
+            RadioConfig,
+        },
     };
 
     // Responses that FakePhyManager will provide
@@ -1849,7 +1846,6 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
-            test_values.hasher.clone(),
         );
 
         if configured {
@@ -1907,7 +1903,6 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
-            test_values.hasher.clone(),
         );
 
         iface_manager.aps.push(ap_container);
@@ -2449,7 +2444,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Call connect on the IfaceManager
@@ -2488,7 +2482,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Create a ConnectionSelector
@@ -2644,7 +2637,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Call disconnect on the IfaceManager
@@ -2780,7 +2772,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Call stop_client_connections.
@@ -2893,7 +2884,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Call stop_client_connections.
@@ -3024,7 +3014,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         {
@@ -3231,7 +3220,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Call start_ap.
@@ -3366,7 +3354,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
         let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
         pin_mut!(fut);
@@ -3515,7 +3502,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         let fut = iface_manager.stop_all_aps();
@@ -3825,7 +3811,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         {
@@ -3932,7 +3917,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         {
@@ -4003,7 +3987,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         {
@@ -4611,7 +4594,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Create other components to run the service.
@@ -4746,7 +4728,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Report a new interface.
@@ -4851,7 +4832,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Make start client connections request
@@ -4929,7 +4909,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Make stop client connections request
@@ -5159,7 +5138,6 @@ mod tests {
             test_values.telemetry_sender,
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // Update the saved networks with knowledge of the test SSID and credentials.
@@ -5773,7 +5751,6 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender,
             test_values.defect_sender,
-            test_values.hasher.clone(),
         );
 
         // If the test calls for it, create an AP interface to test that the IfaceManager preserves
@@ -5898,7 +5875,6 @@ mod tests {
             test_values.telemetry_sender.clone(),
             test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
-            test_values.hasher.clone(),
         );
 
         // Send a defect to the IfaceManager service loop.
