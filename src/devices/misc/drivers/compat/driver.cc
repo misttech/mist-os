@@ -132,6 +132,18 @@ zx::result<zx::resource> GetIrqResource(fdf::Namespace& ns) {
   return zx::ok(std::move(result.value().resource));
 }
 
+zx::result<zx::resource> GetSmcResource(fdf::Namespace& ns) {
+  zx::result resource = ns.Connect<fkernel::SmcResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result.value().resource));
+}
+
 }  // namespace
 
 namespace compat {
@@ -410,6 +422,18 @@ zx_handle_t Driver::GetIrqResource() {
     }
   }
   return irq_resource_.get();
+}
+
+zx_handle_t Driver::GetSmcResource() {
+  if (!smc_resource_.is_valid()) {
+    zx::result resource = ::GetSmcResource(*incoming());
+    if (resource.is_ok()) {
+      smc_resource_ = std::move(resource.value());
+    } else {
+      FDF_LOGL(WARNING, *logger_, "Failed to get smc_resource '%s'", resource.status_string());
+    }
+  }
+  return smc_resource_.get();
 }
 
 bool Driver::IsRunningOnDispatcher() const {
