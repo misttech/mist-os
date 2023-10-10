@@ -51,7 +51,7 @@ use crate::{
     context::{CounterContext, InstantContext, RngContext},
     data_structures::{socketmap::IterShadows as _, token_bucket::TokenBucket},
     device::{FrameDestination, Id, WeakId},
-    error::LocalAddressError,
+    error::{LocalAddressError, SocketError},
     ip::{
         device::{
             nud::{ConfirmationFlags, NudIpHandler},
@@ -1430,7 +1430,8 @@ impl<
                 let seq = echo_reply.message().seq();
                 let meta = echo_reply.parse_metadata();
                 buffer.undo_parse(meta);
-                receive_icmp_echo_reply(sync_ctx,ctx, src_ip, dst_ip, id, seq, buffer);
+                let device = sync_ctx.downgrade_device_id(device);
+                receive_icmp_echo_reply(sync_ctx,ctx, src_ip, dst_ip, id, seq, buffer, device);
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
                 ctx.increment_debug_counter("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::timestamp_request");
@@ -2169,7 +2170,17 @@ impl<
                     let seq = echo_reply.message().seq();
                     let meta = echo_reply.parse_metadata();
                     buffer.undo_parse(meta);
-                    receive_icmp_echo_reply(sync_ctx, ctx, src_ip.get(), dst_ip, id, seq, buffer);
+                    let device = sync_ctx.downgrade_device_id(device);
+                    receive_icmp_echo_reply(
+                        sync_ctx,
+                        ctx,
+                        src_ip.get(),
+                        dst_ip,
+                        id,
+                        seq,
+                        buffer,
+                        device,
+                    );
                 }
             }
             Icmpv6Packet::Ndp(packet) => receive_ndp_packet(sync_ctx, ctx, device, src_ip, packet),
@@ -3226,6 +3237,7 @@ fn receive_icmp_echo_reply<
     id: u16,
     seq: u16,
     body: B,
+    device: SC::WeakDeviceId,
 ) {
     let src_ip = match SpecifiedAddr::new(src_ip) {
         Some(src_ip) => src_ip,
@@ -3250,10 +3262,10 @@ fn receive_icmp_echo_reply<
     };
     sync_ctx.with_icmp_sockets(|sockets| {
         if let Some(id) = NonZeroU16::new(id) {
-            let mut addrs_to_search =
-                AddrVecIter::<I, SC::WeakDeviceId, IcmpAddrSpec>::without_device(
-                    ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
-                );
+            let mut addrs_to_search = AddrVecIter::<I, SC::WeakDeviceId, IcmpAddrSpec>::with_device(
+                ConnIpAddr { local: (dst_ip, id), remote: (src_ip, ()) }.into(),
+                device,
+            );
             let socket = match addrs_to_search.try_for_each(|addr_vec| {
                 match addr_vec {
                     AddrVec::Conn(c) => {
@@ -3332,6 +3344,15 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
     /// Gets the socket information of an ICMP socket.
     fn get_info(&mut self, ctx: &mut C, id: SocketId<I>)
         -> SocketInfo<I::Addr, Self::WeakDeviceId>;
+
+    fn set_device(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        device_id: Option<&Self::DeviceId>,
+    ) -> Result<(), SocketError>;
+
+    fn get_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId>;
 }
 
 /// A handler trait for ICMP sockets that also allows sending/receiving on the
@@ -3431,6 +3452,19 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
                 }
             }
         })
+    }
+
+    fn set_device(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        device_id: Option<&Self::DeviceId>,
+    ) -> Result<(), SocketError> {
+        datagram::set_device(self, ctx, id, device_id)
+    }
+
+    fn get_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId> {
+        datagram::get_bound_device(self, ctx, id)
     }
 }
 
@@ -3643,6 +3677,51 @@ pub fn get_info<I: Ip, C: NonSyncContext>(
     )
 }
 
+/// Sets the bound device for a socket.
+///
+/// Sets the device to be used for sending and receiving packets for a socket.
+/// If the socket is not currently bound to a local address and port, the device
+/// will be used when binding.
+pub fn set_device<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &mut C,
+    id: &SocketId<I>,
+    device_id: Option<&crate::DeviceId<C>>,
+) -> Result<(), SocketError> {
+    let IpInvariant(result) = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((sync_ctx, ctx, device_id)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
+            IpInvariant(SocketHandler::<I, _>::set_device(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                id,
+                device_id,
+            ))
+        },
+    );
+    result
+}
+
+/// Gets the device the specified socket is bound to.
+pub fn get_bound_device<I: Ip, C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    ctx: &C,
+    id: &SocketId<I>,
+) -> Option<crate::device::WeakDeviceId<C>> {
+    let IpInvariant(device) = net_types::map_ip_twice!(
+        I,
+        (IpInvariant((sync_ctx, ctx)), id.clone()),
+        |(IpInvariant((sync_ctx, ctx)), id)| {
+            IpInvariant(SocketHandler::<I, _>::get_bound_device(
+                &mut Locked::new(sync_ctx),
+                ctx,
+                id,
+            ))
+        },
+    );
+    device
+}
 #[cfg(test)]
 mod tests {
     use alloc::{format, vec, vec::Vec};
@@ -4508,14 +4587,20 @@ mod tests {
         SendTo,
     }
 
+    // TODO(https://fxbug.dev/135041): Add test cases with local delivery and a
+    // bound device once delivery of looped-back packets is corrected in the
+    // socket map.
     #[ip_test]
-    #[test_case(IcmpConnectionType::Local, IcmpSendType::Send)]
-    #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo)]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send)]
-    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, true)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, true)]
+    #[test_case(IcmpConnectionType::Local, IcmpSendType::Send, false)]
+    #[test_case(IcmpConnectionType::Local, IcmpSendType::SendTo, false)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::Send, false)]
+    #[test_case(IcmpConnectionType::Remote, IcmpSendType::SendTo, false)]
     fn test_icmp_connection<I: Ip + TestIpExt + datagram::IpExt>(
         conn_type: IcmpConnectionType,
         send_type: IcmpSendType,
+        bind_to_device: bool,
     ) {
         crate::testutil::set_logger_for_test();
 
@@ -4542,7 +4627,6 @@ mod tests {
             remote,
             remote_device_ids[0].downgrade(),
         );
-        core::mem::drop((local_device_ids, remote_device_ids));
 
         let icmp_id = 13;
 
@@ -4577,6 +4661,12 @@ mod tests {
             crate::device::testutil::enable_device(&&*sync_ctx, non_sync_ctx, &loopback_device_id);
 
             let conn = new_socket::<I, _>(sync_ctx);
+            if bind_to_device {
+                let device = local_device_ids[0].clone().into();
+                set_device(sync_ctx, non_sync_ctx, &conn, Some(&device))
+                    .expect("failed to set SO_BINDTODEVICE");
+            }
+            core::mem::drop((local_device_ids, remote_device_ids));
             bind(sync_ctx, non_sync_ctx, conn, None, NonZeroU16::new(icmp_id)).unwrap();
             match send_type {
                 IcmpSendType::Send => {
