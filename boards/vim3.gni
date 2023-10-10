@@ -7,7 +7,8 @@
 # by default.
 # Cq-Include-Trybots: luci.turquoise.global.try:bringup.vim3-debug,core.vim3-debug,core.vim3-vg-debug
 
-import("//boards/common/arm64-common.gni")
+has_board = true
+target_cpu = "arm64"
 
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/vim3"
@@ -15,34 +16,42 @@ board_configuration_label = "//boards/vim3"
 board_name = "vim3"
 board_description = "A generic vim3 device"
 
-# Remove drivers added by arm64-common.gni that are now in the vim3 board.
-_common_bootfs_deps_to_remove = [
-  "//src/devices/bus/drivers/pci:bus-pci",
-  "//src/devices/usb/drivers/xhci",
-]
-board_bootfs_labels -= _common_bootfs_deps_to_remove
-board_zedboot_bootfs_labels -= _common_bootfs_deps_to_remove
-board_recovery_bootfs_labels -= _common_bootfs_deps_to_remove
+partitions_config_label = "//boards/partitions:vim3"
+partitions_config_contents =
+    [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]
 
-# Additional, non-driver, bootfs deps
+bazel_product_bundle_board = "vim3"
+
+#####
+#
+# Configuration items that need to be added to assembly
+
 _common_bootfs_deps = [
   "//boards/kernel_cmdline:vim3",
   "//src/power/power-manager/thermal_config:vim3",
+  "//src/security/policy/zxcrypt:null",
 ]
 
-board_bootfs_labels += _common_bootfs_deps
+board_bootfs_labels =
+    _common_bootfs_deps + [ "//src/power/power-manager:vim3_config" ]
+board_zedboot_bootfs_labels =
+    _common_bootfs_deps + [ "//src/power/power-manager:base_config" ]
+board_recovery_bootfs_labels =
+    _common_bootfs_deps + [ "//src/power/power-manager:base_config" ]
 
-board_bootfs_labels -= [ "//src/power/power-manager:base_config" ]
-board_bootfs_labels += [ "//src/power/power-manager:vim3_config" ]
+board_package_labels = [
+  "//src/hwinfo:default_board_config",
+  "//src/graphics/drivers/msd-arm-mali:msd-config",
+]
 
-board_zedboot_bootfs_labels += _common_bootfs_deps
-
-board_recovery_bootfs_labels += _common_bootfs_deps
-
-board_package_labels += [ "//src/graphics/drivers/msd-arm-mali:msd-config" ]
-
-# Board file adds vulkan VCD that lets vulkan tests work on systems with Mali GPUs.
+# Board file adds vulkan VCD that lets vulkan tests work on systems with Mali
+# GPUs.
 board_has_libvulkan_arm_mali = true
+
+#####
+#
+# Items below here are duplicating information assembly, and are used by targets
+# that need to switch using assembly outputs as their source of truth.
 
 firmware_prebuilts_path_suffix = ""
 firmware_prebuilts = [
@@ -59,6 +68,10 @@ avb_key = "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_devkey_atx_psk.pem"
 avb_algorithm = "SHA512_RSA4096"
 avb_atx_metadata =
     "//src/firmware/avb_keys/vim3/vim3-dev-key/vim3_dev_atx_metadata.bin"
+
+blobfs_capacity = 10485760000  # 10000 MiB
+max_blob_contents_size =
+    5216665600  # 4975 MiB. Leaves 50 MiB for the update package.
 
 # partitions for fx flash to flash
 zircon_a_partition = "zircon_a"
@@ -77,9 +90,3 @@ assembly_generate_fvm_fastboot = true
 # Supports only physical devices.
 board_is_emu = false
 board_is_phys = true
-
-partitions_config_label = "//boards/partitions:vim3"
-partitions_config_contents +=
-    [ "//prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned" ]
-
-bazel_product_bundle_board = "vim3"
