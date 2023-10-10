@@ -209,12 +209,14 @@ constexpr WordSize TotalPayloadSize(const First& first, const Rest&... rest) {
   return first.PayloadSize() + TotalPayloadSize(rest...);
 }
 
+// Terminal case.
+template <typename Reservation>
+constexpr void WriteElements(Reservation& res) {}
+
 template <typename Reservation, typename First, typename... Rest>
 constexpr void WriteElements(Reservation& res, const First& first, const Rest&... rest) {
   first.Write(res);
-  if constexpr (sizeof...(rest) > 0) {
-    WriteElements(res, rest...);
-  }
+  WriteElements(res, rest...);
 }
 
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType thread_type,
@@ -729,8 +731,7 @@ constexpr zx_status_t WriteLargeBlobRecordWithMetadata(
     category_ref.Write(*res);
     name_ref.Write(*res);
     res->WriteWord(timestamp);
-    thread_ref.Write(*res);
-    internal::WriteElements(*res, args...);
+    internal::WriteElements(*res, thread_ref, args...);
     res->WriteWord(num_bytes);
     res->WriteBytes(data, num_bytes);
     res->Commit();

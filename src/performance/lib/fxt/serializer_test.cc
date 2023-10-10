@@ -804,6 +804,7 @@ TEST(Serializer, ContextSwitchRecord) {
                                                  outgoing_thread_weight, incoming_thread_weight));
   // 1 word for the header, 1 for the timestamp, 2 for the in/out tids, 2 for the args.
   ASSERT_EQ(writer.bytes.size(), fxt::WordSize(6).SizeInBytes());
+
   uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
   uint64_t header = bytes[0];
   // Record type is 8
@@ -825,6 +826,11 @@ TEST(Serializer, ContextSwitchRecord) {
   EXPECT_NE(bytes[4], uint64_t{0x0000'0030'0010'0011});
   // Incoming thread weight argument
   EXPECT_NE(bytes[5], uint64_t{0x0000'0040'0020'0011});
+
+  // Also exercise the non argument path
+  FakeWriter writer2;
+  EXPECT_EQ(ZX_OK, fxt::WriteContextSwitchRecord(&writer2, event_time, cpu_number, outgoing_state,
+                                                 outgoing_thread, incoming_thread));
 }
 
 TEST(Serializer, ThreadWakeupRecord) {
@@ -839,6 +845,7 @@ TEST(Serializer, ThreadWakeupRecord) {
                                                 incoming_thread_weight));
   // 1 word for the header, 1 for the timestamp, 1 for the tid, 1 for the arg.
   ASSERT_EQ(writer.bytes.size(), fxt::WordSize(4).SizeInBytes());
+
   uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
   uint64_t header = bytes[0];
   // Record type is 8
@@ -855,6 +862,10 @@ TEST(Serializer, ThreadWakeupRecord) {
   EXPECT_EQ(bytes[2], incoming_tid);
   // Thread weight argument
   EXPECT_NE(bytes[3], uint64_t{0x0000'0020'0010'0011});
+
+  // Exercise the non argument path
+  FakeWriter writer2;
+  EXPECT_EQ(ZX_OK, fxt::WriteThreadWakeupRecord(&writer2, event_time, cpu_number, incoming_thread));
 }
 
 TEST(Serializer, LogRecord) {
@@ -896,10 +907,10 @@ TEST(Serializer, LargeBlobWithMetadataRecord) {
   EXPECT_EQ(ZX_OK, fxt::WriteLargeBlobRecordWithMetadata(
                        &writer, event_time, category_ref, name_ref, thread_ref, data,
                        blob_size_bytes, fxt::Argument(arg_name, true)));
-
   // 1 word for the large header, 1 for the blob header, 1 for timestamp, 1 for
   // the argument header, 1 for blob size, 5 for payload.
   EXPECT_EQ(writer.bytes.size(), fxt::WordSize(10).SizeInBytes());
+
   uint64_t* words = reinterpret_cast<uint64_t*>(writer.bytes.data());
   uint64_t header = words[0];
   // Record type is 15
@@ -927,6 +938,12 @@ TEST(Serializer, LargeBlobWithMetadataRecord) {
   EXPECT_EQ(std::memcmp(words + 7, "te into ", 8), 0);
   EXPECT_EQ(std::memcmp(words + 8, "the buff", 8), 0);
   EXPECT_EQ(std::memcmp(words + 9, "er\0\0\0\0\0\0", 8), 0);
+
+  // Also exercise the non argument codepath
+  FakeWriter writer2;
+  EXPECT_EQ(ZX_OK,
+            fxt::WriteLargeBlobRecordWithMetadata(&writer2, event_time, category_ref, name_ref,
+                                                  thread_ref, data, blob_size_bytes));
 }
 
 TEST(Serializer, LargeBlobWithNoMetadataRecord) {
