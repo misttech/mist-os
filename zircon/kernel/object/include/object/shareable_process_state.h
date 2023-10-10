@@ -72,10 +72,12 @@ class ShareableProcessState : public fbl::RefCounted<ShareableProcessState> {
   //
   // It is an error to call initialize on a shared state that has already been initialized, or one
   // that has been destroyed.
-  bool Initialize(vaddr_t aspace_base, vaddr_t aspace_size, const char* aspace_name) {
+  bool Initialize(vaddr_t aspace_base, vaddr_t aspace_size, const char* aspace_name,
+                  VmAspace::ShareOpt share_opt) {
     DEBUG_ASSERT(!aspace_);
     DEBUG_ASSERT(process_count_.load(ktl::memory_order_relaxed) == 1);
-    aspace_ = VmAspace::Create(aspace_base, aspace_size, VmAspace::Type::User, aspace_name);
+    aspace_ =
+        VmAspace::Create(aspace_base, aspace_size, VmAspace::Type::User, aspace_name, share_opt);
     return aspace_ != nullptr;
   }
 

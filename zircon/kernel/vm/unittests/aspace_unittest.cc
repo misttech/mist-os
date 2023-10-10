@@ -194,18 +194,20 @@ static bool vmaspace_create_invalid_ranges() {
 #define GUEST_PHYSICAL_ASPACE_SIZE (1UL << MMU_GUEST_SIZE_SHIFT)
 
   // Test when base < valid base.
-  EXPECT_NULL(VmAspace::Create(USER_ASPACE_BASE - 1, 4096, VmAspace::Type::User, "test"));
-  EXPECT_NULL(VmAspace::Create(KERNEL_ASPACE_BASE - 1, 4096, VmAspace::Type::Kernel, "test"));
+  EXPECT_NULL(VmAspace::Create(USER_ASPACE_BASE - 1, 4096, VmAspace::Type::User, "test",
+                               VmAspace::ShareOpt::None));
+  EXPECT_NULL(VmAspace::Create(KERNEL_ASPACE_BASE - 1, 4096, VmAspace::Type::Kernel, "test",
+                               VmAspace::ShareOpt::None));
   EXPECT_NULL(VmAspace::Create(GUEST_PHYSICAL_ASPACE_BASE - 1, 4096, VmAspace::Type::GuestPhysical,
-                               "test"));
+                               "test", VmAspace::ShareOpt::None));
 
   // Test when base + size exceeds valid range.
-  EXPECT_NULL(
-      VmAspace::Create(USER_ASPACE_BASE, USER_ASPACE_SIZE + 1, VmAspace::Type::User, "test"));
-  EXPECT_NULL(
-      VmAspace::Create(KERNEL_ASPACE_BASE, KERNEL_ASPACE_SIZE + 1, VmAspace::Type::Kernel, "test"));
+  EXPECT_NULL(VmAspace::Create(USER_ASPACE_BASE, USER_ASPACE_SIZE + 1, VmAspace::Type::User, "test",
+                               VmAspace::ShareOpt::None));
+  EXPECT_NULL(VmAspace::Create(KERNEL_ASPACE_BASE, KERNEL_ASPACE_SIZE + 1, VmAspace::Type::Kernel,
+                               "test", VmAspace::ShareOpt::None));
   EXPECT_NULL(VmAspace::Create(GUEST_PHYSICAL_ASPACE_BASE, GUEST_PHYSICAL_ASPACE_SIZE + 1,
-                               VmAspace::Type::GuestPhysical, "test"));
+                               VmAspace::Type::GuestPhysical, "test", VmAspace::ShareOpt::None));
 
   END_TEST;
 }

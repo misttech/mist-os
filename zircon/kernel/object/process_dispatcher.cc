@@ -271,7 +271,8 @@ zx_status_t ProcessDispatcher::Initialize() {
   char aspace_name[ZX_MAX_NAME_LEN];
   snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
 
-  if (!shareable_state_->Initialize(USER_ASPACE_BASE, USER_ASPACE_SIZE, aspace_name)) {
+  if (!shareable_state_->Initialize(USER_ASPACE_BASE, USER_ASPACE_SIZE, aspace_name,
+                                    VmAspace::ShareOpt::None)) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -288,13 +289,15 @@ zx_status_t ProcessDispatcher::Initialize(SharedAspaceType type) {
   char aspace_name[ZX_MAX_NAME_LEN];
   if (type == SharedAspaceType::New) {
     snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
-    if (!shareable_state_->Initialize(kSharedAspaceBase, kSharedAspaceSize, aspace_name)) {
+    if (!shareable_state_->Initialize(kSharedAspaceBase, kSharedAspaceSize, aspace_name,
+                                      VmAspace::ShareOpt::None)) {
       return ZX_ERR_NO_MEMORY;
     }
   } else if (type == SharedAspaceType::Shared) {
     snprintf(aspace_name, sizeof(aspace_name), "proc(restricted):%" PRIu64, get_koid());
     restricted_aspace_ =
-        VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User, aspace_name);
+        VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User, aspace_name,
+                         VmAspace::ShareOpt::None);
     if (!restricted_aspace_) {
       return ZX_ERR_NO_MEMORY;
     }
@@ -555,9 +558,12 @@ void ProcessDispatcher::FinishDeadTransition() {
   exceptionate_.Shutdown();
   debug_exceptionate_.Shutdown();
 
-  // clean up shareable state, including the handle table
-  LTRACEF_LEVEL(2, "removing shareable state reference from proc %p\n", this);
-  shareable_state_->DecrementShareCount();
+  // Tear down the unified address space. It may not exist if Initialize() failed, this process
+  // was not created with one, or they aren't supported on this architecture.
+  if (unified_aspace_) {
+    zx_status_t result = unified_aspace_->Destroy();
+    ASSERT_MSG(result == ZX_OK, "%d\n", result);
+  }
 
   // Tear down the restricted address space. It may not exist if Initialize() failed or if this
   // process was not created with one.
@@ -565,6 +571,10 @@ void ProcessDispatcher::FinishDeadTransition() {
     zx_status_t result = restricted_aspace_->Destroy();
     ASSERT_MSG(result == ZX_OK, "%d\n", result);
   }
+
+  // clean up shareable state, including the handle table
+  LTRACEF_LEVEL(2, "removing shareable state reference from proc %p\n", this);
+  shareable_state_->DecrementShareCount();
 
   // signal waiter
   LTRACEF_LEVEL(2, "signaling waiters\n");
@@ -983,7 +993,12 @@ TaskRuntimeStats ProcessDispatcher::GetAggregatedRuntime() const {
 
 uintptr_t ProcessDispatcher::cache_vdso_code_address() {
   Guard<CriticalMutex> guard{get_lock()};
-  vdso_code_address_ = normal_aspace()->vdso_code_address();
+  // The VDSO code address is always stored in the shareable state's address space, even when a
+  // unified address space is present. This is because the unified address space doesn't store any
+  // mappings itself, so the VDSO code address of that address space is always 0. Therefore, to
+  // make sure syscalls work in shared processes, we redirect this call to the shared address
+  // space.
+  vdso_code_address_ = shareable_state_->aspace()->vdso_code_address();
   return vdso_code_address_;
 }
 

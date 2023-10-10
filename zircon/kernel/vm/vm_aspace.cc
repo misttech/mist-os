@@ -120,7 +120,7 @@ void VmAspace::KernelAspaceInitPreHeap() TA_NO_THREAD_SAFETY_ANALYSIS {
   g_kernel_root_vmar.Initialize(g_kernel_aspace.Get());
   g_kernel_aspace->root_vmar_ = fbl::AdoptRef(&g_kernel_root_vmar.Get());
 
-  zx_status_t status = g_kernel_aspace->Init();
+  zx_status_t status = g_kernel_aspace->Init(ShareOpt::None);
   ASSERT(status == ZX_OK);
 
   // save a pointer to the singleton kernel address space
@@ -136,21 +136,23 @@ VmAspace::VmAspace(vaddr_t base, size_t size, Type type, AslrConfig aslr_config,
       aslr_prng_(nullptr, 0),
       aslr_config_(aslr_config),
       arch_aspace_(base, size, arch_aspace_flags_from_type(type)) {
-  DEBUG_ASSERT(size != 0);
-  DEBUG_ASSERT(base + size - 1 >= base);
-
   Rename(name);
 
   LTRACEF("%p '%s'\n", this, name_);
 }
 
-zx_status_t VmAspace::Init() {
+zx_status_t VmAspace::Init(ShareOpt share_opt) {
   canary_.Assert();
 
   LTRACEF("%p '%s'\n", this, name_);
 
   // initialize the architecturally specific part
-  zx_status_t status = arch_aspace_.Init();
+  zx_status_t status;
+  if (share_opt == ShareOpt::Shared) {
+    status = arch_aspace_.InitPrepopulated();
+  } else {
+    status = arch_aspace_.Init();
+  }
   if (status != ZX_OK) {
     return status;
   }
@@ -165,7 +167,38 @@ zx_status_t VmAspace::Init() {
   return ZX_OK;
 }
 
-fbl::RefPtr<VmAspace> VmAspace::Create(vaddr_t base, size_t size, Type type, const char* name) {
+fbl::RefPtr<VmAspace> VmAspace::CreateUnified(VmAspace* shared, VmAspace* restricted,
+                                              const char* name) {
+  const VmAspace::Type type = VmAspace::Type::User;
+  fbl::AllocChecker ac;
+  // Unified aspaces are initialized with a base and size of 0 to signify that they do not manage
+  // any mappings themselves. It also provides an extra layer of security in that any operation on
+  // a unified aspace will fail to do a range check.
+  auto aspace = fbl::AdoptRef(new (&ac) VmAspace(0, 0, type, CreateAslrConfig(type), name));
+  if (!ac.check()) {
+    return nullptr;
+  }
+
+  // Initialize the arch specific component to our address space.
+  zx_status_t status =
+      aspace->arch_aspace_.InitUnified(shared->arch_aspace(), restricted->arch_aspace());
+  if (status != ZX_OK) {
+    status = aspace->Destroy();
+    DEBUG_ASSERT(status == ZX_OK);
+    return nullptr;
+  }
+
+  // Add it to the global list.
+  {
+    Guard<Mutex> guard{AspaceListLock::Get()};
+    aspaces_list_.push_back(aspace.get());
+  }
+
+  return aspace;
+}
+
+fbl::RefPtr<VmAspace> VmAspace::Create(vaddr_t base, size_t size, Type type, const char* name,
+                                       ShareOpt share_opt) {
   LTRACEF("type %u, name '%s'\n", static_cast<uint>(type), name);
 
   if (!is_valid_for_type(base, size, type)) {
@@ -179,7 +212,7 @@ fbl::RefPtr<VmAspace> VmAspace::Create(vaddr_t base, size_t size, Type type, con
   }
 
   // initialize the arch specific component to our address space
-  zx_status_t status = aspace->Init();
+  zx_status_t status = aspace->Init(share_opt);
   if (status != ZX_OK) {
     status = aspace->Destroy();
     DEBUG_ASSERT(status == ZX_OK);
@@ -220,7 +253,7 @@ fbl::RefPtr<VmAspace> VmAspace::Create(Type type, const char* name) {
       panic("Invalid aspace type");
   }
 
-  return Create(base, size, type, name);
+  return Create(base, size, type, name, ShareOpt::None);
 }
 
 void VmAspace::Rename(const char* name) {
@@ -775,7 +808,7 @@ void VmAspace::HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
   Guard<Mutex> guard{AspaceListLock::Get()};
 
   for (auto& a : aspaces_list_) {
-    if (a.is_user()) {
+    if (a.is_user() && a.size() > 0) {
       // Forbid PT reclamation and accessed bit harvesting on high priority aspaces.
       const NonTerminalAction apply_non_terminal_action =
           a.IsHighMemoryPriority() ? NonTerminalAction::Retain : non_terminal_action;

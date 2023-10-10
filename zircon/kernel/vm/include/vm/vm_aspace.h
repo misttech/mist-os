@@ -57,10 +57,33 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   //
   // The returned aspace will start at |base| and span |size|.
   //
+  // If |share_opt| is ShareOpt::Shared, we're creating a shared address space, and the underlying
+  // ArchVmAspace will be initialized using the `InitPrepopulated` method instead of the normal
+  // `Init` method.
+  //
   // Although reference counted, the returned VmAspace must be explicitly destroyed via Destroy.
   //
   // Returns null on failure (e.g. due to resource starvation).
-  static fbl::RefPtr<VmAspace> Create(vaddr_t base, size_t size, Type type, const char* name);
+  enum class ShareOpt {
+    None,
+    Shared,
+  };
+  static fbl::RefPtr<VmAspace> Create(vaddr_t base, size_t size, Type type, const char* name,
+                                      ShareOpt share_opt);
+
+  // Create a unified address space that consists of the given constituent address spaces.
+  //
+  // The passed in address spaces must meet the following criteria:
+  // 1. They must manage non-overlapping regions.
+  // 2. The shared VmAspace must have been created with the shared argument set to true.
+  //
+  // Although reference counted, the returned VmAspace must be explicitly destroyed via Destroy.
+  // Note that it must be Destroy()'d before the shared and restricted VmAspaces; Destroy()'ing the
+  // constituent VmAspaces before Destroy()'ing this one will trigger asserts.
+  //
+  // Returns null on failure (e.g. due to resource starvation).
+  static fbl::RefPtr<VmAspace> CreateUnified(VmAspace* shared, VmAspace* restricted,
+                                             const char* name);
 
   // Destroy this address space.
   //
@@ -241,7 +264,7 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   friend fbl::RefPtr<VmAspace>;
 
   // complete initialization, may fail in OOM cases
-  zx_status_t Init();
+  zx_status_t Init(ShareOpt share_opt);
 
   void InitializeAslr();
 
