@@ -510,6 +510,11 @@ template("gvisor_with_expectations_test_package") {
       log_settings = {
         max_severity = "ERROR"
       }
+
+      # These tests can take a while on debug builders.
+      if (is_debug) {
+        timeout_secs = 600
+      }
     }
   }
 }
