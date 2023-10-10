@@ -20,7 +20,6 @@ platform
 power
 process
 product
-product-bundle
 profile
 repository
 schema

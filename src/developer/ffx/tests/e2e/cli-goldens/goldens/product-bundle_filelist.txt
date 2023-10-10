@@ -1,5 +1,0 @@
-ffx/product-bundle.golden
-ffx/product-bundle/create.golden
-ffx/product-bundle/get.golden
-ffx/product-bundle/list.golden
-ffx/product-bundle/remove.golden
