@@ -351,7 +351,6 @@
                 "MountTest.BindSlaveToSlave",
                 "MountTest.LargeTreePropagationEvent",
                 "MountTest.MaxMounts",
-                "MountTest.MaxMountsWithSlave",
                 "MountTest.MountInfo",
                 "MountTest.MountNamespaceSlavesNewUserNamespace",
                 "MountTest.MountNoExec",
@@ -885,6 +884,11 @@
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondSuccess/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondFailure/*",
                 "Inotify.EpollNoDeadlock",
+
+                // This hangs on debug builds.
+                //
+                // See https://fxbug.dev/135058.
+                "MountTest.MaxMountsWithSlave",
 
                 // This test hangs because Netlink sockets do not support the
                 // "MSG_PEEK" flag on reads.
