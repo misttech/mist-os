@@ -13,5 +13,6 @@ source_set("debugcommands") {
     "//zircon/kernel/lib/boot-options:boot-options-cli",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/unittest",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }

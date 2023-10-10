@@ -80,5 +80,6 @@ source_set("tests") {
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/unittest",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }

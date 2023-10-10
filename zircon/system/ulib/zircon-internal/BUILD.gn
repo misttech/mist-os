@@ -2,11 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/migrated_targets.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("zircon-internal") {
-  sdk = "source"
-  sdk_headers = [
+library_headers("headers") {
+  headers = [
     "lib/zircon-internal/align.h",
     "lib/zircon-internal/default_stack_size.h",
     "lib/zircon-internal/device/cpu-trace/intel-pm-events.inc",
@@ -25,8 +24,11 @@ zx_library("zircon-internal") {
     "lib/zircon-internal/unique-backtrace.h",
     "lib/zircon-internal/xorshiftrand.h",
   ]
+}
 
+source_set("zircon-internal") {
   sources = []
+  public_deps = [ ":headers" ]
 }
 
 if (!is_kernel) {

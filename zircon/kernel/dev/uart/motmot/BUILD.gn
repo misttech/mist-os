@@ -20,5 +20,6 @@ source_set("motmot") {
     "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/cbuf",
     "//zircon/kernel/lib/debuglog",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }

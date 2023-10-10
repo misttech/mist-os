@@ -10,5 +10,6 @@ source_set("tests") {
   deps = [
     "//zircon/kernel/lib/io:headers",
     "//zircon/kernel/lib/unittest",
+    "//zircon/system/ulib/zircon-internal",
   ]
 }
