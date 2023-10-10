@@ -736,10 +736,11 @@ impl DirEntry {
 
     /// Notifies watchers on the current node and its parent about an event.
     pub fn notify(&self, event_mask: InotifyMask) {
+        let mode = self.node.info().mode;
         if let Some(parent) = self.parent() {
-            parent.node.watchers.notify(event_mask, 0, &self.local_name(), self.node.info().mode);
+            parent.node.watchers.notify(event_mask, 0, &self.local_name(), mode);
         }
-        self.node.watchers.notify(event_mask, 0, b"", self.node.info().mode);
+        self.node.watchers.notify(event_mask, 0, b"", mode);
     }
 
     /// Notifies parents about creation, and notifies current node about link_count change.
