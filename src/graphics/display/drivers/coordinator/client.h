@@ -349,9 +349,6 @@ class Client : public fidl::WireServer<fuchsia_hardware_display::Coordinator> {
   // until this issue is fixed.
   DriverLayerId next_driver_layer_id = DriverLayerId(1);
 
-  // TODO(stevensd): Delete this when client stop using SetDisplayImage
-  uint64_t display_image_layer_ = INVALID_ID;
-
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
   bool CheckConfig(fuchsia_hardware_display::wire::ConfigResult* res,
