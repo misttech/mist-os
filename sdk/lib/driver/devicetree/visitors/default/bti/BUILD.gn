@@ -2,25 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  deps = [ "mmio:tests" ]
-  testonly = true
-}
-
-source_set("default") {
-  public = [ "default.h" ]
-
+source_set("bti") {
+  sources = [
+    "bti.cc",
+    "bti.h",
+  ]
   deps = [
-    "bind-property",
-    "bti",
-    "mmio",
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bind/fuchsia.devicetree:fuchsia.devicetree_cpp",
   ]
 
   public_deps = [
     "//sdk/lib/driver/devicetree/manager:headers",
-    "//sdk/lib/driver/devicetree/visitors:multivisitor",
     "//zircon/system/ulib/zx",
   ]
 }

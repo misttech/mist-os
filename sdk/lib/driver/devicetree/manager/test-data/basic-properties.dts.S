@@ -14,11 +14,7 @@
 
     sample-device@0 {
         compatible = "fuchsia,sample-device";
-        reg = <0 TEST_REG_A_BASE 0 TEST_REG_A_LENGTH
-               TEST_REG_B_BASE_WORD0 TEST_REG_B_BASE_WORD1
-               TEST_REG_B_LENGTH_WORD0 TEST_REG_B_LENGTH_WORD1
-               TEST_REG_C_BASE_WORD0 TEST_REG_C_BASE_WORD1
-               TEST_REG_C_LENGTH_WORD0 TEST_REG_C_LENGTH_WORD1>;
+        reg = <0 TEST_REG_A_BASE 0 TEST_REG_A_LENGTH>;
         device_specific_prop = <DEVICE_SPECIFIC_PROP_VALUE>;
     };
 
@@ -32,4 +28,5 @@
         compatible = "fuchsia,sample-bti-device";
         iommus = <&dummy_iommu TEST_BTI_ID>;
     };
+
 };

@@ -4,251 +4,30 @@
 
 #include "manager.h"
 
-#include <fcntl.h>
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
-#include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
-#include <lib/driver/logging/cpp/logger.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/syslog/cpp/macros.h>
 
-#include <memory>
-#include <sstream>
 #include <unordered_set>
 
 #include <bind/fuchsia/devicetree/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
 
+#include "manager-test-helper.h"
 #include "test-data/basic-properties.h"
 #include "visitor.h"
 
 namespace fdf_devicetree {
 namespace {
 
-std::string DebugStringifyProperty(const fuchsia_driver_framework::NodeProperty& prop) {
-  std::stringstream ret;
-  ret << "Key=";
-
-  switch (prop.key().Which()) {
-    using Tag = fuchsia_driver_framework::NodePropertyKey::Tag;
-    case Tag::kIntValue:
-      ret << "Int{" << prop.key().int_value().value() << "}";
-      break;
-    case Tag::kStringValue:
-      ret << "Str{" << prop.key().string_value().value() << "}";
-      break;
-    default:
-      ret << "Unknown{" << static_cast<int>(prop.key().Which()) << "}";
-      break;
-  }
-
-  ret << " Value=";
-  switch (prop.value().Which()) {
-    using Tag = fuchsia_driver_framework::NodePropertyValue::Tag;
-    case Tag::kBoolValue:
-      ret << "Bool{" << prop.value().bool_value().value() << "}";
-      break;
-    case Tag::kEnumValue:
-      ret << "Enum{" << prop.value().enum_value().value() << "}";
-      break;
-    case Tag::kIntValue:
-      ret << "Int{" << prop.value().int_value().value() << "}";
-      break;
-    case Tag::kStringValue:
-      ret << "String{" << prop.value().string_value().value() << "}";
-      break;
-    default:
-      ret << "Unknown{" << static_cast<int>(prop.value().Which()) << "}";
-      break;
-  }
-
-  return ret.str();
-}
-
-void AssertHasProperties(
-    std::vector<fuchsia_driver_framework::NodeProperty> expected,
-    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties) {
-  for (auto& property : node_properties) {
-    auto iter = std::find(expected.begin(), expected.end(), property);
-    EXPECT_NE(expected.end(), iter) << "Unexpected property: " << DebugStringifyProperty(property);
-    if (iter != expected.end()) {
-      expected.erase(iter);
-    }
-  }
-
-  ASSERT_TRUE(expected.empty());
-}
-
-class FakePlatformBus final : public fdf::Server<fuchsia_hardware_platform_bus::PlatformBus> {
+class ManagerTest : public testing::ManagerTestHelper, public ::testing::Test {
  public:
-  void NodeAdd(NodeAddRequest& request, NodeAddCompleter::Sync& completer) override {
-    nodes_.emplace_back(std::move(request.node()));
-    completer.Reply(zx::ok());
-  }
-  void ProtocolNodeAdd(ProtocolNodeAddRequest& request,
-                       ProtocolNodeAddCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void RegisterProtocol(RegisterProtocolRequest& request,
-                        RegisterProtocolCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void AddCompositeNodeSpec(AddCompositeNodeSpecRequest& request,
-                            AddCompositeNodeSpecCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void SetBoardInfo(SetBoardInfoRequest& request, SetBoardInfoCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void SetBootloaderInfo(SetBootloaderInfoRequest& request,
-                         SetBootloaderInfoCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void AddComposite(AddCompositeRequest& request, AddCompositeCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void AddCompositeImplicitPbusFragment(
-      AddCompositeImplicitPbusFragmentRequest& request,
-      AddCompositeImplicitPbusFragmentCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-  void RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequest& request,
-                                  RegisterSysSuspendCallbackCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  std::vector<fuchsia_hardware_platform_bus::Node>& nodes() { return nodes_; }
-
- private:
-  std::vector<fuchsia_hardware_platform_bus::Node> nodes_;
-};
-class FakeCompositeNodeManager final
-    : public fidl::Server<fuchsia_driver_framework::CompositeNodeManager> {
- public:
-  void AddSpec(AddSpecRequest& request, AddSpecCompleter::Sync& completer) override {
-    requests_.emplace_back(std::move(request));
-    completer.Reply(zx::ok());
-  }
-
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_driver_framework::CompositeNodeManager> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {}
-
-  std::vector<AddSpecRequest> requests() { return requests_; }
-
- private:
-  std::vector<AddSpecRequest> requests_;
-};
-
-class EnvWrapper {
- public:
-  void Bind(fdf::ServerEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus_endpoints_server,
-            fidl::ServerEnd<fuchsia_driver_framework::CompositeNodeManager> mgr_endpoints_server) {
-    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(pbus_endpoints_server), &pbus_);
-    fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                     std::move(mgr_endpoints_server), &mgr_);
-  }
-
-  size_t pbus_node_size() { return pbus_.nodes().size(); }
-
-  size_t mgr_requests_size() { return mgr_.requests().size(); }
-
-  FakeCompositeNodeManager::AddSpecRequest mgr_requests_at(size_t index) {
-    return mgr_.requests()[1];
-  }
-
-  fuchsia_hardware_platform_bus::Node pbus_nodes_at(size_t index) { return pbus_.nodes()[index]; }
-
- private:
-  FakePlatformBus pbus_;
-  FakeCompositeNodeManager mgr_;
-};
-
-class ManagerTest : public ::testing::Test {
- public:
-  ManagerTest() { ConnectLogger(); }
-
-  ~ManagerTest() { fdf::Logger::SetGlobalInstance(nullptr); }
-
-  void ConnectLogger() {
-    zx::socket client_end, server_end;
-    zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &client_end, &server_end);
-    ASSERT_EQ(status, ZX_OK);
-
-    auto connect_result = component::Connect<fuchsia_logger::LogSink>();
-    ASSERT_FALSE(connect_result.is_error());
-
-    fidl::WireSyncClient<fuchsia_logger::LogSink> log_sink;
-    log_sink.Bind(std::move(*connect_result));
-    auto sink_result = log_sink->ConnectStructured(std::move(server_end));
-    ASSERT_TRUE(sink_result.ok());
-
-    logger_ = std::make_unique<fdf::Logger>("ManagerTest", 0, std::move(client_end),
-                                            fidl::WireClient<fuchsia_logger::LogSink>());
-    fdf::Logger::SetGlobalInstance(logger_.get());
-  }
-
-  // Load the file |name| into a vector and return it.
-  static std::vector<uint8_t> LoadTestBlob(const char* name) {
-    int fd = open(name, O_RDONLY);
-    if (fd < 0) {
-      FX_LOGS(ERROR) << "Open failed: " << strerror(errno);
-      return {};
-    }
-
-    struct stat stat_out;
-    if (fstat(fd, &stat_out) < 0) {
-      FX_LOGS(ERROR) << "fstat failed: " << strerror(errno);
-      return {};
-    }
-
-    std::vector<uint8_t> vec(stat_out.st_size);
-    ssize_t bytes_read = read(fd, vec.data(), stat_out.st_size);
-    if (bytes_read < 0) {
-      FX_LOGS(ERROR) << "read failed: " << strerror(errno);
-      return {};
-    }
-    vec.resize(bytes_read);
-    return vec;
-  }
-
-  void DoPublish(Manager& manager) {
-    auto pbus_endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-    ASSERT_EQ(ZX_OK, pbus_endpoints.status_value());
-    auto mgr_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::CompositeNodeManager>();
-    ASSERT_EQ(ZX_OK, mgr_endpoints.status_value());
-    auto node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-    ASSERT_EQ(ZX_OK, node_endpoints.status_value());
-    node_.Bind(std::move(node_endpoints->client));
-
-    env_.SyncCall(&EnvWrapper::Bind, std::move(pbus_endpoints->server),
-                  std::move(mgr_endpoints->server));
-    ASSERT_EQ(
-        ZX_OK,
-        manager.PublishDevices(std::move(pbus_endpoints->client), std::move(mgr_endpoints->client))
-            .status_value());
-  }
-
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher = runtime_.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<EnvWrapper> env_{env_dispatcher->async_dispatcher(),
-                                                       std::in_place};
-  fidl::SyncClient<fuchsia_driver_framework::Node> node_;
-  std::unique_ptr<fdf::Logger> logger_;
+  ManagerTest() : ManagerTestHelper("ManagerTest") {}
 };
 
 TEST_F(ManagerTest, TestFindsNodes) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
   class EmptyVisitor : public Visitor {
    public:
     zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
@@ -273,7 +52,7 @@ TEST_F(ManagerTest, TestFindsNodes) {
 }
 
 TEST_F(ManagerTest, TestPropertyCallback) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
   class TestVisitor : public Visitor {
    public:
     zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override {
@@ -301,63 +80,41 @@ TEST_F(ManagerTest, TestPropertyCallback) {
 }
 
 TEST_F(ManagerTest, TestPublishesSimpleNode) {
-  Manager manager(LoadTestBlob("/pkg/test-data/simple.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
   DefaultVisitors<> default_visitors;
   ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
-  DoPublish(manager);
-  ASSERT_EQ(2lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
 
-  ASSERT_EQ(0lu, env_.SyncCall(&EnvWrapper::mgr_requests_size));
+  ASSERT_EQ(0lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
 
-  auto pbus_node = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1);
+  auto pbus_node = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1);
   ASSERT_TRUE(pbus_node.name().has_value());
   ASSERT_NE(nullptr, strstr("example-device", pbus_node.name()->data()));
   ASSERT_TRUE(pbus_node.properties().has_value());
 
-  AssertHasProperties({{{
-                          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
-                              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
-                          .value = fuchsia_driver_framework::NodePropertyValue::WithStringValue(
-                              "fuchsia,sample-device"),
-                      }}},
-                      *pbus_node.properties());
-}
-
-TEST_F(ManagerTest, TestMmioProperty) {
-  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
-  DefaultVisitors<> default_visitors;
-  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
-
-  DoPublish(manager);
-
-  // First node is devicetree root. Second one is the sample-device. Check MMIO of sample-device.
-  auto mmio = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1).mmio();
-
-  // Test MMIO properties.
-  ASSERT_TRUE(mmio);
-  ASSERT_EQ(3lu, mmio->size());
-  ASSERT_EQ(TEST_REG_A_BASE, *(*mmio)[0].base());
-  ASSERT_EQ(static_cast<uint64_t>(TEST_REG_A_LENGTH), *(*mmio)[0].length());
-  ASSERT_EQ((uint64_t)TEST_REG_B_BASE_WORD0 << 32 | TEST_REG_B_BASE_WORD1, *(*mmio)[1].base());
-  ASSERT_EQ((uint64_t)TEST_REG_B_LENGTH_WORD0 << 32 | TEST_REG_B_LENGTH_WORD1,
-            *(*mmio)[1].length());
-  ASSERT_EQ((uint64_t)TEST_REG_C_BASE_WORD0 << 32 | TEST_REG_C_BASE_WORD1, *(*mmio)[2].base());
-  ASSERT_EQ((uint64_t)TEST_REG_C_LENGTH_WORD0 << 32 | TEST_REG_C_LENGTH_WORD1,
-            *(*mmio)[2].length());
+  ASSERT_TRUE(testing::CheckHasProperties(
+      {{{
+          .key = fuchsia_driver_framework::NodePropertyKey::WithStringValue(
+              bind_fuchsia_devicetree::FIRST_COMPATIBLE),
+          .value =
+              fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-device"),
+      }}},
+      *pbus_node.properties()));
 }
 
 TEST_F(ManagerTest, TestBtiProperty) {
-  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
   DefaultVisitors<> default_visitors;
   ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
 
-  DoPublish(manager);
+  ASSERT_TRUE(DoPublish(manager).is_ok());
 
   // First node is devicetree root. Second one is the sample-device.
   // Third is sample-bti-device.
   // Check BTI of sample-bti-device.
-  auto bti = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 2).bti();
+  auto bti = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 2).bti();
 
   // Test BTI properties.
   ASSERT_TRUE(bti);
@@ -367,7 +124,7 @@ TEST_F(ManagerTest, TestBtiProperty) {
 }
 
 TEST_F(ManagerTest, DriverVisitorTest) {
-  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
 
   class TestDriverVisitor final : public DriverVisitor {
    public:
@@ -383,12 +140,12 @@ TEST_F(ManagerTest, DriverVisitorTest) {
   TestDriverVisitor visitor;
   ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
 
-  DoPublish(manager);
+  ASSERT_TRUE(DoPublish(manager).is_ok());
   ASSERT_TRUE(visitor.visited);
 }
 
 TEST_F(ManagerTest, TestMetadata) {
-  Manager manager(LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/basic-properties.dtb"));
 
   class MetadataVisitor : public DriverVisitor {
    public:
@@ -413,13 +170,13 @@ TEST_F(ManagerTest, TestMetadata) {
   DefaultVisitors<MetadataVisitor> visitor;
   ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
 
-  DoPublish(manager);
+  ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(3lu, env_.SyncCall(&EnvWrapper::pbus_node_size));
+  ASSERT_EQ(3lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
 
   // First node is devicetree root. Second one is the sample-device. Check
   // metadata of sample-device.
-  auto metadata = env_.SyncCall(&EnvWrapper::pbus_nodes_at, 1).metadata();
+  auto metadata = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1).metadata();
 
   // Test Metadata properties.
   ASSERT_TRUE(metadata);

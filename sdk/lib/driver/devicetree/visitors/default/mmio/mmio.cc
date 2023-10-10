@@ -27,7 +27,7 @@ zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& d
   auto reg_props = property->second.AsReg(decoder);
   if (reg_props == std::nullopt) {
     FDF_SLOG(WARNING, "Node has invalid mmio property", KV("node_name", node.name()));
-    return zx::ok();
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   for (uint32_t i = 0; i < reg_props->size(); i++) {

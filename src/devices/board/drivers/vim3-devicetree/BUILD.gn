@@ -72,7 +72,7 @@ fuchsia_driver_component("vim3-devicetree") {
 test("vim3-devicetree-test") {
   sources = [ "vim3-devicetree-test.cc" ]
   deps = [
-    "//sdk/lib/driver/devicetree/testing",
+    "//sdk/lib/driver/devicetree/testing:board-test-helper",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/ddk-platform-defs",

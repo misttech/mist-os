@@ -12,6 +12,7 @@
 #include <zircon/dlfcn.h>
 
 #include <memory>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -30,17 +31,17 @@ struct dirent_t {
   char name[0];
 } __PACKED;
 
-zx::result<zx::vmo> SetVmoName(zx::vmo vmo, const std::string& vmo_name) {
+zx::result<zx::vmo> SetVmoName(zx::vmo vmo, std::string_view vmo_name) {
   if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, vmo_name.data(), vmo_name.size());
       status != ZX_OK) {
-    FDF_LOG(ERROR, "Cannot set name on visitor VMO '%s' %s", vmo_name.c_str(),
-            zx_status_get_string(status));
+    FDF_LOG(ERROR, "Cannot set name on visitor VMO '%.*s' %s", (int)vmo_name.length(),
+            vmo_name.data(), zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok(std::move(vmo));
 }
 
-zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, const std::string& visitor_file) {
+zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view visitor_file) {
   const fio::wire::VmoFlags KVisitorVmoFlag = fio::wire::VmoFlags::kRead |
                                               fio::wire::VmoFlags::kExecute |
                                               fio::wire::VmoFlags::kPrivateClone;
@@ -50,27 +51,28 @@ zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, const std::string& 
     return endpoints.take_error();
   }
 
-  auto full_path = std::string(kVisitorsPath) + "/" + visitor_file;
-  auto status =
+  std::string full_path = std::string(kVisitorsPath) + "/" + visitor_file.data();
+  zx::result status =
       incoming.Open(full_path.c_str(),
                     fio::wire::OpenFlags::kRightReadable | fio::wire::OpenFlags::kRightExecutable,
                     endpoints->server.TakeChannel());
   if (status.is_error()) {
-    FDF_LOG(ERROR, "Failed to open visitor '%s': %s", visitor_file.c_str(), status.status_string());
+    FDF_LOG(ERROR, "Failed to open visitor '%.*s': %s", (int)visitor_file.length(),
+            visitor_file.data(), status.status_string());
     return status.take_error();
   }
 
   fidl::WireSyncClient file_client{std::move(endpoints->client)};
   fidl::WireResult file_res = file_client->GetBackingMemory(KVisitorVmoFlag);
   if (!file_res.ok()) {
-    FDF_LOG(ERROR, "Failed to get visitor '%s' vmo: %s", visitor_file.c_str(),
-            file_res.FormatDescription().c_str());
+    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", (int)visitor_file.length(),
+            visitor_file.data(), file_res.FormatDescription().c_str());
     return zx::error(ZX_ERR_INTERNAL);
   }
 
   if (file_res->is_error()) {
-    FDF_LOG(ERROR, "Failed to get visitor '%s' vmo: %s", visitor_file.c_str(),
-            zx_status_get_string(file_res->error_value()));
+    FDF_LOG(ERROR, "Failed to get visitor '%.*s' vmo: %s", (int)visitor_file.length(),
+            visitor_file.data(), zx_status_get_string(file_res->error_value()));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -129,7 +131,7 @@ namespace fdf_devicetree {
 zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(fdf::Namespace& incoming) {
   auto visitors = std::make_unique<VisitorRegistry>();
 
-  auto status = visitors->RegisterVisitor(std::unique_ptr<Visitor>(new DefaultVisitors<>));
+  auto status = visitors->RegisterVisitor(std::make_unique<DefaultVisitors<>>());
   if (status.is_error()) {
     FDF_LOG(ERROR, "DefaultVisitors registration failed: %s", status.status_string());
     return status.take_error();

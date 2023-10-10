@@ -8,9 +8,9 @@
 
 #include <lib/driver/devicetree/visitors/multivisitor.h>
 
-#include "bind-property.h"
-#include "bti.h"
-#include "mmio.h"
+#include "bind-property/bind-property.h"
+#include "bti/bti.h"
+#include "mmio/mmio.h"
 
 namespace fdf_devicetree {
 

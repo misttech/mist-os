@@ -63,7 +63,7 @@ zbi_input("example-board-dtb") {
 test("example-board-test") {
   sources = [ "integration-test.cc" ]
   deps = [
-    "//sdk/lib/driver/devicetree/testing",
+    "//sdk/lib/driver/devicetree/testing:board-test-helper",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/ddk-platform-defs",

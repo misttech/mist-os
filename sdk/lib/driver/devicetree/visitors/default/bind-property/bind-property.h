@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_H_
-#define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_H_
+#ifndef LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_BIND_PROPERTY_H_
+#define LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_BIND_PROPERTY_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
 #include <lib/zx/result.h>
@@ -22,4 +22,4 @@ class BindPropertyVisitor : public Visitor {
 
 }  // namespace fdf_devicetree
 
-#endif  // LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_H_
+#endif  // LIB_DRIVER_DEVICETREE_VISITORS_DEFAULT_BIND_PROPERTY_BIND_PROPERTY_H_

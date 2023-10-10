@@ -8,5 +8,6 @@ group("tests") {
   deps = [
     "examples/example-board:tests",
     "manager:tests",
+    "visitors:tests",
   ]
 }

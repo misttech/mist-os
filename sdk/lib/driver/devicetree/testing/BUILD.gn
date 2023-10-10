@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-source_set("testing") {
+source_set("board-test-helper") {
   deps = [
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
@@ -27,5 +27,12 @@ source_set("testing") {
     "board-test-helper.h",
   ]
 
+  testonly = true
+}
+
+source_set("visitor-test-helper") {
+  sources = [ "visitor-test-helper.h" ]
+  deps = []
+  public_deps = [ "//sdk/lib/driver/devicetree/manager:manager-test-helper" ]
   testonly = true
 }
