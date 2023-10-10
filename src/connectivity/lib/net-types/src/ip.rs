@@ -59,7 +59,7 @@ use core::convert::TryFrom;
 use core::fmt::{self, Debug, Display, Formatter};
 use core::hash::Hash;
 use core::mem;
-use core::ops::Deref;
+use core::ops::{Deref, DerefMut};
 
 #[cfg(feature = "std")]
 use std::net;
@@ -3181,6 +3181,62 @@ impl<I: Ip, T> GenericOverIp<I> for IpInvariant<T> {
 
 impl<I: Ip> GenericOverIp<I> for core::convert::Infallible {
     type Type = Self;
+}
+
+/// A wrapper structure to add an IP version marker to an IP-invariant type.
+#[derive(GenericOverIp, Default, Debug, PartialOrd, Ord, Eq, PartialEq, Hash)]
+#[generic_over_ip(I, Ip)]
+pub struct IpMarked<I: Ip, T> {
+    inner: T,
+    _marker: IpVersionMarker<I>,
+}
+
+impl<I: Ip, T> Deref for IpMarked<I, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl<I: Ip, T> DerefMut for IpMarked<I, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut()
+    }
+}
+impl<I: Ip, T> AsRef<T> for IpMarked<I, T> {
+    fn as_ref(&self) -> &T {
+        &self.inner
+    }
+}
+
+impl<I: Ip, T> AsMut<T> for IpMarked<I, T> {
+    fn as_mut(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
+impl<I: Ip, T> IpMarked<I, T> {
+    /// Constructs a new `IpMarked` from the provided `T`.
+    pub fn new(inner: T) -> Self {
+        Self { inner, _marker: IpVersionMarker::<I>::new() }
+    }
+
+    /// Consumes the `IpMarked` and returns the contained `T` by value.
+    pub fn into_inner(self) -> T {
+        let Self { inner, _marker } = self;
+        inner
+    }
+
+    /// Gets an immutable reference to the underlying `T`.
+    pub fn get(&self) -> &T {
+        self.as_ref()
+    }
+
+    /// Gets an mutable reference to the underlying `T`.
+    pub fn get_mut(&mut self) -> &mut T {
+        self.as_mut()
+    }
 }
 
 /// Calls the provided macro with all suffixes of the input.

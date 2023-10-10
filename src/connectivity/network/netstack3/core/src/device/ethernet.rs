@@ -2074,14 +2074,14 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         // Accept packet destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         let buf = Buf::new(Vec::new(), ..)
@@ -2107,14 +2107,14 @@ mod tests {
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         // Accept packet not destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
             get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name),
             usize::from(is_other_host)
@@ -2230,7 +2230,7 @@ mod tests {
             buf,
         );
         assert_eq!(
-            get_counter_val(non_sync_ctx, dispatch_receive_ip_packet_name::<A::Version>()),
+            sync_ctx.state.get_ip_counters::<A::Version>().dispatch_receive_ip_packet.get(),
             expected
         );
     }

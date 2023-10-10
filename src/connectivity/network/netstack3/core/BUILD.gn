@@ -14,6 +14,7 @@ lib_sources = [
   "src/benchmarks.rs",
   "src/context.rs",
   "src/convert.rs",
+  "src/counters.rs",
   "src/data_structures/mod.rs",
   "src/data_structures/ref_counted_hash_map.rs",
   "src/data_structures/socketmap.rs",

@@ -30,6 +30,7 @@ mod algorithm;
 pub mod benchmarks;
 pub mod context;
 pub(crate) mod convert;
+pub(crate) mod counters;
 pub mod data_structures;
 pub mod device;
 pub mod error;
@@ -72,7 +73,7 @@ use crate::{
             Ipv6DeviceTimerId,
         },
         icmp::{BufferIcmpContext, IcmpContext},
-        IpLayerTimerId, Ipv4State, Ipv6State,
+        IpCounters, IpLayerTimerId, Ipv4State, Ipv6State,
     },
     transport::{tcp::socket::TcpBindingsTypes, TransportLayerState, TransportLayerTimerId},
 };
@@ -186,6 +187,16 @@ pub struct StackState<BT: BindingsTypes> {
     ipv4: Ipv4State<BT::Instant, DeviceId<BT>>,
     ipv6: Ipv6State<BT::Instant, DeviceId<BT>>,
     device: DeviceLayerState<BT>,
+}
+
+impl<BT: BindingsTypes> StackState<BT> {
+    pub(crate) fn get_ip_counters<I: Ip>(&self) -> &IpCounters<I> {
+        I::map_ip(
+            IpInvariant(self),
+            |IpInvariant(state)| state.ipv4.as_ref().get_counters(),
+            |IpInvariant(state)| state.ipv6.as_ref().get_counters(),
+        )
+    }
 }
 
 /// The non synchronized context for the stack with a buffer.

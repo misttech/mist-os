@@ -40,8 +40,8 @@ use lock_order::{
 use net_types::ip::IpVersion;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Mtu, Subnet,
+        GenericOverIp, Ip, IpAddress, IpInvariant, IpMarked, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+        Ipv6SourceAddr, Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -57,9 +57,10 @@ use tracing::{debug, trace};
 
 use crate::{
     context::{
-        CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler,
-        TracingContext,
+        CounterContext, CounterContext2, EventContext, InstantContext, NonTestCtxMarker,
+        TimerHandler, TracingContext,
     },
+    counters::Counter,
     data_structures::token_bucket::TokenBucket,
     device::{
         AnyDevice, DeviceId, DeviceIdContext, DeviceLayerTypes, FrameDestination, Id, StrongId,
@@ -873,6 +874,14 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
+impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IpCounters<I>>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::IpStateCounters<I>>())
+    }
+}
+
 impl<I, C, L> IpStateContext<I, C> for Locked<&SyncCtx<C>, L>
 where
     I: IpLayerIpExt,
@@ -1357,12 +1366,39 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateNextPacket
     }
 }
 
+pub(crate) type IpCounters<I> = IpMarked<I, IpCountersInner>;
+
+/// Ip layer counters.
+#[derive(Default)]
+pub(crate) struct IpCountersInner {
+    /// Count of incoming IP packets that are dispatched to the appropriate protocol.
+    pub(crate) dispatch_receive_ip_packet: Counter,
+}
+
+impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
+    for SyncCtx<C>
+{
+    type Data = IpCounters<I>;
+    type Guard<'l> = &'l IpCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.get_ip_counters()
+    }
+}
+
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct IpStateInner<I: Ip, Instant: crate::Instant, DeviceId> {
     table: RwLock<ForwardingTable<I, DeviceId>>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, Instant>>,
     pmtu_cache: Mutex<PmtuCache<I, Instant>>,
+    counters: IpCounters<I>,
+}
+
+impl<I: Ip, Instant: crate::Instant, DeviceId> IpStateInner<I, Instant, DeviceId> {
+    pub(crate) fn get_counters(&self) -> &IpCounters<I> {
+        &self.counters
+    }
 }
 
 /// The identifier for timer events in the IP layer.
@@ -1454,7 +1490,7 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 fn dispatch_receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv4, C, B>,
+    SC: BufferIpLayerContext<Ipv4, C, B> + CounterContext2<IpCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1466,7 +1502,9 @@ fn dispatch_receive_ipv4_packet<
     body: B,
     parse_metadata: Option<ParseMetadata>,
 ) {
-    ctx.increment_debug_counter("dispatch_receive_ipv4_packet");
+    sync_ctx.with_counters(|counters| {
+        counters.dispatch_receive_ip_packet.increment();
+    });
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
@@ -1537,7 +1575,7 @@ fn dispatch_receive_ipv4_packet<
 fn dispatch_receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv6, C, B>,
+    SC: BufferIpLayerContext<Ipv6, C, B> + CounterContext2<IpCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1555,7 +1593,9 @@ fn dispatch_receive_ipv6_packet<
     // parse_metadata argument which corresponds to a single extension
     // header rather than all of the IPv6 headers.
 
-    ctx.increment_debug_counter("dispatch_receive_ipv6_packet");
+    sync_ctx.with_counters(|counters| {
+        counters.dispatch_receive_ip_packet.increment();
+    });
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
@@ -1778,7 +1818,9 @@ pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B
 pub(crate) fn receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv4, C, B> + BufferIpLayerContext<Ipv4, C, Buf<Vec<u8>>>,
+    SC: BufferIpLayerContext<Ipv4, C, B>
+        + BufferIpLayerContext<Ipv4, C, Buf<Vec<u8>>>
+        + CounterContext2<IpCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1994,7 +2036,9 @@ pub(crate) fn receive_ipv4_packet<
 pub(crate) fn receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv6, C, B> + BufferIpLayerContext<Ipv6, C, Buf<Vec<u8>>>,
+    SC: BufferIpLayerContext<Ipv6, C, B>
+        + BufferIpLayerContext<Ipv6, C, Buf<Vec<u8>>>
+        + CounterContext2<IpCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -3577,8 +3621,8 @@ mod tests {
 
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_parameter_problem"), 0);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), 0);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 0);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 0);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 0);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
     }
 
     #[test]
@@ -3656,7 +3700,7 @@ mod tests {
         );
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
         // Test with unrecognized option type set with
@@ -3749,7 +3793,7 @@ mod tests {
         // IP packet after the first.
 
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_parameter_problem"), 0);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3760,14 +3804,14 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         let fragment_id = 5;
 
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Test that a non fragmented packet gets dispatched right away.
 
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id, 0, 1);
 
         // Make sure the packet got dispatched.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3788,14 +3832,14 @@ mod tests {
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id, 1, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process fragment #2
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id, 2, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]
@@ -3821,33 +3865,33 @@ mod tests {
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id_1, 0, 3);
 
         // Make sure no packets got dispatched yet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Process a packet that does not require reassembly (packet #2, fragment #0).
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id_2, 0, 1);
 
         // Make packet #1 got dispatched since it didn't need reassembly.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #2
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id_0, 2, 3);
 
         // Make sure no other packets got dispatched yet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Process packet #0, fragment #0
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id_0, 0, 3);
 
         // Make sure that packet #0 finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // Process packet #1, fragment #1
         process_ip_fragment::<I, _>(&mut sync_ctx, &mut non_sync_ctx, &device, fragment_id_1, 1, 3);
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been 'received'.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
     }
 
     #[ip_test]
@@ -3902,7 +3946,7 @@ mod tests {
         // technically received all the fragments, this fragment (#2) arrived
         // too late and the reassembly timer was triggered, causing the prior
         // fragment data to be discarded.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
     }
 
     #[ip_test]
@@ -3975,11 +4019,21 @@ mod tests {
 
         // Make sure no packets got dispatched yet.
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("alice"), dispatch_receive_ip_packet_name::<I>()),
+            net.context("alice")
+                .sync_ctx
+                .state
+                .get_ip_counters::<I>()
+                .dispatch_receive_ip_packet
+                .get(),
             0
         );
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("bob"), dispatch_receive_ip_packet_name::<I>()),
+            net.context("bob")
+                .sync_ctx
+                .state
+                .get_ip_counters::<I>()
+                .dispatch_receive_ip_packet
+                .get(),
             0
         );
 
@@ -3999,11 +4053,21 @@ mod tests {
         // Make sure the packet finally got dispatched now that the final
         // fragment has been received by bob.
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("alice"), dispatch_receive_ip_packet_name::<I>()),
+            net.context("alice")
+                .sync_ctx
+                .state
+                .get_ip_counters::<I>()
+                .dispatch_receive_ip_packet
+                .get(),
             0
         );
         assert_eq!(
-            get_counter_val(net.non_sync_ctx("bob"), dispatch_receive_ip_packet_name::<I>()),
+            net.context("bob")
+                .sync_ctx
+                .state
+                .get_ip_counters::<I>()
+                .dispatch_receive_ip_packet
+                .get(),
             1
         );
 
@@ -4064,7 +4128,7 @@ mod tests {
         );
 
         // Should not have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 0);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_packet_too_big"), 1);
 
         // Should have sent out one frame though.
@@ -4188,7 +4252,7 @@ mod tests {
         receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
             I::get_pmtu(&sync_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get())
@@ -4213,7 +4277,7 @@ mod tests {
         receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
 
         // The PMTU should not have updated to `new_mtu2`
         assert_eq!(
@@ -4239,7 +4303,7 @@ mod tests {
         receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
 
         // The PMTU should have updated to 1900.
         assert_eq!(
@@ -4278,7 +4342,7 @@ mod tests {
         receive_ip_packet::<_, _, I>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         assert_eq!(
             I::get_pmtu(&sync_ctx.state, fake_config.local_ip.get(), fake_config.remote_ip.get()),
@@ -4331,7 +4395,7 @@ mod tests {
         );
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
@@ -4366,7 +4430,7 @@ mod tests {
         );
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 2);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 2);
 
         // Should not have updated PMTU as there is no other valid
         // lower PMTU value.
@@ -4401,7 +4465,7 @@ mod tests {
         );
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 3);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 3);
 
         // Should have decreased PMTU value to the next lower PMTU
         // plateau from `crate::ip::path_mtu::PMTU_PLATEAUS`.
@@ -4439,7 +4503,7 @@ mod tests {
         );
 
         // Should have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 4);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 4);
 
         // Should not have updated the PMTU as the current PMTU is lower.
         assert_eq!(
@@ -4488,7 +4552,7 @@ mod tests {
 
         // Should not have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet"), 1);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 0);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // In IPv6, the next header value (ICMP(v4)) would have been considered
         // unrecognized so an ICMP parameter problem response SHOULD be sent,
@@ -4531,7 +4595,7 @@ mod tests {
         receive_ip_packet::<_, _, Ipv4>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
 
         // Should have dispatched the packet but resulted in an ICMP error.
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv4.inner.counters.dispatch_receive_ip_packet.get(), 1);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv4_dest_unreachable"), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         let buf = &non_sync_ctx.frames_sent()[0].1[..];
@@ -4581,7 +4645,7 @@ mod tests {
         // multicast group `multi_addr`.
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
         device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 0);
 
         // Join the multicast group and receive the packet, we should dispatch
         // it.
@@ -4601,7 +4665,7 @@ mod tests {
         }
         assert!(is_in_ip_multicast(&sync_ctx, &device, multi_addr));
         device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
 
         // Leave the multicast group and receive the packet, we should not
         // dispatch it.
@@ -4621,7 +4685,7 @@ mod tests {
         }
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
         device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[test]
@@ -4679,7 +4743,7 @@ mod tests {
             frame_dst,
             buf.clone(),
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 0);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // Wait until DAD is complete. Arbitrarily choose a year in the future
         // as a time after which we're confident DAD will be complete. We can't
@@ -4696,7 +4760,7 @@ mod tests {
 
         // Received packet should have been dispatched.
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Set the new IP (this should trigger DAD).
         let ip = config.local_ip.get();
@@ -4722,7 +4786,7 @@ mod tests {
             frame_dst,
             buf.clone(),
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 1);
 
         // Make sure all timers are done (DAD to complete on the interface due
         // to new IP).
@@ -4736,7 +4800,7 @@ mod tests {
 
         // Received packet should have been dispatched.
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
-        assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 2);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 2);
     }
 
     #[test]

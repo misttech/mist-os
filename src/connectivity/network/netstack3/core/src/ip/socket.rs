@@ -2017,7 +2017,7 @@ mod tests {
 
         assert_eq!(non_sync_ctx.frames_sent().len(), 0);
 
-        assert_eq!(get_counter_val(&non_sync_ctx, I::DISPATCH_RECEIVE_COUNTER), 1);
+        assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
     }
 
     #[ip_test]

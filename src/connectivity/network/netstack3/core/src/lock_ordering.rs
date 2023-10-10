@@ -122,6 +122,8 @@ pub(crate) struct UdpSocketsTable<I>(PhantomData<I>, Never);
 pub(crate) struct UdpBoundMap<I>(PhantomData<I>, Never);
 
 pub(crate) enum Ipv4StateNextPacketId {}
+// Provides unlocked access of IpCounters.
+pub(crate) struct IpStateCounters<I>(PhantomData<I>, Never);
 
 pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
 pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);

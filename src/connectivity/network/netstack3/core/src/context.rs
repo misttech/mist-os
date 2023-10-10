@@ -274,6 +274,16 @@ pub trait CounterContext {
     fn increment_debug_counter(&mut self, _key: &'static str) {}
 }
 
+/// A context that stores counters.
+///
+/// `CounterContext` exposes access to counters for observation and debugging.
+// TODO(http://fxbug.dev/134635): rename CounterContext once the deprecated
+// trait of that name is removed.
+pub(crate) trait CounterContext2<T> {
+    /// Call the function with an immutable reference to counter type T.
+    fn with_counters<O, F: FnOnce(&T) -> O>(&self, cb: F) -> O;
+}
+
 /// A context for emitting events.
 ///
 /// `EventContext` encodes the common pattern for emitting atomic events of type
