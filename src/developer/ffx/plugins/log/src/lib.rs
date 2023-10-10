@@ -5,7 +5,6 @@
 use error::LogError;
 use ffx_log_args::FfxLogCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
@@ -31,7 +30,7 @@ mod symbolizer;
 #[cfg(test)]
 mod testing_utils;
 
-const ARCHIVIST_MONIKER: &str = "/bootstrap/archivist";
+const ARCHIVIST_MONIKER: &str = "bootstrap/archivist";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(FfxTool)]
@@ -62,7 +61,7 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
-    let (instance_getter, server_end) = create_proxy::<fsys::RealmQueryMarker>()?;
+    let (instance_getter, server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()?;
     rcs_proxy.root_realm_query(server_end).await??;
     log_main(writer, rcs_proxy, target_collection_proxy, cmd, LogSymbolizer::new(), instance_getter)
         .await
@@ -116,21 +115,17 @@ async fn connect_to_target(
         _ => {}
     }
     // Connect to ArchiveAccessor
-    let (diagnostics_client, diagnostics_server) = create_proxy::<ArchiveAccessorMarker>()?;
-    rcs::connect_with_timeout::<ArchiveAccessorMarker>(
-        TIMEOUT,
-        ARCHIVIST_MONIKER,
+    let diagnostics_client = rcs::toolbox::connect_with_timeout::<ArchiveAccessorMarker>(
         &rcs_client,
-        diagnostics_server.into_channel(),
+        Some(ARCHIVIST_MONIKER),
+        TIMEOUT,
     )
     .await?;
     // Connect to LogSettings
-    let (log_settings_client, log_settings_server) = create_proxy::<LogSettingsMarker>()?;
-    rcs::connect_with_timeout::<LogSettingsMarker>(
-        TIMEOUT,
-        ARCHIVIST_MONIKER,
+    let log_settings_client = rcs::toolbox::connect_with_timeout::<LogSettingsMarker>(
         &rcs_client,
-        log_settings_server.into_channel(),
+        Some(ARCHIVIST_MONIKER),
+        TIMEOUT,
     )
     .await?;
     // Setup stream
@@ -160,9 +155,9 @@ async fn connect_to_rcs(
     target_collection_proxy: &TargetCollectionProxy,
     query: &TargetQuery,
 ) -> Result<RemoteControlProxy, LogError> {
-    let (client, server) = create_proxy()?;
+    let (client, server) = fidl::endpoints::create_proxy()?;
     target_collection_proxy.open_target(query, server).await??;
-    let (rcs_client, rcs_server) = create_proxy()?;
+    let (rcs_client, rcs_server) = fidl::endpoints::create_proxy()?;
     client.open_remote_control(rcs_server).await??;
     Ok(rcs_client)
 }
@@ -312,9 +307,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn symbolizer_replaces_markers_with_symbolized_logs() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -390,9 +385,9 @@ mod tests {
 
     #[fuchsia::test]
     async fn json_logger_test() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -440,9 +435,10 @@ mod tests {
 
     #[fuchsia::test]
     async fn logger_prints_error_if_ambiguous_selector() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) =
+            fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<TargetCollectionMarker>().unwrap();
 
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -495,9 +491,10 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_translates_selector_if_one_match() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) =
+            fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy::<TargetCollectionMarker>().unwrap();
 
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -538,9 +535,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_prints_error_if_both_dump_and_since_now_are_combined() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             since: Some(parse_time("now").unwrap()),
@@ -572,9 +569,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_prints_hello_world_message_and_exits_in_snapshot_mode() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -611,9 +608,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_does_not_color_logs_if_disabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             no_color: true,
@@ -651,9 +648,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_metadata_if_enabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             show_metadata: true,
@@ -692,9 +689,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_utc_time_if_enabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
@@ -744,9 +741,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_filtered_by_severity() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
@@ -838,9 +835,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             clock: TimeFormat::Local,
@@ -914,9 +911,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots_heuristic() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             clock: TimeFormat::Local,
@@ -1000,9 +997,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Local,
@@ -1094,9 +1091,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_monotonic() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Utc,
@@ -1170,9 +1167,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_local_time_if_enabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             clock: TimeFormat::Local,
@@ -1225,9 +1222,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_tags_by_default() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -1277,9 +1274,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_hides_full_moniker_by_default() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -1329,9 +1326,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_hides_full_moniker_when_enabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             show_full_moniker: true,
@@ -1382,9 +1379,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_hides_tag_when_hidden() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             hide_tags: true,
@@ -1435,9 +1432,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_sets_severity_appropriately_then_exits() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let severity = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -1477,9 +1474,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_file_names_by_default() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             ..LogCommand::default()
@@ -1532,9 +1529,9 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_hides_filename_if_disabled() {
-        let (rcs_proxy, rcs_server) = create_proxy::<RemoteControlMarker>().unwrap();
+        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
         let (target_collection_proxy, target_collection_server) =
-            create_proxy::<TargetCollectionMarker>().unwrap();
+            fidl::endpoints::create_proxy().unwrap();
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             hide_file: true,

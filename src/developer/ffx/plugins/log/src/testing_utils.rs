@@ -21,6 +21,7 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
 };
+use fidl_fuchsia_sys2::OpenDirType;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -218,6 +219,9 @@ async fn handle_open_capability(
     channel: fidl::Channel,
     scheduler: TaskScheduler,
 ) {
+    let Some(capability_name) = capability_name.strip_prefix("svc/") else {
+        panic!("Expected a protocol starting with svc/. Got: {capability_name}");
+    };
     match capability_name {
         ArchiveAccessorMarker::PROTOCOL_NAME => {
             handle_archive_accessor(
@@ -227,8 +231,8 @@ async fn handle_open_capability(
             .await
         }
         LogSettingsMarker::PROTOCOL_NAME => handle_log_settings(channel, scheduler.clone()).await,
-        _ => {
-            unreachable!();
+        other => {
+            unreachable!("Attempted to connect to {other:?}");
         }
     }
 }
@@ -250,13 +254,15 @@ pub async fn handle_rcs_connection(
                     .unwrap();
             }
             RemoteControlRequest::OpenCapability {
-                moniker: _,
-                capability_set: _,
+                moniker,
+                capability_set,
                 capability_name,
                 server_channel,
                 flags: _,
                 responder,
             } => {
+                assert_eq!(moniker, rcs::toolbox::MONIKER);
+                assert_eq!(capability_set, OpenDirType::NamespaceDir);
                 let scheduler_2 = scheduler.clone();
                 scheduler.spawn(async move {
                     handle_open_capability(&capability_name, server_channel, scheduler_2).await

@@ -15,5 +15,11 @@
             ],
             availability: "optional",
         },
+        {
+            protocol: [
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+                "fuchsia.diagnostics.LogSettings",
+            ],
+        },
     ],
 }

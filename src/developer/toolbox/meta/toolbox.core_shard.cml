@@ -30,5 +30,13 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: [
+                "fuchsia.diagnostics.host.ArchiveAccessor",
+                "fuchsia.diagnostics.LogSettings",
+            ],
+            from: "parent",
+            to: "#toolbox",
+        },
     ],
 }
