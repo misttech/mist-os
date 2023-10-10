@@ -567,6 +567,7 @@ mod tests {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
@@ -657,6 +658,7 @@ mod tests {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
@@ -778,6 +780,7 @@ mod tests {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),
@@ -913,6 +916,7 @@ mod tests {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::Operations::CONNECT),

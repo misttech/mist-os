@@ -195,6 +195,7 @@ async fn use_framework_service() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -236,6 +237,7 @@ async fn capability_requested_event_at_parent() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "bar_svc".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -261,6 +263,7 @@ async fn capability_requested_event_at_parent() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -335,6 +338,7 @@ async fn use_in_collection() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: Some(fio::R_STAR_DIR),
@@ -345,6 +349,7 @@ async fn use_in_collection() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -359,6 +364,7 @@ async fn use_in_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -366,6 +372,7 @@ async fn use_in_collection() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: OfferSource::Parent,
+                    source_dictionary: None,
                     target_name: "hippo_data".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     rights: Some(fio::R_STAR_DIR),
@@ -376,6 +383,7 @@ async fn use_in_collection() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: OfferSource::Parent,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
@@ -391,6 +399,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -405,6 +414,7 @@ async fn use_in_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -469,6 +479,7 @@ async fn use_in_collection_not_offered() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source_name: "foo_data".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: Some(fio::R_STAR_DIR),
@@ -479,6 +490,7 @@ async fn use_in_collection_not_offered() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -493,6 +505,7 @@ async fn use_in_collection_not_offered() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -506,6 +519,7 @@ async fn use_in_collection_not_offered() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "hippo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -516,6 +530,7 @@ async fn use_in_collection_not_offered() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "hippo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -570,6 +585,7 @@ async fn dynamic_offer_from_parent() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -584,6 +600,7 @@ async fn dynamic_offer_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -601,6 +618,7 @@ async fn dynamic_offer_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -613,6 +631,7 @@ async fn dynamic_offer_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     dependency_type: DependencyType::Strong,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
@@ -682,6 +701,7 @@ async fn dynamic_offer_from_parent_with_collision() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -690,6 +710,7 @@ async fn dynamic_offer_from_parent_with_collision() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: OfferSource::Self_,
+                    source_dictionary: None,
                     target_name: "foo_svc".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
@@ -708,6 +729,7 @@ async fn dynamic_offer_from_parent_with_collision() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "foo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -764,6 +786,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -782,6 +805,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -794,6 +818,7 @@ async fn dynamic_offer_siblings_same_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -864,6 +889,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -885,6 +911,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -897,6 +924,7 @@ async fn dynamic_offer_siblings_cross_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -967,6 +995,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -985,6 +1014,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -997,6 +1027,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1091,6 +1122,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1109,6 +1141,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: ExposeSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_data".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::R_STAR_DIR),
@@ -1123,6 +1156,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source_name: "hippo_data".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     rights: fio::R_STAR_DIR,
@@ -1219,6 +1253,7 @@ async fn dynamic_offer_to_static_offer() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
                     source: UseSource::Framework,
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1238,6 +1273,7 @@ async fn dynamic_offer_to_static_offer() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: ExposeSource::Self_,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -1250,6 +1286,7 @@ async fn dynamic_offer_to_static_offer() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: OfferSource::Parent,
+                    source_dictionary: None,
                     target_name: "hippo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("d".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1264,6 +1301,7 @@ async fn dynamic_offer_to_static_offer() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source_name: "hippo_svc".parse().unwrap(),
                     source: UseSource::Parent,
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1317,6 +1355,7 @@ async fn destroying_instance_kills_framework_service_task() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1353,6 +1392,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("c".into()),
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("b".into()),
                     dependency_type: DependencyType::Strong,
@@ -1361,6 +1401,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::static_child("c".into()),
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".into()),
                     rights: None,
@@ -1378,6 +1419,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/echo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1385,6 +1427,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -1401,6 +1444,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -1408,6 +1452,7 @@ async fn destroying_instance_blocks_on_routing() {
                 .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_data".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::R_STAR_DIR),
@@ -1567,6 +1612,7 @@ async fn use_runner_from_environment_in_collection() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1638,6 +1684,7 @@ async fn use_runner_from_grandparent_environment() {
                 .offer(OfferDecl::Runner(OfferRunnerDecl {
                     source: OfferSource::Self_,
                     source_name: "elf".parse().unwrap(),
+                    source_dictionary: None,
                     target: OfferTarget::static_child("b".to_string()),
                     target_name: "dwarf".parse().unwrap(),
                 }))
@@ -1725,6 +1772,7 @@ async fn use_runner_from_sibling_environment() {
                 .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                     source: ExposeSource::Self_,
                     source_name: "elf".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "dwarf".parse().unwrap(),
                 }))
@@ -2054,6 +2102,7 @@ async fn use_with_destroyed_parent() {
     let use_protocol_decl = UseProtocolDecl {
         source: UseSource::Parent,
         source_name: "foo_svc".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/hippo".parse().unwrap(),
         dependency_type: DependencyType::Strong,
         availability: Availability::Required,
@@ -2067,6 +2116,7 @@ async fn use_with_destroyed_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2074,6 +2124,7 @@ async fn use_with_destroyed_parent() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_svc".parse().unwrap(),
                     target: OfferTarget::Collection("coll".parse().unwrap()),
                     dependency_type: DependencyType::Strong,
@@ -2088,6 +2139,7 @@ async fn use_with_destroyed_parent() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Parent,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_svc".parse().unwrap(),
                     target: OfferTarget::static_child("c".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2156,6 +2208,7 @@ async fn use_from_destroyed_but_not_removed() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "bar_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "baz_svc".parse().unwrap(),
                     target: OfferTarget::static_child("c".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2173,6 +2226,7 @@ async fn use_from_destroyed_but_not_removed() {
                 .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "bar_svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -2185,6 +2239,7 @@ async fn use_from_destroyed_but_not_removed() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "baz_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2247,6 +2302,7 @@ async fn use_resolver_from_parent_environment() {
                 .expose(ExposeDecl::Resolver(ExposeResolverDecl {
                     source: ExposeSource::Self_,
                     source_name: "base".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "base".parse().unwrap(),
                 }))
@@ -2736,6 +2792,7 @@ async fn offer_service_from_collection() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -2747,6 +2804,7 @@ async fn offer_service_from_collection() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::Collection("coll".parse().unwrap()),
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: None,
                     renamed_instances: None,
                     target_name: "foo".parse().unwrap(),
@@ -2766,6 +2824,7 @@ async fn offer_service_from_collection() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -2799,6 +2858,7 @@ async fn offer_service_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -2808,6 +2868,7 @@ async fn offer_service_from_collections() {
             OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 source_instance_filter: None,
                 renamed_instances: None,
                 target_name: "foo".parse().unwrap(),
@@ -2839,6 +2900,7 @@ async fn offer_service_from_collections() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -2874,6 +2936,7 @@ async fn offer_service_from_collections_multilevel() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -2883,6 +2946,7 @@ async fn offer_service_from_collections_multilevel() {
             OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 source_instance_filter: None,
                 renamed_instances: None,
                 target_name: "foo".parse().unwrap(),
@@ -2911,6 +2975,7 @@ async fn offer_service_from_collections_multilevel() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::Parent,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: None,
                     renamed_instances: None,
                     target_name: "foo".parse().unwrap(),
@@ -2929,6 +2994,7 @@ async fn offer_service_from_collections_multilevel() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -2964,6 +3030,7 @@ async fn expose_service_from_collection() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("b".into()),
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -2979,6 +3046,7 @@ async fn expose_service_from_collection() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Collection("coll".parse().unwrap()),
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "foo".parse().unwrap(),
                     availability: Availability::Required,
@@ -2994,6 +3062,7 @@ async fn expose_service_from_collection() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3029,6 +3098,7 @@ async fn expose_service_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("b".into()),
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -3038,6 +3108,7 @@ async fn expose_service_from_collections() {
             ExposeDecl::Service(ExposeServiceDecl {
                 source: ExposeSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 target: ExposeTarget::Parent,
                 target_name: "foo".parse().unwrap(),
                 availability: Availability::Required,
@@ -3069,6 +3140,7 @@ async fn expose_service_from_collections() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3106,6 +3178,7 @@ async fn expose_service_from_collections_multilevel() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Child("m".into()),
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -3115,6 +3188,7 @@ async fn expose_service_from_collections_multilevel() {
             ExposeDecl::Service(ExposeServiceDecl {
                 source: ExposeSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 target: ExposeTarget::Parent,
                 target_name: "foo".parse().unwrap(),
                 availability: Availability::Required,
@@ -3132,6 +3206,7 @@ async fn expose_service_from_collections_multilevel() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Child("b".into()),
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3159,6 +3234,7 @@ async fn expose_service_from_collections_multilevel() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3192,6 +3268,7 @@ async fn list_service_instances_from_collections() {
         dependency_type: DependencyType::Strong,
         source: UseSource::Parent,
         source_name: "foo".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/foo".parse().unwrap(),
         availability: Availability::Required,
     };
@@ -3201,6 +3278,7 @@ async fn list_service_instances_from_collections() {
             OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection(coll.parse().unwrap()),
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 source_instance_filter: None,
                 renamed_instances: None,
                 target_name: "foo".parse().unwrap(),
@@ -3228,6 +3306,7 @@ async fn list_service_instances_from_collections() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
@@ -3244,6 +3323,7 @@ async fn list_service_instances_from_collections() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "foo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
@@ -3340,6 +3420,7 @@ async fn use_service_from_sibling_collection() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("c".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: None,
                     renamed_instances: None,
                     target: OfferTarget::static_child("b".to_string()),
@@ -3357,6 +3438,7 @@ async fn use_service_from_sibling_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3369,12 +3451,14 @@ async fn use_service_from_sibling_collection() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     availability: Availability::Required,
                 }))
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Collection("coll".parse().unwrap()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3388,6 +3472,7 @@ async fn use_service_from_sibling_collection() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3404,6 +3489,7 @@ async fn use_service_from_sibling_collection() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3497,6 +3583,7 @@ async fn use_filtered_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: Some(vec!["variantinstance".to_string()]),
                     renamed_instances: None,
                     target: OfferTarget::static_child("c".to_string()),
@@ -3506,6 +3593,7 @@ async fn use_filtered_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: None,
                     renamed_instances: Some(vec![NameMapping {
                         source_name: "default".to_string(),
@@ -3526,6 +3614,7 @@ async fn use_filtered_service_from_sibling() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3543,6 +3632,7 @@ async fn use_filtered_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3555,6 +3645,7 @@ async fn use_filtered_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3656,6 +3747,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: Some(vec!["variantinstance".to_string()]),
                     renamed_instances: None,
                     target: OfferTarget::static_child("c".to_string()),
@@ -3665,6 +3757,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     source_instance_filter: Some(vec!["renamed_default".to_string()]),
                     renamed_instances: Some(vec![NameMapping {
                         source_name: "default".to_string(),
@@ -3684,6 +3777,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
                 .expose(ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "my.service.Service".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -3701,6 +3795,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3780,6 +3875,7 @@ async fn use_anonymized_aggregate_service_from_sibling() {
         .expose(ExposeDecl::Service(ExposeServiceDecl {
             source: ExposeSource::Self_,
             source_name: "my.service.Service".parse().unwrap(),
+            source_dictionary: None,
             target_name: "my.service.Service".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -3796,6 +3892,7 @@ async fn use_anonymized_aggregate_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("b".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target: OfferTarget::static_child("d".to_string()),
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
@@ -3805,6 +3902,7 @@ async fn use_anonymized_aggregate_service_from_sibling() {
                 .offer(OfferDecl::Service(OfferServiceDecl {
                     source: OfferSource::static_child("c".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target: OfferTarget::static_child("d".to_string()),
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
@@ -3825,6 +3923,7 @@ async fn use_anonymized_aggregate_service_from_sibling() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                 }))

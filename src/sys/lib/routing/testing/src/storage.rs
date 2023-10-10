@@ -303,6 +303,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -384,6 +385,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -471,6 +473,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -648,6 +651,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -726,6 +730,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -827,6 +832,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -1014,6 +1020,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -1128,6 +1135,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "minfs".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::RW_STAR_DIR),

@@ -27,6 +27,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -50,6 +51,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -64,6 +66,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -90,6 +93,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::W_STAR_DIR),
@@ -113,6 +117,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -127,6 +132,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -153,6 +159,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -176,6 +183,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -190,6 +198,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -216,6 +225,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -239,6 +249,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::W_STAR_DIR),
@@ -253,6 +264,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -279,6 +291,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -302,6 +315,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -316,6 +330,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -342,6 +357,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::RW_STAR_DIR),
@@ -365,6 +381,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::RW_STAR_DIR),
@@ -379,6 +396,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -413,6 +431,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: None,
@@ -429,6 +448,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: cm_types::Path::from_str("/data/hippo").unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,

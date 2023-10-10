@@ -176,6 +176,7 @@ mod tests {
         assert_matches!(&component.exposes[0], ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Framework,
             source_name,
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name,
             rights: _,
@@ -336,6 +337,7 @@ mod tests {
         assert_matches!(&component.exposes[0], ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Framework,
             source_name,
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name,
             rights: _,

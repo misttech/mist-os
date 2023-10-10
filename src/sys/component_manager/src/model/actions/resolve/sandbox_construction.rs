@@ -94,6 +94,10 @@ pub async fn build_component_sandboxes(
                     output.collection_sandboxes.entry(name.clone()).or_insert(Sandbox::new());
                 dict
             }
+            cm_rust::OfferTarget::Capability(_name) => {
+                // TODO(fxbug.dev/301674053): Support dictionary routing.
+                continue;
+            }
         };
         extend_dict_with_offer(&output.sandbox_from_parent, offer, target_sandbox);
     }

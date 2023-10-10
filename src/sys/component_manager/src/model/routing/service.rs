@@ -732,6 +732,7 @@ mod tests {
             .expose(ExposeDecl::Service(ExposeServiceDecl {
                 source: ExposeSource::Self_,
                 source_name: "my.service.Service".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "my.service.Service".parse().unwrap(),
                 target: ExposeTarget::Parent,
                 availability: cm_rust::Availability::Required,
@@ -748,6 +749,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Framework,
                         source_name: "fuchsia.component.Realm".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -755,6 +757,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Collection("coll1".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -762,6 +765,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Collection("coll2".parse().unwrap()),
                         source_name: "my.service.Service".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -769,6 +773,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Child("static_a".into()),
                         source_name: "my.service.Service".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -776,6 +781,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Child("static_b".into()),
                         source_name: "my.service.Service".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "my.service.Service".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,

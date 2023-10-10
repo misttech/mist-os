@@ -228,6 +228,7 @@ mod tests {
                 UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "baz-dir".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/in/data/hippo".parse().unwrap(),
                     rights: fio::Operations::CONNECT,
                     subdir: None,
@@ -237,6 +238,7 @@ mod tests {
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "baz-svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/in/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -305,6 +307,7 @@ mod tests {
                 ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
                     source_name: "baz-dir".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "hippo-dir".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
@@ -314,6 +317,7 @@ mod tests {
                 ExposeDecl::Directory(ExposeDirectoryDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo-dir".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "bar-dir".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     rights: Some(fio::Operations::CONNECT),
@@ -323,6 +327,7 @@ mod tests {
                 ExposeDecl::Protocol(ExposeProtocolDecl {
                     source: ExposeSource::Self_,
                     source_name: "baz-proto".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "hippo-proto".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -331,6 +336,7 @@ mod tests {
                 ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "foo-svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "whale-svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -338,6 +344,7 @@ mod tests {
                 ExposeDecl::Service(ExposeServiceDecl {
                     source: ExposeSource::Self_,
                     source_name: "bar-svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "whale-svc".parse().unwrap(),
                     target: ExposeTarget::Parent,
                     availability: cm_rust::Availability::Required,
@@ -345,6 +352,7 @@ mod tests {
                 ExposeDecl::Runner(ExposeRunnerDecl {
                     source: ExposeSource::Self_,
                     source_name: "elf".parse().unwrap(),
+                    source_dictionary: None,
                     target: ExposeTarget::Parent,
                     target_name: "elf".parse().unwrap(),
                 }),

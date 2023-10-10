@@ -141,6 +141,7 @@ async fn add_component_resolver(
     child_decl.exposes.push(cm_rust::ExposeDecl::Resolver(cm_rust::ExposeResolverDecl {
         source: cm_rust::ExposeSource::Self_,
         source_name: component_resolver.name().parse().unwrap(),
+        source_dictionary: None,
         target: cm_rust::ExposeTarget::Parent,
         target_name: component_resolver.name().parse().unwrap(),
     }));

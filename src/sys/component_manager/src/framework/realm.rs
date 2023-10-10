@@ -1223,6 +1223,7 @@ mod tests {
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "foo".parse().unwrap(),
+                            source_dictionary: None,
                             target_name: "hippo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,
@@ -1288,6 +1289,7 @@ mod tests {
                         .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                             source: ExposeSource::Self_,
                             source_name: "foo".parse().unwrap(),
+                            source_dictionary: None,
                             target_name: "hippo".parse().unwrap(),
                             target: ExposeTarget::Parent,
                             availability: cm_rust::Availability::Required,

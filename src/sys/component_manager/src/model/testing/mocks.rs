@@ -154,6 +154,7 @@ fn new_proxy_routing_fn(
                 CapabilityTypeName::Runner => panic!("runner capability unsupported"),
                 CapabilityTypeName::Resolver => panic!("resolver capability unsupported"),
                 CapabilityTypeName::EventStream => panic!("event stream capability unsupported"),
+                CapabilityTypeName::Dictionary => panic!("dictionary capability unsupported"),
             }
         },
     )

@@ -858,6 +858,7 @@ mod tests {
             let use_decl = UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Framework,
                 source_name: use_name.parse().unwrap(),
+                source_dictionary: None,
                 target_path: capability_path.parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -866,6 +867,7 @@ mod tests {
             let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
                 source: ExposeSource::Self_,
                 source_name: expose_name.parse().unwrap(),
+                source_dictionary: None,
                 target: ExposeTarget::Parent,
                 target_name: expose_name.parse().unwrap(),
                 availability: Availability::Required,
@@ -992,6 +994,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1000,6 +1003,7 @@ mod tests {
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "bar".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1144,6 +1148,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1232,6 +1237,7 @@ mod tests {
                         target_name: "fs".parse().unwrap(),
                         subdir: None,
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target: ExposeTarget::Parent,
                         rights: None,
                         availability: cm_rust::Availability::Required,

@@ -2665,6 +2665,7 @@ pub mod tests {
             source: OfferSource::static_child("a".to_string()),
             target: OfferTarget::static_child("b".to_string()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_name: "foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             rights: None,
@@ -2679,12 +2680,14 @@ pub mod tests {
             source: ExposeSource::Self_,
             target: ExposeTarget::Parent,
             source_name: "bar".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });
         let example_use = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "baz".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/baz".parse().expect("parsing"),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -2762,6 +2765,7 @@ pub mod tests {
             source: OfferSource::static_child("a".to_string()),
             target: OfferTarget::static_child("b".to_string()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_name: "foo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             rights: None,
@@ -2838,6 +2842,7 @@ pub mod tests {
                 name: "b".into(),
                 collection: Some("coll_1".parse().unwrap()),
             }),
+            source_dictionary: None,
             source_name: "dyn_offer_source_name".parse().unwrap(),
             target_name: "dyn_offer_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
@@ -2949,6 +2954,7 @@ pub mod tests {
                 collection: Some("coll_1".parse().unwrap()),
             }),
             source_name: "dyn_offer2_source_name".parse().unwrap(),
+            source_dictionary: None,
             target_name: "dyn_offer2_target_name".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -2996,6 +3002,7 @@ pub mod tests {
         let example_offer = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             source_instance_filter: None,
             renamed_instances: None,
             target: OfferTarget::static_child("static_child".to_string()),
@@ -3050,6 +3057,7 @@ pub mod tests {
         let static_collection_offer = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll1".parse().unwrap()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             source_instance_filter: None,
             renamed_instances: None,
             target: OfferTarget::Collection("coll2".parse().unwrap()),
@@ -3360,6 +3368,7 @@ pub mod tests {
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".parse().unwrap()),
@@ -3385,6 +3394,7 @@ pub mod tests {
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Void,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Child(ChildRef {
                     name: "foo".into(),
                     collection: Some("col".parse().unwrap()),
@@ -3403,6 +3413,7 @@ pub mod tests {
                             collection: Some("col".parse().unwrap()),
                         })),
                         source_name: Some("fuchsia.example.Echo".to_string()),
+                        source_dictionary: None,
                         target: None,
                         target_name: Some("fuchsia.example.Echo".to_string()),
                         dependency_type: Some(fdecl::DependencyType::Strong),
@@ -3419,6 +3430,7 @@ pub mod tests {
                         collection: Some("col".parse().unwrap()),
                     }),
                     source_name: "fuchsia.example.Echo".parse().unwrap(),
+                    source_dictionary: None,
                     target: OfferTarget::Child(ChildRef {
                         name: "foo".into(),
                         collection: Some("col".parse().unwrap()),
@@ -3447,6 +3459,7 @@ pub mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        source_dictionary: None,
                         target_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
                         target: OfferTarget::static_child(TEST_CHILD_NAME.to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3461,6 +3474,7 @@ pub mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: flogger::LogSinkMarker::PROTOCOL_NAME.parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/fuchsia.logger.LogSink".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,

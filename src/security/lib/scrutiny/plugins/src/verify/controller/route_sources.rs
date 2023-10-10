@@ -802,6 +802,7 @@ mod tests {
                     OfferDirectoryDecl{
                         source: OfferSource::static_child("one_dir_provider".to_string()),
                         source_name: "exposed_by_provider".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("two_dir_user".to_string()),
                         target_name: "routed_from_provider".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -812,6 +813,7 @@ mod tests {
                     OfferDirectoryDecl{
                         source: OfferSource::Self_,
                         source_name: "root_dir".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("two_dir_user".to_string()),
                         target_name: "routed_from_root".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -845,6 +847,7 @@ mod tests {
                     UseDirectoryDecl{
                         source: UseSource::Parent,
                         source_name: "routed_from_provider".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: Path::from_str("/data/from/provider").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -854,6 +857,7 @@ mod tests {
                     UseDirectoryDecl{
                         source: UseSource::Parent,
                         source_name: "routed_from_root".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: Path::from_str("/data/from/root").unwrap(),
                         rights: fio::Operations::CONNECT,
                         subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -876,6 +880,7 @@ mod tests {
                     ExposeDirectoryDecl{
                         source: ExposeSource::Self_,
                         source_name: "provider_dir".parse().unwrap(),
+                        source_dictionary: None,
                         target: ExposeTarget::Parent,
                         target_name: "exposed_by_provider".parse().unwrap(),
                         rights: Some(fio::Operations::CONNECT),
@@ -2159,6 +2164,7 @@ mod tests {
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_root".parse().unwrap(),
+                                    source_dictionary: None,
                                     target_path: Path::from_str("/data/from/root").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),
@@ -2174,6 +2180,7 @@ mod tests {
                                 capability: UseDirectoryDecl{
                                     source: UseSource::Parent,
                                     source_name: "routed_from_provider".parse().unwrap(),
+                                    source_dictionary: None,
                                     target_path: Path::from_str("/data/from/provider").unwrap(),
                                     rights: fio::Operations::CONNECT,
                                     subdir: Some(PathBuf::from_str("user_subdir").unwrap()),

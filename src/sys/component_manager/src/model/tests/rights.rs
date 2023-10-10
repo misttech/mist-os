@@ -123,6 +123,7 @@ async fn framework_directory_rights() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Framework,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: None,
@@ -140,6 +141,7 @@ async fn framework_directory_rights() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -174,6 +176,7 @@ async fn framework_directory_incompatible_rights() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Framework,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "foo_data".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: None,
@@ -191,6 +194,7 @@ async fn framework_directory_incompatible_rights() {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::X_STAR_DIR,
                     subdir: None,

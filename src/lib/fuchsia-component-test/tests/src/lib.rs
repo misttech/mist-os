@@ -659,6 +659,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     echo_client_decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
         source: cm_rust::OfferSource::Self_,
         source_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
+        source_dictionary: None,
         target: cm_rust::OfferTarget::Collection(collection_name.parse().unwrap()),
         target_name: "fidl.examples.routing.echo.Echo".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
@@ -667,6 +668,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
     echo_client_decl.uses.push(cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl {
         source: cm_rust::UseSource::Framework,
         source_name: "fuchsia.component.Realm".parse().unwrap(),
+        source_dictionary: None,
         target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
         dependency_type: cm_rust::DependencyType::Strong,
         availability: cm_rust::Availability::Required,
@@ -1589,6 +1591,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                     exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                         source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
                         source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                        source_dictionary: None,
                         target: cm_rust::ExposeTarget::Parent,
                         target_name: "fuchsia.examples.Echo".parse().unwrap(),
                         availability: cm_rust::Availability::Required,
@@ -1607,6 +1610,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
                 exposes: vec![cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
                     source: cm_rust::ExposeSource::Child("does-not-exist".to_string()),
                     source_name: "fuchsia.examples.Echo".parse().unwrap(),
+                    source_dictionary: None,
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: "fuchsia.examples.Echo".parse().unwrap(),
                     availability: cm_rust::Availability::Required,
@@ -1623,6 +1627,7 @@ async fn fail_to_set_invalid_decls() -> Result<(), Error> {
     realm_decl.exposes.push(cm_rust::ExposeDecl::Protocol(cm_rust::ExposeProtocolDecl {
         source: cm_rust::ExposeSource::Child("b".to_string()),
         source_name: "fuchsia.examples.Echo".parse().unwrap(),
+        source_dictionary: None,
         target: cm_rust::ExposeTarget::Parent,
         target_name: "fuchsia.examples.Echo".parse().unwrap(),
         availability: cm_rust::Availability::Required,

@@ -111,6 +111,7 @@ impl ComponentDeclBuilder {
             dependency_type: cm_rust::DependencyType::Strong,
             source: cm_rust::UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             availability: cm_rust::Availability::Required,
         });

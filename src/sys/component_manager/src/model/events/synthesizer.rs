@@ -416,6 +416,7 @@ mod tests {
         ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Self_,
             source_name: "diagnostics".parse().unwrap(),
+            source_dictionary: None,
             target_name: "diagnostics".parse().unwrap(),
             target: ExposeTarget::Framework,
             rights: Some(fio::Operations::CONNECT),

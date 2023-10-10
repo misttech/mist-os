@@ -187,6 +187,11 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
             // Runners, resolvers, and event streams do not add directory entries.
             None
         }
+        cm_rust::ExposeDecl::Dictionary(_) => {
+            assert!(exposes.len() == 1, "multiple exposes");
+            // TODO(fxbug.dev/301674053): Support this.
+            None
+        }
     }
 }
 

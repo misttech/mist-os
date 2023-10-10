@@ -507,6 +507,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -515,6 +516,7 @@ mod tests {
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "foo.bar".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -523,6 +525,7 @@ mod tests {
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
             source_name: "foo.bar".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -531,6 +534,7 @@ mod tests {
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "foo.bar".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -653,6 +657,7 @@ mod tests {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "a".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/a".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -661,6 +666,7 @@ mod tests {
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
             source_name: "b".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/b".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -669,6 +675,7 @@ mod tests {
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
             source_name: "c".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "c".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -677,6 +684,7 @@ mod tests {
         let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("bad_child".to_string()),
             source_name: "d".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "d".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -784,6 +792,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -792,6 +801,7 @@ mod tests {
         let use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".into()),
             source_name: "biz.buz".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -800,6 +810,7 @@ mod tests {
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
             source_name: "biz.buz".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.bar".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -808,6 +819,7 @@ mod tests {
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "biz.buz".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "biz.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -931,6 +943,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.bar".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -939,6 +952,7 @@ mod tests {
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
             source_name: "qax.qux".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -947,6 +961,7 @@ mod tests {
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "qax.qux".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "qax.qux".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1025,6 +1040,7 @@ mod tests {
         let use_from_framework_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.bar".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1032,6 +1048,7 @@ mod tests {
         let use_from_framework_decl2 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "foo.buz".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.buz".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1039,6 +1056,7 @@ mod tests {
         let use_from_framework_decl3 = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Framework,
             source_name: "no.match".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/no.match".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1047,6 +1065,7 @@ mod tests {
         let expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
             source_name: "qax.qux".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.buz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1054,6 +1073,7 @@ mod tests {
         let expose_from_child_decl2 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".into()),
             source_name: "qax.qux".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo.biz".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1061,6 +1081,7 @@ mod tests {
         let expose_from_child_decl3 = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
             source_name: "no.match".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "no.match".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1069,6 +1090,7 @@ mod tests {
         let expose_from_self_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "qax.qux".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "qax.qux".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1177,6 +1199,7 @@ mod tests {
         let offer_from_collection_decl = OfferDecl::Service(OfferServiceDecl {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "my_service".parse().unwrap(),
+            source_dictionary: None,
             target: OfferTarget::static_child("target".into()),
             target_name: "my_service".parse().unwrap(),
             availability: Availability::Required,
@@ -1186,6 +1209,7 @@ mod tests {
         let expose_from_self_decl = ExposeDecl::Service(ExposeServiceDecl {
             source: ExposeSource::Self_,
             source_name: "my_service".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "my_service".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1193,6 +1217,7 @@ mod tests {
         let use_decl = UseDecl::Service(UseServiceDecl {
             source: UseSource::Parent,
             source_name: "my_service".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/foo.bar".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1346,6 +1371,7 @@ mod tests {
         let invalid_source_name_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("my_child".to_string()),
             source_name: "a".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/a".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1354,6 +1380,7 @@ mod tests {
         let invalid_source_use_from_child_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("bad_child".to_string()),
             source_name: "b".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/b".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1362,6 +1389,7 @@ mod tests {
         let invalid_source_name_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("my_child".to_string()),
             source_name: "c".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "c".parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -1370,6 +1398,7 @@ mod tests {
         let invalid_source_expose_from_child_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("bad_child".to_string()),
             source_name: "d".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "d".parse().unwrap(),
             availability: cm_rust::Availability::Required,

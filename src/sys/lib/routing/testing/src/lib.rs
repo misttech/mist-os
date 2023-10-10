@@ -93,6 +93,7 @@ pub fn component_decl_with_exposed_binder() -> ComponentDecl {
         exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Framework,
             source_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: fcomponent::BinderMarker::DEBUG_NAME.parse().unwrap(),
             availability: cm_rust::Availability::Required,
@@ -415,6 +416,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -425,6 +427,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -433,6 +436,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "file".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "device".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -447,6 +451,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -456,6 +461,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -463,6 +469,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "device".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/device".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -505,6 +512,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -514,6 +522,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -529,6 +538,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -538,6 +548,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -567,6 +578,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Self_,
                     source_name: "hippo".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -605,6 +617,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -614,6 +627,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "baz_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -627,6 +641,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -636,6 +651,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -651,6 +667,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -660,6 +677,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -702,6 +720,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -712,6 +731,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -726,6 +746,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -736,6 +757,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -750,6 +772,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -759,6 +782,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "baz_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -801,6 +825,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "builtin.Echo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "builtin.Echo".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -815,6 +840,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "builtin.Echo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "builtin.Echo".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -829,6 +855,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "builtin.Echo".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -873,6 +900,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foobar_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -883,6 +911,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foobar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -898,6 +927,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foobar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -907,6 +937,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "foobar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -921,6 +952,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -930,6 +962,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -970,6 +1003,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -980,6 +1014,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -997,6 +1032,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1006,6 +1042,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1018,6 +1055,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1027,6 +1065,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "baz_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1070,6 +1109,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foobar_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1080,6 +1120,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "baz_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foobar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1095,6 +1136,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("d".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1104,6 +1146,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("d".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1117,6 +1160,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foobar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1126,6 +1170,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "foobar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1140,6 +1185,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1149,6 +1195,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1195,6 +1242,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_a_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1203,6 +1251,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1220,6 +1269,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1230,6 +1280,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_from_a_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_a_svc".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1238,6 +1289,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("d".to_string()),
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_d_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1254,6 +1306,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_d_data".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1264,6 +1317,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("g".to_string()),
                         source_name: "foo_from_h_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_h_svc".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1280,6 +1334,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_d_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1294,6 +1349,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1303,6 +1359,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "foo_from_a_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1315,6 +1372,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foo_from_d_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1324,6 +1382,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "foo_from_h_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1336,6 +1395,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("h".to_string()),
                         source_name: "foo_from_h_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_h_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1350,6 +1410,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_from_h_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1403,6 +1464,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .use_(UseDecl::Directory(UseDirectoryDecl {
                     source: UseSource::Parent,
                     source_name: "foo_data".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/data/hippo".parse().unwrap(),
                     rights: fio::R_STAR_DIR,
                     subdir: None,
@@ -1412,6 +1474,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1463,6 +1526,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1473,6 +1537,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1487,6 +1552,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1496,6 +1562,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1552,6 +1619,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1561,6 +1629,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1602,6 +1671,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::static_child("b".to_string()),
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1612,6 +1682,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::static_child("b".to_string()),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1628,6 +1699,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1637,6 +1709,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1681,6 +1754,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::Parent,
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1691,6 +1765,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::Parent,
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1705,6 +1780,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1714,6 +1790,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1756,6 +1833,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1765,6 +1843,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1780,6 +1859,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -1789,6 +1869,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source_name: "hippo_svc".parse().unwrap(),
                         source: ExposeSource::Self_,
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1824,6 +1905,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl = ExposeProtocolDecl {
             source: ExposeSource::Child("b".parse().unwrap()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_name: "foo".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -1847,6 +1929,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1888,6 +1971,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1898,6 +1982,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "bar_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "baz_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -1915,6 +2000,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: ExposeTarget::Framework,
                         rights: Some(fio::R_STAR_DIR),
@@ -1924,6 +2010,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_svc".parse().unwrap(),
                         target: ExposeTarget::Framework,
                         availability: cm_rust::Availability::Required,
@@ -1936,6 +2023,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "baz_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -1945,6 +2033,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "baz_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -1988,6 +2077,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source_name: "hippo_data".parse().unwrap(),
                         source: OfferSource::Self_,
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -1998,6 +2088,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source_name: "hippo_svc".parse().unwrap(),
                         source: OfferSource::Self_,
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -2012,6 +2103,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -2021,6 +2113,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2067,6 +2160,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("b".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
@@ -2079,6 +2173,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
@@ -2099,6 +2194,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2112,6 +2208,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2125,6 +2222,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/foo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2141,6 +2239,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/foo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2188,6 +2287,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("b".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: None,
@@ -2197,6 +2297,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: None,
@@ -2214,6 +2315,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2227,6 +2329,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2240,6 +2343,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/foo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2255,6 +2359,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,
                 source_name: "foo".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/foo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2302,6 +2407,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("b".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
@@ -2314,6 +2420,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         source_instance_filter: Some(vec![
@@ -2334,6 +2441,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2347,6 +2455,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2360,6 +2469,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Service(UseServiceDecl {
                         source: UseSource::Parent,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/foo".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2376,6 +2486,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 RouteRequest::UseService(UseServiceDecl {
                     source: UseSource::Parent,
                     source_name: "foo".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/foo".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2407,6 +2518,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -2423,6 +2535,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Parent,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_data".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -2439,6 +2552,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: Some(PathBuf::from("s4")),
@@ -2481,6 +2595,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::static_child("b".to_string()),
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("c".to_string()),
                         target_name: "foo_data".parse().unwrap(),
                         rights: Some(fio::R_STAR_DIR),
@@ -2499,6 +2614,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target: ExposeTarget::Parent,
                         target_name: "foo_data".parse().unwrap(),
                         rights: Some(fio::R_STAR_DIR),
@@ -2513,6 +2629,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -2557,6 +2674,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("b".to_string()),
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: None,
@@ -2572,6 +2690,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: None,
@@ -2588,6 +2707,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -2623,6 +2743,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "hippo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_bar_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -2632,6 +2753,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("c".to_string()),
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_bar_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2647,6 +2769,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -2656,6 +2779,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2716,6 +2840,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Directory(ExposeDirectoryDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_data".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         rights: Some(fio::R_STAR_DIR),
@@ -2725,6 +2850,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -2789,6 +2915,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "invalid".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/valid".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2825,6 +2952,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source_name: "invalid".parse().unwrap(),
                         source: OfferSource::Parent,
+                        source_dictionary: None,
                         target_name: "valid".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -2839,6 +2967,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "valid".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/valid".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -2861,102 +2990,103 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     }
 
     /*
-    TODO(https://fxbug.dev/107902): Allow exposing from parent.
+        TODO(https://fxbug.dev/107902): Allow exposing from parent.
 
-    /// Tests exposing an event_stream from a child through its parent down to another
-    /// unrelated child.
-    ///        a
-    ///         \
-    ///          b
-    ///          /\
-    ///          c f
-    ///          /\
-    ///          d e
-    /// c exposes started with a scope of e (but not d)
-    /// to b, which then offers that to f.
-    pub async fn test_expose_event_stream_with_scope(&self) {
-        let components = vec![
-            ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .offer(OfferDecl::EventStream(OfferEventStreamDecl {
-                        source: OfferSource::Child(ChildRef {
-                            name: "c".to_string(),
-                            collection: None,
-                        }),
-                        source_name: "started".parse().unwrap(),
-                        scope: None,
-                        filter: None,
-                        target: OfferTarget::Child(ChildRef {
-                            name: "f".to_string(),
-                            collection: None,
-                        }),
-                        target_name: "started".parse().unwrap(),
-                        availability: Availability::Required,
-                    }))
-                    .add_lazy_child("c")
-                    .add_lazy_child("f")
-                    .build(),
-            ),
-            (
-                "c",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::EventStream(ExposeEventStreamDecl {
-                        source: ExposeSource::Framework,
-                        source_name: "started".parse().unwrap(),
-                        scope: Some(vec![EventScope::Child(ChildRef {
-                            name: "e".to_string(),
-                            collection: None,
-                        })]),
-                        target: ExposeTarget::Parent,
-                        target_name: "started".parse().unwrap(),
-                    }))
-                    .add_lazy_child("d")
-                    .add_lazy_child("e")
-                    .build(),
-            ),
-            ("d", ComponentDeclBuilder::new().build()),
-            ("e", ComponentDeclBuilder::new().build()),
-            (
-                "f",
-                ComponentDeclBuilder::new()
-                    .use_(UseDecl::EventStream(UseEventStreamDecl {
-                        source: UseSource::Parent,
-                        source_name: "started".parse().unwrap(),
-                        target_path: "/event/stream".parse().unwrap(),
-                        scope: None,
-                        filter: None,
-                        availability: Availability::Required,
-                    }))
-                    .build(),
-            ),
-        ];
+        /// Tests exposing an event_stream from a child through its parent down to another
+        /// unrelated child.
+        ///        a
+        ///         \
+        ///          b
+        ///          /\
+        ///          c f
+        ///          /\
+        ///          d e
+        /// c exposes started with a scope of e (but not d)
+        /// to b, which then offers that to f.
+        pub async fn test_expose_event_stream_with_scope(&self) {
+            let components = vec![
+                ("a", ComponentDeclBuilder::new().add_lazy_child("b").build()),
+                (
+                    "b",
+                    ComponentDeclBuilder::new()
+                        .offer(OfferDecl::EventStream(OfferEventStreamDecl {
+                            source: OfferSource::Child(ChildRef {
+                                name: "c".to_string(),
+                                collection: None,
+                            }),
+                            source_name: "started".parse().unwrap(),
+                            scope: None,
+                            filter: None,
+                            target: OfferTarget::Child(ChildRef {
+                                name: "f".to_string(),
+                                collection: None,
+                            }),
+                            target_name: "started".parse().unwrap(),
+                            availability: Availability::Required,
+                        }))
+                        .add_lazy_child("c")
+                        .add_lazy_child("f")
+                        .build(),
+                ),
+                (
+                    "c",
+                    ComponentDeclBuilder::new()
+                        .expose(ExposeDecl::EventStream(ExposeEventStreamDecl {
+                            source: ExposeSource::Framework,
+                            source_name: "started".parse().unwrap(),
+    source_dictionary: None,
+                            scope: Some(vec![EventScope::Child(ChildRef {
+                                name: "e".to_string(),
+                                collection: None,
+                            })]),
+                            target: ExposeTarget::Parent,
+                            target_name: "started".parse().unwrap(),
+                        }))
+                        .add_lazy_child("d")
+                        .add_lazy_child("e")
+                        .build(),
+                ),
+                ("d", ComponentDeclBuilder::new().build()),
+                ("e", ComponentDeclBuilder::new().build()),
+                (
+                    "f",
+                    ComponentDeclBuilder::new()
+                        .use_(UseDecl::EventStream(UseEventStreamDecl {
+                            source: UseSource::Parent,
+                            source_name: "started".parse().unwrap(),
+                            target_path: "/event/stream".parse().unwrap(),
+                            scope: None,
+                            filter: None,
+                            availability: Availability::Required,
+                        }))
+                        .build(),
+                ),
+            ];
 
-        let mut builder = T::new("a", components);
-        builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
-            name: "started".parse().unwrap(),
-        })]);
+            let mut builder = T::new("a", components);
+            builder.set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
+                name: "started".parse().unwrap(),
+            })]);
 
-        let model = builder.build().await;
-        model
-            .check_use(
-                vec!["b", "f"].into(),
-                CheckUse::EventStream {
-                    expected_res: ExpectedResult::Ok,
-                    path: "/event/stream".parse().unwrap(),
-                    scope: vec![
-                        ComponentEventRoute {
-                            component: "c".to_string(),
-                            scope: Some(vec!["e".to_string()]),
-                        },
-                        ComponentEventRoute { component: "b".to_string(), scope: None },
-                    ],
-                    name: "started".parse().unwrap(),
-                },
-            )
-            .await;
-    }*/
+            let model = builder.build().await;
+            model
+                .check_use(
+                    vec!["b", "f"].into(),
+                    CheckUse::EventStream {
+                        expected_res: ExpectedResult::Ok,
+                        path: "/event/stream".parse().unwrap(),
+                        scope: vec![
+                            ComponentEventRoute {
+                                component: "c".to_string(),
+                                scope: Some(vec!["e".to_string()]),
+                            },
+                            ComponentEventRoute { component: "b".to_string(), scope: None },
+                        ],
+                        name: "started".parse().unwrap(),
+                    },
+                )
+                .await;
+        }*/
 
     /// Tests event stream aliasing (scoping rules are applied correctly)
     ///        root
@@ -3361,6 +3491,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3376,6 +3507,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3420,6 +3552,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Directory(OfferDirectoryDecl {
                         source: OfferSource::Self_,
                         source_name: "foo_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "bar_data".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         rights: Some(fio::R_STAR_DIR),
@@ -3436,6 +3569,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Directory(UseDirectoryDecl {
                         source: UseSource::Parent,
                         source_name: "bar_data".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/data/hippo".parse().unwrap(),
                         rights: fio::R_STAR_DIR,
                         subdir: None,
@@ -3482,6 +3616,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3496,6 +3631,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3505,6 +3641,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3518,6 +3655,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3579,6 +3717,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Self_,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("b".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3593,6 +3732,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3601,6 +3741,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "hippo_svc".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3617,6 +3758,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3629,6 +3771,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Parent,
                         source_name: "hippo_svc".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3686,6 +3829,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     dependency_type: DependencyType::Strong,
                     source: UseSource::Parent,
                     source_name: "foo_svc".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/hippo".parse().unwrap(),
                     availability: Availability::Required,
                 }))
@@ -3774,6 +3918,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3786,6 +3931,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3885,6 +4031,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3897,6 +4044,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -3958,6 +4106,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -3965,6 +4114,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -4005,6 +4155,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4026,6 +4177,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4092,6 +4244,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -4099,6 +4252,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -4138,6 +4292,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4145,6 +4300,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo_not_allowed".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4156,6 +4312,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(cm_rust::ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("e".parse().unwrap()),
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "svc_allowed".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4163,6 +4320,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(cm_rust::ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Child("e".parse().unwrap()),
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "svc_not_allowed".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4236,6 +4394,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -4243,6 +4402,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let expose_decl_svc_not_allowed = ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "svc_not_allowed".parse().unwrap(),
+            source_dictionary: None,
             target_name: "svc_not_allowed".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -4257,6 +4417,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".parse().unwrap()),
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "svc_allowed".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -4265,6 +4426,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".parse().unwrap()),
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "svc_not_allowed".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -4313,6 +4475,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_not_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo_not_allowed".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4320,6 +4483,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         dependency_type: DependencyType::Strong,
                         source: UseSource::Debug,
                         source_name: "svc_allowed".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/hippo".parse().unwrap(),
                         availability: Availability::Required,
                     }))
@@ -4377,6 +4541,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -4387,6 +4552,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter: None,
                         renamed_instances: None,
                         target_name: "foo".parse().unwrap(),
@@ -4446,6 +4612,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             dependency_type: DependencyType::Strong,
             source: UseSource::Child("b".to_string()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -4467,6 +4634,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4519,6 +4687,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -4529,6 +4698,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter: None,
                         renamed_instances: None,
                         target_name: "foo".parse().unwrap(),
@@ -4546,6 +4716,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4605,6 +4776,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -4617,6 +4789,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter,
                         renamed_instances,
                         target_name: "foo".parse().unwrap(),
@@ -4634,6 +4807,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4712,6 +4886,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -4728,6 +4903,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter,
                         renamed_instances,
                         target_name: "foo".parse().unwrap(),
@@ -4745,6 +4921,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4852,6 +5029,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -4901,6 +5079,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Runner(OfferRunnerDecl {
                         source: OfferSource::Self_,
                         source_name: "elf".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("b".to_string()),
                         target_name: "dwarf".parse().unwrap(),
                     }))
@@ -4938,6 +5117,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -5001,6 +5181,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                         source: ExposeSource::Self_,
                         source_name: "elf".parse().unwrap(),
+                        source_dictionary: None,
                         target: ExposeTarget::Parent,
                         target_name: "dwarf".parse().unwrap(),
                     }))
@@ -5022,6 +5203,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -5108,6 +5290,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &c_component,
             &mut NoopRouteMapper,
@@ -5178,6 +5361,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -5240,6 +5424,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -5284,6 +5469,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "elf".parse().unwrap(),
+                source_dictionary: None,
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -5348,6 +5534,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -5384,6 +5571,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -5418,6 +5606,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Runner(UseRunnerDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "dwarf".parse().unwrap(),
+                        source_dictionary: None,
                     }))
                     .add_lazy_child("b")
                     .build(),
@@ -5428,6 +5617,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                         source: ExposeSource::Self_,
                         source_name: "elf".parse().unwrap(),
+                        source_dictionary: None,
                         target: ExposeTarget::Parent,
                         target_name: "dwarf".parse().unwrap(),
                     }))
@@ -5447,6 +5637,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Child("b".parse().unwrap()),
                 source_name: "dwarf".parse().unwrap(),
+                source_dictionary: None,
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -5491,6 +5682,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .offer(OfferDecl::Runner(OfferRunnerDecl {
                         source: OfferSource::Self_,
                         source_name: "elf".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("b".to_string()),
                         target_name: "dwarf".parse().unwrap(),
                     }))
@@ -5507,6 +5699,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Runner(UseRunnerDecl {
                         source: UseSource::Parent,
                         source_name: "dwarf".parse().unwrap(),
+                        source_dictionary: None,
                     }))
                     .build(),
             ),
@@ -5520,6 +5713,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Parent,
                 source_name: "dwarf".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,
@@ -5586,6 +5780,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .use_(UseDecl::Runner(UseRunnerDecl {
                         source: UseSource::Environment,
                         source_name: "hobbit".parse().unwrap(),
+                        source_dictionary: None,
                     }))
                     .build(),
             ),
@@ -5599,6 +5794,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             RouteRequest::UseRunner(UseRunnerDecl {
                 source: UseSource::Environment,
                 source_name: "hobbit".parse().unwrap(),
+                source_dictionary: None,
             }),
             &b_component,
             &mut NoopRouteMapper,

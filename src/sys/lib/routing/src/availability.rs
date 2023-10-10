@@ -219,6 +219,7 @@ mod tests {
         OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target: OfferTarget::static_child("echo".to_string()),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Weak,
@@ -230,6 +231,7 @@ mod tests {
         OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Void,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target: OfferTarget::static_child("echo".to_string()),
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Weak,
@@ -290,6 +292,7 @@ mod tests {
         ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             availability,
@@ -300,6 +303,7 @@ mod tests {
         ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Void,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             availability: Availability::Optional,

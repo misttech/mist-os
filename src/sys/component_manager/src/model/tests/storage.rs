@@ -115,6 +115,7 @@ async fn use_in_collection_from_parent() {
                 .offer(OfferDecl::Directory(OfferDirectoryDecl {
                     source: OfferSource::Self_,
                     source_name: "data".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "minfs".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     rights: Some(fio::RW_STAR_DIR),
@@ -131,6 +132,7 @@ async fn use_in_collection_from_parent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -304,6 +306,7 @@ async fn use_in_collection_from_grandparent() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -869,6 +872,7 @@ async fn storage_persistence_moniker_path() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Capability("data".parse().unwrap()),
                     source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -883,6 +887,7 @@ async fn storage_persistence_moniker_path() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -890,6 +895,7 @@ async fn storage_persistence_moniker_path() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1054,6 +1060,7 @@ async fn storage_persistence_instance_id_path() {
                 .offer(OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Capability("data".parse().unwrap()),
                     source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     target: OfferTarget::static_child("b".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1068,6 +1075,7 @@ async fn storage_persistence_instance_id_path() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1075,6 +1083,7 @@ async fn storage_persistence_instance_id_path() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Parent,
                     source_name: "fuchsia.sys2.StorageAdmin".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.sys2.StorageAdmin".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1249,6 +1258,7 @@ async fn storage_persistence_inheritance() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1277,6 +1287,7 @@ async fn storage_persistence_inheritance() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1502,6 +1513,7 @@ async fn storage_persistence_disablement() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1530,6 +1542,7 @@ async fn storage_persistence_disablement() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1566,6 +1579,7 @@ async fn storage_persistence_disablement() {
                 .use_(UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Framework,
                     source_name: "fuchsia.component.Realm".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,

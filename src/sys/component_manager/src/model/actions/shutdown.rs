@@ -11,10 +11,11 @@ use {
     async_trait::async_trait,
     cm_rust::{
         CapabilityDecl, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl, ExposeDecl,
-        OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
-        OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon,
-        RegistrationSource, StorageDirectorySource, UseDecl, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
+        OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl,
+        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
+        RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseDecl,
+        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
+        UseSource,
     },
     cm_types::Name,
     futures::future::select_all,
@@ -524,9 +525,13 @@ fn get_dependency_from_offer(
             ..
         })
         | OfferDecl::Runner(OfferRunnerDecl { source, target, .. })
-        | OfferDecl::Resolver(OfferResolverDecl { source, target, .. }) => {
-            Some((find_offer_sources(instance, source), find_offer_targets(instance, target)))
-        }
+        | OfferDecl::Resolver(OfferResolverDecl { source, target, .. })
+        | OfferDecl::Dictionary(OfferDictionaryDecl {
+            dependency_type: DependencyType::Strong,
+            source,
+            target,
+            ..
+        }) => Some((find_offer_sources(instance, source), find_offer_targets(instance, target))),
 
         OfferDecl::Service(OfferServiceDecl { source, target, .. }) => Some((
             find_service_offer_sources(instance, source),
@@ -538,6 +543,10 @@ fn get_dependency_from_offer(
         })
         | OfferDecl::Directory(OfferDirectoryDecl {
             dependency_type: DependencyType::Weak, ..
+        })
+        | OfferDecl::Dictionary(OfferDictionaryDecl {
+            dependency_type: DependencyType::Weak,
+            ..
         }) => {
             // weak dependencies are ignored by this algorithm, because weak
             // dependencies can be broken arbitrarily.
@@ -713,6 +722,10 @@ fn find_offer_targets(instance: &impl Component, target: &OfferTarget) -> Vec<Co
             .filter(|child| child.moniker.collection() == Some(collection))
             .map(|child| child.moniker.into())
             .collect(),
+        OfferTarget::Capability(_capability) => {
+            // TODO(fxbug.dev/301674053): Support dictionary routing.
+            vec![]
+        }
     }
 }
 
@@ -888,6 +901,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
@@ -919,6 +933,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: weak_dep,
@@ -950,6 +965,7 @@ mod tests {
             exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
                 target: ExposeTarget::Parent,
                 source_name: "serviceFromChild".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceFromChild".parse().unwrap(),
                 source: ExposeSource::Child("childA".to_string()),
                 availability: cm_rust::Availability::Required,
@@ -997,6 +1013,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "serviceParent".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceParent".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1005,6 +1022,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1211,6 +1229,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childB".to_string()),
                 source_name: "childBOffer".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childC".to_string()),
                 dependency_type: DependencyType::Strong,
@@ -1448,6 +1467,7 @@ mod tests {
                 source: OfferSource::Child(ChildRef { name: "childA".into(), collection: None }),
                 target: OfferTarget::Collection("coll".parse().unwrap()),
                 source_name: "some_dir".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "some_dir".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 rights: None,
@@ -1475,6 +1495,7 @@ mod tests {
                         collection: Some("coll".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1489,6 +1510,7 @@ mod tests {
                         collection: Some("coll".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1546,6 +1568,7 @@ mod tests {
                         collection: Some("coll2".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1560,6 +1583,7 @@ mod tests {
                         collection: Some("coll1".parse().unwrap()),
                     }),
                     source_name: "test.protocol".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -1600,6 +1624,7 @@ mod tests {
                     collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1635,6 +1660,7 @@ mod tests {
                     collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1675,6 +1701,7 @@ mod tests {
                     collection: Some("coll".parse().unwrap()),
                 }),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -1721,6 +1748,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "serviceSelf".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSelf".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep.clone(),
@@ -1729,6 +1757,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep.clone(),
@@ -1772,6 +1801,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::Self_,
                     source_name: "serviceSelf".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSelf".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1780,6 +1810,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1788,6 +1819,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBOtherOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceOtherSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1839,6 +1871,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1847,6 +1880,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBToC".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1904,6 +1938,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1912,6 +1947,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBToC".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1920,6 +1956,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
                     source_name: "childCToA".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childA".to_string()),
                     dependency_type: weak_dep,
@@ -1976,6 +2013,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
                     source_name: "childBOffer".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childB".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -1984,6 +2022,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBToC".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "serviceSibling".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2065,6 +2104,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
                     source_name: "childAService".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childB".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2073,6 +2113,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childA".to_string()),
                     source_name: "childAService".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childC".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2081,6 +2122,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childB".to_string()),
                     source_name: "childBService".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "childBService".parse().unwrap(),
                     target: OfferTarget::static_child("childD".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2089,6 +2131,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
                     source_name: "childAService".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childD".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2097,6 +2140,7 @@ mod tests {
                 OfferDecl::Protocol(OfferProtocolDecl {
                     source: OfferSource::static_child("childC".to_string()),
                     source_name: "childAService".parse().unwrap(),
+                    source_dictionary: None,
                     target_name: "childAService".parse().unwrap(),
                     target: OfferTarget::static_child("childE".to_string()),
                     dependency_type: DependencyType::Strong,
@@ -2147,6 +2191,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childA".to_string()),
                 source_name: "childBOffer".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childB".to_string()),
                 dependency_type: DependencyType::Strong,
@@ -2187,6 +2232,7 @@ mod tests {
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".parse().unwrap()),
                 source_name: "service_capability".parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
                     collection: None,
@@ -2238,6 +2284,7 @@ mod tests {
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection("coll".parse().unwrap()),
                 source_name: "service_capability".parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Child(ChildRef {
                     name: "static_child".into(),
                     collection: None,
@@ -2300,6 +2347,7 @@ mod tests {
             offers: vec![OfferDecl::Service(OfferServiceDecl {
                 source: OfferSource::Collection(c1_name.parse().unwrap()),
                 source_name: cap_name.clone().parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Collection(c2_name.parse().unwrap()),
                 target_name: cap_name.clone().parse().unwrap(),
                 source_instance_filter: None,
@@ -2362,6 +2410,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::static_child("childB".to_string()),
                 source_name: "childBOffer".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSibling".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
@@ -2386,6 +2435,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
@@ -2402,6 +2452,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2432,6 +2483,7 @@ mod tests {
             uses: vec![UseDecl::Runner(UseRunnerDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.runner".parse().unwrap(),
+                source_dictionary: None,
             })],
             ..default_component_decl()
         };
@@ -2451,6 +2503,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
@@ -2477,6 +2530,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2553,6 +2607,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
@@ -2576,6 +2631,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Strong,
@@ -2592,6 +2648,7 @@ mod tests {
             uses: vec![UseDecl::Protocol(UseProtocolDecl {
                 source: UseSource::Child("childA".to_string()),
                 source_name: "test.protocol".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/test.protocol".parse().unwrap(),
                 dependency_type: DependencyType::Weak,
                 availability: Availability::Required,
@@ -2614,6 +2671,7 @@ mod tests {
             offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Self_,
                 source_name: "serviceSelf".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "serviceSelf".parse().unwrap(),
                 target: OfferTarget::static_child("childA".to_string()),
                 dependency_type: DependencyType::Weak,
@@ -2641,6 +2699,7 @@ mod tests {
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childA".to_string()),
                     source_name: "test.protocol".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/test.protocol".parse().unwrap(),
                     dependency_type: DependencyType::Strong,
                     availability: Availability::Required,
@@ -2648,6 +2707,7 @@ mod tests {
                 UseDecl::Protocol(UseProtocolDecl {
                     source: UseSource::Child("childB".to_string()),
                     source_name: "test.protocol2".parse().unwrap(),
+                    source_dictionary: None,
                     target_path: "/svc/test.protocol2".parse().unwrap(),
                     dependency_type: DependencyType::Weak,
                     availability: Availability::Required,
@@ -2689,6 +2749,7 @@ mod tests {
             offers: vec![OfferDecl::Resolver(OfferResolverDecl {
                 source: OfferSource::static_child("childA".to_string()),
                 source_name: "resolver".parse().unwrap(),
+                source_dictionary: None,
                 target_name: "resolver".parse().unwrap(),
                 target: OfferTarget::static_child("childB".to_string()),
             })],
@@ -2910,6 +2971,7 @@ mod tests {
                     .offer(cm_rust::OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::Child(ChildRef { name: "c".into(), collection: None }),
                         source_name: "static_offer_source".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::Collection("coll".parse().unwrap()),
                         target_name: "static_offer_target".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -3211,6 +3273,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3219,6 +3282,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3232,6 +3296,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3248,6 +3313,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3260,6 +3326,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3360,6 +3427,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3368,6 +3436,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3376,6 +3445,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("e".to_string()),
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceE".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3389,6 +3459,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3405,6 +3476,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3421,6 +3493,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3428,6 +3501,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceE".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3440,6 +3514,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3569,6 +3644,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("c".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3577,6 +3653,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("e".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3585,6 +3662,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("d".to_string()),
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3593,6 +3671,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("e".to_string()),
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceE".parse().unwrap(),
                         target: OfferTarget::static_child("f".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3606,6 +3685,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3622,6 +3702,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceD".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3638,6 +3719,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3645,6 +3727,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceE".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3657,6 +3740,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceE".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceE".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3664,6 +3748,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceD".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceD".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3783,6 +3868,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceC".parse().unwrap(),
                         target: OfferTarget::static_child("d".to_string()),
                         dependency_type: DependencyType::Strong,
@@ -3800,6 +3886,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3812,6 +3899,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3883,6 +3971,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -3899,6 +3988,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -3967,6 +4057,7 @@ mod tests {
                     .use_(UseDecl::Runner(UseRunnerDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "test.runner".parse().unwrap(),
+                        source_dictionary: None,
                     }))
                     .build(),
             ),
@@ -3976,6 +4067,7 @@ mod tests {
                     .expose(ExposeDecl::Runner(ExposeRunnerDecl {
                         source: ExposeSource::Self_,
                         source_name: "test.runner".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "test.runner".parse().unwrap(),
                         target: ExposeTarget::Parent,
                     }))
@@ -4043,6 +4135,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceB".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceB".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -4050,6 +4143,7 @@ mod tests {
                     .offer(OfferDecl::Protocol(OfferProtocolDecl {
                         source: OfferSource::static_child("c".to_string()),
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target: OfferTarget::static_child("b".to_string()),
                         target_name: "serviceB".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
@@ -4067,6 +4161,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceB".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceB".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4074,6 +4169,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Parent,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Strong,
                         availability: Availability::Required,
@@ -4090,6 +4186,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -4157,6 +4254,7 @@ mod tests {
                     .use_(UseDecl::Protocol(UseProtocolDecl {
                         source: UseSource::Child("b".to_string()),
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_path: "/svc/serviceC".parse().unwrap(),
                         dependency_type: DependencyType::Weak,
                         availability: Availability::Required,
@@ -4173,6 +4271,7 @@ mod tests {
                     .expose(ExposeDecl::Protocol(ExposeProtocolDecl {
                         source: ExposeSource::Self_,
                         source_name: "serviceC".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "serviceC".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,

@@ -582,6 +582,10 @@ impl ComponentModelForAnalyzer {
                 // Offering to a collection should always cause an offer check.
                 true
             }
+            OfferTarget::Capability(_) => {
+                // TODO(fxbug.dev/301674053): Support dictionary routing.
+                false
+            }
         };
 
         if should_check_offer {
@@ -633,6 +637,10 @@ impl ComponentModelForAnalyzer {
                 let capability = offer_decl.source_name.clone();
                 let route_request = RouteRequest::OfferResolver(offer_decl);
                 (capability, route_request)
+            }
+            OfferDecl::Dictionary(_offer_decl) => {
+                // TODO(fxbug.dev/301674053): Support this.
+                return vec![];
             }
         };
 
@@ -924,6 +932,7 @@ impl ComponentModelForAnalyzer {
                     RouteRequest::UseRunner(UseRunnerDecl {
                         source: UseSource::Environment,
                         source_name: runner.clone(),
+                        source_dictionary: None,
                     }),
                     target,
                 );
@@ -1402,6 +1411,7 @@ mod tests {
             RouteRequest::UseProtocol(UseProtocolDecl {
                 source: UseSource::Parent,
                 source_name: "bar_svc".parse().unwrap(),
+                source_dictionary: None,
                 target_path: "/svc/hippo".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,

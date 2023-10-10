@@ -1671,6 +1671,10 @@ fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bo
         OfferTarget::Collection(target_collection) => {
             Some(target_collection) == child_moniker.collection()
         }
+        OfferTarget::Capability(_target_capability) => {
+            // TODO(fxbug.dev/301674053): Support dictionary targets.
+            false
+        }
     }
 }
 
@@ -1848,6 +1852,7 @@ mod tests {
             .map(|i| OfferServiceDecl {
                 source: OfferSource::Parent,
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
+                source_dictionary: None,
                 target: OfferTarget::Collection("coll".parse().unwrap()),
                 target_name: "foo_target".parse().unwrap(),
                 source_instance_filter: None,
@@ -1858,6 +1863,7 @@ mod tests {
         let collection_offer = OfferServiceDecl {
             source: OfferSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
+            source_dictionary: None,
             target: OfferTarget::Child(ChildRef { name: "target".into(), collection: None }),
             target_name: "foo_target".parse().unwrap(),
             source_instance_filter: None,
@@ -1889,6 +1895,7 @@ mod tests {
             .map(|i| ExposeServiceDecl {
                 source: ExposeSource::Child("source".into()),
                 source_name: format!("foo_source_{}", i).parse().unwrap(),
+                source_dictionary: None,
                 target: ExposeTarget::Parent,
                 target_name: "foo_target".parse().unwrap(),
                 availability: Availability::Required,
@@ -1897,6 +1904,7 @@ mod tests {
         let collection_expose = ExposeServiceDecl {
             source: ExposeSource::Collection("coll".parse().unwrap()),
             source_name: "foo_source".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "foo_target".parse().unwrap(),
             availability: Availability::Required,

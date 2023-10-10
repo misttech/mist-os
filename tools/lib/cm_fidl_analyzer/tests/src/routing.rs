@@ -569,6 +569,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -579,6 +580,7 @@ mod tests {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter: None,
                         renamed_instances: None,
                         target_name: "foo".parse().unwrap(),
@@ -620,6 +622,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -630,6 +633,7 @@ mod tests {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter: None,
                         renamed_instances: None,
                         target_name: "foo".parse().unwrap(),
@@ -671,6 +675,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Child("b".to_string()),
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -692,6 +697,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -726,6 +732,7 @@ mod tests {
             dependency_type: DependencyType::Strong,
             source: UseSource::Parent,
             source_name: "foo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/foo".parse().unwrap(),
             availability: Availability::Required,
         };
@@ -736,6 +743,7 @@ mod tests {
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".into()),
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         source_instance_filter: None,
                         renamed_instances: None,
                         target_name: "foo".parse().unwrap(),
@@ -753,6 +761,7 @@ mod tests {
                     .expose(ExposeDecl::Service(ExposeServiceDecl {
                         source: ExposeSource::Self_,
                         source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
                         target: ExposeTarget::Parent,
                         availability: cm_rust::Availability::Required,
@@ -1261,6 +1270,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "bar_svc".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1268,6 +1278,7 @@ mod tests {
         let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Self_,
             source_name: "foo_svc".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar_svc".parse().unwrap(),
             target: OfferTarget::Child(ChildRef { name: "b".into(), collection: None }),
             dependency_type: DependencyType::Strong,
@@ -1320,6 +1331,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Child("b".to_string()),
             source_name: "bar_svc".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1327,6 +1339,7 @@ mod tests {
         let expose_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Self_,
             source_name: "foo_svc".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar_svc".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -1371,6 +1384,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Self_,
             source_name: "foo_svc".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1418,6 +1432,7 @@ mod tests {
         let use_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
             source_name: "foobar_data".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/data/hippo".parse().unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
@@ -1427,6 +1442,7 @@ mod tests {
         let a_offer_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::static_child("b".to_string()),
             source_name: "baz_data".parse().unwrap(),
+            source_dictionary: None,
             target_name: "foobar_data".parse().unwrap(),
             target: OfferTarget::static_child("c".to_string()),
             rights: Some(fio::R_STAR_DIR),
@@ -1437,6 +1453,7 @@ mod tests {
         let b_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Child("d".to_string()),
             source_name: "bar_data".parse().unwrap(),
+            source_dictionary: None,
             target_name: "baz_data".parse().unwrap(),
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
@@ -1446,6 +1463,7 @@ mod tests {
         let d_expose_decl = ExposeDecl::Directory(ExposeDirectoryDecl {
             source: ExposeSource::Self_,
             source_name: "foo_data".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar_data".parse().unwrap(),
             target: ExposeTarget::Parent,
             rights: Some(fio::R_STAR_DIR),
@@ -1678,6 +1696,7 @@ mod tests {
         let offer_realm_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Framework,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
+            source_dictionary: None,
             target_name: "fuchsia.component.Realm".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
@@ -1686,6 +1705,7 @@ mod tests {
         let use_realm_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "fuchsia.component.Realm".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/fuchsia.component.Realm".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1741,6 +1761,7 @@ mod tests {
         let offer_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Parent,
             source_name: "foo_svc".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar_svc".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
@@ -1749,6 +1770,7 @@ mod tests {
         let use_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "bar_svc".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/hippo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
@@ -1810,6 +1832,7 @@ mod tests {
         let expose_decl = ExposeDecl::Resolver(ExposeResolverDecl {
             source: ExposeSource::Self_,
             source_name: "base".parse().unwrap(),
+            source_dictionary: None,
             target: ExposeTarget::Parent,
             target_name: "base".parse().unwrap(),
         });
@@ -2127,6 +2150,7 @@ mod tests {
         let use_directory_decl = UseDecl::Directory(UseDirectoryDecl {
             source: UseSource::Parent,
             source_name: "bar_data".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/data/hippo".parse().unwrap(),
             rights: fio::R_STAR_DIR,
             subdir: None,
@@ -2136,6 +2160,7 @@ mod tests {
         let offer_directory_decl = OfferDecl::Directory(OfferDirectoryDecl {
             source: OfferSource::Self_,
             source_name: "foo_data".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bar_data".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             rights: Some(fio::R_STAR_DIR),
@@ -2147,6 +2172,7 @@ mod tests {
         let expose_protocol_decl = ExposeDecl::Protocol(ExposeProtocolDecl {
             source: ExposeSource::Child("c".to_string()),
             source_name: "bad_protocol".parse().unwrap(),
+            source_dictionary: None,
             target_name: "bad_protocol".parse().unwrap(),
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
@@ -2310,6 +2336,7 @@ mod tests {
         let use_protocol_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target_path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Optional,
@@ -2317,6 +2344,7 @@ mod tests {
         let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Void,
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
@@ -2368,6 +2396,7 @@ mod tests {
         let offer_protocol_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::static_child("c".to_string()),
             source_name: "fuchsia.examples.Echo".parse().unwrap(),
+            source_dictionary: None,
             target_name: "fuchsia.examples.Echo".parse().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
             dependency_type: DependencyType::Strong,
