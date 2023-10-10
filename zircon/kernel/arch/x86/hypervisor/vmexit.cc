@@ -61,7 +61,7 @@ constexpr uint32_t kXsaveHeaderSize = 64;
 // NOTE: x86 instructions are guaranteed to be 15 bytes or fewer.
 constexpr uint8_t kMaxInstructionSize = 15;
 
-constexpr char kHypVendorId[] = "KVMKVMKVM\0\0\0";
+alignas(uint32_t) constexpr char kHypVendorId[] = "KVMKVMKVM\0\0\0";
 static_assert(sizeof(kHypVendorId) - 1 == 12, "Vendor ID must be 12 characters long");
 
 constexpr uint64_t kKvmFeatureNoIoDelay = 1u << 1;
