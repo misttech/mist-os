@@ -28,6 +28,9 @@ class ProfileProvider : public fuchsia::media::ProfileProvider {
                                    RegisterHandlerWithCapacityCallback callback) override;
   void UnregisterHandler(zx::thread thread_handle, std::string name,
                          UnregisterHandlerCallback callback) override;
+  void RegisterMemoryRange(zx::vmar vmar_handle, std::string name,
+                           RegisterMemoryRangeCallback callback) override;
+  void UnregisterMemoryRange(zx::vmar vmar_handle, UnregisterMemoryRangeCallback callback) override;
 
  private:
   fidl::BindingSet<fuchsia::media::ProfileProvider, ProfileProvider*> bindings_;

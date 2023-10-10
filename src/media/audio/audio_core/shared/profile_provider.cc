@@ -83,4 +83,36 @@ void ProfileProvider::UnregisterHandler(zx::thread thread_handle, const std::str
       });
 }
 
+void ProfileProvider::RegisterMemoryRange(zx::vmar vmar_handle, std::string name,
+                                          RegisterMemoryRangeCallback callback) {
+  if (!profile_provider_) {
+    profile_provider_ = context_.svc()->Connect<fuchsia::scheduler::ProfileProvider>();
+  }
+
+  profile_provider_->SetProfileByRole(
+      std::move(vmar_handle), name, [callback = std::move(callback), &name](zx_status_t status) {
+        if (status != ZX_OK) {
+          FX_PLOGS(WARNING, status) << "Failed to set memory role \"" << name << "\"";
+        }
+        callback();
+      });
+}
+
+void ProfileProvider::UnregisterMemoryRange(zx::vmar vmar_handle,
+                                            UnregisterMemoryRangeCallback callback) {
+  if (!profile_provider_) {
+    profile_provider_ = context_.svc()->Connect<fuchsia::scheduler::ProfileProvider>();
+  }
+
+  const std::string role_name = "fuchsia.default";
+  profile_provider_->SetProfileByRole(
+      std::move(vmar_handle), role_name,
+      [callback = std::move(callback), &role_name](zx_status_t status) {
+        if (status != ZX_OK) {
+          FX_PLOGS(WARNING, status) << "Failed to set memory role \"" << role_name << "\"";
+        }
+        callback();
+      });
+}
+
 }  // namespace media::audio

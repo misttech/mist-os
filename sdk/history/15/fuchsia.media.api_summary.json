@@ -2829,11 +2829,27 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.media/ProfileProvider.RegisterMemoryRange",
+        "strictness": "strict",
+        "ordinal": "3409397769480787501",
+        "direction": "two_way",
+        "request": "fuchsia.media/ProfileProviderRegisterMemoryRangeRequest"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.media/ProfileProvider.UnregisterHandler",
         "strictness": "strict",
         "ordinal": "8236412328517522508",
         "direction": "two_way",
         "request": "fuchsia.media/ProfileProviderUnregisterHandlerRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.media/ProfileProvider.UnregisterMemoryRange",
+        "strictness": "strict",
+        "ordinal": "3297501164869889319",
+        "direction": "two_way",
+        "request": "fuchsia.media/ProfileProviderUnregisterMemoryRangeRequest"
     },
     {
         "kind": "protocol",
@@ -2888,6 +2904,23 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.media/ProfileProviderRegisterMemoryRangeRequest.name",
+        "ordinal": "2",
+        "type": "string:64"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/ProfileProviderRegisterMemoryRangeRequest.vmar_handle",
+        "ordinal": "1",
+        "type": "zx/Handle:VMAR"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/ProfileProviderRegisterMemoryRangeRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.media/ProfileProviderUnregisterHandlerRequest.name",
         "ordinal": "2",
         "type": "string:64"
@@ -2901,6 +2934,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.media/ProfileProviderUnregisterHandlerRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.media/ProfileProviderUnregisterMemoryRangeRequest.vmar_handle",
+        "ordinal": "1",
+        "type": "zx/Handle:VMAR"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.media/ProfileProviderUnregisterMemoryRangeRequest",
         "resourceness": "resource"
     },
     {

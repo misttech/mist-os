@@ -30,6 +30,16 @@ class ProfileProvider : public fuchsia::media::ProfileProvider {
     // Does not actually set a thread profile, but provides a successful response to the request.
     callback();
   }
+  void RegisterMemoryRange(zx::vmar vmar_handle, std::string name,
+                           RegisterMemoryRangeCallback callback) override {
+    // Does not actually set a memory profile, but provides a successful response to the request.
+    callback();
+  }
+  void UnregisterMemoryRange(zx::vmar vmar_handle,
+                             UnregisterMemoryRangeCallback callback) override {
+    // Does not actually set a memory profile, but provides a successful response to the request.
+    callback();
+  }
 
  private:
   fidl::BindingSet<fuchsia::media::ProfileProvider> bindings_;
