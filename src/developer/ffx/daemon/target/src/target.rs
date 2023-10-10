@@ -1310,6 +1310,34 @@ impl Debug for Target {
     }
 }
 
+/// A handle to a discovered target.
+///
+/// Allows basic info to be queried about a target. Use `TargetCollection::use_target` to declare
+/// consent to use the target on behalf of an explicit ffx invocation.
+#[derive(Clone, Debug)]
+pub struct DiscoveredTarget(pub(crate) Rc<Target>);
+
+impl DiscoveredTarget {
+    pub fn id(&self) -> u64 {
+        self.0.id()
+    }
+    pub fn nodename(&self) -> Option<String> {
+        self.0.nodename()
+    }
+    pub fn nodename_str(&self) -> String {
+        self.0.nodename_str()
+    }
+    pub fn is_enabled(&self) -> bool {
+        self.0.is_enabled()
+    }
+}
+
+impl From<Rc<Target>> for DiscoveredTarget {
+    fn from(target: Rc<Target>) -> Self {
+        Self(target)
+    }
+}
+
 /// Convert a TargetAddrInfo to a SocketAddr preserving the port number if
 /// provided, otherwise the returned SocketAddr will have port number 0.
 pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
@@ -1351,6 +1379,27 @@ impl PartialEq for Target {
             && self.addrs() == o.addrs()
             && *self.state.borrow() == *o.state.borrow()
             && self.build_config() == o.build_config()
+    }
+}
+
+#[cfg(test)]
+impl PartialEq for DiscoveredTarget {
+    fn eq(&self, o: &DiscoveredTarget) -> bool {
+        self.0 == o.0
+    }
+}
+
+#[cfg(test)]
+impl PartialEq<Target> for DiscoveredTarget {
+    fn eq(&self, o: &Target) -> bool {
+        (&*self.0) == o
+    }
+}
+
+#[cfg(test)]
+impl PartialEq<Rc<Target>> for DiscoveredTarget {
+    fn eq(&self, o: &Rc<Target>) -> bool {
+        (&self.0) == o
     }
 }
 

@@ -333,26 +333,32 @@ impl TracingProtocol {
     ) -> Result<String, ffx::RecordingError> {
         match tasks.output_file_to_nodename.remove(output_file) {
             Some(n) => Ok(n),
-            None => cx
-                .get_target_collection()
-                .await
-                .map_err(|e| {
-                    tracing::warn!("unable to get target collection: {:?}", e);
-                    ffx::RecordingError::RecordingStop
-                })?
-                .get(output_file.as_str())
-                .ok_or_else(|| {
-                    tracing::warn!("target query '{}' matches no targets", output_file);
-                    ffx::RecordingError::NoSuchTarget
-                })?
-                .nodename()
-                .ok_or_else(|| {
+            None => {
+                let target = cx
+                    .get_target_collection()
+                    .await
+                    .map_err(|e| {
+                        tracing::warn!("unable to get target collection: {:?}", e);
+                        ffx::RecordingError::RecordingStop
+                    })?
+                    .query_single_enabled_target(&output_file.to_string().into())
+                    .map_err(|_| {
+                        tracing::warn!("target query '{output_file}' matches multiple targets");
+                        ffx::RecordingError::NoSuchTarget
+                    })?
+                    .ok_or_else(|| {
+                        tracing::warn!("target query '{}' matches no targets", output_file);
+                        ffx::RecordingError::NoSuchTarget
+                    })?;
+
+                target.nodename().ok_or_else(|| {
                     tracing::warn!(
                         "target query '{}' matches target with no nodename",
                         output_file
                     );
                     ffx::RecordingError::DisconnectedTarget
-                }),
+                })
+            }
         }
     }
 }

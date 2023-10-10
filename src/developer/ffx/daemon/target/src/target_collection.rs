@@ -3,23 +3,26 @@
 // found in the LICENSE file.
 
 use crate::{
-    target::{Target, TargetAddrType},
+    target::{DiscoveredTarget, Target, TargetAddrType},
     MDNS_MAX_AGE,
 };
 use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
+use async_utils::event::Event;
 use chrono::Utc;
 use ffx::DaemonError;
 use ffx_daemon_core::events::{self, EventSynthesizer};
 use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
 use fidl_fuchsia_developer_ffx as ffx;
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, net::IpAddr, ops::ControlFlow, rc::Rc};
 
-#[derive(Default)]
 pub struct TargetCollection {
     targets: RefCell<HashMap<u64, Rc<Target>>>,
     events: RefCell<Option<events::Queue<DaemonEvent>>>,
+    // Unlike the daemon event, these also fire for discovered targets.
+    // TODO(b/303144137): Stop publishing events to the daemon-wide event queue.
+    on_targets_changed: RefCell<Event>,
 }
 
 #[async_trait(?Send)]
@@ -40,7 +43,11 @@ impl EventSynthesizer<DaemonEvent> for TargetCollection {
 
 impl TargetCollection {
     pub fn new() -> Self {
-        Self { targets: RefCell::new(HashMap::new()), events: RefCell::new(None) }
+        Self {
+            targets: RefCell::new(HashMap::new()),
+            events: RefCell::new(None),
+            on_targets_changed: RefCell::new(Event::new()),
+        }
     }
 
     #[cfg(test)]
@@ -64,10 +71,10 @@ impl TargetCollection {
     }
 
     pub fn remove_target(&self, target_id: String) -> bool {
-        if let Some(t) = self.get(target_id) {
+        if let Ok(Some(t)) = self.query_any_single_target(&target_id.into(), |_| true) {
             let target = self.targets.borrow_mut().remove(&t.id());
             if let Some(target) = target {
-                target.disconnect()
+                target.disable();
             }
             true
         } else {
@@ -76,7 +83,9 @@ impl TargetCollection {
     }
 
     pub fn remove_ephemeral_target(&self, target: Rc<Target>) -> bool {
-        self.targets.borrow_mut().remove(&target.id()).is_some()
+        let Some(target) = self.targets.borrow_mut().remove(&target.id()) else { return false };
+        target.disable();
+        true
     }
 
     fn find_matching_target(&self, new_target: &Target) -> (Option<Rc<Target>>, bool) {
@@ -180,6 +189,39 @@ impl TargetCollection {
         (to_update, network_changed)
     }
 
+    // Wait for targets until the predicate exits the loop.
+    //
+    // Panics if the predicate attempts to mutate the target collection.
+    async fn wait_for_change<B>(&self, mut predicate: impl FnMut() -> ControlFlow<B>) -> B {
+        // A timeout is not needed here as timeouts are handled downstream and may be
+        // undesired. Futures can be dropped before completion, so the loop will always exit.
+        loop {
+            // Guard against modification while running the predicate.
+            // It is also important that the predicate is synchronous as we do not want to race
+            // with merge_insert.
+            let guard = self.targets.borrow();
+            if let ControlFlow::Break(b) = predicate() {
+                return b;
+            }
+            drop(guard);
+
+            tracing::debug!("Waiting for next change...");
+
+            // TODO(b/297896647): Move synchronous polled discovery here. Make sure to clone the
+            // event before doing sync polling.
+
+            // TODO(b/297896647): Kick off discovery advertisement every 10 seconds when not found.
+            // Benign discovery types (USB) can poll here. Just make it explicit that we're waiting
+            // on discovery.
+
+            self.on_targets_changed.clone().into_inner().wait().await;
+        }
+    }
+
+    fn signal_targets_changed(&self) {
+        self.on_targets_changed.replace(Event::new()).signal();
+    }
+
     #[tracing::instrument(skip(self))]
     pub fn merge_insert(&self, new_target: Rc<Target>) -> Rc<Target> {
         // Drop non-manual loopback address entries, as matching against
@@ -207,6 +249,7 @@ impl TargetCollection {
                     .push(DaemonEvent::NewTarget(new_target.target_info()))
                     .unwrap_or_else(|e| tracing::warn!("unable to push new target event: {}", e));
             }
+            self.signal_targets_changed();
             return new_target;
         };
 
@@ -273,6 +316,7 @@ impl TargetCollection {
             to_update.enable();
         }
 
+        self.signal_targets_changed();
         to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
             tracing::warn!("unable to enqueue rediscovered event: {:#}", err)
         });
@@ -377,6 +421,132 @@ impl TargetCollection {
             .find(|target| query.match_info(&target.target_info()))
             .map(Clone::clone)
     }
+
+    fn query_any_target<B>(
+        &self,
+        query: &TargetQuery,
+        mut f: impl FnMut(&Rc<Target>) -> ControlFlow<B>,
+    ) -> Option<B> {
+        for target in self.targets.borrow().values() {
+            if !query.matches(target) {
+                continue;
+            }
+
+            let cf = f(target);
+            if let ControlFlow::Break(b) = cf {
+                return Some(b);
+            }
+        }
+
+        None
+    }
+
+    fn query_any_single_target(
+        &self,
+        query: &TargetQuery,
+        predicate: impl Fn(&Target) -> bool,
+    ) -> Result<Option<Rc<Target>>, ()> {
+        let mut selected = None;
+        let mut found_multiple = false;
+        self.query_any_target::<()>(query, |target| {
+            if !predicate(target) {
+                return ControlFlow::Continue(());
+            }
+
+            if let Some(selected) = selected.as_ref() {
+                if !found_multiple {
+                    // Print out the header with the first selected target, then
+                    // subsequent log lines print the rest of the matching targets.
+                    tracing::error!("Target query {query:?} matched multiple targets:");
+                    tracing::error!("{:?}", selected);
+                    found_multiple = true;
+                }
+
+                tracing::error!("& {:?}", target);
+            } else {
+                selected = Some(target.clone());
+            }
+            ControlFlow::Continue(())
+        });
+
+        if found_multiple {
+            Err(())
+        } else {
+            Ok(selected)
+        }
+    }
+
+    // Filters through targets, returning info for matching targets. Targets must be previously
+    // enabled by `use_target`.
+    pub fn query_enabled_targets<B>(
+        &self,
+        query: &TargetQuery,
+        mut f: impl FnMut(&Rc<Target>) -> ControlFlow<B>,
+    ) -> Option<B> {
+        self.query_any_target(query, move |target| {
+            if !target.is_connected() {
+                tracing::debug!("Skipping inactive target {target:?}");
+                ControlFlow::Continue(())
+            } else {
+                f(target)
+            }
+        })
+    }
+
+    pub fn query_single_enabled_target(
+        &self,
+        query: &TargetQuery,
+    ) -> Result<Option<Rc<Target>>, ()> {
+        self.query_any_single_target(query, |target| {
+            if !target.is_connected() {
+                tracing::debug!("Skipping inactive target {target:?}");
+                false
+            } else {
+                true
+            }
+        })
+    }
+
+    /// Waits to find a single matching target, without filtering out discovered/disabled targets.
+    ///
+    /// Use `query_enabled_targets` to find a previously used target.
+    ///
+    /// Returns an error if multiple targets match. In an environment where targets are discovered
+    /// asynchronously this error will not consistently fire.
+    #[tracing::instrument(skip(self))]
+    pub async fn discover_target(&self, query: &TargetQuery) -> Result<DiscoveredTarget, ()> {
+        tracing::debug!("Using query: {:?}", query);
+
+        // A timeout is not needed here as timeouts are handled downstream and may be
+        // undesired. Futures can be dropped before completion, so the loop will always exit.
+        let target = self
+            .wait_for_change(|| {
+                // Prefer enabled targets over discovered targets.
+                // Functions as a way to silo usages of the "first" matcher.
+                let Ok(enabled_target) = self.query_single_enabled_target(query) else {
+                    return ControlFlow::Break(Err(()));
+                };
+
+                if let Some(found) = enabled_target {
+                    return ControlFlow::Break(Ok(found));
+                }
+
+                // Otherwise match against all targets.
+                ControlFlow::Break(match self.query_any_single_target(query, |_| true) {
+                    Ok(Some(found)) => Ok(found),
+                    Ok(None) => return ControlFlow::Continue(()),
+                    Err(_) => {
+                        tracing::warn!("Too many targets matched query");
+
+                        Err(())
+                    }
+                })
+            })
+            .await?;
+
+        tracing::debug!("Matched {target:?}");
+        Ok(DiscoveredTarget(target))
+    }
 }
 
 pub trait MatchTarget {
@@ -385,9 +555,10 @@ pub trait MatchTarget {
         TQ: Into<TargetQuery>;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TargetQuery {
     /// Attempts to match the nodename, falling back to serial (in that order).
+    /// TODO(b/299345828): Make this an exact match by default, fall back to substring matching
     NodenameOrSerial(String),
     AddrPort((TargetAddr, u16)),
     Addr(TargetAddr),
@@ -495,6 +666,32 @@ mod tests {
         time::Instant,
     };
 
+    #[track_caller]
+    fn expect_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
+        tc.query_any_single_target(query, |_| true)
+            .expect("Multiple targets found")
+            .expect("No target found")
+    }
+
+    #[track_caller]
+    fn expect_enabled_target(tc: &TargetCollection, query: &TargetQuery) -> Rc<Target> {
+        tc.query_single_enabled_target(query)
+            .expect("Multiple targets found")
+            .expect("No target found")
+    }
+
+    #[track_caller]
+    fn expect_no_target(tc: &TargetCollection, query: &TargetQuery) {
+        let opt = tc.query_any_single_target(query, |_| true).expect("Multiple targets found");
+        assert!(opt.is_none(), "Target found")
+    }
+
+    #[track_caller]
+    fn expect_no_enabled_target(tc: &TargetCollection, query: &TargetQuery) {
+        let opt = tc.query_single_enabled_target(query).expect("Multiple targets found");
+        assert!(opt.is_none(), "Target found")
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_collection_insert_new_not_connected() {
         let tc = TargetCollection::new_with_queue();
@@ -523,6 +720,7 @@ mod tests {
     async fn test_target_collection_insert_new() {
         let tc = TargetCollection::new_with_queue();
         let nodename = String::from("what");
+        let query = nodename.clone().into();
         let t = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
         tc.merge_insert(t.clone());
         assert_eq!(tc.get(nodename.clone()).unwrap(), t);
@@ -530,6 +728,21 @@ mod tests {
             Some(_) => panic!("string lookup should return None"),
             _ => (),
         }
+        assert_eq!(expect_target(&tc, &query), t);
+        expect_no_target(&tc, &"oihaoih".into())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_target_collection_insert_new_disabled() {
+        let tc = TargetCollection::new_with_queue();
+        let nodename = String::from("what");
+        let query = nodename.clone().into();
+        let t = Target::new_with_time(&nodename, Utc.ymd(2014, 10, 31).and_hms(9, 10, 12));
+        tc.merge_insert(t.clone());
+        expect_no_enabled_target(&tc, &query);
+        assert_eq!(expect_target(&tc, &query), t);
+        tc.merge_insert(Target::new_autoconnected(&nodename));
+        assert_eq!(expect_enabled_target(&tc, &query), t);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -579,7 +792,7 @@ mod tests {
         let t2 = Target::new_with_time(&nodename, Utc.ymd(2014, 11, 2).and_hms(13, 2, 1));
         let a1 = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
         let a2 = IpAddr::V6(Ipv6Addr::new(
-            0xfe80, 0xcafe, 0xf00d, 0xf000, 0xb412, 0xb455, 0x1337, 0xfeed,
+            0xfe80, 0x0000, 0x0000, 0x0000, 0xb412, 0xb455, 0x1337, 0xfeed,
         ));
         t1.addrs_insert(TargetAddr::new(a1.clone(), 1, 0));
         t2.addrs_insert(TargetAddr::new(a2.clone(), 1, 0));
@@ -634,27 +847,40 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_target_by_addr() {
-        let addr: TargetAddr = TargetAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
-        let t = Target::new_named("foo");
-        t.addrs_insert(addr.clone());
-        let tc = TargetCollection::new_with_queue();
-        tc.merge_insert(clone_target(&t));
-        assert_eq!(tc.get(addr).unwrap(), t);
-        assert_eq!(tc.get("192.168.0.1").unwrap(), t);
-        assert!(tc.get("fe80::dead:beef:beef:beef").is_none());
+    async fn test_query_target_by_addr() {
+        let ipv4_addr: TargetAddr = TargetAddr::new(IpAddr::from([192, 168, 0, 1]), 0, 0);
 
-        let addr: TargetAddr = TargetAddr::new(
+        let ipv6_addr: TargetAddr = TargetAddr::new(
             IpAddr::from([0xfe80, 0x0, 0x0, 0x0, 0xdead, 0xbeef, 0xbeef, 0xbeef]),
             3,
             0,
         );
+
+        let t = Target::new_named("foo");
+        t.addrs_insert(ipv4_addr);
+        let tc = TargetCollection::new_with_queue();
+        tc.merge_insert(t.clone());
+
+        let ipv4_query = TargetQuery::Addr(ipv4_addr);
+        let ipv6_query = TargetQuery::Addr(ipv6_addr);
+
+        assert_eq!(tc.get(ipv4_addr).unwrap(), t);
+        assert_eq!(tc.get("192.168.0.1").unwrap(), t);
+        assert!(tc.get("fe80::dead:beef:beef:beef").is_none());
+
+        assert_eq!(expect_target(&tc, &ipv4_query), t);
+        expect_no_target(&tc, &ipv6_query);
+
         let t = Target::new_named("fooberdoober");
-        t.addrs_insert(addr.clone());
-        tc.merge_insert(clone_target(&t));
+        t.addrs_insert(ipv6_addr);
+        tc.merge_insert(t.clone());
+
         assert_eq!(tc.get("fe80::dead:beef:beef:beef").unwrap(), t);
-        assert_eq!(tc.get(addr.clone()).unwrap(), t);
+        assert_eq!(tc.get(ipv6_addr).unwrap(), t);
         assert_eq!(tc.get("fooberdoober").unwrap(), t);
+
+        assert_eq!(expect_target(&tc, &ipv6_query), t);
+        assert_ne!(expect_target(&tc, &ipv4_query), t);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -771,6 +997,34 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_discover_target() {
+        let default = "clam-chowder-is-tasty";
+        let t = Target::new_autoconnected(default);
+        let t2 = Target::new_named("this-is-a-crunchy-falafel");
+        let tc = TargetCollection::new_with_queue();
+        tc.merge_insert(t.clone());
+
+        let query = TargetQuery::from(default.to_owned());
+        assert_eq!(tc.discover_target(&query).await.unwrap(), t);
+        assert_eq!(tc.discover_target(&TargetQuery::First).await.unwrap(), t);
+
+        let query2 = TargetQuery::from(t2.nodename());
+        tc.merge_insert(t2.clone());
+
+        assert_eq!(tc.discover_target(&query).await.unwrap(), t);
+        assert_eq!(tc.discover_target(&query2).await.unwrap(), t2);
+
+        // Targets in use are preferred
+        assert_eq!(tc.discover_target(&TargetQuery::First).await.unwrap(), t);
+
+        // Find by partial match
+        assert_eq!(tc.discover_target(&TargetQuery::from("clam".to_owned())).await.unwrap(), t);
+
+        tc.merge_insert(Target::new_autoconnected("this-is-a-crunchy-falafel"));
+        tc.discover_target(&TargetQuery::First).await.unwrap_err(); // Too many targets found
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_wait_for_match() {
         let default = "clam-chowder-is-tasty";
         let t = Target::new_autoconnected(default);
@@ -865,6 +1119,31 @@ mod tests {
                 target_wait_fut.poll(cx)
             }
         }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_discover_target_updated_target() {
+        let address = "f111::1";
+        let ip = address.parse().unwrap();
+        let mut addr_set = BTreeSet::new();
+        addr_set.replace(TargetAddr::new(ip, 0, 0));
+        let t = Target::new_with_addrs(Option::<String>::None, addr_set);
+        let tc = TargetCollection::new_with_queue();
+        tc.merge_insert(t);
+        let target_name = "fesenjoon-is-my-jam";
+        let wait_fut = Box::pin(async {
+            tc.discover_target(&TargetQuery::from(target_name.to_owned())).await.unwrap().0
+        });
+        // Now we will update the target with a nodename. This should merge into
+        // the collection and create an updated target event.
+        let t2 = Target::new_autoconnected(target_name);
+        t2.addrs.borrow_mut().replace(TargetAddrEntry::new(
+            TargetAddr::new(ip, 0, 0),
+            Utc::now(),
+            TargetAddrType::Ssh,
+        ));
+        let fut = TargetUpdatedFut::new(t2, tc.clone(), wait_fut);
+        assert_eq!(fut.await.nodename().unwrap(), target_name);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -1166,6 +1445,26 @@ mod tests {
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_no_ambiguous_target_when_disabled() {
+        let tc = TargetCollection::new_with_queue();
+
+        tc.merge_insert(Target::new_named("this-is-not-connected"));
+        tc.merge_insert(Target::new_autoconnected("this-is-connected"));
+
+        let found_target = expect_enabled_target(&tc, &TargetQuery::First);
+        assert_eq!(
+            "this-is-connected",
+            found_target.nodename().expect("target should have nodename")
+        );
+
+        let found_target = expect_enabled_target(&tc, &TargetQuery::from("connected".to_owned()));
+        assert_eq!(
+            "this-is-connected",
+            found_target.nodename().expect("target should have nodename")
+        );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
     async fn test_no_ambiguous_target_when_disconnected() {
         // While this is an implementation detail, the naming of these targets
         // are important. The match order of the targets, if not filtering by
@@ -1189,6 +1488,8 @@ mod tests {
             found_target.nodename().expect("target should have nodename")
         );
     }
+
+    /* TARGET QUERIES */
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_target_query_matches_nodename() {

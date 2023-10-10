@@ -11,7 +11,7 @@ use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetInfo};
 use ffx_daemon_target::{
     manual_targets,
     target::{target_addr_info_to_socketaddr, Target, TargetAddrEntry, TargetAddrType},
-    target_collection::TargetCollection,
+    target_collection::{TargetCollection, TargetQuery},
 };
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
@@ -226,24 +226,24 @@ impl FidlProtocol for TargetCollectionProtocol {
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
                 let reader = reader.into_proxy()?;
-                let targets =
-                    match query.string_matcher.as_deref() {
-                        None | Some("") => target_collection
-                            .targets()
-                            .into_iter()
-                            .filter_map(|t| {
-                                if t.is_connected() {
-                                    Some(t.as_ref().into())
-                                } else {
-                                    None
-                                }
-                            })
-                            .collect::<Vec<ffx::TargetInfo>>(),
-                        q => match target_collection.get_connected(q) {
-                            Some(t) => vec![t.as_ref().into()],
-                            None => vec![],
-                        },
-                    };
+                let query = match query.string_matcher.clone() {
+                    Some(query) if !query.is_empty() => Some(TargetQuery::from(query)),
+                    _ => None,
+                };
+
+                // TODO(b/297896647): Use `discover_targets` to run discovery & stream discovered
+                // targets. Wait for `reader.as_channel().on_closed()` to cancel discovery when no
+                // longer reading. Add FIDL parameter to control discovery streaming.
+
+                let targets = target_collection
+                    .targets()
+                    .into_iter()
+                    .filter(|t| query.as_ref().map(|q| q.matches(t)).unwrap_or(true))
+                    // TODO(b/299129117): For back compat. Remove
+                    .filter(|t| t.is_connected())
+                    .map(|t| Into::into(&*t))
+                    .collect::<Vec<_>>();
+
                 // This was chosen arbitrarily. It's possible to determine a
                 // better chunk size using some FIDL constant math.
                 const TARGET_CHUNK_SIZE: usize = 20;
@@ -833,8 +833,8 @@ mod tests {
         assert_eq!(res[0].nodename.as_ref().unwrap(), NAME3);
 
         let res = list_targets(Some(PARTIAL_NAME_MATCH), &tc).await;
-        assert_eq!(res.len(), 1, "received: {:?}", res);
-        assert!(res.iter().any(|t| {
+        assert_eq!(res.len(), 2, "received: {:?}", res);
+        assert!(res.iter().all(|t| {
             let name = t.nodename.as_ref().unwrap();
             // Check either partial match just in case the backing impl
             // changes ordering. Possible todo here would be to return multiple

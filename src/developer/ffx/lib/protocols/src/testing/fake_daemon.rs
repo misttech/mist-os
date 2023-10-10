@@ -8,7 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ffx_daemon_events::TargetInfo;
+use ffx_daemon_events::{TargetConnectionState, TargetInfo};
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
 use fidl::{
     endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
@@ -21,6 +21,7 @@ use std::{
     cell::{Cell, RefCell},
     rc::Rc,
     sync::Arc,
+    time::Instant,
 };
 
 #[derive(Default)]
@@ -142,7 +143,7 @@ impl Default for FakeDaemon {
     fn default() -> Self {
         FakeDaemon {
             register: Default::default(),
-            target_collection: Default::default(),
+            target_collection: TargetCollection::new().into(),
             rcs_handler: Default::default(),
             overnet_node: overnet_core::Router::new(None).unwrap(),
         }
@@ -253,6 +254,7 @@ impl FakeDaemonBuilder {
             ..Default::default()
         };
         let built_target = Target::from_target_info(t.into());
+        built_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
 
         // Need to set for `ssh` target testing.
         if let Some(addr) = target.ssh_address {
@@ -339,7 +341,7 @@ impl Default for FakeDaemonBuilder {
         Self {
             map: Default::default(),
             rcs_handler: Default::default(),
-            target_collection: Default::default(),
+            target_collection: TargetCollection::new().into(),
         }
     }
 }

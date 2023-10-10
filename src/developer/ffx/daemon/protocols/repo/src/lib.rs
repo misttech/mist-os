@@ -319,10 +319,18 @@ impl<S: SshProvider> Registrar for RealRegistrar<S> {
 
         let target = match cx.get_target_collection().await {
             Ok(target_collection) => {
-                match target_collection.get(target_info.target_identifier.clone()) {
-                    Some(target) => target,
-                    None => {
+                match target_collection
+                    .query_single_enabled_target(&target_info.target_identifier.clone().into())
+                {
+                    Ok(Some(target)) => target,
+                    Ok(None) => {
                         tracing::error!("failed to get target from target collection");
+                        return Err(ffx::RepositoryError::TargetCommunicationFailure);
+                    }
+                    Err(()) => {
+                        tracing::error!(
+                            "failed to get target from target collection: ambiguous identifier"
+                        );
                         return Err(ffx::RepositoryError::TargetCommunicationFailure);
                     }
                 }
@@ -1980,8 +1988,11 @@ mod tests {
     // * clear out the config keys before we run each test to make sure state isn't leaked across
     //   tests.
     fn run_test<F: Future>(mode: TestRunMode, fut: F) -> F::Output {
-        let _guard = TEST_LOCK.lock().unwrap_or_else(|_| {
-            panic!("the test lock is poisoned, which probably means another test failed")
+        let _guard = TEST_LOCK.lock().unwrap_or_else(|err| {
+            // Ignore poison, the config is cleaned up below.
+            // Using a plain unwrap would cause all subsequent tests to fail, instead of a single
+            // test.
+            err.into_inner()
         });
 
         let _ = simplelog::SimpleLogger::init(
