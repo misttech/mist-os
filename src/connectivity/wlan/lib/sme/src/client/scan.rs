@@ -18,7 +18,6 @@ use {
     wlan_common::{
         bss::BssDescription,
         channel::{Cbw, Channel},
-        format::MacFmt,
         ie::IesMerger,
     },
 };
@@ -178,7 +177,7 @@ fn maybe_insert_bss(
     let mut ies = vec![];
     std::mem::swap(&mut ies, &mut fidl_bss.ies);
 
-    match bss_map.entry(Bssid(fidl_bss.bssid)) {
+    match bss_map.entry(Bssid::from(fidl_bss.bssid)) {
         hash_map::Entry::Occupied(mut entry) => {
             let (ref mut existing_bss, ref mut ies_merger) = entry.get_mut();
 
@@ -192,8 +191,8 @@ fn maybe_insert_bss(
             ies_merger.merge(&ies[..]);
             if ies_merger.buffer_overflow() {
                 warn!(
-                    "Not merging some IEs due to running out of buffer. BSSID: {:?}",
-                    fidl_bss.bssid.to_mac_string()
+                    "Not merging some IEs due to running out of buffer. BSSID: {}",
+                    Bssid::from(fidl_bss.bssid)
                 );
             }
             *existing_bss = fidl_bss;
@@ -350,6 +349,7 @@ mod tests {
     use fuchsia_inspect::Inspector;
     use fuchsia_zircon as zx;
     use ieee80211::MacAddr;
+    use lazy_static::lazy_static;
     use regex::bytes::Regex;
     use std::{convert::TryFrom, fmt::Write};
     use test_case::test_case;
@@ -362,7 +362,9 @@ mod tests {
         },
     };
 
-    const CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67];
+    lazy_static! {
+        static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();
+    }
 
     fn passive_discovery_scan(token: i32) -> DiscoveryScan<i32> {
         DiscoveryScan::new(token, fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}))
@@ -892,7 +894,7 @@ mod tests {
 
     fn create_sched() -> ScanScheduler<i32> {
         ScanScheduler::new(
-            Arc::new(test_utils::fake_device_info(CLIENT_ADDR)),
+            Arc::new(test_utils::fake_device_info(*CLIENT_ADDR)),
             fake_spectrum_management_support_empty(),
         )
     }
@@ -903,7 +905,7 @@ mod tests {
                 operating_channels,
                 ..fake_5ghz_band_capability()
             }],
-            ..test_utils::fake_device_info(CLIENT_ADDR)
+            ..test_utils::fake_device_info(*CLIENT_ADDR)
         }
     }
 

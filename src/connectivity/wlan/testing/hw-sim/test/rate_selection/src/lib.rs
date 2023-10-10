@@ -10,7 +10,8 @@ use {
     fuchsia_async::Interval,
     fuchsia_zircon::DurationNum,
     futures::{channel::mpsc, StreamExt},
-    ieee80211::Bssid,
+    ieee80211::{Bssid, MacAddrBytes},
+    lazy_static::lazy_static,
     pin_utils::pin_mut,
     std::collections::{hash_map::Entry, HashMap},
     tracing::info,
@@ -36,7 +37,9 @@ use {
 // Refer to |KMinstrelUpdateIntervalForHwSim| in //src/connectivity/wlan/drivers/wlan/device.cpp
 const DATA_FRAME_INTERVAL_NANOS: i64 = 4_000_000;
 
-const BSS_MINSTL: Bssid = Bssid([0x6d, 0x69, 0x6e, 0x73, 0x74, 0x0a]);
+lazy_static! {
+    static ref BSS_MINSTL: Bssid = Bssid::from([0x6d, 0x69, 0x6e, 0x73, 0x74, 0x0a]);
+}
 
 // Simulated hardware supports eight ERP transmission vectors with indices 129 to 136, inclusive.
 // See the `send_association_response` function.
@@ -200,7 +203,7 @@ fn send_tx_result(
     proxy: &fidl_tap::WlantapPhyProxy,
 ) -> Result<(), Error> {
     let result = WlanTxResult {
-        peer_addr: bssid.0,
+        peer_addr: bssid.to_array(),
         result_code: if is_successful {
             WlanTxResultCode::Success
         } else {
@@ -231,8 +234,8 @@ async fn send_eth_beacons<'a>(
 
     let mut buf: Vec<u8> = vec![];
     buf.append_value(&mac::EthernetIIHdr {
-        da: ETH_DST_MAC,
-        sa: CLIENT_MAC_ADDR,
+        da: *ETH_DST_MAC,
+        sa: *CLIENT_MAC_ADDR,
         ether_type: BigEndianU16::from_native(mac::ETHER_TYPE_IPV4),
     })
     .expect("error creating fake ethernet header");
@@ -248,7 +251,7 @@ async fn send_eth_beacons<'a>(
             intervals_since_last_beacon = 0;
             Beacon {
                 channel: Channel::new(1, Cbw::Cbw20),
-                bssid: BSS_MINSTL,
+                bssid: *BSS_MINSTL,
                 ssid: AP_SSID.clone(),
                 protection: Protection::Open,
                 rssi_dbm: 0,
@@ -293,7 +296,7 @@ async fn rate_selection() {
 
     let (client, port) = netdevice_helper::create_client(
         helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
     )
     .await
     .expect("failed to create netdevice client");

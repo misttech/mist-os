@@ -343,6 +343,7 @@ mod tests {
     use {
         super::*,
         crate::assert_variant,
+        ieee80211::MacAddr,
         std::convert::TryInto,
         zerocopy::{AsBytes, FromBytes, FromZeroes},
     };
@@ -1007,10 +1008,10 @@ mod tests {
         let r = parse_preq(&data[..]).expect("expected Ok");
         assert_eq!(0x02, r.header.hop_count);
         let ext_addr = r.originator_external_addr.expect("expected ext addr to be present");
-        assert_eq!([0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b], *ext_addr);
+        assert_eq!(MacAddr::from([0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b]), *ext_addr);
         assert_eq!(0x1b1a1918, { r.middle.lifetime });
         assert_eq!(2, r.targets.len());
-        assert_eq!([0xbb, 0xbb, 0xbb, 0xbb, 0xbb, 0xbb], r.targets[1].target_addr);
+        assert_eq!(MacAddr::from([0xbb, 0xbb, 0xbb, 0xbb, 0xbb, 0xbb]), r.targets[1].target_addr);
     }
 
     #[test]
@@ -1142,7 +1143,7 @@ mod tests {
         let r = parse_prep(&data[..]).expect("expected Ok");
         assert_eq!(0x0c0b0a09, { r.header.target_hwmp_seqno });
         let ext_addr = r.target_external_addr.expect("expected an external address");
-        assert_eq!([0x44, 0x55, 0x66, 0x77, 0x88, 0x99], *ext_addr);
+        assert_eq!(MacAddr::from([0x44, 0x55, 0x66, 0x77, 0x88, 0x99]), *ext_addr);
         assert_eq!(0x14131211, { r.tail.metric });
     }
 

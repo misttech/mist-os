@@ -150,7 +150,7 @@ mod test {
         futures::channel::mpsc,
         ieee80211_testutils::{BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
         rand::Rng,
-        wlan_common::{assert_variant, channel, format::MacFmt, random_fidl_bss_description},
+        wlan_common::{assert_variant, channel, random_fidl_bss_description},
     };
 
     struct TestValues {
@@ -425,7 +425,7 @@ mod test {
                     "selected": {
                         ssid: candidates[2].network.ssid.to_string(),
                         ssid_hash: candidates[2].hasher.hash_ssid(&candidates[2].network.ssid),
-                        bssid: candidates[2].bss.bssid.0.to_mac_string(),
+                        bssid: candidates[2].bss.bssid.to_string(),
                         rssi: i64::from(candidates[2].bss.rssi),
                         score: i64::from(scoring_functions::score_bss_scanned_candidate(candidates[2].clone())),
                         security_type_saved: candidates[2].saved_security_type_to_string(),

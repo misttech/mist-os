@@ -16,6 +16,7 @@ use crate::rsna::{Dot11VerifiedKeyFrame, NegotiatedProtection, Role, SecAssocUpd
 use crate::ProtectionInfo;
 use crate::{rsn_ensure, Error};
 use eapol;
+use ieee80211::MacAddr;
 use std::sync::{Arc, Mutex};
 use wlan_common::ie::rsn::{cipher::Cipher, rsne::Rsne, suite_filter::DEFAULT_GROUP_MGMT_CIPHER};
 use wlan_statemachine::StateMachine;
@@ -171,9 +172,9 @@ pub fn get_group_mgmt_cipher(
 #[derive(Debug, Clone)]
 pub struct Config {
     pub role: Role,
-    pub s_addr: [u8; 6],
+    pub s_addr: MacAddr,
     pub s_protection: ProtectionInfo,
-    pub a_addr: [u8; 6],
+    pub a_addr: MacAddr,
     pub a_protection: ProtectionInfo,
     pub nonce_rdr: Arc<NonceReader>,
     pub gtk_provider: Option<Arc<Mutex<GtkProvider>>>,
@@ -187,9 +188,9 @@ pub struct Config {
 impl Config {
     pub fn new(
         role: Role,
-        s_addr: [u8; 6],
+        s_addr: MacAddr,
         s_protection: ProtectionInfo,
-        a_addr: [u8; 6],
+        a_addr: MacAddr,
         a_protection: ProtectionInfo,
         nonce_rdr: Arc<NonceReader>,
         gtk_provider: Option<Arc<Mutex<GtkProvider>>>,

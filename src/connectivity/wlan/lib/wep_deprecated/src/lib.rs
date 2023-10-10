@@ -5,6 +5,7 @@
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     hex::FromHex,
+    ieee80211::{MacAddr, MacAddrBytes},
     std::ops::Deref,
     thiserror::Error,
     wlan_common::ie::rsn::{cipher, suite_selector::OUI},
@@ -64,13 +65,13 @@ pub fn derive_key(input: &[u8]) -> Result<Key, Error> {
 }
 
 /// Create an MLME-SETKEYS.request primitive for the given key and BSSID.
-pub fn make_mlme_set_keys_request(peer: [u8; 6], key: &Key) -> fidl_mlme::SetKeysRequest {
+pub fn make_mlme_set_keys_request(peer: MacAddr, key: &Key) -> fidl_mlme::SetKeysRequest {
     fidl_mlme::SetKeysRequest {
         keylist: vec![fidl_mlme::SetKeyDescriptor {
             key_type: fidl_mlme::KeyType::Pairwise,
             key: key.to_vec(),
             key_id: 0,
-            address: peer,
+            address: peer.to_array(),
             cipher_suite_oui: OUI.into(),
             cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
                 key.cipher_suite_type().into(),
@@ -117,7 +118,7 @@ mod tests {
     #[test]
     fn test_make_mlme_set_keys_request() {
         // WEP-40:
-        let actual = make_mlme_set_keys_request([4; 6], &Key::Bits40([3; 5]));
+        let actual = make_mlme_set_keys_request([4; 6].into(), &Key::Bits40([3; 5]));
         let expected = fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 key_type: fidl_mlme::KeyType::Pairwise,
@@ -132,7 +133,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         // WEP-104:
-        let actual = make_mlme_set_keys_request([4; 6], &Key::Bits104([3; 13]));
+        let actual = make_mlme_set_keys_request([4; 6].into(), &Key::Bits104([3; 13]));
         let expected = fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 key_type: fidl_mlme::KeyType::Pairwise,

@@ -131,7 +131,7 @@ fn scan_and_reassociate<'h>(
 /// after the link becomes up.
 #[fuchsia::test]
 async fn reconnect_to_wpa2_network() {
-    const BSSID: Bssid = Bssid(*b"wpa2ok");
+    let bssid: Bssid = Bssid::from(*b"wpa2ok");
     const PROTECTION: Protection = Protection::Wpa2Personal;
     const PASSWORD: &str = "wpa2good";
 
@@ -147,7 +147,7 @@ async fn reconnect_to_wpa2_network() {
     let mut control = AuthenticationControl {
         updates: UpdateSink::new(),
         authenticator: create_authenticator(
-            &BSSID,
+            &bssid,
             &AP_SSID,
             PASSWORD,
             CIPHER_CCMP_128,
@@ -167,11 +167,11 @@ async fn reconnect_to_wpa2_network() {
     helper
         .run_until_complete_or_timeout(
             30.seconds(),
-            format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
+            format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_reassociate(
                 &phy,
                 &AP_SSID,
-                &BSSID,
+                &bssid,
                 &Channel::new(1, Cbw::Cbw20),
                 &PROTECTION,
                 &mut control,

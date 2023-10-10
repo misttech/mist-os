@@ -6,7 +6,8 @@ use {
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
-    ieee80211::Bssid,
+    ieee80211::{Bssid, MacAddrBytes},
+    lazy_static::lazy_static,
     netdevice_client,
     pin_utils::pin_mut,
     wlan_common::{
@@ -26,7 +27,9 @@ use {
     },
 };
 
-const BSS: Bssid = Bssid([0x65, 0x74, 0x68, 0x6e, 0x65, 0x74]);
+lazy_static! {
+    static ref BSS: Bssid = [0x65, 0x74, 0x68, 0x6e, 0x65, 0x74].into();
+}
 const PAYLOAD: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
 async fn send_and_receive<'a>(
@@ -50,7 +53,7 @@ async fn verify_tx_and_rx(
     helper: &mut test_utils::TestHelper,
 ) {
     let mut buf: Vec<u8> = Vec::new();
-    netdevice_helper::write_fake_frame(ETH_DST_MAC, CLIENT_MAC_ADDR, PAYLOAD, &mut buf);
+    netdevice_helper::write_fake_frame(*ETH_DST_MAC, *CLIENT_MAC_ADDR, PAYLOAD, &mut buf);
 
     let tx_rx_fut = send_and_receive(session, port, &buf);
     pin_mut!(tx_rx_fut);
@@ -64,14 +67,14 @@ async fn verify_tx_and_rx(
             "verify ethernet_tx_rx",
             event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
                 for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.msdus() {
-                    if dst_addr == ETH_DST_MAC && src_addr == CLIENT_MAC_ADDR {
+                    if dst_addr == *ETH_DST_MAC && src_addr == *CLIENT_MAC_ADDR {
                         assert_eq!(llc_frame.hdr.protocol_id.to_native(), mac::ETHER_TYPE_IPV4);
                         actual.clear();
                         actual.extend_from_slice(llc_frame.body);
                         rx_wlan_data_frame(
                             &Channel::new(1, Cbw::Cbw20),
                             &CLIENT_MAC_ADDR,
-                            &BSS.0,
+                            &(*BSS).into(),
                             &ETH_DST_MAC,
                             &PAYLOAD,
                             mac::ETHER_TYPE_IPV4,
@@ -85,8 +88,8 @@ async fn verify_tx_and_rx(
         )
         .await;
     assert_eq!(&actual[..], PAYLOAD);
-    assert_eq!(header.da, CLIENT_MAC_ADDR);
-    assert_eq!(header.sa, ETH_DST_MAC);
+    assert_eq!(header.da, *CLIENT_MAC_ADDR);
+    assert_eq!(header.sa, *ETH_DST_MAC);
     assert_eq!(header.ether_type.to_native(), mac::ETHER_TYPE_IPV4);
     assert_eq!(&payload[..], PAYLOAD);
 }
@@ -115,7 +118,7 @@ async fn ethernet_tx_rx() {
 
     let (client, port) = netdevice_helper::create_client(
         &helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
     )
     .await
     .expect("failed to create netdevice client");

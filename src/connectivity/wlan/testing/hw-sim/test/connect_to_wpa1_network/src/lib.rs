@@ -9,7 +9,7 @@ use {
 /// Test a client successfully connects to a network protected by WPA1-PSK.
 #[fuchsia::test]
 async fn connect_to_wpa1_network() {
-    const BSS: Bssid = Bssid(*b"wpa1ok");
+    let bss = Bssid::from(*b"wpa1ok");
 
     let mut helper = test_utils::TestHelper::begin_test(
         default_wlantap_config_client(),
@@ -22,7 +22,7 @@ async fn connect_to_wpa1_network() {
         &mut helper,
         30.seconds(),
         &AP_SSID,
-        &BSS,
+        &bss,
         &Protection::Wpa1,
         Some("wpa1good"),
         fidl_policy::SecurityType::Wpa,

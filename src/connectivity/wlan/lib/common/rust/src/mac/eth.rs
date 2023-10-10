@@ -50,8 +50,8 @@ mod tests {
         ];
         let (mut hdr, body) = Ref::<_, EthernetIIHdr>::new_unaligned_from_prefix(&mut bytes[..])
             .expect("cannot create ethernet header.");
-        assert_eq!(hdr.da, [1u8, 2, 3, 4, 5, 6]);
-        assert_eq!(hdr.sa, [7u8, 8, 9, 10, 11, 12]);
+        assert_eq!(hdr.da, MacAddr::from([1u8, 2, 3, 4, 5, 6]));
+        assert_eq!(hdr.sa, MacAddr::from([7u8, 8, 9, 10, 11, 12]));
         assert_eq!(hdr.ether_type.to_native(), 13 << 8 | 14);
         assert_eq!(hdr.ether_type.0, [13u8, 14]);
         assert_eq!(body, [99, 99]);

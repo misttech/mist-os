@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::HashMap;
-
-type MacAddr = [u8; 6];
+use {ieee80211::MacAddr, std::collections::HashMap};
 
 const SEQ_START_NUM: SequenceNum = 1;
 pub type SequenceNum = u32;
@@ -91,27 +89,31 @@ impl SequenceManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::lazy_static;
+
+    lazy_static! {
+        static ref FIRST_PEER: MacAddr = MacAddr::from([1; 6]);
+        static ref SECOND_PEER: MacAddr = MacAddr::from([2; 6]);
+    }
 
     #[test]
     fn sns1_next() {
         let mut seq_mgr = SequenceManager::new();
 
         for i in 0..4095 {
-            let seq_num = seq_mgr.next_sns1(&[1; 6]);
+            let seq_num = seq_mgr.next_sns1(&FIRST_PEER);
             assert_eq!(i + 1, seq_num);
         }
 
-        let seq_num = seq_mgr.next_sns1(&[1; 6]);
+        let seq_num = seq_mgr.next_sns1(&FIRST_PEER);
         assert_eq!(0, seq_num); // wrapped
 
-        let seq_num = seq_mgr.next_sns1(&[1; 6]);
+        let seq_num = seq_mgr.next_sns1(&FIRST_PEER);
         assert_eq!(0 + 1, seq_num);
     }
 
     #[test]
     fn sns1_next_multiple_peers() {
-        const FIRST_PEER: [u8; 6] = [1; 6];
-        const SECOND_PEER: [u8; 6] = [2; 6];
         let mut seq_mgr = SequenceManager::new();
 
         seq_mgr.next_sns1(&FIRST_PEER);
@@ -131,16 +133,16 @@ mod tests {
     fn sns2_next_multiple_tids() {
         let mut seq_mgr = SequenceManager::new();
 
-        seq_mgr.next_sns2(&[1; 6], 0);
-        seq_mgr.next_sns2(&[1; 6], 0);
-        let seq_num = seq_mgr.next_sns2(&[1; 6], 0);
+        seq_mgr.next_sns2(&FIRST_PEER, 0);
+        seq_mgr.next_sns2(&FIRST_PEER, 0);
+        let seq_num = seq_mgr.next_sns2(&&FIRST_PEER, 0);
         assert_eq!(3, seq_num);
 
-        seq_mgr.next_sns2(&[1; 6], 1);
-        let seq_num = seq_mgr.next_sns2(&[1; 6], 1);
+        seq_mgr.next_sns2(&FIRST_PEER, 1);
+        let seq_num = seq_mgr.next_sns2(&FIRST_PEER, 1);
         assert_eq!(2, seq_num);
 
-        let seq_num = seq_mgr.next_sns2(&[1; 6], 0);
+        let seq_num = seq_mgr.next_sns2(&FIRST_PEER, 0);
         assert_eq!(4, seq_num);
     }
 
@@ -148,16 +150,16 @@ mod tests {
     fn sns4_next_multiple_acis() {
         let mut seq_mgr = SequenceManager::new();
 
-        seq_mgr.next_sns4(&[1; 6], 0);
-        seq_mgr.next_sns4(&[1; 6], 0);
-        let seq_num = seq_mgr.next_sns4(&[1; 6], 0);
+        seq_mgr.next_sns4(&FIRST_PEER, 0);
+        seq_mgr.next_sns4(&FIRST_PEER, 0);
+        let seq_num = seq_mgr.next_sns4(&FIRST_PEER, 0);
         assert_eq!(3, seq_num);
 
-        seq_mgr.next_sns4(&[1; 6], 1);
-        let seq_num = seq_mgr.next_sns4(&[1; 6], 1);
+        seq_mgr.next_sns4(&FIRST_PEER, 1);
+        let seq_num = seq_mgr.next_sns4(&FIRST_PEER, 1);
         assert_eq!(2, seq_num);
 
-        let seq_num = seq_mgr.next_sns4(&[1; 6], 0);
+        let seq_num = seq_mgr.next_sns4(&FIRST_PEER, 0);
         assert_eq!(4, seq_num);
     }
 
@@ -165,16 +167,16 @@ mod tests {
     fn sns1_sns2_sns4_next() {
         let mut seq_mgr = SequenceManager::new();
 
-        seq_mgr.next_sns1(&[1; 6]);
-        seq_mgr.next_sns1(&[1; 6]);
-        let seq_num = seq_mgr.next_sns1(&[1; 6]);
+        seq_mgr.next_sns1(&FIRST_PEER);
+        seq_mgr.next_sns1(&FIRST_PEER);
+        let seq_num = seq_mgr.next_sns1(&FIRST_PEER);
         assert_eq!(3, seq_num);
 
-        seq_mgr.next_sns2(&[1; 6], 0);
-        let seq_num = seq_mgr.next_sns2(&[1; 6], 0);
+        seq_mgr.next_sns2(&FIRST_PEER, 0);
+        let seq_num = seq_mgr.next_sns2(&FIRST_PEER, 0);
         assert_eq!(2, seq_num);
 
-        let seq_num = seq_mgr.next_sns4(&[1; 6], 3);
+        let seq_num = seq_mgr.next_sns4(&FIRST_PEER, 3);
         assert_eq!(1, seq_num);
     }
 }

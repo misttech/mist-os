@@ -706,7 +706,7 @@ mod tests {
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                 entries: vec![
                     types::Bss {
-                        bssid: types::Bssid([0, 0, 0, 0, 0, 0]),
+                        bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                         rssi: 0,
                         timestamp: zx::Time::from_nanos(sme_result_1.timestamp_nanos),
                         snr_db: 1,
@@ -718,7 +718,7 @@ mod tests {
                         bss_description: sme_result_1.bss_description.clone().into(),
                     },
                     types::Bss {
-                        bssid: types::Bssid([7, 8, 9, 10, 11, 12]),
+                        bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
                         rssi: 13,
                         timestamp: zx::Time::from_nanos(sme_result_3.timestamp_nanos),
                         snr_db: 3,
@@ -734,7 +734,7 @@ mod tests {
                 ssid: types::Ssid::try_from("unique ssid").unwrap(),
                 security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
                 entries: vec![types::Bss {
-                    bssid: types::Bssid([1, 2, 3, 4, 5, 6]),
+                    bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                     rssi: 7,
                     timestamp: zx::Time::from_nanos(sme_result_2.timestamp_nanos),
                     snr_db: 2,
@@ -1178,7 +1178,7 @@ mod tests {
         // entry for the unique bss
         let expected_bss = vec![
             types::Bss {
-                bssid: types::Bssid([0, 0, 0, 0, 0, 0]),
+                bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                 rssi: 0,
                 timestamp: zx::Time::from_nanos(first_result.timestamp_nanos),
                 snr_db: 1,
@@ -1188,7 +1188,7 @@ mod tests {
                 bss_description: first_result.bss_description.clone().into(),
             },
             types::Bss {
-                bssid: types::Bssid([1, 2, 3, 4, 5, 6]),
+                bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                 rssi: 101,
                 timestamp: zx::Time::from_nanos(second_result.timestamp_nanos),
                 snr_db: 101,

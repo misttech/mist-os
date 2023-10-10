@@ -23,9 +23,9 @@ mod tests {
             Some(MacFrame::Data { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
                 assert_eq!(0x0202, { fixed_fields.duration });
-                assert_eq!([3, 3, 3, 3, 3, 3], fixed_fields.addr1);
-                assert_eq!([4, 4, 4, 4, 4, 4], fixed_fields.addr2);
-                assert_eq!([5, 5, 5, 5, 5, 5], fixed_fields.addr3);
+                assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), fixed_fields.addr1);
+                assert_eq!(MacAddr::from([4, 4, 4, 4, 4, 4]), fixed_fields.addr2);
+                assert_eq!(MacAddr::from([5, 5, 5, 5, 5, 5]), fixed_fields.addr3);
                 assert_eq!(0x0606, { fixed_fields.seq_ctrl.0 });
                 assert!(addr4.is_none());
                 assert_eq!(0x0101, qos_ctrl.expect("qos_ctrl not present").get().0);

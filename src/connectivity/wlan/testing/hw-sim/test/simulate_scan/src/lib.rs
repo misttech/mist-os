@@ -5,7 +5,7 @@
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
     std::convert::TryFrom,
@@ -16,14 +16,13 @@ use {
     wlan_hw_sim::{event::action, *},
 };
 
-const BSS_FOO: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
-const BSS_FOO_2: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x66, 0x66]);
-const BSS_BAR: Bssid = Bssid([0x62, 0x73, 0x73, 0x62, 0x61, 0x72]);
-const BSS_BAR_2: Bssid = Bssid([0x63, 0x74, 0x74, 0x63, 0x62, 0x73]);
-const BSS_BAZ: Bssid = Bssid([0x62, 0x73, 0x73, 0x62, 0x61, 0x7a]);
-const BSS_BAZ_2: Bssid = Bssid([0x60, 0x70, 0x70, 0x60, 0x60, 0x70]);
-
 lazy_static! {
+    static ref BSS_FOO: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+    static ref BSS_FOO_2: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x66, 0x66]);
+    static ref BSS_BAR: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x62, 0x61, 0x72]);
+    static ref BSS_BAR_2: Bssid = Bssid::from([0x63, 0x74, 0x74, 0x63, 0x62, 0x73]);
+    static ref BSS_BAZ: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x62, 0x61, 0x7a]);
+    static ref BSS_BAZ_2: Bssid = Bssid::from([0x60, 0x70, 0x70, 0x60, 0x60, 0x70]);
     static ref SSID_FOO: Ssid = Ssid::try_from("foo").unwrap();
     static ref SSID_BAR: Ssid = Ssid::try_from("bar").unwrap();
     static ref SSID_BAZ: Ssid = Ssid::try_from("baz").unwrap();
@@ -60,42 +59,42 @@ async fn simulate_scan() {
                 [
                     Beacon {
                         channel: Channel::new(1, Cbw::Cbw20),
-                        bssid: BSS_FOO,
+                        bssid: *BSS_FOO,
                         ssid: SSID_FOO.clone(),
                         protection: Protection::Wpa2Personal,
                         rssi_dbm: -60,
                     },
                     Beacon {
                         channel: Channel::new(2, Cbw::Cbw20),
-                        bssid: BSS_FOO_2,
+                        bssid: *BSS_FOO_2,
                         ssid: SSID_FOO.clone(),
                         protection: Protection::Open,
                         rssi_dbm: -60,
                     },
                     Beacon {
                         channel: Channel::new(3, Cbw::Cbw20),
-                        bssid: BSS_BAR,
+                        bssid: *BSS_BAR,
                         ssid: SSID_BAR.clone(),
                         protection: Protection::Wpa2Personal,
                         rssi_dbm: -60,
                     },
                     Beacon {
                         channel: Channel::new(4, Cbw::Cbw20),
-                        bssid: BSS_BAR_2,
+                        bssid: *BSS_BAR_2,
                         ssid: SSID_BAR.clone(),
                         protection: Protection::Wpa2Personal,
                         rssi_dbm: -40,
                     },
                     Beacon {
                         channel: Channel::new(5, Cbw::Cbw20),
-                        bssid: BSS_BAZ,
+                        bssid: *BSS_BAZ,
                         ssid: SSID_BAZ.clone(),
                         protection: Protection::Open,
                         rssi_dbm: -60,
                     },
                     Beacon {
                         channel: Channel::new(6, Cbw::Cbw20),
-                        bssid: BSS_BAZ_2,
+                        bssid: *BSS_BAZ_2,
                         ssid: SSID_BAZ.clone(),
                         protection: Protection::Wpa2Personal,
                         rssi_dbm: -60,
@@ -113,7 +112,7 @@ async fn simulate_scan() {
                 type_: fidl_policy::SecurityType::Wpa2,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_FOO.0.clone()),
+                bssid: Some(BSS_FOO.to_array()),
                 rssi: Some(-60),
                 frequency: Some(2412),
                 ..Default::default()
@@ -127,7 +126,7 @@ async fn simulate_scan() {
                 type_: fidl_policy::SecurityType::None,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_FOO_2.0.clone()),
+                bssid: Some(BSS_FOO_2.to_array()),
                 rssi: Some(-60),
                 frequency: Some(2417),
                 ..Default::default()
@@ -142,13 +141,13 @@ async fn simulate_scan() {
             }),
             entries: Some(vec![
                 fidl_policy::Bss {
-                    bssid: Some(BSS_BAR.0.clone()),
+                    bssid: Some(BSS_BAR.to_array()),
                     rssi: Some(-60),
                     frequency: Some(2422),
                     ..Default::default()
                 },
                 fidl_policy::Bss {
-                    bssid: Some(BSS_BAR_2.0.clone()),
+                    bssid: Some(BSS_BAR_2.to_array()),
                     rssi: Some(-40),
                     frequency: Some(2427),
                     ..Default::default()
@@ -163,7 +162,7 @@ async fn simulate_scan() {
                 type_: fidl_policy::SecurityType::None,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_BAZ.0.clone()),
+                bssid: Some(BSS_BAZ.to_array()),
                 rssi: Some(-60),
                 frequency: Some(2432),
                 ..Default::default()
@@ -177,7 +176,7 @@ async fn simulate_scan() {
                 type_: fidl_policy::SecurityType::Wpa2,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_BAZ_2.0.clone()),
+                bssid: Some(BSS_BAZ_2.to_array()),
                 rssi: Some(-60),
                 frequency: Some(2437),
                 ..Default::default()

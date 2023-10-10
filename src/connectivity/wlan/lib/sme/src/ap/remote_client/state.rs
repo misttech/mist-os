@@ -144,7 +144,7 @@ impl Authenticated {
         let rsna_link_state = match (s_rsne.as_ref(), rsn_cfg) {
             (Some(s_rsne_bytes), Some(a_rsn)) => {
                 let authenticator = new_authenticator_from_rsne(
-                    ctx.device_info.sta_addr,
+                    ctx.device_info.sta_addr.into(),
                     r_sta.addr,
                     s_rsne_bytes,
                     a_rsn,
@@ -827,7 +827,8 @@ mod tests {
             test_utils, MlmeRequest, MlmeSink, MlmeStream,
         },
         futures::channel::mpsc,
-        ieee80211::{MacAddr, Ssid},
+        ieee80211::{MacAddr, MacAddrBytes, Ssid},
+        lazy_static::lazy_static,
         std::convert::TryFrom,
         wlan_common::{
             assert_variant,
@@ -842,15 +843,17 @@ mod tests {
         wlan_rsn::key::exchange::Key,
     };
 
-    const AP_ADDR: MacAddr = [6u8; 6];
-    const CLIENT_ADDR: MacAddr = [7u8; 6];
+    lazy_static! {
+        static ref AP_ADDR: MacAddr = [6u8; 6].into();
+        static ref CLIENT_ADDR: MacAddr = [7u8; 6].into();
+    }
 
     fn make_remote_client() -> RemoteClient {
-        RemoteClient::new(CLIENT_ADDR)
+        RemoteClient::new(*CLIENT_ADDR)
     }
 
     fn make_env() -> (Context, MlmeStream, TimeStream) {
-        let device_info = test_utils::fake_device_info(AP_ADDR);
+        let device_info = test_utils::fake_device_info(*AP_ADDR);
         let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
@@ -880,7 +883,7 @@ mod tests {
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
         assert_eq!(timed_event.id, timeout_event_id);
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
-            assert_eq!(addr, CLIENT_ADDR);
+            assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);
         });
 
@@ -889,7 +892,7 @@ mod tests {
             peer_sta_address,
             result_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AuthenticateResultCode::Success);
         });
     }
@@ -913,7 +916,7 @@ mod tests {
             peer_sta_address,
             result_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AuthenticateResultCode::Refused);
         });
     }
@@ -951,7 +954,7 @@ mod tests {
             capability_info,
             rates,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(association_id, 0);
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedReasonUnspecified);
             assert_eq!(capability_info, 0);
@@ -979,7 +982,7 @@ mod tests {
             peer_sta_address,
             result_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AuthenticateResultCode::Refused);
         });
     }
@@ -1003,7 +1006,7 @@ mod tests {
             peer_sta_address,
             reason_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::InvalidAuthentication);
         });
     }
@@ -1062,7 +1065,7 @@ mod tests {
             rates,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::Success);
             assert_eq!(capability_info, CapabilityInfo(0).with_short_preamble(true).raw());
             assert_eq!(rates, vec![0b11111000]);
@@ -1110,7 +1113,7 @@ mod tests {
             rates,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::Success);
             assert_eq!(
                 capability_info,
@@ -1215,7 +1218,7 @@ mod tests {
             result_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedBasicRatesMismatch);
         });
 
@@ -1225,7 +1228,7 @@ mod tests {
             reason_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::ReasonInvalidElement);
         });
     }
@@ -1257,7 +1260,7 @@ mod tests {
             result_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedCapabilitiesMismatch);
         });
 
@@ -1267,7 +1270,7 @@ mod tests {
             reason_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::ReasonInvalidElement);
         });
     }
@@ -1308,7 +1311,7 @@ mod tests {
             result_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedReasonUnspecified);
         });
 
@@ -1318,7 +1321,7 @@ mod tests {
             reason_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::UnspecifiedReason);
         });
     }
@@ -1359,7 +1362,7 @@ mod tests {
             result_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedCapabilitiesMismatch);
         });
 
@@ -1369,7 +1372,7 @@ mod tests {
             reason_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::ReasonInvalidElement);
         });
     }
@@ -1424,7 +1427,7 @@ mod tests {
             result_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedCapabilitiesMismatch);
         });
 
@@ -1434,7 +1437,7 @@ mod tests {
             reason_code,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::Ieee8021XAuthFailed);
         });
     }
@@ -1482,7 +1485,7 @@ mod tests {
             rates,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::Success);
             assert_eq!(capability_info, CapabilityInfo(0).with_short_preamble(true).with_privacy(true).raw());
             assert_eq!(rates, vec![0b11111000]);
@@ -1538,7 +1541,7 @@ mod tests {
             rates,
             ..
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::Success);
             assert_eq!(
                 capability_info,
@@ -1579,7 +1582,7 @@ mod tests {
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
         assert_eq!(timed_event.id, timeout_event_id);
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
-            assert_eq!(addr, CLIENT_ADDR);
+            assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);
         });
     }
@@ -1656,8 +1659,8 @@ mod tests {
                     request_timeout_event_id: Some(1),
                     negotiation_timeout_event_id: Some(2),
                     authenticator: new_authenticator_from_rsne(
-                        AP_ADDR,
-                        CLIENT_ADDR,
+                        *AP_ADDR,
+                        *CLIENT_ADDR,
                         &s_rsne_vec[..],
                         &rsn_cfg,
                     )
@@ -1689,7 +1692,7 @@ mod tests {
             rsna_link_state.as_ref().unwrap().request_timeout_event_id.unwrap()
         );
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
-            assert_eq!(addr, CLIENT_ADDR);
+            assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::RsnaTimeout(RsnaTimeout::Request));
         });
     }
@@ -1716,8 +1719,8 @@ mod tests {
                     request_timeout_event_id: Some(1),
                     negotiation_timeout_event_id: Some(2),
                     authenticator: new_authenticator_from_rsne(
-                        AP_ADDR,
-                        CLIENT_ADDR,
+                        *AP_ADDR,
+                        *CLIENT_ADDR,
                         &s_rsne_vec[..],
                         &rsn_cfg,
                     )
@@ -1743,7 +1746,7 @@ mod tests {
             peer_sta_address,
             reason_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::FourwayHandshakeTimeout);
         });
     }
@@ -1770,8 +1773,8 @@ mod tests {
                     request_timeout_event_id: Some(1),
                     negotiation_timeout_event_id: Some(2),
                     authenticator: new_authenticator_from_rsne(
-                        AP_ADDR,
-                        CLIENT_ADDR,
+                        *AP_ADDR,
+                        *CLIENT_ADDR,
                         &s_rsne_vec[..],
                         &rsn_cfg,
                     )
@@ -1816,8 +1819,8 @@ mod tests {
                     request_timeout_event_id: Some(1),
                     negotiation_timeout_event_id: Some(2),
                     authenticator: new_authenticator_from_rsne(
-                        AP_ADDR,
-                        CLIENT_ADDR,
+                        *AP_ADDR,
+                        *CLIENT_ADDR,
                         &s_rsne_vec[..],
                         &rsn_cfg,
                     )
@@ -1843,7 +1846,7 @@ mod tests {
             peer_sta_address,
             reason_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::FourwayHandshakeTimeout);
         });
     }
@@ -1885,8 +1888,8 @@ mod tests {
             dst_addr,
             data,
         }) => {
-            assert_eq!(src_addr, AP_ADDR);
-            assert_eq!(dst_addr, CLIENT_ADDR);
+            assert_eq!(&src_addr, AP_ADDR.as_array());
+            assert_eq!(&dst_addr, CLIENT_ADDR.as_array());
             assert_eq!(data, Vec::<u8>::from(test_utils::eapol_key_frame()));
         });
     }
@@ -1963,7 +1966,7 @@ mod tests {
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap()]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
-            assert_eq!(k.address, CLIENT_ADDR);
+            assert_eq!(&k.address, CLIENT_ADDR.as_array());
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
             assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
@@ -2014,7 +2017,7 @@ mod tests {
             peer_sta_address,
             state,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(state, fidl_mlme::ControlledPortState::Open);
         });
     }

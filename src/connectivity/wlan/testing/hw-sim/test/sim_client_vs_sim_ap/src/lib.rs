@@ -8,6 +8,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum as _,
     futures::{channel::oneshot, join, TryFutureExt},
+    ieee80211::{MacAddr, MacAddrBytes},
     pin_utils::pin_mut,
     tracing::{info, warn},
     wlan_common::{bss::Protection::Wpa2Personal, buffer_reader::BufferReader, mac},
@@ -83,7 +84,7 @@ async fn verify_client_connects_to_ap(
             &client_proxy,
             [Beacon {
                 channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
-                bssid: AP_MAC_ADDR,
+                bssid: *AP_MAC_ADDR,
                 ssid: AP_SSID.clone(),
                 protection: Wpa2Personal,
                 rssi_dbm: -30,
@@ -121,7 +122,7 @@ async fn verify_client_connects_to_ap(
 // Data transfer stage
 
 struct PeerInfo<'a> {
-    addr: [u8; 6],
+    addr: MacAddr,
     payload: &'a [u8],
     name: &'a str,
 }
@@ -251,13 +252,13 @@ async fn verify_ethernet_in_both_directions(
 ) {
     let (client_netdevice, client_port) = netdevice_helper::create_client(
         &client_helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
     )
     .await
     .expect("failed to create netdevice client for client");
     let (ap_netdevice, ap_port) = netdevice_helper::create_client(
         &ap_helper.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: AP_MAC_ADDR.0.clone() },
+        fidl_fuchsia_net::MacAddress { octets: AP_MAC_ADDR.to_array() },
     )
     .await
     .expect("failed to create netdevice client for AP");
@@ -272,9 +273,9 @@ async fn verify_ethernet_in_both_directions(
     const CLIENT_PAYLOAD: &[u8] = b"from client to peer_behind_ap";
     const ETH_PEER_PAYLOAD: &[u8] = b"from peer_behind_ap to client but longer";
 
-    let client_info = PeerInfo { addr: CLIENT_MAC_ADDR, payload: CLIENT_PAYLOAD, name: "client" };
+    let client_info = PeerInfo { addr: *CLIENT_MAC_ADDR, payload: CLIENT_PAYLOAD, name: "client" };
     let peer_behind_ap_info =
-        PeerInfo { addr: ETH_DST_MAC, payload: ETH_PEER_PAYLOAD, name: "peer_behind_ap" };
+        PeerInfo { addr: *ETH_DST_MAC, payload: ETH_PEER_PAYLOAD, name: "peer_behind_ap" };
 
     let client_fut = send_then_receive(
         &client_session,

@@ -16,12 +16,10 @@ use {
     fidl_fuchsia_wlan_sme::ConnectTransactionEvent,
     fuchsia_zircon_status as zx_status, fuchsia_zircon_types as zx_sys,
     futures::prelude::*,
-    ieee80211::Ssid,
-    ieee80211::NULL_MAC_ADDR,
+    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid, NULL_ADDR},
     itertools::Itertools,
     std::convert::TryFrom,
     std::fmt,
-    std::str::FromStr,
     wlan_common::{
         bss::{BssDescription, Protection},
         scan::ScanResult,
@@ -291,11 +289,15 @@ async fn do_iface(cmd: opts::IfaceCmd, monitor_proxy: DeviceMonitor) -> Result<(
     match cmd {
         opts::IfaceCmd::New { phy_id, role, sta_addr } => {
             let sta_addr = match sta_addr {
-                Some(s) => s.parse::<MacAddr>()?.0,
-                None => NULL_MAC_ADDR,
+                Some(s) => s.parse::<MacAddr>()?,
+                None => NULL_ADDR,
             };
 
-            let req = wlan_service::CreateIfaceRequest { phy_id, role: role.into(), sta_addr };
+            let req = wlan_service::CreateIfaceRequest {
+                phy_id,
+                role: role.into(),
+                sta_addr: sta_addr.to_array(),
+            };
 
             let response =
                 monitor_proxy.create_iface(&req).await.context("error getting response")?;
@@ -470,7 +472,7 @@ async fn print_iface_status(iface_id: u16, monitor_proxy: DeviceMonitor) -> Resu
                         "Iface {}: Connected to '{}' (bssid {}) channel: {:?} rssi: {}dBm snr: {}dB",
                         iface_id,
                         String::from_utf8_lossy(&serving_ap_info.ssid),
-                        MacAddr(serving_ap_info.bssid),
+                        Bssid::from(serving_ap_info.bssid),
                         serving_ap_info.channel,
                         serving_ap_info.rssi_dbm,
                         serving_ap_info.snr_db,
@@ -613,41 +615,6 @@ fn generate_psk(passphrase: &str, ssid: &str) -> Result<String, Error> {
     return Ok(psk_hex);
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-struct MacAddr([u8; 6]);
-
-impl fmt::Display for MacAddr {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5]
-        )
-    }
-}
-
-impl FromStr for MacAddr {
-    type Err = Error;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut bytes = [0; 6];
-        let mut index = 0;
-
-        for octet in s.split(|c| c == ':' || c == '-') {
-            if index == 6 {
-                return Err(format_err!("Too many octets"));
-            }
-            bytes[index] = u8::from_str_radix(octet, 16)?;
-            index += 1;
-        }
-
-        if index != 6 {
-            return Err(format_err!("Too few octets"));
-        }
-        Ok(MacAddr(bytes))
-    }
-}
-
 fn print_scan_result(scan_result: fidl_sme::ClientSmeScanResult) {
     match scan_result {
         Ok(vmo) => {
@@ -702,7 +669,7 @@ fn print_scan_header() {
 
 fn print_one_scan_result(scan_result: &wlan_common::scan::ScanResult) {
     print_scan_line(
-        MacAddr(scan_result.bss_description.bssid.0),
+        scan_result.bss_description.bssid,
         scan_result.bss_description.rssi_dbm,
         wlan_common::channel::Channel::from(scan_result.bss_description.channel),
         scan_result.bss_description.protection(),
@@ -815,7 +782,7 @@ fn format_iface_query_response(resp: QueryIfaceResponse) -> String {
         resp.id,
         resp.phy_id,
         resp.phy_assigned_id,
-        MacAddr(resp.sta_addr)
+        MacAddr::from(resp.sta_addr)
     )
 }
 
@@ -831,29 +798,6 @@ mod tests {
         pin_utils::pin_mut,
         wlan_common::{assert_variant, fake_bss_description},
     };
-
-    #[test]
-    fn format_mac_addr() {
-        assert_eq!(
-            "01:02:03:ab:cd:ef",
-            format!("{}", MacAddr([0x01, 0x02, 0x03, 0xab, 0xcd, 0xef]))
-        );
-    }
-
-    #[test]
-    fn mac_addr_from_str() {
-        assert_eq!(
-            MacAddr::from_str("01:02:03:ab:cd:ef").unwrap(),
-            MacAddr([0x01, 0x02, 0x03, 0xab, 0xcd, 0xef])
-        );
-        assert_eq!(
-            MacAddr::from_str("01:02-03:ab-cd:ef").unwrap(),
-            MacAddr([0x01, 0x02, 0x03, 0xab, 0xcd, 0xef])
-        );
-        assert!(MacAddr::from_str("01:02:03:ab:cd").is_err());
-        assert!(MacAddr::from_str("01:02:03:04:05:06:07").is_err());
-        assert!(MacAddr::from_str("01:02:gg:gg:gg:gg").is_err());
-    }
 
     #[test]
     fn negotiate_authentication() {

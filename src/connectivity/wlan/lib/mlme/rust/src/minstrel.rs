@@ -8,6 +8,7 @@ use {
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_zircon as zx,
+    ieee80211::{MacAddr, MacAddrBytes},
     std::{
         collections::{hash_map, HashMap, HashSet},
         time::Duration,
@@ -111,9 +112,8 @@ impl From<&TxStats> for fidl_minstrel::StatsEntry {
     }
 }
 
-#[derive(Default)]
 struct Peer {
-    addr: [u8; 6],
+    addr: MacAddr,
     tx_stats_map: TxStatsMap,
     erp_rates: HashSet<TxVecIdx>,
     highest_erp_rate: Option<TxVecIdx>,         // Set by AssocCtx
@@ -136,10 +136,18 @@ impl Peer {
                     error!("Cannot create Peer without a BSSID.");
                     return Err(zx::Status::INTERNAL);
                 }
-                Some(bssid) => bssid,
+                Some(bssid) => bssid.into(),
             },
             num_pkt_until_next_probe: PROBE_INTERVAL - 1,
-            ..Default::default()
+            tx_stats_map: Default::default(),
+            erp_rates: Default::default(),
+            highest_erp_rate: Default::default(),
+            best_erp_for_reliability: Default::default(),
+            best_expected_throughput: Default::default(),
+            best_for_reliability: Default::default(),
+            num_probe_cycles_done: Default::default(),
+            probes_total: Default::default(),
+            probe_entry: Default::default(),
         };
 
         if let Some(ht_cap) = assoc_cfg.ht_cap {
@@ -166,7 +174,7 @@ impl Peer {
         }
         debug!("tx_stats_map populated. size: {}", peer.tx_stats_map.len());
         if peer.tx_stats_map.is_empty() {
-            error!("No usable rates for peer {:?}", &peer.addr);
+            error!("No usable rates for peer {}", &peer.addr);
             return Err(zx::Status::INTERNAL);
         }
 
@@ -480,8 +488,8 @@ pub struct MinstrelRateSelector<T: TimerManager> {
     timer_manager: T,
     update_interval: Duration,
     probe_sequence: ProbeSequence,
-    peer_map: HashMap<[u8; 6], Peer>,
-    outdated_peers: HashSet<[u8; 6]>,
+    peer_map: HashMap<MacAddr, Peer>,
+    outdated_peers: HashSet<MacAddr>,
 }
 
 #[allow(unused)]
@@ -500,31 +508,31 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
         &mut self,
         assoc_cfg: &fidl_softmac::WlanAssociationConfig,
     ) -> Result<(), zx::Status> {
-        let bssid = match assoc_cfg.bssid {
+        let bssid: MacAddr = match assoc_cfg.bssid {
             None => {
                 error!("Attempted to add peer with no BSSID.");
                 return Err(zx::Status::INTERNAL);
             }
-            Some(bssid) => bssid,
+            Some(bssid) => bssid.into(),
         };
         if self.peer_map.contains_key(&bssid) {
-            error!("Attempted to add peer {:?} twice.", &bssid);
+            error!("Attempted to add peer {} twice.", &bssid);
         } else {
             let mut peer = Peer::from_assoc_cfg(assoc_cfg)?;
             if self.peer_map.is_empty() {
                 self.timer_manager.schedule(self.update_interval);
             }
             peer.update_stats();
-            self.peer_map.insert(bssid.clone(), peer);
+            self.peer_map.insert(bssid, peer);
         }
         Ok(())
     }
 
-    pub fn remove_peer(&mut self, addr: &[u8; 6]) {
+    pub fn remove_peer(&mut self, addr: &MacAddr) {
         self.outdated_peers.remove(addr);
         match self.peer_map.remove(addr) {
-            Some(_) => debug!("Peer {:?} removed.", addr),
-            None => debug!("Cannot remove peer {:?}, not found.", addr),
+            Some(_) => debug!("Peer {} removed.", addr),
+            None => debug!("Cannot remove peer {}, not found.", addr),
         }
         if self.peer_map.is_empty() {
             self.timer_manager.cancel();
@@ -532,16 +540,14 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
     }
 
     pub fn handle_tx_result_report(&mut self, tx_result: &banjo_common::WlanTxResult) {
-        match self.peer_map.get_mut(&tx_result.peer_addr) {
+        let peer_addr: MacAddr = tx_result.peer_addr.into();
+        match self.peer_map.get_mut(&peer_addr) {
             Some(peer) => {
                 peer.handle_tx_result_report(tx_result);
-                self.outdated_peers.insert(tx_result.peer_addr);
+                self.outdated_peers.insert(peer_addr);
             }
             None => {
-                debug!(
-                    "Peer {:?} received tx status report after it was removed.",
-                    &tx_result.peer_addr
-                );
+                debug!("Peer {} received tx status report after it was removed.", peer_addr);
             }
         }
     }
@@ -561,7 +567,7 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
     pub fn get_tx_vector_idx(
         &mut self,
         frame_control: &FrameControl,
-        peer_addr: &[u8; 6],
+        peer_addr: &MacAddr,
         flags: u32,
     ) -> Option<TxVecIdx> {
         match self.peer_map.get_mut(peer_addr) {
@@ -579,16 +585,18 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
     }
 
     pub fn get_fidl_peers(&self) -> fidl_minstrel::Peers {
-        fidl_minstrel::Peers { addrs: self.peer_map.iter().map(|(peer, _)| *peer).collect() }
+        fidl_minstrel::Peers {
+            addrs: self.peer_map.iter().map(|(peer, _)| peer.to_array()).collect(),
+        }
     }
 
     pub fn get_fidl_peer_stats(
         &self,
-        peer_addr: &[u8; 6],
+        peer_addr: &MacAddr,
     ) -> Result<fidl_minstrel::Peer, zx::Status> {
         let peer = self.peer_map.get(peer_addr).ok_or(zx::Status::NOT_FOUND)?;
         Ok(fidl_minstrel::Peer {
-            addr: peer_addr.clone(),
+            addr: peer_addr.to_array(),
             max_tp: tx_vec_idx_opt_to_u16(&peer.best_expected_throughput),
             max_probability: tx_vec_idx_opt_to_u16(&peer.best_for_reliability),
             basic_highest: tx_vec_idx_opt_to_u16(&peer.highest_erp_rate),
@@ -699,7 +707,8 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_wlan_common as fidl_common,
-        ieee80211::MacAddr,
+        ieee80211::{MacAddr, MacAddrBytes},
+        lazy_static::lazy_static,
         std::sync::{Arc, Mutex},
         wlan_common::{
             ie::{ChanWidthSet, HtCapabilityInfo},
@@ -731,7 +740,10 @@ mod tests {
         (MinstrelRateSelector::new(timer_manager, update_interval, probe_sequence), timer)
     }
 
-    const TEST_MAC_ADDR: MacAddr = [50, 53, 51, 56, 55, 52];
+    lazy_static! {
+        static ref TEST_MAC_ADDR: MacAddr = MacAddr::from([50, 53, 51, 56, 55, 52]);
+    }
+
     const BASIC_RATE_BIT: u8 = 0b10000000;
 
     fn ht_assoc_cfg() -> fidl_softmac::WlanAssociationConfig {
@@ -744,7 +756,7 @@ mod tests {
         ht_cap.mcs_set.0 = 0xffff; // Enable MCS 0-15
 
         fidl_softmac::WlanAssociationConfig {
-            bssid: Some(TEST_MAC_ADDR),
+            bssid: Some(TEST_MAC_ADDR.to_array()),
             aid: Some(42),
             listen_interval: Some(0),
             channel: Some(fidl_common::WlanChannel {
@@ -782,7 +794,7 @@ mod tests {
         let assoc_cfg = ht_assoc_cfg();
         let peer = Peer::from_assoc_cfg(&assoc_cfg)
             .expect("Failed to convert WlanAssociationConfig into Peer.");
-        assert_eq!(peer.addr, assoc_cfg.bssid.unwrap());
+        assert_eq!(peer.addr, assoc_cfg.bssid.unwrap().into());
         assert_eq!(peer.tx_stats_map.len(), 24);
         let mut peer_rates = peer
             .tx_stats_map
@@ -818,11 +830,15 @@ mod tests {
 
         let peers = minstrel.get_fidl_peers();
         assert_eq!(peers.addrs.len(), 1);
-        let mut peer_addr = [0u8; 6];
-        peer_addr.copy_from_slice(&peers.addrs[0][..]);
+
+        let peer_addr: MacAddr = {
+            let mut peer_addr = [0u8; 6];
+            peer_addr.copy_from_slice(&peers.addrs[0][..]);
+            peer_addr.into()
+        };
         let peer_stats =
             minstrel.get_fidl_peer_stats(&peer_addr).expect("Failed to get peer stats");
-        assert_eq!(peer_stats.addr, TEST_MAC_ADDR);
+        assert_eq!(&peer_stats.addr, TEST_MAC_ADDR.as_array());
         // TODO(fxbug.dev/28744): Size would be 40 if 40 MHz is supported and 72 if 40 MHz + SGI are supported.
         assert_eq!(peer_stats.entries.len(), 24);
         assert_eq!(peer_stats.max_tp, 16); // In the absence of data, our highest supported rate is max throughput.
@@ -859,7 +875,7 @@ mod tests {
         assert!(timer.lock().unwrap().is_some()); // A timer is still scheduled.
 
         assert_eq!(minstrel.get_fidl_peer_stats(&TEST_MAC_ADDR), Err(zx::Status::NOT_FOUND));
-        assert!(minstrel.get_fidl_peer_stats(&peer2.bssid.unwrap()).is_ok());
+        assert!(minstrel.get_fidl_peer_stats(&peer2.bssid.unwrap().into()).is_ok());
     }
 
     /// Helper fn to easily create tx result reports.
@@ -881,7 +897,11 @@ mod tests {
         } else {
             banjo_common::WlanTxResultCode::FAILED
         };
-        banjo_common::WlanTxResult { tx_result_entry, peer_addr: TEST_MAC_ADDR, result_code }
+        banjo_common::WlanTxResult {
+            tx_result_entry,
+            peer_addr: TEST_MAC_ADDR.to_array(),
+            result_code,
+        }
     }
 
     #[test]
@@ -1079,7 +1099,7 @@ mod tests {
 
         for _ in 0..DEAD_PROBE_CYCLE_COUNT as usize {
             // Repeatedly increment probe_cycles_skipped for all rates.
-            minstrel.outdated_peers.insert(TEST_MAC_ADDR);
+            minstrel.outdated_peers.insert(*TEST_MAC_ADDR);
             minstrel.handle_timeout();
         }
 

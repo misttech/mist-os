@@ -84,9 +84,9 @@ mod tests {
         },
         anyhow::format_err,
         async_trait::async_trait,
-        eui48::MacAddress,
         fuchsia_async, fuchsia_zircon as zx,
         futures::{channel::mpsc, task::Poll, StreamExt},
+        ieee80211::MacAddr,
         pin_utils::pin_mut,
         std::unimplemented,
         test_case::test_case,
@@ -352,7 +352,7 @@ mod tests {
             unimplemented!();
         }
 
-        fn suggest_ap_mac(&mut self, _mac: MacAddress) {
+        fn suggest_ap_mac(&mut self, _mac: MacAddr) {
             unimplemented!();
         }
 

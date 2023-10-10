@@ -11,7 +11,7 @@ use {
 /// hard coded authentication and association response frames.
 #[fuchsia::test]
 async fn connect_to_open_network() {
-    const BSS: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+    let bss = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
 
     let mut helper = test_utils::TestHelper::begin_test(
         default_wlantap_config_client(),
@@ -24,7 +24,7 @@ async fn connect_to_open_network() {
         &mut helper,
         30.seconds(),
         &AP_SSID,
-        &BSS,
+        &bss,
         &Protection::Open,
         None,
         fidl_policy::SecurityType::None,

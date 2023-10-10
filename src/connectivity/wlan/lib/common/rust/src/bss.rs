@@ -5,7 +5,6 @@
 use {
     crate::{
         channel::Channel,
-        format::MacFmt as _,
         hasher::WlanHasher,
         ie::{
             self,
@@ -18,7 +17,7 @@ use {
     anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     static_assertions::assert_eq_size,
     std::{
         cmp::Ordering,
@@ -474,7 +473,7 @@ impl BssDescription {
         format!(
             "SSID: {}, BSSID: {}, Protection: {}, Pri Chan: {}, Rx dBm: {}",
             hasher.hash_ssid(&self.ssid),
-            self.bssid.0.to_mac_string(),
+            self.bssid,
             self.protection(),
             self.channel.primary,
             self.rssi_dbm,
@@ -487,7 +486,7 @@ impl BssDescription {
         format!(
             "SSID: {}, BSSID: {}, Protection: {}, Pri Chan: {}, Rx dBm: {}",
             self.ssid.to_string_not_redactable(),
-            self.bssid.0.to_mac_string(),
+            self.bssid,
             self.protection(),
             self.channel.primary,
             self.rssi_dbm,
@@ -528,7 +527,7 @@ impl BssDescription {
 impl From<BssDescription> for fidl_internal::BssDescription {
     fn from(bss: BssDescription) -> fidl_internal::BssDescription {
         fidl_internal::BssDescription {
-            bssid: bss.bssid.0,
+            bssid: bss.bssid.to_array(),
             bss_type: bss.bss_type,
             beacon_period: bss.beacon_period,
             capability_info: bss.capability_info,
@@ -612,7 +611,7 @@ impl TryFrom<fidl_internal::BssDescription> for BssDescription {
 
         Ok(Self {
             ssid: Ssid::from_bytes_unchecked(bss.ies[ssid_range].to_vec()),
-            bssid: Bssid(bss.bssid),
+            bssid: Bssid::from(bss.bssid),
             bss_type: bss.bss_type,
             beacon_period: bss.beacon_period,
             capability_info: bss.capability_info,

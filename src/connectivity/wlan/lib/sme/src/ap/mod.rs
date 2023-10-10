@@ -19,7 +19,7 @@ use {
     fidl_fuchsia_wlan_mlme::{self as fidl_mlme, DeviceInfo, MlmeEvent},
     fidl_fuchsia_wlan_sme as fidl_sme,
     futures::channel::{mpsc, oneshot},
-    ieee80211::{MacAddr, Ssid},
+    ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::HashMap,
     tracing::{debug, error, info, warn},
     wlan_common::{
@@ -271,7 +271,7 @@ impl ApSme {
                 for (client_addr, _) in &bss.clients {
                     bss.ctx.mlme_sink.send(MlmeRequest::Deauthenticate(
                         fidl_mlme::DeauthenticateRequest {
-                            peer_sta_address: *client_addr,
+                            peer_sta_address: client_addr.to_array(),
                             // This seems to be the most appropriate reason code (IEEE Std
                             // 802.11-2016, Table 9-45): Requesting STA is leaving the BSS (or
                             // resetting). The spec doesn't seem to mandate a choice of reason code
@@ -394,12 +394,12 @@ impl super::Station for ApSme {
                     MlmeEvent::OnChannelSwitched { info } => bss.handle_channel_switch(info),
                     MlmeEvent::AuthenticateInd { ind } => bss.handle_auth_ind(ind),
                     MlmeEvent::DeauthenticateInd { ind } => {
-                        bss.handle_deauth(&ind.peer_sta_address)
+                        bss.handle_deauth(&ind.peer_sta_address.into())
                     }
                     // TODO(fxbug.dev/37891): This path should never be taken, as the MLME will never send
                     // this. Make sure this is the case.
                     MlmeEvent::DeauthenticateConf { resp } => {
-                        bss.handle_deauth(&resp.peer_sta_address)
+                        bss.handle_deauth(&resp.peer_sta_address.into())
                     }
                     MlmeEvent::AssociateInd { ind } => bss.handle_assoc_ind(ind),
                     MlmeEvent::DisassociateInd { ind } => bss.handle_disassoc_ind(ind),
@@ -677,7 +677,7 @@ impl InfraBss {
     }
 
     fn handle_auth_ind(&mut self, ind: fidl_mlme::AuthenticateIndication) {
-        let peer_addr = ind.peer_sta_address;
+        let peer_addr: MacAddr = ind.peer_sta_address.into();
         if self.remove_client(&peer_addr) {
             // This may occur if an already authenticated client on the SME receives a fresh
             // MLME-AUTHENTICATE.indication from the MLME.
@@ -686,42 +686,36 @@ impl InfraBss {
             // MLME-AUTHENTICATE.response to the MLME, indicating whether it should deauthenticate
             // the client or not.
             warn!(
-                "client {:02X?} is trying to reauthenticate; removing client and starting again",
+                "client {} is trying to reauthenticate; removing client and starting again",
                 peer_addr
             );
         }
         let mut client = RemoteClient::new(peer_addr);
         client.handle_auth_ind(&mut self.ctx, ind.auth_type);
         if !client.authenticated() {
-            info!("client {:02X?} was not authenticated", peer_addr);
+            info!("client {} was not authenticated", peer_addr);
             return;
         }
 
-        info!("client {:02X?} authenticated", peer_addr);
+        info!("client {} authenticated", peer_addr);
         let _ = self.clients.insert(peer_addr, client);
     }
 
     fn handle_deauth(&mut self, peer_addr: &MacAddr) {
         if !self.remove_client(peer_addr) {
-            warn!(
-                "client {:02X?} never authenticated, ignoring deauthentication request",
-                peer_addr
-            );
+            warn!("client {} never authenticated, ignoring deauthentication request", peer_addr);
             return;
         }
 
-        info!("client {:02X?} deauthenticated", peer_addr);
+        info!("client {} deauthenticated", peer_addr);
     }
 
     fn handle_assoc_ind(&mut self, ind: fidl_mlme::AssociateIndication) {
-        let peer_addr = ind.peer_sta_address;
+        let peer_addr: MacAddr = ind.peer_sta_address.into();
 
         let client = match self.clients.get_mut(&peer_addr) {
             None => {
-                warn!(
-                    "client {:02X?} never authenticated, ignoring association indication",
-                    peer_addr
-                );
+                warn!("client {} never authenticated, ignoring association indication", peer_addr);
                 return;
             }
             Some(client) => client,
@@ -738,22 +732,22 @@ impl InfraBss {
             ind.rsne,
         );
         if !client.authenticated() {
-            warn!("client {:02X?} failed to associate and was deauthenticated", peer_addr);
+            warn!("client {} failed to associate and was deauthenticated", peer_addr);
             let _ = self.remove_client(&peer_addr);
         } else if !client.associated() {
-            warn!("client {:02X?} failed to associate but did not deauthenticate", peer_addr);
+            warn!("client {} failed to associate but did not deauthenticate", peer_addr);
         } else {
-            info!("client {:02X?} associated", peer_addr);
+            info!("client {} associated", peer_addr);
         }
     }
 
     fn handle_disassoc_ind(&mut self, ind: fidl_mlme::DisassociateIndication) {
-        let peer_addr = ind.peer_sta_address;
+        let peer_addr: MacAddr = ind.peer_sta_address.into();
 
         let client = match self.clients.get_mut(&peer_addr) {
             None => {
                 warn!(
-                    "client {:02X?} never authenticated, ignoring disassociation indication",
+                    "client {} never authenticated, ignoring disassociation indication",
                     peer_addr
                 );
                 return;
@@ -763,9 +757,9 @@ impl InfraBss {
 
         client.handle_disassoc_ind(&mut self.ctx, &mut self.aid_map);
         if client.associated() {
-            panic!("client {:02X?} didn't disassociate? this should never happen!", peer_addr)
+            panic!("client {} didn't disassociate? this should never happen!", peer_addr)
         } else {
-            info!("client {:02X?} disassociated", peer_addr);
+            info!("client {} disassociated", peer_addr);
         }
     }
 
@@ -783,19 +777,19 @@ impl InfraBss {
                 client.handle_timeout(&mut self.ctx, timed_event.id, event);
                 if !client.authenticated() {
                     if !self.remove_client(&addr) {
-                        error!("failed to remove client {:02X?} from AID map", addr);
+                        error!("failed to remove client {} from AID map", addr);
                     }
-                    info!("client {:02X?} lost authentication", addr);
+                    info!("client {} lost authentication", addr);
                 }
             }
         }
     }
 
     fn handle_eapol_ind(&mut self, ind: fidl_mlme::EapolIndication) {
-        let peer_addr = ind.src_addr;
+        let peer_addr: MacAddr = ind.src_addr.into();
         let client = match self.clients.get_mut(&peer_addr) {
             None => {
-                warn!("client {:02X?} never authenticated, ignoring EAPoL indication", peer_addr);
+                warn!("client {} never authenticated, ignoring EAPoL indication", peer_addr);
                 return;
             }
             Some(client) => client,
@@ -805,9 +799,10 @@ impl InfraBss {
     }
 
     fn handle_eapol_conf(&mut self, resp: fidl_mlme::EapolConfirm) {
-        let client = match self.clients.get_mut(&resp.dst_addr) {
+        let dst_addr: MacAddr = resp.dst_addr.into();
+        let client = match self.clients.get_mut(&dst_addr) {
             None => {
-                warn!("never sent EAPOL frame to client {:02X?}, ignoring confirm", resp.dst_addr);
+                warn!("never sent EAPOL frame to client {}, ignoring confirm", dst_addr);
                 return;
             }
             Some(client) => client,
@@ -906,12 +901,13 @@ mod tests {
         },
     };
 
-    const AP_ADDR: MacAddr = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66];
-    const CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67];
-    const CLIENT_ADDR2: MacAddr = [0x22, 0x22, 0x22, 0x22, 0x22, 0x22];
     lazy_static! {
+        static ref AP_ADDR: MacAddr = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66].into();
+        static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();
+        static ref CLIENT_ADDR2: MacAddr = [0x22, 0x22, 0x22, 0x22, 0x22, 0x22].into();
         static ref SSID: Ssid = Ssid::try_from([0x46, 0x55, 0x43, 0x48, 0x53, 0x49, 0x41]).unwrap();
     }
+
     const RSNE: &'static [u8] = &[
         0x30, // element id
         0x2A, // length
@@ -1270,7 +1266,7 @@ mod tests {
         assert_variant!(
         mlme_stream.try_next(),
         Ok(Some(MlmeRequest::Deauthenticate(deauth_req))) => {
-            assert_eq!(deauth_req.peer_sta_address, client.addr);
+            assert_eq!(&deauth_req.peer_sta_address, client.addr.as_array());
             assert_eq!(deauth_req.reason_code, fidl_ieee80211::ReasonCode::StaLeaving);
         });
 
@@ -1466,7 +1462,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut sme, mut mlme_stream, _) = start_protected_ap(&exec);
         let client1 = Client::default();
-        let client2 = Client { addr: CLIENT_ADDR2 };
+        let client2 = Client { addr: *CLIENT_ADDR2 };
 
         sme.on_mlme_event(client1.create_auth_ind(fidl_mlme::AuthenticationTypes::OpenSystem));
         client1.verify_auth_resp(&mut mlme_stream, fidl_mlme::AuthenticateResultCode::Success);
@@ -1507,7 +1503,7 @@ mod tests {
 
     impl Client {
         fn default() -> Self {
-            Client { addr: CLIENT_ADDR }
+            Client { addr: *CLIENT_ADDR }
         }
 
         fn authenticate_and_drain_mlme(
@@ -1531,14 +1527,17 @@ mod tests {
 
         fn create_auth_ind(&self, auth_type: fidl_mlme::AuthenticationTypes) -> MlmeEvent {
             MlmeEvent::AuthenticateInd {
-                ind: fidl_mlme::AuthenticateIndication { peer_sta_address: self.addr, auth_type },
+                ind: fidl_mlme::AuthenticateIndication {
+                    peer_sta_address: self.addr.to_array(),
+                    auth_type,
+                },
             }
         }
 
         fn create_assoc_ind(&self, rsne: Option<Vec<u8>>) -> MlmeEvent {
             MlmeEvent::AssociateInd {
                 ind: fidl_mlme::AssociateIndication {
-                    peer_sta_address: self.addr,
+                    peer_sta_address: self.addr.to_array(),
                     listen_interval: 100,
                     ssid: Some(SSID.to_vec()),
                     rsne,
@@ -1557,7 +1556,7 @@ mod tests {
         ) {
             let msg = mlme_stream.try_next();
             assert_variant!(msg, Ok(Some(MlmeRequest::AuthResponse(auth_resp))) => {
-                assert_eq!(auth_resp.peer_sta_address, self.addr);
+                assert_eq!(&auth_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(auth_resp.result_code, result_code);
             });
         }
@@ -1571,7 +1570,7 @@ mod tests {
         ) {
             let msg = mlme_stream.try_next();
             assert_variant!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
-                assert_eq!(assoc_resp.peer_sta_address, self.addr);
+                assert_eq!(&assoc_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(assoc_resp.association_id, aid);
                 assert_eq!(assoc_resp.result_code, result_code);
                 assert_eq!(
@@ -1588,7 +1587,7 @@ mod tests {
         ) {
             let msg = mlme_stream.try_next();
             assert_variant!(msg, Ok(Some(MlmeRequest::AssocResponse(assoc_resp))) => {
-                assert_eq!(assoc_resp.peer_sta_address, self.addr);
+                assert_eq!(&assoc_resp.peer_sta_address, self.addr.as_array());
                 assert_eq!(assoc_resp.association_id, 0);
                 assert_eq!(assoc_resp.result_code, result_code);
                 assert_eq!(assoc_resp.capability_info, 0);
@@ -1597,8 +1596,8 @@ mod tests {
 
         fn verify_eapol_req(&self, mlme_stream: &mut MlmeStream) {
             assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(eapol_req))) => {
-                assert_eq!(eapol_req.src_addr, AP_ADDR);
-                assert_eq!(eapol_req.dst_addr, self.addr);
+                assert_eq!(&eapol_req.src_addr, AP_ADDR.as_array());
+                assert_eq!(&eapol_req.dst_addr, self.addr.as_array());
                 assert!(eapol_req.data.len() > 0);
             });
         }
@@ -1610,7 +1609,7 @@ mod tests {
         ) {
             let msg = mlme_stream.try_next();
             assert_variant!(msg, Ok(Some(MlmeRequest::Deauthenticate(deauth_req))) => {
-                assert_eq!(deauth_req.peer_sta_address, self.addr);
+                assert_eq!(&deauth_req.peer_sta_address, self.addr.as_array());
                 assert_eq!(deauth_req.reason_code, reason_code);
             });
         }
@@ -1643,7 +1642,7 @@ mod tests {
 
     fn create_sme(_exec: &fasync::TestExecutor) -> (ApSme, MlmeStream, TimeStream) {
         let (ap_sme, _mlme_sink, mlme_stream, time_stream) =
-            ApSme::new(fake_device_info(AP_ADDR), fake_mac_sublayer_support());
+            ApSme::new(fake_device_info(*AP_ADDR), fake_mac_sublayer_support());
         (ap_sme, mlme_stream, time_stream)
     }
 }

@@ -26,7 +26,7 @@ use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, Ssid},
+    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
     scanner::Scanner,
     state::States,
     std::convert::TryInto,
@@ -192,7 +192,7 @@ impl<D> ClientMlme<D> {
     fn on_sme_get_minstrel_stats(
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
-        _addr: &[u8; 6],
+        _addr: &MacAddr,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("GetMinstrelStats is not supported.");
@@ -237,7 +237,7 @@ impl<D: DeviceOps> ClientMlme<D> {
         // TODO(fxbug.dev/44487): Send the entire frame to scanner.
         match mac::MacFrame::parse(frame, false) {
             Some(mac::MacFrame::Mgmt { mgmt_hdr, body, .. }) => {
-                let bssid = Bssid(mgmt_hdr.addr3);
+                let bssid = Bssid::from(mgmt_hdr.addr3);
                 let frame_ctrl = mgmt_hdr.frame_ctrl;
                 match mac::MgmtBody::parse(frame_ctrl.mgmt_subtype(), body) {
                     Some(mac::MgmtBody::Beacon { bcn_hdr, elements }) => {
@@ -307,7 +307,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             }
             Req::ListMinstrelPeers(responder) => self.on_sme_list_minstrel_peers(responder),
             Req::GetMinstrelStats(req, responder) => {
-                self.on_sme_get_minstrel_stats(responder, &req.peer_addr)
+                self.on_sme_get_minstrel_stats(responder, &req.peer_addr.into())
             }
             other_message => match &mut self.sta {
                 None => {
@@ -424,7 +424,7 @@ impl<D: DeviceOps> ClientMlme<D> {
             .map_err(|status| Error::Status(format!("Error setting device channel"), status))?;
 
         let bss_config = banjo_common::JoinBssRequest {
-            bssid: bss.bssid.0,
+            bssid: bss.bssid.to_array(),
             bss_type: banjo_common::BssType::INFRASTRUCTURE,
             remote: true,
             beacon_period: bss.beacon_period,
@@ -599,11 +599,11 @@ impl Client {
                         .with_power_mgmt(state)
                         .with_to_ds(true),
                     duration: 0,
-                    addr1: self.bssid().0,
+                    addr1: self.bssid().into(),
                     addr2: self.iface_mac,
-                    addr3: self.bssid().0,
+                    addr3: self.bssid().into(),
                     seq_ctrl: mac::SequenceControl(0)
-                        .with_seq_num(ctx.seq_mgr.next_sns1(&self.bssid().0) as u16)
+                        .with_seq_num(ctx.seq_mgr.next_sns1(&self.bssid().into()) as u16)
                 },
             },
         })?;
@@ -627,16 +627,9 @@ impl Client {
             // Control frames are not supported. Drop them.
             _ => return false,
         };
-        src_addr.map_or(false, |src_addr| src_addr == self.bssid().0)
-            && (!is_unicast(dst_addr) || dst_addr == self.iface_mac)
+        src_addr.map_or(false, |src_addr| src_addr == self.bssid().into())
+            && (!dst_addr.is_unicast() || dst_addr == self.iface_mac)
     }
-}
-
-/// A MAC address is a unicast address if the least significant bit of the first octet is 0.
-/// See "individual/group bit" in
-/// https://standards.ieee.org/content/dam/ieee-standards/standards/web/documents/tutorials/macgrp.pdf
-fn is_unicast(addr: MacAddr) -> bool {
-    addr[0] & 1 == 0
 }
 
 pub struct BoundClient<'a, D> {
@@ -712,7 +705,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                     self.sta.bssid(),
                     self.sta.iface_mac,
                     mac::SequenceControl(0)
-                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().0) as u16)
+                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().into()) as u16)
                 ),
                 mac::AuthHdr: &mac::AuthHdr {
                     auth_alg_num: auth_type,
@@ -757,7 +750,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                     self.sta.bssid(),
                     self.sta.iface_mac,
                     mac::SequenceControl(0)
-                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().0) as u16)
+                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().into()) as u16)
                 ),
                 mac::AssocReqHdr: &mac::AssocReqHdr {
                     capabilities: mac::CapabilityInfo(capability_info),
@@ -797,7 +790,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                     self.sta.bssid(),
                     self.sta.iface_mac,
                     mac::SequenceControl(0)
-                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().0) as u16)
+                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().into()) as u16)
                 ),
             },
         })?;
@@ -818,7 +811,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
                     self.sta.bssid(),
                     self.sta.iface_mac,
                     mac::SequenceControl(0)
-                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().0) as u16)
+                        .with_seq_num(self.ctx.seq_mgr.next_sns1(&self.sta.bssid().into()) as u16)
                 ),
                 mac::DeauthHdr: &mac::DeauthHdr {
                     reason_code,
@@ -863,10 +856,10 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         let to_ds = true;
         let from_ds = src != self.sta.iface_mac;
         // Detect when SA != TA, in which case we use addr4.
-        let addr1 = self.sta.bssid().0;
+        let addr1 = self.sta.bssid().into();
         let addr2 = self.sta.iface_mac;
         let addr3 = match (to_ds, from_ds) {
-            (false, false) => self.sta.bssid().0,
+            (false, false) => self.sta.bssid().into(),
             (false, true) => src,
             (true, _) => dst,
         };
@@ -926,7 +919,11 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         self.ctx
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
-                ind: fidl_mlme::EapolIndication { src_addr, dst_addr, data: eapol_frame.to_vec() },
+                ind: fidl_mlme::EapolIndication {
+                    src_addr: src_addr.to_array(),
+                    dst_addr: dst_addr.to_array(),
+                    data: eapol_frame.to_vec(),
+                },
             })
             .map_err(|e| e.into())
     }
@@ -962,7 +959,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         self.ctx
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::EapolConf {
-                resp: fidl_mlme::EapolConfirm { result_code, dst_addr: dst },
+                resp: fidl_mlme::EapolConfirm { result_code, dst_addr: dst.to_array() },
             })
             .unwrap_or_else(|e| error!("error sending MLME-EAPOL.confirm message: {}", e));
     }
@@ -1026,7 +1023,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
 
     fn send_connect_conf_failure(&mut self, result_code: fidl_ieee80211::StatusCode) {
         self.sta.connect_timeout.take();
-        let bssid = self.sta.connect_req.selected_bss.bssid.0;
+        let bssid = self.sta.connect_req.selected_bss.bssid;
         self.send_connect_conf_failure_with_bssid(bssid, result_code);
     }
 
@@ -1034,11 +1031,11 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     /// The connect timeout is not cleared as this method may be called with a foreign BSSID.
     fn send_connect_conf_failure_with_bssid(
         &mut self,
-        bssid: [u8; 6],
+        bssid: Bssid,
         result_code: fidl_ieee80211::StatusCode,
     ) {
         let connect_conf = fidl_mlme::ConnectConfirm {
-            peer_sta_address: bssid,
+            peer_sta_address: bssid.to_array(),
             result_code,
             association_id: 0,
             association_ies: vec![],
@@ -1052,7 +1049,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     fn send_connect_conf_success(&mut self, association_id: u16, association_ies: &[u8]) {
         self.sta.connect_timeout.take();
         let connect_conf = fidl_mlme::ConnectConfirm {
-            peer_sta_address: self.sta.connect_req.selected_bss.bssid.0,
+            peer_sta_address: self.sta.connect_req.selected_bss.bssid.to_array(),
             result_code: fidl_ieee80211::StatusCode::Success,
             association_id,
             association_ies: association_ies.to_vec(),
@@ -1076,7 +1073,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateInd {
                 ind: fidl_mlme::DeauthenticateIndication {
-                    peer_sta_address: self.sta.bssid().0,
+                    peer_sta_address: self.sta.bssid().to_array(),
                     reason_code,
                     locally_initiated: locally_initiated.0,
                 },
@@ -1094,7 +1091,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
                 ind: fidl_mlme::DisassociateIndication {
-                    peer_sta_address: self.sta.bssid().0,
+                    peer_sta_address: self.sta.bssid().to_array(),
                     reason_code: reason_code,
                     locally_initiated: locally_initiated.0,
                 },
@@ -1113,7 +1110,7 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::OnSaeFrameRx {
                 frame: fidl_mlme::SaeFrame {
-                    peer_sta_address: self.sta.bssid().0,
+                    peer_sta_address: self.sta.bssid().to_array(),
                     seq_num,
                     status_code,
                     sae_fields,
@@ -1126,7 +1123,9 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
         self.ctx
             .device
             .send_mlme_event(fidl_mlme::MlmeEvent::OnSaeHandshakeInd {
-                ind: fidl_mlme::SaeHandshakeIndication { peer_sta_address: self.sta.bssid().0 },
+                ind: fidl_mlme::SaeHandshakeIndication {
+                    peer_sta_address: self.sta.bssid().to_array(),
+                },
             })
             .unwrap_or_else(|e| error!("error sending OnSaeHandshakeInd: {}", e));
     }
@@ -1244,7 +1243,7 @@ fn write_block_ack_hdr<B: Appendable>(
                     bssid,
                     addr,
                     mac::SequenceControl(0)
-                        .with_seq_num(seq_mgr.next_sns1(&bssid.0) as u16),
+                        .with_seq_num(seq_mgr.next_sns1(&bssid.into()) as u16),
                 ),
             },
         }
@@ -1269,6 +1268,8 @@ mod tests {
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async as fasync,
         futures::task::Poll,
+        ieee80211::MacAddrBytes,
+        lazy_static::lazy_static,
         std::{
             convert::TryFrom,
             sync::{Arc, Mutex},
@@ -1285,8 +1286,10 @@ mod tests {
         wlan_sme::responder::Responder,
         wlan_statemachine::*,
     };
-    const BSSID: Bssid = Bssid([6u8; 6]);
-    const IFACE_MAC: MacAddr = [7u8; 6];
+    lazy_static! {
+        static ref BSSID: Bssid = [6u8; 6].into();
+        static ref IFACE_MAC: MacAddr = [7u8; 6].into();
+    }
     const RSNE: &[u8] = &[
         0x30, 0x14, //  ID and len
         1, 0, //  version
@@ -1333,7 +1336,7 @@ mod tests {
                 executor,
                 FakeDeviceConfig {
                     mac_role: banjo_common::WlanMacRole::CLIENT,
-                    sta_addr: IFACE_MAC,
+                    sta_addr: (*IFACE_MAC).into(),
                     ..Default::default()
                 },
             );
@@ -1366,26 +1369,26 @@ mod tests {
 
     fn make_client_station() -> Client {
         let connect_req = ParsedConnectRequest {
-            selected_bss: fake_bss_description!(Open, bssid: BSSID.0),
+            selected_bss: fake_bss_description!(Open, bssid: BSSID.to_array()),
             connect_failure_timeout: 100,
             auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
             sae_password: vec![],
             wep_key: None,
             security_ie: vec![],
         };
-        Client::new(connect_req, IFACE_MAC, fake_client_capabilities())
+        Client::new(connect_req, *IFACE_MAC, fake_client_capabilities())
     }
 
     fn make_client_station_protected() -> Client {
         let connect_req = ParsedConnectRequest {
-            selected_bss: fake_bss_description!(Wpa2, bssid: BSSID.0),
+            selected_bss: fake_bss_description!(Wpa2, bssid: BSSID.to_array()),
             connect_failure_timeout: 100,
             auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
             sae_password: vec![],
             wep_key: None,
             security_ie: RSNE.to_vec(),
         };
-        Client::new(connect_req, IFACE_MAC, fake_client_capabilities())
+        Client::new(connect_req, *IFACE_MAC, fake_client_capabilities())
     }
 
     impl ClientMlme<FakeDevice> {
@@ -1434,7 +1437,7 @@ mod tests {
         fn close_controlled_port(&mut self) {
             self.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
                 fidl_mlme::SetControlledPortRequest {
-                    peer_sta_address: BSSID.0,
+                    peer_sta_address: BSSID.to_array(),
                     state: fidl_mlme::ControlledPortState::Closed,
                 },
             ));
@@ -1619,7 +1622,7 @@ mod tests {
         assert_eq!(
             deauth_ind,
             fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
                 locally_initiated: true,
             }
@@ -1702,7 +1705,7 @@ mod tests {
         assert_eq!(
             deauth_ind,
             fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
                 locally_initiated: true,
             }
@@ -1742,7 +1745,7 @@ mod tests {
         let connect_req = ParsedConnectRequest {
             selected_bss: fake_bss_description!(Wpa2,
                 ssid: Ssid::try_from([11, 22, 33, 44]).unwrap(),
-                bssid: BSSID.0,
+                bssid: BSSID.to_array(),
             ),
             connect_failure_timeout: 100,
             auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
@@ -1758,7 +1761,7 @@ mod tests {
                 .map(|v| *v)
                 .ok(),
         });
-        me.sta.replace(Client::new(connect_req, IFACE_MAC, client_capabilities));
+        me.sta.replace(Client::new(connect_req, *IFACE_MAC, client_capabilities));
         let mut client = me.get_bound_client().expect("client should be present");
         client.send_assoc_req_frame().expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
@@ -1832,7 +1835,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_data_frame(IFACE_MAC, [4; 6], false, false, 0x1234, &payload[..])
+            .send_data_frame(*IFACE_MAC, [4; 6].into(), false, false, 0x1234, &payload[..])
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -1862,8 +1865,8 @@ mod tests {
         client
             .bind(&mut me.ctx, &mut me.scanner, &mut me.channel_state)
             .send_data_frame(
-                IFACE_MAC,
-                [4; 6],
+                *IFACE_MAC,
+                [4; 6].into(),
                 false,
                 true,
                 0x0800,              // IPv4
@@ -1899,8 +1902,8 @@ mod tests {
         client
             .bind(&mut me.ctx, &mut me.scanner, &mut me.channel_state)
             .send_data_frame(
-                IFACE_MAC,
-                [4; 6],
+                *IFACE_MAC,
+                [4; 6].into(),
                 false,
                 true,
                 0x86DD,                         // IPv6
@@ -1936,7 +1939,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_data_frame([3; 6], [4; 6], false, false, 0x1234, &payload[..])
+            .send_data_frame([3; 6].into(), [4; 6].into(), false, false, 0x1234, &payload[..])
             .expect("error delivering WLAN frame");
         assert_eq!(m.fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2026,8 +2029,8 @@ mod tests {
     fn data_frame_to_ethernet_single_llc() {
         let mut data_frame = make_data_frame_single_llc(None, None);
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2052,8 +2055,8 @@ mod tests {
     fn data_frame_to_ethernet_amsdu() {
         let mut data_frame = make_data_frame_amsdu();
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2088,8 +2091,8 @@ mod tests {
     fn data_frame_to_ethernet_amsdu_padding_too_short() {
         let mut data_frame = make_data_frame_amsdu_padding_too_short();
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2116,8 +2119,8 @@ mod tests {
     fn data_frame_controlled_port_closed() {
         let mut data_frame = make_data_frame_single_llc(None, None);
         data_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        data_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        data_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        data_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        data_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2135,10 +2138,10 @@ mod tests {
 
     #[test]
     fn eapol_frame_controlled_port_closed() {
-        let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(IFACE_MAC);
+        let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(*IFACE_MAC);
         eapol_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        eapol_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        eapol_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        eapol_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2162,16 +2165,20 @@ mod tests {
             .expect("error reading EAPOL.indication");
         assert_eq!(
             eapol_ind,
-            fidl_mlme::EapolIndication { src_addr, dst_addr, data: EAPOL_PDU.to_vec() }
+            fidl_mlme::EapolIndication {
+                src_addr: src_addr.to_array(),
+                dst_addr: dst_addr.to_array(),
+                data: EAPOL_PDU.to_vec()
+            }
         );
     }
 
     #[test]
     fn eapol_frame_is_controlled_port_open() {
-        let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(IFACE_MAC);
+        let (src_addr, dst_addr, mut eapol_frame) = make_eapol_frame(*IFACE_MAC);
         eapol_frame[1] = 0b00000010; // from_ds = 1, to_ds = 0 when AP sends to client (us)
-        eapol_frame[4..10].copy_from_slice(&IFACE_MAC); // addr1 - receiver - client (us)
-        eapol_frame[10..16].copy_from_slice(&BSSID.0); // addr2 - bssid
+        eapol_frame[4..10].copy_from_slice(IFACE_MAC.as_array()); // addr1 - receiver - client (us)
+        eapol_frame[10..16].copy_from_slice(BSSID.as_array()); // addr2 - bssid
 
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
@@ -2194,7 +2201,11 @@ mod tests {
             .expect("error reading EAPOL.indication");
         assert_eq!(
             eapol_ind,
-            fidl_mlme::EapolIndication { src_addr, dst_addr, data: EAPOL_PDU.to_vec() }
+            fidl_mlme::EapolIndication {
+                src_addr: src_addr.to_array(),
+                dst_addr: dst_addr.to_array(),
+                data: EAPOL_PDU.to_vec()
+            }
         );
     }
 
@@ -2206,7 +2217,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_eapol_indication([1; 6], [2; 6], &[5; 256])
+            .send_eapol_indication([1; 6].into(), [2; 6].into(), &[5; 256])
             .expect_err("sending too large EAPOL frame should fail");
         m.fake_device_state
             .lock()
@@ -2223,7 +2234,7 @@ mod tests {
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
         client
-            .send_eapol_indication([1; 6], [2; 6], &[5; 200])
+            .send_eapol_indication([1; 6].into(), [2; 6].into(), &[5; 200])
             .expect("expected EAPOL.indication to be sent");
         let eapol_ind = m
             .fake_device_state
@@ -2233,7 +2244,11 @@ mod tests {
             .expect("error reading EAPOL.indication");
         assert_eq!(
             eapol_ind,
-            fidl_mlme::EapolIndication { src_addr: [1; 6], dst_addr: [2; 6], data: vec![5; 200] }
+            fidl_mlme::EapolIndication {
+                src_addr: [1; 6].into(),
+                dst_addr: [2; 6].into(),
+                data: vec![5; 200]
+            }
         );
     }
 
@@ -2244,7 +2259,7 @@ mod tests {
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
-        client.send_eapol_frame(IFACE_MAC, BSSID.0, false, &[5; 8]);
+        client.send_eapol_frame(*IFACE_MAC, (*BSSID).into(), false, &[5; 8]);
 
         // Verify EAPOL.confirm message was sent to SME.
         let eapol_confirm = m
@@ -2257,7 +2272,7 @@ mod tests {
             eapol_confirm,
             fidl_mlme::EapolConfirm {
                 result_code: fidl_mlme::EapolResultCode::Success,
-                dst_addr: BSSID.0,
+                dst_addr: BSSID.to_array(),
             }
         );
 
@@ -2288,7 +2303,7 @@ mod tests {
         let mut me = m.make_mlme();
         me.make_client_station();
         let mut client = me.get_bound_client().expect("client should be present");
-        client.send_eapol_frame([1; 6], [2; 6], false, &[5; 200]);
+        client.send_eapol_frame([1; 6].into(), [2; 6].into(), false, &[5; 200]);
 
         // Verify EAPOL.confirm message was sent to SME.
         let eapol_confirm = m
@@ -2301,7 +2316,7 @@ mod tests {
             eapol_confirm,
             fidl_mlme::EapolConfirm {
                 result_code: fidl_mlme::EapolResultCode::TransmissionFailure,
-                dst_addr: [2; 6],
+                dst_addr: [2; 6].into(),
             }
         );
 
@@ -2319,10 +2334,10 @@ mod tests {
         client.move_to_associated_state();
 
         assert!(m.fake_device_state.lock().unwrap().keys.is_empty());
-        client.handle_mlme_req(crate::test_utils::fake_set_keys_req(BSSID.0));
+        client.handle_mlme_req(crate::test_utils::fake_set_keys_req((*BSSID).into()));
         assert_eq!(m.fake_device_state.lock().unwrap().keys.len(), 1);
 
-        let sent_key = crate::test_utils::fake_key(BSSID.0);
+        let sent_key = crate::test_utils::fake_key((*BSSID).into());
         let received_key = &m.fake_device_state.lock().unwrap().keys[0];
         assert_eq!(received_key.key[0..received_key.key_len as usize], sent_key.key);
         assert_eq!(received_key.key_idx, sent_key.key_id as u8);
@@ -2439,7 +2454,7 @@ mod tests {
         assert_eq!(
             connect_conf,
             fidl_mlme::ConnectConfirm {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 result_code: fidl_ieee80211::StatusCode::Success,
                 association_id: 42,
                 association_ies: vec![0, 5, 3, 4, 5, 6, 7],
@@ -2464,7 +2479,7 @@ mod tests {
         assert_eq!(
             connect_conf,
             fidl_mlme::ConnectConfirm {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 result_code: fidl_ieee80211::StatusCode::DeniedNoMoreStas,
                 association_id: 0,
                 association_ies: vec![],
@@ -2619,7 +2634,7 @@ mod tests {
         assert_eq!(
             info,
             fidl_mlme::DeviceInfo {
-                sta_addr: IFACE_MAC,
+                sta_addr: IFACE_MAC.to_array(),
                 role: fidl_common::WlanMacRole::Client,
                 bands: fake_fidl_band_caps(),
                 softmac_hardware_capability: 0,
@@ -2707,7 +2722,7 @@ mod tests {
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
                 ssid: Ssid::try_from("ssid").unwrap().into(),
-                bssid: BSSID.0,
+                bssid: BSSID.to_array(),
                 channel: channel.clone(),
             ),
             connect_failure_timeout: 100,
@@ -2832,7 +2847,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 result_code: fidl_ieee80211::StatusCode::Success,
                 association_id: 42,
                 association_ies: vec![
@@ -2863,7 +2878,7 @@ mod tests {
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Wpa2,
                 ssid: Ssid::try_from("ssid").unwrap().into(),
-                bssid: BSSID.0,
+                bssid: BSSID.to_array(),
                 channel: channel.clone(),
             ),
             connect_failure_timeout: 100,
@@ -3004,7 +3019,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 result_code: fidl_ieee80211::StatusCode::Success,
                 association_id: 42,
                 association_ies: vec![
@@ -3033,7 +3048,7 @@ mod tests {
         // Send a request to open controlled port
         me.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
             fidl_mlme::SetControlledPortRequest {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 state: fidl_mlme::ControlledPortState::Open,
             },
         ))
@@ -3052,7 +3067,7 @@ mod tests {
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
                 ssid: Ssid::try_from("ssid").unwrap().into(),
-                bssid: BSSID.0,
+                bssid: BSSID.to_array(),
                 channel: channel.clone(),
             ),
             connect_failure_timeout: 100,
@@ -3129,7 +3144,7 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
         let connect_req = fidl_mlme::ConnectRequest {
-            selected_bss: fake_fidl_bss_description!(Open, bssid: BSSID.0),
+            selected_bss: fake_fidl_bss_description!(Open, bssid: BSSID.to_array()),
             connect_failure_timeout: 100,
             auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
             sae_password: vec![],
@@ -3162,7 +3177,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::ConnectConfirm {
-                peer_sta_address: BSSID.0,
+                peer_sta_address: BSSID.to_array(),
                 result_code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
                 association_id: 0,
                 association_ies: vec![],
@@ -3232,19 +3247,6 @@ mod tests {
             resp,
             fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
         );
-    }
-
-    #[test]
-    fn unicast_addresses() {
-        assert!(is_unicast([0; 6]));
-        assert!(is_unicast([0xfe; 6]));
-    }
-
-    #[test]
-    fn non_unicast_addresses() {
-        assert!(!is_unicast([0xff; 6])); // broadcast
-        assert!(!is_unicast([0x33, 0x33, 0, 0, 0, 0])); // IPv6 multicast
-        assert!(!is_unicast([0x01, 0x00, 0x53, 0, 0, 0])); // IPv4 multicast
     }
 
     #[test]

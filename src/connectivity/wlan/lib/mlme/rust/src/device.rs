@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
     fuchsia_zircon as zx,
     futures::channel::mpsc,
-    ieee80211::MacAddr,
+    ieee80211::{MacAddr, MacAddrBytes},
     std::{ffi::c_void, sync::Arc},
     tracing::error,
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
@@ -113,7 +113,7 @@ pub trait DeviceOps {
     fn tx_vector_idx(
         &mut self,
         frame_control: &FrameControl,
-        peer_addr: &[u8; 6],
+        peer_addr: &MacAddr,
         flags: u32,
     ) -> tx_vector::TxVecIdx {
         self.minstrel()
@@ -191,8 +191,11 @@ impl DeviceOps for Device {
         if frame_control.protected() {
             tx_flags |= banjo_wlan_softmac::WlanTxInfoFlags::PROTECTED.0;
         }
-        let mut peer_addr = [0u8; 6];
-        peer_addr.copy_from_slice(&buf.as_slice()[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
+        let peer_addr: MacAddr = {
+            let mut peer_addr = [0u8; 6];
+            peer_addr.copy_from_slice(&buf.as_slice()[PEER_ADDR_OFFSET..PEER_ADDR_OFFSET + 6]);
+            peer_addr.into()
+        };
         let tx_vector_idx = self.tx_vector_idx(frame_control, &peer_addr, tx_flags);
 
         let tx_info = wlan_common::tx_vector::TxVector::from_idx(tx_vector_idx)
@@ -226,7 +229,7 @@ impl DeviceOps for Device {
                 key::KeyType::PEER => banjo_common::WlanKeyType::PEER,
                 _ => return Err(zx::Status::INVALID_ARGS),
             },
-            peer_addr: key.peer_addr,
+            peer_addr: key.peer_addr.to_array(),
             key_idx: key.key_idx,
             key_list: key.key.as_ptr(),
             key_count: usize::from(key.key_len),
@@ -294,7 +297,7 @@ impl DeviceOps for Device {
         if let Some(minstrel) = &self.minstrel {
             minstrel.lock().remove_peer(addr);
         }
-        zx::ok((self.raw_device.clear_association)(self.raw_device.device, addr))
+        zx::ok((self.raw_device.clear_association)(self.raw_device.device, addr.as_array()))
     }
 
     fn notify_association_complete(
@@ -475,7 +478,7 @@ mod convert {
 
     impl QueryResponse {
         pub fn sta_addr(&self) -> MacAddr {
-            self.inner.sta_addr
+            self.inner.sta_addr.into()
         }
 
         pub fn mac_role(&self) -> banjo_common::WlanMacRole {
@@ -529,7 +532,7 @@ mod convert {
         }
 
         pub(crate) fn with_sta_addr(mut self, sta_addr: MacAddr) -> Self {
-            self.inner.sta_addr = sta_addr;
+            self.inner.sta_addr = sta_addr.to_array();
             self
         }
     }
@@ -562,7 +565,7 @@ mod convert {
                 bands.push(convert_ddk_band_cap(&band_cap)?)
             }
             Ok(fidl_mlme::DeviceInfo {
-                sta_addr: query_response.sta_addr(),
+                sta_addr: query_response.sta_addr().to_array(),
                 role: fidl_common::WlanMacRole::from_primitive(query_response.mac_role().0).ok_or(
                     format_err!("Unknown WlanWlanMacRole: {}", query_response.mac_role().0),
                 )?,
@@ -746,6 +749,7 @@ pub mod test_utils {
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync,
         fuchsia_zircon::HandleBased,
+        ieee80211::Bssid,
         std::{
             collections::VecDeque,
             sync::{Arc, Mutex},
@@ -845,7 +849,7 @@ pub mod test_utils {
 
     pub struct FakeDeviceConfig {
         pub mac_role: banjo_common::WlanMacRole,
-        pub sta_addr: MacAddr,
+        pub sta_addr: Bssid,
         pub start_passive_scan_fails: bool,
         pub start_active_scan_fails: bool,
         pub send_wlan_frame_fails: bool,
@@ -855,7 +859,7 @@ pub mod test_utils {
         fn default() -> Self {
             Self {
                 mac_role: banjo_common::WlanMacRole::CLIENT,
-                sta_addr: [7u8; 6],
+                sta_addr: [7u8; 6].into(),
                 start_passive_scan_fails: false,
                 start_active_scan_fails: false,
                 send_wlan_frame_fails: false,
@@ -909,8 +913,9 @@ pub mod test_utils {
             _executor: &fasync::TestExecutor,
             config: FakeDeviceConfig,
         ) -> (FakeDevice, Arc<Mutex<FakeDeviceState>>) {
-            let query_response =
-                QueryResponse::fake().with_mac_role(config.mac_role).with_sta_addr(config.sta_addr);
+            let query_response = QueryResponse::fake()
+                .with_mac_role(config.mac_role)
+                .with_sta_addr(config.sta_addr.into());
 
             // Create a channel for SME requests, to be surfaced by start().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
@@ -1110,7 +1115,7 @@ pub mod test_utils {
             if let Some(minstrel) = &state.minstrel {
                 minstrel.lock().add_peer(&cfg)?
             }
-            state.assocs.insert(cfg.bssid.unwrap(), cfg);
+            state.assocs.insert(cfg.bssid.unwrap().into(), cfg);
             Ok(())
         }
 
@@ -1295,7 +1300,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let (mut fake_device, _) = FakeDevice::new(&exec);
         let query_response = fake_device.wlan_softmac_query_response();
-        assert_eq!(query_response.sta_addr(), [7u8; 6]);
+        assert_eq!(query_response.sta_addr(), [7u8; 6].into());
         assert_eq!(query_response.mac_role(), banjo_common::WlanMacRole::CLIENT);
         assert_eq!(
             query_response.supported_phys(),
@@ -1550,7 +1555,7 @@ mod tests {
                 cipher_oui: [3, 4, 5],
                 cipher_type: 6,
                 key_type: key::KeyType::PAIRWISE,
-                peer_addr: [8; 6],
+                peer_addr: [8; 6].into(),
                 key_idx: 9,
                 key_len: 10,
                 key: [11; 32],
@@ -1794,7 +1799,7 @@ mod tests {
                 ..Default::default()
             })
             .expect("error configuring assoc");
-        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&[1, 2, 3, 4, 5, 6]));
+        assert!(fake_device_state.lock().unwrap().assocs.contains_key(&[1, 2, 3, 4, 5, 6].into()));
     }
 
     #[test]
@@ -1824,7 +1829,7 @@ mod tests {
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_some());
         fake_device.notify_association_complete(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 1);
-        fake_device.clear_association(&[1, 2, 3, 4, 5, 6]).expect("error clearing assoc");
+        fake_device.clear_association(&[1, 2, 3, 4, 5, 6].into()).expect("error clearing assoc");
         assert_eq!(fake_device_state.lock().unwrap().assocs.len(), 0);
         assert!(fake_device_state.lock().unwrap().join_bss_request.is_none());
     }

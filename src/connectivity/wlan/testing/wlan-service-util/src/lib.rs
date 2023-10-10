@@ -9,7 +9,7 @@ use {
         CreateIfaceRequest, DestroyIfaceRequest, DeviceMonitorProxy, QueryIfaceResponse,
     },
     fuchsia_zircon as zx,
-    ieee80211::MacAddr,
+    ieee80211::{MacAddr, MacAddrBytes},
 };
 
 pub mod ap;
@@ -60,7 +60,7 @@ pub async fn create_iface(
     role: WlanMacRole,
     sta_addr: MacAddr,
 ) -> Result<u16, Error> {
-    let req = CreateIfaceRequest { phy_id, role, sta_addr };
+    let req = CreateIfaceRequest { phy_id, role, sta_addr: sta_addr.to_array() };
 
     let response = monitor_proxy.create_iface(&req).await.context("Error creating iface")?;
 
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn test_create_iface_ok() {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
-        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0]);
+        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0].into());
 
         pin_mut!(iface_id_fut);
 
@@ -249,7 +249,7 @@ mod tests {
     #[test]
     fn test_create_iface_internal_err() {
         let (mut exec, proxy, mut req_stream) = setup_fake_service::<DeviceMonitorMarker>();
-        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0]);
+        let iface_id_fut = create_iface(&proxy, 0, WlanMacRole::Client, [0, 0, 0, 0, 0, 0].into());
 
         pin_mut!(iface_id_fut);
 

@@ -21,9 +21,9 @@ pub fn data_hdr_client_to_ap(
     FixedDataHdrFields {
         frame_ctrl,
         duration: 0,
-        addr1: bssid.0,
+        addr1: bssid.into(),
         addr2: client_addr,
-        addr3: bssid.0,
+        addr3: bssid.into(),
         seq_ctrl,
     }
 }
@@ -46,16 +46,16 @@ mod tests {
     fn client_to_ap() {
         let got = data_hdr_client_to_ap(
             FrameControl(0b00110000_00110000),
-            Bssid([1; 6]),
-            [2; 6],
+            Bssid::from([1; 6]),
+            MacAddr::from([2; 6]),
             SequenceControl(4321),
         );
         let expected = FixedDataHdrFields {
             frame_ctrl: FrameControl(0b00110001_00110000),
             duration: 0,
-            addr1: [1; 6],
-            addr2: [2; 6],
-            addr3: [1; 6],
+            addr1: MacAddr::from([1; 6]),
+            addr2: MacAddr::from([2; 6]),
+            addr3: MacAddr::from([1; 6]),
             seq_ctrl: SequenceControl(4321),
         };
         assert_eq!(got, expected);

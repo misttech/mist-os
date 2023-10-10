@@ -6,7 +6,7 @@ use {
     anyhow::Error,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_internal as fidl_internal,
-    ieee80211::Bssid,
+    ieee80211::{Bssid, MacAddrBytes},
     wlan_common::{channel::derive_channel, ie, mac::CapabilityInfo, TimeUnit},
 };
 
@@ -44,7 +44,7 @@ pub fn construct_bss_description(
         derive_channel(rx_info.channel.primary, dsss_channel, parsed_ht_op, parsed_vht_op);
 
     Ok(fidl_internal::BssDescription {
-        bssid: bssid.0,
+        bssid: bssid.to_array(),
         bss_type,
         beacon_period: beacon_interval.0,
         capability_info: capability_info.raw(),
@@ -70,10 +70,13 @@ fn get_bss_type(capability_info: CapabilityInfo) -> fidl_common::BssType {
 mod tests {
     use {
         super::*, banjo_fuchsia_wlan_common as banjo_common,
-        fidl_fuchsia_wlan_common as fidl_common,
+        fidl_fuchsia_wlan_common as fidl_common, lazy_static::lazy_static,
     };
 
-    const BSSID: Bssid = Bssid([0x33; 6]);
+    lazy_static! {
+        static ref BSSID: Bssid = [0x33; 6].into();
+    }
+
     const BEACON_INTERVAL: u16 = 100;
     // Capability information: ESS, privacy, spectrum mgmt, radio msmt
     const CAPABILITY_INFO: CapabilityInfo = CapabilityInfo(0x1111);
@@ -165,7 +168,7 @@ mod tests {
     fn test_construct_bss_description() {
         let ies = beacon_frame_ies();
         let bss_description = construct_bss_description(
-            BSSID,
+            *BSSID,
             TimeUnit(BEACON_INTERVAL),
             CAPABILITY_INFO,
             &ies[..],
@@ -176,7 +179,7 @@ mod tests {
         assert_eq!(
             bss_description,
             fidl_internal::BssDescription {
-                bssid: BSSID.0,
+                bssid: BSSID.to_array(),
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL,
                 capability_info: CAPABILITY_INFO.0,

@@ -22,12 +22,11 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_inspect_contrib::{inspect_log, log::InspectBytes},
     fuchsia_zircon as zx,
-    ieee80211::{Bssid, MacAddr, Ssid},
+    ieee80211::{Bssid, MacAddr, MacAddrBytes, Ssid},
     link_state::LinkState,
     tracing::{error, info, warn},
     wlan_common::{
         bss::BssDescription,
-        format::MacFmt as _,
         ie::{
             self,
             rsn::{cipher, suite_selector::OUI},
@@ -532,7 +531,7 @@ impl Associated {
                 connect_txn_sink: self.connect_txn_sink,
                 protection,
             };
-            let req = fidl_mlme::ReconnectRequest { peer_sta_address: cmd.bss.bssid.0 };
+            let req = fidl_mlme::ReconnectRequest { peer_sta_address: cmd.bss.bssid.to_array() };
             context.mlme_sink.send(MlmeRequest::Reconnect(req));
             Ok(Connecting {
                 cfg: self.cfg,
@@ -653,12 +652,12 @@ impl Associated {
         }
 
         // Reject EAPoL frames from other BSS.
-        if ind.src_addr != self.latest_ap_state.bssid.0 {
+        if &ind.src_addr != self.latest_ap_state.bssid.as_array() {
             let eapol_pdu = &ind.data[..];
             inspect_log!(context.inspect.rsn_events.lock(), {
                 rx_eapol_frame: InspectBytes(&eapol_pdu),
-                foreign_bssid: ind.src_addr.to_mac_string(),
-                current_bssid: self.latest_ap_state.bssid.0.to_mac_string(),
+                foreign_bssid: MacAddr::from(ind.src_addr).to_string(),
+                current_bssid: self.latest_ap_state.bssid.to_string(),
                 status: "rejected (foreign BSS)",
             });
             return Ok(self);
@@ -1144,7 +1143,7 @@ fn process_sae_updates(updates: UpdateSink, peer_sta_address: MacAddr, context: 
             }
             SecAssocUpdate::SaeAuthStatus(status) => context.mlme_sink.send(
                 MlmeRequest::SaeHandshakeResp(fidl_mlme::SaeHandshakeResponse {
-                    peer_sta_address,
+                    peer_sta_address: peer_sta_address.to_array(),
                     status_code: match status {
                         AuthStatus::Success => fidl_ieee80211::StatusCode::Success,
                         AuthStatus::Rejected => {
@@ -1177,7 +1176,7 @@ fn process_sae_handshake_ind(
 
     let mut updates = UpdateSink::default();
     supplicant.on_sae_handshake_ind(&mut updates)?;
-    process_sae_updates(updates, ind.peer_sta_address, context);
+    process_sae_updates(updates, MacAddr::from(ind.peer_sta_address), context);
     Ok(())
 }
 
@@ -1186,7 +1185,7 @@ fn process_sae_frame_rx(
     frame: fidl_mlme::SaeFrame,
     context: &mut Context,
 ) -> Result<(), anyhow::Error> {
-    let peer_sta_address = frame.peer_sta_address.clone();
+    let peer_sta_address = MacAddr::from(frame.peer_sta_address.clone());
     let supplicant = match protection {
         Protection::Rsna(rsna) => &mut rsna.supplicant,
         _ => bail!("Unexpected SAE frame received"),
@@ -1214,7 +1213,7 @@ fn process_sae_timeout(
 
             let mut updates = UpdateSink::default();
             supplicant.on_sae_timeout(&mut updates, timer.0)?;
-            process_sae_updates(updates, bssid.0, context);
+            process_sae_updates(updates, MacAddr::from(bssid), context);
         }
         _ => (),
     }
@@ -1257,7 +1256,7 @@ fn log_state_change(
                     from: start_state,
                     to: new_state.state_name(),
                     ctx: msg,
-                    bssid: bssid.0.to_mac_string(),
+                    bssid: bssid.to_string(),
                     ssid: ssid.to_string(),
                     ssid_hash: context.inspect.hasher.hash_ssid(&ssid)
                 });
@@ -1288,7 +1287,7 @@ fn build_wep_set_key_descriptor(bssid: Bssid, key: &WepKey) -> fidl_mlme::SetKey
         key_type: fidl_mlme::KeyType::Pairwise,
         key: key.clone().into(),
         key_id: 0,
-        address: bssid.0,
+        address: bssid.to_array(),
         cipher_suite_oui: OUI.into(),
         cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
             cipher_suite.into(),
@@ -1322,7 +1321,7 @@ fn connect_cmd_inspect_summary(cmd: &ConnectCommand) -> String {
 
 fn send_deauthenticate_request(current_bss: &BssDescription, mlme_sink: &MlmeSink) {
     mlme_sink.send(MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
-        peer_sta_address: current_bss.bssid.0,
+        peer_sta_address: current_bss.bssid.to_array(),
         reason_code: fidl_ieee80211::ReasonCode::StaLeaving,
     }));
 }
@@ -1424,7 +1423,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1511,7 +1510,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1605,7 +1604,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1648,7 +1647,7 @@ mod tests {
                     key_type: fidl_mlme::KeyType::Pairwise,
                     key: vec![3; 5],
                     key_id: 0,
-                    address: bss.bssid.0,
+                    address: bss.bssid.to_array(),
                     cipher_suite_oui: OUI.into(),
                     cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(1),
                     rsc: 0,
@@ -1674,7 +1673,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1705,7 +1704,7 @@ mod tests {
         // (mlme->sme) Send a ConnectConf as a response
         let connect_conf = fidl_mlme::MlmeEvent::ConnectConf {
             resp: fidl_mlme::ConnectConfirm {
-                peer_sta_address: bss.bssid.0,
+                peer_sta_address: bss.bssid.to_array(),
                 result_code: fidl_ieee80211::StatusCode::Success,
                 association_id: 42,
                 association_ies: vec![
@@ -1735,7 +1734,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -1827,7 +1826,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -2062,7 +2061,7 @@ mod tests {
         });
 
         // Send an EapolInd from foreign BSS.
-        let foreign_bssid = Bssid([1; 6]);
+        let foreign_bssid = Bssid::from([1; 6]);
         let eapol_ind = create_eapol_ind(foreign_bssid, test_utils::eapol_key_frame().into());
         let state = state.on_mlme_event(eapol_ind, &mut h.context);
 
@@ -2081,8 +2080,8 @@ mod tests {
                     "0" : {
                         "@time": AnyNumericProperty,
                         rx_eapol_frame: AnyBytesProperty,
-                        foreign_bssid: foreign_bssid.0.to_mac_string(),
-                        current_bssid: bss.bssid.0.to_mac_string(),
+                        foreign_bssid: foreign_bssid.to_string(),
+                        current_bssid: bss.bssid.to_string(),
                         status: "rejected (foreign BSS)"
                     }
                 }
@@ -2113,7 +2112,7 @@ mod tests {
 
         // (mlme->sme) Send a DeauthenticateConf as a response
         let deauth_conf = MlmeEvent::DeauthenticateConf {
-            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.0 },
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.to_array() },
         };
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
@@ -2194,7 +2193,7 @@ mod tests {
 
         // (mlme->sme) Send a DeauthenticateConf as a response
         let deauth_conf = MlmeEvent::DeauthenticateConf {
-            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.0 },
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.to_array() },
         };
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
@@ -2255,7 +2254,7 @@ mod tests {
         // Send an initial EAPOL frame to SME
         let eapol_ind = MlmeEvent::EapolInd {
             ind: fidl_mlme::EapolIndication {
-                src_addr: bssid.clone().0,
+                src_addr: bssid.to_array(),
                 dst_addr: fake_device_info().sta_addr,
                 data: test_utils::eapol_key_frame().into(),
             },
@@ -2363,7 +2362,7 @@ mod tests {
         // Send an initial EAPOL frame to SME
         let eapol_ind = MlmeEvent::EapolInd {
             ind: fidl_mlme::EapolIndication {
-                src_addr: bss.bssid.0,
+                src_addr: bss.bssid.to_array(),
                 dst_addr: fake_device_info().sta_addr,
                 data: test_utils::eapol_key_frame().into(),
             },
@@ -2416,7 +2415,7 @@ mod tests {
 
         // (mlme->sme) Send a DeauthenticateConf as a response
         let deauth_conf = MlmeEvent::DeauthenticateConf {
-            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.0 },
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.to_array() },
         };
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
@@ -2512,7 +2511,7 @@ mod tests {
         // simultaneous response timeouts for simplicity.
         h.executor.set_fake_time(fuchsia_async::Time::from_nanos(100));
         let eapol_ind = fidl_mlme::EapolIndication {
-            src_addr: bss.bssid.0,
+            src_addr: bss.bssid.to_array(),
             dst_addr: fake_device_info().sta_addr,
             data: test_utils::eapol_key_frame().into(),
         };
@@ -2616,7 +2615,7 @@ mod tests {
 
         // (mlme->sme) Send a DeauthenticateConf as a response
         let deauth_conf = MlmeEvent::DeauthenticateConf {
-            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.0 },
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bss.bssid.to_array() },
         };
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
@@ -2917,7 +2916,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: DISCONNECTING_STATE,
                         to: CONNECTING_STATE,
-                        bssid: bss2.bssid.0.to_mac_string(),
+                        bssid: bss2.bssid.to_string(),
                         ssid: bss2.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     },
@@ -3161,7 +3160,7 @@ mod tests {
 
         // Check that reconnect is attempted
         assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
-            assert_eq!(req.peer_sta_address, bss.bssid.0);
+            assert_eq!(&req.peer_sta_address, bss.bssid.as_array());
         });
 
         // (mlme->sme) Send a ConnectConf
@@ -3217,7 +3216,7 @@ mod tests {
 
         // Check that reconnect is attempted
         assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Reconnect(req))) => {
-            assert_eq!(req.peer_sta_address, bss.bssid.0);
+            assert_eq!(&req.peer_sta_address, bss.bssid.as_array());
         });
 
         // (mlme->sme) Send a ConnectConf
@@ -3399,7 +3398,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: IDLE_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     }
@@ -3436,7 +3435,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: IDLE_STATE,
                         to: IDLE_STATE,
-                        bssid: bss.bssid.0.to_mac_string(),
+                        bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
                         ssid_hash: &*SSID_HASH_REGEX,
                     }
@@ -3762,7 +3761,7 @@ mod tests {
     fn create_eapol_ind(bssid: Bssid, data: Vec<u8>) -> MlmeEvent {
         MlmeEvent::EapolInd {
             ind: fidl_mlme::EapolIndication {
-                src_addr: bssid.0,
+                src_addr: bssid.to_array(),
                 dst_addr: fake_device_info().sta_addr,
                 data,
             },
@@ -3789,7 +3788,7 @@ mod tests {
         state: fidl_mlme::ControlledPortState,
     ) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetCtrlPort(req))) => {
-            assert_eq!(req.peer_sta_address, bssid.0);
+            assert_eq!(&req.peer_sta_address, bssid.as_array());
             assert_eq!(req.state, state);
         });
     }
@@ -3801,7 +3800,7 @@ mod tests {
     ) {
         // (sme->mlme) Expect a DeauthenticateRequest
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Deauthenticate(req))) => {
-            assert_eq!(bssid.0, req.peer_sta_address);
+            assert_eq!(bssid.as_array(), &req.peer_sta_address);
             assert_eq!(reason_code, req.reason_code);
         });
     }
@@ -3810,7 +3809,7 @@ mod tests {
     fn expect_eapol_req(mlme_stream: &mut MlmeStream, bssid: Bssid) {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::Eapol(req))) => {
             assert_eq!(req.src_addr, fake_device_info().sta_addr);
-            assert_eq!(req.dst_addr, bssid.0);
+            assert_eq!(&req.dst_addr, bssid.as_array());
             assert_eq!(req.data, Vec::<u8>::from(test_utils::eapol_key_frame()));
         });
     }
@@ -3822,7 +3821,7 @@ mod tests {
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap()]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
-            assert_eq!(k.address, bssid.0);
+            assert_eq!(&k.address, bssid.as_array());
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
             assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
@@ -3850,7 +3849,7 @@ mod tests {
             assert_eq!(k.key, vec![0xCCu8; test_utils::wpa1_cipher().tk_bytes().unwrap()]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
-            assert_eq!(k.address, bssid.0);
+            assert_eq!(&k.address, bssid.as_array());
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x50, 0xF2]);
             assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(2));
@@ -3986,7 +3985,7 @@ mod tests {
         let state = state
             .on_mlme_event(
                 fidl_mlme::MlmeEvent::DeauthenticateConf {
-                    resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bssid.0 },
+                    resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: bssid.to_array() },
                 },
                 &mut h.context,
             )
@@ -4071,6 +4070,6 @@ mod tests {
     }
 
     fn fake_device_info() -> fidl_mlme::DeviceInfo {
-        test_utils::fake_device_info([0, 1, 2, 3, 4, 5])
+        test_utils::fake_device_info([0, 1, 2, 3, 4, 5].into())
     }
 }

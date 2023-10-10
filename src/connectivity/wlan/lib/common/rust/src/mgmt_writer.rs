@@ -16,9 +16,9 @@ pub fn mgmt_hdr_to_ap(
     MgmtHdr {
         frame_ctrl,
         duration: 0,
-        addr1: bssid.0,
+        addr1: bssid.into(),
         addr2: client_addr,
-        addr3: bssid.0,
+        addr3: bssid.into(),
         seq_ctrl,
     }
 }
@@ -33,8 +33,8 @@ pub fn mgmt_hdr_from_ap(
         frame_ctrl,
         duration: 0,
         addr1: client_addr,
-        addr2: bssid.0,
-        addr3: bssid.0,
+        addr2: bssid.into(),
+        addr3: bssid.into(),
         seq_ctrl,
     }
 }
@@ -45,13 +45,18 @@ mod tests {
 
     #[test]
     fn client_to_ap() {
-        let got = mgmt_hdr_to_ap(FrameControl(1234), Bssid([1; 6]), [2; 6], SequenceControl(4321));
+        let got = mgmt_hdr_to_ap(
+            FrameControl(1234),
+            Bssid::from([1; 6]),
+            MacAddr::from([2; 6]),
+            SequenceControl(4321),
+        );
         let expected = MgmtHdr {
             frame_ctrl: FrameControl(1234),
             duration: 0,
-            addr1: [1; 6],
-            addr2: [2; 6],
-            addr3: [1; 6],
+            addr1: MacAddr::from([1; 6]),
+            addr2: MacAddr::from([2; 6]),
+            addr3: MacAddr::from([1; 6]),
             seq_ctrl: SequenceControl(4321),
         };
         assert_eq!(got, expected);

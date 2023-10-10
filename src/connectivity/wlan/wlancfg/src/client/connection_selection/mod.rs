@@ -29,8 +29,7 @@ use {
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
     wlan_common::{
-        self, format::MacFmt, hasher::WlanHasher, security::SecurityAuthenticator,
-        sequestered::Sequestered,
+        self, hasher::WlanHasher, security::SecurityAuthenticator, sequestered::Sequestered,
     },
     wlan_inspect::wrappers::InspectWlanChan,
     wlan_metrics_registry::{
@@ -392,7 +391,7 @@ impl types::ScannedCandidate {
             "{}({:4}), {}({:6}), {:>4}dBm, channel {:8}, score {:4}{}{}{}{}",
             self.hasher.hash_ssid(&self.network.ssid),
             self.saved_security_type_to_string(),
-            self.bss.bssid.0.to_mac_string(),
+            self.bss.bssid.to_string(),
             self.scanned_security_type_to_string(),
             rssi,
             channel,
@@ -418,7 +417,7 @@ impl WriteInspect for types::ScannedCandidate {
         inspect_insert!(writer, var key: {
             ssid: self.network.ssid.to_string(),
             ssid_hash: self.hasher.hash_ssid(&self.network.ssid),
-            bssid: self.bss.bssid.0.to_mac_string(),
+            bssid: self.bss.bssid.to_string(),
             rssi: self.bss.rssi,
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
             security_type_saved: self.saved_security_type_to_string(),
@@ -1245,14 +1244,14 @@ mod tests {
             security_type: types::SecurityType::Wpa3,
         };
         let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
-        let bssid_1 = types::Bssid([1, 1, 1, 1, 1, 1]);
+        let bssid_1 = types::Bssid::from([1, 1, 1, 1, 1, 1]);
 
         let test_id_2 = types::NetworkIdentifier {
             ssid: types::Ssid::try_from("bar").unwrap(),
             security_type: types::SecurityType::Wpa,
         };
         let credential_2 = Credential::Password("bar_pass".as_bytes().to_vec());
-        let bssid_2 = types::Bssid([2, 2, 2, 2, 2, 2]);
+        let bssid_2 = types::Bssid::from([2, 2, 2, 2, 2, 2]);
 
         // insert some new saved networks
         assert!(exec

@@ -576,7 +576,7 @@ mod tests {
             hop_count: 0x01,
             element_ttl: 0x02,
             path_discovery_id: 0x06050403,
-            originator_addr: [0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c],
+            originator_addr: MacAddr::from([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
             originator_hwmp_seqno: 0x100f0e0d,
         };
         let middle = PreqMiddle { lifetime: 0x1a191817, metric: 0x1e1d1c1b, target_count: 0 };
@@ -607,14 +607,14 @@ mod tests {
             hop_count: 0x01,
             element_ttl: 0x02,
             path_discovery_id: 0x06050403,
-            originator_addr: [0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c],
+            originator_addr: MacAddr::from([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
             originator_hwmp_seqno: 0x100f0e0d,
         };
-        let ext_addr = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16];
+        let ext_addr = MacAddr::from([0x11, 0x12, 0x13, 0x14, 0x15, 0x16]);
         let middle = PreqMiddle { lifetime: 0x1a191817, metric: 0x1e1d1c1b, target_count: 1 };
         let target = PreqPerTarget {
             flags: PreqPerTargetFlags(0),
-            target_addr: [0x21, 0x22, 0x23, 0x24, 0x25, 0x26],
+            target_addr: MacAddr::from([0x21, 0x22, 0x23, 0x24, 0x25, 0x26]),
             target_hwmp_seqno: 0x2a292827,
         };
         let mut buf = vec![];
@@ -648,7 +648,7 @@ mod tests {
             hop_count: 0x01,
             element_ttl: 0x02,
             path_discovery_id: 0x06050403,
-            originator_addr: [0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c],
+            originator_addr: MacAddr::from([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
             originator_hwmp_seqno: 0x100f0e0d,
         };
         let middle = PreqMiddle { lifetime: 0x1a191817, metric: 0x1e1d1c1b, target_count: 0 };
@@ -668,10 +668,10 @@ mod tests {
             hop_count: 0x01,
             element_ttl: 0x02,
             path_discovery_id: 0x06050403,
-            originator_addr: [0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c],
+            originator_addr: MacAddr::from([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
             originator_hwmp_seqno: 0x100f0e0d,
         };
-        let ext_addr = [0x11, 0x12, 0x13, 0x14, 0x15, 0x16];
+        let ext_addr = MacAddr::from([0x11, 0x12, 0x13, 0x14, 0x15, 0x16]);
         let middle = PreqMiddle { lifetime: 0x1a191817, metric: 0x1e1d1c1b, target_count: 0 };
         assert_eq!(
             Err(FrameWriteError::new_invalid_data(
@@ -689,7 +689,7 @@ mod tests {
             hop_count: 0x01,
             element_ttl: 0x02,
             path_discovery_id: 0x06050403,
-            originator_addr: [0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c],
+            originator_addr: MacAddr::from([0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c]),
             originator_hwmp_seqno: 0x100f0e0d,
         };
         let middle = PreqMiddle { lifetime: 0x1a191817, metric: 0x1e1d1c1b, target_count: 1 };
@@ -709,13 +709,13 @@ mod tests {
             flags: PrepFlags(0),
             hop_count: 1,
             element_ttl: 2,
-            target_addr: [3, 4, 5, 6, 7, 8],
+            target_addr: MacAddr::from([3, 4, 5, 6, 7, 8]),
             target_hwmp_seqno: 0x0c0b0a09,
         };
         let tail = PrepTail {
             lifetime: 0x100f0e0d,
             metric: 0x14131211,
-            originator_addr: [0x15, 0x16, 0x17, 0x18, 0x19, 0x1a],
+            originator_addr: MacAddr::from([0x15, 0x16, 0x17, 0x18, 0x19, 0x1a]),
             originator_hwmp_seqno: 0x1e1d1c1b,
         };
         write_prep(&mut buf, &header, None, &tail).expect("expected Ok");
@@ -741,14 +741,14 @@ mod tests {
             flags: PrepFlags(0).with_addr_ext(true),
             hop_count: 1,
             element_ttl: 2,
-            target_addr: [3, 4, 5, 6, 7, 8],
+            target_addr: MacAddr::from([3, 4, 5, 6, 7, 8]),
             target_hwmp_seqno: 0x0c0b0a09,
         };
-        let ext_addr = [0x44, 0x55, 0x66, 0x77, 0x88, 0x99];
+        let ext_addr = MacAddr::from([0x44, 0x55, 0x66, 0x77, 0x88, 0x99]);
         let tail = PrepTail {
             lifetime: 0x100f0e0d,
             metric: 0x14131211,
-            originator_addr: [0x15, 0x16, 0x17, 0x18, 0x19, 0x1a],
+            originator_addr: MacAddr::from([0x15, 0x16, 0x17, 0x18, 0x19, 0x1a]),
             originator_hwmp_seqno: 0x1e1d1c1b,
         };
         write_prep(&mut buf, &header, Some(&ext_addr), &tail).expect("expected Ok");
@@ -774,13 +774,13 @@ mod tests {
             flags: PrepFlags(0).with_addr_ext(true),
             hop_count: 1,
             element_ttl: 2,
-            target_addr: [3, 4, 5, 6, 7, 8],
+            target_addr: MacAddr::from([3, 4, 5, 6, 7, 8]),
             target_hwmp_seqno: 0x0c0b0a09,
         };
         let tail = PrepTail {
             lifetime: 0x100f0e0d,
             metric: 0x14131211,
-            originator_addr: [0x15, 0x16, 0x17, 0x18, 0x19, 0x1a],
+            originator_addr: MacAddr::from([0x15, 0x16, 0x17, 0x18, 0x19, 0x1a]),
             originator_hwmp_seqno: 0x1e1d1c1b,
         };
         assert_eq!(
@@ -798,14 +798,14 @@ mod tests {
             flags: PrepFlags(0),
             hop_count: 1,
             element_ttl: 2,
-            target_addr: [3, 4, 5, 6, 7, 8],
+            target_addr: MacAddr::from([3, 4, 5, 6, 7, 8]),
             target_hwmp_seqno: 0x0c0b0a09,
         };
-        let ext_addr = [0x44, 0x55, 0x66, 0x77, 0x88, 0x99];
+        let ext_addr = MacAddr::from([0x44, 0x55, 0x66, 0x77, 0x88, 0x99]);
         let tail = PrepTail {
             lifetime: 0x100f0e0d,
             metric: 0x14131211,
-            originator_addr: [0x15, 0x16, 0x17, 0x18, 0x19, 0x1a],
+            originator_addr: MacAddr::from([0x15, 0x16, 0x17, 0x18, 0x19, 0x1a]),
             originator_hwmp_seqno: 0x1e1d1c1b,
         };
         assert_eq!(
@@ -822,7 +822,7 @@ mod tests {
         let mut buf = vec![];
         let header = PerrDestinationHeader {
             flags: PerrDestinationFlags(0),
-            dest_addr: [1, 2, 3, 4, 5, 6],
+            dest_addr: MacAddr::from([1, 2, 3, 4, 5, 6]),
             hwmp_seqno: 0x0a090807,
         };
         write_perr_destination(&mut buf, &header, None, ReasonCode(0x0c0b)).expect("expected Ok");
@@ -841,10 +841,10 @@ mod tests {
         let mut buf = vec![];
         let header = PerrDestinationHeader {
             flags: PerrDestinationFlags(0).with_addr_ext(true),
-            dest_addr: [1, 2, 3, 4, 5, 6],
+            dest_addr: MacAddr::from([1, 2, 3, 4, 5, 6]),
             hwmp_seqno: 0x0a090807,
         };
-        let ext_addr = [0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10];
+        let ext_addr = MacAddr::from([0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
         write_perr_destination(&mut buf, &header, Some(&ext_addr), ReasonCode(0x1211))
             .expect("expected Ok");
         #[rustfmt::skip]
@@ -862,7 +862,7 @@ mod tests {
     fn perr_destination_addr_ext_flag_set_but_no_addr_given() {
         let header = PerrDestinationHeader {
             flags: PerrDestinationFlags(0).with_addr_ext(true),
-            dest_addr: [1, 2, 3, 4, 5, 6],
+            dest_addr: MacAddr::from([1, 2, 3, 4, 5, 6]),
             hwmp_seqno: 0x0a090807,
         };
         assert_eq!(
@@ -878,10 +878,10 @@ mod tests {
     fn perr_destination_ext_addr_given_but_no_flag_set() {
         let header = PerrDestinationHeader {
             flags: PerrDestinationFlags(0),
-            dest_addr: [1, 2, 3, 4, 5, 6],
+            dest_addr: MacAddr::from([1, 2, 3, 4, 5, 6]),
             hwmp_seqno: 0x0a090807,
         };
-        let ext_addr = [0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10];
+        let ext_addr = MacAddr::from([0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10]);
         assert_eq!(
             Err(FrameWriteError::new_invalid_data(
                 "External address is present but address extension flag \
@@ -898,7 +898,7 @@ mod tests {
         let mut writer = BufferWriter::new(&mut buf[..]);
         let header = PerrDestinationHeader {
             flags: PerrDestinationFlags(0),
-            dest_addr: [1, 2, 3, 4, 5, 6],
+            dest_addr: MacAddr::from([1, 2, 3, 4, 5, 6]),
             hwmp_seqno: 0x0a090807,
         };
         assert_eq!(

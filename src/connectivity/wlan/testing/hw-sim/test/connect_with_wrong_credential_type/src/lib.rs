@@ -6,6 +6,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::Bssid,
+    lazy_static::lazy_static,
     pin_utils::pin_mut,
     tracing::info,
     wlan_common::{
@@ -15,7 +16,9 @@ use {
     wlan_hw_sim::*,
 };
 
-const BSSID: &Bssid = &Bssid(*b"bessid");
+lazy_static! {
+    static ref BSSID: Bssid = Bssid::from(*b"bessid");
+}
 const AUTHENTICATOR_PASSWORD: &str = "goodpassword";
 
 async fn connect_and_wait_for_failure(supplicant: Supplicant<'_>) {
@@ -59,7 +62,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
     // returned by policy.
     {
         let authenticator = create_authenticator(
-            BSSID,
+            &BSSID,
             &AP_SSID,
             AUTHENTICATOR_PASSWORD,
             CIPHER_CCMP_128,
@@ -87,7 +90,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
     // returned by policy.
     {
         let authenticator = create_authenticator(
-            BSSID,
+            &BSSID,
             &AP_SSID,
             AUTHENTICATOR_PASSWORD,
             CIPHER_TKIP,

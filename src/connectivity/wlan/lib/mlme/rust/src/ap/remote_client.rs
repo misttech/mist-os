@@ -13,7 +13,7 @@ use {
     banjo_fuchsia_wlan_softmac as banjo_softmac, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
-    ieee80211::{MacAddr, Ssid},
+    ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::VecDeque,
     tracing::warn,
     wlan_common::{
@@ -438,7 +438,7 @@ impl RemoteClient {
             self.reset_bss_max_idle_timeout(ctx);
             ctx.device
                 .notify_association_complete(fidl_softmac::WlanAssociationConfig {
-                    bssid: Some(self.addr),
+                    bssid: Some(self.addr.to_array()),
                     aid: Some(aid),
                     listen_interval: None, // This field is not used for AP.
                     channel: Some(fidl_common::WlanChannel {
@@ -1098,6 +1098,7 @@ mod tests {
         crate::{ap::TimedEvent, buffer::FakeBufferProvider, device::FakeDevice},
         fuchsia_async as fasync,
         ieee80211::Bssid,
+        lazy_static::lazy_static,
         std::convert::TryFrom,
         test_case::test_case,
         wlan_common::{
@@ -1108,17 +1109,18 @@ mod tests {
         },
     };
 
-    const CLIENT_ADDR: MacAddr = [1; 6];
-    const AP_ADDR: Bssid = Bssid([2; 6]);
-    const CLIENT_ADDR2: MacAddr = [3; 6];
-
+    lazy_static! {
+        static ref CLIENT_ADDR: MacAddr = [1; 6].into();
+        static ref AP_ADDR: Bssid = [2; 6].into();
+        static ref CLIENT_ADDR2: MacAddr = [3; 6].into();
+    }
     fn make_remote_client() -> RemoteClient {
-        RemoteClient::new(CLIENT_ADDR)
+        RemoteClient::new(*CLIENT_ADDR)
     }
 
     fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeBufferProvider::new(), timer, AP_ADDR), time_stream)
+        (Context::new(fake_device, FakeBufferProvider::new(), timer, *AP_ADDR), time_stream)
     }
 
     #[test]
@@ -1535,7 +1537,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let mut r_sta = make_remote_client();
         let (mut ctx, _) = make_context(fake_device);
-        r_sta.handle_mlme_eapol_req(&mut ctx, CLIENT_ADDR2, &[1, 2, 3][..]).expect("expected OK");
+        r_sta.handle_mlme_eapol_req(&mut ctx, *CLIENT_ADDR2, &[1, 2, 3][..]).expect("expected OK");
         assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
         assert_eq!(&fake_device_state.lock().unwrap().wlan_queue[0].0[..], &[
@@ -1575,7 +1577,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DisassociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
                 locally_initiated: false,
             },
@@ -1616,7 +1618,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AssociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 listen_interval: 1,
                 ssid: Some(Ssid::try_from("coolnet").unwrap().into()),
                 capability_info: CapabilityInfo(0).with_short_preamble(true).raw(),
@@ -1650,7 +1652,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AuthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 auth_type: fidl_mlme::AuthenticationTypes::SharedKey,
             },
         );
@@ -1707,7 +1709,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
                 locally_initiated: false,
             }
@@ -1738,10 +1740,10 @@ mod tests {
 
         // Send a bunch of Ethernet frames.
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
             .expect("expected OK");
 
         // Make sure nothing has been actually sent to the WLAN queue.
@@ -1866,7 +1868,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_eapol_llc_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, &[1, 2, 3, 4, 5][..])
+            .handle_eapol_llc_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         let msg = fake_device_state
             .lock()
@@ -1876,8 +1878,8 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::EapolIndication {
-                dst_addr: CLIENT_ADDR2,
-                src_addr: CLIENT_ADDR,
+                dst_addr: CLIENT_ADDR2.to_array(),
+                src_addr: CLIENT_ADDR.to_array(),
                 data: vec![1, 2, 3, 4, 5],
             },
         );
@@ -1897,7 +1899,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_llc_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_llc_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         assert_eq!(fake_device_state.lock().unwrap().eth_queue.len(), 1);
         #[rustfmt::skip]
@@ -1924,7 +1926,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -1954,7 +1956,13 @@ mod tests {
         r_sta.state = StateMachine::new(State::Authenticated);
         assert_variant!(
             r_sta
-                .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+                .handle_eth_frame(
+                    &mut ctx,
+                    *CLIENT_ADDR2,
+                    *CLIENT_ADDR,
+                    0x1234,
+                    &[1, 2, 3, 4, 5][..]
+                )
                 .expect_err("expected error"),
             ClientRejection::NotAssociated
         );
@@ -1975,7 +1983,13 @@ mod tests {
         });
         assert_variant!(
             r_sta
-                .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+                .handle_eth_frame(
+                    &mut ctx,
+                    *CLIENT_ADDR2,
+                    *CLIENT_ADDR,
+                    0x1234,
+                    &[1, 2, 3, 4, 5][..]
+                )
                 .expect_err("expected error"),
             ClientRejection::ControlledPortClosed
         );
@@ -1995,7 +2009,7 @@ mod tests {
             ps_state: PowerSaveState::Awake,
         });
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         #[rustfmt::skip]
@@ -2030,9 +2044,9 @@ mod tests {
                     mac::FixedDataHdrFields {
                         frame_ctrl: mac::FrameControl(0b000000010_00001000),
                         duration: 0,
-                        addr1: CLIENT_ADDR,
-                        addr2: AP_ADDR.0.clone(),
-                        addr3: CLIENT_ADDR2,
+                        addr1: *CLIENT_ADDR,
+                        addr2: (*AP_ADDR).into(),
+                        addr3: *CLIENT_ADDR2,
                         seq_ctrl: mac::SequenceControl(10),
                     },
                     None,
@@ -2057,7 +2071,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::InvalidClass3Frame,
                 locally_initiated: true,
             },
@@ -2095,9 +2109,9 @@ mod tests {
                     mac::FixedDataHdrFields {
                         frame_ctrl: mac::FrameControl(0b000000010_00001000),
                         duration: 0,
-                        addr1: CLIENT_ADDR,
-                        addr2: AP_ADDR.0.clone(),
-                        addr3: CLIENT_ADDR2,
+                        addr1: *CLIENT_ADDR,
+                        addr2: (*AP_ADDR).into(),
+                        addr3: *CLIENT_ADDR2,
                         seq_ctrl: mac::SequenceControl(10),
                     },
                     None,
@@ -2122,7 +2136,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DisassociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::InvalidClass3Frame,
                 locally_initiated: true,
             },
@@ -2164,9 +2178,9 @@ mod tests {
                 mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0b000000010_00001000),
                     duration: 0,
-                    addr1: CLIENT_ADDR,
-                    addr2: AP_ADDR.0.clone(),
-                    addr3: CLIENT_ADDR2,
+                    addr1: *CLIENT_ADDR,
+                    addr2: (*AP_ADDR).into(),
+                    addr3: *CLIENT_ADDR2,
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 None,
@@ -2229,9 +2243,9 @@ mod tests {
                 mac::FixedDataHdrFields {
                     frame_ctrl: mac::FrameControl(0b000000010_00001000),
                     duration: 0,
-                    addr1: CLIENT_ADDR,
-                    addr2: AP_ADDR.0.clone(),
-                    addr3: CLIENT_ADDR2,
+                    addr1: *CLIENT_ADDR,
+                    addr2: (*AP_ADDR).into(),
+                    addr3: *CLIENT_ADDR2,
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 None,
@@ -2266,9 +2280,9 @@ mod tests {
                 mac::MgmtHdr {
                     frame_ctrl: mac::FrameControl(0b00000000_10110000), // Auth frame
                     duration: 0,
-                    addr1: [1; 6],
-                    addr2: [2; 6],
-                    addr3: [3; 6],
+                    addr1: [1; 6].into(),
+                    addr2: [2; 6].into(),
+                    addr3: [3; 6].into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -2309,9 +2323,9 @@ mod tests {
                 mac::MgmtHdr {
                     frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
                     duration: 0,
-                    addr1: [1; 6],
-                    addr2: [2; 6],
-                    addr3: [3; 6],
+                    addr1: [1; 6].into(),
+                    addr2: [2; 6].into(),
+                    addr3: [3; 6].into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &assoc_frame_body[..],
@@ -2327,7 +2341,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AssociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 listen_interval: 10,
                 ssid: Some(ssid.into()),
                 capability_info: CapabilityInfo(0).raw(),
@@ -2378,9 +2392,9 @@ mod tests {
                 mac::MgmtHdr {
                     frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
                     duration: 0,
-                    addr1: [1; 6],
-                    addr2: [2; 6],
-                    addr3: [3; 6],
+                    addr1: [1; 6].into(),
+                    addr2: [2; 6].into(),
+                    addr3: [3; 6].into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &ies[..],
@@ -2395,7 +2409,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AssociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 listen_interval: 10,
                 ssid: Some(Ssid::try_from("coolnet").unwrap().into()),
                 capability_info: CapabilityInfo(0).raw(),
@@ -2422,9 +2436,9 @@ mod tests {
                     mac::MgmtHdr {
                         frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
                         duration: 0,
-                        addr1: [1; 6],
-                        addr2: [2; 6],
-                        addr3: [3; 6],
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
                         seq_ctrl: mac::SequenceControl(10),
                     },
                     &[
@@ -2444,7 +2458,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::InvalidClass2Frame,
                 locally_initiated: true,
             },
@@ -2489,9 +2503,9 @@ mod tests {
                     mac::MgmtHdr {
                         frame_ctrl: mac::FrameControl(0b00000000_00010000), // Assoc resp frame
                         duration: 0,
-                        addr1: [1; 6],
-                        addr2: [2; 6],
-                        addr3: [3; 6],
+                        addr1: [1; 6].into(),
+                        addr2: [2; 6].into(),
+                        addr3: [3; 6].into(),
                         seq_ctrl: mac::SequenceControl(10),
                     },
                     &[
@@ -2526,9 +2540,9 @@ mod tests {
                 mac::MgmtHdr {
                     frame_ctrl: mac::FrameControl(0b00000000_00000000), // Assoc req frame
                     duration: 0,
-                    addr1: [1; 6],
-                    addr2: [2; 6],
-                    addr3: [3; 6],
+                    addr1: [1; 6].into(),
+                    addr2: [2; 6].into(),
+                    addr3: [3; 6].into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -2584,7 +2598,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DisassociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
                 locally_initiated: true,
             },
@@ -2609,10 +2623,10 @@ mod tests {
 
         // Send a bunch of Ethernet frames.
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[1, 2, 3, 4, 5][..])
             .expect("expected OK");
         r_sta
-            .handle_eth_frame(&mut ctx, CLIENT_ADDR2, CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
+            .handle_eth_frame(&mut ctx, *CLIENT_ADDR2, *CLIENT_ADDR, 0x1234, &[6, 7, 8, 9, 0][..])
             .expect("expected OK");
 
         assert!(r_sta.has_buffered_frames());

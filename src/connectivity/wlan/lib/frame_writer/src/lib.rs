@@ -66,9 +66,9 @@ mod tests {
         MgmtHdr {
             frame_ctrl: FrameControl(0x4321),
             duration: 42,
-            addr1: [7; 6],
-            addr2: [6; 6],
-            addr3: [5; 6],
+            addr1: MacAddr::from([7; 6]),
+            addr2: MacAddr::from([6; 6]),
+            addr3: MacAddr::from([5; 6]),
             seq_ctrl: SequenceControl(0x8765),
         }
     }
@@ -632,9 +632,9 @@ mod tests {
                 MgmtHdr: &MgmtHdr {
                     frame_ctrl: FrameControl(0x1234),
                     duration: 42,
-                    addr1: [7; 6],
-                    addr2: [6; 6],
-                    addr3: [5; 6],
+                    addr1: MacAddr::from([7; 6]),
+                    addr2: MacAddr::from([6; 6]),
+                    addr3: MacAddr::from([5; 6]),
                     seq_ctrl: SequenceControl(0x5678),
                 },
                 // Block expression:
@@ -642,7 +642,7 @@ mod tests {
                     &DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::MicFailure.into() }
                 },
                 // Repeat and literal expressions:
-                MacAddr: &[2u8; 6],
+                MacAddr: &MacAddr::from([2u8; 6]),
                 u8: &42u8,
                 // Function invocation:
                 MgmtHdr: &make_mgmt_hdr(),
@@ -697,15 +697,15 @@ mod tests {
                 MgmtHdr: &MgmtHdr {
                     frame_ctrl: FrameControl(0x1234),
                     duration: 42,
-                    addr1: [7; 6],
-                    addr2: [6; 6],
-                    addr3: [5; 6],
+                    addr1: MacAddr::from([7; 6]),
+                    addr2: MacAddr::from([6; 6]),
+                    addr3: MacAddr::from([5; 6]),
                     seq_ctrl: SequenceControl(0x5678),
                 },
                 DeauthHdr: {
                     &DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::MicFailure.into() }
                 },
-                MacAddr: &[2u8; 6],
+                MacAddr: &MacAddr::from([2u8; 6]),
                 u8: &42u8,
                 MgmtHdr: &make_mgmt_hdr(),
             },
@@ -767,15 +767,15 @@ mod tests {
                 MgmtHdr: &MgmtHdr {
                     frame_ctrl: FrameControl(0x1234),
                     duration: 42,
-                    addr1: [7; 6],
-                    addr2: [6; 6],
-                    addr3: [5; 6],
+                    addr1: MacAddr::from([7; 6]),
+                    addr2: MacAddr::from([6; 6]),
+                    addr3: MacAddr::from([5; 6]),
                     seq_ctrl: SequenceControl(0x5678),
                 },
                 DeauthHdr: {
                     &DeauthHdr { reason_code: fidl_ieee80211::ReasonCode::MicFailure.into() }
                 },
-                MacAddr: &[2u8; 6],
+                MacAddr: &MacAddr::from([2u8; 6]),
                 u8: &42u8,
                 MgmtHdr: &make_mgmt_hdr(),
             },

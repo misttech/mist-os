@@ -328,7 +328,7 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
         banjo_common::WlanMacRole::AP => {
             info!("Running wlansoftmac with AP role");
-            let config = ieee80211::Bssid(softmac_info.sta_addr());
+            let config = ieee80211::Bssid::from(softmac_info.sta_addr());
             Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::ap::Ap<D>>(
                 config,
                 device,

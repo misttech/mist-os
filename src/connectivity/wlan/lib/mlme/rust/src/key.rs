@@ -65,7 +65,7 @@ impl From<&fidl_mlme::SetKeyDescriptor> for KeyConfig {
                 fidl_mlme::KeyType::Igtk => KeyType::IGTK,
                 fidl_mlme::KeyType::Group => KeyType::GROUP,
             },
-            peer_addr: key_desc.address,
+            peer_addr: key_desc.address.into(),
             key_idx: key_desc.key_id as u8,
             key_len: key_desc.key.len() as u8,
             key: key,
@@ -96,7 +96,7 @@ mod test {
                 cipher_oui: [1, 2, 3],
                 cipher_type: 4,
                 key_type: KeyType::PAIRWISE,
-                peer_addr: [5; 6],
+                peer_addr: [5; 6].into(),
                 key_idx: 6,
                 key_len: 7,
                 key: [

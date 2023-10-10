@@ -37,14 +37,6 @@ pub type Aid = u16;
 // 2007.
 pub const MAX_AID: u16 = 2007;
 
-pub const BCAST_ADDR: MacAddr = [0xFF; 6];
-
-pub fn is_multicast(addr: MacAddr) -> bool {
-    // IEEE Std 802.3-2015, 3.2.3: The least significant bit of the first octet of a MAC address
-    // denotes multicast.
-    addr[0] & 0x01 != 0
-}
-
 // TODO(fxbug.dev/128928): Use this in the `MacFrame::Data` variant.
 pub struct DataFrame<B> {
     // Data Header: fixed fields
@@ -265,9 +257,9 @@ mod tests {
             Some(MacFrame::Mgmt { mgmt_hdr, ht_ctrl, body }) => {
                 assert_eq!(0x0101, { mgmt_hdr.frame_ctrl.0 });
                 assert_eq!(0x0202, { mgmt_hdr.duration });
-                assert_eq!([3, 3, 3, 3, 3, 3], mgmt_hdr.addr1);
-                assert_eq!([4, 4, 4, 4, 4, 4], mgmt_hdr.addr2);
-                assert_eq!([5, 5, 5, 5, 5, 5], mgmt_hdr.addr3);
+                assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), mgmt_hdr.addr1);
+                assert_eq!(MacAddr::from([4, 4, 4, 4, 4, 4]), mgmt_hdr.addr2);
+                assert_eq!(MacAddr::from([5, 5, 5, 5, 5, 5]), mgmt_hdr.addr3);
                 assert_eq!(0x0606, { mgmt_hdr.seq_ctrl.0 });
                 assert!(ht_ctrl.is_none());
                 assert_eq!(&body[..], &[9, 9, 9]);
@@ -299,9 +291,9 @@ mod tests {
             Some(MacFrame::Data { fixed_fields, addr4, qos_ctrl, ht_ctrl, body }) => {
                 assert_eq!(0b00000000_10001000, { fixed_fields.frame_ctrl.0 });
                 assert_eq!(0x0202, { fixed_fields.duration });
-                assert_eq!([3, 3, 3, 3, 3, 3], fixed_fields.addr1);
-                assert_eq!([4, 4, 4, 4, 4, 4], fixed_fields.addr2);
-                assert_eq!([5, 5, 5, 5, 5, 5], fixed_fields.addr3);
+                assert_eq!(MacAddr::from([3, 3, 3, 3, 3, 3]), fixed_fields.addr1);
+                assert_eq!(MacAddr::from([4, 4, 4, 4, 4, 4]), fixed_fields.addr2);
+                assert_eq!(MacAddr::from([5, 5, 5, 5, 5, 5]), fixed_fields.addr3);
                 assert_eq!(0x0606, { fixed_fields.seq_ctrl.0 });
                 assert!(addr4.is_none());
                 assert_eq!(0x0101, qos_ctrl.expect("qos_ctrl not present").get().0);
@@ -341,15 +333,5 @@ mod tests {
         assert_eq!(4, round_up(3u32, 4));
         assert_eq!(4, round_up(4u32, 4));
         assert_eq!(8, round_up(5u32, 4));
-    }
-
-    #[test]
-    fn is_multicast_valid_addr() {
-        assert!(is_multicast([33, 33, 33, 33, 33, 33]));
-    }
-
-    #[test]
-    fn is_multicast_not_valid_addr() {
-        assert!(!is_multicast([34, 33, 33, 33, 33, 33]));
     }
 }

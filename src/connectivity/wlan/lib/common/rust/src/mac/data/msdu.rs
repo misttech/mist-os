@@ -156,8 +156,8 @@ mod tests {
         let mut found_msdu = false;
         for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
             assert!(!found_msdu, "unexpected MSDU: {:x?}", llc_frame.body);
-            assert_eq!(dst_addr, [3; 6]);
-            assert_eq!(src_addr, [4; 6]);
+            assert_eq!(dst_addr, MacAddr::from([3; 6]));
+            assert_eq!(src_addr, MacAddr::from([4; 6]));
             assert_eq!(llc_frame.hdr.protocol_id.to_native(), 9 << 8 | 10);
             assert_eq!(llc_frame.body, [11; 3]);
             found_msdu = true;
@@ -173,8 +173,8 @@ mod tests {
         let mut found_msdu = false;
         for Msdu { dst_addr, src_addr, llc_frame } in msdus.unwrap() {
             assert!(!found_msdu, "unexpected MSDU: {:x?}", llc_frame.body);
-            assert_eq!(dst_addr, [3; 6]);
-            assert_eq!(src_addr, [4; 6]);
+            assert_eq!(dst_addr, MacAddr::from([3; 6]));
+            assert_eq!(src_addr, MacAddr::from([4; 6]));
             assert_eq!(llc_frame.hdr.protocol_id.to_native(), 9 << 8 | 10);
             assert_eq!(llc_frame.body, [11; 5]);
             found_msdu = true;
@@ -184,7 +184,8 @@ mod tests {
 
     #[test]
     fn parse_llc_with_addr4_ht_ctrl() {
-        let bytes = make_data_frame_single_llc(Some([1, 2, 3, 4, 5, 6]), Some([4, 3, 2, 1]));
+        let bytes =
+            make_data_frame_single_llc(Some(MacAddr::from([1, 2, 3, 4, 5, 6])), Some([4, 3, 2, 1]));
         assert_variant!(
             MacFrame::parse(&bytes[..], false),
             Some(MacFrame::Data { body, .. }) => {

@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {crate::mac::*, ieee80211::MacAddr};
+use {
+    crate::mac::*,
+    ieee80211::{MacAddr, MacAddrBytes},
+};
 
 pub const EAPOL_PDU: &[u8] = &[5, 5, 5, 5, 5, 5, 5, 5];
 
@@ -24,7 +27,7 @@ pub fn make_mgmt_frame(ht_ctrl: bool) -> Vec<u8> {
 }
 
 pub fn make_data_hdr(
-    addr4: Option<[u8; 6]>,
+    addr4: Option<MacAddr>,
     qos_ctrl: [u8; 2],
     ht_ctrl: Option<[u8; 4]>,
 ) -> Vec<u8> {
@@ -48,7 +51,7 @@ pub fn make_data_hdr(
     ];
 
     if let Some(addr4) = addr4 {
-        bytes.extend_from_slice(&addr4);
+        bytes.extend_from_slice(addr4.as_slice());
     }
 
     bytes.extend_from_slice(&qos_ctrl);
@@ -59,12 +62,12 @@ pub fn make_data_hdr(
     bytes
 }
 
-pub fn make_data_frame_single_llc(addr4: Option<[u8; 6]>, ht_ctrl: Option<[u8; 4]>) -> Vec<u8> {
+pub fn make_data_frame_single_llc(addr4: Option<MacAddr>, ht_ctrl: Option<[u8; 4]>) -> Vec<u8> {
     make_data_frame_single_llc_payload(addr4, ht_ctrl, &[11, 11, 11][..])
 }
 
 pub fn make_data_frame_single_llc_payload(
-    addr4: Option<[u8; 6]>,
+    addr4: Option<MacAddr>,
     ht_ctrl: Option<[u8; 4]>,
     payload: &[u8],
 ) -> Vec<u8> {
@@ -204,12 +207,12 @@ pub fn make_eapol_frame(addr1: MacAddr) -> (MacAddr, MacAddr, Vec<u8>) {
         0x88, 0x8E, // protocol id (EAPOL)
     ];
     // overwrite addr1
-    frame[4..10].copy_from_slice(&addr1);
+    frame[4..10].copy_from_slice(addr1.as_array());
     // EAPOL frame:
     frame.extend(EAPOL_PDU);
 
     // (src, dst, data frame)
-    ([7; 6], addr1, frame)
+    (MacAddr::from([7; 6]), addr1, frame)
 }
 
 pub fn make_data_frame_amsdu_padding_too_short() -> Vec<u8> {

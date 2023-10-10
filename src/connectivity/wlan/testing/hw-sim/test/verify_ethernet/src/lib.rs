@@ -5,6 +5,7 @@
 use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
+    ieee80211::MacAddrBytes,
     wlan_hw_sim::{
         default_wlantap_config_client, loop_until_iface_is_found, netdevice_helper, test_utils,
         CLIENT_MAC_ADDR,
@@ -24,7 +25,7 @@ async fn verify_ethernet() {
     // Make sure there is no existing ethernet device.
     let client = netdevice_helper::create_client(
         ctx.devfs(),
-        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+        fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
     )
     .await;
     assert!(client.is_none());
@@ -38,14 +39,14 @@ async fn verify_ethernet() {
     loop {
         let client = netdevice_helper::create_client(
             helper.devfs(),
-            fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.clone() },
+            fidl_fuchsia_net::MacAddress { octets: CLIENT_MAC_ADDR.to_array() },
         )
         .await;
         if client.is_some() {
             break;
         }
         retry.sleep_unless_after_deadline().await.unwrap_or_else(|_| {
-            panic!("No netdevice client with mac_addr {:?} found in time", &CLIENT_MAC_ADDR)
+            panic!("No netdevice client with mac_addr {:?} found in time", *CLIENT_MAC_ADDR)
         });
     }
     helper.stop().await;

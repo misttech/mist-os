@@ -39,6 +39,7 @@ use {
         future::BoxFuture,
         select, Future, FutureExt, StreamExt, TryFutureExt,
     },
+    ieee80211::OuiFmt,
     num_traits::SaturatingAdd,
     parking_lot::Mutex,
     static_assertions::const_assert_eq,
@@ -52,7 +53,7 @@ use {
         },
     },
     tracing::{error, info, warn},
-    wlan_common::{format::MacFmt, hasher::WlanHasher},
+    wlan_common::hasher::WlanHasher,
     wlan_metrics_registry as metrics,
 };
 
@@ -579,7 +580,7 @@ fn inspect_record_connection_status(
                 inspect_insert!(inspector.root(), connected_network: {
                     rssi_dbm: ap_state.tracked.signal.rssi_dbm,
                     snr_db: ap_state.tracked.signal.snr_db,
-                    bssid: ap_state.original().bssid.0.to_mac_string(),
+                    bssid: ap_state.original().bssid.to_string(),
                     ssid: ap_state.original().ssid.to_string(),
                     ssid_hash: hasher.hash_ssid(&ap_state.original().ssid),
                     protection: format!("{:?}", ap_state.original().protection()),
@@ -1347,7 +1348,7 @@ impl Telemetry {
         inspect_log!(self.connect_events_node.lock().get_mut(), {
             multiple_bss_candidates: multiple_bss_candidates,
             network: {
-                bssid: ap_state.original().bssid.0.to_mac_string(),
+                bssid: ap_state.original().bssid.to_string(),
                 ssid: ap_state.original().ssid.to_string(),
                 ssid_hash: self.hasher.hash_ssid(&ap_state.original().ssid),
                 rssi_dbm: ap_state.tracked.signal.rssi_dbm,
@@ -1364,7 +1365,7 @@ impl Telemetry {
             network: {
                 rssi_dbm: info.ap_state.tracked.signal.rssi_dbm,
                 snr_db: info.ap_state.tracked.signal.snr_db,
-                bssid: info.ap_state.original().bssid.0.to_mac_string(),
+                bssid: info.ap_state.original().bssid.to_string(),
                 ssid: info.ap_state.original().ssid.to_string(),
                 ssid_hash: self.hasher.hash_ssid(&info.ap_state.original().ssid),
                 protection: format!("{:?}", info.ap_state.original().protection()),
@@ -2459,7 +2460,7 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        let oui = ap_state.original().bssid.0.to_oui_uppercase("");
+        let oui = ap_state.original().bssid.to_oui_uppercase("");
         metric_events.push(MetricEvent {
             metric_id: metrics::SUCCESSFUL_CONNECT_PER_OUI_METRIC_ID,
             event_codes: vec![],
@@ -2610,7 +2611,7 @@ impl StatsLogger {
             payload: MetricEventPayload::Count(1),
         });
 
-        let oui = ap_state.original().bssid.0.to_oui_uppercase("");
+        let oui = ap_state.original().bssid.to_oui_uppercase("");
         metric_events.push(MetricEvent {
             metric_id: metrics::DEVICE_CONNECTED_TO_AP_OUI_2_METRIC_ID,
             event_codes: vec![],

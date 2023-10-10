@@ -308,6 +308,7 @@ mod internal {
 mod tests {
     use {
         super::{internal::*, *},
+        lazy_static::lazy_static,
         std::convert::TryFrom,
         wlan_common::assert_variant,
     };
@@ -315,8 +316,11 @@ mod tests {
     // IEEE 802.11-2016 Annex J.10 SAE test vector
     const TEST_SSID: &'static str = "SSID not in 802.11-2016";
     const TEST_PWD: &'static str = "thisisreallysecret";
-    const TEST_STA_A: MacAddr = [0x7b, 0x88, 0x56, 0x20, 0x2d, 0x8d];
-    const TEST_STA_B: MacAddr = [0xe2, 0x47, 0x1c, 0x0a, 0x5a, 0xcb];
+
+    lazy_static! {
+        static ref TEST_STA_A: MacAddr = MacAddr::from([0x7b, 0x88, 0x56, 0x20, 0x2d, 0x8d]);
+        static ref TEST_STA_B: MacAddr = MacAddr::from([0xe2, 0x47, 0x1c, 0x0a, 0x5a, 0xcb]);
+    }
 
     #[test]
     fn bad_akm() {
@@ -328,8 +332,8 @@ mod tests {
             Ssid::try_from(TEST_SSID).unwrap(),
             Vec::from(TEST_PWD),
             None, // Not required for PweMethod::Loop
-            TEST_STA_A,
-            TEST_STA_B,
+            *TEST_STA_A,
+            *TEST_STA_B,
         );
         assert!(res.is_err());
         assert!(format!("{}", res.err().unwrap())
@@ -346,8 +350,8 @@ mod tests {
             Ssid::try_from(TEST_SSID).unwrap(),
             Vec::from(TEST_PWD),
             None, // Not required for PweMethod::Loop
-            TEST_STA_A,
-            TEST_STA_B,
+            *TEST_STA_A,
+            *TEST_STA_B,
         );
         assert!(res.is_err());
         assert!(format!("{}", res.err().unwrap()).contains("Unsupported SAE group id: 200"));
@@ -428,8 +432,8 @@ mod tests {
                 Ssid::try_from(TEST_SSID).unwrap(),
                 Vec::from(TEST_PWD),
                 None, // Not required for PweMethod::Loop
-                TEST_STA_A,
-                TEST_STA_B,
+                *TEST_STA_A,
+                *TEST_STA_B,
             )
             .unwrap();
             let mut sta2 = new_sae_handshake(
@@ -439,8 +443,8 @@ mod tests {
                 Ssid::try_from(TEST_SSID).unwrap(),
                 Vec::from(TEST_PWD),
                 None, // Not required for PweMethod::Loop
-                TEST_STA_B,
-                TEST_STA_A,
+                *TEST_STA_B,
+                *TEST_STA_A,
             )
             .unwrap();
             Self { sta1, sta2 }
@@ -513,8 +517,8 @@ mod tests {
             Ssid::try_from(TEST_SSID).unwrap(),
             Vec::from(TEST_PWD),
             None, // Not required for PweMethod::Loop
-            TEST_STA_A,
-            TEST_STA_B,
+            *TEST_STA_A,
+            *TEST_STA_B,
         )
         .unwrap();
         let mut sta2 = new_sae_handshake(
@@ -524,8 +528,8 @@ mod tests {
             Ssid::try_from(TEST_SSID).unwrap(),
             Vec::from("other_pwd"),
             None, // Not required for PweMethod::Loop
-            TEST_STA_B,
-            TEST_STA_A,
+            *TEST_STA_B,
+            *TEST_STA_A,
         )
         .unwrap();
         let mut handshake = TestHandshake { sta1, sta2 };

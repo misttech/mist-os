@@ -365,7 +365,7 @@ mod tests {
                 .expect("failed to create MlmeProxy");
         let device_info = fidl_mlme::DeviceInfo {
             role: fidl_common::WlanMacRole::unknown(),
-            ..test_utils::fake_device_info([0; 6])
+            ..test_utils::fake_device_info([0; 6].into())
         };
         let result = create_sme(
             crate::Config::default(),
@@ -397,7 +397,7 @@ mod tests {
         let (_mlme_req_stream, serve_fut) = create_sme(
             crate::Config::default(),
             mlme_event_stream,
-            &test_utils::fake_device_info([0; 6]),
+            &test_utils::fake_device_info([0; 6].into()),
             fake_mac_sublayer_support(),
             fake_security_support(),
             fake_spectrum_management_support_empty(),
@@ -445,7 +445,8 @@ mod tests {
         let (generic_sme_proxy, generic_sme_stream) =
             create_proxy_and_stream::<fidl_sme::GenericSmeMarker>()
                 .expect("failed to create MlmeProxy");
-        let device_info = fidl_mlme::DeviceInfo { role, ..test_utils::fake_device_info([0; 6]) };
+        let device_info =
+            fidl_mlme::DeviceInfo { role, ..test_utils::fake_device_info([0; 6].into()) };
         let (mlme_req_stream, serve_fut) = create_sme(
             crate::Config::default(),
             mlme_event_stream,

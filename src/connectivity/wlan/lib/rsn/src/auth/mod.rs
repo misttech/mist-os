@@ -12,7 +12,7 @@ use {
     },
     anyhow,
     fidl_fuchsia_wlan_mlme::SaeFrame,
-    ieee80211::{MacAddr, Ssid},
+    ieee80211::{MacAddr, MacAddrBytes, Ssid},
     tracing::warn,
     wlan_common::ie::rsn::akm::AKM_SAE,
     wlan_sae as sae,
@@ -210,7 +210,7 @@ fn process_sae_updates(
         match sae_update {
             sae::SaeUpdate::SendFrame(frame) => {
                 let sae_frame = SaeFrame {
-                    peer_sta_address: sae_data.peer.clone(),
+                    peer_sta_address: sae_data.peer.clone().to_array(),
                     status_code: frame.status_code,
                     seq_num: frame.seq,
                     sae_fields: frame.body,
@@ -344,7 +344,7 @@ mod test {
     fn sae_executes_handshake() {
         let sae_counter = Arc::new(Mutex::new(SaeCounter::default()));
         let mut auth = Method::Sae(SaeData {
-            peer: [0xaa; 6],
+            peer: MacAddr::from([0xaa; 6]),
             pmk: None,
             handshake: Box::new(DummySae(sae_counter.clone())),
             retransmit_timeout_id: 0,
@@ -388,7 +388,7 @@ mod test {
     fn sae_handles_current_timeouts() {
         let sae_counter = Arc::new(Mutex::new(SaeCounter::default()));
         let mut sae = Method::Sae(SaeData {
-            peer: [0xaa; 6],
+            peer: MacAddr::from([0xaa; 6]),
             pmk: None,
             handshake: Box::new(DummySae(sae_counter.clone())),
             retransmit_timeout_id: 0,
@@ -433,7 +433,7 @@ mod test {
     fn sae_key_expiration_no_op() {
         let sae_counter = Arc::new(Mutex::new(SaeCounter::default()));
         let mut data = SaeData {
-            peer: [0xaa; 6],
+            peer: MacAddr::from([0xaa; 6]),
             pmk: None,
             handshake: Box::new(DummySae(sae_counter.clone())),
             retransmit_timeout_id: 0,

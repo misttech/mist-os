@@ -28,7 +28,7 @@ use {
     fuchsia_inspect_contrib::auto_persist::{self, AutoPersist},
     fuchsia_zircon as zx,
     futures::channel::{mpsc, oneshot},
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     std::{
         convert::{TryFrom, TryInto},
         sync::Arc,
@@ -39,7 +39,6 @@ use {
         bss::{BssDescription, Protection as BssProtection},
         capabilities::derive_join_capabilities,
         channel::Channel,
-        format::MacFmt,
         hasher::WlanHasher,
         ie::{self, rsn::rsne, wsc},
         scan::{Compatibility, ScanResult},
@@ -452,7 +451,7 @@ pub struct ServingApInfo {
 impl From<ServingApInfo> for fidl_sme::ServingApInfo {
     fn from(ap: ServingApInfo) -> fidl_sme::ServingApInfo {
         fidl_sme::ServingApInfo {
-            bssid: ap.bssid.0,
+            bssid: ap.bssid.to_array(),
             ssid: ap.ssid.to_vec(),
             rssi_dbm: ap.rssi_dbm,
             snr_db: ap.snr_db,
@@ -601,7 +600,7 @@ impl ClientSme {
                     format!(
                         "Failed to configure protection for network {} ({}): {:?}",
                         self.context.inspect.hasher.hash_ssid(&bss_description.ssid),
-                        bss_description.bssid.0.to_mac_string(),
+                        bss_description.bssid,
                         error
                     )
                 );
@@ -799,6 +798,7 @@ mod tests {
     use fuchsia_async as fasync;
     use fuchsia_inspect as finspect;
     use ieee80211::MacAddr;
+    use lazy_static::lazy_static;
     use std::convert::TryFrom;
     use test_case::test_case;
     use wlan_common::{
@@ -821,7 +821,9 @@ mod tests {
     use crate::test_utils;
     use crate::Station;
 
-    const CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67];
+    lazy_static! {
+        static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();
+    }
     const DUMMY_HASH_KEY: [u8; 8] = [88, 77, 66, 55, 44, 33, 22, 11];
 
     fn authentication_open() -> fidl_security::Authentication {
@@ -966,7 +968,7 @@ mod tests {
     fn verify_rates_compatibility() {
         // Compatible rates.
         let cfg = ClientConfig::default();
-        let device_info = test_utils::fake_device_info([1u8; 6]);
+        let device_info = test_utils::fake_device_info([1u8; 6].into());
         assert!(
             cfg.has_compatible_channel_and_data_rates(&fake_bss_description!(Open), &device_info)
         );
@@ -993,7 +995,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let device_info = test_utils::fake_device_info([1u8; 6]);
+        let device_info = test_utils::fake_device_info([1u8; 6].into());
         let timestamp = zx::Time::get_monotonic();
         let scan_result = cfg.create_scan_result(
             timestamp,
@@ -1129,7 +1131,7 @@ mod tests {
         bss: BssDescription,
         authentication: fidl_security::Authentication,
     ) -> Result<Protection, anyhow::Error> {
-        let device = test_utils::fake_device_info(CLIENT_ADDR);
+        let device = test_utils::fake_device_info(*CLIENT_ADDR);
         let security_support = fake_security_support();
         let config = Default::default();
 
@@ -1192,7 +1194,7 @@ mod tests {
             fidl_common::MacImplementationType::Fullmac;
         let (mut sme, _mlme_sink, mut mlme_stream, _time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
-            test_utils::fake_device_info(CLIENT_ADDR),
+            test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
@@ -1712,7 +1714,7 @@ mod tests {
             test_utils::create_inspect_persistence_channel();
         let (mut sme, _mlme_sink, _mlme_stream, mut time_stream) = ClientSme::new(
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
-            test_utils::fake_device_info(CLIENT_ADDR),
+            test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
@@ -1793,7 +1795,7 @@ mod tests {
             fidl_common::MacImplementationType::Fullmac;
         let (client_sme, _mlme_sink, mlme_stream, time_stream) = ClientSme::new(
             ClientConfig::default(),
-            test_utils::fake_device_info(CLIENT_ADDR),
+            test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
             WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,

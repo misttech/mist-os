@@ -392,10 +392,10 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             mac::FrameControl(0)
                 .with_frame_type(mac::FrameType::MGMT)
                 .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
-            Bssid(mac::BCAST_ADDR),
+            ieee80211::BROADCAST_ADDR.into(),
             self.scanner.iface_mac,
             mac::SequenceControl(0)
-                .with_seq_num(self.ctx.seq_mgr.next_sns1(&mac::BCAST_ADDR) as u16),
+                .with_seq_num(self.ctx.seq_mgr.next_sns1(&ieee80211::BROADCAST_ADDR) as u16),
         )
     }
 }
@@ -505,7 +505,7 @@ mod tests {
             test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync,
-        ieee80211::Ssid,
+        ieee80211::{MacAddrBytes, Ssid},
         lazy_static::lazy_static,
         std::{
             convert::TryFrom,
@@ -519,9 +519,12 @@ mod tests {
         },
     };
 
-    const BSSID_FOO: Bssid = Bssid([6u8; 6]);
+    lazy_static! {
+        static ref BSSID_FOO: Bssid = [6u8; 6].into();
+    }
     const CAPABILITY_INFO_FOO: CapabilityInfo = CapabilityInfo(1);
     const BEACON_INTERVAL_FOO: u16 = 100;
+
     #[rustfmt::skip]
     static BEACON_IES_FOO: &'static [u8] = &[
         // SSID: "ssid"
@@ -531,6 +534,7 @@ mod tests {
         // TIM - DTIM count: 0, DTIM period: 1, PVB: 2
         0x05, 0x04, 0x00, 0x01, 0x00, 0x02,
     ];
+
     lazy_static! {
         static ref RX_INFO_FOO: banjo_wlan_softmac::WlanRxInfo = MockWlanRxInfo {
             rssi_dbm: -30,
@@ -539,7 +543,7 @@ mod tests {
         .into();
         static ref BSS_DESCRIPTION_FOO: fidl_internal::BssDescription =
             fidl_internal::BssDescription {
-                bssid: BSSID_FOO.0,
+                bssid: BSSID_FOO.to_array(),
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL_FOO,
                 capability_info: CAPABILITY_INFO_FOO.0,
@@ -552,9 +556,9 @@ mod tests {
                 },
                 snr_db: 0,
             };
+        static ref BSSID_BAR: Bssid = [1u8; 6].into();
     }
 
-    const BSSID_BAR: Bssid = Bssid([1u8; 6]);
     const CAPABILITY_INFO_BAR: CapabilityInfo = CapabilityInfo(33);
     const BEACON_INTERVAL_BAR: u16 = 150;
     #[rustfmt::skip]
@@ -574,7 +578,7 @@ mod tests {
         .into();
         static ref BSS_DESCRIPTION_BAR: fidl_internal::BssDescription =
             fidl_internal::BssDescription {
-                bssid: BSSID_BAR.0,
+                bssid: BSSID_BAR.to_array(),
                 bss_type: fidl_common::BssType::Infrastructure,
                 beacon_period: BEACON_INTERVAL_BAR,
                 capability_info: CAPABILITY_INFO_BAR.0,
@@ -589,7 +593,9 @@ mod tests {
             };
     }
 
-    const IFACE_MAC: MacAddr = [7u8; 6];
+    lazy_static! {
+        static ref IFACE_MAC: MacAddr = [7u8; 6].into();
+    }
 
     fn passive_scan_req() -> fidl_mlme::ScanRequest {
         fidl_mlme::ScanRequest {
@@ -623,7 +629,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
         let scan_req = fidl_mlme::ScanRequest { txn_id: 1338, ..passive_scan_req() };
@@ -641,7 +647,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         scanner.bind(&mut ctx).disable_scanning().expect("Failed to disable scanning");
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
@@ -662,7 +668,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         let scan_req = fidl_mlme::ScanRequest { channel_list: vec![], ..passive_scan_req() };
         let result = scanner.bind(&mut ctx).on_sme_scan(scan_req);
@@ -679,7 +685,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         let scan_req = fidl_mlme::ScanRequest {
             min_channel_time: 101,
@@ -701,7 +707,7 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
@@ -807,7 +813,7 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner
@@ -897,7 +903,7 @@ mod tests {
         m.fake_device_state.lock().unwrap().config.start_passive_scan_fails = true;
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(passive_scan_req());
         assert_variant!(
@@ -918,7 +924,7 @@ mod tests {
         m.fake_device_state.lock().unwrap().config.start_active_scan_fails = true;
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
 
         let result = scanner.bind(&mut ctx).on_sme_scan(active_scan_req(&[6]));
         assert_variant!(
@@ -938,7 +944,7 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
@@ -983,7 +989,7 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
         m.fake_device_state.lock().unwrap().discovery_support.scan_offload.supported = true;
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner
@@ -1030,7 +1036,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
@@ -1065,7 +1071,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
@@ -1113,7 +1119,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut ctx = m.make_ctx();
-        let mut scanner = Scanner::new(IFACE_MAC);
+        let mut scanner = Scanner::new(*IFACE_MAC);
         assert_eq!(false, scanner.is_scanning());
 
         scanner.bind(&mut ctx).on_sme_scan(passive_scan_req()).expect("expect scan req accepted");
@@ -1122,7 +1128,7 @@ mod tests {
 
     fn handle_beacon_foo(scanner: &mut Scanner, ctx: &mut Context<FakeDevice>) {
         scanner.bind(ctx).handle_ap_advertisement(
-            BSSID_FOO,
+            *BSSID_FOO,
             TimeUnit(BEACON_INTERVAL_FOO),
             CAPABILITY_INFO_FOO,
             BEACON_IES_FOO,
@@ -1132,7 +1138,7 @@ mod tests {
 
     fn handle_beacon_bar(scanner: &mut Scanner, ctx: &mut Context<FakeDevice>) {
         scanner.bind(ctx).handle_ap_advertisement(
-            BSSID_BAR,
+            *BSSID_BAR,
             TimeUnit(BEACON_INTERVAL_BAR),
             CAPABILITY_INFO_BAR,
             BEACON_IES_BAR,

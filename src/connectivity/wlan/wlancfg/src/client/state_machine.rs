@@ -1327,7 +1327,7 @@ mod tests {
             let expected_connect_result = ConnectResultRecord {
                  id: connect_selection.target.network.clone(),
                  credential: connect_selection.target.credential.clone(),
-                 bssid: types::Bssid(bss_description.bssid),
+                 bssid: types::Bssid::from(bss_description.bssid),
                  connect_result: fake_successful_connect_result(),
                  scan_type: connect_selection.target.bss.observation,
             };
@@ -1366,7 +1366,7 @@ mod tests {
             id: connect_selection.target.network.clone(),
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: types::Bssid(bss_description.bssid),
+                bssid: types::Bssid::from(bss_description.bssid),
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time: fasync::Time::now(),
@@ -2269,7 +2269,7 @@ mod tests {
             id: connect_selection.target.network.clone(),
             credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: types::Bssid(bss_description.bssid),
+                bssid: types::Bssid::from(bss_description.bssid),
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
@@ -2511,7 +2511,7 @@ mod tests {
             id: first_connect_selection.target.network.clone(),
             credential: first_connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: types::Bssid(first_bss_desc.bssid),
+                bssid: types::Bssid::from(first_bss_desc.bssid),
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
@@ -2758,7 +2758,7 @@ mod tests {
         // Add a PastConnectionData for the connected network to be send in BSS quality data.
         let mut past_connections = PastConnectionList::default();
         let mut past_connection_data = random_connection_data();
-        past_connection_data.bssid = ieee80211::Bssid(bss_description.bssid);
+        past_connection_data.bssid = ieee80211::Bssid::from(bss_description.bssid);
         past_connections.add(past_connection_data);
         let mut saved_networks_manager = FakeSavedNetworksManager::new();
         saved_networks_manager.past_connections_response = past_connections.clone();

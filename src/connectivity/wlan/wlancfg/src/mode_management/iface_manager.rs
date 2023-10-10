@@ -39,7 +39,6 @@ use {
     },
     std::{convert::Infallible, fmt::Debug, sync::Arc, unimplemented},
     tracing::{debug, error, info, warn},
-    wlan_common::format::MacFmt,
 };
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
@@ -1037,7 +1036,7 @@ async fn handle_bss_selection_results_for_connect_request(
                 target: scanned_candidate,
                 reason: request.reason,
             };
-            info!("Starting connection to {}", selection.target.bss.bssid.0.to_mac_string(),);
+            info!("Starting connection to {}", selection.target.bss.bssid.to_string(),);
             let _ = iface_manager.connect(selection).await;
         }
         None => {
@@ -1491,7 +1490,6 @@ mod tests {
             },
         },
         async_trait::async_trait,
-        eui48::MacAddress,
         fidl::endpoints::create_proxy,
         fidl_fuchsia_stash as fidl_stash, fidl_fuchsia_wlan_common as fidl_common,
         fuchsia_async::{DurationExt, TestExecutor},
@@ -1502,6 +1500,7 @@ mod tests {
             task::Poll,
             TryStreamExt,
         },
+        ieee80211::MacAddr,
         lazy_static::lazy_static,
         pin_utils::pin_mut,
         std::convert::TryFrom,
@@ -1698,7 +1697,7 @@ mod tests {
             }
         }
 
-        fn suggest_ap_mac(&mut self, _mac: MacAddress) {
+        fn suggest_ap_mac(&mut self, _mac: MacAddr) {
             unimplemented!()
         }
 

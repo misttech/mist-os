@@ -15,7 +15,7 @@ use {
 /// Test connections against all modern bool (non-WEP/WPA1) BSS protection types.
 #[fuchsia::test]
 async fn connect_to_modern_wpa_network() {
-    let bss = Bssid(*b"wpaok!");
+    let bss = Bssid::from(*b"wpaok!");
     // ssid, password, and psk are from "test case 2" of IEEE Std 802.11-2020 Annex J.4.2
     let ssid = Ssid::try_from("ThisIsASSID").unwrap();
     let password = Some("ThisIsAPassword");

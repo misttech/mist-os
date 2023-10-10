@@ -12,6 +12,7 @@ rustc_library("ieee80211") {
 
   deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:thiserror",
@@ -23,6 +24,7 @@ rustc_library("ieee80211") {
   sources = [
     "src/bssid.rs",
     "src/lib.rs",
+    "src/mac_addr.rs",
     "src/ssid.rs",
   ]
 }

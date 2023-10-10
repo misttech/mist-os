@@ -6,7 +6,7 @@ use crate::server::Facade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_wlan_common as fidl_common;
-use ieee80211::{MacAddr, Ssid};
+use ieee80211::{MacAddr, Ssid, NULL_ADDR};
 use serde_json::{from_value, to_value, Value};
 use std::convert::TryFrom;
 use tracing::*;
@@ -98,25 +98,29 @@ impl Facade for WlanFacade {
                     return Err(format_err!("Please provide a role for the new iface"));
                 };
 
-                const DEFAULT_MAC: MacAddr = [0, 0, 0, 0, 0, 0];
-
                 let sta_addr: MacAddr = if let Some(mac) = args.get("sta_addr") {
                     match mac.as_str() {
-                        Some(mac) => match serde_json::from_str(mac) {
-                            Ok(mac) => mac,
+                        Some(mac) => match serde_json::from_str::<[u8; 6]>(mac) {
+                            Ok(mac) => mac.into(),
                             Err(e) => {
-                                println!("Could not parse mac: {:?}, using default addr", e);
-                                DEFAULT_MAC
+                                println!(
+                                    "Could not parse mac: {:?}, using null addr {}",
+                                    e, NULL_ADDR
+                                );
+                                NULL_ADDR
                             }
                         },
                         None => {
-                            println!("Could not convert sta_addr to string, using default addr");
-                            DEFAULT_MAC
+                            println!(
+                                "Could not convert sta_addr to string, using null addr {}",
+                                NULL_ADDR
+                            );
+                            NULL_ADDR
                         }
                     }
                 } else {
-                    println!("No MAC provided in args, using default addr");
-                    DEFAULT_MAC
+                    println!("No MAC provided in args, using null addr {}", NULL_ADDR);
+                    NULL_ADDR
                 };
 
                 let result = self.create_iface(phy_id, role, sta_addr).await?;

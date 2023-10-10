@@ -554,7 +554,7 @@ mod tests {
         fidl::endpoints::{create_proxy, create_proxy_and_stream, ControlHandle},
         fidl_fuchsia_wlan_common as fidl_wlan_common, fuchsia_async as fasync,
         futures::{future::BoxFuture, pin_mut, task::Poll, StreamExt},
-        ieee80211::NULL_MAC_ADDR,
+        ieee80211::{MacAddrBytes, NULL_ADDR},
         std::convert::Infallible,
         test_case::test_case,
         wlan_common::assert_variant,
@@ -1488,7 +1488,7 @@ mod tests {
             fidl_svc::CreateIfaceRequest {
                 phy_id: 10,
                 role: fidl_wlan_common::WlanMacRole::Client,
-                sta_addr: if with_mac { [0, 1, 2, 3, 4, 5] } else { NULL_MAC_ADDR },
+                sta_addr: if with_mac { [0, 1, 2, 3, 4, 5] } else { NULL_ADDR.to_array() },
             },
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },
@@ -1672,7 +1672,7 @@ mod tests {
             fidl_svc::CreateIfaceRequest {
                 phy_id: 10,
                 role: fidl_wlan_common::WlanMacRole::Client,
-                sta_addr: NULL_MAC_ADDR,
+                sta_addr: NULL_ADDR.to_array(),
             },
             &iface_counter,
             &wlandevicemonitor_config::Config { wep_supported: true, wpa1_supported: true },

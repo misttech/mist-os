@@ -8,6 +8,8 @@ use {
     fuchsia_async as fasync,
     fuchsia_zircon::DurationNum,
     futures::{channel::oneshot, future, join, FutureExt, StreamExt, TryFutureExt},
+    ieee80211::MacAddr,
+    lazy_static::lazy_static,
     pin_utils::pin_mut,
     std::{fmt::Display, panic, sync::Arc},
     wlan_common::bss::Protection::Open,
@@ -17,8 +19,10 @@ use {
     },
 };
 
-pub const CLIENT1_MAC_ADDR: [u8; 6] = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6c];
-pub const CLIENT2_MAC_ADDR: [u8; 6] = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6d];
+lazy_static! {
+    static ref CLIENT1_MAC_ADDR: MacAddr = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6c].into();
+    static ref CLIENT2_MAC_ADDR: MacAddr = [0x68, 0x62, 0x6f, 0x6e, 0x69, 0x6d].into();
+}
 
 #[derive(Debug)]
 struct ClientPhy<N> {
@@ -64,7 +68,7 @@ fn scan_and_transmit_to_ap<'h>(
 ) -> impl Handler<(), fidl_tap::WlantapPhyEvent> + 'h {
     let probes = [ProbeResponse {
         channel: WLANCFG_DEFAULT_AP_CHANNEL.clone(),
-        bssid: AP_MAC_ADDR,
+        bssid: *AP_MAC_ADDR,
         ssid: AP_SSID.clone(),
         protection: Open,
         rssi_dbm: 0,
@@ -107,7 +111,7 @@ async fn multiple_clients_ap() {
     let ap_proxy = ap_helper.proxy();
 
     let mut client1_helper = test_utils::TestHelper::begin_test(
-        wlantap_config_client(format!("wlantap-client-1"), CLIENT1_MAC_ADDR),
+        wlantap_config_client(format!("wlantap-client-1"), *CLIENT1_MAC_ADDR),
         WlanConfig {
             use_legacy_privacy: Some(false),
             name: Some("client1-realm".to_string()),
@@ -120,7 +124,7 @@ async fn multiple_clients_ap() {
     let (client1_confirm_sender, client1_confirm_receiver) = oneshot::channel();
 
     let mut client2_helper = test_utils::TestHelper::begin_test(
-        wlantap_config_client(format!("wlantap-client-2"), CLIENT2_MAC_ADDR),
+        wlantap_config_client(format!("wlantap-client-2"), *CLIENT2_MAC_ADDR),
         WlanConfig {
             use_legacy_privacy: Some(false),
             name: Some("client2-realm".to_string()),

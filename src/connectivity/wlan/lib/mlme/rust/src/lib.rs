@@ -232,8 +232,11 @@ async fn main_loop_impl<T: MlmeImpl>(
 #[cfg(test)]
 pub mod test_utils {
     use {
-        super::*, crate::device::FakeDevice, banjo_fuchsia_wlan_common as banjo_common,
-        fidl_fuchsia_wlan_mlme as fidl_mlme, wlan_common::channel,
+        super::*,
+        crate::device::FakeDevice,
+        banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
+        ieee80211::{MacAddr, MacAddrBytes},
+        wlan_common::channel,
     };
 
     pub struct FakeMlme {
@@ -339,19 +342,19 @@ pub mod test_utils {
         }
     }
 
-    pub(crate) fn fake_key(address: [u8; 6]) -> fidl_mlme::SetKeyDescriptor {
+    pub(crate) fn fake_key(address: MacAddr) -> fidl_mlme::SetKeyDescriptor {
         fidl_mlme::SetKeyDescriptor {
             cipher_suite_oui: [1, 2, 3],
             cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
             key_type: fidl_mlme::KeyType::Pairwise,
-            address,
+            address: address.to_array(),
             key_id: 6,
             key: vec![1, 2, 3, 4, 5, 6, 7],
             rsc: 8,
         }
     }
 
-    pub(crate) fn fake_set_keys_req(address: [u8; 6]) -> wlan_sme::MlmeRequest {
+    pub(crate) fn fake_set_keys_req(address: MacAddr) -> wlan_sme::MlmeRequest {
         wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
             keylist: vec![fake_key(address)],
         })

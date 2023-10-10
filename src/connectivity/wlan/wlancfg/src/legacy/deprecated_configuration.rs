@@ -4,9 +4,9 @@
 
 use {
     crate::mode_management::phy_manager::PhyManagerApi,
-    eui48::MacAddress,
     fidl_fuchsia_wlan_product_deprecatedconfiguration as fidl_deprecated,
     futures::{lock::Mutex, select, StreamExt},
+    ieee80211::MacAddr,
     std::sync::Arc,
     tracing::{error, info},
 };
@@ -31,21 +31,7 @@ impl DeprecatedConfigurator {
                     Ok(req) => match req {
                         fidl_deprecated::DeprecatedConfiguratorRequest::SuggestAccessPointMacAddress{mac, responder} => {
                             info!("setting suggested AP MAC");
-                            let mac = match MacAddress::from_bytes(&mac.octets) {
-                                Ok(mac) => mac,
-                                Err(e) => {
-                                    error!("failed to parse MAC address: {:?}", e);
-                                    match responder.send(
-                                        Err(fidl_deprecated::SuggestMacAddressError::InvalidArguments)
-                                    ) {
-                                        Ok(()) => {},
-                                        Err(e) => error!(
-                                            "could not send SuggestAccessPointMacAddress response: {:?}", e
-                                        )
-                                    }
-                                    continue;
-                                }
-                            };
+                            let mac = MacAddr::from(mac.octets);
                             let mut phy_manager = self.phy_manager.lock().await;
                             phy_manager.suggest_ap_mac(mac);
 
@@ -78,7 +64,6 @@ mod tests {
         },
         async_trait::async_trait,
         fidl::endpoints::create_proxy,
-        fidl_fuchsia_net::MacAddress,
         fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::task::Poll,
         pin_utils::pin_mut,
@@ -87,7 +72,7 @@ mod tests {
     };
 
     #[derive(Debug)]
-    struct StubPhyManager(Option<eui48::MacAddress>);
+    struct StubPhyManager(Option<MacAddr>);
 
     impl StubPhyManager {
         fn new() -> Self {
@@ -148,7 +133,7 @@ mod tests {
             unimplemented!();
         }
 
-        fn suggest_ap_mac(&mut self, mac: eui48::MacAddress) {
+        fn suggest_ap_mac(&mut self, mac: MacAddr) {
             self.0 = Some(mac);
         }
 
@@ -204,7 +189,7 @@ mod tests {
 
         // Issue a request to set the MAC address.
         let octets = [1, 2, 3, 4, 5, 6];
-        let mac = MacAddress { octets };
+        let mac = fidl_fuchsia_net::MacAddress { octets };
         let mut suggest_fut = configurator_proxy.suggest_access_point_mac_address(&mac);
         assert!(exec.run_until_stalled(&mut fut).is_pending());
 
@@ -217,7 +202,7 @@ mod tests {
                 phy_manager
             }
         );
-        let expected_mac = eui48::MacAddress::from_bytes(&octets).unwrap();
+        let expected_mac = MacAddr::from(octets);
         assert_eq!(Some(expected_mac), phy_manager.0);
 
         assert_variant!(exec.run_until_stalled(&mut suggest_fut), Poll::Ready(Ok(Ok(()))));

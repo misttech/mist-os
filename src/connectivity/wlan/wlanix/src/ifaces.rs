@@ -260,7 +260,7 @@ pub mod test_utils {
         }
         async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
             *self.connected_ssid.lock() = Some(ssid.to_vec());
-            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: Bssid([42, 42, 42, 42, 42, 42]) })
+            Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: [42, 42, 42, 42, 42, 42].into() })
         }
     }
 

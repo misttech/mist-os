@@ -40,6 +40,7 @@ rustc_library("wlan-rsn") {
   test_deps = [
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_rust",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:lazy_static",
   ]
 
   sources = [

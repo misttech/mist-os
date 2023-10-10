@@ -5,17 +5,20 @@
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device as fidl_device,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_tap as wlantap,
-    std::convert::TryInto, wlan_common::ie::*, zerocopy::AsBytes,
+    ieee80211::{MacAddr, MacAddrBytes},
+    std::convert::TryInto,
+    wlan_common::ie::*,
+    zerocopy::AsBytes,
 };
 
 pub(crate) fn create_wlantap_config(
     name: String,
-    sta_addr: [u8; 6],
+    sta_addr: MacAddr,
     mac_role: fidl_common::WlanMacRole,
 ) -> wlantap::WlantapPhyConfig {
     wlantap::WlantapPhyConfig {
         // TODO(fxbug.dev/64628): wlantap will configure all of its ifaces to use the same MAC address
-        sta_addr,
+        sta_addr: sta_addr.to_array(),
         supported_phys: vec![
             fidl_common::WlanPhyType::Dsss,
             fidl_common::WlanPhyType::Hr,

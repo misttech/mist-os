@@ -2,33 +2,69 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned},
-};
+use crate::mac_addr::{MacAddr, MacAddrByteArray, MacAddrBytes, MacFmt, OuiFmt};
+use std::fmt;
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
-// Strictly speaking, the MAC address is not defined in 802.11, but it's defined
-// here for convenience.
-pub type MacAddr = [u8; fidl_ieee80211::MAC_ADDR_LEN as usize];
-
-pub const NULL_MAC_ADDR: MacAddr = [0x00; fidl_ieee80211::MAC_ADDR_LEN as usize];
-
-// Bssid is a newtype to wrap MacAddr where a BSSID is explicitly required.
+// Bssid is a newtype to wrap MacAddrBytes where a BSSID is explicitly required.
 #[repr(transparent)]
 #[derive(
-    FromZeroes,
-    FromBytes,
-    AsBytes,
-    Unaligned,
-    Clone,
-    Copy,
-    Debug,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
+    FromZeroes, FromBytes, AsBytes, Unaligned, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash,
 )]
-pub struct Bssid(pub MacAddr);
+pub struct Bssid(pub(crate) MacAddrByteArray);
+
+impl MacAddrBytes for Bssid {
+    fn to_array(&self) -> MacAddrByteArray {
+        self.0
+    }
+
+    fn as_array(&self) -> &MacAddrByteArray {
+        &self.0
+    }
+}
+
+impl MacFmt for Bssid {}
+impl OuiFmt for Bssid {}
+
+impl From<MacAddrByteArray> for Bssid {
+    fn from(bytes: MacAddrByteArray) -> Bssid {
+        Bssid(bytes)
+    }
+}
+
+impl From<MacAddr> for Bssid {
+    fn from(mac: MacAddr) -> Bssid {
+        Bssid(mac.0)
+    }
+}
+
+impl fmt::Display for Bssid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_mac_string())
+    }
+}
+
+impl fmt::Debug for Bssid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Bssid({})", self.to_string())
+    }
+}
 
 pub const WILDCARD_BSSID: Bssid = Bssid([0xff, 0xff, 0xff, 0xff, 0xff, 0xff]);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn format_bssid_as_mac_string() {
+        let bssid = Bssid::from([0x01, 0x02, 0x01, 0x02, 0x01, 0x02]);
+        assert_eq!("01:02:01:02:01:02", &format!("{}", bssid));
+    }
+
+    #[test]
+    fn format_bssid_as_mac_debug_string() {
+        let bssid = Bssid::from([0x01, 0x02, 0x01, 0x02, 0x01, 0x02]);
+        assert_eq!("Bssid(01:02:01:02:01:02)", &format!("{:?}", bssid));
+    }
+}

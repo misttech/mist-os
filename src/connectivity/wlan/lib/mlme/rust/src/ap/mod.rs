@@ -191,7 +191,7 @@ impl<D> Ap<D> {
     fn handle_sme_get_minstrel_stats(
         &self,
         responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
-        _addr: &[u8; 6],
+        _addr: &MacAddr,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("GetMinstrelStats is not supported.");
@@ -350,7 +350,7 @@ impl<D: DeviceOps> Ap<D> {
             }
             Req::ListMinstrelPeers(responder) => self.handle_sme_list_minstrel_peers(responder),
             Req::GetMinstrelStats(req, responder) => {
-                self.handle_sme_get_minstrel_stats(responder, &req.peer_addr)
+                self.handle_sme_get_minstrel_stats(responder, &req.peer_addr.into())
             }
             Req::AuthResponse(resp) => {
                 // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
@@ -472,6 +472,8 @@ mod tests {
         banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_common as fidl_common,
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
         futures::task::Poll,
+        ieee80211::MacAddrBytes,
+        lazy_static::lazy_static,
         std::{
             convert::TryFrom,
             sync::{Arc, Mutex},
@@ -483,9 +485,12 @@ mod tests {
         wlan_frame_writer::write_frame_with_dynamic_buf,
         wlan_sme::responder::Responder,
     };
-    const CLIENT_ADDR: MacAddr = [4u8; 6];
-    const BSSID: Bssid = Bssid([2u8; 6]);
-    const CLIENT_ADDR2: MacAddr = [6u8; 6];
+
+    lazy_static! {
+        static ref CLIENT_ADDR: MacAddr = [4u8; 6].into();
+        static ref BSSID: Bssid = [2u8; 6].into();
+        static ref CLIENT_ADDR2: MacAddr = [6u8; 6].into();
+    }
 
     fn make_eth_frame(
         dst_addr: MacAddr,
@@ -516,12 +521,12 @@ mod tests {
             &exec,
             FakeDeviceConfig {
                 mac_role: banjo_common::WlanMacRole::AP,
-                sta_addr: BSSID.0,
+                sta_addr: *BSSID,
                 ..Default::default()
             },
         );
         (
-            Ap::new(fake_device, FakeBufferProvider::new(), timer, BSSID),
+            Ap::new(fake_device, FakeBufferProvider::new(), timer, *BSSID),
             fake_device_state,
             time_stream,
         )
@@ -544,7 +549,7 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = ap.bss.as_mut().unwrap().clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -564,8 +569,8 @@ mod tests {
         fake_device_state.lock().unwrap().wlan_queue.clear();
 
         ap.handle_eth_frame_tx(&make_eth_frame(
-            CLIENT_ADDR,
-            CLIENT_ADDR2,
+            *CLIENT_ADDR,
+            *CLIENT_ADDR2,
             0x1234,
             &[1, 2, 3, 4, 5][..],
         ));
@@ -608,8 +613,8 @@ mod tests {
             .expect("expected InfraBss::new ok"),
         );
         ap.handle_eth_frame_tx(&make_eth_frame(
-            CLIENT_ADDR2,
-            CLIENT_ADDR,
+            *CLIENT_ADDR2,
+            *CLIENT_ADDR,
             0x1234,
             &[1, 2, 3, 4, 5][..],
         ));
@@ -668,7 +673,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AuthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
             },
         );
@@ -691,7 +696,7 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = ap.bss.as_mut().unwrap().clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -724,8 +729,8 @@ mod tests {
         );
 
         ap.handle_eth_frame_tx(&make_eth_frame(
-            CLIENT_ADDR,
-            CLIENT_ADDR2,
+            *CLIENT_ADDR,
+            *CLIENT_ADDR2,
             0x1234,
             &[1, 2, 3, 4, 5][..],
         ));
@@ -1074,7 +1079,7 @@ mod tests {
         assert_eq!(key.cipher_oui, [1, 2, 3]);
         assert_eq!(key.cipher_type, 4);
         assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
-        assert_eq!(key.peer_addr, [5; 6]);
+        assert_eq!(key.peer_addr, [5; 6].into());
         assert_eq!(key.key_idx, 6);
         assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
         assert_eq!(key.rsc, 8);
@@ -1155,10 +1160,10 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
-            peer_sta_address: CLIENT_ADDR,
+            peer_sta_address: CLIENT_ADDR.to_array(),
             result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::AuthenticateResp) ok");
@@ -1190,7 +1195,7 @@ mod tests {
             zx::Status::from(
                 ap.handle_mlme_req(wlan_sme::MlmeRequest::AuthResponse(
                     fidl_mlme::AuthenticateResponse {
-                        peer_sta_address: CLIENT_ADDR,
+                        peer_sta_address: CLIENT_ADDR.to_array(),
                         result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
                     }
                 ))
@@ -1224,7 +1229,7 @@ mod tests {
             zx::Status::from(
                 ap.handle_mlme_req(wlan_sme::MlmeRequest::AuthResponse(
                     fidl_mlme::AuthenticateResponse {
-                        peer_sta_address: CLIENT_ADDR,
+                        peer_sta_address: CLIENT_ADDR.to_array(),
                         result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
                     }
                 ))
@@ -1253,11 +1258,11 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::Deauthenticate(
             fidl_mlme::DeauthenticateRequest {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             },
         ))
@@ -1296,10 +1301,10 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address: CLIENT_ADDR,
+            peer_sta_address: CLIENT_ADDR.to_array(),
             result_code: fidl_mlme::AssociateResultCode::Success,
             association_id: 1,
             capability_info: CapabilityInfo(0).raw(),
@@ -1346,10 +1351,10 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::Disassociate(fidl_mlme::DisassociateRequest {
-            peer_sta_address: CLIENT_ADDR,
+            peer_sta_address: CLIENT_ADDR.to_array(),
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::DisassociateReq) ok");
@@ -1387,10 +1392,10 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address: CLIENT_ADDR,
+            peer_sta_address: CLIENT_ADDR.to_array(),
             result_code: fidl_mlme::AssociateResultCode::Success,
             association_id: 1,
             capability_info: CapabilityInfo(0).raw(),
@@ -1400,7 +1405,7 @@ mod tests {
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
             fidl_mlme::SetControlledPortRequest {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 state: fidl_mlme::ControlledPortState::Open,
             },
         ))
@@ -1424,11 +1429,11 @@ mod tests {
             )
             .expect("expected InfraBss::new ok"),
         );
-        ap.bss.as_mut().unwrap().clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        ap.bss.as_mut().unwrap().clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         ap.handle_mlme_req(wlan_sme::MlmeRequest::Eapol(fidl_mlme::EapolRequest {
-            dst_addr: CLIENT_ADDR,
-            src_addr: BSSID.0,
+            dst_addr: CLIENT_ADDR.to_array(),
+            src_addr: BSSID.to_array(),
             data: vec![1, 2, 3],
         }))
         .expect("expected Ap::handle_mlme_msg(fidl_mlme::MlmeRequest::EapolReq) ok");
@@ -1466,7 +1471,7 @@ mod tests {
         assert_eq!(
             info,
             fidl_mlme::DeviceInfo {
-                sta_addr: BSSID.0,
+                sta_addr: BSSID.to_array(),
                 role: fidl_common::WlanMacRole::Ap,
                 bands: fake_fidl_band_caps(),
                 softmac_hardware_capability: 0,

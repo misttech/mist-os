@@ -20,6 +20,7 @@ rustc_test("verify_wlan_inspect") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pin-utils",
   ]
 

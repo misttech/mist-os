@@ -168,8 +168,8 @@ impl<'a> SecurityContext<'a, wpa::Wpa3PersonalCredentials> {
                     Ok(auth::Config::Sae {
                         ssid: self.bss.ssid.clone(),
                         password: passphrase.clone().into(),
-                        mac: self.device.sta_addr.clone(),
-                        peer_mac: self.bss.bssid.0,
+                        mac: self.device.sta_addr.into(),
+                        peer_mac: self.bss.bssid.into(),
                     })
                 } else if self.security_support.sae.driver_handler_supported {
                     Ok(auth::Config::DriverSae { password: passphrase.clone().into() })
@@ -234,14 +234,15 @@ impl<'a> TryFrom<SecurityContext<'a, wpa::Wpa1Credentials>> for Protection {
             .bss
             .has_wpa1_configured()
             .then(|| -> Result<_, Self::Error> {
+                let sta_addr = context.device.sta_addr.into();
                 let (a_wpa_ie, s_wpa_ie) = context.authenticator_supplicant_ie()?;
                 let negotiated_protection = NegotiatedProtection::from_legacy_wpa(&s_wpa_ie)?;
                 let supplicant = wlan_rsn::Supplicant::new_wpa_personal(
-                    NonceReader::new(&context.device.sta_addr[..])?,
+                    NonceReader::new(&sta_addr)?,
                     context.authentication_config(),
-                    context.device.sta_addr,
+                    sta_addr,
                     ProtectionInfo::LegacyWpa(s_wpa_ie),
-                    context.bss.bssid.0,
+                    context.bss.bssid.into(),
                     ProtectionInfo::LegacyWpa(a_wpa_ie),
                 )
                 .map_err(|error| format_err!("Failed to create ESS-SA: {:?}", error))?;
@@ -265,14 +266,15 @@ impl<'a> TryFrom<SecurityContext<'a, wpa::Wpa2PersonalCredentials>> for Protecti
             .bss
             .has_wpa2_personal_configured()
             .then(|| -> Result<_, Self::Error> {
+                let sta_addr = context.device.sta_addr.into();
                 let (a_rsne, s_rsne) = context.authenticator_supplicant_rsne()?;
                 let negotiated_protection = NegotiatedProtection::from_rsne(&s_rsne)?;
                 let supplicant = wlan_rsn::Supplicant::new_wpa_personal(
-                    NonceReader::new(&context.device.sta_addr[..])?,
+                    NonceReader::new(&sta_addr)?,
                     context.authentication_config(),
-                    context.device.sta_addr,
+                    sta_addr,
                     ProtectionInfo::Rsne(s_rsne),
-                    context.bss.bssid.0,
+                    context.bss.bssid.into(),
                     ProtectionInfo::Rsne(a_rsne),
                 )
                 .map_err(|error| format_err!("Failed to creat ESS-SA: {:?}", error))?;
@@ -296,17 +298,18 @@ impl<'a> TryFrom<SecurityContext<'a, wpa::Wpa3PersonalCredentials>> for Protecti
             .bss
             .has_wpa3_personal_configured()
             .then(|| -> Result<_, Self::Error> {
+                let sta_addr = context.device.sta_addr.into();
                 if !context.config.wpa3_supported {
                     return Err(format_err!("WPA3 requested but client does not support WPA3"));
                 }
                 let (a_rsne, s_rsne) = context.authenticator_supplicant_rsne()?;
                 let negotiated_protection = NegotiatedProtection::from_rsne(&s_rsne)?;
                 let supplicant = wlan_rsn::Supplicant::new_wpa_personal(
-                    NonceReader::new(&context.device.sta_addr[..])?,
+                    NonceReader::new(&sta_addr)?,
                     context.authentication_config()?,
-                    context.device.sta_addr,
+                    sta_addr,
                     ProtectionInfo::Rsne(s_rsne),
-                    context.bss.bssid.0,
+                    context.bss.bssid.into(),
                     ProtectionInfo::Rsne(a_rsne),
                 )
                 .map_err(|error| format_err!("Failed to create ESS-SA: {:?}", error))?;
@@ -423,7 +426,7 @@ mod tests {
 
     #[test]
     fn protection_from_wep40() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wep);
@@ -441,7 +444,7 @@ mod tests {
 
     #[test]
     fn protection_from_wep104() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wep);
@@ -459,7 +462,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa1_psk() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa1);
@@ -477,7 +480,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa2_personal_psk() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa2);
@@ -495,7 +498,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa2_personal_passphrase() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa2);
@@ -514,7 +517,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa2_personal_tkip_only_passphrase() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa2TkipOnly);
@@ -533,7 +536,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa3_personal_passphrase() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = ClientConfig { wpa3_supported: true, ..Default::default() };
         let bss = fake_bss_description!(Wpa3);
@@ -552,7 +555,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa1_passphrase_with_open_bss() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Open);
@@ -570,7 +573,7 @@ mod tests {
 
     #[test]
     fn protection_from_open_authenticator_with_wpa1_bss() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa1);
@@ -589,7 +592,7 @@ mod tests {
 
     #[test]
     fn protection_from_wpa2_personal_passphrase_with_wpa3_bss() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = ClientConfig { wpa3_supported: true, ..Default::default() };
         let bss = fake_bss_description!(Wpa3);
@@ -607,7 +610,7 @@ mod tests {
 
     #[test]
     fn wpa1_psk_rsna() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa1);
@@ -630,7 +633,7 @@ mod tests {
 
     #[test]
     fn wpa2_personal_psk_rsna() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa2);
@@ -653,7 +656,7 @@ mod tests {
 
     #[test]
     fn wpa3_personal_passphrase_rsna_sme_auth() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support();
         let config = ClientConfig { wpa3_supported: true, ..Default::default() };
         let bss = fake_bss_description!(Wpa3);
@@ -677,7 +680,7 @@ mod tests {
 
     #[test]
     fn wpa3_personal_passphrase_rsna_driver_auth() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let mut security_support = fake_security_support_empty();
         security_support.mfp.supported = true;
         security_support.sae.driver_handler_supported = true;
@@ -703,7 +706,7 @@ mod tests {
 
     #[test]
     fn wpa3_personal_passphrase_prefer_sme_auth() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let mut security_support = fake_security_support_empty();
         security_support.mfp.supported = true;
         security_support.sae.driver_handler_supported = true;
@@ -724,7 +727,7 @@ mod tests {
 
     #[test]
     fn wpa3_personal_passphrase_no_security_support_features() {
-        let device = crate::test_utils::fake_device_info([1u8; 6]);
+        let device = crate::test_utils::fake_device_info([1u8; 6].into());
         let security_support = fake_security_support_empty();
         let config = Default::default();
         let bss = fake_bss_description!(Wpa3);

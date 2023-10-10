@@ -7,7 +7,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     futures::channel::mpsc,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
     std::{
         convert::TryFrom,
@@ -27,7 +27,7 @@ use {
 
 pub fn fake_serving_ap_info() -> ServingApInfo {
     ServingApInfo {
-        bssid: Bssid([0x37, 0x0a, 0x16, 0x03, 0x09, 0x46]),
+        bssid: Bssid::from([0x37, 0x0a, 0x16, 0x03, 0x09, 0x46]),
         ssid: Ssid::try_from("foo").unwrap(),
         rssi_dbm: 0,
         snr_db: 0,
@@ -74,7 +74,7 @@ pub fn create_connect_conf(
 ) -> fidl_mlme::MlmeEvent {
     fidl_mlme::MlmeEvent::ConnectConf {
         resp: fidl_mlme::ConnectConfirm {
-            peer_sta_address: bssid.0,
+            peer_sta_address: bssid.to_array(),
             result_code,
             association_id: 42,
             association_ies: vec![],
@@ -184,8 +184,8 @@ pub fn mock_sae_supplicant() -> (MockSupplicant, MockSupplicantController) {
     let config = auth::Config::Sae {
         ssid: MOCK_SSID.clone(),
         password: MOCK_PASS.as_bytes().to_vec(),
-        mac: [0xaa; 6],
-        peer_mac: [0xbb; 6],
+        mac: [0xaa; 6].into(),
+        peer_mac: [0xbb; 6].into(),
     };
     mock_supplicant(config)
 }

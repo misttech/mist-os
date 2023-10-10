@@ -6,6 +6,7 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::{self as zx, prelude::*},
     ieee80211::{Bssid, Ssid},
+    lazy_static::lazy_static,
     pin_utils::pin_mut,
     tracing::info,
     wlan_common::{
@@ -15,7 +16,9 @@ use {
     wlan_hw_sim::*,
 };
 
-const BSSID: &Bssid = &Bssid(*b"wpa2ok");
+lazy_static! {
+    static ref BSSID: Bssid = Bssid::from(*b"wpa2ok");
+}
 const AUTHENTICATOR_PASSWORD: &str = "goodpassword";
 const SUPPLICANT_PASSWORD: &str = "badpassword";
 

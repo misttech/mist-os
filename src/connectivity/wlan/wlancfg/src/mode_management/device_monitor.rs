@@ -160,10 +160,10 @@ mod tests {
         },
         anyhow::Error,
         async_trait::async_trait,
-        eui48::MacAddress,
         fidl_fuchsia_wlan_device_service as fidl_service, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
         futures::{channel::oneshot, task::Poll, StreamExt},
+        ieee80211::MacAddr,
         pin_utils::pin_mut,
         wlan_common::assert_variant,
     };
@@ -835,7 +835,7 @@ mod tests {
             unimplemented!();
         }
 
-        fn suggest_ap_mac(&mut self, _mac: MacAddress) {
+        fn suggest_ap_mac(&mut self, _mac: MacAddr) {
             unimplemented!()
         }
 

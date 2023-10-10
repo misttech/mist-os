@@ -11,11 +11,10 @@ use {
         telemetry::{TelemetryEvent, TelemetrySender},
     },
     async_trait::async_trait,
-    eui48::MacAddress,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_device_service as fidl_service,
     fuchsia_inspect::{self as inspect, NumericProperty},
     fuchsia_zircon,
-    ieee80211::{MacAddr, NULL_MAC_ADDR},
+    ieee80211::{MacAddr, MacAddrBytes, NULL_ADDR},
     std::collections::{HashMap, HashSet},
     thiserror::Error,
     tracing::{error, info, warn},
@@ -124,7 +123,7 @@ pub trait PhyManagerApi {
     async fn destroy_all_ap_ifaces(&mut self) -> Result<(), PhyManagerError>;
 
     /// Sets a suggested MAC address to be used by new AP interfaces.
-    fn suggest_ap_mac(&mut self, mac: MacAddress);
+    fn suggest_ap_mac(&mut self, mac: MacAddr);
 
     /// Returns the IDs for all currently known PHYs.
     fn get_phy_ids(&self) -> Vec<u16>;
@@ -160,7 +159,7 @@ pub struct PhyManager {
     device_monitor: fidl_service::DeviceMonitorProxy,
     client_connections_enabled: bool,
     power_state: fidl_common::PowerSaveType,
-    suggested_ap_mac: Option<MacAddress>,
+    suggested_ap_mac: Option<MacAddr>,
     saved_country_code: Option<[u8; REGION_CODE_LEN]>,
     _node: inspect::Node,
     telemetry_sender: TelemetrySender,
@@ -286,7 +285,7 @@ impl PhyManagerApi for PhyManager {
                 &self.device_monitor,
                 phy_id,
                 fidl_common::WlanMacRole::Client,
-                NULL_MAC_ADDR,
+                NULL_ADDR,
                 &self.telemetry_sender,
             )
             .await?;
@@ -393,7 +392,7 @@ impl PhyManagerApi for PhyManager {
                         &self.device_monitor,
                         *client_phy,
                         fidl_common::WlanMacRole::Client,
-                        NULL_MAC_ADDR,
+                        NULL_ADDR,
                         &self.telemetry_sender,
                     )
                     .await
@@ -520,8 +519,8 @@ impl PhyManagerApi for PhyManager {
                 self.phys.get_mut(ap_phy_id).ok_or(PhyManagerError::PhyQueryFailure)?;
             if phy_container.ap_ifaces.is_empty() {
                 let mac = match self.suggested_ap_mac {
-                    Some(mac) => mac.to_array(),
-                    None => NULL_MAC_ADDR,
+                    Some(mac) => mac,
+                    None => NULL_ADDR,
                 };
                 let iface_id = match create_iface(
                     &self.device_monitor,
@@ -627,7 +626,7 @@ impl PhyManagerApi for PhyManager {
         result
     }
 
-    fn suggest_ap_mac(&mut self, mac: MacAddress) {
+    fn suggest_ap_mac(&mut self, mac: MacAddr) {
         self.suggested_ap_mac = Some(mac);
     }
 
@@ -731,7 +730,7 @@ async fn create_iface(
     sta_addr: MacAddr,
     telemetry_sender: &TelemetrySender,
 ) -> Result<u16, PhyManagerError> {
-    let request = fidl_service::CreateIfaceRequest { phy_id, role, sta_addr };
+    let request = fidl_service::CreateIfaceRequest { phy_id, role, sta_addr: sta_addr.to_array() };
     let create_iface_response = match proxy.create_iface(&request).await {
         Ok((status, iface_response)) => {
             if fuchsia_zircon::ok(status).is_err() || iface_response.is_none() {
@@ -2590,7 +2589,7 @@ mod tests {
         let _ = phy_container.client_ifaces.insert(fake_iface_id, fake_security_support());
 
         // Suggest an AP MAC
-        let mac = MacAddress::from_bytes(&[1, 2, 3, 4, 5, 6]).unwrap();
+        let mac: MacAddr = [1, 2, 3, 4, 5, 6].into();
         phy_manager.suggest_ap_mac(mac);
 
         let get_ap_future = phy_manager.create_or_get_ap_iface();
@@ -2606,7 +2605,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                let requested_mac = MacAddress::from_bytes(&req.sta_addr).unwrap();
+                let requested_mac: MacAddr = req.sta_addr.into();
                 assert_eq!(requested_mac, mac);
                 let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
                 responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
@@ -2635,8 +2634,8 @@ mod tests {
         let _ = phy_manager.phys.insert(fake_phy_id, phy_container);
 
         // Suggest an AP MAC
-        let mac = MacAddress::from_bytes(&[1, 2, 3, 4, 5, 6]);
-        phy_manager.suggest_ap_mac(mac.unwrap());
+        let mac: MacAddr = [1, 2, 3, 4, 5, 6].into();
+        phy_manager.suggest_ap_mac(mac);
 
         // Start client connections so that an IfaceRequest is issued for the client.
         let start_client_future =
@@ -2653,7 +2652,7 @@ mod tests {
                     responder,
                 }
             ))) => {
-                assert_eq!(req.sta_addr, ieee80211::NULL_MAC_ADDR);
+                assert_eq!(req.sta_addr, ieee80211::NULL_ADDR.to_array());
                 let response = fidl_service::CreateIfaceResponse { iface_id: fake_iface_id };
                 responder.send(ZX_OK, Some(&response)).expect("sending fake iface id");
             }
@@ -3559,7 +3558,7 @@ mod tests {
             &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
-            NULL_MAC_ADDR,
+            NULL_ADDR,
             &test_values.telemetry_sender,
         );
         pin_mut!(fut);
@@ -3587,7 +3586,7 @@ mod tests {
             &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
-            NULL_MAC_ADDR,
+            NULL_ADDR,
             &test_values.telemetry_sender,
         );
         pin_mut!(fut);
@@ -3623,7 +3622,7 @@ mod tests {
             &test_values.monitor_proxy,
             0,
             fidl_common::WlanMacRole::Client,
-            NULL_MAC_ADDR,
+            NULL_ADDR,
             &test_values.telemetry_sender,
         );
         pin_mut!(fut);

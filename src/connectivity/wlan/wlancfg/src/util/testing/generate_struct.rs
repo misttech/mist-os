@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     rand::Rng as _,
     std::convert::TryFrom,
     wlan_common::{
@@ -77,7 +77,7 @@ pub fn generate_random_sme_scan_result() -> fidl_sme::ScanResult {
 
 pub fn generate_random_bss() -> types::Bss {
     let mut rng = rand::thread_rng();
-    let bssid: Bssid = Bssid(rng.gen());
+    let bssid: Bssid = Bssid::from(rng.gen::<[u8; 6]>());
     let rssi = rng.gen_range(-100..20);
     let channel = generate_random_channel();
     let timestamp = zx::Time::from_nanos(rng.gen());
@@ -104,7 +104,7 @@ pub fn generate_random_bss() -> types::Bss {
             _ => None,
         },
         bss_description: random_fidl_bss_description!(
-            bssid: bssid.0,
+            bssid: bssid.to_array(),
             rssi_dbm: rssi,
             channel: channel,
             snr_db: snr_db,

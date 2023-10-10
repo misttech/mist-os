@@ -22,7 +22,10 @@ rustc_library("wlan-sae") {
     "//third_party/rust_crates:tracing",
   ]
 
-  test_deps = [ "//third_party/rust_crates:hex" ]
+  test_deps = [
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:lazy_static",
+  ]
 
   sources = [
     "src/boringssl.rs",

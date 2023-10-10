@@ -20,7 +20,8 @@ use crate::{Authenticator, Supplicant};
 use eapol::KeyFrameTx;
 use fidl_fuchsia_wlan_mlme::SaeFrame;
 use hex::FromHex;
-use ieee80211::Ssid;
+use ieee80211::{MacAddr, Ssid};
+use lazy_static::lazy_static;
 use std::{
     convert::TryFrom,
     sync::{Arc, Mutex},
@@ -41,8 +42,10 @@ use wlan_common::{
 };
 use zerocopy::ByteSlice;
 
-pub const S_ADDR: [u8; 6] = [0x81, 0x76, 0x61, 0x14, 0xDF, 0xC9];
-pub const A_ADDR: [u8; 6] = [0x1D, 0xE3, 0xFD, 0xDF, 0xCB, 0xD3];
+lazy_static! {
+    static ref S_ADDR: MacAddr = MacAddr::from([0x81, 0x76, 0x61, 0x14, 0xDF, 0xC9]);
+    static ref A_ADDR: MacAddr = MacAddr::from([0x1D, 0xE3, 0xFD, 0xDF, 0xCB, 0xD3]);
+}
 
 pub fn get_rsne_protection() -> NegotiatedProtection {
     NegotiatedProtection::from_rsne(&fake_wpa2_s_rsne())
@@ -50,15 +53,15 @@ pub fn get_rsne_protection() -> NegotiatedProtection {
 }
 
 pub fn get_wpa2_supplicant() -> Supplicant {
-    let nonce_rdr = NonceReader::new(&S_ADDR[..]).expect("error creating Reader");
+    let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     let psk = psk::compute("ThisIsAPassword".as_bytes(), &Ssid::try_from("ThisIsASSID").unwrap())
         .expect("error computing PSK");
     Supplicant::new_wpa_personal(
         nonce_rdr,
         auth::Config::ComputedPsk(psk),
-        test_util::S_ADDR,
+        *S_ADDR,
         ProtectionInfo::Rsne(fake_wpa2_s_rsne()),
-        test_util::A_ADDR,
+        *A_ADDR,
         ProtectionInfo::Rsne(fake_wpa2_a_rsne()),
     )
     .expect("could not create Supplicant")
@@ -67,34 +70,34 @@ pub fn get_wpa2_supplicant() -> Supplicant {
 pub fn get_wpa2_authenticator() -> Authenticator {
     let gtk_provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 })
         .expect("error creating GtkProvider");
-    let nonce_rdr = NonceReader::new(&S_ADDR[..]).expect("error creating Reader");
+    let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     let psk = psk::compute("ThisIsAPassword".as_bytes(), &Ssid::try_from("ThisIsASSID").unwrap())
         .expect("error computing PSK");
     Authenticator::new_wpa2psk_ccmp128(
         nonce_rdr,
         Arc::new(Mutex::new(gtk_provider)),
         psk,
-        test_util::S_ADDR,
+        *S_ADDR,
         ProtectionInfo::Rsne(fake_wpa2_s_rsne()),
-        test_util::A_ADDR,
+        *A_ADDR,
         ProtectionInfo::Rsne(fake_wpa2_a_rsne()),
     )
     .expect("could not create Authenticator")
 }
 
 pub fn get_wpa3_supplicant() -> Supplicant {
-    let nonce_rdr = NonceReader::new(&S_ADDR[..]).expect("error creating Reader");
+    let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     Supplicant::new_wpa_personal(
         nonce_rdr,
         auth::Config::Sae {
             ssid: Ssid::try_from("ThisIsASSID").unwrap(),
             password: "ThisIsAPassword".as_bytes().to_vec(),
-            mac: test_util::S_ADDR,
-            peer_mac: test_util::A_ADDR,
+            mac: *S_ADDR,
+            peer_mac: *A_ADDR,
         },
-        test_util::S_ADDR,
+        *S_ADDR,
         ProtectionInfo::Rsne(fake_wpa3_s_rsne()),
-        test_util::A_ADDR,
+        *A_ADDR,
         ProtectionInfo::Rsne(fake_wpa3_a_rsne()),
     )
     .expect("could not create Supplicant")
@@ -105,7 +108,7 @@ pub fn get_wpa3_authenticator() -> Authenticator {
         .expect("error creating GtkProvider");
     let igtk_provider =
         IgtkProvider::new(DEFAULT_GROUP_MGMT_CIPHER).expect("error creating IgtkProvider");
-    let nonce_rdr = NonceReader::new(&S_ADDR[..]).expect("error creating Reader");
+    let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     let ssid = Ssid::try_from("ThisIsASSID").unwrap();
     let password = "ThisIsAPassword".as_bytes().to_vec();
     Authenticator::new_wpa3(
@@ -114,9 +117,9 @@ pub fn get_wpa3_authenticator() -> Authenticator {
         Arc::new(Mutex::new(igtk_provider)),
         ssid,
         password,
-        test_util::S_ADDR,
+        *S_ADDR,
         ProtectionInfo::Rsne(fake_wpa3_s_rsne()),
-        test_util::A_ADDR,
+        *A_ADDR,
         ProtectionInfo::Rsne(fake_wpa3_a_rsne()),
     )
     .expect("could not create Authenticator")
@@ -447,12 +450,12 @@ fn make_fourway_cfg(
         Role::Supplicant => None,
     };
 
-    let nonce_rdr = NonceReader::new(&S_ADDR[..]).expect("error creating Reader");
+    let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     fourway::Config::new(
         role,
-        test_util::S_ADDR,
+        *S_ADDR,
         s_protection,
-        test_util::A_ADDR,
+        *A_ADDR,
         a_protection,
         nonce_rdr,
         gtk_provider,

@@ -31,7 +31,11 @@ impl<B: ByteSlice> CtrlBody<B> {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, crate::assert_variant};
+    use {
+        super::*,
+        crate::assert_variant,
+        ieee80211::{Bssid, MacAddr},
+    };
 
     #[test]
     fn parse_ps_poll_frame() {
@@ -44,8 +48,8 @@ mod tests {
             CtrlBody::parse(CtrlSubtype::PS_POLL, &bytes[..]),
             Some(CtrlBody::PsPoll { ps_poll }) => {
                 assert_eq!(0b1100000000000001, { ps_poll.masked_aid });
-                assert_eq!([2; 6], { ps_poll.bssid.0 });
-                assert_eq!([4; 6], { ps_poll.ta });
+                assert_eq!(Bssid::from([2; 6]), ps_poll.bssid);
+                assert_eq!(MacAddr::from([4; 6]), ps_poll.ta);
             },
             "expected PS-Poll frame"
         );

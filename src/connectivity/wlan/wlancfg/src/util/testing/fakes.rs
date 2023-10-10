@@ -295,9 +295,7 @@ pub fn random_connection_data() -> PastConnectionData {
     let uptime = zx::Duration::from_seconds(rng.gen_range::<i64, _>(5..1000));
     let disconnect_time = connect_time + time_to_connect + uptime;
     PastConnectionData::new(
-        client_types::Bssid(
-            (0..6).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>().try_into().unwrap(),
-        ),
+        client_types::Bssid::from(rng.gen::<[u8; 6]>()),
         connect_time,
         time_to_connect,
         disconnect_time,

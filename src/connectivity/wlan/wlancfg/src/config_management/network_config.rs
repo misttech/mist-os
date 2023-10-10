@@ -1044,7 +1044,7 @@ mod tests {
         let curr_time = fasync::Time::now();
 
         // Add two failures for BSSID_1
-        let bssid_1 = client_types::Bssid([1; 6]);
+        let bssid_1 = client_types::Bssid::from([1; 6]);
         let failure_1_bssid_1 = ConnectFailure {
             time: curr_time - zx::Duration::from_seconds(10),
             bssid: bssid_1,
@@ -1066,7 +1066,7 @@ mod tests {
         );
 
         // Add one failure for BSSID_2
-        let bssid_2 = client_types::Bssid([2; 6]);
+        let bssid_2 = client_types::Bssid::from([2; 6]);
         let failure_1_bssid_2 = ConnectFailure {
             time: curr_time - zx::Duration::from_seconds(3),
             bssid: bssid_2,
@@ -1108,7 +1108,7 @@ mod tests {
         // Get time before adding so we can get back everything we added.
         let curr_time = fasync::Time::now();
         assert!(connect_failures.get_recent(curr_time).is_empty());
-        let bssid = client_types::Bssid([1; 6]);
+        let bssid = client_types::Bssid::from([1; 6]);
         let failure =
             ConnectFailure { time: curr_time, bssid, reason: FailureReason::GeneralFailure };
         connect_failures.add(failure);
@@ -1132,7 +1132,7 @@ mod tests {
             connect_failures.add(ConnectFailure {
                 time: curr_time + zx::Duration::from_seconds(i as i64),
                 reason: FailureReason::GeneralFailure,
-                bssid: client_types::Bssid([1; 6]),
+                bssid: client_types::Bssid::from([1; 6]),
             })
         }
 
@@ -1208,7 +1208,7 @@ mod tests {
         // Add to list, exceeding the capacity by one entry
         for i in 0..past_connections_list.0.capacity() + 1 {
             let mut data = random_connection_data();
-            data.bssid = client_types::Bssid([1; 6]);
+            data.bssid = client_types::Bssid::from([1; 6]);
             data.disconnect_time = curr_time + zx::Duration::from_seconds(i as i64);
             past_connections_list.add(data);
         }

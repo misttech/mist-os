@@ -35,12 +35,12 @@ fn concat_mac_addrs(sta_a_mac: &MacAddr, sta_b_mac: &MacAddr) -> Vec<u8> {
     let mut result: Vec<u8> = Vec::with_capacity(sta_a_mac.len() + sta_b_mac.len());
     match sta_a_mac.cmp(sta_b_mac) {
         std::cmp::Ordering::Less => {
-            result.extend_from_slice(sta_b_mac);
-            result.extend_from_slice(sta_a_mac);
+            result.extend_from_slice(sta_b_mac.as_slice());
+            result.extend_from_slice(sta_a_mac.as_slice());
         }
         _ => {
-            result.extend_from_slice(sta_a_mac);
-            result.extend_from_slice(sta_b_mac);
+            result.extend_from_slice(sta_a_mac.as_slice());
+            result.extend_from_slice(sta_b_mac.as_slice());
         }
     };
 
@@ -393,6 +393,7 @@ mod tests {
         super::*,
         crate::hmac_utils::HmacUtilsImpl,
         ieee80211::{MacAddr, Ssid},
+        lazy_static::lazy_static,
         mundane::hash::Sha256,
         std::convert::TryFrom,
     };
@@ -414,8 +415,10 @@ mod tests {
 
     // IEEE Std 802.11-2020 J.10
     // Test vectors for looping PWE generation
-    const TEST_LOOP_STA_A: MacAddr = [0x4d, 0x3f, 0x2f, 0xff, 0xe3, 0x87];
-    const TEST_LOOP_STA_B: MacAddr = [0xa5, 0xd8, 0xaa, 0x95, 0x8e, 0x3c];
+    lazy_static! {
+        static ref TEST_LOOP_STA_A: MacAddr = MacAddr::from([0x4d, 0x3f, 0x2f, 0xff, 0xe3, 0x87]);
+        static ref TEST_LOOP_STA_B: MacAddr = MacAddr::from([0xa5, 0xd8, 0xaa, 0x95, 0x8e, 0x3c]);
+    }
     const TEST_LOOP_PWE_X: &'static str =
         "da6eb7b06a1ac5624974f90afdd6a8e9d5722634cf987c34defc91a9874e5658";
     const TEST_LOOP_PWE_Y: &'static str =
@@ -423,8 +426,10 @@ mod tests {
 
     // IEEE Std 802.11-2020 J.10
     // Test vectors for direct PWE generation
-    const TEST_DIRECT_STA_A: MacAddr = [0x00, 0x09, 0x5b, 0x66, 0xec, 0x1e];
-    const TEST_DIRECT_STA_B: MacAddr = [0x00, 0x0b, 0x6b, 0xd9, 0x02, 0x46];
+    lazy_static! {
+        static ref TEST_DIRECT_STA_A: MacAddr = MacAddr::from([0x00, 0x09, 0x5b, 0x66, 0xec, 0x1e]);
+        static ref TEST_DIRECT_STA_B: MacAddr = MacAddr::from([0x00, 0x0b, 0x6b, 0xd9, 0x02, 0x46]);
+    }
     const TEST_DIRECT_Z: &'static str =
         "ffffffff00000001000000000000000000000000fffffffffffffffffffffff5";
     const TEST_DIRECT_C1: &'static str =
@@ -555,8 +560,8 @@ mod tests {
             ssid: Ssid::try_from(TEST_SSID).unwrap(),
             password: Vec::from(TEST_PWD),
             password_id: None,
-            sta_a_mac: TEST_LOOP_STA_A,
-            sta_b_mac: TEST_LOOP_STA_B,
+            sta_a_mac: *TEST_LOOP_STA_A,
+            sta_b_mac: *TEST_LOOP_STA_B,
         };
         let pwe = group.generate_pwe(&params).unwrap();
         let (x, y) = pwe.to_affine_coords(&group.group, &group.bn_ctx).unwrap();
@@ -565,7 +570,7 @@ mod tests {
 
         // The PWE should not change depending on the order of mac addresses.
         let params =
-            SaeParameters { sta_a_mac: TEST_LOOP_STA_B, sta_b_mac: TEST_LOOP_STA_A, ..params };
+            SaeParameters { sta_a_mac: *TEST_LOOP_STA_B, sta_b_mac: *TEST_LOOP_STA_A, ..params };
         let pwe = group.generate_pwe(&params).unwrap();
         let (x, y) = pwe.to_affine_coords(&group.group, &group.bn_ctx).unwrap();
         assert_eq!(x.to_be_vec(group_params.p.len()), hex::decode(TEST_LOOP_PWE_X).unwrap());
@@ -582,8 +587,8 @@ mod tests {
             ssid: Ssid::try_from(TEST_SSID).unwrap(),
             password: Vec::from(TEST_PWD),
             password_id: Some(Vec::from(TEST_PWD_ID)),
-            sta_a_mac: TEST_DIRECT_STA_A,
-            sta_b_mac: TEST_DIRECT_STA_B,
+            sta_a_mac: *TEST_DIRECT_STA_A,
+            sta_b_mac: *TEST_DIRECT_STA_B,
         };
         let pwe = group.generate_pwe(&params).unwrap();
         let (x, y) = pwe.to_affine_coords(&group.group, &group.bn_ctx).unwrap();
@@ -591,8 +596,11 @@ mod tests {
         assert_eq!(y.to_be_vec(group_params.p.len()), hex::decode(TEST_DIRECT_PWE_Y).unwrap());
 
         // The PWE should not change depending on the order of mac addresses.
-        let params =
-            SaeParameters { sta_a_mac: TEST_DIRECT_STA_B, sta_b_mac: TEST_DIRECT_STA_A, ..params };
+        let params = SaeParameters {
+            sta_a_mac: *TEST_DIRECT_STA_B,
+            sta_b_mac: *TEST_DIRECT_STA_A,
+            ..params
+        };
         let pwe = group.generate_pwe(&params).unwrap();
         let (x, y) = pwe.to_affine_coords(&group.group, &group.bn_ctx).unwrap();
         assert_eq!(x.to_be_vec(group_params.p.len()), hex::decode(TEST_DIRECT_PWE_X).unwrap());
@@ -609,8 +617,8 @@ mod tests {
             ssid: Ssid::try_from(TEST_SSID).unwrap(),
             password: Vec::from(TEST_PWD),
             password_id: Some(Vec::from(TEST_PWD_ID)),
-            sta_a_mac: TEST_LOOP_STA_A,
-            sta_b_mac: TEST_LOOP_STA_B,
+            sta_a_mac: *TEST_LOOP_STA_A,
+            sta_b_mac: *TEST_LOOP_STA_B,
         };
         let pwe = group.generate_pwe(&params);
         // IEEE Std 802.11-2020: password ID cannot be used with PWE generation by looping
@@ -721,8 +729,8 @@ mod tests {
             ssid: Ssid::try_from(TEST_SSID).unwrap(),
             password: Vec::from(TEST_PWD),
             password_id: Some(Vec::from(TEST_PWD_ID)),
-            sta_a_mac: TEST_DIRECT_STA_A,
-            sta_b_mac: TEST_DIRECT_STA_B,
+            sta_a_mac: *TEST_DIRECT_STA_A,
+            sta_b_mac: *TEST_DIRECT_STA_B,
         };
 
         let pt = group.generate_pt(&params).unwrap();

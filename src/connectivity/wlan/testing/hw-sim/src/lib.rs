@@ -16,7 +16,7 @@ use {
     fidl_fuchsia_wlan_tap::{WlanRxInfo, WlantapPhyConfig, WlantapPhyProxy},
     fuchsia_zircon as zx,
     fuchsia_zircon::prelude::*,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddr, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
     realm_proxy::client::RealmProxyClient,
@@ -49,12 +49,14 @@ mod config;
 mod wlancfg_helper;
 
 pub const PSK_STR_LEN: usize = 64;
-pub const CLIENT_MAC_ADDR: [u8; 6] = [0x67, 0x62, 0x6f, 0x6e, 0x69, 0x6b];
-pub const AP_MAC_ADDR: Bssid = Bssid([0x70, 0xf1, 0x1c, 0x05, 0x2d, 0x7f]);
+
 lazy_static! {
+    pub static ref CLIENT_MAC_ADDR: MacAddr = [0x67, 0x62, 0x6f, 0x6e, 0x69, 0x6b].into();
+    pub static ref AP_MAC_ADDR: Bssid = [0x70, 0xf1, 0x1c, 0x05, 0x2d, 0x7f].into();
     pub static ref AP_SSID: Ssid = Ssid::try_from("ap_ssid").unwrap();
+    pub static ref ETH_DST_MAC: MacAddr = [0x65, 0x74, 0x68, 0x64, 0x73, 0x74].into();
 }
-pub const ETH_DST_MAC: [u8; 6] = [0x65, 0x74, 0x68, 0x64, 0x73, 0x74];
+
 pub const WLANCFG_DEFAULT_AP_CHANNEL: Channel = Channel { primary: 11, cbw: Cbw::Cbw20 };
 
 lazy_static! {
@@ -103,18 +105,18 @@ impl<'a> Supplicant<'a> {
 }
 
 pub fn default_wlantap_config_client() -> WlantapPhyConfig {
-    wlantap_config_client(format!("wlantap-client"), CLIENT_MAC_ADDR)
+    wlantap_config_client(format!("wlantap-client"), *CLIENT_MAC_ADDR)
 }
 
-pub fn wlantap_config_client(name: String, mac_addr: [u8; 6]) -> WlantapPhyConfig {
+pub fn wlantap_config_client(name: String, mac_addr: MacAddr) -> WlantapPhyConfig {
     config::create_wlantap_config(name, mac_addr, WlanMacRole::Client)
 }
 
 pub fn default_wlantap_config_ap() -> WlantapPhyConfig {
-    wlantap_config_ap(format!("wlantap-ap"), AP_MAC_ADDR.0)
+    wlantap_config_ap(format!("wlantap-ap"), (*AP_MAC_ADDR).into())
 }
 
-pub fn wlantap_config_ap(name: String, mac_addr: [u8; 6]) -> WlantapPhyConfig {
+pub fn wlantap_config_ap(name: String, mac_addr: MacAddr) -> WlantapPhyConfig {
     config::create_wlantap_config(name, mac_addr, WlanMacRole::Ap)
 }
 
@@ -147,8 +149,8 @@ pub fn send_sae_authentication_frame(
                 mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                CLIENT_MAC_ADDR,
-                *bssid,
+                *CLIENT_MAC_ADDR,
+                bssid.clone().into(),
                 mac::SequenceControl(0).with_seq_num(123),
             ),
             mac::AuthHdr: &mac::AuthHdr {
@@ -175,8 +177,8 @@ pub fn send_open_authentication(
                 mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
-                CLIENT_MAC_ADDR,
-                *bssid,
+                *CLIENT_MAC_ADDR,
+                bssid.clone().into(),
                 mac::SequenceControl(0).with_seq_num(123),
             ),
             mac::AuthHdr: &mac::AuthHdr {
@@ -202,8 +204,8 @@ pub fn send_association_response(
                 mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_RESP),
-                CLIENT_MAC_ADDR,
-                *bssid,
+                *CLIENT_MAC_ADDR,
+                bssid.clone().into(),
                 mac::SequenceControl(0).with_seq_num(123),
             ),
             mac::AssocRespHdr: &mac::AssocRespHdr {
@@ -237,8 +239,8 @@ pub fn send_disassociate(
                 mac::FrameControl(0)
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::DISASSOC),
-                CLIENT_MAC_ADDR,
-                *bssid,
+                *CLIENT_MAC_ADDR,
+                bssid.clone().into(),
                 mac::SequenceControl(0).with_seq_num(123),
             ),
             mac::DisassocHdr: &mac::DisassocHdr {
@@ -279,7 +281,8 @@ pub fn create_authenticator(
     // The protection used for the actual handshake
     supplicant_protection: Protection,
 ) -> wlan_rsn::Authenticator {
-    let nonce_rdr = wlan_rsn::nonce::NonceReader::new(&bssid.0).expect("creating nonce reader");
+    let nonce_rdr =
+        wlan_rsn::nonce::NonceReader::new(&bssid.clone().into()).expect("creating nonce reader");
     let gtk_provider = wlan_rsn::GtkProvider::new(gtk_cipher).expect("creating gtk provider");
 
     let advertised_protection_info = match advertised_protection {
@@ -325,9 +328,9 @@ pub fn create_authenticator(
                 nonce_rdr,
                 std::sync::Arc::new(std::sync::Mutex::new(gtk_provider)),
                 psk,
-                CLIENT_MAC_ADDR,
+                *CLIENT_MAC_ADDR,
                 supplicant_protection_info,
-                bssid.0,
+                bssid.clone().into(),
                 advertised_protection_info,
             )
             .expect("creating authenticator")
@@ -343,9 +346,9 @@ pub fn create_authenticator(
                 std::sync::Arc::new(std::sync::Mutex::new(igtk_provider)),
                 ssid.clone(),
                 password_or_psk.as_bytes().to_vec(),
-                CLIENT_MAC_ADDR,
+                *CLIENT_MAC_ADDR,
                 supplicant_protection_info,
-                bssid.0,
+                bssid.clone().into(),
                 advertised_protection_info,
             )
             .expect("creating authenticator")
@@ -418,8 +421,8 @@ pub trait ApAdvertisement {
                             ApAdvertisementMode::ProbeResponse{..} => mac::MgmtSubtype::PROBE_RESP
                         }),
                     match mode {
-                        ApAdvertisementMode::Beacon => mac::BCAST_ADDR,
-                        ApAdvertisementMode::ProbeResponse{..} => CLIENT_MAC_ADDR
+                        ApAdvertisementMode::Beacon => ieee80211::BROADCAST_ADDR,
+                        ApAdvertisementMode::ProbeResponse{..} => *CLIENT_MAC_ADDR
                     },
                     *self.bssid(),
                     mac::SequenceControl(0).with_seq_num(123),
@@ -662,9 +665,9 @@ pub async fn connect_or_timeout(
 
 pub fn rx_wlan_data_frame(
     channel: &Channel,
-    addr1: &[u8; 6],
-    addr2: &[u8; 6],
-    addr3: &[u8; 6],
+    addr1: &MacAddr,
+    addr2: &MacAddr,
+    addr3: &MacAddr,
     payload: &[u8],
     ether_type: u16,
     phy: &WlantapPhyProxy,

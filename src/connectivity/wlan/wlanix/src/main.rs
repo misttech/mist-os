@@ -9,6 +9,7 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
     futures::StreamExt,
+    ieee80211::MacAddrBytes,
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
@@ -281,7 +282,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         info!("Connected to requested network");
                         let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
                             new_state: Some(fidl_wlanix::StaIfaceCallbackState::Completed),
-                            bssid: Some(connected_result.bssid.0),
+                            bssid: Some(connected_result.bssid.to_array()),
                             // TODO(fxbug.dev/128604): do we need to keep track of actual id?
                             id: Some(1),
                             ssid: Some(connected_result.ssid),

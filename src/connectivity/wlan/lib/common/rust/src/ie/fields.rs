@@ -1327,7 +1327,7 @@ mod tests {
             let target = iter.next().expect("expected first target");
             assert_eq!(0x44332211, { target.header.hwmp_seqno });
             let ext_addr = target.ext_addr.expect("expected external addr");
-            assert_eq!([0x1a, 0x2a, 0x3a, 0x4a, 0x5a, 0x6a], *ext_addr);
+            assert_eq!(MacAddr::from([0x1a, 0x2a, 0x3a, 0x4a, 0x5a, 0x6a]), *ext_addr);
             assert_eq!(0x6655, target.reason_code.get().0);
         }
 

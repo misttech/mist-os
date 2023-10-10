@@ -84,7 +84,7 @@ fn scan_and_connect<'h>(
 /// In this test, no data is being sent after the link becomes up.
 #[fuchsia::test]
 async fn handle_tx_event_hooks() {
-    const BSSID: Bssid = Bssid(*b"wpa2ok");
+    let bssid: Bssid = Bssid::from(*b"wpa2ok");
     const PASSWORD: &str = "wpa2good";
     const PROTECTION: Protection = Protection::Wpa2Personal;
 
@@ -100,7 +100,7 @@ async fn handle_tx_event_hooks() {
     let mut control = AuthenticationControl {
         updates: UpdateSink::new(),
         authenticator: create_authenticator(
-            &BSSID,
+            &bssid,
             &AP_SSID,
             &PASSWORD,
             CIPHER_CCMP_128,
@@ -128,11 +128,11 @@ async fn handle_tx_event_hooks() {
     helper
         .run_until_complete_or_timeout(
             30.seconds(),
-            format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
+            format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_connect(
                 &phy,
                 &AP_SSID,
-                &BSSID,
+                &bssid,
                 &Channel::new(1, Cbw::Cbw20),
                 &PROTECTION,
                 &mut control,

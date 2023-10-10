@@ -1084,7 +1084,7 @@ mod tests {
 
         let network_id = NetworkIdentifier::try_from("bar", SecurityType::Wpa2).unwrap();
         let credential = Credential::Password(b"password".to_vec());
-        let bssid = types::Bssid([4; 6]);
+        let bssid = types::Bssid::from([4; 6]);
 
         // If connect and network hasn't been saved, we should not save the network.
         saved_networks
@@ -1177,7 +1177,7 @@ mod tests {
         let net_id = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
         let net_id_also_valid = NetworkIdentifier::try_from("foo", SecurityType::Wpa).unwrap();
         let credential = Credential::Password(b"some_password".to_vec());
-        let bssid = types::Bssid([2; 6]);
+        let bssid = types::Bssid::from([2; 6]);
 
         // Save the networks and record a successful connection.
         assert!(saved_networks
@@ -1215,7 +1215,7 @@ mod tests {
         let saved_networks = SavedNetworksManager::new_for_test().await;
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
         let credential = Credential::None;
-        let bssid = types::Bssid([1; 6]);
+        let bssid = types::Bssid::from([1; 6]);
         let before_recording = fasync::Time::now();
 
         // Verify that recording connect result does not save the network.
@@ -1294,7 +1294,7 @@ mod tests {
         let saved_networks = SavedNetworksManager::new_for_test().await;
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
         let credential = Credential::None;
-        let bssid = types::Bssid([0; 6]);
+        let bssid = types::Bssid::from([0; 6]);
         let before_recording = fasync::Time::now();
 
         // Verify that recording connect result does not save the network.

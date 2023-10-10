@@ -6,6 +6,7 @@ use crate::prf;
 use anyhow;
 use bytes::{BufMut, BytesMut};
 use fuchsia_zircon as zx;
+use ieee80211::MacAddr;
 use num::bigint::BigUint;
 use parking_lot::Mutex;
 use rand::{rngs::OsRng, Rng as _};
@@ -22,7 +23,7 @@ pub struct NonceReader {
 }
 
 impl NonceReader {
-    pub fn new(sta_addr: &[u8]) -> Result<Arc<NonceReader>, anyhow::Error> {
+    pub fn new(sta_addr: &MacAddr) -> Result<Arc<NonceReader>, anyhow::Error> {
         // Write time and STA's address to buffer for PRF-256.
         // It's unclear whether or not using PRF has any significant cryptographic advantage.
         // For the time being, follow IEEE's recommendation for nonce generation.
@@ -32,7 +33,7 @@ impl NonceReader {
         let mut buf = BytesMut::with_capacity(14);
         let epoch_nanos = zx::Time::get_monotonic().into_nanos();
         buf.put_i64_le(epoch_nanos);
-        buf.put_slice(sta_addr);
+        buf.put_slice(sta_addr.as_slice());
         let k = OsRng.gen::<[u8; 32]>();
         let init = prf::prf(&k[..], "Init Counter", &buf[..], 8 * std::mem::size_of_val(&k))?;
         Ok(Arc::new(NonceReader { key_counter: Mutex::new(BigUint::from_bytes_le(&init[..])) }))
@@ -57,8 +58,8 @@ mod tests {
 
     #[test]
     fn test_next_nonce() {
-        let addr: [u8; 6] = [1, 2, 3, 4, 5, 6];
-        let rdr = NonceReader::new(&addr[..]).expect("error creating NonceReader");
+        let addr = MacAddr::from([1, 2, 3, 4, 5, 6]);
+        let rdr = NonceReader::new(&addr).expect("error creating NonceReader");
         let mut previous_nonce = rdr.next();
         for _ in 0..300 {
             let nonce = rdr.next();

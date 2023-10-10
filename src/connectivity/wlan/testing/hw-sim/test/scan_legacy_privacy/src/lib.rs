@@ -5,7 +5,7 @@
 use {
     fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_test_wlan_realm::WlanConfig,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     lazy_static::lazy_static,
     pin_utils::pin_mut,
     std::convert::TryFrom,
@@ -16,11 +16,10 @@ use {
     wlan_hw_sim::{event::action, *},
 };
 
-const BSS_WPA1: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
-const BSS_WEP: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x72]);
-const BSS_MIXED: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x7a]);
-
 lazy_static! {
+    static ref BSS_WPA1: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+    static ref BSS_WEP: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x72]);
+    static ref BSS_MIXED: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x7a]);
     static ref SSID_WPA1: Ssid = Ssid::try_from("wpa1___how_nice").unwrap();
     static ref SSID_WEP: Ssid = Ssid::try_from("wep_is_soooo_secure").unwrap();
     static ref SSID_MIXED: Ssid = Ssid::try_from("this_is_fine").unwrap();
@@ -54,21 +53,21 @@ async fn scan_legacy_privacy() {
                 [
                     Beacon {
                         channel: Channel::new(1, Cbw::Cbw20),
-                        bssid: BSS_WPA1,
+                        bssid: *BSS_WPA1,
                         ssid: SSID_WPA1.clone(),
                         protection: Protection::Wpa1,
                         rssi_dbm: -30,
                     },
                     Beacon {
                         channel: Channel::new(1, Cbw::Cbw20),
-                        bssid: BSS_WEP,
+                        bssid: *BSS_WEP,
                         ssid: SSID_WEP.clone(),
                         protection: Protection::Wep,
                         rssi_dbm: -40,
                     },
                     Beacon {
                         channel: Channel::new(1, Cbw::Cbw20),
-                        bssid: BSS_MIXED,
+                        bssid: *BSS_MIXED,
                         ssid: SSID_MIXED.clone(),
                         protection: Protection::Wpa1Wpa2Personal,
                         rssi_dbm: -50,
@@ -86,7 +85,7 @@ async fn scan_legacy_privacy() {
                 type_: fidl_policy::SecurityType::Wpa2,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_MIXED.0.clone()),
+                bssid: Some(BSS_MIXED.to_array()),
                 rssi: Some(-50),
                 frequency: Some(2412),
                 ..Default::default()
@@ -100,7 +99,7 @@ async fn scan_legacy_privacy() {
                 type_: fidl_policy::SecurityType::Wep,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_WEP.0.clone()),
+                bssid: Some(BSS_WEP.to_array()),
                 rssi: Some(-40),
                 frequency: Some(2412),
                 ..Default::default()
@@ -114,7 +113,7 @@ async fn scan_legacy_privacy() {
                 type_: fidl_policy::SecurityType::Wpa,
             }),
             entries: Some(vec![fidl_policy::Bss {
-                bssid: Some(BSS_WPA1.0.clone()),
+                bssid: Some(BSS_WPA1.to_array()),
                 rssi: Some(-30),
                 frequency: Some(2412),
                 ..Default::default()

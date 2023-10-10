@@ -33,7 +33,7 @@ use {
     },
     eapol,
     fidl_fuchsia_wlan_mlme::{EapolResultCode, SaeFrame},
-    ieee80211::Ssid,
+    ieee80211::{MacAddr, Ssid},
     std::sync::{Arc, Mutex},
     tracing::warn,
     wlan_common::ie::{
@@ -81,9 +81,9 @@ impl Supplicant {
     pub fn new_wpa_personal(
         nonce_rdr: Arc<nonce::NonceReader>,
         auth_cfg: auth::Config,
-        s_addr: [u8; 6],
+        s_addr: MacAddr,
         s_protection: ProtectionInfo,
-        a_addr: [u8; 6],
+        a_addr: MacAddr,
         a_protection: ProtectionInfo,
     ) -> Result<Supplicant, anyhow::Error> {
         let negotiated_protection = NegotiatedProtection::from_protection(&s_protection)?;
@@ -224,9 +224,9 @@ impl Authenticator {
         nonce_rdr: Arc<nonce::NonceReader>,
         gtk_provider: Arc<Mutex<gtk::GtkProvider>>,
         psk: psk::Psk,
-        s_addr: [u8; 6],
+        s_addr: MacAddr,
         s_protection: ProtectionInfo,
-        a_addr: [u8; 6],
+        a_addr: MacAddr,
         a_protection: ProtectionInfo,
     ) -> Result<Authenticator, anyhow::Error> {
         let negotiated_protection = NegotiatedProtection::from_protection(&s_protection)?;
@@ -261,9 +261,9 @@ impl Authenticator {
         igtk_provider: Arc<Mutex<igtk::IgtkProvider>>,
         ssid: Ssid,
         password: Vec<u8>,
-        s_addr: [u8; 6],
+        s_addr: MacAddr,
         s_protection: ProtectionInfo,
-        a_addr: [u8; 6],
+        a_addr: MacAddr,
         a_protection: ProtectionInfo,
     ) -> Result<Authenticator, anyhow::Error> {
         let negotiated_protection = NegotiatedProtection::from_protection(&s_protection)?;

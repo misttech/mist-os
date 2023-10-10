@@ -17,12 +17,12 @@ use {
     anyhow::format_err,
     banjo_fuchsia_wlan_common as banjo_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    ieee80211::{MacAddr, Ssid},
+    ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::collections::{HashMap, VecDeque},
     tracing::error,
     wlan_common::{
         ie,
-        mac::{self, is_multicast, CapabilityInfo, EthernetIIHdr},
+        mac::{self, CapabilityInfo, EthernetIIHdr},
         tim,
         timer::EventId,
         TimeUnit,
@@ -58,7 +58,7 @@ fn get_client_mut(
 /// This will discard any more specific error information (e.g. if it was a FIDL error or a
 /// anyhow::Error error), but will still preserve the underlying zx::Status code.
 fn make_client_error(addr: MacAddr, e: Error) -> Error {
-    Error::Status(format!("client {:02X?}: {}", addr, e), e.into())
+    Error::Status(format!("client {}: {}", addr, e), e.into())
 }
 
 impl InfraBss {
@@ -155,7 +155,7 @@ impl InfraBss {
         ctx: &mut Context<D>,
         resp: fidl_mlme::AuthenticateResponse,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, resp.peer_sta_address)?;
+        let client = get_client_mut(&mut self.clients, resp.peer_sta_address.into())?;
         client
             .handle_mlme_auth_resp(ctx, resp.result_code)
             .map_err(|e| make_client_error(client.addr, e))
@@ -166,12 +166,12 @@ impl InfraBss {
         ctx: &mut Context<D>,
         req: fidl_mlme::DeauthenticateRequest,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
+        let client = get_client_mut(&mut self.clients, req.peer_sta_address.into())?;
         client
             .handle_mlme_deauth_req(ctx, req.reason_code)
             .map_err(|e| make_client_error(client.addr, e))?;
         if client.deauthenticated() {
-            self.clients.remove(&req.peer_sta_address);
+            self.clients.remove(&req.peer_sta_address.into());
         }
         Ok(())
     }
@@ -181,7 +181,7 @@ impl InfraBss {
         ctx: &mut Context<D>,
         resp: fidl_mlme::AssociateResponse,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, resp.peer_sta_address)?;
+        let client = get_client_mut(&mut self.clients, resp.peer_sta_address.into())?;
 
         client
             .handle_mlme_assoc_resp(
@@ -201,7 +201,7 @@ impl InfraBss {
         ctx: &mut Context<D>,
         req: fidl_mlme::DisassociateRequest,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
+        let client = get_client_mut(&mut self.clients, req.peer_sta_address.into())?;
         client
             .handle_mlme_disassoc_req(ctx, req.reason_code.into_primitive())
             .map_err(|e| make_client_error(client.addr, e))
@@ -211,7 +211,7 @@ impl InfraBss {
         &mut self,
         req: fidl_mlme::SetControlledPortRequest,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, req.peer_sta_address)?;
+        let client = get_client_mut(&mut self.clients, req.peer_sta_address.into())?;
         client
             .handle_mlme_set_controlled_port_req(req.state)
             .map_err(|e| make_client_error(client.addr, e))
@@ -222,16 +222,18 @@ impl InfraBss {
         ctx: &mut Context<D>,
         req: fidl_mlme::EapolRequest,
     ) -> Result<(), Error> {
-        let client = get_client_mut(&mut self.clients, req.dst_addr)?;
+        let client = get_client_mut(&mut self.clients, req.dst_addr.into())?;
         match client
-            .handle_mlme_eapol_req(ctx, req.src_addr, &req.data)
+            .handle_mlme_eapol_req(ctx, req.src_addr.into(), &req.data)
             .map_err(|e| make_client_error(client.addr, e))
         {
-            Ok(()) => ctx.send_mlme_eapol_conf(fidl_mlme::EapolResultCode::Success, req.dst_addr),
+            Ok(()) => {
+                ctx.send_mlme_eapol_conf(fidl_mlme::EapolResultCode::Success, req.dst_addr.into())
+            }
             Err(e) => {
                 if let Err(e) = ctx.send_mlme_eapol_conf(
                     fidl_mlme::EapolResultCode::TransmissionFailure,
-                    req.dst_addr,
+                    req.dst_addr.into(),
                 ) {
                     error!("Failed to send eapol transmission failure: {:?}", e);
                 }
@@ -307,7 +309,8 @@ impl InfraBss {
             return Err(Rejection::BadDsBits);
         }
 
-        let to_bss = mgmt_hdr.addr1 == ctx.bssid.0 && mgmt_hdr.addr3 == ctx.bssid.0;
+        let to_bss = mgmt_hdr.addr1.as_array() == ctx.bssid.as_array()
+            && mgmt_hdr.addr3.as_array() == ctx.bssid.as_array();
         let client_addr = mgmt_hdr.addr2;
 
         let mgmt_subtype = *&{ mgmt_hdr.frame_ctrl }.mgmt_subtype();
@@ -319,7 +322,10 @@ impl InfraBss {
                 )));
             }
 
-            if to_bss || (mgmt_hdr.addr1 == mac::BCAST_ADDR && mgmt_hdr.addr3 == mac::BCAST_ADDR) {
+            if to_bss
+                || (mgmt_hdr.addr1 == ieee80211::BROADCAST_ADDR
+                    && mgmt_hdr.addr3 == ieee80211::BROADCAST_ADDR)
+            {
                 // Allow either probe request sent directly to the AP, or ones that are broadcast.
                 for (id, ie_body) in ie::Reader::new(&body[..]) {
                     match id {
@@ -403,7 +409,7 @@ impl InfraBss {
         qos_ctrl: Option<mac::QosControl>,
         body: B,
     ) -> Result<(), Rejection> {
-        if mac::data_receiver_addr(&fixed_fields) != ctx.bssid.0 {
+        if mac::data_receiver_addr(&fixed_fields).as_array() != ctx.bssid.as_array() {
             // Frame is not for this BSSID.
             return Err(Rejection::OtherBss);
         }
@@ -517,7 +523,7 @@ impl InfraBss {
         hdr: EthernetIIHdr,
         body: &[u8],
     ) -> Result<(), Rejection> {
-        if is_multicast(hdr.da) {
+        if hdr.da.is_multicast() {
             return self.handle_multicast_eth_frame(ctx, hdr, body);
         }
 
@@ -591,6 +597,7 @@ mod tests {
         },
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync,
         ieee80211::Bssid,
+        lazy_static::lazy_static,
         std::{
             convert::TryFrom,
             sync::{Arc, Mutex},
@@ -605,14 +612,16 @@ mod tests {
         },
     };
 
-    const CLIENT_ADDR: MacAddr = [4u8; 6];
-    const BSSID: Bssid = Bssid([2u8; 6]);
-    const CLIENT_ADDR2: MacAddr = [6u8; 6];
-    const REMOTE_ADDR: MacAddr = [123u8; 6];
+    lazy_static! {
+        static ref CLIENT_ADDR: MacAddr = [4u8; 6].into();
+        static ref BSSID: Bssid = [2u8; 6].into();
+        static ref CLIENT_ADDR2: MacAddr = [6u8; 6].into();
+        static ref REMOTE_ADDR: MacAddr = [123u8; 6].into();
+    }
 
     fn make_context(fake_device: FakeDevice) -> (Context<FakeDevice>, TimeStream<TimedEvent>) {
         let (timer, time_stream) = create_timer();
-        (Context::new(fake_device, FakeBufferProvider::new(), timer, BSSID), time_stream)
+        (Context::new(fake_device, FakeBufferProvider::new(), timer, *BSSID), time_stream)
     }
 
     fn make_infra_bss(ctx: &mut Context<FakeDevice>) -> InfraBss {
@@ -716,12 +725,12 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_auth_resp(
             &mut ctx,
             fidl_mlme::AuthenticateResponse {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
             },
         )
@@ -757,7 +766,7 @@ mod tests {
                 bss.handle_mlme_auth_resp(
                     &mut ctx,
                     fidl_mlme::AuthenticateResponse {
-                        peer_sta_address: CLIENT_ADDR,
+                        peer_sta_address: CLIENT_ADDR.to_array(),
                         result_code: fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired,
                     },
                 )
@@ -774,12 +783,12 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_deauth_req(
             &mut ctx,
             fidl_mlme::DeauthenticateRequest {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             },
         )
@@ -810,11 +819,11 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         bss.handle_mlme_assoc_resp(
             &mut ctx,
             fidl_mlme::AssociateResponse {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 result_code: fidl_mlme::AssociateResultCode::Success,
                 association_id: 1,
                 capability_info: 0,
@@ -863,12 +872,12 @@ mod tests {
         )
         .expect("expected InfraBss::new ok");
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_assoc_resp(
             &mut ctx,
             fidl_mlme::AssociateResponse {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 result_code: fidl_mlme::AssociateResultCode::Success,
                 association_id: 1,
                 capability_info: CapabilityInfo(0).with_short_preamble(true).raw(),
@@ -907,12 +916,12 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_disassoc_req(
             &mut ctx,
             fidl_mlme::DisassociateRequest {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
             },
         )
@@ -941,12 +950,12 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_assoc_resp(
             &mut ctx,
             fidl_mlme::AssociateResponse {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 result_code: fidl_mlme::AssociateResultCode::Success,
                 association_id: 1,
                 capability_info: 0,
@@ -956,7 +965,7 @@ mod tests {
         .expect("expected InfraBss::handle_mlme_assoc_resp ok");
 
         bss.handle_mlme_set_controlled_port_req(fidl_mlme::SetControlledPortRequest {
-            peer_sta_address: CLIENT_ADDR,
+            peer_sta_address: CLIENT_ADDR.to_array(),
             state: fidl_mlme::ControlledPortState::Open,
         })
         .expect("expected InfraBss::handle_mlme_set_controlled_port_req ok");
@@ -969,13 +978,13 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         bss.handle_mlme_eapol_req(
             &mut ctx,
             fidl_mlme::EapolRequest {
-                dst_addr: CLIENT_ADDR,
-                src_addr: BSSID.0,
+                dst_addr: CLIENT_ADDR.to_array(),
+                src_addr: BSSID.to_array(),
                 data: vec![1, 2, 3],
             },
         )
@@ -1005,7 +1014,7 @@ mod tests {
             .next_mlme_msg::<fidl_mlme::EapolConfirm>()
             .expect("Did not receive valid Eapol Confirm msg");
         assert_eq!(confirm.result_code, fidl_mlme::EapolResultCode::Success);
-        assert_eq!(&confirm.dst_addr[..], &CLIENT_ADDR[..]);
+        assert_eq!(&confirm.dst_addr, CLIENT_ADDR.as_array());
     }
 
     #[test]
@@ -1022,9 +1031,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
                 duration: 0,
-                addr1: BSSID.0,
-                addr2: CLIENT_ADDR,
-                addr3: BSSID.0,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[
@@ -1046,7 +1055,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AuthenticateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 auth_type: fidl_mlme::AuthenticationTypes::OpenSystem,
             },
         );
@@ -1059,7 +1068,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
             .handle_mlme_auth_resp(&mut ctx, fidl_mlme::AuthenticateResultCode::Success)
@@ -1072,9 +1081,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
                 duration: 0,
-                addr1: BSSID.0,
-                addr2: CLIENT_ADDR,
-                addr3: BSSID.0,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[
@@ -1099,7 +1108,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::AssociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 listen_interval: 10,
                 ssid: Some(Ssid::try_from("coolnet").unwrap().into()),
                 capability_info: 0,
@@ -1125,9 +1134,9 @@ mod tests {
                         .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
                         .with_to_ds(true),
                     duration: 0,
-                    addr1: BSSID.0,
-                    addr2: CLIENT_ADDR,
-                    addr3: BSSID.0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -1160,9 +1169,9 @@ mod tests {
                         .with_mgmt_subtype(mac::MgmtSubtype::AUTH)
                         .with_from_ds(true),
                     duration: 0,
-                    addr1: BSSID.0,
-                    addr2: CLIENT_ADDR,
-                    addr3: BSSID.0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -1194,9 +1203,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::MGMT)
                         .with_mgmt_subtype(mac::MgmtSubtype::DISASSOC),
                     duration: 0,
-                    addr1: BSSID.0,
-                    addr2: CLIENT_ADDR,
-                    addr3: BSSID.0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -1226,9 +1235,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::MGMT)
                         .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
                     duration: 0,
-                    addr1: BSSID.0,
-                    addr2: CLIENT_ADDR,
-                    addr3: BSSID.0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[
@@ -1249,7 +1258,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
 
         // Move the client to associated so it can handle data frames.
@@ -1275,9 +1284,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::DATA)
                     .with_to_ds(true),
                 duration: 0,
-                addr1: BSSID.0.clone(),
-                addr2: CLIENT_ADDR,
-                addr3: CLIENT_ADDR2,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: *CLIENT_ADDR2,
                 seq_ctrl: mac::SequenceControl(10),
             },
             None,
@@ -1320,9 +1329,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::DATA)
                         .with_to_ds(false),
                     duration: 0,
-                    addr1: BSSID.0.clone(),
-                    addr2: CLIENT_ADDR,
-                    addr3: CLIENT_ADDR2,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: *CLIENT_ADDR2,
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 None,
@@ -1349,7 +1358,7 @@ mod tests {
         let (mut ctx, mut time_stream) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
 
         // Move the client to associated so it can handle data frames.
@@ -1375,7 +1384,7 @@ mod tests {
         bss.handle_timed_event(
             &mut ctx,
             timed_event.id,
-            TimedEvent::ClientEvent(CLIENT_ADDR, ClientEvent::BssIdleTimeout),
+            TimedEvent::ClientEvent(*CLIENT_ADDR, ClientEvent::BssIdleTimeout),
         )
         .expect("expected OK");
 
@@ -1402,7 +1411,7 @@ mod tests {
         assert_eq!(
             msg,
             fidl_mlme::DisassociateIndication {
-                peer_sta_address: CLIENT_ADDR,
+                peer_sta_address: CLIENT_ADDR.to_array(),
                 reason_code: fidl_ieee80211::ReasonCode::ReasonInactivity,
                 locally_initiated: true,
             },
@@ -1424,9 +1433,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::DATA)
                         .with_to_ds(true),
                     duration: 0,
-                    addr1: BSSID.0.clone(),
-                    addr2: CLIENT_ADDR,
-                    addr3: CLIENT_ADDR2,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: *CLIENT_ADDR2,
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 None,
@@ -1469,7 +1478,7 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
 
         // Move the client to authenticated, but not associated: data frames are still not
@@ -1488,9 +1497,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::DATA)
                         .with_to_ds(true),
                     duration: 0,
-                    addr1: BSSID.0.clone(),
-                    addr2: CLIENT_ADDR,
-                    addr3: CLIENT_ADDR2,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: *CLIENT_ADDR2,
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 None,
@@ -1532,7 +1541,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -1554,8 +1563,8 @@ mod tests {
         bss.handle_eth_frame(
             &mut ctx,
             EthernetIIHdr {
-                da: CLIENT_ADDR,
-                sa: CLIENT_ADDR2,
+                da: *CLIENT_ADDR,
+                sa: *CLIENT_ADDR2,
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
@@ -1593,8 +1602,8 @@ mod tests {
             bss.handle_eth_frame(
                 &mut ctx,
                 EthernetIIHdr {
-                    da: CLIENT_ADDR,
-                    sa: CLIENT_ADDR2,
+                    da: *CLIENT_ADDR,
+                    sa: *CLIENT_ADDR2,
                     ether_type: BigEndianU16::from_native(0x1234)
                 },
                 &[1, 2, 3, 4, 5][..],
@@ -1612,7 +1621,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -1635,8 +1644,8 @@ mod tests {
             bss.handle_eth_frame(
                 &mut ctx,
                 EthernetIIHdr {
-                    da: CLIENT_ADDR,
-                    sa: CLIENT_ADDR2,
+                    da: *CLIENT_ADDR,
+                    sa: *CLIENT_ADDR2,
                     ether_type: BigEndianU16::from_native(0x1234)
                 },
                 &[1, 2, 3, 4, 5][..],
@@ -1652,7 +1661,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -1678,8 +1687,8 @@ mod tests {
         bss.handle_eth_frame(
             &mut ctx,
             EthernetIIHdr {
-                da: CLIENT_ADDR,
-                sa: CLIENT_ADDR2,
+                da: *CLIENT_ADDR,
+                sa: *CLIENT_ADDR2,
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
@@ -1713,7 +1722,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_protected_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -1745,9 +1754,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::DATA)
                     .with_to_ds(true),
                 duration: 0,
-                addr1: BSSID.0.clone(),
-                addr2: CLIENT_ADDR,
-                addr3: CLIENT_ADDR2,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: *CLIENT_ADDR2,
                 seq_ctrl: mac::SequenceControl(10),
             },
             None,
@@ -1782,9 +1791,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::AUTH),
                 duration: 0,
-                addr1: BSSID.0,
+                addr1: (*BSSID).into(),
                 addr2: client_addr,
-                addr3: BSSID.0,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[
@@ -1804,7 +1813,7 @@ mod tests {
         bss.handle_mlme_auth_resp(
             ctx,
             fidl_mlme::AuthenticateResponse {
-                peer_sta_address: client_addr.clone(),
+                peer_sta_address: client_addr.to_array(),
                 result_code: fidl_mlme::AuthenticateResultCode::Success,
             },
         )
@@ -1827,9 +1836,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::ASSOC_REQ),
                 duration: 0,
-                addr1: BSSID.0,
+                addr1: (*BSSID).into(),
                 addr2: client_addr,
-                addr3: BSSID.0,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[
@@ -1851,7 +1860,7 @@ mod tests {
         bss.handle_mlme_assoc_resp(
             ctx,
             fidl_mlme::AssociateResponse {
-                peer_sta_address: client_addr,
+                peer_sta_address: client_addr.to_array(),
                 result_code: fidl_mlme::AssociateResultCode::Success,
                 association_id,
                 capability_info: msg.capability_info,
@@ -1872,7 +1881,7 @@ mod tests {
             ctx,
             EthernetIIHdr {
                 da: client_addr,
-                sa: REMOTE_ADDR,
+                sa: *REMOTE_ADDR,
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
@@ -1887,17 +1896,17 @@ mod tests {
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
 
-        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR);
-        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR2);
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR);
+        authenticate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2);
 
-        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR, 1);
-        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, CLIENT_ADDR2, 2);
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR, 1);
+        associate_client(fake_device_state.clone(), &mut ctx, &mut bss, *CLIENT_ADDR2, 2);
 
         assert!(bss.clients.contains_key(&CLIENT_ADDR));
         assert!(bss.clients.contains_key(&CLIENT_ADDR2));
 
-        send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, CLIENT_ADDR);
-        send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, CLIENT_ADDR2);
+        send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, *CLIENT_ADDR);
+        send_eth_frame_from_ds_to_client(&mut ctx, &mut bss, *CLIENT_ADDR2);
 
         assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 2);
     }
@@ -1908,7 +1917,7 @@ mod tests {
         let (fake_device, fake_device_state) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -1931,8 +1940,8 @@ mod tests {
         bss.handle_eth_frame(
             &mut ctx,
             EthernetIIHdr {
-                da: CLIENT_ADDR,
-                sa: CLIENT_ADDR2,
+                da: *CLIENT_ADDR,
+                sa: *CLIENT_ADDR2,
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],
@@ -1984,7 +1993,7 @@ mod tests {
                 cipher_suite_oui: [1, 2, 3],
                 cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4),
                 key_type: fidl_mlme::KeyType::Pairwise,
-                address: [5; 6],
+                address: [5; 6].into(),
                 key_id: 6,
                 key: vec![1, 2, 3, 4, 5, 6, 7],
                 rsc: 8,
@@ -1997,7 +2006,7 @@ mod tests {
         assert_eq!(key.cipher_oui, [1, 2, 3]);
         assert_eq!(key.cipher_type, 4);
         assert_eq!(key.key_type, crate::key::KeyType::PAIRWISE);
-        assert_eq!(key.peer_addr, [5; 6]);
+        assert_eq!(key.peer_addr, [5; 6].into());
         assert_eq!(key.key_idx, 6);
         assert_eq!(key.key[0..key.key_len as usize], [1, 2, 3, 4, 5, 6, 7]);
         assert_eq!(key.rsc, 8);
@@ -2046,7 +2055,7 @@ mod tests {
         )
         .expect("expected InfraBss::new ok");
 
-        bss.handle_probe_req(&mut ctx, CLIENT_ADDR)
+        bss.handle_probe_req(&mut ctx, *CLIENT_ADDR)
             .expect("expected InfraBss::handle_probe_req ok");
         assert_eq!(fake_device_state.lock().unwrap().wlan_queue.len(), 1);
         assert_eq!(
@@ -2098,9 +2107,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
                 duration: 0,
-                addr1: BSSID.0,
-                addr2: CLIENT_ADDR,
-                addr3: BSSID.0,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[][..],
@@ -2132,9 +2141,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
                 duration: 0,
-                addr1: BSSID.0,
-                addr2: CLIENT_ADDR,
-                addr3: BSSID.0,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[
@@ -2191,9 +2200,9 @@ mod tests {
                     .with_frame_type(mac::FrameType::MGMT)
                     .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
                 duration: 0,
-                addr1: BSSID.0,
-                addr2: CLIENT_ADDR,
-                addr3: BSSID.0,
+                addr1: (*BSSID).into(),
+                addr2: *CLIENT_ADDR,
+                addr3: (*BSSID).into(),
                 seq_ctrl: mac::SequenceControl(10),
             },
             &[0, 5, 1, 2, 3, 4, 5][..],
@@ -2249,9 +2258,9 @@ mod tests {
                         .with_frame_type(mac::FrameType::MGMT)
                         .with_mgmt_subtype(mac::MgmtSubtype::PROBE_REQ),
                     duration: 0,
-                    addr1: BSSID.0,
-                    addr2: CLIENT_ADDR,
-                    addr3: BSSID.0,
+                    addr1: (*BSSID).into(),
+                    addr2: *CLIENT_ADDR,
+                    addr3: (*BSSID).into(),
                     seq_ctrl: mac::SequenceControl(10),
                 },
                 &[0, 5, 1, 2, 3, 4, 6][..],
@@ -2267,7 +2276,7 @@ mod tests {
         let (fake_device, _) = FakeDevice::new(&exec);
         let (mut ctx, _) = make_context(fake_device);
         let mut bss = make_infra_bss(&mut ctx);
-        bss.clients.insert(CLIENT_ADDR, RemoteClient::new(CLIENT_ADDR));
+        bss.clients.insert(*CLIENT_ADDR, RemoteClient::new(*CLIENT_ADDR));
 
         let client = bss.clients.get_mut(&CLIENT_ADDR).unwrap();
         client
@@ -2289,8 +2298,8 @@ mod tests {
         bss.handle_eth_frame(
             &mut ctx,
             EthernetIIHdr {
-                da: CLIENT_ADDR,
-                sa: CLIENT_ADDR2,
+                da: *CLIENT_ADDR,
+                sa: *CLIENT_ADDR2,
                 ether_type: BigEndianU16::from_native(0x1234),
             },
             &[1, 2, 3, 4, 5][..],

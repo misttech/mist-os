@@ -12,12 +12,12 @@ use {
     fidl_test_wlan_realm::WlanConfig,
     fuchsia_zircon::DurationNum,
     ieee80211::Bssid,
+    lazy_static::lazy_static,
     pin_utils::pin_mut,
     realm_proxy::client::RealmProxyClient,
     wlan_common::{
         bss::Protection,
         channel::{Cbw, Channel},
-        format::MacFmt as _,
     },
     wlan_hw_sim::{
         event::{action, Handler},
@@ -25,7 +25,9 @@ use {
     },
 };
 
-const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+lazy_static! {
+    static ref BSSID: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+}
 
 #[rustfmt::skip]
 const WSC_IE_BODY: &'static [u8] = &[
@@ -90,7 +92,7 @@ async fn verify_wlan_inspect() {
         let protection = Protection::Open;
         let probes = [ProbeResponse {
             channel,
-            bssid: BSSID,
+            bssid: *BSSID,
             ssid: AP_SSID.clone(),
             protection,
             rssi_dbm: -10,
@@ -116,7 +118,7 @@ async fn verify_wlan_inspect() {
         let () = helper
             .run_until_complete_or_timeout(
                 240.seconds(),
-                format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
+                format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), *BSSID),
                 event::on_scan(action::send_advertisements_and_scan_completion(&phy, probes))
                     .or(event::on_transmit(action::connect_with_open_authentication(
                         &phy,
@@ -169,7 +171,7 @@ async fn verify_wlan_inspect() {
                         status: contains {
                             status_str: "connected",
                             connected_to: contains {
-                                bssid: BSSID.0.to_mac_string(),
+                                bssid: BSSID.to_string(),
                                 ssid: AP_SSID.to_string(),
                                 ssid_hash: AnyProperty,
                                 wsc: {
@@ -242,7 +244,7 @@ async fn verify_wlan_inspect() {
                         status: contains {
                             status_str: "idle",
                             prev_connected_to: contains {
-                                bssid: BSSID.0.to_mac_string(),
+                                bssid: BSSID.to_string(),
                                 ssid: AP_SSID.to_string(),
                                 ssid_hash: AnyProperty,
                                 wsc: {

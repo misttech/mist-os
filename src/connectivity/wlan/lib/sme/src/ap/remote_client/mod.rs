@@ -14,7 +14,7 @@ use {
     },
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
-    ieee80211::MacAddr,
+    ieee80211::{MacAddr, MacAddrBytes},
     tracing::error,
     wlan_common::{
         ie::SupportedRate,
@@ -111,7 +111,7 @@ impl RemoteClient {
         // TODO(fxbug.dev/91118) - Added to help investigate hw-sim test. Remove later
         tracing::info!("Sending fidl_mlme::AuthenticateResponse - result code: {:?}", result_code);
         ctx.mlme_sink.send(MlmeRequest::AuthResponse(fidl_mlme::AuthenticateResponse {
-            peer_sta_address: self.addr.clone(),
+            peer_sta_address: self.addr.to_array(),
             result_code,
         }))
     }
@@ -123,7 +123,7 @@ impl RemoteClient {
         reason_code: fidl_ieee80211::ReasonCode,
     ) {
         ctx.mlme_sink.send(MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
-            peer_sta_address: self.addr.clone(),
+            peer_sta_address: self.addr.to_array(),
             reason_code,
         }))
     }
@@ -138,7 +138,7 @@ impl RemoteClient {
         rates: Vec<SupportedRate>,
     ) {
         ctx.mlme_sink.send(MlmeRequest::AssocResponse(fidl_mlme::AssociateResponse {
-            peer_sta_address: self.addr.clone(),
+            peer_sta_address: self.addr.to_array(),
             result_code,
             association_id: aid,
             capability_info: capabilities.0,
@@ -150,7 +150,7 @@ impl RemoteClient {
     pub fn send_eapol_req(&mut self, ctx: &mut Context, frame: eapol::KeyFrameBuf) {
         ctx.mlme_sink.send(MlmeRequest::Eapol(fidl_mlme::EapolRequest {
             src_addr: ctx.device_info.sta_addr.clone(),
-            dst_addr: self.addr.clone(),
+            dst_addr: self.addr.to_array(),
             data: frame.into(),
         }));
     }
@@ -162,7 +162,7 @@ impl RemoteClient {
         port_state: fidl_mlme::ControlledPortState,
     ) {
         ctx.mlme_sink.send(MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {
-            peer_sta_address: self.addr.clone(),
+            peer_sta_address: self.addr.to_array(),
             state: port_state,
         }));
     }
@@ -173,7 +173,7 @@ impl RemoteClient {
                 key: ptk.tk().to_vec(),
                 key_id: 0,
                 key_type: fidl_mlme::KeyType::Pairwise,
-                address: self.addr.clone(),
+                address: self.addr.to_array(),
                 rsc: 0,
                 cipher_suite_oui: eapol::to_array(&ptk.cipher.oui[..]),
                 cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
@@ -217,20 +217,23 @@ mod tests {
         super::*,
         crate::{ap::TimeStream, test_utils, MlmeSink, MlmeStream},
         futures::channel::mpsc,
+        lazy_static::lazy_static,
         wlan_common::{
             assert_variant, test_utils::fake_features::fake_mac_sublayer_support, timer,
         },
     };
 
-    const AP_ADDR: MacAddr = [6u8; 6];
-    const CLIENT_ADDR: MacAddr = [7u8; 6];
+    lazy_static! {
+        static ref AP_ADDR: MacAddr = [6u8; 6].into();
+        static ref CLIENT_ADDR: MacAddr = [7u8; 6].into();
+    }
 
     fn make_remote_client() -> RemoteClient {
-        RemoteClient::new(CLIENT_ADDR)
+        RemoteClient::new(*CLIENT_ADDR)
     }
 
     fn make_env() -> (Context, MlmeStream, TimeStream) {
-        let device_info = test_utils::fake_device_info(AP_ADDR);
+        let device_info = test_utils::fake_device_info(*AP_ADDR);
         let mac_sublayer_support = fake_mac_sublayer_support();
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (timer, time_stream) = timer::create_timer();
@@ -344,7 +347,7 @@ mod tests {
             peer_sta_address,
             result_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AuthenticateResultCode::AntiCloggingTokenRequired);
         });
     }
@@ -380,7 +383,7 @@ mod tests {
             capability_info,
             rates,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(result_code, fidl_mlme::AssociateResultCode::RefusedApOutOfMemory);
             assert_eq!(association_id, 1);
             assert_eq!(capability_info, CapabilityInfo(0).with_short_preamble(true).raw());
@@ -398,7 +401,7 @@ mod tests {
             peer_sta_address,
             reason_code,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(reason_code, fidl_ieee80211::ReasonCode::NoMoreStas);
         });
     }
@@ -414,8 +417,8 @@ mod tests {
             dst_addr,
             data,
         }) => {
-            assert_eq!(src_addr, AP_ADDR);
-            assert_eq!(dst_addr, CLIENT_ADDR);
+            assert_eq!(&src_addr, AP_ADDR.as_array());
+            assert_eq!(&dst_addr, CLIENT_ADDR.as_array());
             assert_eq!(data, Vec::<u8>::from(test_utils::eapol_key_frame()));
         });
     }
@@ -432,7 +435,7 @@ mod tests {
             assert_eq!(k.key, vec![0xCCu8; test_utils::cipher().tk_bytes().unwrap()]);
             assert_eq!(k.key_id, 0);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Pairwise);
-            assert_eq!(k.address, CLIENT_ADDR);
+            assert_eq!(&k.address, CLIENT_ADDR.as_array());
             assert_eq!(k.rsc, 0);
             assert_eq!(k.cipher_suite_oui, [0x00, 0x0F, 0xAC]);
             assert_eq!(k.cipher_suite_type, fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(4));
@@ -468,7 +471,7 @@ mod tests {
             peer_sta_address,
             state,
         }) => {
-            assert_eq!(peer_sta_address, CLIENT_ADDR);
+            assert_eq!(&peer_sta_address, CLIENT_ADDR.as_array());
             assert_eq!(state, fidl_mlme::ControlledPortState::Open);
         });
     }
@@ -485,7 +488,7 @@ mod tests {
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");
         assert_eq!(timed_event.id, timeout_event_id);
         assert_variant!(timed_event.event, Event::Client { addr, event } => {
-            assert_eq!(addr, CLIENT_ADDR);
+            assert_eq!(addr, *CLIENT_ADDR);
             assert_variant!(event, ClientEvent::AssociationTimeout);
         });
     }

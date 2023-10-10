@@ -5,7 +5,7 @@
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
     futures::channel::mpsc,
-    ieee80211::MacAddr,
+    ieee80211::{MacAddr, MacAddrBytes},
     wlan_common::{
         ie::{
             rsn::{
@@ -115,7 +115,7 @@ pub fn wpa1_cipher() -> Cipher {
 
 pub fn fake_device_info(sta_addr: MacAddr) -> fidl_mlme::DeviceInfo {
     fidl_mlme::DeviceInfo {
-        sta_addr,
+        sta_addr: sta_addr.to_array(),
         role: fidl_common::WlanMacRole::Client,
         bands: vec![
             fake_2ghz_band_capability_vht(),
@@ -130,14 +130,14 @@ pub fn fake_device_info(sta_addr: MacAddr) -> fidl_mlme::DeviceInfo {
 pub fn fake_device_info_ht(chanwidth: ChanWidthSet) -> fidl_mlme::DeviceInfo {
     fidl_mlme::DeviceInfo {
         bands: vec![fake_5ghz_band_capability_ht_cbw(chanwidth)],
-        ..fake_device_info([0; 6])
+        ..fake_device_info([0; 6].into())
     }
 }
 
 pub fn fake_device_info_vht(chanwidth: ChanWidthSet) -> fidl_mlme::DeviceInfo {
     fidl_mlme::DeviceInfo {
         bands: vec![fake_5ghz_band_capability_vht(chanwidth)],
-        ..fake_device_info([0; 6])
+        ..fake_device_info([0; 6].into())
     }
 }
 

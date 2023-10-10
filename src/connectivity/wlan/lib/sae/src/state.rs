@@ -730,6 +730,7 @@ mod test {
         },
         hex::FromHex,
         ieee80211::{MacAddr, Ssid},
+        lazy_static::lazy_static,
         mundane::hash::Sha256,
         std::convert::TryFrom,
         wlan_common::assert_variant,
@@ -739,10 +740,14 @@ mod test {
     // TEST_PWD is slightly modified by concatenating the password identifier field; IEEE Std
     // 802.11-2020 specifies that a password identifier may not be used with PWE generation by
     // looping.
+    lazy_static! {
+        static ref TEST_STA_A: MacAddr = MacAddr::from([0x82, 0x7b, 0x91, 0x9d, 0xd4, 0xb9]);
+        static ref TEST_STA_B: MacAddr = MacAddr::from([0x1e, 0xec, 0x49, 0xea, 0x64, 0x88]);
+    }
+
     const TEST_GROUP: EcGroupId = EcGroupId::P256;
     const TEST_SSID: &'static str = "SSID in from 802.11-18/r1104r0";
     const TEST_PWD: &'static str = "mekmitasdigoatpsk4internet";
-    const TEST_STA_A: MacAddr = [0x82, 0x7b, 0x91, 0x9d, 0xd4, 0xb9];
     const TEST_RAND_A: &'static str =
         "a906f61e4d3a5d4eb2965ff34cf917dd044445c878c17ca5d5b93786da9f83cf";
     const TEST_SCALAR_A: &'static str =
@@ -750,7 +755,6 @@ mod test {
     const TEST_ELEMENT_A: &'static str = "4b5c21597658f4e3eddfb4b99f25b4d6540f32ff1fd5c530c60a794448610bc6de3d92bdbbd47d935980ca6cf8988ab6630be6764c885ceb9793970f695217ee";
     const TEST_CONFIRM_A: &'static str =
         "12d9d5c78c500526d36c41dbc56aedf2914cedddd7cad4a58c48f83dbde9fc77";
-    const TEST_STA_B: MacAddr = [0x1e, 0xec, 0x49, 0xea, 0x64, 0x88];
     const TEST_RAND_B: &'static str =
         "a47d07bbd3d1b618b325dfde02413a450a90fd1ee1ac35f4d3856cc9cb77128c";
     const TEST_SCALAR_B: &'static str =
@@ -771,8 +775,8 @@ mod test {
             ssid: Ssid::try_from(TEST_SSID).unwrap(),
             password: Vec::from(TEST_PWD),
             password_id: None, // Cannot be used with PweMethod::Loop
-            sta_a_mac: TEST_STA_A,
-            sta_b_mac: TEST_STA_B,
+            sta_a_mac: *TEST_STA_A,
+            sta_b_mac: *TEST_STA_B,
         };
         let fcg_constructor = Box::new(|| {
             ecc::Group::new(TEST_GROUP).map(|group| {

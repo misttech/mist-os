@@ -157,10 +157,10 @@ mod tests {
         let mut fc = FrameControl(0);
         fc.set_to_ds(true);
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_dst_addr(&fixed_fields), [5; 6]); // Addr3
+        assert_eq!(data_dst_addr(&fixed_fields), MacAddr::from([5; 6])); // Addr3
         fc.set_to_ds(false);
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_dst_addr(&fixed_fields), [3; 6]); // Addr1
+        assert_eq!(data_dst_addr(&fixed_fields), MacAddr::from([3; 6])); // Addr1
     }
 
     #[test]
@@ -172,22 +172,28 @@ mod tests {
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_src_addr(&fixed_fields, None), Some([4; 6])); // Addr2
+        assert_eq!(data_src_addr(&fixed_fields, None), Some(MacAddr::from([4; 6]))); // Addr2
 
         fc.set_to_ds(true);
         // to_ds == true && from_ds == false
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_src_addr(&fixed_fields, None), Some([4; 6])); // Addr2
+        assert_eq!(data_src_addr(&fixed_fields, None), Some(MacAddr::from([4; 6]))); // Addr2
 
         fc.set_from_ds(true);
         // to_ds == true && from_ds == true;
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_src_addr(&fixed_fields, Some([11; 6])), Some([11; 6])); // Addr4
+        assert_eq!(
+            data_src_addr(&fixed_fields, Some(MacAddr::from([11; 6]))),
+            Some(MacAddr::from([11; 6])) // Addr4
+        );
 
         fc.set_to_ds(false);
         // to_ds == false && from_ds == true;
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_src_addr(&fixed_fields, None), Some([5; 6])); // Addr3
+        assert_eq!(
+            data_src_addr(&fixed_fields, None),
+            Some(MacAddr::from([5; 6])) // Addr3
+        );
     }
 
     #[test]
@@ -196,7 +202,10 @@ mod tests {
         let (fixed_fields, _) =
             Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
-        assert_eq!(data_transmitter_addr(&fixed_fields), [4; 6]); // Addr2
+        assert_eq!(
+            data_transmitter_addr(&fixed_fields),
+            MacAddr::from([4; 6]) // Addr2
+        );
     }
 
     #[test]
@@ -205,7 +214,7 @@ mod tests {
         let (fixed_fields, _) =
             Ref::<_, FixedDataHdrFields>::new_unaligned_from_prefix(&mut fixed_fields[..])
                 .expect("invalid data header");
-        assert_eq!(data_receiver_addr(&fixed_fields), [3; 6]); // Addr2
+        assert_eq!(data_receiver_addr(&fixed_fields), MacAddr::from([3; 6])); // Addr2
     }
 
     #[test]
@@ -217,12 +226,12 @@ mod tests {
         let mut fc = FrameControl(0);
         // to_ds == false && from_ds == false
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_bssid(&fixed_fields), Some([5; 6])); // Addr3
+        assert_eq!(data_bssid(&fixed_fields), Some(MacAddr::from([5; 6]))); // Addr3
 
         fc.set_to_ds(true);
         // to_ds == true && from_ds == false
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_bssid(&fixed_fields), Some([3; 6])); // Addr1
+        assert_eq!(data_bssid(&fixed_fields), Some(MacAddr::from([3; 6]))); // Addr1
 
         fc.set_from_ds(true);
         // to_ds == true && from_ds == true;
@@ -232,6 +241,6 @@ mod tests {
         fc.set_to_ds(false);
         // to_ds == false && from_ds == true;
         fixed_fields.frame_ctrl = fc;
-        assert_eq!(data_bssid(&fixed_fields), Some([4; 6])); // Addr2
+        assert_eq!(data_bssid(&fixed_fields), Some(MacAddr::from([4; 6]))); // Addr2
     }
 }

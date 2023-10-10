@@ -79,7 +79,7 @@ async fn save_network_and_await_failed_connection(
 /// not success.
 #[fuchsia::test]
 async fn connect_with_failed_association() {
-    const BSSID: Bssid = Bssid([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
+    let bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);
 
     let mut helper = test_utils::TestHelper::begin_test(
         default_wlantap_config_client(),
@@ -100,8 +100,8 @@ async fn connect_with_failed_association() {
     let () = helper
         .run_until_complete_or_timeout(
             240.seconds(),
-            format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), BSSID),
-            scan_and_associate(&phy, &AP_SSID, &BSSID, &Channel::new(1, Cbw::Cbw20)),
+            format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
+            scan_and_associate(&phy, &AP_SSID, &bssid, &Channel::new(1, Cbw::Cbw20)),
             save_network_fut,
         )
         .await;

@@ -48,7 +48,7 @@ use {
     anyhow::{bail, Context},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fidl_fuchsia_wlan_tap as fidl_tap,
-    ieee80211::{Bssid, Ssid},
+    ieee80211::{Bssid, MacAddrBytes, Ssid},
     tracing::{debug, info},
     wlan_common::{bss::Protection, channel::Channel, mac},
     wlan_rsn::{auth, rsna::UpdateSink, Authenticator},
@@ -265,8 +265,8 @@ pub fn authenticate_with_control_state<'h>(
                         crate::rx_wlan_data_frame(
                             &event.channel,
                             &CLIENT_MAC_ADDR,
-                            &event.bssid.0,
-                            &event.bssid.0,
+                            &event.bssid.clone().into(),
+                            &event.bssid.clone().into(),
                             &frame[..],
                             mac::ETHER_TYPE_EAPOL,
                             event.phy,
@@ -383,7 +383,7 @@ where
                         .on_sae_frame_rx(
                             &mut tap.control.updates,
                             fidl_mlme::SaeFrame {
-                                peer_sta_address: bssid.0,
+                                peer_sta_address: bssid.to_array(),
                                 status_code: frame
                                     .auth_hdr
                                     .status_code
