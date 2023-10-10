@@ -3504,11 +3504,9 @@ impl<
 
 /// Creates a new unbound ICMP socket.
 pub fn new_socket<I: Ip, C: NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId<I> {
-    I::map_ip(
-        IpInvariant(sync_ctx),
-        |IpInvariant(sync_ctx)| SocketHandler::<Ipv4, C>::create(&mut Locked::new(sync_ctx)),
-        |IpInvariant(sync_ctx)| SocketHandler::<Ipv6, C>::create(&mut Locked::new(sync_ctx)),
-    )
+    net_types::map_ip_twice!(I, IpInvariant(sync_ctx), |IpInvariant(sync_ctx)| {
+        SocketHandler::<I, C>::create(&mut Locked::new(sync_ctx))
+    },)
 }
 
 /// Connects an ICMP socket to remote IP.
@@ -3521,26 +3519,18 @@ pub fn connect<I: Ip, C: NonSyncContext>(
     remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     remote_id: NonZeroU16,
 ) -> Result<(), datagram::ConnectError> {
-    let IpInvariant(result) = I::map_ip(
+    let IpInvariant(result) = net_types::map_ip_twice!(
+        I,
         (IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip)| {
-            IpInvariant(SocketHandler::<Ipv4, C>::connect(
+            IpInvariant(SocketHandler::<I, C>::connect(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 id,
                 remote_ip,
                 remote_id,
             ))
-        },
-        |(IpInvariant((sync_ctx, ctx, remote_id)), id, remote_ip)| {
-            IpInvariant(SocketHandler::<Ipv6, C>::connect(
-                &mut Locked::new(sync_ctx),
-                ctx,
-                id,
-                remote_ip,
-                remote_id,
-            ))
-        },
+        }
     );
     result
 }
@@ -3556,26 +3546,18 @@ pub fn bind<I: Ip, C: NonSyncContext>(
     local_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     icmp_id: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-    let IpInvariant(result) = I::map_ip(
+    let IpInvariant(result) = net_types::map_ip_twice!(
+        I,
         (IpInvariant((sync_ctx, ctx, icmp_id)), id, local_ip),
         |(IpInvariant((sync_ctx, ctx, icmp_id)), id, local_ip)| {
-            IpInvariant(SocketHandler::<Ipv4, _>::bind(
+            IpInvariant(SocketHandler::<I, _>::bind(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 id,
                 local_ip,
                 icmp_id,
             ))
-        },
-        |(IpInvariant((sync_ctx, ctx, icmp_id)), id, local_ip)| {
-            IpInvariant(SocketHandler::<Ipv6, _>::bind(
-                &mut Locked::new(sync_ctx),
-                ctx,
-                id,
-                local_ip,
-                icmp_id,
-            ))
-        },
+        }
     );
     result
 }
@@ -3589,15 +3571,12 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     id: SocketId<I>,
     body: B,
 ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
-    I::map_ip(
-        (IpInvariant((sync_ctx, ctx, body)), id),
-        |(IpInvariant((sync_ctx, ctx, body)), id)| {
-            BufferSocketHandler::<Ipv4, C, _>::send(&mut Locked::new(sync_ctx), ctx, id, body)
-        },
-        |(IpInvariant((sync_ctx, ctx, body)), id)| {
-            BufferSocketHandler::<Ipv6, C, _>::send(&mut Locked::new(sync_ctx), ctx, id, body)
-        },
-    )
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx, body)), id), |(
+        IpInvariant((sync_ctx, ctx, body)),
+        id,
+    )| {
+        BufferSocketHandler::<I, C, _>::send(&mut Locked::new(sync_ctx), ctx, id, body)
+    })
 }
 
 /// Sends an ICMP packet with an remote address.
@@ -3666,15 +3645,12 @@ pub fn get_info<I: Ip, C: NonSyncContext>(
     ctx: &mut C,
     id: SocketId<I>,
 ) -> SocketInfo<I::Addr, crate::device::WeakDeviceId<C>> {
-    I::map_ip(
-        (IpInvariant((sync_ctx, ctx)), id),
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv4, C>::get_info(&mut Locked::new(sync_ctx), ctx, id)
-        },
-        |(IpInvariant((sync_ctx, ctx)), id)| {
-            SocketHandler::<Ipv6, C>::get_info(&mut Locked::new(sync_ctx), ctx, id)
-        },
-    )
+    net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
+        IpInvariant((sync_ctx, ctx)),
+        id,
+    )| {
+        SocketHandler::<I, C>::get_info(&mut Locked::new(sync_ctx), ctx, id)
+    })
 }
 
 /// Sets the bound device for a socket.
