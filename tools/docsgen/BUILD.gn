@@ -95,9 +95,7 @@ compiled_action("invoke_clidoc") {
     "-o",
     rebase_path("$target_gen_dir/sdk-docs", root_build_dir),
     "--quiet",
-
-    # TODO (https://fxbug.dev/86553) to rename tarball-dir.
-    "--tarball-dir",
+    "--archive-path",
     rebase_path("$target_out_dir/$clidoc_tarfile", root_build_dir),
     "--depfile",
     rebase_path(depfile, root_build_dir),

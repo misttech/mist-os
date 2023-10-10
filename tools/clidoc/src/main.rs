@@ -52,16 +52,16 @@ struct Opt {
     #[argh(switch, short = 'v')]
     verbose: bool,
 
-    /// path for tarball- if set the output will be compressed as a tarball
+    /// path for tarball archive of the output will be compressed as a tarball
     /// and intermediate files will be cleaned up
     /// For example: "clidoc_out.tar.gz". Note that .tar.gz is not automatically
     /// added as a file extension.
     #[argh(option)]
-    tarball_dir: Option<PathBuf>,
+    archive_path: Option<PathBuf>,
 
     /// path for depfile if clidoc is invoked as a BUILD action
     /// if set, will output a depfile based on inputs at specified location
-    /// depfile is only supported with tarball_dir flag.
+    /// depfile is only supported with archive_path flag.
     /// depfile is a Ninja term and does not need to be split into 2 words.
     #[argh(option)]
     depfile: Option<PathBuf>,
@@ -192,7 +192,7 @@ fn run(opt: Opt) -> Result<()> {
 
     info!("Generated documentation at dir: {}", &output_path.display());
 
-    if let Some(tardir) = opt.tarball_dir {
+    if let Some(tardir) = opt.archive_path {
         // First check if depfile is needed as well since this will probably be invoked
         // as part of a BUILD action.
         if let Some(depfile_path) = opt.depfile {
@@ -469,8 +469,8 @@ mod tests {
     fn run_test_archive_and_cleanup() {
         let tmp_dir = tempfile::Builder::new().prefix("clidoc-tar-test").tempdir().unwrap();
         let argv = [
-            "--tarball-dir",
-            "clidoc_out.tar.gz",
+            "--archive-path",
+            "clidoc_archive.tar.gz",
             "-v",
             "-o",
             &tmp_dir.path().to_str().unwrap(),
@@ -480,11 +480,11 @@ mod tests {
         let opt = Opt::from_args(&[cmd], &argv).unwrap();
         run(opt).expect("tool_with_subcommands could not be generated");
 
-        // With the tarball-dir flag set, the md file should be zipped
+        // With the archive-path flag set, the md file should be zipped
         // and not exist.
         assert!(!tmp_dir.path().join("tool_with_subcommands.md").exists());
 
-        let tar_gz = File::open("clidoc_out.tar.gz").expect("open tarball");
+        let tar_gz = File::open("clidoc_archive.tar.gz").expect("open tarball");
         let tar = GzDecoder::new(tar_gz);
         let mut archive = Archive::new(tar);
         archive.unpack(".").expect("extract tar");
