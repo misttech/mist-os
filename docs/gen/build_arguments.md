@@ -4558,14 +4558,6 @@ Maximum allowable size for fuchsia.zbi and zedboot.zbi.
 A number greater than zero informs the rust toolchain to optimize for space.
 TODO(b/291953514): Enforce this by implementing an image size checker.
 
-**Current value for `target_cpu = "arm64"`:** `16777216`
-
-From //boards/common/arm64-common.gni:31
-
-**Overridden from the default:** `0`
-
-From //build/images/filesystem_limits.gni:22
-
 **Current value (from the default):** `0`
 
 From //build/images/filesystem_limits.gni:22
@@ -4580,14 +4572,6 @@ Should be a string value that only contains digits.
 From //src/diagnostics/log_listener/BUILD.gn:11
 
 ### max_zedboot_zbi_size
-
-**Current value for `target_cpu = "arm64"`:** `16777216`
-
-From //boards/common/arm64-common.gni:32
-
-**Overridden from the default:** `0`
-
-From //build/images/filesystem_limits.gni:23
 
 **Current value (from the default):** `0`
 
