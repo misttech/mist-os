@@ -128,7 +128,7 @@ declare_args() {
   # Set to true to use a fast, minimalist wrapper, that lacks features
   # of the python-based wrapper.  Use with caution.
   # This flag is only meaningful when `cxx_rbe_enable` is true.
-  cxx_rbe_minimalist_wrapper = false
+  cxx_rbe_minimalist_wrapper = true
 
   # One of:
   #
