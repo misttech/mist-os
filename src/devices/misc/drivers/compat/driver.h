@@ -45,6 +45,8 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetRootResource();
 
+  zx_handle_t GetInfoResource();
+
   zx_handle_t GetMmioResource();
 
   zx_handle_t GetPowerResource();
@@ -150,6 +152,7 @@ class Driver : public fdf::DriverBase {
   zx::resource ioport_resource_;
   zx::resource irq_resource_;
   zx::resource smc_resource_;
+  zx::resource info_resource_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;

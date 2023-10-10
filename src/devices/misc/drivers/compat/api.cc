@@ -73,6 +73,10 @@ __EXPORT zx_handle_t get_smc_resource(zx_device_t* device) {
   return device->driver()->GetSmcResource();
 }
 
+__EXPORT zx_handle_t get_info_resource(zx_device_t* device) {
+  return device->driver()->GetInfoResource();
+}
+
 __EXPORT zx_status_t load_firmware_from_driver(zx_driver_t* drv, zx_device_t* dev, const char* path,
                                                zx_handle_t* fw, size_t* size) {
   auto result = dev->driver()->LoadFirmware(dev, path, size);

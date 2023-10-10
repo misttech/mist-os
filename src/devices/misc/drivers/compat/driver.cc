@@ -144,6 +144,18 @@ zx::result<zx::resource> GetSmcResource(fdf::Namespace& ns) {
   return zx::ok(std::move(result.value().resource));
 }
 
+zx::result<zx::resource> GetInfoResource(fdf::Namespace& ns) {
+  zx::result resource = ns.Connect<fkernel::InfoResource>();
+  if (resource.is_error()) {
+    return resource.take_error();
+  }
+  fidl::WireResult result = fidl::WireCall(resource.value())->Get();
+  if (!result.ok()) {
+    return zx::error(result.status());
+  }
+  return zx::ok(std::move(result.value().resource));
+}
+
 }  // namespace
 
 namespace compat {
@@ -434,6 +446,18 @@ zx_handle_t Driver::GetSmcResource() {
     }
   }
   return smc_resource_.get();
+}
+
+zx_handle_t Driver::GetInfoResource() {
+  if (!info_resource_.is_valid()) {
+    zx::result resource = ::GetInfoResource(*incoming());
+    if (resource.is_ok()) {
+      info_resource_ = std::move(resource.value());
+    } else {
+      FDF_LOGL(WARNING, *logger_, "Failed to get info_resource '%s'", resource.status_string());
+    }
+  }
+  return info_resource_.get();
 }
 
 bool Driver::IsRunningOnDispatcher() const {

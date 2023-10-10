@@ -229,6 +229,33 @@ class TestSmcResource : public fidl::testing::WireTestBase<fkernel::SmcResource>
   zx::event fake_resource_;
 };
 
+class TestInfoResource : public fidl::testing::WireTestBase<fkernel::InfoResource> {
+ public:
+  TestInfoResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
+
+  fidl::ProtocolHandler<fkernel::InfoResource> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
+  void Get(GetCompleter::Sync& completer) override {
+    zx::event duplicate;
+    ASSERT_EQ(ZX_OK, fake_resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate));
+    completer.Reply(zx::resource(duplicate.release()));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: InfoResource::%s\n", name.data());
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::ServerBindingGroup<fkernel::InfoResource> bindings_;
+
+  // An event is similar enough that we can pretend it's the info resource, in that we can
+  // send it over a FIDL channel.
+  zx::event fake_resource_;
+};
+
 class TestItems : public fidl::testing::WireTestBase<fboot::Items> {
  public:
   fidl::ProtocolHandler<fboot::Items> GetHandler() {
@@ -509,6 +536,11 @@ class IncomingNamespace {
         return result.take_error();
       }
 
+      result = outgoing.AddUnmanagedProtocol<fkernel::InfoResource>(info_resource_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
       result = outgoing.AddUnmanagedProtocol<fboot::Items>(items_.GetHandler());
       if (result.is_error()) {
         return result.take_error();
@@ -578,6 +610,7 @@ class IncomingNamespace {
   TestIoportResource ioport_resource_;
   TestIrqResource irq_resource_;
   TestSmcResource smc_resource_;
+  TestInfoResource info_resource_;
   std::optional<TestProfileProvider> profile_provider_;
   mock_boot_arguments::Server boot_args_;
   TestItems items_;
