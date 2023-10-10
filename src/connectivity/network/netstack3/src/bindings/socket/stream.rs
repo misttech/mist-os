@@ -489,9 +489,9 @@ enum InitialSocketState {
 impl<I: IpExt + IpSockAddrExt> worker::SocketWorkerHandler for BindingData<I>
 where
     DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Request = fposix_socket::StreamSocketRequest;
     type RequestStream = fposix_socket::StreamSocketRequestStream;
@@ -736,9 +736,9 @@ struct RequestHandler<'a, I: IpExt> {
 impl<I: IpSockAddrExt + IpExt> RequestHandler<'_, I>
 where
     DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
         let Self {
@@ -1607,9 +1607,9 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
 ) where
     DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     spawner.spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
@@ -1632,10 +1632,7 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for SocketAddr<A, D>
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<
-        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
-        Error = DeviceNotFoundError,
-    >,
+    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = DeviceNotFoundError;
 

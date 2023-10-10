@@ -1112,6 +1112,19 @@ impl<A: ScopeableAddress, Z> ZonedAddr<A, Z> {
     }
 }
 
+impl<A: ScopeableAddress<Scope = ()>, Z> ZonedAddr<A, Z> {
+    /// Retrieves the addr for this `ZonedAddr` when the `Scope` is `()`.
+    ///
+    /// `()` is a known implementation that never allows `AddrAndZone` to be
+    /// constructed so we can safely drop the zone information.
+    pub fn into_unzoned(self) -> A {
+        match self {
+            ZonedAddr::Unzoned(u) => u,
+            ZonedAddr::Zoned(_z) => unreachable!(),
+        }
+    }
+}
+
 impl<A, Z> From<AddrAndZone<A, Z>> for ZonedAddr<A, Z> {
     fn from(a: AddrAndZone<A, Z>) -> Self {
         Self::Zoned(a)

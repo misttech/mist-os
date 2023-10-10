@@ -4,6 +4,7 @@
 
 use core::{convert::Infallible as Never, num::NonZeroU16};
 use std::{
+    num::NonZeroU64,
     ops::Deref,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -876,10 +877,7 @@ impl<A: IpAddress, D> TryFromFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (Option<SocketZonedIpAddr<A, D>>, u16)
 where
     A::Version: IpSockAddrExt,
-    D: TryFromFidlWithContext<
-        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
-        Error = DeviceNotFoundError,
-    >,
+    D: TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = SocketAddressError;
 
@@ -915,7 +913,7 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (Option<SocketZonedIpAddr<A, D>>, u16)
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<<<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone>,
+    D: TryIntoFidlWithContext<NonZeroU64>,
 {
     type Error = D::Error;
 
@@ -945,10 +943,7 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (SocketZonedIpAddr<A, D>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<
-        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
-        Error = DeviceNotFoundError,
-    >,
+    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = DeviceNotFoundError;
 
@@ -965,10 +960,7 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (Option<SocketZonedIpAddr<A, D>>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<
-        <<A::Version as IpSockAddrExt>::SocketAddress as SockAddr>::Zone,
-        Error = DeviceNotFoundError,
-    >,
+    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = DeviceNotFoundError;
 
@@ -1458,7 +1450,7 @@ mod tests {
             TryFromFidlWithContext<A, Error = SocketAddressError>,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsNonSyncCtxImpl>:
-            TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
+            TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new().await;
         let result: Result<(Option<_>, _), _> = addr.try_into_core_with_ctx(&ctx);
@@ -1516,7 +1508,7 @@ mod tests {
                  TryIntoFidlWithContext<A>>::Error: Debug,
         <A::AddrType as IpAddress>::Version: IpSockAddrExt<SocketAddress = A>,
         DeviceId<BindingsNonSyncCtxImpl>:
-            TryFromFidlWithContext<A::Zone, Error = DeviceNotFoundError>,
+            TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {

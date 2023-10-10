@@ -4,7 +4,7 @@
 
 //! Socket features exposed by netstack3.
 
-use std::{convert::Infallible as Never, num::NonZeroU64};
+use std::num::NonZeroU64;
 
 use const_unwrap::const_unwrap_option;
 use either::Either;
@@ -302,15 +302,13 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     type AddrType: IpAddress + ScopeableAddress;
     /// The socket's domain.
     const DOMAIN: psocket::Domain;
-    /// The type of a zone identifier for this `SockAddr`.
-    type Zone;
 
     /// Creates a new `SockAddr` from the provided address and port.
     ///
     /// `addr` is either `Some(a)` where `a` holds a specified address an
     /// optional zone, or `None` for the unspecified address (which can't have a
     /// zone).
-    fn new(addr: Option<SocketZonedIpAddr<Self::AddrType, Self::Zone>>, port: u16) -> Self;
+    fn new(addr: Option<SocketZonedIpAddr<Self::AddrType, NonZeroU64>>, port: u16) -> Self;
 
     /// Gets this `SockAddr`'s address.
     fn addr(&self) -> Self::AddrType;
@@ -330,7 +328,7 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     }
 
     /// Gets this `SockAddr`'s zone identifier.
-    fn zone(&self) -> Option<Self::Zone>;
+    fn zone(&self) -> Option<NonZeroU64>;
 
     /// Converts this `SockAddr` into an [`fnet::SocketAddress`].
     fn into_sock_addr(self) -> fnet::SocketAddress;
@@ -342,7 +340,6 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
 impl SockAddr for fnet::Ipv6SocketAddress {
     type AddrType = Ipv6Addr;
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv6;
-    type Zone = NonZeroU64;
 
     /// Creates a new `SockAddr6`.
     fn new(addr: Option<SocketZonedIpAddr<Ipv6Addr, NonZeroU64>>, port: u16) -> Self {
@@ -369,7 +366,7 @@ impl SockAddr for fnet::Ipv6SocketAddress {
         self.port = port
     }
 
-    fn zone(&self) -> Option<Self::Zone> {
+    fn zone(&self) -> Option<NonZeroU64> {
         NonZeroU64::new(self.zone_index)
     }
 
@@ -388,14 +385,11 @@ impl SockAddr for fnet::Ipv6SocketAddress {
 impl SockAddr for fnet::Ipv4SocketAddress {
     type AddrType = Ipv4Addr;
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv4;
-    type Zone = Never;
 
     /// Creates a new `SockAddr4`.
-    fn new(addr: Option<SocketZonedIpAddr<Ipv4Addr, Never>>, port: u16) -> Self {
-        let addr = addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |zoned| match zoned.into_addr_zone() {
-            (a, None) => a.get(),
-            (_a, Some(n)) => match n {},
-        });
+    fn new(addr: Option<SocketZonedIpAddr<Ipv4Addr, NonZeroU64>>, port: u16) -> Self {
+        let addr =
+            addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, |zoned| zoned.into_inner().into_unzoned().get());
         fnet::Ipv4SocketAddress { address: addr.into_fidl(), port }
     }
 
@@ -415,7 +409,7 @@ impl SockAddr for fnet::Ipv4SocketAddress {
         self.port = port
     }
 
-    fn zone(&self) -> Option<Self::Zone> {
+    fn zone(&self) -> Option<NonZeroU64> {
         None
     }
 

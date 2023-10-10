@@ -754,9 +754,9 @@ where
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
     DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
@@ -819,9 +819,9 @@ where
     T: BufferTransportState<I, Buf<Vec<u8>>>,
     T: Send + Sync + 'static,
     DeviceId<BindingsNonSyncCtxImpl>:
-        TryFromFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     WeakDeviceId<BindingsNonSyncCtxImpl>:
-        TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+        TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
     BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
 {
     fn handle_request(
@@ -1961,7 +1961,7 @@ impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, NonZeroU16>> for udp::SocketInfo<
 impl<I: IpSockAddrExt, D, L: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
     for LocalAddress<I, D, L>
 where
-    D: TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = fposix::Errno;
 
@@ -1979,7 +1979,7 @@ where
 impl<I: IpSockAddrExt, D, R: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
     for RemoteAddress<I, D, R>
 where
-    D: TryIntoFidlWithContext<<I::SocketAddress as SockAddr>::Zone, Error = DeviceNotFoundError>,
+    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
     type Error = fposix::Errno;
 
