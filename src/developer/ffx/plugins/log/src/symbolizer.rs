@@ -70,7 +70,9 @@ where
         let symbolized_msg = match self.execute_symbolization(msg).await {
             Ok(msg) => msg,
             Err(err) => {
-                tracing::error!(%err, "Failed to symbolize message");
+                if !matches!(err, SymbolizerError::NoContextMarker) {
+                    tracing::error!(%err, "Failed to symbolize message");
+                }
                 return LogEntry { timestamp, data: LogData::TargetLog(data) };
             }
         };
