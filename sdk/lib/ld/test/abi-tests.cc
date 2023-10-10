@@ -50,4 +50,35 @@ TEST(LdTests, AbiTypes) {
   EXPECT_THAT(storage, testing::Each(testing::Eq(std::byte(0))));
 }
 
+constexpr Module MakeModule(const char* name, const Module* next, const Module* prev) {
+  Module result;
+  result.link_map.name = name;
+  if (next) {
+    result.link_map.next = &const_cast<Module*>(next)->link_map;
+  }
+  if (prev) {
+    result.link_map.prev = &const_cast<Module*>(prev)->link_map;
+  }
+  return result;
+}
+
+constexpr const char* kName1 = "first";
+constexpr const char* kName2 = "second";
+
+constexpr Module kModules[2] = {
+    MakeModule(kName1, &kModules[1], nullptr),
+    MakeModule(kName2, nullptr, &kModules[0]),
+};
+
+TEST(LdTests, AbiModuleList) {
+  constexpr Abi abi{.loaded_modules{&kModules[0]}};
+  const auto modules = ld::AbiLoadedModules(abi);
+  auto it = modules.begin();
+  ASSERT_NE(it, modules.end());
+  ASSERT_EQ(it++->link_map.name.get(), kName1);
+  ASSERT_NE(it, modules.end());
+  ASSERT_EQ(it++->link_map.name.get(), kName2);
+  ASSERT_EQ(it, modules.end());
+}
+
 }  // namespace

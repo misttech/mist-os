@@ -6,6 +6,7 @@
 #define LIB_LD_MODULE_H_
 
 #include <lib/elfldltl/init-fini.h>
+#include <lib/elfldltl/link-map-list.h>
 #include <lib/elfldltl/symbol.h>
 #include <lib/stdcompat/span.h>
 
@@ -14,7 +15,8 @@
 
 #include "abi.h"
 
-namespace ld::abi {
+namespace ld {
+namespace abi {
 
 // ld::abi::Abi::Module holds all the information about an ELF module that's
 // still relevant at runtime after it's been loaded and dynamically linked.
@@ -135,6 +137,20 @@ struct Abi<Elf, AbiTraits>::Module {
   Span<const std::byte> build_id;
 };
 
-}  // namespace ld::abi
+}  // namespace abi
+
+// This provides a container-like view on the doubly-linked list of modules.
+template <class Elf = elfldltl::Elf<>>
+using AbiModuleList = elfldltl::LinkMapList<
+    const typename abi::Abi<Elf>::Module,
+    elfldltl::LinkMapListInFirstMemberTraits<const typename abi::Abi<Elf>::Module>>;
+
+// This returns the ld::AbiModuleList for an ld::Abi::Abi<>.
+template <class Elf = elfldltl::Elf<>>
+constexpr AbiModuleList<Elf> AbiLoadedModules(const abi::Abi<Elf>& abi) {
+  return AbiModuleList<Elf>(abi.loaded_modules.get());
+}
+
+}  // namespace ld
 
 #endif  // LIB_LD_MODULE_H_
