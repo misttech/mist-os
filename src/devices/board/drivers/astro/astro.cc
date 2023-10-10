@@ -60,6 +60,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
+  if ((status = I2cInit()) != ZX_OK) {
+    zxlogf(ERROR, "I2cInit failed: %d", status);
+  }
+
   if ((status = SdioInit()) != ZX_OK) {
     zxlogf(ERROR, "SdioInit failed: %d", status);
   }
@@ -109,10 +113,6 @@ int Astro::Thread() {
 
   if ((status = ButtonsInit()) != ZX_OK) {
     zxlogf(ERROR, "ButtonsInit failed: %d", status);
-  }
-
-  if ((status = I2cInit()) != ZX_OK) {
-    zxlogf(ERROR, "I2cInit failed: %d", status);
   }
 
   if ((status = CpuInit()) != ZX_OK) {

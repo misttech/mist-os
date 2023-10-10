@@ -15,9 +15,9 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio",
       "sys/platform/05:06:1/aml-gpio/gpio-init",
       "sys/platform/05:06:14/clocks",
-      "sys/platform/05:00:2/aml-i2c",
-      "sys/platform/05:00:2:2/aml-i2c",
-      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-50",
+      "sys/platform/05:00:2/i2c-0/aml-i2c",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-50",
       "sys/platform/05:06:12:1/audio-pcm-out-composite-spec/vim3-audio-tdm1-out",
       "sys/platform/05:06:12:2/audio-i2s-out-composite-spec/vim3-audio-tdm1-out",
       "sys/platform/05:06:12:3/audio-pcm-in-composite-spec/vim3-audio-tdm1-in",
@@ -66,23 +66,23 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "class/thermal/000",
 
       // GPIO
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-107",
 
       // Touch panel
       //
       // i2c device
-      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-56",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-56",
       // interrupt pin
       "sys/platform/05:06:1/aml-gpio/gpio-21",
       // reset pin
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-106",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-32/gpio-expander/ti-tca6408a/gpio-106",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-24/vim3-mcu",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-24/vim3-mcu",
 
 #ifdef include_packaged_drivers
 
       // RTC
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-81/rtc",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-81/rtc",
 
       // WLAN
       "sys/platform/05:00:6/vim3-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1/wifi/brcmfmac-wlanphy",

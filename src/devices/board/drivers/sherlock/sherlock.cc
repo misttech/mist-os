@@ -138,6 +138,10 @@ int Sherlock::Thread() {
     return -1;
   }
 
+  if (I2cInit() != ZX_OK) {
+    zxlogf(ERROR, "I2cInit() failed");
+  }
+
   if (EmmcInit() != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed");
   }
@@ -170,10 +174,6 @@ int Sherlock::Thread() {
   if (BoardInit() != ZX_OK) {
     zxlogf(ERROR, "BoardInit() failed");
     return -1;
-  }
-
-  if (I2cInit() != ZX_OK) {
-    zxlogf(ERROR, "I2cInit() failed");
   }
 
   if (CpuInit() != ZX_OK) {

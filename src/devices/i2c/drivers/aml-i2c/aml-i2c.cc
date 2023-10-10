@@ -205,11 +205,11 @@ void AmlI2c::StartIrqThread() {
 zx_status_t AmlI2c::SetClockDelay(zx_device_t* parent, const fdf::MmioBuffer& regs_iobuff) {
   aml_i2c_delay_values delay{0, 0};
   size_t actual;
-  zx_status_t status =
-      device_get_metadata(parent, DEVICE_METADATA_PRIVATE, &delay, sizeof(delay), &actual);
+  zx_status_t status = device_get_fragment_metadata(parent, "pdev", DEVICE_METADATA_PRIVATE, &delay,
+                                                    sizeof(delay), &actual);
   if (status != ZX_OK) {
     if (status != ZX_ERR_NOT_FOUND) {
-      zxlogf(ERROR, "device_get_metadata failed: %s", zx_status_get_string(status));
+      zxlogf(ERROR, "device_get_fragment_metadata failed: %s", zx_status_get_string(status));
       return status;
     }
   } else if (actual != sizeof(delay)) {
@@ -277,10 +277,7 @@ zx_status_t AmlI2c::I2cImplTransact(const i2c_impl_op_t* rws, size_t count) {
 }
 
 zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {
-  ddk::PDevFidl pdev(parent);
-  if (!pdev.is_valid()) {
-    pdev = ddk::PDevFidl(parent, "pdev");
-  }
+  ddk::PDevFidl pdev(parent, "pdev");
   if (!pdev.is_valid()) {
     zxlogf(ERROR, "ZX_PROTOCOL_PDEV not available");
     return ZX_ERR_NO_RESOURCES;

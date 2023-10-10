@@ -12,9 +12,9 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:03:1/aml-gpio",
       "sys/platform/05:03:1/aml-gpio/gpio-init",
       "sys/platform/05:03:1/aml-gpio/gpio-2/astro-buttons/hid-buttons",
-      "sys/platform/05:00:2/aml-i2c",
-      "sys/platform/05:00:2:1/aml-i2c",
-      "sys/platform/05:00:2:2/aml-i2c",
+      "sys/platform/05:00:2/i2c-0/aml-i2c",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c",
       "sys/platform/05:03:17/aml-gpu-composite/aml-gpu",
       "sys/platform/05:00:18/aml-usb-phy-v2",
       "sys/platform/05:00:3/bluetooth-composite-spec/aml-uart/bt-transport-uart",
@@ -23,7 +23,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       // XHCI driver will not be loaded if we are in USB peripheral mode.
       // "xhci/xhci/usb-bus",
 
-      "sys/platform/05:00:2:2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
+      "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-44/backlight/ti-lp8556",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
       "sys/platform/00:00:1e/dw-dsi",
       "sys/platform/05:00:10/aml-canvas",
@@ -42,7 +42,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-1",
       "sys/platform/05:00:7/aml-sdio/aml-sd-emmc/sdmmc/sdmmc-sdio/sdmmc-sdio-2",
 
-      "sys/platform/05:00:2/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
+      "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
       "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
       "sys/platform/05:03:13/aml_pdm/astro-audio-pdm-in",
@@ -96,8 +96,8 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
 
   static const char* kTouchscreenDevicePaths[] = {
-      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
-      "sys/platform/05:00:2:1/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx-HidDevice/hid-device/InputReport",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-56/focaltech_touch/focaltouch-HidDevice",
+      "sys/platform/05:00:2:1/i2c-1/aml-i2c/i2c/i2c-1-93/gt92xx_touch/gt92xx-HidDevice/hid-device/InputReport",
   };
   ASSERT_NO_FATAL_FAILURE(device_enumeration::WaitForOne(
       cpp20::span(kTouchscreenDevicePaths, std::size(kTouchscreenDevicePaths))));

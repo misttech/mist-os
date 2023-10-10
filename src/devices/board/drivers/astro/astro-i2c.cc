@@ -8,16 +8,24 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <span>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro-gpios.h"
 #include "astro.h"
 #include "src/devices/lib/fidl-metadata/i2c.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -133,7 +141,19 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
-  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::ParentSpec> kI2cParents = std::vector{
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+  };
+
+  const fdf::CompositeNodeSpec i2c_spec{{name, kI2cParents}};
+  const auto result = pbus.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, i2c_dev),
+                                                               fidl::ToWire(fidl_arena, i2c_spec));
   if (!result.ok()) {
     zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus.bus_id,
            result.FormatDescription().data());
@@ -149,27 +169,35 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Astro::I2cInit() {
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
+
+  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
+  };
+
   // setup pinmux for our I2C busses
 
   // i2c_ao_0
-  gpio_impl_.SetAltFunction(GPIO_SOC_SENSORS_I2C_SDA, 1);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SENSORS_I2C_SDA, 4000, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, set_alt_function(1)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, set_drive_strength(4000)});
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SENSORS_I2C_SCL, 1);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SENSORS_I2C_SCL, 4000, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, set_alt_function(1)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, set_drive_strength(4000)});
 
   // i2c2
-  gpio_impl_.SetAltFunction(GPIO_SOC_TOUCH_I2C_SDA, 3);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_TOUCH_I2C_SDA, 4000, nullptr);
-  gpio_impl_.SetAltFunction(GPIO_SOC_TOUCH_I2C_SCL, 3);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_TOUCH_I2C_SCL, 4000, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, set_alt_function(3)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, set_alt_function(3)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, set_drive_strength(4000)});
 
   // i2c3
-  gpio_impl_.SetAltFunction(GPIO_SOC_AV_I2C_SDA, 2);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_AV_I2C_SDA, 3000, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, set_alt_function(2)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, set_drive_strength(3000)});
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_AV_I2C_SCL, 2);
-  gpio_impl_.SetDriveStrength(GPIO_SOC_AV_I2C_SCL, 3000, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, set_alt_function(2)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, set_drive_strength(3000)});
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

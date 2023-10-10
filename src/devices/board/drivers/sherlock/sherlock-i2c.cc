@@ -9,15 +9,23 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 
 #include <span>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <soc/aml-t931/t931-gpio.h>
 #include <soc/aml-t931/t931-hw.h>
 
 #include "sherlock.h"
 #include "src/devices/lib/fidl-metadata/i2c.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -166,7 +174,19 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
-  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, dev));
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::ParentSpec> kI2cParents = std::vector{
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+  };
+
+  const fdf::CompositeNodeSpec i2c_spec{{name, kI2cParents}};
+  const auto result = pbus.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev),
+                                                               fidl::ToWire(fidl_arena, i2c_spec));
   if (!result.ok()) {
     zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus.bus_id,
            result.FormatDescription().data());
@@ -182,16 +202,20 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Sherlock::I2cInit() {
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
+
   // setup pinmux for our I2C busses
   // i2c_ao_0
-  gpio_impl_.SetAltFunction(T931_GPIOAO(2), 1);
-  gpio_impl_.SetAltFunction(T931_GPIOAO(3), 1);
+  gpio_init_steps_.push_back({T931_GPIOAO(2), set_alt_function(1)});
+  gpio_init_steps_.push_back({T931_GPIOAO(3), set_alt_function(1)});
   // i2c2
-  gpio_impl_.SetAltFunction(T931_GPIOZ(14), 3);
-  gpio_impl_.SetAltFunction(T931_GPIOZ(15), 3);
+  gpio_init_steps_.push_back({T931_GPIOZ(14), set_alt_function(3)});
+  gpio_init_steps_.push_back({T931_GPIOZ(15), set_alt_function(3)});
   // i2c3
-  gpio_impl_.SetAltFunction(T931_GPIOA(14), 2);
-  gpio_impl_.SetAltFunction(T931_GPIOA(15), 2);
+  gpio_init_steps_.push_back({T931_GPIOA(14), set_alt_function(2)});
+  gpio_init_steps_.push_back({T931_GPIOA(15), set_alt_function(2)});
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

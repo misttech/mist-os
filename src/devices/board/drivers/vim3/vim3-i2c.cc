@@ -8,18 +8,26 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <limits.h>
 
 #include <span>
 #include <vector>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/focaltech/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
 
 #include "src/devices/lib/fidl-metadata/i2c.h"
 #include "vim3.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -155,7 +163,19 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('I2C_');
-  auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, i2c_dev));
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::ParentSpec> kI2cParents = std::vector{
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+  };
+
+  const fdf::CompositeNodeSpec i2c_spec{{name, kI2cParents}};
+  const auto result = pbus.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, i2c_dev),
+                                                               fidl::ToWire(fidl_arena, i2c_spec));
   if (!result.ok()) {
     zxlogf(ERROR, "Request to add I2C bus %u failed: %s", bus.bus_id,
            result.FormatDescription().data());
@@ -171,14 +191,18 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Vim3::I2cInit() {
+  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
+    return fuchsia_hardware_gpio::wire::InitCall::WithAltFunction(arena, alt_function);
+  };
+
   // AO
-  gpio_impl_.SetAltFunction(A311D_GPIOAO(2), A311D_GPIOAO_2_M0_SCL_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOAO(3), A311D_GPIOAO_3_M0_SDA_FN);
+  gpio_init_steps_.push_back({A311D_GPIOAO(2), set_alt_function(A311D_GPIOAO_2_M0_SCL_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOAO(3), set_alt_function(A311D_GPIOAO_3_M0_SDA_FN)});
 
   // EE - M3
   // Used on J13(pins 3,4), M.2 socket(pins 40,42), and J4(pins 22,23)
-  gpio_impl_.SetAltFunction(A311D_GPIOA(15), A311D_GPIOA_15_I2C_EE_M3_SCL_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOA(14), A311D_GPIOA_14_I2C_EE_M3_SDA_FN);
+  gpio_init_steps_.push_back({A311D_GPIOA(15), set_alt_function(A311D_GPIOA_15_I2C_EE_M3_SCL_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOA(14), set_alt_function(A311D_GPIOA_14_I2C_EE_M3_SDA_FN)});
 
   for (const I2cBus& bus : kBuses) {
     AddI2cBus(bus, pbus_);

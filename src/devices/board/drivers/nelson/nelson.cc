@@ -95,6 +95,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
+  if ((status = I2cInit()) != ZX_OK) {
+    zxlogf(ERROR, "I2cInit failed: %d", status);
+  }
+
   if ((status = EmmcInit()) != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed: %d", status);
   }
@@ -168,10 +172,6 @@ int Nelson::Thread() {
 
   if ((status = ButtonsInit()) != ZX_OK) {
     zxlogf(ERROR, "ButtonsInit failed: %d", status);
-  }
-
-  if ((status = I2cInit()) != ZX_OK) {
-    zxlogf(ERROR, "I2cInit failed: %d", status);
   }
 
   if ((status = CpuInit()) != ZX_OK) {
