@@ -7,12 +7,18 @@
 #include <sys/stat.h>
 #include <sys/sysmacros.h>
 
+#include <cstring>
+#include <string>
+
 #include <gtest/gtest.h>
 #include <linux/input.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
+
+const uint32_t kTouchInputMinor = 0;
+const uint32_t kKeyboardInputMinor = 1;
 
 constexpr size_t min_bytes(size_t n_bits) { return (n_bits + 7) / 8; }
 
@@ -27,20 +33,21 @@ bool get_bit(const std::array<uint8_t, SIZE>& buf, size_t bit_num) {
 
 // TODO(quiche): Maybe move this to a test fixture, and guarantee removal of the input
 // node between test cases.
-test_helper::ScopedFD GetInputFile() {
-  // Typically, this would be `/dev/input/event0`, but there's not much to be gained by
-  // exercising `mkdir()` in this test.
-  const char kInputFile[] = "/dev/input0";
+test_helper::ScopedFD GetInputFile(const uint32_t kInputMinor) {
+  // Typically, this would be `/dev/input/event0` or `/dev/input/event1`, but there's
+  // not much to be gained by exercising `mkdir()` in these tests.
+  std::string kInputFile = "/dev/input" + std::to_string(kInputMinor);
 
   // Create device node. Allow `EEXIST`, to avoid requiring each test case to remove the
   // input device node.
   const uint32_t kInputMajor = 13;
-  if (mknod(kInputFile, 0600 | S_IFCHR, makedev(kInputMajor, 0)) != 0 && errno != EEXIST) {
+  if (mknod(kInputFile.c_str(), 0600 | S_IFCHR, makedev(kInputMajor, kInputMinor)) != 0 &&
+      errno != EEXIST) {
     ADD_FAILURE() << " creating " << kInputFile << " failed: " << strerror(errno);
   };
 
   // Open device node.
-  test_helper::ScopedFD fd(open(kInputFile, O_RDONLY));
+  test_helper::ScopedFD fd(open(kInputFile.c_str(), O_RDONLY));
   EXPECT_TRUE(fd.is_valid()) << " failed to open " << kInputFile << ": " << strerror(errno);
 
   return fd;
@@ -51,7 +58,7 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
     GTEST_SKIP() << "Can only be run as root.";
   }
 
-  auto fd = GetInputFile();
+  auto fd = GetInputFile(kTouchInputMinor);
   ASSERT_TRUE(fd.is_valid());
 
   // Getting the driver version must succeed, but the actual value doesn't matter.
@@ -159,12 +166,119 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
   }
 }
 
+TEST(InputTest, DevicePropertiesMatchKeyboardProperties) {
+  if (getuid() != 0) {
+    GTEST_SKIP() << "Can only be run as root.";
+  }
+
+  auto fd = GetInputFile(kKeyboardInputMinor);
+  ASSERT_TRUE(fd.is_valid());
+
+  // Getting the driver version must succeed, but the actual value doesn't matter.
+  {
+    uint32_t buf;
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGVERSION, &buf)) << "get version failed: " << strerror(errno);
+  }
+
+  // Getting the device identifier must succeed, but the actual value doesn't matter.
+  {
+    input_id buf;
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGID, &buf)) << "get identifier failed: " << strerror(errno);
+  }
+
+  // Getting the supported keys must succeed, with `BTN_MISC` and `KEY_POWER` supported.
+  {
+    constexpr auto kBufSize = min_bytes(KEY_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_KEY, kBufSize), &buf))
+        << "get supported keys failed: " << strerror(errno);
+    ASSERT_TRUE(get_bit(buf, BTN_MISC)) << " BTN_MISC not supported (but should be)";
+    ASSERT_TRUE(get_bit(buf, KEY_POWER)) << " KEY_POWER not supported (but should be)";
+  }
+
+  // Getting the supported absolute position attributes must succeed, but Keyboard should
+  // not support position attributes `ABS_X` and `ABS_Y`.
+  {
+    constexpr auto kBufSize = min_bytes(ABS_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_ABS, kBufSize), &buf))
+        << "get supported absolute position failed: " << strerror(errno);
+    ASSERT_FALSE(get_bit(buf, ABS_X)) << " ABS_X not supported (but should be)";
+    ASSERT_FALSE(get_bit(buf, ABS_Y)) << " ABS_Y not supported (but should be)";
+  }
+
+  // Getting the supported relative motive attributes must succeed, but the actual values
+  // don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(REL_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_REL, kBufSize), &buf))
+        << "get supported relative motion failed: " << strerror(errno);
+  }
+
+  // Getting the supported switches must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(SW_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_SW, kBufSize), &buf))
+        << "get supported switches failed: " << strerror(errno);
+  }
+
+  // Getting the supported LEDs must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(LED_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_LED, kBufSize), &buf))
+        << "get supported LEDs failed: " << strerror(errno);
+  }
+
+  // Getting the supported force feedbacks must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(FF_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_FF, kBufSize), &buf))
+        << "get supported force feedbacks failed: " << strerror(errno);
+  }
+
+  // Getting the supported miscellaneous features must succeed, but the actual values don't matter.
+  {
+    constexpr auto kBufSize = min_bytes(MSC_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_MSC, kBufSize), &buf))
+        << "get supported miscellaneous features failed: " << strerror(errno);
+  }
+
+  // Getting the input properties must succeed, with `INPUT_PROP_DIRECT` set.
+  {
+    constexpr auto kBufSize = min_bytes(INPUT_PROP_MAX);
+    std::array<uint8_t, kBufSize> buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGPROP(kBufSize), &buf))
+        << "get supported input properties features failed: " << strerror(errno);
+    ASSERT_TRUE(get_bit(buf, INPUT_PROP_DIRECT))
+        << " INPUT_PROP_DIRECT not supported (but should be)";
+  }
+
+  // Getting the x-axis range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_X), &buf))
+        << "get x-axis info failed: " << strerror(errno);
+  }
+
+  // Getting the y-axis range must succeed, but the actual values don't matter.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_Y), &buf))
+        << "get y-axis info failed: " << strerror(errno);
+  }
+}
+
 TEST(InputTest, DeviceCanBeRegisteredWithEpoll) {
   if (getuid() != 0) {
     GTEST_SKIP() << "Can only be run as root.";
   }
 
-  auto input_fd = GetInputFile();
+  auto input_fd = GetInputFile(kTouchInputMinor);
   ASSERT_TRUE(input_fd.is_valid());
 
   test_helper::ScopedFD epoll_fd(epoll_create(1));  // Per `man` page, must be >0.
