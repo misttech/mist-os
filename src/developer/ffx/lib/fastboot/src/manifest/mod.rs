@@ -32,11 +32,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::{from_value, to_value, Value};
 use std::{
     collections::BTreeMap,
-    fs::File,
-    io::{BufReader, Read, Write},
+    fs::{create_dir_all, File},
+    io::{copy, BufReader, Read, Write},
     path::PathBuf,
 };
+use tempfile::{tempdir, TempDir};
 use termion::{color, style};
+use zip::read::ZipArchive;
 
 pub mod resolvers;
 pub mod sdk;
@@ -482,14 +484,52 @@ pub async fn from_local_product_bundle<W: Write, F: FastbootInterface>(
     fastboot_interface: &mut F,
     cmd: ManifestParams,
 ) -> Result<()> {
+    let tempdir = tempdir()?;
     tracing::debug!("fastboot manifest from_local_product_bundle");
-    let product_bundle = ProductBundle::try_load_from(Utf8Path::from_path(&*path).unwrap())?;
-    FlashManifest {
-        resolver: Resolver::new(path)?,
+    // TODO(b/303650362): Cleanup
+    let pb_dir =
+        if path.is_file() && path.extension().is_some() && path.extension().unwrap() == "zip" {
+            extract_product_bundle_zip(&tempdir, path)?
+        } else {
+            path
+        };
+    let product_bundle = ProductBundle::try_load_from(Utf8Path::from_path(&*pb_dir).unwrap())?;
+    let result = FlashManifest {
+        resolver: Resolver::new(pb_dir)?,
         version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
     }
     .flash(writer, fastboot_interface, cmd)
-    .await
+    .await;
+    drop(tempdir);
+    result
+}
+
+pub fn extract_product_bundle_zip(tempdir: &TempDir, path: PathBuf) -> Result<PathBuf> {
+    let extracted_dir = tempdir.path();
+    let file =
+        File::open(path.clone()).map_err(|e| ffx_error!("Could not open archive file: {}", e))?;
+    let mut archive =
+        ZipArchive::new(file).map_err(|e| ffx_error!("Could not read archive: {}", e))?;
+
+    for i in 0..archive.len() {
+        let mut archive_file = archive.by_index(i)?;
+        let outpath = archive_file.sanitized_name();
+        let extracted_path = extracted_dir.join(outpath);
+
+        if (*archive_file.name()).ends_with('/') {
+            create_dir_all(&extracted_path)?;
+        } else {
+            if let Some(p) = extracted_path.parent() {
+                if p.exists() {
+                    continue;
+                }
+                create_dir_all(&p)?;
+            }
+            let mut extracted_file = File::create(&extracted_path)?;
+            copy(&mut archive_file, &mut extracted_file)?;
+        }
+    }
+    Ok(extracted_dir.join("product_bundle"))
 }
 
 pub async fn from_in_tree<W: Write, T: FastbootInterface>(
