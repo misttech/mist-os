@@ -18,6 +18,7 @@ use {
     fuchsia_merkle::{hash_block, MerkleTree},
     fuchsia_zircon::Status,
     fuchsia_zircon::{self as zx, AsHandleRef},
+    futures::try_join,
     fxfs::{
         async_enter,
         errors::FxfsError,
@@ -253,8 +254,15 @@ impl PagerBacked for FxBlob {
                 ..round_up(compressed_offsets.end, bs).unwrap();
             let mut compressed_buf =
                 self.handle.allocate_buffer((aligned.end - aligned.start) as usize);
-            let read =
-                self.handle.read(aligned.start, compressed_buf.as_mut()).await.context(format!(
+            let (read, _) =
+                try_join!(self.handle.read(aligned.start, compressed_buf.as_mut()), async {
+                    buffer
+                        .allocator()
+                        .buffer_source()
+                        .commit_range(buffer.range())
+                        .map_err(|e| e.into())
+                })
+                .context(format!(
                     "Failed to read compressed range {:?}, len {}",
                     aligned,
                     self.handle.get_size()

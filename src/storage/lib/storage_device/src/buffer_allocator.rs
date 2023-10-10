@@ -57,6 +57,11 @@ mod buffer_source {
             assert!(range.start < self.size && range.end <= self.size);
             std::slice::from_raw_parts_mut(self.base.add(range.start), range.end - range.start)
         }
+
+        /// Commits the range in memory to avoid future page faults.
+        pub fn commit_range(&self, range: Range<usize>) -> Result<(), zx::Status> {
+            self.vmo.op_range(zx::VmoOp::COMMIT, range.start as u64, range.len() as u64)
+        }
     }
 
     impl Drop for BufferSource {
