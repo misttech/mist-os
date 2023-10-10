@@ -109,8 +109,9 @@ config("bootfs") {
   # TODO(fxbug.dev/84386): use "z" when resolved.
   rustflags = [ "-Copt-level=s" ]
 
-  if (is_debug &&  # Debug builds produce large Rust binaries
-      max_fuchsia_zbi_size > 0) {  # So large they might not fit in the ZBI
+  if (target_cpu == "arm64" && is_debug) {
+    # Debug builds produce large Rust binaries.
+    # So large they might not fit in the ZBI.
     # Force ThinLTO to squeeze Rust binaries further.
     # See: fxbug.dev/80514
     # See: fxbug.dev/91325
