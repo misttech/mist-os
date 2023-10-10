@@ -86,6 +86,7 @@ TEST_F(ContiguousPooledSystem, VmoNamesAreSet) {
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize - 42;
   EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
   EXPECT_OK(vmo.get_property(ZX_PROP_NAME, name, sizeof(name)));
@@ -108,6 +109,7 @@ TEST_F(ContiguousPooledSystem, Full) {
   for (uint32_t i = 0; i < kVmoCount; ++i) {
     zx::vmo vmo;
     fuchsia_sysmem2::SingleBufferSettings settings;
+    settings.buffer_settings().emplace();
     settings.buffer_settings()->size_bytes() = kVmoSize - 100;
     EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
     vmos.push_back(std::move(vmo));
@@ -119,6 +121,7 @@ TEST_F(ContiguousPooledSystem, Full) {
   auto before_time = zx::clock::get_monotonic();
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
   EXPECT_NOT_OK(
       allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
@@ -208,6 +211,7 @@ TEST_F(ContiguousPooledSystem, InitPhysical) {
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
   EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
   allocator_.Delete(std::move(vmo));
@@ -219,6 +223,7 @@ TEST_F(ContiguousPooledSystem, SetReady) {
   EXPECT_FALSE(allocator_.is_ready());
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
   EXPECT_EQ(ZX_ERR_BAD_STATE,
             allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
@@ -242,6 +247,7 @@ TEST_F(ContiguousPooledSystem, GuardPages) {
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
   EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
   EXPECT_EQ(0u, allocator_.failed_guard_region_checks());
@@ -283,6 +289,7 @@ TEST_F(ContiguousPooledSystem, ExternalGuardPages) {
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kVmoSize;
   EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
   EXPECT_EQ(0u, allocator_.failed_guard_region_checks());
@@ -337,6 +344,7 @@ TEST_F(ContiguousPooledSystem, UnusedGuardPages) {
 
   zx::vmo vmo;
   fuchsia_sysmem2::SingleBufferSettings settings;
+  settings.buffer_settings().emplace();
   settings.buffer_settings()->size_bytes() = kBigVmoSize;
   EXPECT_OK(
       allocator_.Allocate(kBigVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
@@ -435,6 +443,7 @@ TEST_F(ContiguousPooledSystem, FreeRegionReporting) {
   for (uint32_t i = 0; i < kVmoCount; ++i) {
     zx::vmo vmo;
     fuchsia_sysmem2::SingleBufferSettings settings;
+    settings.buffer_settings().emplace();
     settings.buffer_settings()->size_bytes() = kVmoSize;
     EXPECT_OK(allocator_.Allocate(kVmoSize, settings, "", kBufferCollectionId, kBufferIndex, &vmo));
     vmos.push_back(std::move(vmo));
