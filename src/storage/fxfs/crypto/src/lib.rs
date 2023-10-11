@@ -185,6 +185,8 @@ impl XtsCipherSet {
     /// * `offset` is the byte offset within the file.
     /// * `key_id` specifies which of the unwrapped keys to use.
     /// * `buffer` is mutated in place.
+    ///
+    /// `buffer` *must* be 16 byte aligned.
     pub fn decrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
         trace_duration!("decrypt");
         assert_eq!(offset % SECTOR_SIZE, 0);
@@ -210,6 +212,8 @@ impl XtsCipherSet {
     /// * `offset` is the byte offset within the file.
     /// * `key_id` specifies which of the unwrapped keys to use.
     /// * `buffer` is mutated in place.
+    ///
+    /// `buffer` *must* be 16 byte aligned.
     pub fn encrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
         trace_duration!("encrypt");
         assert_eq!(offset % SECTOR_SIZE, 0);
@@ -311,8 +315,9 @@ struct XtsProcessor<'a> {
 }
 
 impl<'a> XtsProcessor<'a> {
-    // `tweak` should be encrypted.  `data` should be a single sector.
+    // `tweak` should be encrypted.  `data` should be a single sector and *must* be 16 byte aligned.
     fn new(tweak: Tweak, data: &'a mut [u8]) -> Self {
+        assert_eq!(data.as_ptr() as usize & 15, 0, "data must be 16 byte aligned");
         Self { tweak, data }
     }
 }
