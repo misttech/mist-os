@@ -7,12 +7,12 @@
 
 import 'dart:typed_data';
 
-import 'package:fidl/fidl.dart' as fidl;
-import 'package:fidl_test_conformance/fidl_async.dart';
 import 'package:test/test.dart';
-import 'package:sdk.dart.lib.gidl/gidl.dart';
-import 'package:sdk.dart.lib.gidl/handles.dart';
-import 'package:zircon/zircon.dart';
+import 'package:turquoise.dart.zircon/zircon.dart';
+import 'package:turquoise.fidl.dart.fidl/fidl.dart' as fidl;
+import 'package:turquoise.fidl.gidl/gidl.dart';
+import 'package:turquoise.fidl.gidl/handles.dart';
+import 'package:turquoise.fidl.tests.dart_bindings_test.conformance.fidl/test_conformance.fidl_async.dart';
 
 void main() {
   group('conformance', () {
