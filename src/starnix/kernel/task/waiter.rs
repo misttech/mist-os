@@ -619,13 +619,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                WaitQueue::retain_waiters(&mut wait_queue.lock().waiters, |entry| {
-                    if entry.waiter == *self {
-                        Retention::Drop
-                    } else {
-                        Retention::Keep
-                    }
-                })
+                wait_queue.lock().waiters.retain(|entry| entry.entry.waiter != *self)
             }
         }
     }
@@ -652,13 +646,7 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                WaitQueue::retain_waiters(&mut wait_queue.lock().waiters, |entry| {
-                    if entry.waiter == self.event {
-                        Retention::Drop
-                    } else {
-                        Retention::Keep
-                    }
-                })
+                wait_queue.lock().waiters.retain(|entry| entry.entry.waiter != self.event)
             }
         }
     }
@@ -926,15 +914,18 @@ impl WaitQueue {
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
-        Self::retain_waiters_or_remove_from_wait_queues(&mut self.0.lock().waiters, |entry| {
+        self.0.lock().waiters.retain(|WaitEntryWithId { entry, id: _ }| {
             if limit > 0 && entry.filter.intercept(&events) {
                 if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;
                     woken += 1;
                 }
-                return Retention::Drop;
+
+                entry.waiter.will_remove_from_wait_queue(&entry.key);
+                false
+            } else {
+                true
             }
-            Retention::Keep
         });
         woken
     }
@@ -959,42 +950,6 @@ impl WaitQueue {
     pub fn is_empty(&self) -> bool {
         self.0.lock().waiters.is_empty()
     }
-
-    fn retain_waiters(
-        waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
-        filter: impl FnMut(&WaitEntry) -> Retention,
-    ) {
-        retain_waiters_inner(waiters, filter, |_: WaitEntry| ())
-    }
-
-    fn retain_waiters_or_remove_from_wait_queues(
-        waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
-        filter: impl FnMut(&WaitEntry) -> Retention,
-    ) {
-        retain_waiters_inner(waiters, filter, |entry| {
-            entry.waiter.will_remove_from_wait_queue(&entry.key);
-        })
-    }
-}
-
-fn retain_waiters_inner(
-    waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
-    mut filter: impl FnMut(&WaitEntry) -> Retention,
-    on_removal: impl Fn(WaitEntry),
-) {
-    waiters
-        .update_retain(move |entry| match filter(&entry.entry) {
-            Retention::Keep => Ok(()),
-            Retention::Drop => Err(()),
-        })
-        .fold((), |(), (_, WaitEntryWithId { entry, id: _ }, ()): (dense_map::Key, _, _)| {
-            on_removal(entry)
-        })
-}
-
-enum Retention {
-    Drop,
-    Keep,
 }
 
 #[cfg(test)]
