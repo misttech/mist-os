@@ -87,6 +87,9 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #   delivery_blob_type (optional)
 #     [int] The type of delivery blob the product needs.
 #
+#   skip_transfer_manifest           (optional; default=false)
+#     [bool] Whether to skip creating transfer manifest
+#
 template("product_bundle") {
   assert(defined(invoker.partitions), "Need to define partitions")
 
@@ -134,6 +137,11 @@ template("product_bundle") {
   } else {
     assert(defined(invoker.scrutiny_recovery_args),
            "scrutiny_recovery_args must be supplied")
+  }
+
+  skip_transfer_manifest = false
+  if (defined(invoker.skip_transfer_manifest)) {
+    skip_transfer_manifest = invoker.skip_transfer_manifest
   }
 
   python_action(labels.hermetic_inputs) {
@@ -336,19 +344,21 @@ template("product_bundle") {
     }
   }
 
-  product_bundle_transfer_manifest(labels.transfer_manifest) {
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-    product_bundle_target = ":${labels.product_bundle}"
-    output_dir = files.target_out_dir
-    product_bundle_dir = files.outdir
+  if (!skip_transfer_manifest) {
+    product_bundle_transfer_manifest(labels.transfer_manifest) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      product_bundle_target = ":${labels.product_bundle}"
+      output_dir = files.target_out_dir
+      product_bundle_dir = files.outdir
 
-    # The definition of metadata.product_bundles.transfer_manifest_path
-    # below depends on the following assertion.
-    assert("${output_dir}/transfer.json" == files.transfer_manifest)
+      # The definition of metadata.product_bundles.transfer_manifest_path
+      # below depends on the following assertion.
+      assert("${output_dir}/transfer.json" == files.transfer_manifest)
+    }
   }
 
   if (!skip_scrutiny) {
@@ -385,15 +395,15 @@ template("product_bundle") {
                              "visibility",
                            ])
 
-    public_deps = [
-      ":${labels.product_bundle}",
-      ":${labels.transfer_manifest}",
-    ]
+    public_deps = [ ":${labels.product_bundle}" ]
     if (!skip_scrutiny) {
       public_deps += [ ":${labels.scrutiny}" ]
     }
     if (!skip_scrutiny_recovery) {
       public_deps += [ ":${labels.scrutiny_recovery}" ]
+    }
+    if (!skip_transfer_manifest) {
+      public_deps += [ ":${labels.transfer_manifest}" ]
     }
 
     # This value can be set (e.g. for testing) with `--args sdk_id=1234` on the
@@ -411,9 +421,11 @@ template("product_bundle") {
           path = rebase_path(files.outdir, root_build_dir)
           name = "${build_info_product}.${build_info_board}"
           product_version = product_version
-          transfer_manifest_path =
-              rebase_path(files.transfer_manifest, root_build_dir)
-          transfer_manifest_url = "file://" + transfer_manifest_path
+          if (!skip_transfer_manifest) {
+            transfer_manifest_path =
+                rebase_path(files.transfer_manifest, root_build_dir)
+            transfer_manifest_url = "file://" + transfer_manifest_path
+          }
         },
       ]
     }

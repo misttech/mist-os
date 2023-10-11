@@ -81,13 +81,18 @@ group("non_hermetic_deps") {
   # will not be resolved except by moving to Bazel.
   visibility += [
     "//build/images/*",
+    "//src/bringup/lib/mexec/tests/*",
+    "//src/lib/elfldltl/test/*",
     "//src/security/lib/scrutiny/plugins/*",
     "//src/security/lib/scrutiny/tests/*",
     "//src/security/tests/pkg_test/tests/*",
     "//src/security/tests/scrutiny_ffx_integration/*",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/assembly/*",
+    "//src/tests/kernel_cprng/*",
     "//third_party/network-conformance/images/*",
+    "//zircon/kernel/*",
+    "//zircon/system/*",
   ]
 
   # TODO(fxbug.dev/94463): Remove entry when action tracer can handle ld.lld invocations.

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/sdk/product_bundle.gni")
 import("//build/testing/test_spec.gni")
 
 # The test runners have no better way to determine that a boot test succeeded
@@ -23,6 +24,12 @@ _all_emu_types = [
 # flexibility is needed as we wish to define one for emulators on $target_cpu
 # hosts even when $target_cpu != $host_cpu in order to take advantage of KVM,
 # HVF, etc.
+#
+# Subtargets
+#
+#   * $target_name.product_bundle
+#     - The associated product_bundle() target, creating a testing product
+#       bundle based on the images comprising the boot test.
 #
 # Parameters
 #
@@ -200,6 +207,65 @@ template("boot_test") {
       "boot_test(\"$target_name\") must define at least one of `zbi`, `qemu_kernel`, `vbmeta`, `efi_disk`")
 
   main_target = target_name
+
+  image_manifest_target = "_boot_test.${target_name}.images_manifest"
+  product_bundle_target = target_name + ".product_bundle"
+
+  generated_file(image_manifest_target) {
+    forward_variables_from(invoker,
+                           [
+                             "zbi",
+                             "qemu_kernel",
+                             "vbmeta",
+                           ])
+    testonly = true
+    data_keys = [ "images" ]
+    output_conversion = "json"
+
+    deps = []
+    if (defined(zbi)) {
+      deps += [ zbi ]
+    }
+    if (defined(vbmeta)) {
+      deps += [ vbmeta ]
+    }
+    if (defined(qemu_kernel)) {
+      deps += [ qemu_kernel ]
+    }
+
+    # TODO(b/304820366): Uncomment this block when we can create product bundle
+    # with efi_disk
+    # if (defined(efi_disk)) {
+    #   deps += [ efi_disk ]
+    # }
+    outputs = [ "${target_out_dir}/${main_target}.images.json" ]
+  }
+
+  _partitions_config = "//boards/partitions:default"
+  if (has_board) {
+    assert(partitions_config_label != false,
+           "Need to define partitions_config_label")
+    _partitions_config = partitions_config_label
+  }
+  _partitions_config_file =
+      get_label_info(_partitions_config, "target_out_dir") + "/" +
+      get_label_info(_partitions_config, "name") + ".json"
+
+  product_bundle(product_bundle_target) {
+    testonly = true
+    forward_variables_from(invoker, [ "deps" ])
+    system_a = ":image_manifest_target"
+    partitions = _partitions_config_file
+    deps = [ _partitions_config ]
+
+    # This is a testing product bundle, so no need for a scrutiny check for this.
+    skip_scrutiny = true
+    skip_scrutiny_recovery = true
+
+    # This Product bundle will not be distributed and only for testing purpose,
+    # so not need to create transfer manifest.
+    skip_transfer_manifest = true
+  }
 
   # If host_cpu != target_cpu, then we make sure to define a separate boot
   # test for a target_cpu host in order to take advantage of KVM, HVF, etc.
