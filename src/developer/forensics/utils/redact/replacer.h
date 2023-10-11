@@ -35,9 +35,12 @@ Replacer ReplaceIPv4();
 Replacer ReplaceIPv6();
 
 // Constructs a Replacer that substitutes all instances of MAC address with a string like
-// "REDACTED-MAC:"
+// "<REDACTED-MAC: %d>"
 Replacer ReplaceMac();
 
+// Constructs a Replacer that substitutes all instances of SSIDs with a string like
+// "<REDACTED-SSID: %d>"
+Replacer ReplaceSsid();
 }  // namespace forensics
 
 #endif  // SRC_DEVELOPER_FORENSICS_UTILS_REDACT_REPLACER_H_

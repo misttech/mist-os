@@ -326,5 +326,24 @@ TEST(MacReplacerTest, ReplaceMac) {
   EXPECT_EQ(replacer(cache, text),
             "MAC address: 00:0a:95:<REDACTED-MAC: 1> 12:34:95:<REDACTED-MAC: 2>");
 }
+
+TEST(SsidReplacerTest, ReplaceSsid) {
+  RedactionIdCache cache(inspect::UintProperty{});
+  Replacer replacer = ReplaceSsid();
+  ASSERT_NE(replacer, nullptr);
+
+  std::string text = R"(
+<ssid->
+<ssid-4567fedcba>
+<ssid-0123456789012345678901234567890123456789012345678901234567890123>
+<ssid-01234567890123456789012345678901234567890123456789012345678901234>
+)";
+  EXPECT_EQ(replacer(cache, text), R"(
+<REDACTED-SSID: 1>
+<REDACTED-SSID: 2>
+<REDACTED-SSID: 3>
+<REDACTED-SSID: 4>
+)");
+}
 }  // namespace
 }  // namespace forensics

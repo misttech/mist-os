@@ -282,4 +282,19 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
 
 Replacer ReplaceMac() { return FunctionBasedReplacer(kMacPattern, RedactMac); }
 
+namespace {
+
+// The SSID identifier contains at most 32 pairs of hexadecimal characters, but match any number so
+// SSID identifiers with the wrong number of hexadecimal characters are also redacted.
+constexpr std::string_view kSsidPattern = R"((<ssid-[0-9a-fA-F]*>))";
+
+std::string RedactSsid(RedactionIdCache& cache, const std::string& match) {
+  const int id = cache.GetId(match);
+  return fxl::StringPrintf("<REDACTED-SSID: %d>", id);
+}
+
+}  // namespace
+
+Replacer ReplaceSsid() { return FunctionBasedReplacer(kSsidPattern, RedactSsid); }
+
 }  // namespace forensics

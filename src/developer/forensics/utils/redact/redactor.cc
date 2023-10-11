@@ -23,10 +23,6 @@ constexpr std::string_view kUuidPattern =
 // http(s) urls
 constexpr std::string_view kUrlPattern = R"(https?://[^"',!<> ]*)";
 
-// The SSID identifier contains at most 32 pairs of hexadecimal characters, but match any number so
-// SSID identifiers with the wrong number of hexadecimal characters are also redacted.
-constexpr std::string_view kSsidPattern = R"((<ssid-[0-9a-fA-F]*>))";
-
 // Long hex strings
 constexpr std::string_view kHexPattern = R"((\b[0-9a-fA-F]{32}\b))";
 
@@ -108,13 +104,14 @@ Redactor::Redactor(const int starting_id, inspect::UintProperty cache_size,
   Add(ReplaceIPv4())
       .Add(ReplaceIPv6())
       .Add(ReplaceMac())
+      .Add(ReplaceSsid())
       .AddJsonReplacer(ReplaceIPv4())
       .AddJsonReplacer(ReplaceIPv6())
       .AddJsonReplacer(ReplaceMac())
+      .AddJsonReplacer(ReplaceSsid())
       .AddTextReplacer(kUrlPattern, "<REDACTED-URL>")
       .AddTextReplacer(kEmailPattern, "<REDACTED-EMAIL>")
       .AddTextReplacer(kUuidPattern, "<REDACTED-UUID>")
-      .AddIdReplacer(kSsidPattern, "<REDACTED-SSID: %d>")
       .AddIdReplacer(kHexPattern, "<REDACTED-HEX: %d>")
       .AddIdReplacer(kGaiaPattern, "<REDACTED-OBFUSCATED-GAIA-ID: %d>");
 }
