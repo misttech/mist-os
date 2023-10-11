@@ -281,10 +281,12 @@ async fn pinned_url_and_non_empty_packages_json() {
     );
 }
 
-// Verifies that:
-//   1. unpinned update pkg url causes first RetainedPackages use to be Clear and second use to
-//      not include the update package
-//   2. second RetainedPackages use still includes packages from packages.json
+// Verifies that an unpinned update pkg URL causes:
+//   1. The first RetainedPackages use to be Clear (instead of setting the index to the hash of the
+//      update package, since the hash is missing from the URL and therefore unknown).
+//   2. The second RetainedPackages use to be Replace with the system image hash (the only entry of
+//      packages.json) and the update package hash. The update package hash was obtained from the
+//      resolved update package (since it was missing from the URL).
 #[fasync::run_singlethreaded(test)]
 async fn unpinned_url_and_non_empty_packages_json_v1() {
     let env = TestEnv::builder().build().await;
@@ -337,7 +339,10 @@ async fn unpinned_url_and_non_empty_packages_json_v1() {
                 payload: b"fake zbi".to_vec(),
             }),
             Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap(),]),
+            ReplaceRetainedPackages(vec![
+                SYSTEM_IMAGE_HASH.parse().unwrap(),
+                UPDATE_HASH.parse().unwrap()
+            ]),
             Gc,
             PackageResolve(SYSTEM_IMAGE_URL.to_string()),
             BlobfsSync,
@@ -348,10 +353,17 @@ async fn unpinned_url_and_non_empty_packages_json_v1() {
     );
 }
 
-// Verifies that:
-//   1. unpinned update pkg url causes first RetainedPackages use to be Clear and second use to
-//      not include the update package
-//   2. second RetainedPackages use still includes packages from packages.json
+// Verifies that an unpinned update pkg URL causes:
+//   1. The first RetainedPackages use to be Clear (instead of setting the index to the hash of the
+//      update package, since the hash is missing from the URL and therefore unknown).
+//   2. The second RetainedPackages use to be Replace with the system image hash (the only entry of
+//      packages.json) and the update package hash. The update package hash was obtained from the
+//      resolved update package (since it was missing from the URL).
+//
+// There are no images.json-related manipulations of the retained index because the only
+// images.json entry is a ZBI with the empty hash, and the paver will report that the currently
+// written image in the available slot has the empty hash, and system-updater does not resolve
+// image packages if the desired image is already present.
 #[fasync::run_singlethreaded(test)]
 async fn unpinned_url_and_non_empty_packages_json() {
     let env = TestEnv::builder().build().await;
@@ -403,7 +415,132 @@ async fn unpinned_url_and_non_empty_packages_json() {
                 asset: paver::Asset::Kernel,
             }),
             Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![SYSTEM_IMAGE_HASH.parse().unwrap(),]),
+            ReplaceRetainedPackages(vec![
+                SYSTEM_IMAGE_HASH.parse().unwrap(),
+                UPDATE_HASH.parse().unwrap()
+            ]),
+            Gc,
+            PackageResolve(SYSTEM_IMAGE_URL.to_string()),
+            BlobfsSync,
+            Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
+            Paver(PaverEvent::BootManagerFlush),
+            Reboot,
+        ]
+    );
+}
+
+// Verifies that an unpinned update pkg URL causes:
+//   1. The first RetainedPackages use to be Clear (instead of setting the index to the hash of the
+//      update package, since the hash is missing from the URL and therefore unknown).
+//   2. The second RetainedPackages use to be Replace with the system image hash (the only entry of
+//      packages.json), the ZBI hash, and the update package hash. The update package hash was
+//      obtained from the resolved update package (since it was missing from the URL).
+//   3. The third RetainedPackages use to be Replace with the ZBI hash and the update package hash.
+//      This is because the first resolve of the ZBI failed and now we are retrying after having
+//      possibly freed some space by GC'ing the packages.json packages.
+//   4. The fourth RetainedPackages use to be Replace with the system image and update package.
+//      This is to GC the images in preparation for resolving the packages.json entries.
+//
+// This is a "maximal" test of RetainedPackages interactions. It triggers each possible call to the
+// protocol and each call contains the most possible information:
+//   1. the update package hash is missing from the URL but obtained from the resolved package
+//   2. packages.json has an entry that needs to be added and removed from the index
+//   3. images.json has an entry that needs to be added and removed from the index
+#[fasync::run_singlethreaded(test)]
+async fn unpinned_url_and_resolved_image_package_and_non_empty_packages_json() {
+    let env = TestEnv::builder().build().await;
+
+    let zbi_hash_seed = 9;
+    let images_json = ::update_package::ImagePackagesManifest::builder()
+        .fuchsia_package(
+            ::update_package::ImageMetadata::new(
+                5,
+                hash(zbi_hash_seed),
+                image_package_resource_url("zbi", zbi_hash_seed, "zbi"),
+            ),
+            None,
+        )
+        .clone()
+        .build();
+
+    env.resolver.url(UPDATE_PKG_URL).respond_serially(vec![
+        // To trigger RetainedPackages interaction, the first two resolves of the update package
+        // must fail.
+        Err(ResolveError::NoSpace),
+        Err(ResolveError::NoSpace),
+        Ok(env
+            .resolver
+            .package("update", UPDATE_HASH)
+            .add_file("packages.json", make_packages_json([SYSTEM_IMAGE_URL]))
+            .add_file("epoch.json", make_current_epoch_json())
+            .add_file("images.json", serde_json::to_string(&images_json).unwrap())),
+    ]);
+
+    env.resolver.url(image_package_url_to_string("zbi", zbi_hash_seed)).respond_serially(vec![
+        // To trigger an additional RetainedPackages interaction, the first resolve of the ZBI
+        // must fail.
+        Err(ResolveError::NoSpace),
+        Ok(env.resolver.package("zbi", hashstr(zbi_hash_seed)).add_file("zbi", "zbi contents")),
+    ]);
+
+    env.resolver
+        .url(SYSTEM_IMAGE_URL)
+        .resolve(&env.resolver.package("system_image/0", SYSTEM_IMAGE_HASH));
+
+    let () = env.run_update().await.expect("run system updater");
+
+    assert_eq!(
+        env.take_interactions(),
+        vec![
+            Paver(PaverEvent::QueryCurrentConfiguration),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::VerifiedBootMetadata,
+            }),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::A,
+                asset: paver::Asset::Kernel,
+            }),
+            Paver(PaverEvent::QueryCurrentConfiguration),
+            Paver(PaverEvent::QueryConfigurationStatus { configuration: paver::Configuration::A }),
+            Paver(PaverEvent::SetConfigurationUnbootable {
+                configuration: paver::Configuration::B
+            }),
+            Paver(PaverEvent::BootManagerFlush),
+            PackageResolve(UPDATE_PKG_URL.to_string()),
+            Gc,
+            PackageResolve(UPDATE_PKG_URL.to_string()),
+            ClearRetainedPackages,
+            Gc,
+            PackageResolve(UPDATE_PKG_URL.to_string()),
+            Paver(PaverEvent::ReadAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+            }),
+            ReplaceRetainedPackages(vec![
+                SYSTEM_IMAGE_HASH.parse().unwrap(),
+                hash(zbi_hash_seed).into(),
+                UPDATE_HASH.parse().unwrap()
+            ]),
+            Gc,
+            PackageResolve(
+                image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string()
+            ),
+            ReplaceRetainedPackages(vec![hash(zbi_hash_seed).into(), UPDATE_HASH.parse().unwrap()]),
+            Gc,
+            PackageResolve(
+                image_package_resource_url("zbi", zbi_hash_seed, "zbi").package_url().to_string()
+            ),
+            Paver(PaverEvent::WriteAsset {
+                configuration: paver::Configuration::B,
+                asset: paver::Asset::Kernel,
+                payload: b"zbi contents".to_vec(),
+            },),
+            Paver(PaverEvent::DataSinkFlush),
+            ReplaceRetainedPackages(vec![
+                SYSTEM_IMAGE_HASH.parse().unwrap(),
+                UPDATE_HASH.parse().unwrap()
+            ]),
             Gc,
             PackageResolve(SYSTEM_IMAGE_URL.to_string()),
             BlobfsSync,
@@ -549,10 +686,12 @@ async fn pinned_url_and_empty_packages_json() {
     );
 }
 
-// Verifies that:
-//   1. unpinned update pkg url causes first RetainedPackages use to be Clear and second use to
-//      not include the update package
-//   2. second RetainedPackages has no packages from packages.json so should be empty
+// Verifies that an unpinned update pkg URL causes:
+//   1. The first RetainedPackages use to be Clear (instead of setting the index to the hash of the
+//      update package, since the hash is missing from the URL and therefore unknown).
+//   2. The second RetainedPackages use to be Replace with just the update package hash. The hash
+//      was obtained from the resolved update package (since it was missing from the URL).
+//      Only the update package hash will be included because packages.json is empty.
 #[fasync::run_singlethreaded(test)]
 async fn unpinned_url_and_empty_packages_json_v1() {
     let env = TestEnv::builder().build().await;
@@ -568,10 +707,6 @@ async fn unpinned_url_and_empty_packages_json_v1() {
             .add_file("epoch.json", make_current_epoch_json())
             .add_file("zbi", "fake zbi")),
     ]);
-
-    env.resolver
-        .url(SYSTEM_IMAGE_URL)
-        .resolve(&env.resolver.package("system_image/0", SYSTEM_IMAGE_HASH));
 
     let () = env.run_update().await.expect("run system updater");
 
@@ -605,7 +740,7 @@ async fn unpinned_url_and_empty_packages_json_v1() {
                 payload: b"fake zbi".to_vec(),
             }),
             Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
+            ReplaceRetainedPackages(vec![UPDATE_HASH.parse().unwrap()]),
             Gc,
             BlobfsSync,
             Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),
@@ -615,10 +750,17 @@ async fn unpinned_url_and_empty_packages_json_v1() {
     );
 }
 
-// Verifies that:
-//   1. unpinned update pkg url causes first RetainedPackages use to be Clear and second use to
-//      not include the update package
-//   2. second RetainedPackages has no packages from packages.json so should be empty
+// Verifies that an unpinned update pkg URL causes:
+//   1. The first RetainedPackages use to be Clear (instead of setting the index to the hash of the
+//      update package, since the hash is missing from the URL and therefore unknown).
+//   2. The second RetainedPackages use to be Replace with just the update package hash. The hash
+//      was obtained from the resolved update package (since it was missing from the URL).
+//      Only the update package hash will be included because packages.json is empty.
+//
+// There are no images.json-related manipulations of the retained index because the only
+// images.json entry is a ZBI with the empty hash, and the paver will report that the currently
+// written image in the available slot has the empty hash, and system-updater does not resolve
+// image packages if the desired image is already present.
 #[fasync::run_singlethreaded(test)]
 async fn unpinned_url_and_empty_packages_json() {
     let env = TestEnv::builder().build().await;
@@ -634,10 +776,6 @@ async fn unpinned_url_and_empty_packages_json() {
             .add_file("epoch.json", make_current_epoch_json())
             .add_file("images.json", make_images_json_zbi())),
     ]);
-
-    env.resolver
-        .url(SYSTEM_IMAGE_URL)
-        .resolve(&env.resolver.package("system_image/0", SYSTEM_IMAGE_HASH));
 
     let () = env.run_update().await.expect("run system updater");
 
@@ -670,7 +808,7 @@ async fn unpinned_url_and_empty_packages_json() {
                 asset: paver::Asset::Kernel,
             }),
             Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
+            ReplaceRetainedPackages(vec![UPDATE_HASH.parse().unwrap()]),
             Gc,
             BlobfsSync,
             Paver(PaverEvent::SetConfigurationActive { configuration: paver::Configuration::B }),

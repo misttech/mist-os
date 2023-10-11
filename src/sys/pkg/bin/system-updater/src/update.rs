@@ -680,7 +680,10 @@ impl<'a> Attempt<'a> {
         let mut state = state.enter_fetch(co).await;
         *phase = metrics::Phase::PackageDownload;
 
-        let packages = match self.fetch_packages(co, &mut state, packages_to_fetch, mode).await {
+        let packages = match self
+            .fetch_packages(co, &mut state, packages_to_fetch, mode, update_pkg.1)
+            .await
+        {
             Ok(packages) => packages,
             Err(e) => {
                 state.fail(co, e.reason()).await;
@@ -716,7 +719,7 @@ impl<'a> Attempt<'a> {
         target_version: &mut history::Version,
     ) -> Result<
         (
-            UpdatePackage,
+            (UpdatePackage, Option<Hash>),
             UpdateMode,
             Vec<PinnedAbsolutePackageUrl>,
             Option<ImagesToWrite>,
@@ -755,6 +758,21 @@ impl<'a> Attempt<'a> {
         )
         .await
         .map_err(PrepareError::ResolveUpdate)?;
+
+        let update_package_hash = if let Some(hash) = self.config.update_url.hash() {
+            Some(hash)
+        } else {
+            match update_pkg.hash().await {
+                Ok(hash) => Some(hash),
+                Err(e) => {
+                    error!(
+                        "unable to obtain the hash of the resolved update package: {:#}",
+                        anyhow!(e)
+                    );
+                    None
+                }
+            }
+        };
 
         *target_version = history::Version::for_update_package(&update_pkg).await;
         let () = update_pkg.verify_name().await.map_err(PrepareError::VerifyName)?;
@@ -886,7 +904,7 @@ impl<'a> Attempt<'a> {
             }
 
             return Ok((
-                update_pkg,
+                (update_pkg, update_package_hash),
                 mode,
                 packages_to_fetch,
                 Some(images_to_write),
@@ -894,7 +912,7 @@ impl<'a> Attempt<'a> {
             ));
         }
 
-        Ok((update_pkg, mode, packages_to_fetch, None, current_config))
+        Ok(((update_pkg, update_package_hash), mode, packages_to_fetch, None, current_config))
     }
 
     /// Pave the various raw images (zbi, firmware, vbmeta) for fuchsia and/or recovery.
@@ -902,7 +920,7 @@ impl<'a> Attempt<'a> {
         &mut self,
         co: &mut async_generator::Yield<State>,
         state: &mut state::Stage,
-        update_pkg: &UpdatePackage,
+        update_pkg: &(UpdatePackage, Option<Hash>),
         mode: UpdateMode,
         current_configuration: paver::CurrentConfiguration,
         images_to_write: Option<ImagesToWrite>,
@@ -931,7 +949,7 @@ impl<'a> Attempt<'a> {
                     .iter()
                     .map(|url| url.hash())
                     .chain(images_to_write.get_url_hashes())
-                    .chain(self.config.update_url.hash()),
+                    .chain(update_pkg.1),
                 &self.env.retained_packages,
             )
             .await
@@ -959,7 +977,7 @@ impl<'a> Attempt<'a> {
                 &self.env.pkg_resolver,
                 desired_config,
                 &self.env.data_sink,
-                self.config.update_url.hash(),
+                update_pkg.1,
                 &self.env.retained_packages,
                 &self.env.space_manager,
                 self.concurrent_package_resolves,
@@ -984,8 +1002,11 @@ impl<'a> Attempt<'a> {
             ImageType::RecoveryVbmeta,
         ];
 
-        let images =
-            update_pkg.resolve_images(&image_list[..]).await.map_err(StageError::ResolveImages)?;
+        let images = update_pkg
+            .0
+            .resolve_images(&image_list[..])
+            .await
+            .map_err(StageError::ResolveImages)?;
 
         let images = images.verify(mode).map_err(StageError::Verify)?.filter(|image| {
             if self.config.should_write_recovery {
@@ -1001,7 +1022,7 @@ impl<'a> Attempt<'a> {
         let desired_config = current_configuration.to_non_current_configuration();
         info!("Targeting configuration: {:?}", desired_config);
 
-        write_images(&self.env.data_sink, update_pkg, desired_config, images.iter())
+        write_images(&self.env.data_sink, &update_pkg.0, desired_config, images.iter())
             .await
             .map_err(StageError::Write)?;
         paver::paver_flush_data_sink(&self.env.data_sink).await.map_err(StageError::PaverFlush)?;
@@ -1018,11 +1039,12 @@ impl<'a> Attempt<'a> {
         state: &mut state::Fetch,
         packages_to_fetch: Vec<PinnedAbsolutePackageUrl>,
         mode: UpdateMode,
+        update_pkg: Option<Hash>,
     ) -> Result<Vec<fio::DirectoryProxy>, FetchError> {
         // Remove ImagesToWrite from the retained_index.
         // GC to remove the ImagesToWrite from blobfs.
         let () = replace_retained_packages(
-            packages_to_fetch.iter().map(|url| url.hash()).chain(self.config.update_url.hash()),
+            packages_to_fetch.iter().map(|url| url.hash()).chain(update_pkg),
             &self.env.retained_packages,
         )
         .await
@@ -1311,7 +1333,7 @@ async fn write_image_packages(
     pkg_resolver: &PackageResolverProxy,
     desired_config: paver::NonCurrentConfiguration,
     data_sink: &DataSinkProxy,
-    update_pkg_hash: Option<Hash>,
+    update_pkg: Option<Hash>,
     retained_packages: &RetainedPackagesProxy,
     space_manager: &SpaceManagerProxy,
     concurrent_package_resolves: usize,
@@ -1328,12 +1350,8 @@ async fn write_image_packages(
         Err(e) => return Err(e),
     };
 
-    let mut hashes = images_to_write.get_url_hashes();
-    if let Some(update_pkg_hash) = update_pkg_hash {
-        hashes.insert(update_pkg_hash);
-    }
-
-    let () = replace_retained_packages(hashes, retained_packages).await.unwrap_or_else(|e| {
+    let to_protect = images_to_write.get_url_hashes().into_iter().chain(update_pkg);
+    let () = replace_retained_packages(to_protect, retained_packages).await.unwrap_or_else(|e| {
         error!(
             "while resolving image packages, unable to minimize retained packages set before \
                     second gc attempt: {:#}",

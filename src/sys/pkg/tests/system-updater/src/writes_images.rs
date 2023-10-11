@@ -1022,7 +1022,7 @@ async fn update_with_current_config(
         .await;
 
     env.resolver
-        .register_package("update", "upd4t3")
+        .register_package("update", crate::UPDATE_HASH)
         .add_file("packages.json", make_packages_json([]))
         .add_file("epoch.json", make_current_epoch_json())
         .add_file("images.json", serde_json::to_string(&images_json).unwrap());
@@ -1115,7 +1115,7 @@ async fn assert_writes_for_current_and_target(
                 configuration: target_config,
                 asset: paver::Asset::Kernel,
             }),
-            ReplaceRetainedPackages(vec![hash(9).into()]),
+            ReplaceRetainedPackages(vec![hash(9).into(), UPDATE_HASH.parse().unwrap()]),
             Gc,
             PackageResolve(image_package_url_to_string("update-images-fuchsia", 9)),
             Paver(PaverEvent::WriteAsset {
@@ -1124,7 +1124,7 @@ async fn assert_writes_for_current_and_target(
                 payload: b"zbi contents".to_vec()
             }),
             Paver(PaverEvent::DataSinkFlush),
-            ReplaceRetainedPackages(vec![]),
+            ReplaceRetainedPackages(vec![UPDATE_HASH.parse().unwrap()]),
             Gc,
             BlobfsSync,
             Paver(PaverEvent::SetConfigurationActive { configuration: target_config }),

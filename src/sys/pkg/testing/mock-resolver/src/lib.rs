@@ -281,8 +281,6 @@ impl MockResolverService {
         dir: ServerEnd<fio::DirectoryMarker>,
         responder: PackageResolverResolveResponder,
     ) -> Result<(), Error> {
-        eprintln!("TEST: Got resolve request for {package_url:?}");
-
         (*self.resolve_hook)(&package_url);
 
         match self.expectations.lock().get_mut(&package_url).unwrap_or(
