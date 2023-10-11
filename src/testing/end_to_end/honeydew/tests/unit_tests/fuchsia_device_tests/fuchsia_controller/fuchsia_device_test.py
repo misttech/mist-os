@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Unit tests for
-honeydew.device_classes.fuchsia_controller.fuchsia_device.py."""
+honeydew.fuchsia_device.fuchsia_controller.fuchsia_device.py."""
 
 from typing import Any, Dict
 import unittest
@@ -20,8 +20,8 @@ from parameterized import parameterized
 
 from honeydew import custom_types
 from honeydew import errors
-from honeydew.device_classes import base_fuchsia_device
-from honeydew.device_classes.fuchsia_controller import fuchsia_device
+from honeydew.fuchsia_device import base_fuchsia_device
+from honeydew.fuchsia_device.fuchsia_controller import fuchsia_device
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
@@ -91,7 +91,7 @@ def _file_attr_resp(
 
 class FuchsiaDeviceFCTests(unittest.TestCase):
     """Unit tests for
-    honeydew.device_classes.fuchsia_controller.fuchsia_device.py."""
+    honeydew.fuchsia_device.fuchsia_controller.fuchsia_device.py."""
 
     def __init__(self, *args, **kwargs) -> None:
         self.fd_obj: fuchsia_device.FuchsiaDevice
