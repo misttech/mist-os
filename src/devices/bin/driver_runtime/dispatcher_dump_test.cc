@@ -286,3 +286,53 @@ TEST_F(DispatcherDumpTest, DumpUnsynchronizedDispatcher) {
   ASSERT_OK(fdf_testing_run_until_idle());
   completion.Wait();
 }
+
+TEST_F(DispatcherDumpTest, DumpRequestsCount) {
+  // Post a non-inlined task.
+  ASSERT_OK(async::PostTask(dispatcher_.async_dispatcher(), [&] {}));
+  ASSERT_OK(fdf_testing_run_until_idle());
+  {
+    driver_runtime::Dispatcher::DumpState state;
+    driver_runtime::Dispatcher* runtime_dispatcher =
+        static_cast<driver_runtime::Dispatcher*>(dispatcher_.get());
+    runtime_dispatcher->Dump(&state);
+    ASSERT_EQ(state.num_inlined_requests, 0);
+    ASSERT_EQ(state.num_total_requests, 1);
+  }
+
+  // Send an inlined request from end1 to end0 of the channel, which will be serviced by
+  // |dispatcher_|.
+  auto channels = fdf::ChannelPair::Create(0);
+  ASSERT_OK(channels.status_value());
+
+  auto channel_read = std::make_unique<fdf::ChannelRead>(
+      channels->end0.get(), 0,
+      [&](fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read, zx_status_t status) {});
+  ASSERT_OK(channel_read->Begin(dispatcher_.get()));
+
+  auto fake_driver2 = CreateFakeDriver();
+  auto shutdown_handler = [&](fdf_dispatcher_t* shutdown_dispatcher) {};
+  auto dispatcher2 = fdf_internal::TestDispatcherBuilder::CreateUnmanagedSynchronizedDispatcher(
+      fake_driver2, {}, "additional_dispatcher", shutdown_handler);
+  ASSERT_OK(dispatcher2.status_value());
+
+  fdf::Arena arena('TEST');
+  ASSERT_OK(async::PostTask(dispatcher2->async_dispatcher(), [&] {
+    ASSERT_OK(
+        channels->end1.Write(0, arena, nullptr, 0, cpp20::span<zx_handle_t>()).status_value());
+  }));
+  ASSERT_OK(fdf_testing_run_until_idle());
+
+  // We should see 1 inlined request in the dump.
+  {
+    driver_runtime::Dispatcher::DumpState state;
+    driver_runtime::Dispatcher* runtime_dispatcher =
+        static_cast<driver_runtime::Dispatcher*>(dispatcher_.get());
+    runtime_dispatcher->Dump(&state);
+    ASSERT_EQ(state.num_inlined_requests, 1);
+    ASSERT_EQ(state.num_total_requests, 2);
+  }
+
+  dispatcher2->ShutdownAsync();
+  ASSERT_OK(fdf_testing_run_until_idle());
+}

@@ -266,6 +266,8 @@ class Dispatcher : public async_dispatcher_t,
     bool allow_sync_calls;
     DispatcherState state;
     std::vector<TaskDebugInfo> queued_tasks;
+    size_t num_inlined_requests;
+    size_t num_total_requests;
   };
 
   // Public for std::make_unique.
@@ -723,6 +725,10 @@ class Dispatcher : public async_dispatcher_t,
 
   // Number of threads currently servicing callbacks.
   size_t num_active_threads_ __TA_GUARDED(&callback_lock_) = 0;
+
+  // Stats for a dispatcher.
+  size_t num_inlined_requests_ __TA_GUARDED(&callback_lock_) = 0;
+  size_t num_total_requests_ __TA_GUARDED(&callback_lock_) = 0;
 
   CompleteShutdownEventManager complete_shutdown_event_manager_ __TA_GUARDED(&callback_lock_);
 
