@@ -38,7 +38,7 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
             (_, _, Some(b)) => b,
         };
         if publish_fuchsia_dev_wired_service {
-            builder.platform_bundle("mdns_fuchsia_dev_wired_service");
+            builder.platform_bundle("mdns_fuchsia_device_wired_service");
         }
 
         // The configuration of networking is dependent on all three of:

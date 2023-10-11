@@ -146,14 +146,14 @@ USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + 
     "core_realm_development_access_rcs_usb",
     "minimal_userdebug",
     "minimal_userdebug_and_eng",
-    "mdns_fuchsia_dev_wired_service",
+    "mdns_fuchsia_device_wired_service",
     "radar_proxy_with_injector",
 ]
 USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
 
 # The names of all of the platform's Assembly Input Bundles.
 ENG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_ENG_PLATFORM_AIB_NAMES + USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + [
-    "audio_dev_support",
+    "audio_development_support",
     "core_realm_eng",
     "example_assembly_bundle",
     "minimal_eng",

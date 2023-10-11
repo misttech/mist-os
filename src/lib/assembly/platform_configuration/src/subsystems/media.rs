@@ -15,7 +15,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         if *context.feature_set_level == FeatureSupportLevel::Minimal
             && *context.build_type == BuildType::Eng
         {
-            builder.platform_bundle("audio_dev_support");
+            builder.platform_bundle("audio_development_support");
         }
 
         match (&media_config.audio, media_config.audio_device_registry_enabled) {

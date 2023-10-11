@@ -867,7 +867,7 @@ assembly_input_bundle("core_realm_development_access") {
   ]
 }
 
-assembly_input_bundle("mdns_fuchsia_dev_wired_service") {
+assembly_input_bundle("mdns_fuchsia_device_wired_service") {
   config_data_labels =
       [ "//src/connectivity/network/mdns/service:mdns_fuchsia_udp_config" ]
 }
@@ -2083,7 +2083,7 @@ assembly_input_bundle("wlan_wlanix") {
 # feature_set_levels: minimal
 # build-types: eng
 #
-assembly_input_bundle("audio_dev_support") {
+assembly_input_bundle("audio_development_support") {
   base_driver_packages = [
     {
       package_target = "//src/media/audio/drivers/virtual_audio"
