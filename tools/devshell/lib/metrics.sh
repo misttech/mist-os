@@ -475,25 +475,15 @@ function track-command-finished {
     args=${args:0:100}
   fi
 
-  if [[ $exit_status == 0 ]]; then
-    # Successes are logged as finish events
-    event_params=$(fx-command-run jq -c -n \
-      --arg subcommand "${subcommand}" \
-      --arg args "${args}" \
-      --argjson timing ${timing} \
-      '$ARGS.named')
+  event_params=$(fx-command-run jq -c -n \
+    --arg subcommand "${subcommand}" \
+    --arg args "${args}" \
+    --arg exit_status "${exit_status}" \
+    --argjson timing "${timing}" \
+    '$ARGS.named')
 
-    _add-to-analytics-batch "finish" "${event_params}"
-  else
-    # Failures are logged as fail events
-    event_params=$(fx-command-run jq -c -n \
-      --arg subcommand "${subcommand}" \
-      --arg args "${args}" \
-      --arg exit_status "${exit_status}" \
-      '$ARGS.named')
+  _add-to-analytics-batch "finish" "${event_params}"
 
-    _add-to-analytics-batch "fail" "${event_params}"
-  fi
 
   # Send any remaining hits.
   _send-analytics-batch
