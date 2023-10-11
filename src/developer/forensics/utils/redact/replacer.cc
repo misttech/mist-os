@@ -7,7 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <algorithm>
-#include <iterator>
 #include <memory>
 #include <queue>
 #include <string>
@@ -40,7 +39,7 @@ namespace {
 // Replaces all non-overlapping instances of the keys in |redactions| with their values.
 //
 // For example, replacing "bc" with "1" and "c" with "2" in "abc" will result in "a1".
-void ApplyRedactions(const std::map<std::string, std::string> redactions, std::string& text) {
+void ApplyRedactions(const std::map<std::string, std::string>& redactions, std::string& text) {
   // Grouping of a string and its position in |text|.
   using Substr = std::pair<size_t, const std::string*>;
   auto Compare = [](const Substr& lhs, const Substr& rhs) { return rhs.first < lhs.first; };
@@ -54,8 +53,8 @@ void ApplyRedactions(const std::map<std::string, std::string> redactions, std::s
   // Seed |queue| with the position of the first instance of each key in |redactions|.
   for (const auto& [original, _] : redactions) {
     const size_t pos = text.find(original);
-    if (pos != text.npos) {
-      queue.push({pos, &original});
+    if (pos != std::string::npos) {
+      queue.emplace(pos, &original);
     }
   }
 
@@ -68,8 +67,9 @@ void ApplyRedactions(const std::map<std::string, std::string> redactions, std::s
     const std::string& original = *(top.second);
 
     // Add the next instance of |original| to |queue|, if one exists.
-    if (const size_t next_pos = text.find(original, pos + original.size()); next_pos != text.npos) {
-      queue.push({next_pos, &original});
+    if (const size_t next_pos = text.find(original, pos + original.size());
+        next_pos != std::string::npos) {
+      queue.emplace(next_pos, &original);
     }
 
     // Only add non-overlapping strings to |to_replace|.
@@ -79,7 +79,7 @@ void ApplyRedactions(const std::map<std::string, std::string> redactions, std::s
   }
 
   // Replace each substring in |to_replace|.
-  int adjustment{0};
+  size_t adjustment{0};
   for (const auto& [pos, original] : to_replace) {
     const auto& redacted = redactions.at(*original);
     text.replace(pos + adjustment, original->size(), redacted);
@@ -148,7 +148,7 @@ Replacer ReplaceWithIdFormatString(const std::string_view pattern,
                                    const std::string_view format_str) {
   bool specificier_found{false};
 
-  for (size_t pos{0}; (pos = format_str.find("%d", pos)) != format_str.npos; ++pos) {
+  for (size_t pos{0}; (pos = format_str.find("%d", pos)) != std::string::npos; ++pos) {
     if (specificier_found) {
       FX_LOGS(ERROR) << "Format string \"" << format_str
                      << "\" expected to have 1 \"%d\" specifier";
