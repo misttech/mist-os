@@ -98,6 +98,7 @@ impl<T> DenseMapEntry<T> {
 /// `push` will grab the lowest free `id` and assign it to the given value,
 /// returning the assigned `id`. `insert` can be used for assigning a specific
 /// `id` to an object, and returns the previous object at that `id` if any.
+#[derive(Debug)]
 #[cfg_attr(test, derive(Clone))]
 pub struct DenseMap<T> {
     freelist: Option<FreeList>,

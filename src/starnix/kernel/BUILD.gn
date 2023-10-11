@@ -90,6 +90,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/lib/debug/rust",
+    "//src/lib/dense-map",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",

@@ -145,10 +145,10 @@ pub enum WaitCallback {
 }
 
 struct WaitCancelerQueue {
-    wait_queue: Weak<WaitQueueImpl>,
+    wait_queue: Weak<Mutex<WaitQueueImpl>>,
     waiter: WaiterRef,
-    key: WaitKey,
-    waiter_key: u64,
+    wait_key: WaitKey,
+    waiter_id: WaitEntryId,
 }
 
 struct WaitCancelerZxio {
@@ -229,14 +229,25 @@ impl WaitCanceler {
                 WaitCancelerInner::Queue(WaitCancelerQueue {
                     wait_queue,
                     waiter,
-                    key,
-                    waiter_key,
+                    wait_key,
+                    waiter_id: WaitEntryId { key, id },
                 }) => {
                     let Some(wait_queue) = wait_queue.upgrade() else { return };
-                    waiter.remove_callback(&key);
-                    wait_queue.waiters.lock().remove(&waiter_key);
+                    waiter.remove_callback(&wait_key);
+                    match wait_queue.lock().waiters.entry(key) {
+                        dense_map::Entry::Vacant(_) => {}
+                        dense_map::Entry::Occupied(entry) => {
+                            // The map of waiters in a wait queue uses a
+                            // `DenseMap` which recycles keys. To make sure we
+                            // are removing the right entry, make sure the ID
+                            // value matches what we expect to remove.
+                            if entry.get().id == id {
+                                entry.remove();
+                            }
+                        }
+                    };
                 }
-            };
+            }
         }
     }
 }
@@ -324,7 +335,7 @@ struct PortWaiter {
     /// can remove itself from the queues.
     ///
     /// This lock is nested inside the WaitQueue.waiters lock.
-    wait_queues: Mutex<HashMap<WaitKey, Weak<WaitQueueImpl>>>,
+    wait_queues: Mutex<HashMap<WaitKey, Weak<Mutex<WaitQueueImpl>>>>,
     /// Indicates whether a user packet is sitting in the `zx::Port` to wake up
     /// waiter after handling user events.
     has_pending_user_packet: AtomicBool,
@@ -668,7 +679,13 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.waiters.lock().retain(|_waiter_key, entry| entry.waiter != *self)
+                WaitQueue::retain_waiters(&mut wait_queue.lock().waiters, |entry| {
+                    if entry.waiter == *self {
+                        Retention::Drop
+                    } else {
+                        Retention::Keep
+                    }
+                })
             }
         }
     }
@@ -682,7 +699,7 @@ impl Default for Waiter {
 
 pub struct SimpleWaiter {
     event: Arc<InterruptibleEvent>,
-    wait_queues: Vec<Weak<WaitQueueImpl>>,
+    wait_queues: Vec<Weak<Mutex<WaitQueueImpl>>>,
 }
 
 impl SimpleWaiter {
@@ -695,7 +712,13 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.waiters.lock().retain(|_waiter_key, entry| entry.waiter != self.event)
+                WaitQueue::retain_waiters(&mut wait_queue.lock().waiters, |entry| {
+                    if entry.waiter == self.event {
+                        Retention::Drop
+                    } else {
+                        Retention::Keep
+                    }
+                })
             }
         }
     }
@@ -833,16 +856,34 @@ impl PartialEq for WaiterRef {
 /// has occurred. The waiters will then wake up on their own thread to handle
 /// the event.
 #[derive(Default, Debug)]
-pub struct WaitQueue(Arc<WaitQueueImpl>);
+pub struct WaitQueue(Arc<Mutex<WaitQueueImpl>>);
+
+#[derive(Debug)]
+struct WaitEntryWithId {
+    entry: WaitEntry,
+    /// The ID use to uniquely identify this wait entry even if it shares the
+    /// key used in the wait queue's [`DenseMap`] with another wait entry since
+    /// a dense map's keys are recycled.
+    id: u64,
+}
+
+struct WaitEntryId {
+    key: dense_map::Key,
+    id: u64,
+}
 
 #[derive(Default, Debug)]
 struct WaitQueueImpl {
-    /// Used to get the next key value for use in the waiters map.
-    next_waiter_key: AtomicU64,
+    /// Holds the next ID value to use when adding a new `WaitEntry` to the
+    /// waiters (dense) map.
+    ///
+    /// A [`DenseMap`]s keys are recycled so we use the ID to uniquely identify
+    /// a wait entry.
+    next_wait_entry_id: u64,
     /// The list of waiters.
     ///
-    /// The WaiterImpl.wait_queues lock is nested inside this lock.
-    waiters: Mutex<HashMap<u64, WaitEntry>>,
+    /// The waiter's wait_queues lock is nested inside this lock.
+    waiters: dense_map::DenseMap<WaitEntryWithId>,
 }
 
 /// An entry in a WaitQueue.
@@ -859,19 +900,14 @@ struct WaitEntry {
 }
 
 impl WaitQueue {
-    fn add_waiter(&self, entry: WaitEntry) -> u64 {
-        let inner = &self.0;
-        let next_waiter_key = inner.next_waiter_key.fetch_add(1, Ordering::Relaxed);
-        // Note that after the `fetch_add` but before this check, another thread
-        // could have also performed a `fetch_add` op and got a key value that
-        // looks OK even though it was the result of an arithmetic overflow. We
-        // can't protect that thread but the assertion below should terminate the
-        // program anyways. Note that even if we were able to perform this function
-        // in a (theoretical) single CPU cycle on a single 4 GHz CPU, it would
-        // take more than 136 years to overflow.
-        assert_ne!(next_waiter_key, u64::MAX, "next_waiter_key overflowed");
-        assert!(inner.waiters.lock().insert(next_waiter_key, entry).is_none());
-        next_waiter_key
+    fn add_waiter(&self, entry: WaitEntry) -> WaitEntryId {
+        let mut wait_queue = self.0.lock();
+        let id = wait_queue
+            .next_wait_entry_id
+            .checked_add(1)
+            .expect("all possible wait entry ID values exhausted");
+        wait_queue.next_wait_entry_id = id;
+        WaitEntryId { key: wait_queue.waiters.push(WaitEntryWithId { entry, id }), id }
     }
 
     /// Establish a wait for the given entry.
@@ -885,13 +921,13 @@ impl WaitQueue {
     fn wait_async_entry(&self, waiter: &Waiter, entry: WaitEntry) -> WaitCanceler {
         profile_duration!("WaitAsyncEntry");
 
-        let key = entry.key;
-        let waiter_key = self.add_waiter(entry);
+        let wait_key = entry.key;
+        let waiter_id = self.add_waiter(entry);
         WaitCanceler::new_inner(WaitCancelerInner::Queue(WaitCancelerQueue {
             wait_queue: Arc::downgrade(&self.0),
             waiter: waiter.weak(),
-            key,
-            waiter_key,
+            wait_key,
+            waiter_id,
         }))
     }
 
@@ -950,7 +986,7 @@ impl WaitQueue {
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
-        Self::filter_waiters(&mut self.0.waiters.lock(), |entry| {
+        Self::retain_waiters_or_remove_from_wait_queues(&mut self.0.lock().waiters, |entry| {
             if limit > 0 && entry.filter.intercept(&events) {
                 if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;
@@ -981,8 +1017,8 @@ impl WaitQueue {
 
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
     pub fn is_empty(&self) -> bool {
-        let mut waiters = self.0.waiters.lock();
-        Self::filter_waiters(&mut waiters, |entry| {
+        let mut waiters = &mut self.0.lock().waiters;
+        Self::retain_waiters_or_remove_from_wait_queues(&mut waiters, |entry| {
             if entry.waiter.is_valid() {
                 Retention::Keep
             } else {
@@ -992,18 +1028,36 @@ impl WaitQueue {
         waiters.is_empty()
     }
 
-    fn filter_waiters(
-        waiters: &mut HashMap<u64, WaitEntry>,
-        mut filter: impl FnMut(&WaitEntry) -> Retention,
+    fn retain_waiters(
+        waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
+        filter: impl FnMut(&WaitEntry) -> Retention,
     ) {
-        waiters.retain(move |_waiter_key, entry| match filter(entry) {
-            Retention::Keep => true,
-            Retention::Drop => {
-                entry.waiter.will_remove_from_wait_queue(&entry.key);
-                false
-            }
+        retain_waiters_inner(waiters, filter, |_: WaitEntry| ())
+    }
+
+    fn retain_waiters_or_remove_from_wait_queues(
+        waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
+        filter: impl FnMut(&WaitEntry) -> Retention,
+    ) {
+        retain_waiters_inner(waiters, filter, |entry| {
+            entry.waiter.will_remove_from_wait_queue(&entry.key);
         })
     }
+}
+
+fn retain_waiters_inner(
+    waiters: &mut dense_map::DenseMap<WaitEntryWithId>,
+    mut filter: impl FnMut(&WaitEntry) -> Retention,
+    on_removal: impl Fn(WaitEntry),
+) {
+    waiters
+        .update_retain(move |entry| match filter(&entry.entry) {
+            Retention::Keep => Ok(()),
+            Retention::Drop => Err(()),
+        })
+        .fold((), |(), (_, WaitEntryWithId { entry, id: _ }, ()): (dense_map::Key, _, _)| {
+            on_removal(entry)
+        })
 }
 
 enum Retention {
