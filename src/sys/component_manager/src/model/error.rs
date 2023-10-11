@@ -141,9 +141,7 @@ impl ModelError {
             ModelError::RoutingError { err } => err.as_zx_status(),
             ModelError::PolicyError { err } => err.as_zx_status(),
             ModelError::StartActionError { err } => err.as_zx_status(),
-            ModelError::ComponentInstanceError {
-                err: ComponentInstanceError::InstanceNotFound { .. },
-            } => zx::Status::NOT_FOUND,
+            ModelError::ComponentInstanceError { err } => err.as_zx_status(),
             ModelError::OpenOutgoingDirError { err } => err.as_zx_status(),
             ModelError::RouteAndOpenCapabilityError { err } => err.as_zx_status(),
             ModelError::CapabilityProviderError { err } => err.as_zx_status(),
