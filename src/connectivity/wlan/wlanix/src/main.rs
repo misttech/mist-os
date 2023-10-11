@@ -253,6 +253,7 @@ async fn serve_wifi(reqs: fidl_wlanix::WifiRequestStream, state: Arc<Mutex<WifiS
 #[derive(Default)]
 struct SupplicantStaNetworkState {
     ssid: Option<Vec<u8>>,
+    passphrase: Option<Vec<u8>>,
 }
 
 #[derive(Default)]
@@ -271,6 +272,12 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
             info!("fidl_wlanix::SupplicantStaNetworkRequest::SetSsid");
             if let Some(ssid) = payload.ssid {
                 sta_network_state.lock().ssid.replace(ssid);
+            }
+        }
+        fidl_wlanix::SupplicantStaNetworkRequest::SetPskPassphrase { payload, .. } => {
+            info!("fidl_wlanix::SupplicantStaNetworkRequest::SetPskPassphrase");
+            if let Some(passphrase) = payload.passphrase {
+                sta_network_state.lock().passphrase.replace(passphrase);
             }
         }
         fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {

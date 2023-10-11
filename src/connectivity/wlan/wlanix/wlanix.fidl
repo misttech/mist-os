@@ -148,6 +148,9 @@ open protocol SupplicantStaNetwork {
     flexible SetSsid(table {
         1: ssid fuchsia.wlan.ieee80211.Ssid;
     });
+    flexible SetPskPassphrase(table {
+        1: passphrase vector<uint8>:MAX;
+    });
     flexible Select() -> () error zx.Status;
 };
 

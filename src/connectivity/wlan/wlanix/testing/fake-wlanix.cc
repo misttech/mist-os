@@ -221,6 +221,12 @@ void FakeWlanix::SetSsid(fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetSsidR
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetSsid});
 }
 
+void FakeWlanix::SetPskPassphrase(
+    fuchsia_wlan_wlanix::wire::SupplicantStaNetworkSetPskPassphraseRequest* request,
+    SetPskPassphraseCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSetPskPassphrase});
+}
+
 void FakeWlanix::Select(SelectCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kSupplicantStaNetworkSelect});
 }
