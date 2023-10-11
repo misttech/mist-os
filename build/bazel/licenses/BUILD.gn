@@ -43,13 +43,12 @@ _excluded_bazel_inputs = [
 
   # This is only used for `//tools/devshell:fx_publish_test`.
   "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
-
-  # Has //build/validate:non_production_tag deps:
-  "//bundles/assembly:bootstrap_userdebug",
-  "//bundles/assembly:core_realm_development_access",
 ]
 
-_excluded_bazel_inputs += eng_only_platform_aib_labels
+# Remove all non-user platform aibs
+_excluded_bazel_inputs += eng_platform_aib_labels
+_excluded_bazel_inputs += user_platform_aib_labels
+_excluded_bazel_inputs -= user_platform_aib_labels
 
 if (fuchsia_zbi_testonly) {
   # Remove fuchsia_zbi_testonly=true targets. See fxb/126949#c18 for why that is ok.
@@ -62,6 +61,13 @@ group("all_bazel_inputs") {
 
   deps += _excluded_bazel_inputs
   deps -= _excluded_bazel_inputs
+
+  metadata = {
+    # Prevent packages from leaking into the universe packages list in
+    # //build/images/updates:universe_packages.list which uses
+    # generate_package_metadata()
+    package_names_barrier = []
+  }
 }
 
 # Collects the license data for all GN inputs and makes it available for Bazel
@@ -74,7 +80,8 @@ group("all_bazel_inputs") {
 #       `rm out/default/project.json`
 # TODO(132725): Remove once migration completes.
 license_data("licenses_data") {
-  target = "//build/bazel/licenses:all_bazel_inputs"
+  target = "//build/bazel/licenses:all_bazel_inputs"  # Must be a fully
+                                                      # qualified label.
   out_dir = "$target_out_dir/licenses_data"
   produce_spdx = true
 
@@ -91,6 +98,11 @@ license_data("licenses_data") {
     "//vendor/third_party/eigen3",
     "//vendor/third_party/eigen3/",
   ]
+
+  # Force build in preparation of fxr/924760.
+  # Otherwise, license_data doesn't actually build "target". It only
+  # searches for it in the generated project.json.
+  deps = [ ":all_bazel_inputs" ]
 }
 
 if (generate_legacy_ninja_build_outputs_licenses_spdx) {

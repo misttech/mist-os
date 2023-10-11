@@ -34,7 +34,7 @@ import("//build/info/info.gni")
 #   emit_metadata (optional)
 #     [bool] Whether to emit metadata for uploading artifacts to GCS. Default == true.
 #
-#   testonly, visibility
+#   testonly, visibility, deps
 template("license_data") {
   target = "//:default"
   if (defined(invoker.target)) {
@@ -138,6 +138,7 @@ template("license_data") {
                              "visibility",
                            ])
     tool = "//tools/check-licenses/util/cmd/gn/generate_intermediate_json:generate_intermediate_json_cmd"
+
     deps = [ ":$generate_intermediate_json" ]
     sources = [ generate_intermediate_json_output ]
     outputs = [ generate_target_json_output ]
@@ -166,6 +167,7 @@ template("license_data") {
   compiled_action(check_licenses_target) {
     forward_variables_from(invoker,
                            [
+                             "deps",
                              "testonly",
                              "visibility",
                            ])
@@ -175,7 +177,10 @@ template("license_data") {
     # TODO(fxbug.dev/84924): Improve the way notice files are generated.
     hermetic_deps = false
 
-    deps = [ ":$generate_target_json" ]
+    if (!defined(deps)) {
+      deps = []
+    }
+    deps += [ ":$generate_target_json" ]
 
     sources = [
       "//tools/check-licenses/cmd/_config.json",

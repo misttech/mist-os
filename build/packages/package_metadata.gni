@@ -35,6 +35,9 @@ import("//build/group_with_inputs.gni")
 #       package_barrier
 #         Metadata barrier.
 #
+#       package_names_barrier
+#         Metadata barrier.
+#
 #   data_deps (optional)
 #   data_keys (optional)
 #   deps (optional)
@@ -63,7 +66,10 @@ template("generate_package_metadata") {
                            ])
 
     outputs = [ _metadata_output ]
-    walk_keys = [ "package_barrier" ]
+    walk_keys = [
+      "package_barrier",
+      "package_names_barrier",
+    ]
   }
 
   action(target_name) {
