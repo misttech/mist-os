@@ -73,6 +73,17 @@ impl KernelThreads {
         self.system_task.get().as_ref().unwrap()
     }
 
+    pub fn workaround_for_b297439724_new_system_task(
+        &self,
+    ) -> Result<OwnedRef<CurrentTask>, Errno> {
+        let system_task = self.system_task();
+        Ok(OwnedRef::new(Task::create_kernel_task(
+            system_task.kernel(),
+            CString::new("[workaround_for_b297439724]").unwrap(),
+            system_task.fs().clone(),
+        )?))
+    }
+
     pub fn weak_system_task(&self) -> WeakRef<CurrentTask> {
         self.system_task.get().unwrap().into()
     }

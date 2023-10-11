@@ -857,10 +857,12 @@ impl ThreadGroup {
         let process: &zx::Process = if zx::AsHandleRef::as_handle_ref(&self.process).is_invalid() {
             // `process` must be valid for all tasks, except `kthreads`. In that case get the
             // stats from starnix process.
-            assert_eq!(
-                self as *const ThreadGroup,
-                Arc::as_ptr(&self.kernel.kthreads.system_task().task.thread_group)
-            );
+            // TODO(b/297439724): This check should be reenabled when we're no longer creating a
+            // new kernel task for closing and flushing fuse files.
+            // assert_eq!(
+            //     self as *const ThreadGroup,
+            //     Arc::as_ptr(&self.kernel.kthreads.system_task().task.thread_group)
+            // );
             &self.kernel.kthreads.starnix_process
         } else {
             &self.process
@@ -916,7 +918,9 @@ impl ThreadGroup {
             tasks.push(task);
         });
         for task in tasks {
-            let Some(task_ref) = task.upgrade() else { continue; };
+            let Some(task_ref) = task.upgrade() else {
+                continue;
+            };
 
             let process_state = &mut task_ref.thread_group.write();
             let mut task_state = task_ref.write();

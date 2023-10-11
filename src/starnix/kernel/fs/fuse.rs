@@ -16,12 +16,14 @@ use crate::{
     logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::{
         errno,
         errno::{EINTR, EINVAL, ENOSYS},
-        errno_from_code, error, off_t, statfs, time_from_timespec, uapi, Access, DeviceType, Errno,
-        FileMode, OpenFlags, FUSE_SUPER_MAGIC,
+        errno_from_code, error, off_t,
+        ownership::Releasable,
+        statfs, time_from_timespec, uapi, Access, DeviceType, Errno, FileMode, OpenFlags,
+        FUSE_SUPER_MAGIC,
     },
 };
 use bstr::B;
@@ -266,7 +268,7 @@ struct FuseFileObject {
     open_out: uapi::fuse_open_out,
 
     /// The current kernel. This is a temporary measure to access a task on close and flush.
-    // TODO(https://fxbug.dev/128843): Remove this.
+    // TODO(b/297439724): Remove this.
     kernel: Arc<Kernel>,
 }
 
@@ -285,15 +287,24 @@ impl FileOps for FuseFileObject {
             log_error!("Unexpected file type");
             return;
         };
-        // TODO(https://fxbug.dev/128843): This should receives a CurrentTask instead of relying on
+        // TODO(b/297439724): This should receives a CurrentTask instead of relying on
         // the system task.
         let mode = file.node().info().mode;
-        if let Err(e) = self.connection.execute_operation(
-            self.kernel.kthreads.system_task(),
-            node,
-            FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
-        ) {
-            log_error!("Error when relasing fh: {e:?}");
+        match self.kernel.kthreads.workaround_for_b297439724_new_system_task() {
+            Ok(workaround_task) => {
+                if let Err(e) = self.connection.execute_operation(
+                    &workaround_task,
+                    node,
+                    FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
+                ) {
+                    log_error!("Error when relasing fh: {e:?}");
+                }
+                workaround_task.thread_group.exit(ExitStatus::Exit(0));
+                workaround_task.release(());
+            }
+            Err(e) => {
+                log_error!("Error creating workaround task: {e:?}");
+            }
         }
     }
 
@@ -304,14 +315,23 @@ impl FileOps for FuseFileObject {
             log_error!("Unexpected file type");
             return;
         };
-        // TODO(https://fxbug.dev/128843): This should receives a CurrentTask instead of relying on
+        // TODO(b/297439724): This should receives a CurrentTask instead of relying on
         // the system task.
-        if let Err(e) = self.connection.execute_operation(
-            self.kernel.kthreads.system_task(),
-            node,
-            FuseOperation::Flush(self.open_out),
-        ) {
-            log_error!("Error when flushing fh: {e:?}");
+        match self.kernel.kthreads.workaround_for_b297439724_new_system_task() {
+            Ok(workaround_task) => {
+                if let Err(e) = self.connection.execute_operation(
+                    &workaround_task,
+                    node,
+                    FuseOperation::Flush(self.open_out),
+                ) {
+                    log_error!("Error when flushing fh: {e:?}");
+                }
+                workaround_task.thread_group.exit(ExitStatus::Exit(0));
+                workaround_task.release(());
+            }
+            Err(e) => {
+                log_error!("Error creating workaround task: {e:?}");
+            }
         }
     }
 
