@@ -6,11 +6,10 @@
 
 #[cfg(test)]
 use alloc::vec;
-use alloc::{borrow::ToOwned, collections::HashMap, rc::Rc, sync::Arc, vec::Vec};
+use alloc::{borrow::ToOwned, collections::HashMap, sync::Arc, vec::Vec};
 #[cfg(test)]
 use core::time::Duration;
 use core::{
-    cell::RefCell,
     convert::Infallible as Never,
     ffi::CStr,
     fmt::Debug,
@@ -73,7 +72,6 @@ use crate::{
     sync::Mutex,
     transport::{
         tcp::{
-            self,
             buffer::{
                 testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer},
                 RingBuffer,
@@ -449,10 +447,8 @@ impl TracingContext for FakeNonSyncCtx {
     fn duration(&self, _: &'static CStr) {}
 }
 
-impl tcp::socket::NonSyncContext for FakeNonSyncCtx {}
-
 impl TcpBindingsTypes for FakeNonSyncCtx {
-    type ReceiveBuffer = Rc<RefCell<RingBuffer>>;
+    type ReceiveBuffer = Arc<Mutex<RingBuffer>>;
 
     type SendBuffer = TestSendBuffer;
 
@@ -465,8 +461,8 @@ impl TcpBindingsTypes for FakeNonSyncCtx {
     ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {
         let client = ClientBuffers::new(buffer_sizes);
         (
-            Rc::clone(&client.receive),
-            TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
+            Arc::clone(&client.receive),
+            TestSendBuffer::new(Arc::clone(&client.send), RingBuffer::default()),
             client,
         )
     }

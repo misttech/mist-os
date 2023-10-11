@@ -2253,7 +2253,7 @@ mod tests {
             link::testutil::{FakeLinkAddress, FakeLinkDevice, FakeLinkDeviceId},
             ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
             testutil::FakeWeakDeviceId,
-            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId,
+            update_ipv6_configuration, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
         },
         ip::{
             device::{
@@ -4898,7 +4898,8 @@ mod tests {
     >(
         net: &mut FakeNudNetwork<L>,
         local_buffers: tcp::buffer::testutil::ProvidedBuffers,
-    ) -> tcp::socket::TcpSocketId<I> {
+    ) -> tcp::socket::TcpSocketId<I, WeakDeviceId<testutil::FakeNonSyncCtx>, testutil::FakeNonSyncCtx>
+    {
         const REMOTE_PORT: NonZeroU16 = const_unwrap::const_unwrap_option(NonZeroU16::new(33333));
 
         net.with_context("remote", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
@@ -4976,7 +4977,7 @@ mod tests {
 
         // Initiate a TCP connection and make sure the SYN and resulting SYN/ACK are
         // received by each context.
-        let _: tcp::socket::TcpSocketId<I> = bind_and_connect_sockets::<I, _>(
+        let _: tcp::socket::TcpSocketId<I, _, _> = bind_and_connect_sockets::<I, _>(
             &mut net,
             tcp::buffer::testutil::ProvidedBuffers::default(),
         );
@@ -5051,8 +5052,8 @@ mod tests {
 
         // Send some data on the local socket and wait for it to be ACKed by the peer.
         let tcp::buffer::testutil::ClientBuffers { send, receive: _ } =
-            client_ends.0.as_ref().borrow_mut().take().unwrap();
-        send.borrow_mut().extend_from_slice(b"hello");
+            client_ends.0.as_ref().lock().take().unwrap();
+        send.lock().extend_from_slice(b"hello");
         net.with_context("local", |testutil::FakeCtx { sync_ctx, non_sync_ctx }| {
             tcp::socket::do_send(sync_ctx, non_sync_ctx, &local_socket);
         });

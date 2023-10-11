@@ -312,6 +312,12 @@ impl<T> Primary<T> {
         alloc::sync::Arc::ptr_eq(this, other)
     }
 
+    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
+    /// address of this [`Primary`].
+    pub fn ptr_debug(Self { inner }: &Self) -> impl core::fmt::Debug {
+        alloc::sync::Arc::as_ptr(inner)
+    }
+
     fn mark_for_destruction_and_take_inner(mut this: Self) -> alloc::sync::Arc<Inner<T>> {
         // Prepare for destruction.
         assert!(!this.mark_for_destruction());
@@ -447,6 +453,12 @@ impl<T> Strong<T> {
         Weak(alloc::sync::Arc::downgrade(inner))
     }
 
+    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
+    /// address of this [`Strong`].
+    pub fn ptr_debug(Self { inner, caller: _ }: &Self) -> impl core::fmt::Debug {
+        alloc::sync::Arc::as_ptr(inner)
+    }
+
     /// Returns true if the inner value has since been marked for destruction.
     pub fn marked_for_destruction(Self { inner, caller: _ }: &Self) -> bool {
         let Inner { marked_for_destruction, data: _, callers: _, notifier: _ } = inner.as_ref();
@@ -527,6 +539,13 @@ impl<T> Weak<T> {
     pub fn ptr_eq(&self, Self(other): &Self) -> bool {
         let Self(this) = self;
         this.ptr_eq(other)
+    }
+
+    /// Returns [`core::fmt::Debug`] implementation that prints the pointer
+    /// address of this [`Weak`].
+    pub fn ptr_debug(&self) -> impl core::fmt::Debug {
+        let Self(this) = self;
+        this.as_ptr()
     }
 
     /// Attempts to upgrade to a [`Strong`].

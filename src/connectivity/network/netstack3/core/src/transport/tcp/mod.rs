@@ -18,7 +18,7 @@ use core::{
 };
 
 use const_unwrap::const_unwrap_option;
-use net_types::ip::{Ip, IpVersion};
+use net_types::ip::{GenericOverIp, Ip, IpVersion};
 use packet_formats::{
     icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
     utils::NonZeroDuration,
@@ -26,15 +26,13 @@ use packet_formats::{
 use rand::RngCore;
 
 use crate::{
-    device::WeakId,
+    device,
     ip::{
         icmp::{IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode},
         socket::Mms,
         IpExt,
     },
-    sync::Mutex,
     transport::tcp::{
-        self,
         seqnum::{UnscaledWindowSize, WindowSize},
         socket::{isn::IsnGenerator, Sockets},
         state::DEFAULT_MAX_SYN_RETRIES,
@@ -177,14 +175,16 @@ impl From<IcmpErrorCode> for Option<ConnectionError> {
     }
 }
 
-pub(crate) struct TcpState<I: IpExt, D: WeakId, BT: TcpBindingsTypes> {
+#[derive(GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub(crate) struct TcpState<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     pub(crate) isn_generator: IsnGenerator<BT::Instant>,
-    pub(crate) sockets: Mutex<Sockets<I, D, BT>>,
+    pub(crate) sockets: Sockets<I, D, BT>,
 }
 
-impl<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
-    pub(crate) fn new(now: C::Instant, rng: &mut impl RngCore) -> Self {
-        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Mutex::new(Sockets::new(rng)) }
+impl<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> TcpState<I, D, BT> {
+    pub(crate) fn new(now: BT::Instant, rng: &mut impl RngCore) -> Self {
+        Self { isn_generator: IsnGenerator::new(now, rng), sockets: Sockets::new(rng) }
     }
 }
 

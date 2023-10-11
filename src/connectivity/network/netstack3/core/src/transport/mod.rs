@@ -59,6 +59,7 @@ mod integration;
 pub mod tcp;
 pub mod udp;
 
+use derivative::Derivative;
 use lock_order::{lock::RwLockFor, Locked};
 use net_types::{
     ip::{IpAddress, Ipv4, Ipv6},
@@ -69,7 +70,7 @@ use crate::{
     convert::OwnedOrCloned,
     device::WeakDeviceId,
     error::ZonedAddressError,
-    ip::EitherDeviceId,
+    ip::{EitherDeviceId, IpExt},
     socket::address::SocketZonedIpAddr,
     sync::{RwLockReadGuard, RwLockWriteGuard},
     transport::{
@@ -110,6 +111,12 @@ pub(crate) struct TransportLayerState<BT: BindingsTypes> {
     udpv6: UdpState<Ipv6, WeakDeviceId<BT>>,
     tcpv4: TcpState<Ipv4, WeakDeviceId<BT>, BT>,
     tcpv6: TcpState<Ipv6, WeakDeviceId<BT>, BT>,
+}
+
+impl<BT: BindingsTypes> TransportLayerState<BT> {
+    fn tcp_state<I: IpExt>(&self) -> &TcpState<I, WeakDeviceId<BT>, BT> {
+        I::map_ip((), |()| &self.tcpv4, |()| &self.tcpv6)
+    }
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpBoundMap<Ipv4>> for SyncCtx<C> {
@@ -165,31 +172,41 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::UdpSocketsTable<Ipv6>> f
 }
 
 /// The identifier for timer events in the transport layer.
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
-pub(crate) enum TransportLayerTimerId {
-    Tcp(tcp::socket::TimerId),
+#[derive(Derivative)]
+#[derivative(
+    Clone(bound = ""),
+    Eq(bound = ""),
+    PartialEq(bound = ""),
+    Hash(bound = ""),
+    Debug(bound = "")
+)]
+pub(crate) enum TransportLayerTimerId<C: crate::NonSyncContext> {
+    Tcp(tcp::socket::TimerId<WeakDeviceId<C>, C>),
 }
 
 /// Handle a timer event firing in the transport layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
-    id: TransportLayerTimerId,
+    id: TransportLayerTimerId<NonSyncCtx>,
 ) {
     match id {
         TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(sync_ctx, ctx, id),
     }
 }
 
-impl From<tcp::socket::TimerId> for TransportLayerTimerId {
-    fn from(id: tcp::socket::TimerId) -> Self {
+impl<C: crate::NonSyncContext> From<tcp::socket::TimerId<WeakDeviceId<C>, C>>
+    for TransportLayerTimerId<C>
+{
+    fn from(id: tcp::socket::TimerId<WeakDeviceId<C>, C>) -> Self {
         TransportLayerTimerId::Tcp(id)
     }
 }
 
 impl_timer_context!(
-    TransportLayerTimerId,
-    tcp::socket::TimerId,
+    C: NonSyncContext,
+    TransportLayerTimerId<C>,
+    tcp::socket::TimerId<WeakDeviceId<C>, C>,
     TransportLayerTimerId::Tcp(id),
     id
 );

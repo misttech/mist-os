@@ -115,7 +115,9 @@ pub(crate) struct IcmpBoundMap<I>(PhantomData<I>, Never);
 pub(crate) struct IcmpTokenBucket<I>(PhantomData<I>, Never);
 pub(crate) struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
 
-pub(crate) struct TcpSockets<I>(PhantomData<I>, Never);
+pub(crate) struct TcpAllSocketsSet<I>(PhantomData<I>, Never);
+pub(crate) struct TcpSocketState<I>(PhantomData<I>, Never);
+pub(crate) struct TcpDemux<I>(PhantomData<I>, Never);
 pub(crate) struct TcpIsnGenerator<I>(PhantomData<I>, Never);
 
 pub(crate) struct UdpSocketsTable<I>(PhantomData<I>, Never);
@@ -178,20 +180,24 @@ impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
 impl_lock_after!(LoopbackRxDequeue => EthernetRxDequeue);
-
 impl_lock_after!(EthernetRxDequeue => IcmpSocketsTable<Ipv4>);
 impl_lock_after!(IcmpSocketsTable<Ipv4> => IcmpBoundMap<Ipv4>);
 impl_lock_after!(IcmpBoundMap<Ipv4> => IcmpTokenBucket<Ipv4>);
 impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSocketsTable<Ipv6>);
 impl_lock_after!(IcmpSocketsTable<Ipv6> => IcmpBoundMap<Ipv6>);
 impl_lock_after!(IcmpBoundMap<Ipv6> => IcmpTokenBucket<Ipv6>);
-impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpSockets<Ipv4>);
+impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpAllSocketsSet<Ipv4>);
 
-// Ideally we'd have separate impls `LoopbackRxDequeue => TcpSockets<Ipv4>` and
-// for `Ipv6`, but that doesn't play well with the blanket impls. Linearize IPv4
-// and IPv6, and TCP and UDP, like for `IpState` below.
-impl_lock_after!(TcpSockets<Ipv4> => TcpSockets<Ipv6>);
-impl_lock_after!(TcpSockets<Ipv6> => UdpSocketsTable<Ipv4>);
+// Ideally we'd have separate impls `LoopbackRxDequeue =>
+// TcpAllSocketsSet<Ipv4>` and for `Ipv6`, but that doesn't play well with the
+// blanket impls. Linearize IPv4 and IPv6, and TCP and UDP, like for `IpState`
+// below.
+impl_lock_after!(TcpAllSocketsSet<Ipv4> => TcpAllSocketsSet<Ipv6>);
+impl_lock_after!(TcpAllSocketsSet<Ipv6> => TcpSocketState<Ipv4>);
+impl_lock_after!(TcpSocketState<Ipv4> => TcpSocketState<Ipv6>);
+impl_lock_after!(TcpSocketState<Ipv6> => TcpDemux<Ipv4>);
+impl_lock_after!(TcpDemux<Ipv4> => TcpDemux<Ipv6>);
+impl_lock_after!(TcpDemux<Ipv6> => UdpSocketsTable<Ipv4>);
 impl_lock_after!(UdpSocketsTable<Ipv4> => UdpSocketsTable<Ipv6>);
 impl_lock_after!(UdpSocketsTable<Ipv6> => UdpBoundMap<Ipv4>);
 impl_lock_after!(UdpBoundMap<Ipv4> => UdpBoundMap<Ipv6>);

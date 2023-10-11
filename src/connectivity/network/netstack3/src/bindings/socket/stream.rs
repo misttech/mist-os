@@ -41,7 +41,7 @@ use netstack3_core::{
             set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
             with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
             ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
-            SocketAddr, SocketInfo, TcpBindingsTypes, TcpSocketId,
+            SocketAddr, SocketInfo, TcpBindingsTypes,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -69,6 +69,9 @@ use crate::bindings::{
 const MAX_TCP_KEEPIDLE_SECS: u64 = 32767;
 const MAX_TCP_KEEPINTVL_SECS: u64 = 32767;
 const MAX_TCP_KEEPCNT: u8 = 127;
+
+type TcpSocketId<I> =
+    tcp::socket::TcpSocketId<I, WeakDeviceId<BindingsNonSyncCtxImpl>, BindingsNonSyncCtxImpl>;
 
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
@@ -126,8 +129,6 @@ impl ListenerNotifier for LocalZirconSocketAndNotifier {
         socket.signal_peer(clear, set).expect("failed to signal for available connections")
     }
 }
-
-impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {}
 
 impl TcpBindingsTypes for BindingsNonSyncCtxImpl {
     type ReceiveBuffer = ReceiveBufferWithZirconSocket;
@@ -509,8 +510,13 @@ where
                 let (socket, watcher) = local_socket_and_watcher
                     .take()
                     .expect("connected socket did not provide socket and watcher");
-                let sender =
-                    spawn_send_task(ctx.clone(), socket, watcher, *id, &spawners.socket_scope);
+                let sender = spawn_send_task(
+                    ctx.clone(),
+                    socket,
+                    watcher,
+                    id.clone(),
+                    &spawners.socket_scope,
+                );
                 assert_matches::assert_matches!(send_task_abort.replace(sender), None);
             }
         }
@@ -768,7 +774,7 @@ where
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
         connect::<I, _>(sync_ctx, non_sync_ctx, id, ip, port).map_err(IntoErrno::into_errno)?;
         if let Some((local, watcher)) = self.data.local_socket_and_watcher.take() {
-            let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, *id, spawner);
+            let sender = spawn_send_task::<I>(ctx.clone(), local, watcher, id.clone(), spawner);
             assert_matches::assert_matches!(send_task_abort.replace(sender), None);
             Err(fposix::Errno::Einprogress)
         } else {

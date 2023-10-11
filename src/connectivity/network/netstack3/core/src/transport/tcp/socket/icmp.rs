@@ -9,6 +9,7 @@ use core::num::NonZeroU16;
 use net_types::SpecifiedAddr;
 use packet::BufferView as _;
 use packet_formats::tcp::TcpFlowAndSeqNum;
+use tracing::error;
 
 use crate::{
     ip::{
@@ -23,7 +24,7 @@ use crate::{
 
 impl<
         I: IcmpIpExt + IpLayerIpExt,
-        C: tcp_socket::NonSyncContext,
+        C: tcp_socket::NonSyncContext<I, SC::WeakDeviceId>,
         SC: tcp_socket::SyncContext<I, C>,
     > IpTransportContext<I, C, SC> for TcpIpTransportContext
 where
@@ -39,15 +40,14 @@ where
         err: I::ErrorCode,
     ) {
         let mut buffer = &mut original_body;
-        let Some(flow_and_seqnum) = buffer
-            .take_obj_front::<TcpFlowAndSeqNum>() else {
-            tracing::error!("received an ICMP error but its body is less than 8 bytes");
+        let Some(flow_and_seqnum) = buffer.take_obj_front::<TcpFlowAndSeqNum>() else {
+            error!("received an ICMP error but its body is less than 8 bytes");
             return;
         };
 
         let Some(original_src_ip) = original_src_ip else { return };
         let Some(original_src_port) = NonZeroU16::new(flow_and_seqnum.src_port()) else { return };
-        let Some(original_dst_port)= NonZeroU16::new(flow_and_seqnum.dst_port()) else { return };
+        let Some(original_dst_port) = NonZeroU16::new(flow_and_seqnum.dst_port()) else { return };
         let original_seqnum = SeqNum::new(flow_and_seqnum.sequence_num());
 
         SocketHandler::on_icmp_error(

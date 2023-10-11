@@ -369,7 +369,7 @@ impl<I: IpExt, D, O> IpSock<I, D, O> {
 // raw IP sockets once we support those.
 
 /// The non-synchronized execution context for IP sockets.
-pub(super) trait IpSocketNonSyncContext:
+pub(crate) trait IpSocketNonSyncContext:
     InstantContext + CounterContext + TracingContext
 {
 }
@@ -379,7 +379,7 @@ impl<C: InstantContext + CounterContext + TracingContext> IpSocketNonSyncContext
 ///
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
-pub(super) trait IpSocketContext<I, C: IpSocketNonSyncContext>:
+pub(crate) trait IpSocketContext<I, C: IpSocketNonSyncContext>:
     DeviceIdContext<AnyDevice>
 where
     I: IpDeviceStateIpExt,
@@ -401,7 +401,7 @@ where
 ///
 /// Blanket impls of `BufferIpSocketHandler` are provided in terms of
 /// `BufferIpSocketContext`.
-pub(super) trait BufferIpSocketContext<I, C: IpSocketNonSyncContext, B: BufferMut>:
+pub(crate) trait BufferIpSocketContext<I, C: IpSocketNonSyncContext, B: BufferMut>:
     IpSocketContext<I, C>
 where
     I: IpDeviceStateIpExt + packet_formats::ip::IpExt,

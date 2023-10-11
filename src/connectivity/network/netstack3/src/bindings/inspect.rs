@@ -19,63 +19,50 @@ use net_types::{
 use netstack3_core::{
     device::{self, DeviceId},
     ip,
-    transport::tcp::{self, socket::TcpSocketId},
+    transport::tcp,
 };
 use std::{fmt, string::ToString as _};
 
 /// Publishes netstack3 socket diagnostics data to Inspect.
 pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
-    /// Convert a [`TcpSocketId`] into a unique integer.
-    ///
-    /// Guarantees that no two unique `SocketId`s (even for different IP
-    /// versions) will have have the same output value.
-    fn transform_id<I: Ip>(id: TcpSocketId<I>) -> usize {
-        let unique_for_ip_version: usize = id.into();
-        2 * unique_for_ip_version
-            + match I::VERSION {
-                IpVersion::V4 => 0,
-                IpVersion::V6 => 1,
-            }
+    struct Visitor {
+        inspector: fuchsia_inspect::Inspector,
+        count: usize,
     }
-
-    struct Visitor(fuchsia_inspect::Inspector);
-    impl tcp::socket::InfoVisitor for &'_ mut Visitor {
-        type VisitResult = ();
-        fn visit<I: Ip, D: fmt::Display>(
-            self,
-            per_socket: impl Iterator<Item = tcp::socket::SocketStats<I, D>>,
-        ) -> Self::VisitResult {
-            let Visitor(inspector) = self;
-            for socket in per_socket {
-                let tcp::socket::SocketStats { id, local, remote } = socket;
-                inspector.root().record_child(format!("{}", transform_id(id)), |node| {
-                    node.record_string("TransportProtocol", "TCP");
-                    node.record_string(
-                        "NetworkProtocol",
-                        match I::VERSION {
-                            IpVersion::V4 => "IPv4",
-                            IpVersion::V6 => "IPv6",
-                        },
-                    );
-                    node.record_string(
-                        "LocalAddress",
-                        local.map_or("[NOT BOUND]".into(), |socket| format!("{}", socket)),
-                    );
-                    node.record_string(
-                        "RemoteAddress",
-                        remote.map_or("[NOT CONNECTED]".into(), |socket| format!("{}", socket)),
-                    )
-                })
-            }
+    impl tcp::socket::InfoVisitor for Visitor {
+        fn visit<I: Ip, D: fmt::Display>(&mut self, socket: tcp::socket::SocketStats<I, D>) {
+            let Self { inspector, count } = self;
+            let id = core::mem::replace(count, *count + 1);
+            let tcp::socket::SocketStats { local, remote } = socket;
+            inspector.root().record_child(format!("{id}"), |node| {
+                node.record_string("TransportProtocol", "TCP");
+                node.record_string(
+                    "NetworkProtocol",
+                    match I::VERSION {
+                        IpVersion::V4 => "IPv4",
+                        IpVersion::V6 => "IPv6",
+                    },
+                );
+                node.record_string(
+                    "LocalAddress",
+                    local.map_or("[NOT BOUND]".into(), |socket| format!("{}", socket)),
+                );
+                node.record_string(
+                    "RemoteAddress",
+                    remote.map_or("[NOT CONNECTED]".into(), |socket| format!("{}", socket)),
+                )
+            })
         }
     }
     let sync_ctx = ctx.sync_ctx();
-    let mut visitor =
-        Visitor(fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()));
+    let mut visitor = Visitor {
+        inspector: fuchsia_inspect::Inspector::new(fuchsia_inspect::InspectorConfig::default()),
+        count: 0,
+    };
     tcp::socket::with_info::<Ipv4, _, _>(sync_ctx, &mut visitor);
     tcp::socket::with_info::<Ipv6, _, _>(sync_ctx, &mut visitor);
-    let Visitor(inspector) = visitor;
-    inspector
+
+    visitor.inspector
 }
 
 /// Publishes netstack3 routing table diagnostics data to Inspect.

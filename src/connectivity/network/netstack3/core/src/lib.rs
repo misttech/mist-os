@@ -264,7 +264,6 @@ pub trait NonSyncContext:
     + transport::udp::NonSyncContext<Ipv6>
     + IcmpContext<Ipv4>
     + IcmpContext<Ipv6>
-    + transport::tcp::socket::NonSyncContext
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
@@ -298,7 +297,6 @@ impl<
             + transport::udp::NonSyncContext<Ipv6>
             + IcmpContext<Ipv4>
             + IcmpContext<Ipv6>
-            + transport::tcp::socket::NonSyncContext
             + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>
@@ -345,7 +343,7 @@ enum TimerIdInner<C: NonSyncContext> {
     /// A timer event in the device layer.
     DeviceLayer(DeviceLayerTimerId<C>),
     /// A timer event in the transport layer.
-    TransportLayer(TransportLayerTimerId),
+    TransportLayer(TransportLayerTimerId<C>),
     /// A timer event in the IP layer.
     IpLayer(IpLayerTimerId),
     /// A timer event for an IPv4 device.
@@ -381,8 +379,8 @@ impl<C: NonSyncContext> From<IpLayerTimerId> for TimerId<C> {
     }
 }
 
-impl<C: NonSyncContext> From<TransportLayerTimerId> for TimerId<C> {
-    fn from(id: TransportLayerTimerId) -> Self {
+impl<C: NonSyncContext> From<TransportLayerTimerId<C>> for TimerId<C> {
+    fn from(id: TransportLayerTimerId<C>) -> Self {
         TimerId(TimerIdInner::TransportLayer(id))
     }
 }
@@ -418,7 +416,7 @@ impl_timer_context!(
 impl_timer_context!(
     C: NonSyncContext,
     TimerId<C>,
-    TransportLayerTimerId,
+    TransportLayerTimerId<C>,
     TimerId(TimerIdInner::TransportLayer(id)),
     id
 );

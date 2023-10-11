@@ -95,17 +95,26 @@ pub(crate) enum AnyDevice {}
 
 impl Device for AnyDevice {}
 
-// An identifier for a device.
-pub(crate) trait Id: Clone + Debug + Eq + Hash + PartialEq + Send + Sync {
+/// An identifier for a device.
+pub trait Id: Clone + Debug + Eq + Hash + PartialEq + Send + Sync + 'static {
     /// Returns true if the device is a loopback device.
     fn is_loopback(&self) -> bool;
 }
 
-pub(crate) trait StrongId: Id {
+/// A marker for a Strong device reference.
+///
+/// Types marked with [`StrongId`] indicates that the referenced device is alive
+/// while the type exists.
+pub trait StrongId: Id {
+    /// The weak version of this identifier.
     type Weak: WeakId<Strong = Self>;
 }
 
-pub(crate) trait WeakId: Id + PartialEq<Self::Strong> {
+/// A marker for a Weak device reference.
+///
+/// This is the weak marker equivalent of [`StrongId`].
+pub trait WeakId: Id + PartialEq<Self::Strong> {
+    /// The strong version of this identifier.
     type Strong: StrongId<Weak = Self>;
 }
 
@@ -1992,13 +2001,17 @@ impl DeviceIdDebugTag for () {
 /// is blanket-implemented for all types that implement
 /// [`socket::DeviceSocketTypes`] and [`DeviceLayerStateTypes`].
 pub trait DeviceLayerTypes:
-    DeviceLayerStateTypes + socket::DeviceSocketTypes + LinkResolutionContext<EthernetLinkDevice>
+    DeviceLayerStateTypes
+    + socket::DeviceSocketTypes
+    + LinkResolutionContext<EthernetLinkDevice>
+    + 'static
 {
 }
 impl<
         C: DeviceLayerStateTypes
             + socket::DeviceSocketTypes
-            + LinkResolutionContext<EthernetLinkDevice>,
+            + LinkResolutionContext<EthernetLinkDevice>
+            + 'static,
     > DeviceLayerTypes for C
 {
 }

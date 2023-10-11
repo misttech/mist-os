@@ -662,9 +662,9 @@ impl<R: Default + ReceiveBuffer, S: Default + SendBuffer> IntoBuffers<R, S> for 
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::{rc::Rc, vec::Vec};
-    use core::cell::RefCell;
+    use alloc::{sync::Arc, vec::Vec};
 
+    use crate::sync::Mutex;
     use crate::transport::tcp::socket::ListenerNotifier;
 
     impl RingBuffer {
@@ -678,38 +678,38 @@ pub(crate) mod testutil {
         }
     }
 
-    impl Buffer for Rc<RefCell<RingBuffer>> {
+    impl Buffer for Arc<Mutex<RingBuffer>> {
         fn limits(&self) -> BufferLimits {
-            self.borrow().limits()
+            self.lock().limits()
         }
 
         fn target_capacity(&self) -> usize {
-            self.borrow().target_capacity()
+            self.lock().target_capacity()
         }
 
         fn request_capacity(&mut self, size: usize) {
-            self.borrow_mut().set_target_size(size)
+            self.lock().set_target_size(size)
         }
     }
 
-    impl ReceiveBuffer for Rc<RefCell<RingBuffer>> {
+    impl ReceiveBuffer for Arc<Mutex<RingBuffer>> {
         fn write_at<P: Payload>(&mut self, offset: usize, data: &P) -> usize {
-            self.borrow_mut().write_at(offset, data)
+            self.lock().write_at(offset, data)
         }
 
         fn make_readable(&mut self, count: usize) {
-            self.borrow_mut().make_readable(count)
+            self.lock().make_readable(count)
         }
     }
 
     #[derive(Debug, Default)]
     pub struct TestSendBuffer {
-        fake_stream: Rc<RefCell<Vec<u8>>>,
+        fake_stream: Arc<Mutex<Vec<u8>>>,
         ring: RingBuffer,
     }
 
     impl TestSendBuffer {
-        pub fn new(fake_stream: Rc<RefCell<Vec<u8>>>, ring: RingBuffer) -> TestSendBuffer {
+        pub fn new(fake_stream: Arc<Mutex<Vec<u8>>>, ring: RingBuffer) -> TestSendBuffer {
             Self { fake_stream, ring }
         }
     }
@@ -718,8 +718,9 @@ pub(crate) mod testutil {
         fn limits(&self) -> BufferLimits {
             let Self { fake_stream, ring } = self;
             let BufferLimits { capacity: ring_capacity, len: ring_len } = ring.limits();
-            let len = ring_len + fake_stream.borrow().len();
-            let capacity = ring_capacity + fake_stream.borrow().capacity();
+            let guard = fake_stream.lock();
+            let len = ring_len + guard.len();
+            let capacity = ring_capacity + guard.capacity();
             BufferLimits { len, capacity }
         }
 
@@ -745,35 +746,52 @@ pub(crate) mod testutil {
             F: FnOnce(SendPayload<'a>) -> R,
         {
             let Self { fake_stream, ring } = self;
-            if !fake_stream.borrow().is_empty() {
+            let mut guard = fake_stream.lock();
+            if !guard.is_empty() {
                 // Pull from the fake stream into the ring if there is capacity.
                 let BufferLimits { capacity, len } = ring.limits();
-                let len = (capacity - len).min(fake_stream.borrow().len());
-                let rest = fake_stream.borrow_mut().split_off(len);
-                let first = fake_stream.replace(rest);
+                let len = (capacity - len).min(guard.len());
+                let rest = guard.split_off(len);
+                let first = core::mem::replace(&mut *guard, rest);
                 assert_eq!(ring.enqueue_data(&first[..]), len);
             }
             ring.peek_with(offset, f)
         }
     }
 
-    #[derive(Clone, Debug, Default, Eq, PartialEq)]
-    pub struct ClientBuffers {
-        pub receive: Rc<RefCell<RingBuffer>>,
-        pub send: Rc<RefCell<Vec<u8>>>,
+    fn arc_mutex_eq<T: PartialEq>(a: &Arc<Mutex<T>>, b: &Arc<Mutex<T>>) -> bool {
+        if Arc::ptr_eq(a, b) {
+            return true;
+        }
+        (&*a.lock()) == (&*b.lock())
     }
+
+    #[derive(Clone, Debug, Default)]
+    pub struct ClientBuffers {
+        pub receive: Arc<Mutex<RingBuffer>>,
+        pub send: Arc<Mutex<Vec<u8>>>,
+    }
+
+    impl PartialEq for ClientBuffers {
+        fn eq(&self, ClientBuffers { receive: other_receive, send: other_send }: &Self) -> bool {
+            let Self { receive, send } = self;
+            arc_mutex_eq(receive, other_receive) && arc_mutex_eq(send, other_send)
+        }
+    }
+
+    impl Eq for ClientBuffers {}
 
     impl ClientBuffers {
         pub fn new(buffer_sizes: BufferSizes) -> Self {
             let BufferSizes { send, receive } = buffer_sizes;
             Self {
-                receive: Rc::new(RefCell::new(RingBuffer::new(receive))),
-                send: Rc::new(RefCell::new(Vec::with_capacity(send))),
+                receive: Arc::new(Mutex::new(RingBuffer::new(receive))),
+                send: Arc::new(Mutex::new(Vec::with_capacity(send))),
             }
         }
     }
 
-    #[derive(Debug, Clone, PartialEq, Eq)]
+    #[derive(Debug, Clone, Eq, PartialEq)]
     pub enum ProvidedBuffers {
         Buffers(WriteBackClientBuffers),
         NoBuffers,
@@ -812,17 +830,26 @@ pub(crate) mod testutil {
         }
     }
 
-    #[derive(Debug, Default, Clone, PartialEq, Eq)]
-    pub struct WriteBackClientBuffers(pub Rc<RefCell<Option<ClientBuffers>>>);
+    #[derive(Debug, Default, Clone)]
+    pub struct WriteBackClientBuffers(pub Arc<Mutex<Option<ClientBuffers>>>);
 
-    impl IntoBuffers<Rc<RefCell<RingBuffer>>, TestSendBuffer> for ProvidedBuffers {
+    impl PartialEq for WriteBackClientBuffers {
+        fn eq(&self, Self(other): &Self) -> bool {
+            let Self(this) = self;
+            arc_mutex_eq(this, other)
+        }
+    }
+
+    impl Eq for WriteBackClientBuffers {}
+
+    impl IntoBuffers<Arc<Mutex<RingBuffer>>, TestSendBuffer> for ProvidedBuffers {
         fn into_buffers(
             self,
             buffer_sizes: BufferSizes,
-        ) -> (Rc<RefCell<RingBuffer>>, TestSendBuffer) {
+        ) -> (Arc<Mutex<RingBuffer>>, TestSendBuffer) {
             let buffers = ClientBuffers::new(buffer_sizes);
             if let ProvidedBuffers::Buffers(b) = self {
-                *b.0.as_ref().borrow_mut() = Some(buffers.clone());
+                *b.0.as_ref().lock() = Some(buffers.clone());
             }
             let ClientBuffers { receive, send } = buffers;
             (receive, TestSendBuffer::new(send, Default::default()))

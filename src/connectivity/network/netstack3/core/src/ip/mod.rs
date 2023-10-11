@@ -2753,7 +2753,7 @@ pub(crate) fn send_ipv6_packet_from_device<
 impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
-            + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
+            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
     > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
@@ -2850,7 +2850,7 @@ impl<
 impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv6>>
-            + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
+            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
     > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
@@ -2949,7 +2949,7 @@ impl<L, C: NonSyncContext> icmp::IcmpStateContext for Locked<&SyncCtx<C>, L> {}
 impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>
-            + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
+            + LockBefore<crate::lock_ordering::TcpDemux<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv6>>,
     > icmp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
@@ -2993,7 +2993,7 @@ impl<
 impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>
-            + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
+            + LockBefore<crate::lock_ordering::TcpDemux<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
     > icmp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
