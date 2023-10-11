@@ -92,7 +92,7 @@ class StreamImpl : public actor::ActorBase {
 
   // Given an InterfaceHandle<BufferCollectionToken> with a valid underlying channel, the client
   // will be set as a participant and the returned promise will yield the bound token for further
-  // use. Otherwise, the client will not be a particpant and the promise will yield nullopt.
+  // use. Otherwise, the client will not be a participant and the promise will yield nullopt.
   promise<std::optional<fuchsia::sysmem::BufferCollectionTokenPtr>> SetClientParticipation(
       uint64_t id, fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_handle);
 

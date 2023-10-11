@@ -14,9 +14,6 @@
 
 class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
  public:
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {}
-
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }

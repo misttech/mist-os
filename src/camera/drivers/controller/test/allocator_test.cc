@@ -75,19 +75,6 @@ class ControllerMemoryAllocatorTest : public gtest::TestLoopFixture {
   ddk::IspProtocolClient isp_;
   ddk::GdcProtocolClient gdc_;
   ddk::Ge2dProtocolClient ge2d_;
-
- private:
-  zx::result<fuchsia::sysmem::AllocatorSyncPtr> CreateSysmemAllocator(
-      fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem>& sysmem) {
-    fuchsia::sysmem::AllocatorSyncPtr sysmem_allocator;
-    fidl::ServerEnd<fuchsia_sysmem::Allocator> allocator_server_end(
-        sysmem_allocator.NewRequest().TakeChannel());
-    fidl::OneWayStatus status = sysmem->ConnectServer(std::move(allocator_server_end));
-    if (!status.ok()) {
-      return zx::error(status.status());
-    }
-    return zx::ok(std::move(sysmem_allocator));
-  }
 };
 
 // Validate FR --> GDC1 --> OutputStreamMLDS
