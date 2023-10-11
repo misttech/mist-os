@@ -337,10 +337,57 @@ class MsdVsiDevice : public msd::Device,
   std::unique_ptr<Sequencer> sequencer_;
   std::unique_ptr<GpuProgress> progress_;
 
-  class BatchRequest;
-  class DumpRequest;
-  class InterruptRequest;
-  class MappingReleaseRequest;
+  enum RequestType : uint8_t { kBatchRequest, kDumpRequest, kInterruptRequest };
+
+  class BatchRequest : public DeviceRequest {
+   public:
+    BatchRequest(std::unique_ptr<MappedBatch> batch, bool do_flush)
+        : batch_(std::move(batch)), do_flush_(do_flush) {}
+
+    static constexpr uint8_t kRequestType = kBatchRequest;
+    uint8_t RequestType() override { return kRequestType; }
+
+   protected:
+    magma::Status Process(MsdVsiDevice* device) override {
+      return device->ProcessBatch(std::move(batch_), do_flush_);
+    }
+
+   private:
+    std::unique_ptr<MappedBatch> batch_;
+    bool do_flush_;
+  };
+
+  class DumpRequest : public DeviceRequest {
+   public:
+    DumpRequest() = default;
+
+    static constexpr uint8_t kRequestType = kDumpRequest;
+    uint8_t RequestType() override { return kRequestType; }
+
+   protected:
+    magma::Status Process(MsdVsiDevice* device) override {
+      return device->ProcessDumpStatusToLog();
+    }
+  };
+
+  class InterruptRequest : public DeviceRequest {
+   public:
+    explicit InterruptRequest(const registers::IrqAck irq_status)
+        : irq_status_(std::move(irq_status)) {}
+
+    const registers::IrqAck& irq_status() const { return irq_status_; }
+
+    static constexpr uint8_t kRequestType = kInterruptRequest;
+    uint8_t RequestType() override { return kRequestType; }
+
+   protected:
+    magma::Status Process(MsdVsiDevice* device) override {
+      return device->ProcessInterrupt(std::move(irq_status_));
+    }
+
+   private:
+    const registers::IrqAck irq_status_;
+  };
 
   // Thread-shared data members
   std::unique_ptr<magma::PlatformSemaphore> device_request_semaphore_;
@@ -396,6 +443,8 @@ class MsdVsiDevice : public msd::Device,
   friend class TestEvents_WriteUnorderedEventIds_Test;
   friend class TestFaultRecovery_ManyBatches_Test;
   friend class TestFaultRecovery_MultipleContexts_Test;
+  friend class TestIrqQueue_EmptyQueue_Test;
+  friend class TestIrqQueue_Queue_Test;
   friend class TestSuspend_SubmitBatchCheckSuspend_Test;
   friend class MsdVsiDeviceTest_FetchEngineDma_Test;
   friend class MsdVsiDeviceTest_LoadAddressSpace_Test;

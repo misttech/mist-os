@@ -32,6 +32,10 @@ class GpuProgress {
     if (sequence_number != last_completed_sequence_number_) {
       DLOG("Completed 0x%x", sequence_number);
       DASSERT(sequence_number > last_completed_sequence_number_);
+      if (sequence_number <= last_completed_sequence_number_) {
+        MAGMA_LOG(ERROR, "Out of order sequence number (%d <= %d)", sequence_number,
+                  last_completed_sequence_number_);
+      }
       last_completed_sequence_number_ = sequence_number;
     } else {
       DLOG("completed 0x%x AGAIN", sequence_number);

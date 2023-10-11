@@ -48,6 +48,8 @@ class DeviceRequest {
       reply_->Signal(status);
   }
 
+  virtual uint8_t RequestType() = 0;
+
  protected:
   virtual magma::Status Process(Processor* processor) { return MAGMA_STATUS_OK; }
 

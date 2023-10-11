@@ -31,42 +31,6 @@ static constexpr uint32_t kInterruptIndex = 0;
 
 static constexpr uint32_t kSramMmioIndex = 4;
 
-class MsdVsiDevice::BatchRequest : public DeviceRequest {
- public:
-  BatchRequest(std::unique_ptr<MappedBatch> batch, bool do_flush)
-      : batch_(std::move(batch)), do_flush_(do_flush) {}
-
- protected:
-  magma::Status Process(MsdVsiDevice* device) override {
-    return device->ProcessBatch(std::move(batch_), do_flush_);
-  }
-
- private:
-  std::unique_ptr<MappedBatch> batch_;
-  bool do_flush_;
-};
-
-class MsdVsiDevice::InterruptRequest : public DeviceRequest {
- public:
-  InterruptRequest(const registers::IrqAck irq_status) : irq_status_(std::move(irq_status)) {}
-
- protected:
-  magma::Status Process(MsdVsiDevice* device) override {
-    return device->ProcessInterrupt(std::move(irq_status_));
-  }
-
- private:
-  const registers::IrqAck irq_status_;
-};
-
-class MsdVsiDevice::DumpRequest : public DeviceRequest {
- public:
-  DumpRequest() {}
-
- protected:
-  magma::Status Process(MsdVsiDevice* device) override { return device->ProcessDumpStatusToLog(); }
-};
-
 MsdVsiDevice::~MsdVsiDevice() { Shutdown(); }
 
 bool MsdVsiDevice::Shutdown() {
@@ -440,7 +404,26 @@ int MsdVsiDevice::DeviceThreadLoop(bool disable_suspend) {
 
 void MsdVsiDevice::EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request) {
   std::unique_lock<std::mutex> lock(device_request_mutex_);
-  device_request_list_.emplace_back(std::move(request));
+
+  // Interrupts are higher priority and placed at the front of the queue in FIFO order
+  if (request->RequestType() == InterruptRequest::kRequestType) {
+    if (device_request_list_.empty()) {
+      device_request_list_.emplace_front(std::move(request));
+    } else {
+      for(auto it = device_request_list_.begin(); ; ++it) {
+        if (it == device_request_list_.end()) {
+          device_request_list_.emplace_back(std::move(request));
+          break;
+        } else if (it->get()->RequestType() != InterruptRequest::kRequestType) {
+          device_request_list_.emplace(it, std::move(request));
+          break;
+        }
+      }
+    }
+  } else {
+    device_request_list_.emplace_back(std::move(request));
+  }
+
   device_request_semaphore_->Signal();
 }
 
