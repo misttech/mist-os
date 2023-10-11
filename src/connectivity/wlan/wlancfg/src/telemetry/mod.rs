@@ -282,6 +282,16 @@ pub enum TelemetryEvent {
     /// Notify telemetry that there was a decision to look for networks to roam to after evaluating
     /// the existing connection.
     RoamingScan,
+    /// Counts of saved networks and count of configurations for each of those networks, to be
+    /// recorded periodically.
+    SavedNetworkCount {
+        saved_network_count: usize,
+        config_count_per_saved_network: Vec<usize>,
+    },
+    /// Record the time since the last network selection scan
+    NetworkSelectionScanInterval {
+        time_since_last_scan: zx::Duration,
+    },
     /// Notify telemetry event loop that connection duration has reached threshold to log
     /// post-connect score deltas.
     PostConnectionScores {
@@ -1240,6 +1250,17 @@ impl Telemetry {
             }
             TelemetryEvent::RoamingScan => {
                 self.stats_logger.log_roaming_scan_metrics().await;
+            }
+            TelemetryEvent::SavedNetworkCount {
+                saved_network_count,
+                config_count_per_saved_network,
+            } => {
+                self.stats_logger
+                    .log_saved_network_counts(saved_network_count, config_count_per_saved_network)
+                    .await;
+            }
+            TelemetryEvent::NetworkSelectionScanInterval { time_since_last_scan } => {
+                self.stats_logger.log_network_selection_scan_interval(time_since_last_scan).await;
             }
             TelemetryEvent::StartClientConnectionsRequest => {
                 let now = fasync::Time::now();
@@ -2348,6 +2369,66 @@ impl StatsLogger {
             metrics::ACTIVE_SCAN_REQUESTED_FOR_POLICY_API_METRIC_ID,
             1,
             &[active_scan_ssids_requested_dim as u32],
+        );
+    }
+
+    async fn log_saved_network_counts(
+        &mut self,
+        saved_network_count: usize,
+        config_count_per_saved_network: Vec<usize>,
+    ) {
+        let mut metric_events = vec![];
+
+        // Count the total number of saved networks
+        use metrics::SavedNetworksMigratedMetricDimensionSavedNetworks as SavedNetworksCount;
+        let num_networks = match saved_network_count {
+            0 => SavedNetworksCount::Zero,
+            1 => SavedNetworksCount::One,
+            2..=4 => SavedNetworksCount::TwoToFour,
+            5..=40 => SavedNetworksCount::FiveToForty,
+            41..=500 => SavedNetworksCount::FortyToFiveHundred,
+            501..=usize::MAX => SavedNetworksCount::FiveHundredAndOneOrMore,
+            _ => unreachable!(),
+        };
+        metric_events.push(MetricEvent {
+            metric_id: metrics::SAVED_NETWORKS_MIGRATED_METRIC_ID,
+            event_codes: vec![num_networks as u32],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        // Count the number of configs for each saved network
+        use metrics::SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations as ConfigCountDimension;
+        for config_count in config_count_per_saved_network {
+            let num_configs = match config_count {
+                0 => ConfigCountDimension::Zero,
+                1 => ConfigCountDimension::One,
+                2..=4 => ConfigCountDimension::TwoToFour,
+                5..=40 => ConfigCountDimension::FiveToForty,
+                41..=500 => ConfigCountDimension::FortyToFiveHundred,
+                501..=usize::MAX => ConfigCountDimension::FiveHundredAndOneOrMore,
+                _ => unreachable!(),
+            };
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
+                event_codes: vec![num_configs as u32],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
+
+        log_cobalt_1dot1_batch!(
+            self.cobalt_1dot1_proxy,
+            &metric_events,
+            "log_saved_network_counts",
+        );
+    }
+
+    async fn log_network_selection_scan_interval(&mut self, time_since_last_scan: zx::Duration) {
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_integer,
+            metrics::LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID,
+            time_since_last_scan.into_micros(),
+            &[],
         );
     }
 
@@ -3471,8 +3552,6 @@ impl ConnectAttemptsCounter {
 
 #[cfg(test)]
 mod tests {
-    use futures::stream::FusedStream;
-
     use {
         super::*,
         crate::util::testing::{
@@ -3486,8 +3565,9 @@ mod tests {
         fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload},
         fidl_fuchsia_wlan_stats,
         fuchsia_inspect::Inspector,
-        futures::{pin_mut, task::Poll, TryStreamExt},
+        futures::{pin_mut, stream::FusedStream, task::Poll, TryStreamExt},
         ieee80211_testutils::{BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
+        rand::Rng,
         regex::Regex,
         std::{cmp::min, collections::VecDeque, pin::Pin},
         test_case::test_case,
@@ -5764,6 +5844,57 @@ mod tests {
             test_helper.get_logged_metrics(metrics::NETWORK_DISCONNECT_COUNTS_METRIC_ID);
         assert_eq!(total_disconnect_counts.len(), 1);
         assert_eq!(total_disconnect_counts[0].payload, MetricEventPayload::Count(1));
+    }
+
+    #[fuchsia::test]
+    fn test_log_saved_networks_count() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let event = TelemetryEvent::SavedNetworkCount {
+            saved_network_count: 4,
+            config_count_per_saved_network: vec![1, 1],
+        };
+        test_helper.telemetry_sender.send(event);
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let saved_networks_count =
+            test_helper.get_logged_metrics(metrics::SAVED_NETWORKS_MIGRATED_METRIC_ID);
+        assert_eq!(saved_networks_count.len(), 1);
+        assert_eq!(
+            saved_networks_count[0].event_codes,
+            vec![metrics::SavedNetworksMigratedMetricDimensionSavedNetworks::TwoToFour as u32]
+        );
+
+        let config_count = test_helper
+            .get_logged_metrics(metrics::SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID);
+        assert_eq!(config_count.len(), 2);
+        assert_eq!(
+            config_count[0].event_codes,
+            vec![metrics::SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::One as u32]
+        );
+        assert_eq!(
+            config_count[1].event_codes,
+            vec![metrics::SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::One as u32]
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_log_network_selection_scan_interval() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let duration = zx::Duration::from_seconds(rand::thread_rng().gen_range(0..100));
+
+        let event = TelemetryEvent::NetworkSelectionScanInterval { time_since_last_scan: duration };
+        test_helper.telemetry_sender.send(event);
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let last_scan_age = test_helper
+            .get_logged_metrics(metrics::LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID);
+        assert_eq!(last_scan_age.len(), 1);
+        assert_eq!(
+            last_scan_age[0].payload,
+            fidl_fuchsia_metrics::MetricEventPayload::IntegerValue(duration.into_micros())
+        );
     }
 
     #[fuchsia::test]

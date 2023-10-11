@@ -17,7 +17,6 @@ use {
     },
     anyhow::format_err,
     async_trait::async_trait,
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async as fasync,
     futures::lock::Mutex,
@@ -29,12 +28,6 @@ use {
         path::Path,
     },
     tracing::{error, info},
-    wlan_metrics_registry::{
-        SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations,
-        SavedNetworksMigratedMetricDimensionSavedNetworks,
-        SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-        SAVED_NETWORKS_MIGRATED_METRIC_ID,
-    },
     wlan_stash::policy::{PolicyStash as Stash, POLICY_STASH_ID},
 };
 
@@ -534,7 +527,18 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
 
     async fn record_periodic_metrics(&self) {
         let saved_networks = self.saved_networks.lock().await;
-        log_cobalt_metrics(&saved_networks, &self.telemetry_sender);
+        // Count the number of configs for each saved network
+        let config_counts = saved_networks
+            .iter()
+            .map(|saved_network| {
+                let configs = saved_network.1;
+                configs.len()
+            })
+            .collect();
+        self.telemetry_sender.send(TelemetryEvent::SavedNetworkCount {
+            saved_network_count: saved_networks.len(),
+            config_count_per_saved_network: config_counts,
+        });
     }
 
     async fn record_scan_result(
@@ -707,54 +711,6 @@ fn evict_if_needed(configs: &mut Vec<NetworkConfig>) -> Option<NetworkConfig> {
     }
     // If all saved networks have connected, remove the first network
     return Some(configs.remove(0));
-}
-
-/// Record Cobalt metrics related to Saved Networks
-fn log_cobalt_metrics(saved_networks: &NetworkConfigMap, telemetry_sender: &TelemetrySender) {
-    // Count the total number of saved networks
-    let mut metric_events = vec![];
-
-    let num_networks = match saved_networks.len() {
-        0 => SavedNetworksMigratedMetricDimensionSavedNetworks::Zero,
-        1 => SavedNetworksMigratedMetricDimensionSavedNetworks::One,
-        2..=4 => SavedNetworksMigratedMetricDimensionSavedNetworks::TwoToFour,
-        5..=40 => SavedNetworksMigratedMetricDimensionSavedNetworks::FiveToForty,
-        41..=500 => SavedNetworksMigratedMetricDimensionSavedNetworks::FortyToFiveHundred,
-        501..=usize::MAX => {
-            SavedNetworksMigratedMetricDimensionSavedNetworks::FiveHundredAndOneOrMore
-        }
-        _ => unreachable!(),
-    };
-    metric_events.push(MetricEvent {
-        metric_id: SAVED_NETWORKS_MIGRATED_METRIC_ID,
-        event_codes: vec![num_networks as u32],
-        payload: MetricEventPayload::Count(1),
-    });
-
-    // Count the number of configs for each saved network
-    for saved_network in saved_networks {
-        let configs = saved_network.1;
-        use SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations as ConfigCountDimension;
-        let num_configs = match configs.len() {
-            0 => ConfigCountDimension::Zero,
-            1 => ConfigCountDimension::One,
-            2..=4 => ConfigCountDimension::TwoToFour,
-            5..=40 => ConfigCountDimension::FiveToForty,
-            41..=500 => ConfigCountDimension::FortyToFiveHundred,
-            501..=usize::MAX => ConfigCountDimension::FiveHundredAndOneOrMore,
-            _ => unreachable!(),
-        };
-        metric_events.push(MetricEvent {
-            metric_id: SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-            event_codes: vec![num_configs as u32],
-            payload: MetricEventPayload::Count(1),
-        });
-    }
-
-    telemetry_sender.send(TelemetryEvent::LogMetricEvents {
-        events: metric_events,
-        ctx: "SavedNetworksManager::log_cobalt_metrics",
-    });
 }
 
 #[cfg(test)]
@@ -1993,104 +1949,11 @@ mod tests {
         // Record metrics
         saved_networks.record_periodic_metrics().await;
 
-        // Verify three metrics are logged
-        let metric_events = assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::LogMetricEvents { events, .. })) => events);
-        assert_eq!(metric_events.len(), 3);
-
-        // Two saved networks
-        assert_eq!(
-            metric_events[0],
-            MetricEvent {
-                metric_id: SAVED_NETWORKS_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    SavedNetworksMigratedMetricDimensionSavedNetworks::TwoToFour as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }
-        );
-
-        // One config for each network
-        assert_eq!(metric_events[1], MetricEvent {
-            metric_id: SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-            event_codes: vec![SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::One as u32],
-            payload: MetricEventPayload::Count(1),
+        // Verify metric is logged with two saved networks, which each have one config
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::SavedNetworkCount { saved_network_count, config_count_per_saved_network })) => {
+            assert_eq!(saved_network_count, 2);
+            assert_eq!(config_count_per_saved_network, [1, 1]);
         });
-        assert_eq!(metric_events[1], MetricEvent {
-            metric_id: SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-            event_codes: vec![SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::One as u32],
-            payload: MetricEventPayload::Count(1),
-        });
-    }
-
-    #[fuchsia::test]
-    async fn metrics_count_configs() {
-        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-
-        let network_id_foo = NetworkIdentifier::try_from("foo", SecurityType::Wpa2).unwrap();
-        let network_id_baz = NetworkIdentifier::try_from("baz", SecurityType::Wpa2).unwrap();
-
-        let networks: NetworkConfigMap = [
-            (network_id_foo, vec![]),
-            (
-                network_id_baz.clone(),
-                vec![
-                    NetworkConfig::new(
-                        network_id_baz.clone(),
-                        Credential::Password(b"qwertyuio".to_vec()),
-                        false,
-                    )
-                    .unwrap(),
-                    NetworkConfig::new(
-                        network_id_baz,
-                        Credential::Password(b"asdfasdfasdf".to_vec()),
-                        false,
-                    )
-                    .unwrap(),
-                ],
-            ),
-        ]
-        .iter()
-        .cloned()
-        .collect();
-
-        log_cobalt_metrics(&networks, &telemetry_sender);
-
-        let metric_events = assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::LogMetricEvents { events, .. })) => events);
-        assert_eq!(metric_events.len(), 3);
-
-        // Two saved networks
-        assert_eq!(
-            metric_events[0],
-            MetricEvent {
-                metric_id: SAVED_NETWORKS_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    SavedNetworksMigratedMetricDimensionSavedNetworks::TwoToFour as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }
-        );
-
-        // For the next two events, the order is not guaranteed
-        // Zero configs for one network
-        assert!(metric_events[1..].iter().any(|event| *event
-            == MetricEvent {
-                metric_id: SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::Zero
-                    as u32
-            ],
-                payload: MetricEventPayload::Count(1),
-            }));
-        // Two configs for the other network
-        assert!(metric_events[1..]
-            .iter()
-            .any(|event| *event == MetricEvent {
-                metric_id: SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
-                event_codes: vec![SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations::TwoToFour
-                     as u32],
-                payload: MetricEventPayload::Count(1),
-            }));
     }
 
     #[fuchsia::test]

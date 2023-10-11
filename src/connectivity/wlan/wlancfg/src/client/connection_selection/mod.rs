@@ -36,7 +36,6 @@ use {
         SavedNetworkInScanResultMigratedMetricDimensionBssCount,
         SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved as ActiveScanSsidsObserved,
         ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount,
-        LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID,
         SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
         SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
         SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
@@ -185,13 +184,8 @@ impl ConnectionSelector {
                 let scan_age = zx::Time::get_monotonic() - last_scan_result_time;
                 if last_scan_result_time != zx::Time::ZERO {
                     info!("Scan results are {}s old, triggering a scan", scan_age.into_seconds());
-                    self.telemetry_sender.send(TelemetryEvent::LogMetricEvents {
-                        events: vec![MetricEvent {
-                            metric_id: LAST_SCAN_AGE_WHEN_SCAN_REQUESTED_MIGRATED_METRIC_ID,
-                            event_codes: vec![],
-                            payload: MetricEventPayload::IntegerValue(scan_age.into_micros()),
-                        }],
-                        ctx: "ConnectionSelector::perform_scan",
+                    self.telemetry_sender.send(TelemetryEvent::NetworkSelectionScanInterval {
+                        time_since_last_scan: scan_age,
                     });
                 }
                 let passive_scan_results = match self
