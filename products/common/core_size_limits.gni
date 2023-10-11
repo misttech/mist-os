@@ -26,7 +26,7 @@ size_checker_input = {
   # expected to grow when there is temporarily more than 1 copy.
   icu_data_creep_limit = 9232384  # 8.80 MiB
 
-  core_limit = 19691938  # 18.780 MiB
+  core_limit = 15497634  # 14.78 MiB
   core_creep_limit = 155648  # 152.0 KiB
 
   components = [
@@ -168,8 +168,10 @@ size_checker_input = {
       pkgs = [
         "audio_core",
         "codec_runner_intel_gen",
+        "mediasession",
+        "codec_factory",
       ]
-      limit = 12582912  # 12 MiB
+      limit = 16777216  # 14 MiB
       creep_limit = 428032  # 418.0 KiB
     },
     {

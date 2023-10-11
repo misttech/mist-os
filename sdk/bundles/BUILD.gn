@@ -21,8 +21,6 @@ group("core-tools") {
     "//src/graphics/lib/magma:magma-tools",
     "//src/media/audio/consumer/bundles:services",
     "//src/media/bundles:tools",
-    "//src/media/codec/bundles:services",
-    "//src/media/sessions/bundles:services",
     "//src/recovery/factory_reset:tools",
     "//src/sys/pkg/bin/pm:host",
     "//src/ui/tools:scenic",
