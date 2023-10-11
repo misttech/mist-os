@@ -19,5 +19,8 @@
     },
     use: [
         { service: "fuchsia.hardware.i2c.Service" },
+        {
+            protocol: [ "fuchsia.scheduler.ProfileProvider" ],
+        },
     ],
 }
