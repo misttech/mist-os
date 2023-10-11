@@ -1,17 +1,19 @@
 # Security Policy
 ## Overview
 Security policies define a combination of runtime and compile time
-restrictions that apply to a particular build type. This directory contains
-the security policies for engineering builds only (which are generally
-more permissive). If you need your policies to also apply to `_user` and
-`_userdebug` as well then please use the corresponding security policy
-directories. Policies must be set for their corresponding build type to have
-any impact.
+restrictions that apply to a particular build type.
+
+This directory contains a base security policy that may be merged into
+product specific policies for any build type (`_user`, `_userdebug`, `_eng`),
+as well as additional policies for `_eng` builds.
 
 This directory is split up into:
 
+- `component_manager_policy_base.json5`: The base policies that are reused in
+  all product configurations.
 - `component_manager_policy.json5`: For restricting V2 (.cml) capabilities at
-  runtime & compile time.
+  runtime & compile time. This file is combined with `component_manager_policy_base.json5` for
+  products defined in fuchsia.git.
 - `build/`: For build time verification configuration such as policy exception,
   verifying goldens & structured configuration.
 - `pkgfs/`: For the set of pkgfs allowlists.

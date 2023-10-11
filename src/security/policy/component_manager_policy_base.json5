@@ -1,0 +1,274 @@
+{
+    security_policy: {
+        job_policy: {
+            main_process_critical: [
+                "/bootstrap/archivist",
+                "/bootstrap/devfs",
+                "/bootstrap/devfs-with-pkg",
+                "/bootstrap/driver_manager",
+                "/bootstrap/power_manager",
+                "/bootstrap/shutdown_shim",
+            ],
+        },
+        capability_policy: [
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.boot.RootResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/driver_manager",
+
+                    // Driver component names vary depending on the
+                    // exact hardware configuration of the board.
+                    // Grant all drivers the ability to access the root
+                    // resource because of this.
+                    // TODO(fxbug.dev/93188): remove this once the root
+                    // resource is not widely used.
+                    "/bootstrap/boot-drivers:**",
+                    "/bootstrap/pkg-drivers:**",
+                    "/bootstrap/netsvc",
+                    "/bootstrap/svchost",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.CpuResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/power_manager",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.DebugResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.HypervisorResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.InfoResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.IoportResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.IrqResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.RootJob",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/driver_manager",
+                    "/bootstrap/netsvc",
+                    "/bootstrap/pwrbtn-monitor",
+                    "/bootstrap/svchost",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.RootJobForInspect",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/netsvc",
+                    "/core/memory_monitor",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.MexecResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.MmioResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.PowerResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/driver_manager",
+                    "/core/thermd",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.SmcResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.kernel.VmexResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/fshost/blobfs",
+                    "/bootstrap/pkg-cache",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "blob",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/fshost",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "data",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/fshost",
+                    "/core",
+                    "/core/minfs",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost",
+                source: "component",
+                source_name: "tmp",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/fshost",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/fshost/blobfs",
+                source: "component",
+                source_name: "blob-exec",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap/fshost",
+                    "/bootstrap/fshost/blobfs",
+                    "/bootstrap/pkg-cache",
+                ],
+            },
+            {
+                // We restrict access to PackageResolver because it gives direct access to package
+                // handles which provide executability which bypass VX security policy.
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/full-resolver",
+                    "/core/system-update/omaha-client-service",
+                    "/core/system-update/system-update-checker",
+                    "/core/system-update/system-updater",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.factory.lowpan.FactoryLookup",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/lowpanservice",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.lowpan.device.DeviceExtraConnector",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/lowpanservice",
+                ],
+            },
+            {
+                source_moniker: "/core/lowpanservice",
+                source: "component",
+                source_name: "fuchsia.lowpan.device.DeviceRouterExtraConnector",
+                capability: "protocol",
+                target_monikers: [
+                    "/core/lowpanservice",
+                ],
+            },
+        ],
+        child_policy: {
+            reboot_on_terminate: [
+                "/bootstrap/driver_index",
+                "/bootstrap/fshost",
+                "/bootstrap/pkg-cache",
+                "/core",
+                "/core/audio_core",
+                "/core/network/netstack",
+                "/core/setui_service",
+                "/core/sysmem_connector",
+                "/core/system-update/omaha-client-service",
+                "/core/system-update/system-update-checker",
+                "/core/system-update/system-update-committer",
+                "/core/wlancfg",
+                "/core/wlandevicemonitor",
+                "/core/wlanstack",
+            ],
+        },
+    },
+}
