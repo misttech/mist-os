@@ -165,6 +165,8 @@ pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
 
 /// Terminates the process, outputting errors as appropriately and with the indicated exit code.
 pub async fn exit(res: Result<ExitStatus>) -> ! {
+    const SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
+
     let exit_code = res.exit_code();
     match res {
         Err(Error::Help { output, .. }) => {
@@ -184,6 +186,14 @@ pub async fn exit(res: Result<ExitStatus>) -> ! {
         }
         Ok(_) | Err(Error::ExitWithCode(_)) => (),
     }
+
+    if timeout::timeout(SHUTDOWN_TIMEOUT, fuchsia_async::emulated_handle::shut_down_handles())
+        .await
+        .is_err()
+    {
+        tracing::warn!("Timed out shutting down handles");
+    };
+
     std::process::exit(exit_code);
 }
 

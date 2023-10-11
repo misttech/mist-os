@@ -21,7 +21,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fho/metadata:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/writer:lib",
-    "//src/developer/ffx/lib/writer:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
