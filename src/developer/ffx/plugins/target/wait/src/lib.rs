@@ -10,6 +10,7 @@ use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
+use fuchsia_async::WakeupTime;
 use futures::future::Either;
 use std::time::Duration;
 use thiserror::Error;
@@ -49,7 +50,11 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
         }
     };
     futures_lite::pin!(knock_fut);
-    let timeout_fut = fuchsia_async::Timer::new(Duration::from_secs(cmd.timeout as u64));
+    let timeout_fut = match cmd.timeout {
+        0 => async_io::Timer::never(),
+        _ => async_io::Timer::at(Duration::from_secs(cmd.timeout as u64).into_time()),
+    };
+
     let is_default_target = ffx.target.is_none();
     let timeout_err = FfxError::DaemonError {
         err: DaemonError::Timeout,

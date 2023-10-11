@@ -19,6 +19,7 @@ ffx_plugin("ffx_wait") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-io",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures-lite",

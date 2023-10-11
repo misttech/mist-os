@@ -16,6 +16,6 @@ use ffx_core::ffx_command;
 
 pub struct WaitCommand {
     #[argh(option, short = 't', default = "120")]
-    /// the timeout in seconds [default = 120]
+    /// the timeout in seconds [default = 120]. A value of 0 implies no timeout.
     pub timeout: usize,
 }

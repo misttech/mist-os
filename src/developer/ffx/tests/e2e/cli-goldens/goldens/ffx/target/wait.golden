@@ -20,7 +20,7 @@
       "optionality": "optional",
       "long": "--timeout",
       "short": "t",
-      "description": "the timeout in seconds [default = 120]",
+      "description": "the timeout in seconds [default = 120]. A value of 0 implies no timeout.",
       "hidden": false
     }
   ],
