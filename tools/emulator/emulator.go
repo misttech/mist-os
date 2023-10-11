@@ -407,9 +407,14 @@ func runZbi(args runZbiArgs) error {
 // that try to boot all the way to a running Fuchsia session. This creates and returns the on-disk
 // path to a fresh raw image that's twice the size as the original.
 func (d *Distribution) ResizeRawImage(imageName, hostPathFvmBinary string) (string, error) {
+	isFvm := true
 	blk, err := d.findImageByName(imageName, "blk")
 	if err != nil {
-		return "", err
+		blk, err = d.findImageByName(imageName, "fxfs-blk")
+		if err != nil {
+			return "", err
+		}
+		isFvm = false
 	}
 
 	resizedPath, err := func() (string, error) {
@@ -421,11 +426,36 @@ func (d *Distribution) ResizeRawImage(imageName, hostPathFvmBinary string) (stri
 		f.Close()
 		resizedPath := f.Name()
 		{
-			cmd := exec.Command(hostPathFvmBinary, resizedPath, "decompress", "--default", blk.Path)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return resizedPath, fmt.Errorf("error running %q: %w", cmd, err)
+			if isFvm {
+				cmd := exec.Command(hostPathFvmBinary, resizedPath, "decompress", "--default", blk.Path)
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return resizedPath, fmt.Errorf("error running %q: %w", cmd, err)
+				}
+			} else { // Create copy at resized path for truncating in place.
+				if info, err := os.Stat(blk.Path); err != nil {
+					return resizedPath, err
+				} else if !info.Mode().IsRegular() {
+					return resizedPath, fmt.Errorf("image is not a regular file")
+				}
+
+				image, err := os.Open(blk.Path)
+				if err != nil {
+					return resizedPath, err
+				}
+
+				defer image.Close()
+
+				resizedImage, err := os.Create(resizedPath)
+				if err != nil {
+					return resizedPath, err
+				}
+				defer resizedImage.Close()
+
+				if _, err = io.Copy(resizedImage, image); err != nil {
+					return resizedPath, err
+				}
 			}
 		}
 		info, err := os.Stat(resizedPath)
@@ -435,11 +465,17 @@ func (d *Distribution) ResizeRawImage(imageName, hostPathFvmBinary string) (stri
 		// Upsize the image by 2x, and express the size in KB
 		size := fmt.Sprintf("%dK", (2*info.Size())/1024)
 		{
-			cmd := exec.Command(hostPathFvmBinary, resizedPath, "extend", "--length", size, "--length-is-lowerbound")
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
-				return resizedPath, fmt.Errorf("error running %q: %w", cmd, err)
+			if isFvm {
+				cmd := exec.Command(hostPathFvmBinary, resizedPath, "extend", "--length", size, "--length-is-lowerbound")
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				if err := cmd.Run(); err != nil {
+					return resizedPath, fmt.Errorf("error running %q: %w", cmd, err)
+				}
+			} else {
+				if err := os.Truncate(resizedPath, info.Size()*2); err != nil {
+					return resizedPath, err
+				}
 			}
 		}
 		return resizedPath, nil
