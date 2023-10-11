@@ -115,7 +115,9 @@ async fn main_inner() -> Result<(), Error> {
 
     let (use_fxblob, use_system_image) = {
         let config = pkg_cache_config::Config::take_from_startup_handle();
-        inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
+        inspector
+            .root()
+            .record_child("structured_config", |config_node| config.record_inspect(config_node));
         (config.use_fxblob, config.use_system_image)
     };
 
