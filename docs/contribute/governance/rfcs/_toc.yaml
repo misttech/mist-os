@@ -472,3 +472,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0227_fuchsia_release_process.md
   - title: "RFC-0228: FDomain: Remote control of Fuchsia targets"
     path: /docs/contribute/governance/rfcs/0228_fdomain.md
+  - title: "RFC-0229: FIDL 2023"
+    path: /docs/contribute/governance/rfcs/0229_fidl_2023.md

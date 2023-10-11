@@ -2983,3 +2983,16 @@
   reviewers: ['abarth@google.com', 'ianloic@google.com', 'mgnb@google.com', 'slgrady@google.com', 'cpu@google.com', 'wilkinsonclay@google.com', 'mkember@google.com']
   submitted: '2023-05-22'
   reviewed: '2023-10-04'
+
+- name: 'RFC-0229'
+  title: 'FIDL 2023'
+  short_description: 'The present FIDL wire format and interaction model, to be known as FIDL 2023, will be supported for at least three years.'
+  authors: ['mkember@google.com']
+  file: '0229_fidl_2023.md'
+  area: ['FIDL']
+  gerrit_change_id: ['909501']
+  status: 'Accepted'
+  issue: ['135111']
+  reviewers: ['abarth@google.com', 'hjfreyer@google.com', 'ianloic@google.com', 'sethladd@google.com', 'ddorwin@google.com']
+  submitted: '2023-08-29'
+  reviewed: '2023-10-11'
