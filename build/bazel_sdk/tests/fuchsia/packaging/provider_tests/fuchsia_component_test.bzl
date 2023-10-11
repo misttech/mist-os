@@ -30,8 +30,8 @@ def _provider_test_impl(ctx):
 
     asserts.equals(
         env,
-        ctx.attr.label_name,
-        component_info.label_name,
+        ctx.attr.run_tag,
+        component_info.run_tag,
     )
 
     asserts.equals(
@@ -52,7 +52,7 @@ _provider_test = analysistest.make(
     _provider_test_impl,
     attrs = {
         "component_name": attr.string(),
-        "label_name": attr.string(),
+        "run_tag": attr.string(),
         "is_driver": attr.bool(),
         "manifest_basename": attr.string(),
     },
@@ -105,7 +105,7 @@ def _test_provider():
         component_name = "component",
         is_driver = False,
         manifest_basename = "component.cm",
-        label_name = _local_name("component"),
+        run_tag = _local_name("component"),
     )
 
     _provider_test(
@@ -114,7 +114,7 @@ def _test_provider():
         component_name = "driver",
         is_driver = True,
         manifest_basename = "driver.cm",
-        label_name = _local_name("driver"),
+        run_tag = _local_name("driver"),
     )
 
 # Entry point from the BUILD file; macro for running each test case's macro and

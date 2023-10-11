@@ -4,8 +4,9 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
-load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
+load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//test_utils:make_file.bzl", "make_file")
 
 ## Name Tests
 def _name_test_impl(ctx):
@@ -65,24 +66,41 @@ def _test_package_and_archive_name():
         archive_name = "some_other_archive.far",
     )
 
-def _mock_component_impl(ctx):
-    manifest = ctx.actions.declare_file(ctx.attr.manifest_name)
-    ctx.actions.write(output = manifest, content = "{}")
-    return FuchsiaComponentInfo(
-        name = "foo",
-        manifest = manifest,
-        resources = [],
-        is_driver = ctx.attr.is_driver,
-        is_test = False,
+def _mock_component(name, manifest_name, is_driver):
+    make_file(
+        name = name + "_manifest",
+        filename = manifest_name,
+        tags = ["manual"],
     )
 
-_mock_component = rule(
-    implementation = _mock_component_impl,
-    attrs = {
-        "manifest_name": attr.string(),
-        "is_driver": attr.bool(),
-    },
-)
+    if is_driver:
+        make_file(
+            name = name + "_lib",
+            filename = name + ".so",
+            content = "",
+        )
+
+        make_file(
+            name = name + "_bind",
+            filename = name + "_bind",
+            content = "",
+        )
+
+        fuchsia_driver_component(
+            name = name,
+            component_name = name,
+            manifest = name + "_manifest",
+            driver_lib = name + "_lib",
+            bind_bytecode = name + "_bind",
+            tags = ["manual"],
+        )
+    else:
+        fuchsia_component(
+            name = name,
+            tags = ["manual"],
+            component_name = name,
+            manifest = name + "_manifest",
+        )
 
 def _dependencies_test_impl(ctx):
     env = analysistest.begin(ctx)

@@ -352,6 +352,7 @@ def fuchsia_wrap_cc_test(
         content = {
             ":%s_autogen_manifest" % name: "meta/%s.cm" % name,
         },
+        component_name = name,
         manifest = ":%s_autogen_manifest" % name,
         deps = [":%s_native_cc" % name],
         **kwargs

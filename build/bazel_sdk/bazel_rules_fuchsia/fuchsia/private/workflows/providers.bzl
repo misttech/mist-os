@@ -10,6 +10,7 @@ load(
     _FuchsiaDebugSymbolInfo = "FuchsiaDebugSymbolInfo",
     _FuchsiaDriverToolInfo = "FuchsiaDriverToolInfo",
     _FuchsiaPackageInfo = "FuchsiaPackageInfo",
+    _FuchsiaPackagedComponentInfo = "FuchsiaPackagedComponentInfo",
     _FuchsiaProductBundleInfo = "FuchsiaProductBundleInfo",
     _FuchsiaProvidersInfo = "FuchsiaProvidersInfo",
 )
@@ -40,6 +41,7 @@ FuchsiaWorkflowInfo = provider(
 )
 
 FuchsiaComponentInfo = _FuchsiaComponentInfo
+FuchsiaPackagedComponentInfo = _FuchsiaPackagedComponentInfo
 FuchsiaDebugSymbolInfo = _FuchsiaDebugSymbolInfo
 FuchsiaDriverToolInfo = _FuchsiaDriverToolInfo
 FuchsiaPackageInfo = _FuchsiaPackageInfo

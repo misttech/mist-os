@@ -126,15 +126,11 @@ def _forward_default_info(ctx):
 ) = rule_variants(
     variants = (None, "executable", "test"),
     implementation = _forward_default_info,
-    cfg = fuchsia_transition,
     doc = """Transitions build-only, build + run, or build + test targets.""",
     attrs = {
         "actual": attr.label(
             doc = "The target to transition.",
             mandatory = True,
-        ),
-        "_allowlist_function_transition": attr.label(
-            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
     },
 )

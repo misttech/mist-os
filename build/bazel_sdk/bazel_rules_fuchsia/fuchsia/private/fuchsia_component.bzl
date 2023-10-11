@@ -67,6 +67,16 @@ def fuchsia_driver_component(name, manifest, driver_lib, bind_bytecode, deps = N
         **kwargs
     )
 
+def _make_fuchsia_component_info(*, component_name, manifest, resources, is_driver, is_test, run_tag):
+    return FuchsiaComponentInfo(
+        name = component_name,
+        manifest = manifest,
+        resources = resources,
+        is_driver = is_driver,
+        is_test = is_test,
+        run_tag = run_tag,
+    )
+
 def _fuchsia_component_impl(ctx):
     component_name = ctx.attr.component_name or ctx.label.name
     manifest = ctx.file.manifest
@@ -98,13 +108,13 @@ def _fuchsia_component_impl(ctx):
             resources.append(make_resource_struct(src = f, dest = d))
 
     return [
-        FuchsiaComponentInfo(
-            name = component_name,
+        _make_fuchsia_component_info(
+            component_name = component_name,
             manifest = manifest,
-            label_name = label_name(str(ctx.label)),
             resources = resources,
             is_driver = ctx.attr.is_driver,
             is_test = ctx.attr._variant == "test",
+            run_tag = label_name(str(ctx.label)),
         ),
         collect_debug_symbols(ctx.attr.deps, ctx.attr.content.keys()),
     ]
@@ -144,8 +154,17 @@ number of dependencies which will be included in the final package.
 
 def _fuchsia_component_for_unit_test_impl(ctx):
     underlying_component = ctx.attr.unit_test[FuchsiaUnitTestComponentInfo].test_component
+    component_info = underlying_component[FuchsiaComponentInfo]
+
     return [
-        underlying_component[FuchsiaComponentInfo],
+        _make_fuchsia_component_info(
+            component_name = component_info.name,
+            manifest = component_info.manifest,
+            resources = component_info.resources,
+            is_driver = component_info.is_driver,
+            is_test = component_info.is_test,
+            run_tag = ctx.attr.run_tag,
+        ),
         collect_debug_symbols(underlying_component),
     ]
 
@@ -157,6 +176,14 @@ fuchsia_component_for_unit_test = rule_variant(
         "unit_test": attr.label(
             doc = "The unit test to convert into a test component",
             providers = [FuchsiaUnitTestComponentInfo],
+        ),
+        "run_tag": attr.string(
+            doc = """A tag used to identify the original component.
+
+            This is most likely going to be the label name for the target which
+            created the test component.
+            """,
+            mandatory = True,
         ),
     },
 )

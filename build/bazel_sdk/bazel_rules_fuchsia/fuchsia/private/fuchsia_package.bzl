@@ -102,7 +102,7 @@ def fuchsia_package(
     fuchsia_package_tasks(
         name = name,
         package = "%s_fuchsia_package" % name,
-        components = {component: component for component in components},
+        component_run_tags = [label_name(c) for c in components],
         tools = {tool: tool for tool in tools},
         disable_repository_name = disable_repository_name,
         **kwargs
@@ -120,7 +120,6 @@ def _fuchsia_test_package(
     """Defines test variants of fuchsia_package.
 
     See fuchsia_package for argument descriptions."""
-
     _build_fuchsia_package_test(
         name = "%s_fuchsia_package" % name,
         test_components = _test_component_mapping.values(),
@@ -134,7 +133,7 @@ def _fuchsia_test_package(
     fuchsia_package_tasks(
         name = name,
         package = "%s_fuchsia_package" % name,
-        components = _test_component_mapping,
+        component_run_tags = _test_component_mapping.keys(),
         is_test = True,
         **kwargs
     )
@@ -150,7 +149,7 @@ def fuchsia_test_package(
     See _fuchsia_test_package for additional arguments."""
     _fuchsia_test_package(
         name = name,
-        _test_component_mapping = {component: component for component in test_components},
+        _test_component_mapping = {label_name(component): component for component in test_components},
         _components = components,
         **kwargs
     )
@@ -170,10 +169,13 @@ def fuchsia_unittest_package(
 
     test_component_mapping = {}
     for unit_test in unit_tests:
-        test_component_mapping[unit_test] = "%s_unit_test" % label_name(unit_test)
+        run_tag = label_name(unit_test)
+        test_component_mapping[run_tag] = "%s_unit_test" % run_tag
+
         fuchsia_component_for_unit_test(
-            name = test_component_mapping[unit_test],
+            name = test_component_mapping[run_tag],
             unit_test = unit_test,
+            run_tag = run_tag,
             **kwargs
         )
 

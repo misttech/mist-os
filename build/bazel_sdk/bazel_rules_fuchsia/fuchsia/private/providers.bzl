@@ -24,11 +24,11 @@ FuchsiaComponentInfo = provider(
     "Contains information about a fuchsia component",
     fields = {
         "name": "name of the component",
-        "label_name": "The original label name used to build this component as a string",
         "manifest": "A file representing the compiled component manifest file",
         "resources": "any additional resources the component needs",
         "is_driver": "True if this is a driver",
         "is_test": "True if this is a test component",
+        "run_tag": "A tag used to identify the component when put in a package to be later used by the run command",
     },
 )
 

@@ -18,15 +18,16 @@ def _to_verb(label):
     return verbs.custom(label_name(label))
 
 def _fuchsia_package_help_impl(ctx, make_shell_task):
+    components = ctx.attr.package[FuchsiaPackageInfo].packaged_components
     help = make_help_executable(ctx, dict((
-        [(verbs.noverb, "Run all test components within this test package.")] if ctx.attr.is_test and ctx.attr.components else []
+        [(verbs.noverb, "Run all test components within this test package.")] if ctx.attr.is_test and len(components) > 0 else []
     ) + [
         (verbs.help, "Print this help message."),
         (verbs.debug_symbols, "Register this package's debug symbols."),
         (verbs.publish, "Publish this package and register debug symbols."),
     ] + [
-        (_to_verb(component), "Publish this package and run '%s' with debug symbols." % component)
-        for component in ctx.attr.components
+        (verbs.custom(component.component_info.run_tag), "Publish this package and run '%s' with debug symbols." % component.component_info.run_tag)
+        for component in components
     ] + [
         (_to_verb(tool), "Publish this package and run '%s' with debug symbols" % tool)
         for tool in ctx.attr.tools
@@ -49,10 +50,6 @@ def _fuchsia_package_help_impl(ctx, make_shell_task):
         "package": attr.label(
             doc = "The package.",
             providers = [FuchsiaPackageInfo],
-            mandatory = True,
-        ),
-        "components": attr.string_list(
-            doc = "The component names.",
             mandatory = True,
         ),
         "tools": attr.string_list(
@@ -154,7 +151,7 @@ def fuchsia_package_tasks(
         *,
         name,
         package,
-        components,
+        component_run_tags,
         tools = {},
         is_test = False,
         tags = [],
@@ -224,7 +221,6 @@ def fuchsia_package_tasks(
     _fuchsia_package_help(
         name = help_task,
         package = package,
-        components = components.keys(),
         tools = tools,
         debug_symbols_task = debug_symbols_task,
         publish_task = publish_task,
@@ -237,15 +233,15 @@ def fuchsia_package_tasks(
 
     # For `bazel run :pkg.component`.
     component_run_tasks = []
-    for label, component in components.items():
-        component_run_task = _to_verb(label)(name)
+    for run_tag in component_run_tags:
+        component_run_task = verbs.custom(run_tag)(name)
         component_run_tasks.append("%s.run_only" % component_run_task)
         fuchsia_task_run_component(
             name = component_run_tasks[-1],
             default_argument_scope = "global",
             repository = package_repository_name or anonymous_repo_name,
             package = package,
-            component = component,
+            run_tag = run_tag,
             tags = tags,
             disable_repository = disable_repository_name,
             **kwargs
