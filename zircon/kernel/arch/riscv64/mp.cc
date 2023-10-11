@@ -184,11 +184,18 @@ zx_status_t arch_mp_cpu_unplug(uint cpu_id) {
   return ZX_OK;
 }
 
-zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t arch_mp_cpu_hotplug(cpu_num_t cpu_id) {
+  if (cpu_id == 0 || cpu_id >= riscv64_num_cpus) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (mp_is_cpu_online(cpu_id)) {
+    return ZX_ERR_BAD_STATE;
+  }
+  return riscv64_start_cpu(cpu_id, arch_cpu_num_to_hart_id(cpu_id));
+}
 
 void arch_setup_percpu(cpu_num_t cpu_num, struct percpu* percpu) {
   riscv64_percpu* arch_percpu = &riscv64_percpu_array[cpu_num];
-  DEBUG_ASSERT(arch_percpu->high_level_percpu == nullptr);
   arch_percpu->high_level_percpu = percpu;
 }
 
