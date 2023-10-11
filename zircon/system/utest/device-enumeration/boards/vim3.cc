@@ -58,7 +58,12 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci",
 
       // USB 2.0 Hub
-      "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci/xhci/usb-bus/000/usb-hub",
+      // Ignored because we've had a spate of vim3 devices that seem to have
+      // broken or flaky root hubs, and we don't make use of the XHCI bus in
+      // any way so we'd rather ignore such failures than cause flakiness or
+      // have to remove more devices from the fleet.
+      // See b/296738636 for more information.
+      // "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci/xhci/usb-bus/000/usb-hub",
 
       // Thermal
       "sys/platform/05:06:28",
