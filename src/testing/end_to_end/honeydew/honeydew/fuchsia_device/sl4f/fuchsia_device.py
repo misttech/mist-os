@@ -19,6 +19,7 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 )
 from honeydew.affordances.sl4f.ui import screenshot as screenshot_sl4f
 from honeydew.affordances.sl4f.ui import user_input as user_input_sl4f
+from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing as tracing_interface
@@ -34,6 +35,7 @@ from honeydew.interfaces.affordances.ui import (
 from honeydew.interfaces.affordances.ui import (
     user_input as user_input_interface,
 )
+from honeydew.interfaces.affordances.wlan import wlan as wlan_interface
 from honeydew.interfaces.affordances.wlan import (
     wlan_policy as wlan_policy_interface,
 )
@@ -67,6 +69,7 @@ class FuchsiaDevice(
     affordances_capable.ScreenshotCapableDevice,
     affordances_capable.TracingCapableDevice,
     affordances_capable.WlanPolicyCapableDevice,
+    affordances_capable.WlanCapableDevice,
     affordances_capable.UserInputCapableDevice,
     transports_capable.SL4FCapableDevice,
 ):
@@ -172,6 +175,15 @@ class FuchsiaDevice(
         return wlan_policy_sl4f.WlanPolicy(
             device_name=self.device_name, sl4f=self.sl4f
         )
+
+    @properties.Affordance
+    def wlan(self) -> wlan_interface.Wlan:
+        """Returns a wlan affordance object.
+
+        Returns:
+            wlan.Wlan object
+        """
+        return wlan_sl4f.Wlan(device_name=self.device_name, sl4f=self.sl4f)
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

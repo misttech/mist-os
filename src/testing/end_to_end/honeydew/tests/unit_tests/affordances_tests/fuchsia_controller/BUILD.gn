@@ -35,6 +35,13 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+
+  python_host_test("wlan_fc_test") {
+    main_source = "wlan_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
 }
 
 group("tests") {
@@ -43,6 +50,7 @@ group("tests") {
     ":bluetooth_avrcp_fc_test($host_toolchain)",
     ":bluetooth_gap_fc_test($host_toolchain)",
     ":tracing_fc_test($host_toolchain)",
+    ":wlan_fc_test($host_toolchain)",
     ":wlan_policy_fc_test($host_toolchain)",
   ]
 }

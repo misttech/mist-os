@@ -31,6 +31,7 @@ from honeydew.affordances.fuchsia_controller.ui import (
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
+from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy as wlan_policy_fc,
 )
@@ -44,6 +45,7 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
 )
 from honeydew.interfaces.affordances.ui import screenshot
 from honeydew.interfaces.affordances.ui import user_input
+from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import (
@@ -89,6 +91,7 @@ class FuchsiaDevice(
     affordances_capable.TracingCapableDevice,
     affordances_capable.UserInputCapableDevice,
     affordances_capable.WlanPolicyCapableDevice,
+    affordances_capable.WlanCapableDevice,
 ):
     """FuchsiaDevice abstract base class implementation using
     Fuchsia-Controller.
@@ -193,6 +196,15 @@ class FuchsiaDevice(
             wlan_policy.WlanPolicy object
         """
         return wlan_policy_fc.WlanPolicy()
+
+    @properties.Affordance
+    def wlan(self) -> wlan.Wlan:
+        """Returns a wlan affordance object.
+
+        Returns:
+            wlan.Wlan object
+        """
+        return wlan_fc.Wlan()
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

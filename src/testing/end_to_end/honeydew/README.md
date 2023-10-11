@@ -238,6 +238,7 @@ INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ 
 * [Bluetooth affordance](markdowns/bluetooth.md)
 * [Tracing affordance](markdowns/tracing.md)
 * [Wlan policy affordance](markdowns/wlan_policy.md)
+* [Wlan affordance](marksdown/wlan.md)
 
 ### Access the transports
 * [Fastboot transport]

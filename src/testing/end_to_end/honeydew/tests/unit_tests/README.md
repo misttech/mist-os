@@ -26,6 +26,8 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/sl4f:wlan_policy_sl4f_test --host --output
 
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/sl4f:wlan_sl4f_test --host --output
+
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:bluetooth_avrcp_fc_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:bluetooth_gap_fc_test --host --output
@@ -34,7 +36,9 @@
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:wlan_policy_fc_test --host --output
 
-    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/fuchsia_device_tests:base_fuchsia_device_test --host --output
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/affordances_tests/fuchsia_controller:wlan_fc_test --host --output
+
+    fx test //src/testing/end_to_end/honeydew/tests/unit_tests/device_classes_tests:base_fuchsia_device_test --host --output
 
     fx test //src/testing/end_to_end/honeydew/tests/unit_tests/fuchsia_device_tests/sl4f:fuchsia_device_sl4f_test --host --output
 

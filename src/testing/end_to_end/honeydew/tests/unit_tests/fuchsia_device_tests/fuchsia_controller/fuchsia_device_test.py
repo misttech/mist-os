@@ -190,6 +190,12 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             self.fd_obj, affordances_capable.WlanPolicyCapableDevice
         )
 
+    def test_fuchsia_device_is_wlan_capable(self) -> None:
+        """Test case to make sure fuchsia device is wlan capable"""
+        self.assertIsInstance(
+            self.fd_obj, affordances_capable.WlanCapableDevice
+        )
+
     # List all the tests related to public methods in alphabetical order
     def test_close(self) -> None:
         """Testcase for FuchsiaDevice.close()"""

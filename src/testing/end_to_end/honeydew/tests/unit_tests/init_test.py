@@ -364,6 +364,7 @@ class InitTests(unittest.TestCase):
             "session",
             "tracing",
             "user_input",
+            "wlan",
             "wlan_policy",
         ]
 
@@ -385,6 +386,7 @@ class InitTests(unittest.TestCase):
             "session",
             "tracing",
             "user_input",
+            "wlan",
             "wlan_policy",
         ]
 
