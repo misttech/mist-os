@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             }
             (Some(AudioConfig::FullStack(config)), false) => {
                 builder.platform_bundle("audio_core_routing");
-                if !config.product_provides_audio_core {
+                if !context.board_info.provides_feature("fuchsia::custom_audio_core") {
                     builder.platform_bundle("audio_core");
                 }
                 if config.use_adc_device {

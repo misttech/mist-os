@@ -35,13 +35,4 @@ pub struct AudioCoreConfig {
     /// Route the ADC device to audio_core.
     #[serde(default)]
     pub use_adc_device: bool,
-
-    /// Expect an audio_core package to be provided by the product and do not
-    /// include a generic one from the platform.
-    ///
-    /// The product-provided audio_core must have the package url:
-    ///     fuchsia-pkg://fuchsia.com/audio_core#meta/audio_core.cm
-    ///
-    #[serde(default)]
-    pub product_provides_audio_core: bool,
 }
