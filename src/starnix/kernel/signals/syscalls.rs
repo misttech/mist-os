@@ -803,6 +803,7 @@ mod tests {
     use crate::{
         auth::Credentials,
         mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
+        signals::testing::dequeue_signal_for_test,
         testing::*,
     };
     use std::convert::TryInto;
@@ -1664,7 +1665,7 @@ mod tests {
 
         // Send SigKill to the child. As kill is handled immediately, no need to dequeue signals.
         send_signal(&child, SignalInfo::default(SIGKILL));
-        dequeue_signal(&mut child);
+        dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 
         // Retrieve the exit status.
@@ -1682,7 +1683,7 @@ mod tests {
 
         // Send the signal to the child.
         send_signal(&child, SignalInfo::default(sig));
-        dequeue_signal(&mut child);
+        dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 
         // Retrieve the exit status.

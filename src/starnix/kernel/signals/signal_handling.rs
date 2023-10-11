@@ -10,6 +10,7 @@ use crate::{
             SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
         },
     },
+    lock::RwLockWriteGuard,
     logging::{log_trace, log_warn},
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::*,
@@ -104,18 +105,18 @@ fn action_for_signal(siginfo: &SignalInfo, sigaction: sigaction_t) -> DeliveryAc
 }
 
 /// Dequeues and handles a pending signal for `current_task`.
-pub fn dequeue_signal(current_task: &mut CurrentTask) {
-    let weak_task = current_task.weak_task();
-    let task = weak_task.upgrade().unwrap();
-    let mut task_state = task.write();
-
+pub fn dequeue_signal(
+    task: &Task,
+    mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
+    registers: &mut RegisterState,
+) {
     let mask = task_state.signals.mask();
     let is_ptraced = task_state.is_ptraced();
     let siginfo = task_state
         .signals
         .take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force || is_ptraced);
     prepare_to_restart_syscall(
-        current_task,
+        registers,
         siginfo.as_ref().map(|siginfo| task.thread_group.signal_actions.get(siginfo.signal)),
     );
 
@@ -133,17 +134,17 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
         }
     }
 
-    // Drop the task state before actually setting up any signal handler.
-    std::mem::drop(task_state);
-
     if let Some(siginfo) = siginfo {
-        deliver_signal(&current_task.task, siginfo, &mut current_task.registers);
+        deliver_signal(task, task_state, siginfo, registers);
     }
 }
 
-pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut RegisterState) {
-    let mut task_state = task.write();
-
+pub fn deliver_signal(
+    task: &Task,
+    mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
+    mut siginfo: SignalInfo,
+    registers: &mut RegisterState,
+) {
     loop {
         let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
         let action = action_for_signal(&siginfo, sigaction);
@@ -299,8 +300,8 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
 /// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-pub fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Option<sigaction_t>) {
-    let err = ErrnoCode::from_return_value(current_task.registers.return_register());
+fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Option<sigaction_t>) {
+    let err = ErrnoCode::from_return_value(registers.return_register());
     // If sigaction is None, the syscall must be restarted if it is restartable. The default
     // sigaction will not have a sighandler, which will guarantee a restart.
     let sigaction = sigaction.unwrap_or_default();
@@ -317,14 +318,14 @@ pub fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Opt
     let should_restart = should_restart || sigaction.sa_handler.is_null();
 
     if !should_restart {
-        current_task.registers.set_return_register(EINTR.return_value());
+        registers.set_return_register(EINTR.return_value());
         return;
     }
 
-    update_register_state_for_restart(&mut current_task.registers, err);
+    update_register_state_for_restart(registers, err);
 
-    current_task.registers.set_instruction_pointer_register(
-        current_task.registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
+    registers.set_instruction_pointer_register(
+        registers.instruction_pointer_register() - SYSCALL_INSTRUCTION_SIZE_BYTES,
     );
 }
 
@@ -338,5 +339,19 @@ pub fn sys_restart_syscall(current_task: &mut CurrentTask) -> Result<SyscallResu
             log_warn!("restart_syscall called, but nothing to restart");
             error!(EINTR)
         }
+    }
+}
+
+/// Test utilities for signal handling.
+#[cfg(test)]
+pub(crate) mod testing {
+    use std::ops::DerefMut as _;
+
+    use crate::{signals::dequeue_signal, task::CurrentTask, testing::AutoReleasableTask};
+
+    pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
+        let CurrentTask { task, registers, .. } = current_task.deref_mut();
+        let task_state = task.write();
+        dequeue_signal(task, task_state, registers);
     }
 }

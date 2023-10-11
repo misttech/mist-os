@@ -1401,8 +1401,9 @@ impl Task {
     pub fn finalize_stop_state(&self) -> bool {
         // Stopping because the thread group is stopping.
         // Try to flip to GroupStopped - will fail if we shouldn't.
-        let _ = self.thread_group.set_stopped(StopState::GroupStopped, None, true);
-        if self.thread_group.read().stopped == StopState::GroupStopped {
+        if self.thread_group.set_stopped(StopState::GroupStopped, None, true)
+            == StopState::GroupStopped
+        {
             // stopping because the thread group has stopped
             self.write().set_stopped(StopState::GroupStopped, None);
             return true;

@@ -104,15 +104,20 @@ pub fn process_completed_restricted_exit(
     error_context: &Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Errno> {
     // Checking for a signal might cause the task to exit, so check before processing exit
-    if current_task.read().exit_status.is_none() {
-        dequeue_signal(current_task);
+    {
+        let CurrentTask { task, registers, .. } = current_task;
+        let task_state = task.write();
+        if task_state.exit_status.is_none() {
+            dequeue_signal(task, task_state, registers);
+        }
     }
 
-    if let Some(exit_status) = current_task.read().exit_status.as_ref() {
+    let exit_status = current_task.read().exit_status.clone();
+    if let Some(exit_status) = exit_status {
         log_trace!("exiting with status {:?}", exit_status);
         if let Some(error_context) = error_context {
             match exit_status {
-                ExitStatus::Exit(value) if *value == 0 => {}
+                ExitStatus::Exit(value) if value == 0 => {}
                 _ => {
                     log_trace!(
                         "last failing syscall before exit: {:?}, failed with {:?}",
@@ -122,14 +127,15 @@ pub fn process_completed_restricted_exit(
                 }
             };
         }
-        return Ok(Some(exit_status.clone()));
+
+        Ok(Some(exit_status))
+    } else {
+        // Block a stopped process after it's had a chance to handle signals, since a signal might
+        // cause it to stop.
+        block_while_stopped(current_task);
+
+        Ok(None)
     }
-
-    // Block a stopped process after it's had a chance to handle signals, since a signal might
-    // cause it to stop.
-    block_while_stopped(current_task);
-
-    Ok(None)
 }
 
 /// Creates a `StartupHandles` from the provided handles.
@@ -222,16 +228,7 @@ pub fn create_filesystem_from_spec<'a>(
 }
 
 /// Block the execution of `current_task` as long as the task is stopped and not terminated.
-pub fn block_while_stopped(current_task: &mut CurrentTask) {
-    // Early exit test to avoid creating a port when we don't need to sleep. Testing in the loop
-    // after adding the waiter to the wait queue is still important to deal with race conditions
-    // where the condition becomes true between checking it and starting the wait.
-    // TODO(tbodt): Find a less hacky way to do this. There might be some way to create one port
-    // per task and use it every time the current task needs to sleep.
-    if current_task.read().exit_status.is_some() {
-        return;
-    }
-
+fn block_while_stopped(current_task: &mut CurrentTask) {
     // Upgrade the state from stopping to stopped if needed. Return if the task
     // should not be stopped.
     if !current_task.finalize_stop_state() {

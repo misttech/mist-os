@@ -618,21 +618,23 @@ impl ThreadGroup {
     /// Set the stop status of the process.  If you pass |siginfo| of |None|,
     /// does not update the signal.  If |finalize_only| is set, will check that
     /// the set will be a finalize (Stopping -> Stopped or Stopped -> Stopped)
-    /// before executing it.  Returns true iff the stop state was changed.
+    /// before executing it.
+    ///
+    /// Returns the latest stop state after any changes.
     pub fn set_stopped(
         self: &Arc<Self>,
         stopped: StopState,
         siginfo: Option<SignalInfo>,
         finalize_only: bool,
-    ) -> bool {
-        {
+    ) -> StopState {
+        let (parent, stopped) = {
             let mut state = self.write();
             if finalize_only && !state.stopped.is_stopping_or_stopped() {
-                return false;
+                return state.stopped;
             }
 
             if state.stopped.is_illegal_transition(stopped) {
-                return false;
+                return state.stopped;
             }
 
             // TODO(qsr): When task can be stopped inside user code, task will need to be
@@ -649,14 +651,18 @@ impl ThreadGroup {
             if state.stopped == StopState::Waking || state.stopped == StopState::ForceWaking {
                 state.stopped_waiters.notify_all();
             };
+
+            (
+                (!state.stopped.is_in_progress()).then(|| state.parent.clone()).flatten(),
+                state.stopped,
+            )
+        };
+
+        if let Some(parent) = parent {
+            parent.write().child_status_waiters.notify_all();
         }
-        if !stopped.is_in_progress() {
-            let parent = self.read().parent.clone();
-            if let Some(parent) = parent {
-                parent.write().child_status_waiters.notify_all();
-            }
-        }
-        return true;
+
+        stopped
     }
 
     /// Ensures |session| is the controlling session inside of |controlling_session|, and returns a

@@ -174,6 +174,7 @@ mod tests {
     use crate::{
         fs::FileWriteGuardRef,
         mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
+        signals::testing::dequeue_signal_for_test,
         testing::*,
     };
 
@@ -222,7 +223,7 @@ mod tests {
         current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER, SignalDetail::None));
 
         // Process the signal.
-        dequeue_signal(&mut current_task);
+        dequeue_signal_for_test(&mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -295,7 +296,7 @@ mod tests {
         current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER, SignalDetail::None));
 
         // Process the signal.
-        dequeue_signal(&mut current_task);
+        dequeue_signal_for_test(&mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -320,7 +321,7 @@ mod tests {
         current_task.write().signals.enqueue(SignalInfo::new(SIGUSR2, SI_USER, SignalDetail::None));
 
         // Process the signal.
-        dequeue_signal(&mut current_task);
+        dequeue_signal_for_test(&mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.registers.rip, SA_HANDLER2_ADDRESS.ptr() as u64);
@@ -403,7 +404,7 @@ mod tests {
         current_task.write().signals.enqueue(SignalInfo::new(SIGUSR1, SI_USER, SignalDetail::None));
 
         // Process the signal.
-        dequeue_signal(&mut current_task);
+        dequeue_signal_for_test(&mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);

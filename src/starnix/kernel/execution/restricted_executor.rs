@@ -403,7 +403,8 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
             // TODO: Verify that the rip is actually in restricted code.
             let mut registers = current_task.registers;
             registers.reset_flags();
-            deliver_signal(current_task, signal, &mut registers);
+            let task = &current_task.task;
+            deliver_signal(&task, task.write(), signal, &mut registers);
             current_task.registers = registers;
         }
     }
