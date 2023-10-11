@@ -13,7 +13,6 @@ product_bootfs_labels =
 
 core_realm_shards = [
   "//src/connectivity/bluetooth/tools/bt-snoop:bt-snoop-core-shard",
-  "//src/media/audio/audio_core:core_shard",
   "//src/media/sounds/soundplayer:core_shard",
 
   # TODO(https://fxbug.dev/120773) remove when unused
@@ -24,7 +23,6 @@ core_realm_shards = [
 ]
 
 legacy_base_package_labels = [
-  "//src/media/audio/audio_core",
   "//src/connectivity/bluetooth:core",
 
   # Add the cache storage manager.

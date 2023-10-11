@@ -40,10 +40,7 @@ legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
 # TODO(fxbug.dev/119075): Remove these.
 legacy_cache_package_labels += [ "//src/chromium:web_engine" ]
 
-core_realm_shards += [
-  "//src/media/codec:codec_factory_shard",
-  "//src/media/audio/audio_core:core_shard",
-]
+core_realm_shards += [ "//src/media/codec:codec_factory_shard" ]
 
 # Add cfv2 sl4f to base.
 core_realm_shards += [ "//src/testing/sl4f:sl4f_terminal_core_shard" ]

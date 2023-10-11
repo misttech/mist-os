@@ -45,6 +45,13 @@ product_assembly_configuration("terminal") {
       ]
     }
 
+    media = {
+      audio = {
+        full_stack = {
+        }
+      }
+    }
+
     intl = {
       config_type = "default"
     }

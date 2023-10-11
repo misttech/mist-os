@@ -37,6 +37,13 @@ _platform_configuration_base = {
     revision = "default"
   }
 
+  media = {
+    audio = {
+      full_stack = {
+      }
+    }
+  }
+
   setui = {
     use_icu = "with_icu"
     with_camera = false
