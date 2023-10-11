@@ -182,6 +182,23 @@ fx test epoll_test --output --test-filter="EpollTest.AllWritable"
 
 Specifying `*` as the filter turns on all tests in the binary.
 
+### Copying files to and from a container
+
+Suppose you have a container running as follows:
+
+```sh
+ffx component run /core/starnix_runner/playground:debian fuchsia-pkg://fuchsia.com/debian#meta/debian_container.cm
+```
+
+You can use the `ffx component copy` command to copy files to and from the container's root file
+system:
+
+```sh
+ffx component copy myfile.txt core/starnix_runner/playground:debian::out::fs_root/tmp
+```
+
+This command copies the local `myfile.txt` file to `/tmp/myfile.txt` in that container.
+
 ### Making changes to Starnix when using ffx
 
 The Starnix instances that `ffx` connects are static in the component hieararchy. This means that
