@@ -97,17 +97,18 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     });
 
     FX_LOGS(INFO) << "Running javascript to inject html: " << web_client_config.html();
-    web_frame_->ExecuteJavaScript({"*"},
-                                  BufferFromString(fxl::StringPrintf(
-                                      "document.write(`%s`);", web_client_config.html().c_str())),
-                                  [](auto result) {
-                                    if (result.is_err()) {
-                                      FX_LOGS(FATAL) << "Error while executing JavaScript: "
-                                                     << static_cast<uint32_t>(result.err());
-                                    } else {
-                                      FX_LOGS(INFO) << "Injected html";
-                                    }
-                                  });
+    web_frame_->ExecuteJavaScript(
+        {"*"},
+        BufferFromString(fxl::StringPrintf("document.write(`%s`);document.close();",
+                                           web_client_config.html().c_str())),
+        [](auto result) {
+          if (result.is_err()) {
+            FX_LOGS(FATAL) << "Error while executing JavaScript: "
+                           << static_cast<uint32_t>(result.err());
+          } else {
+            FX_LOGS(INFO) << "Injected html";
+          }
+        });
 
     loop_.Run();
   }
