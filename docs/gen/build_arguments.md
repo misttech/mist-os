@@ -1404,7 +1404,7 @@ Set to true to use a fast, minimalist wrapper, that lacks features
 of the python-based wrapper.  Use with caution.
 This flag is only meaningful when `cxx_rbe_enable` is true.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //build/toolchain/rbe.gni:131
 
