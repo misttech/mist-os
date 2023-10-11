@@ -78,10 +78,21 @@ enum class ArmVirtualAddressRange {
 };
 
 struct ArmSystemPagingState {
+  template <class CurrentEl>
+  static ArmSystemPagingState Create(ArmMemoryAttrIndirectionRegister mair,
+                                     ArmShareabilityAttribute sh) {
+    return {
+        .mair = mair,
+        .shareability = sh,
+        .el1 = CurrentEl::Read().el() == 1,
+    };
+  }
+
   // Defaults to only configuring non-cacheable normal memory.
   ArmMemoryAttrIndirectionRegister mair =
       ArmMemoryAttrIndirectionRegister::Get().FromValue(0).SetAttribute(0, {});
   ArmShareabilityAttribute shareability = ArmShareabilityAttribute::kNone;
+  bool el1 = true;
 };
 
 using ArmPagingSettings = internal::PagingSettings<ArmMairAttribute>;
@@ -155,6 +166,9 @@ struct ArmPagingTraits {
     return Page::kValid || Block::kValid;
   }
 };
+
+using ArmLowerPagingTraits = ArmPagingTraits<ArmVirtualAddressRange::kLower>;
+using ArmUpperPagingTraits = ArmPagingTraits<ArmVirtualAddressRange::kUpper>;
 
 //
 // Forward declarations of the different descriptor layouts; defined below.
@@ -408,7 +422,7 @@ class ArmAddressTranslationDescriptor
       }
     }
 
-    Set(settings.access);
+    Set(state, settings.access);
 
     if (IsTable()) {
       AsTable().set_table_address(settings.address);
@@ -436,7 +450,7 @@ class ArmAddressTranslationDescriptor
     return *static_cast<std::conditional_t<std::is_const_v<Base>, const Subclass, Subclass>*>(base);
   }
 
-  constexpr SelfType& Set(const AccessPermissions& access) {
+  constexpr SelfType& Set(const ArmSystemPagingState& state, const AccessPermissions& access) {
     if (terminal()) {
       ArmAccessPermissions ap = [&]() {
         if (access.writable) {
@@ -453,7 +467,7 @@ class ArmAddressTranslationDescriptor
 
       auto set_xn = [&](auto& desc) {
         // We do not need to support user-executable pages at this time.
-        desc.set_uxn(true).set_pxn(!access.executable);
+        desc.set_uxn(state.el1).set_pxn(!access.executable);
       };
 
       if (IsPage()) {
@@ -478,7 +492,7 @@ class ArmAddressTranslationDescriptor
       AsTable()
           .set_ap_table(ap_table)
           // We do not need to support user-executable pages at this time.
-          .set_uxn_table(true)
+          .set_uxn_table(state.el1)
           .set_pxn_table(!access.executable);
     }
 

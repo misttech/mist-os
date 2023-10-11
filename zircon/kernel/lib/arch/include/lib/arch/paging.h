@@ -37,7 +37,7 @@ struct AccessPermissions {
 namespace internal {
 
 template <typename T, typename = std::enable_if_t<std::is_default_constructible_v<T>>>
-constexpr T kDefaultConstructedValue = {};
+inline constexpr T kDefaultConstructedValue = {};
 
 // See ExamplePagingTraits::PagingSettings below.
 template <typename MemoryType, auto& DefaultMemoryValue = kDefaultConstructedValue<MemoryType>>
@@ -50,6 +50,16 @@ struct PagingSettings {
   AccessPermissions access;
   MemoryType memory = DefaultMemoryValue;
   bool accessed = true;
+};
+
+// See Paging<PagingTraits>::MemoryType below.
+template <typename MemoryType, auto& DefaultMemoryValue = kDefaultConstructedValue<MemoryType>>
+struct MapSettings {
+  AccessPermissions access;
+  MemoryType memory = DefaultMemoryValue;
+  bool accessed = true;
+
+  // TODO(fxbug.dev/129344): global.
 };
 
 }  // namespace internal
@@ -227,7 +237,7 @@ struct ExamplePagingTraits {
 
   /// The log2 number of page table entries for a given level.
   template <LevelType Level>
-  static constexpr unsigned int kNumTableEntriesLog2 = 0;
+  static constexpr unsigned int kNumTableEntriesLog2 = 1;
 
   /// Whether access permissions may be set on non-terminal entries so as to
   /// narrow access for later levels. If false, then access permissions are
@@ -327,13 +337,7 @@ class Paging : public PagingTraits {
 
   /// The settings to apply to each page mapped in the context of the mapping
   /// utilities below.
-  struct MapSettings {
-    AccessPermissions access;
-    MemoryType memory = PagingTraits::PagingSettings::kDefaultMemory;
-    bool accessed = true;
-
-    // TODO(fxbug.dev/129344): global.
-  };
+  using MapSettings = internal::MapSettings<MemoryType, PagingSettings::kDefaultMemory>;
 
   using PagingTraits::kLevels;
   static_assert(kLevels.size() > 0);
@@ -391,27 +395,8 @@ class Paging : public PagingTraits {
   /// The virtual address bit range at a given level that serves as the index
   /// into a page table at that level.
   template <LevelType Level>
-  static constexpr VirtualAddressBitRange kVirtualAddressBitRange = []() {
-    constexpr auto kRange = []() -> VirtualAddressBitRange {
-      constexpr unsigned int kWidth = kNumTableEntriesLog2<Level>;
-      if constexpr (Level == kLevels.back()) {
-        return {
-            .high = kTableAlignmentLog2 + kWidth - 1,
-            .low = kTableAlignmentLog2,
-        };
-      } else {
-        constexpr auto kNextRange = kVirtualAddressBitRange<kNextLevel<Level>>;
-        return {
-            .high = kNextRange.high + 1 + kWidth - 1,
-            .low = kNextRange.high + 1,
-        };
-      }
-    }();
-    static_assert(64 > kRange.high);
-    static_assert(kRange.high > kRange.low);
-    static_assert(kRange.low >= kTableAlignmentLog2);
-    return kRange;
-  }();
+  static constexpr VirtualAddressBitRange kVirtualAddressBitRange =
+      []() { return Paging::template GetVirtualAddressBitRange<Level>(); }();
 
   /// The size of a would-be page if mapped from a given level.
   template <LevelType Level>
@@ -607,7 +592,7 @@ class Paging : public PagingTraits {
       PaddrToTableIo&& paddr_to_io,  //
       Visitor&& visitor,             //
       uint64_t vaddr) {              //
-    AssertValidVirtualAddress<>(vaddr);
+    AssertValidVirtualAddress(vaddr);
     return VisitPageTablesFrom<kFirstLevel>(table_paddr, std::forward<PaddrToTableIo>(paddr_to_io),
                                             std::forward<Visitor>(visitor), vaddr);
   }
@@ -779,35 +764,51 @@ class Paging : public PagingTraits {
   template <typename PageTableAllocator>
   MappingVisitor(PageTableAllocator, ...) -> MappingVisitor<PageTableAllocator>;
 
-  template <VirtualAddressExtension Extension = kVirtualAddressExtension>
-  static void AssertValidVirtualAddress(uint64_t vaddr);
-
-  template <>
-  static void AssertValidVirtualAddress<VirtualAddressExtension::kCanonical>(uint64_t vaddr) {
-    ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
-    ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
-    ZX_DEBUG_ASSERT_MSG(
-        vaddr < *kLowerVirtualAddressRangeEnd || vaddr >= *kUpperVirtualAddressRangeStart,
-        "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ") or [%#" PRIx64
-        ", 0xffff'ffff'ffff'ffff]",
-        vaddr, *kLowerVirtualAddressRangeEnd, *kUpperVirtualAddressRangeStart);
+  // A private helper for defining kVirtualAddressBitRange.
+  template <LevelType Level>
+  static constexpr VirtualAddressBitRange GetVirtualAddressBitRange() {
+    constexpr auto kRange = []() -> VirtualAddressBitRange {
+      constexpr unsigned int kWidth = kNumTableEntriesLog2<Level>;
+      if constexpr (Level == kLevels.back()) {
+        return {
+            .high = kTableAlignmentLog2 + kWidth - 1,
+            .low = kTableAlignmentLog2,
+        };
+      } else {
+        constexpr auto kNextRange = GetVirtualAddressBitRange<kNextLevel<Level>>();
+        return {
+            .high = kNextRange.high + 1 + kWidth - 1,
+            .low = kNextRange.high + 1,
+        };
+      }
+    }();
+    static_assert(64 > kRange.high);
+    static_assert(kRange.high >= kRange.low);
+    static_assert(kRange.low >= kTableAlignmentLog2);
+    return kRange;
   }
 
-  template <>
-  static void AssertValidVirtualAddress<VirtualAddressExtension::k0>(uint64_t vaddr) {
-    ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
-    ZX_DEBUG_ASSERT_MSG(vaddr < *kLowerVirtualAddressRangeEnd,
-                        "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ")", vaddr,
-                        *kLowerVirtualAddressRangeEnd);
-  }
-
-  template <>
-  static void AssertValidVirtualAddress<VirtualAddressExtension::k1>(uint64_t vaddr) {
-    ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
-    ZX_DEBUG_ASSERT_MSG(vaddr >= *kUpperVirtualAddressRangeStart,
-                        "virtual address %#" PRIx64 " must be within [%#" PRIx64
-                        ", 0xffff'ffff'ffff'ffff]",
-                        vaddr, *kUpperVirtualAddressRangeStart);
+  static void AssertValidVirtualAddress(uint64_t vaddr) {
+    if constexpr (kVirtualAddressExtension == VirtualAddressExtension::kCanonical) {
+      ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
+      ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
+      ZX_DEBUG_ASSERT_MSG(
+          vaddr < *kLowerVirtualAddressRangeEnd || vaddr >= *kUpperVirtualAddressRangeStart,
+          "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ") or [%#" PRIx64
+          ", 0xffff'ffff'ffff'ffff]",
+          vaddr, *kLowerVirtualAddressRangeEnd, *kUpperVirtualAddressRangeStart);
+    } else if constexpr (kVirtualAddressExtension == VirtualAddressExtension::k0) {
+      ZX_DEBUG_ASSERT(kLowerVirtualAddressRangeEnd);
+      ZX_DEBUG_ASSERT_MSG(vaddr < *kLowerVirtualAddressRangeEnd,
+                          "virtual address %#" PRIx64 " must be within [0, %#" PRIx64 ")", vaddr,
+                          *kLowerVirtualAddressRangeEnd);
+    } else if constexpr (kVirtualAddressExtension == VirtualAddressExtension::k1) {
+      ZX_DEBUG_ASSERT(kUpperVirtualAddressRangeStart);
+      ZX_DEBUG_ASSERT_MSG(vaddr >= *kUpperVirtualAddressRangeStart,
+                          "virtual address %#" PRIx64 " must be within [%#" PRIx64
+                          ", 0xffff'ffff'ffff'ffff]",
+                          vaddr, *kUpperVirtualAddressRangeStart);
+    }
   }
 
   /// A helper routine for `VisitPageTables()` starting a given level, allowing

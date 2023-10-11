@@ -274,16 +274,23 @@ if (toolchain_environment == "kernel.phys" ||
       "$arch_phys:address-space",
     ]
 
-    public = [ "include/phys/address-space.h" ]
+    public = [
+      "$arch_phys/include/phys/arch/address-space.h",
+      "include/phys/address-space.h",
+    ]
 
     public_configs = [ ":includes" ]
 
     public_deps = [
+      ":allocation",
       "//zircon/kernel/lib/ktl",
 
-      # "address-space.h" has #include <lib/page-table/builder-interface.h>
-      # "address-space.h" has #include <lib/page-table/types.h>
-      "//zircon/kernel/phys/lib/page-table",
+      # <phys/address-space.h> has #include <lib/arch/paging.h>
+      # <phys/arch/address-space.h> has #include <lib/arch/${zircon_cpu}/page-table.h>
+      "//zircon/kernel/lib/arch:headers",
+
+      # <phys/address-space.h> has #include <hwreg/array.h>
+      "//zircon/system/ulib/hwreg:headers",
     ]
   }
 
@@ -386,7 +393,6 @@ if (toolchain_environment == "kernel.phys" ||
       deps = [
         ":main",
         "//zircon/kernel/phys/lib/memalloc",
-        "//zircon/kernel/phys/lib/page-table",
       ]
     }
     public_deps = [
@@ -474,7 +480,6 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/phys/lib/memalloc",
-      "//zircon/kernel/phys/lib/page-table",
     ]
     public_deps = [
       "//sdk/lib/zbi-format",
