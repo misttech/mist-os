@@ -16,6 +16,9 @@ impl DefineSubsystemConfiguration<InputGroupsConfig> for InputGroupsSubsystem {
             builder.platform_bundle("input_group_one");
             builder.platform_bundle("bluetooth_core");
         }
+        if config.group2 {
+            builder.platform_bundle("input_group_two");
+        }
         Ok(())
     }
 }

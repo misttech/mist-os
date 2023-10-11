@@ -72,6 +72,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "fonts",
     "fonts_hermetic",
     "input_group_one",
+    "input_group_two",
     "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),
     "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),

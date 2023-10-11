@@ -1359,6 +1359,52 @@ assembly_input_bundle("bluetooth_core") {
   ]
 }
 
+assembly_input_bundle("input_group_two") {
+  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
+  base_packages = [
+    "//src/media/sounds/soundplayer",
+    "//src/session/bin/session_manager",
+  ]
+  flexible_packages = [
+    "//src/connectivity/bluetooth/profiles/bt-a2dp",
+    "//src/connectivity/bluetooth/profiles/bt-avrcp",
+    "//src/connectivity/bluetooth/profiles/bt-avrcp-target",
+    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default",
+    "//src/connectivity/location/emergency",
+    "//src/factory/factory_store_providers",
+    "//src/media/sessions:mediasession",
+  ]
+  if (current_cpu != "riscv64") {
+    flexible_packages += [ "//src/media/codec:codec_factory" ]
+  }
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    # TODO(fxbug.dev/79964): eliminate this when the core_shard above can eagerly start
+                    # A2DP when it is available at startup.
+                    # "eager_core_shard" should be used when the A2DP profile should be available from
+                    # startup.
+                    "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-eager.core_shard.cml",
+                    "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml",
+                    "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml",
+                    "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
+                    "//src/factory/factory_store_providers/meta/factory_store_providers.core_shard.cml",
+                    "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
+                    "//src/media/sessions/meta/mediasession.core_shard.cml",
+                    "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Driver Framework V1 support
 #
 # feature_set_levels: minimal
