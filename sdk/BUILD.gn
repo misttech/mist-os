@@ -147,10 +147,11 @@ sdk_collection("core") {
 # belong in the IDK, but unfortunately, before they can be added, the `testonly`
 # attribute must be removed.
 sdk_molecule("fuchsia_idk_atoms") {
-  # If targeting older API levels, only these cc_prebuilt_library and sysroot
-  # molecules will be built.
+  # Prebulilt libraries and packages must be built and included for all API
+  # levels they support. The sysroot molecule must also be built.
   deps = [
     ":core_cc_prebuilt_library",
+    ":core_packages",
     ":core_sysroot",
   ]
 
@@ -163,15 +164,10 @@ sdk_molecule("fuchsia_idk_atoms") {
       ":core_documentation",
       ":core_license",
       ":core_loadable_module",
-      ":core_packages",
       ":version_history",
       "devices",
       "docs",
       "//sdk/fidl",
-
-      # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
-      # when targeting older API levels, or remove them from the IDK entirely.
-      "//sdk/lib/magma_common:magma_common_sdk",
     ]
   }
 
@@ -371,10 +367,15 @@ sdk_molecule("core_bindlib") {
 sdk_molecule("core_packages") {
   visibility = [ ":*" ]
 
-  deps = [
-    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
-    "//src/performance/memory/heapdump/collector:collector_sdk",
-  ]
+  deps = [ "//src/performance/memory/heapdump/collector:collector_sdk" ]
+
+  if (!sdk_inside_supported_api_sub_build) {
+    deps += [
+      # TODO(https://fxbug.dev/133231): Fix compilation of the following atoms
+      # when targeting older API levels and move to the list above.
+      "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
+    ]
+  }
 }
 
 sdk_molecule("core_data") {
@@ -423,6 +424,14 @@ sdk_molecule("core_cc_prebuilt_library") {
     "//zircon/system/ulib/trace-engine:trace-engine_sdk",
     "//zircon/system/ulib/trace-provider:trace-provider-so_sdk",
   ]
+
+  if (!sdk_inside_supported_api_sub_build) {
+    deps += [
+      # TODO(https://fxbug.dev/132284): Fix compilation of the following atoms
+      # when targeting older API levels and move to the list above.
+      "//sdk/lib/magma_client:magma_client_sdk",
+    ]
+  }
 }
 
 sdk_molecule("core_cc_source_library") {
@@ -442,7 +451,7 @@ sdk_molecule("core_cc_source_library") {
     "//sdk/lib/fit-promise:fit-promise_sdk",
     "//sdk/lib/input_report_reader:input_report_reader_sdk",
     "//sdk/lib/inspect/service/cpp:cpp_sdk",
-    "//sdk/lib/magma_client:magma_client_sdk",
+    "//sdk/lib/magma_common:magma_common_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
