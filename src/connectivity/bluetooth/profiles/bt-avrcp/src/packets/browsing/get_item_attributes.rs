@@ -27,7 +27,6 @@ impl GetItemAttributesCommand {
     /// 1 byte for scope, 8 for uid, 2 for uid counter, 1 for number of attributes.
     const MIN_PACKET_SIZE: usize = 12;
 
-    #[cfg(test)]
     pub fn from_now_playing_list(
         uid: u64,
         uid_counter: u16,

@@ -925,7 +925,7 @@ pub(crate) mod tests {
     use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion, AvrcpTargetFeatures};
     use assert_matches::assert_matches;
     use async_utils::PollExt;
-    use bt_avctp::{AvctpCommand, AvctpCommandStream};
+    use bt_avctp::{AvcCommand, AvcCommandStream, AvctpCommand, AvctpCommandStream};
     use futures::{pin_mut, task::Poll, TryStreamExt};
 
     use {
@@ -1830,6 +1830,46 @@ pub(crate) mod tests {
             .expect("has valid command")
     }
 
+    #[track_caller]
+    pub(crate) fn get_next_avc_command(
+        exec: &mut fasync::TestExecutor,
+        command_stream: &mut AvcCommandStream,
+    ) -> AvcCommand {
+        exec.run_until_stalled(&mut command_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("has valid command")
+    }
+
+    // There are some browse commands that are sent out post peer-setup.
+    // Verify that those browse commands were successfully sent out and reply
+    // with a mock response.
+    #[track_caller]
+    pub(crate) fn expect_outgoing_commands(
+        exec: &mut fasync::TestExecutor,
+        avc_stream: &mut AvcCommandStream,
+        avctp_stream: &mut AvctpCommandStream,
+    ) {
+        // Expect get folder items command with media player scope.
+        let command = get_next_avctp_command(exec, avctp_stream);
+        let params = decode_avctp_command(&command, PduId::GetFolderItems);
+        let cmd =
+            GetFolderItemsCommand::decode(&params).expect("should have received valid command");
+        assert_matches!(cmd.scope(), Scope::MediaPlayerList);
+        let mock_resp = GetFolderItemsResponse::new_success(1, vec![]);
+        send_avctp_response(PduId::GetFolderItems, &mock_resp, &command);
+
+        // Expect get capabilities command for setting up notification streams.
+        let command = get_next_avc_command(exec, avc_stream);
+        let (pdu_id, _) = decode_avc_vendor_command(&command).expect("should have succeeded");
+        assert_eq!(pdu_id, PduId::GetCapabilities);
+        let packets =
+            GetCapabilitiesResponse::new_events(&[]).encode_packet().expect("should not fail");
+        let _ = command
+            .send_response(AvcResponseType::ImplementedStable, &packets[..])
+            .expect("should succeed");
+    }
+
     /// Helper function for decoding AVCTP command. It checks that the PduId of the message is
     /// equal to the expected PduId.
     #[track_caller]
@@ -1842,6 +1882,7 @@ pub(crate) mod tests {
     }
 
     /// Helper function to reply to the command with an AVCTP response.
+    #[track_caller]
     pub(crate) fn send_avctp_response(
         pdu_id: PduId,
         response: &impl Encodable<Error = PacketError>,
