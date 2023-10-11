@@ -251,7 +251,7 @@ class CrashReporterTest : public UnitTestFixture {
         {"guid", kDefaultDeviceId},
         {"channel", kDefaultChannel},
         {"debug.snapshot.shared-request.num-clients", Not(IsEmpty())},
-        {"debug.snapshot.shared-request.uuid", Not(IsEmpty())},
+        {feedback::kSnapshotUuid, Not(IsEmpty())},
     };
     for (const auto& [key, value] : expected_extra_annotations) {
       expected_annotations[key] = value;

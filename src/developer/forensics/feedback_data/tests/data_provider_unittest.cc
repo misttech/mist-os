@@ -44,6 +44,7 @@
 #include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/timekeeper/test_clock.h"
+#include "src/lib/uuid/uuid.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"
 #include "third_party/rapidjson/include/rapidjson/schema.h"
 
@@ -212,6 +213,7 @@ class DataProviderTest : public UnitTestFixture {
   }
 
   std::pair<feedback::Annotations, fuchsia::feedback::Attachment> GetSnapshotInternal(
+      const std::string& uuid = uuid::Generate(),
       zx::duration snapshot_flow_duration = kDefaultSnapshotFlowDuration) {
     FX_CHECK(data_provider_);
 
@@ -224,8 +226,9 @@ class DataProviderTest : public UnitTestFixture {
     // recorded.
     clock_.Set(zx::time(0));
     data_provider_->GetSnapshotInternal(
-        kDefaultDataTimeout, [&annotations, &archive](feedback::Annotations resultAnnotations,
-                                                      fuchsia::feedback::Attachment resultArchive) {
+        kDefaultDataTimeout, uuid,
+        [&annotations, &archive](feedback::Annotations resultAnnotations,
+                                 fuchsia::feedback::Attachment resultArchive) {
           annotations = std::move(resultAnnotations);
           archive = std::move(resultArchive);
         });
@@ -587,8 +590,9 @@ TEST_F(DataProviderTest, GetSnapshot_Timeout) {
   fuchsia::feedback::Attachment archive;
 
   data_provider_->GetSnapshotInternal(
-      zx::sec(1), [&annotations, &archive](feedback::Annotations result_annotations,
-                                           fuchsia::feedback::Attachment result_archive) {
+      zx::sec(1), uuid::Generate(),
+      [&annotations, &archive](feedback::Annotations result_annotations,
+                               fuchsia::feedback::Attachment result_archive) {
         annotations = std::move(result_annotations);
         archive = std::move(result_archive);
       });
@@ -609,6 +613,20 @@ TEST_F(DataProviderTest, GetSnapshot_Timeout) {
 
   EXPECT_EQ(unpacked_attachments[kSuccessFile], kSuccessValue);
   EXPECT_EQ(unpacked_attachments[kTimeoutFile], kTimeoutValue);
+}
+
+TEST_F(DataProviderTest, GetSnapshotInternalUsesUuid) {
+  SetUpDataProvider(kDefaultAnnotations, /*attachment_allowlist=*/{});
+  const auto [annotations, archive] = GetSnapshotInternal("test-uuid");
+
+  ASSERT_TRUE(archive.value.size > 0u);
+
+  std::map<std::string, std::string> unpacked_attachments;
+  FX_CHECK(Unpack(archive.value, &unpacked_attachments));
+
+  EXPECT_NE(unpacked_attachments.find(kAttachmentMetadata), unpacked_attachments.end());
+  EXPECT_NE(unpacked_attachments[kAttachmentMetadata].find(R"("snapshot_uuid": "test-uuid")"),
+            std::string::npos);
 }
 
 }  // namespace

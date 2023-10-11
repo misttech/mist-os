@@ -152,7 +152,7 @@ std::string SnapshotCollector::MakeNewSnapshotRequest(const zx::time start_time,
   snapshot_requests_.back()->delayed_get_snapshot.set_handler([this, timeout, uuid]() {
     zx::duration collection_timeout_per_data = timeout;
     data_provider_->GetSnapshotInternal(
-        collection_timeout_per_data,
+        collection_timeout_per_data, uuid,
         [this, uuid](feedback::Annotations annotations, fuchsia::feedback::Attachment archive) {
           CompleteWithSnapshot(uuid, std::move(annotations), std::move(archive));
         });
@@ -178,7 +178,7 @@ void SnapshotCollector::CompleteWithSnapshot(const std::string& uuid,
   // they're unchanging and not the result of the SnapshotManager's data management.
   AddAnnotation("debug.snapshot.shared-request.num-clients", request->promise_ids.size(),
                 annotations);
-  AddAnnotation("debug.snapshot.shared-request.uuid", uuid, annotations);
+  AddAnnotation(feedback::kSnapshotUuid, uuid, annotations);
 
   if (archive.key.empty() || !archive.value.vmo.is_valid()) {
     AddAnnotation(feedback::kDebugSnapshotPresentKey, std::string("false"), annotations);

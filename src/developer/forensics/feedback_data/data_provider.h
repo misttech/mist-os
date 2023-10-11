@@ -51,7 +51,8 @@ class DataProviderInternal {
 
   using GetSnapshotInternalCallback =
       fit::callback<void(feedback::Annotations, fuchsia::feedback::Attachment)>;
-  virtual void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) = 0;
+  virtual void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                                   GetSnapshotInternalCallback callback) = 0;
 };
 
 // Provides data useful to attach in feedback reports (crash, user feedback or bug reports).
@@ -70,7 +71,8 @@ class DataProvider : public fuchsia::feedback::DataProvider, public DataProvider
                       GetAnnotationsCallback callback) override;
   void GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
                    GetSnapshotCallback callback) override;
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
   void GetScreenshot(fuchsia::feedback::ImageEncoding encoding,
                      GetScreenshotCallback callback) override;
 
@@ -79,7 +81,7 @@ class DataProvider : public fuchsia::feedback::DataProvider, public DataProvider
  private:
   ::fpromise::promise<feedback::Annotations> GetAnnotations(const zx::duration timeout);
   ::fpromise::promise<feedback::Attachments> GetAttachments(const zx::duration timeout);
-  void GetSnapshotInternal(zx::duration timeout,
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
                            fit::callback<void(feedback::Annotations, fsl::SizedVmo)> callback);
 
   bool ServeArchive(fsl::SizedVmo archive, zx::channel server_end);

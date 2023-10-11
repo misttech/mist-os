@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <map>
 #include <memory>
+#include <string>
 
 #include "src/developer/forensics/feedback_data/data_provider.h"
 #include "src/developer/forensics/testing/stubs/fidl_server.h"
@@ -40,7 +41,8 @@ class DataProvider : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 
  protected:
   const std::map<std::string, std::string> annotations_;
@@ -57,7 +59,8 @@ class DataProviderReturnsNoAnnotation : public DataProvider {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 };
 
 class DataProviderReturnsNoAttachment : public DataProvider {
@@ -70,7 +73,8 @@ class DataProviderReturnsNoAttachment : public DataProvider {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 };
 
 class DataProviderReturnsEmptySnapshot : public DataProviderBase {
@@ -80,7 +84,8 @@ class DataProviderReturnsEmptySnapshot : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 };
 
 class DataProviderTracksNumConnections : public DataProviderBase {
@@ -102,7 +107,8 @@ class DataProviderTracksNumConnections : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 
  private:
   const size_t expected_num_connections_;
@@ -120,7 +126,8 @@ class DataProviderTracksNumCalls : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 
  private:
   const size_t expected_num_calls_;
@@ -135,7 +142,7 @@ class DataProviderNeverReturning : public DataProviderBase {
                               GetSnapshotCallback)
 
   // |feedback::DataProviderInternal|
-  STUB_METHOD_DOES_NOT_RETURN(GetSnapshotInternal, zx::duration timeout,
+  STUB_METHOD_DOES_NOT_RETURN(GetSnapshotInternal, zx::duration timeout, const std::string& uuid,
                               GetSnapshotInternalCallback callback)
 };
 
@@ -150,7 +157,8 @@ class DataProviderReturnsOnDemand : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 
   void PopSnapshotCallback();
   void PopSnapshotInternalCallback();
@@ -172,7 +180,8 @@ class DataProviderSnapshotOnly : public DataProviderBase {
                    GetSnapshotCallback callback) override;
 
   // |feedback::DataProviderInternal|
-  void GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) override;
+  void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                           GetSnapshotInternalCallback callback) override;
 
  private:
   fuchsia::feedback::Attachment snapshot_;

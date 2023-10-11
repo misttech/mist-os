@@ -115,47 +115,52 @@ void DataProvider::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,
   }
 
   FX_LOGS(INFO) << "Generating snapshot";
-  GetSnapshotInternal(timeout, [this, callback = std::move(callback), channel = std::move(channel)](
-                                   const feedback::Annotations& annotations,
-                                   fsl::SizedVmo archive) mutable {
-    FX_LOGS(INFO) << "Generated snapshot";
-    Snapshot snapshot;
+  GetSnapshotInternal(
+      timeout, uuid::Generate(),
+      [this, callback = std::move(callback), channel = std::move(channel)](
+          const feedback::Annotations& annotations, fsl::SizedVmo archive) mutable {
+        FX_LOGS(INFO) << "Generated snapshot";
+        Snapshot snapshot;
 
-    // Add the annotations to the FIDL object and as file in the snapshot itself.
-    if (auto fidl = feedback::Encode<fuchsia::feedback::Annotations>(annotations);
-        fidl.has_annotations()) {
-      snapshot.set_annotations(fidl.annotations());
-    }
+        // Add the annotations to the FIDL object and as file in the snapshot itself.
+        if (auto fidl = feedback::Encode<fuchsia::feedback::Annotations>(annotations);
+            fidl.has_annotations()) {
+          snapshot.set_annotations(fidl.annotations());
+        }
 
-    if (archive.vmo().is_valid()) {
-      if (channel) {
-        ServeArchive(std::move(archive), std::move(channel.value()));
-      } else {
-        snapshot.set_archive({.key = kSnapshotFilename, .value = std::move(archive).ToTransport()});
-      }
-    }
+        if (archive.vmo().is_valid()) {
+          if (channel) {
+            ServeArchive(std::move(archive), std::move(channel.value()));
+          } else {
+            snapshot.set_archive(
+                {.key = kSnapshotFilename, .value = std::move(archive).ToTransport()});
+          }
+        }
 
-    callback(std::move(snapshot));
-  });
+        callback(std::move(snapshot));
+      });
 }
 
-void DataProvider::GetSnapshotInternal(zx::duration timeout, GetSnapshotInternalCallback callback) {
-  GetSnapshotInternal(timeout, [callback = std::move(callback)](
-                                   const feedback::Annotations& annotations,
-                                   fsl::SizedVmo archive) mutable {
-    callback(annotations, {.key = kSnapshotFilename, .value = std::move(archive).ToTransport()});
-  });
+void DataProvider::GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
+                                       GetSnapshotInternalCallback callback) {
+  GetSnapshotInternal(timeout, uuid,
+                      [callback = std::move(callback)](const feedback::Annotations& annotations,
+                                                       fsl::SizedVmo archive) mutable {
+                        callback(annotations, {.key = kSnapshotFilename,
+                                               .value = std::move(archive).ToTransport()});
+                      });
 }
 
 void DataProvider::GetSnapshotInternal(
-    zx::duration timeout, fit::callback<void(feedback::Annotations, fsl::SizedVmo)> callback) {
+    zx::duration timeout, const std::string& uuid,
+    fit::callback<void(feedback::Annotations, fsl::SizedVmo)> callback) {
   const uint64_t timer_id = cobalt_->StartTimer();
 
   auto join = ::fpromise::join_promises(GetAnnotations(timeout), GetAttachments(timeout));
   using result_t = decltype(join)::value_type;
 
-  auto promise =
-      join.and_then([this, timer_id, callback = std::move(callback)](result_t& results) mutable {
+  auto promise = join.and_then(
+      [this, uuid, timer_id, callback = std::move(callback)](result_t& results) mutable {
         FX_CHECK(std::get<0>(results).is_ok()) << "Impossible annotation collection failure";
         FX_CHECK(std::get<1>(results).is_ok()) << "Impossible attachment collection failure";
 
@@ -174,9 +179,8 @@ void DataProvider::GetSnapshotInternal(
           }
         }
 
-        snapshot_files[kAttachmentMetadata] =
-            metadata_.MakeMetadata(annotations, attachments, uuid::Generate(),
-                                   annotation_manager_->IsMissingNonPlatformAnnotations());
+        snapshot_files[kAttachmentMetadata] = metadata_.MakeMetadata(
+            annotations, attachments, uuid, annotation_manager_->IsMissingNonPlatformAnnotations());
 
         fsl::SizedVmo archive;
 

@@ -382,7 +382,7 @@ TEST_F(SnapshotCollectorTest, Check_SetsPresenceAnnotations) {
   EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
               IsSupersetOf({
                   Pair("debug.snapshot.shared-request.num-clients", std::to_string(1)),
-                  Pair("debug.snapshot.shared-request.uuid", report->SnapshotUuid()),
+                  Pair(feedback::kSnapshotUuid, report->SnapshotUuid()),
               }));
 }
 
