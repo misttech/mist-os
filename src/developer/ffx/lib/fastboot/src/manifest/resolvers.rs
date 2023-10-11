@@ -16,19 +16,13 @@ use std::io::{copy, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use tempfile::{tempdir, TempDir};
+use walkdir::WalkDir;
 use zip::ZipArchive;
 
 /// Trait that allows the given Resolvers to find out where their flash manifest paths are
 #[async_trait]
 pub trait ManifestResolver {
     async fn get_manifest_path(&self) -> &Path;
-}
-
-#[async_trait]
-impl ManifestResolver for TarResolver {
-    async fn get_manifest_path(&self) -> &Path {
-        self.manifest()
-    }
 }
 
 #[async_trait]
@@ -174,5 +168,41 @@ impl FileResolver for ArchiveResolver {
         let duration = Utc::now().signed_duration_since(time);
         done_time(writer, duration)?;
         Ok(outpath.to_str().ok_or(anyhow!("invalid temp file name"))?.to_owned())
+    }
+}
+
+pub struct FlashManifestTarResolver(TarResolver, PathBuf);
+
+impl FlashManifestTarResolver {
+    pub fn new<W: Write>(writer: &mut W, path: PathBuf) -> Result<Self> {
+        let resolver_inner = TarResolver::new(writer, path.clone())?;
+
+        let manifest_path = WalkDir::new(resolver_inner.root_path())
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .find(|e| e.file_name() == "flash.json" || e.file_name() == "flash-manifest.manifest");
+
+        match manifest_path {
+            Some(m) => Ok(Self(resolver_inner, m.into_path())),
+            _ => ffx_bail!("Could not locate flash manifest in archive: {}", path.display()),
+        }
+    }
+
+    pub fn manifest(&self) -> &Path {
+        self.1.as_path()
+    }
+}
+
+#[async_trait(?Send)]
+impl FileResolver for FlashManifestTarResolver {
+    async fn get_file<W: Write>(&mut self, writer: &mut W, file: &str) -> Result<String> {
+        self.0.get_file(writer, file).await
+    }
+}
+
+#[async_trait]
+impl ManifestResolver for FlashManifestTarResolver {
+    async fn get_manifest_path(&self) -> &Path {
+        self.1.as_path()
     }
 }

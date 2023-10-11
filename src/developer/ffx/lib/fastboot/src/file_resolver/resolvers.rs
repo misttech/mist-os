@@ -16,7 +16,6 @@ use std::{
 };
 use tar::Archive;
 use tempfile::{tempdir, TempDir};
-use walkdir::WalkDir;
 use zip::read::ZipArchive;
 
 pub struct EmptyResolver {
@@ -143,8 +142,7 @@ impl FileResolver for ZipArchiveResolver {
 }
 
 pub struct TarResolver {
-    _temp_dir: TempDir,
-    manifest_path: PathBuf,
+    temp_dir: TempDir,
 }
 
 impl TarResolver {
@@ -170,36 +168,23 @@ impl TarResolver {
         let duration = Utc::now().signed_duration_since(time);
         done_time(writer, duration)?;
 
-        let manifest_path = WalkDir::new(temp_dir.path())
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .find(|e| e.file_name() == "flash.json" || e.file_name() == "flash-manifest.manifest");
-
-        match manifest_path {
-            Some(m) => Ok(Self { _temp_dir: temp_dir, manifest_path: m.into_path() }),
-            _ => ffx_bail!("Could not locate flash manifest in archive: {}", path.display()),
-        }
+        Ok(Self { temp_dir })
     }
 
-    pub fn manifest(&self) -> &Path {
-        self.manifest_path.as_path()
+    pub fn root_path(&self) -> &Path {
+        self.temp_dir.path()
     }
 }
 
 #[async_trait(?Send)]
 impl FileResolver for TarResolver {
     async fn get_file<W: Write>(&mut self, _writer: &mut W, file: &str) -> Result<String> {
-        if let Some(p) = self.manifest().parent() {
-            let mut parent = p.to_path_buf();
-            parent.push(file);
-            if let Some(f) = parent.to_str() {
-                Ok(f.to_string())
-            } else {
-                ffx_bail!("Only UTF-8 strings are currently supported in the flash manifest")
-            }
+        let mut parent = self.root_path().to_path_buf();
+        parent.push(file);
+        if let Some(f) = parent.to_str() {
+            Ok(f.to_string())
         } else {
-            // Should not get here, the parent of the manifest file SHOULD AT LEAST be the temp dir.
-            bail!("Could not get file to upload");
+            ffx_bail!("Only UTF-8 strings are currently supported.")
         }
     }
 }

@@ -8,10 +8,12 @@ use crate::{
         fastboot_interface::FastbootInterface,
         prepare, Boot, Flash, Unlock,
     },
-    file_resolver::resolvers::{Resolver, TarResolver},
+    file_resolver::resolvers::Resolver,
     file_resolver::FileResolver,
     manifest::{
-        resolvers::{ArchiveResolver, FlashManifestResolver, ManifestResolver},
+        resolvers::{
+            ArchiveResolver, FlashManifestResolver, FlashManifestTarResolver, ManifestResolver,
+        },
         sdk::SdkEntries,
         v1::FlashManifest as FlashManifestV1,
         v2::FlashManifest as FlashManifestV2,
@@ -566,7 +568,7 @@ pub async fn from_path<W: Write, T: FastbootInterface>(
                 let r = ArchiveResolver::new(writer, path)?;
                 load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             } else if ext == "tgz" || ext == "tar.gz" || ext == "tar" {
-                let r = TarResolver::new(writer, path)?;
+                let r = FlashManifestTarResolver::new(writer, path)?;
                 load_flash_manifest(r).await?.flash(writer, fastboot_interface, cmd).await
             } else {
                 let r = FlashManifestResolver::new(path)?;
