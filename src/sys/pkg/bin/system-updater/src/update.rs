@@ -780,11 +780,9 @@ impl<'a> Attempt<'a> {
 
         let () = validate_epoch(SOURCE_EPOCH_RAW, &update_pkg).await?;
 
-        let mut images_to_write = ImagesToWrite::new();
-
         if let Ok(image_package_manifest) = update_pkg.image_packages().await {
+            let mut images_to_write = ImagesToWrite::new();
             let manifest: ImagePackagesSlots = image_package_manifest.into();
-
             manifest.verify(mode).map_err(PrepareError::VerifyImages)?;
 
             if let Some(fuchsia) = manifest.fuchsia() {
