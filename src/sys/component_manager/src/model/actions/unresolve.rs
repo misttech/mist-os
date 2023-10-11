@@ -272,8 +272,7 @@ pub mod tests {
             let mut actions = component_a.lock_actions().await;
             actions.register_no_wait(&component_a, UnresolveAction::new())
         };
-        // The component is not resolved anymore, so the unresolve will have no effect. It will not
-        // emit an UnresolveFailed event.
+        // The component is not resolved anymore, so the unresolve will have no effect.
         nf2.await.unwrap();
         assert!(is_discovered(&component_a).await);
     }

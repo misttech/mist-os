@@ -36,15 +36,6 @@ pub enum ComponentInstanceError {
         #[source]
         err: ClonableError,
     },
-    // The capability routing static analyzer never produces this error subtype, so we don't need
-    // to serialize it.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    #[error("Failed to unresolve `{}`: {}", moniker, err)]
-    UnresolveFailed {
-        moniker: Moniker,
-        #[source]
-        err: ClonableError,
-    },
 }
 
 impl ComponentInstanceError {
@@ -66,10 +57,6 @@ impl ComponentInstanceError {
 
     pub fn resolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
         Self::ResolveFailed { moniker, err: err.into().into() }
-    }
-
-    pub fn unresolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
-        Self::UnresolveFailed { moniker, err: err.into().into() }
     }
 }
 
@@ -227,14 +214,6 @@ pub enum RoutingError {
     // TODO: Could this be distinguished by use/offer/expose?
     #[error("`{}` is not a framework capability.", capability_id)]
     CapabilityFromComponentManagerNotFound { capability_id: String },
-
-    #[error(
-        "A capability was sourced to storage capability `{}` with id `{}`, but no matching \
-        capability was found.",
-        storage_capability,
-        capability_id
-    )]
-    CapabilityFromStorageCapabilityNotFound { storage_capability: String, capability_id: String },
 
     #[error("`{}` does not have child `#{}`.", moniker, child_moniker)]
     ExposeFromChildInstanceNotFound {
@@ -446,16 +425,6 @@ impl RoutingError {
 
     pub fn capability_from_component_manager_not_found(capability_id: impl Into<String>) -> Self {
         Self::CapabilityFromComponentManagerNotFound { capability_id: capability_id.into() }
-    }
-
-    pub fn capability_from_storage_capability_not_found(
-        storage_capability: impl Into<String>,
-        capability_id: impl Into<String>,
-    ) -> Self {
-        Self::CapabilityFromStorageCapabilityNotFound {
-            storage_capability: storage_capability.into(),
-            capability_id: capability_id.into(),
-        }
     }
 
     pub fn expose_from_framework_not_found(

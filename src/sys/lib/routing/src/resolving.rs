@@ -500,12 +500,8 @@ pub enum ResolverError {
     AbiRevisionNotFound,
     #[error("abi revision invalid: {0}")]
     AbiRevisionInvalid(#[source] ClonableError),
-    #[error("failed to read manifest: {0}")]
-    ManifestIo(zx::Status),
     #[error("failed to read config values: {0}")]
     ConfigValuesIo(zx::Status),
-    #[error("Model not available")]
-    ModelNotAvailable,
     #[error("scheme not registered")]
     SchemeNotRegistered,
     #[error("malformed url: {0}")]
@@ -516,22 +512,14 @@ pub enum ResolverError {
     PackageUrlMissing,
     #[error("package directory handle missing")]
     PackageDirectoryMissing,
-    #[error("url missing resource")]
-    UrlMissingResource,
     #[error("a relative URL was not expected: {0}")]
     RelativeUrlNotExpected(String),
     #[error("failed to route resolver capability: {0}")]
     RoutingError(#[source] ClonableError),
-    #[error("a resolver resolved a component but did not return its required context")]
-    ResolveMustReturnContext,
     #[error("a context is required to resolve relative url: {0}")]
     RelativeUrlMissingContext(String),
     #[error("this component resolver does not resolve relative path component URLs: {0}")]
     UnexpectedRelativePath(String),
-    #[error("error creating a resolution context: {0}")]
-    CreatingContext(String),
-    #[error("error reading a resolution context: {0}")]
-    ReadingContext(String),
     #[error("the remote resolver returned invalid data")]
     RemoteInvalidData,
     #[error("an error occurred sending a FIDL request to the remote resolver: {0}")]
@@ -621,8 +609,7 @@ impl From<ComponentInstanceError> for ResolverError {
         match &err {
             ComponentManagerInstanceUnavailable {}
             | InstanceNotFound { .. }
-            | ResolveFailed { .. }
-            | UnresolveFailed { .. } => {
+            | ResolveFailed { .. } => {
                 ResolverError::Internal(ClonableError::from(anyhow::format_err!("{:?}", err)))
             }
             NoAbsoluteUrl { .. } => ResolverError::NoParentContext(ClonableError::from(
