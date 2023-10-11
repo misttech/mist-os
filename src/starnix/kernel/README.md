@@ -272,6 +272,12 @@ the "syscall_stats" feature):
 ffx inspect show core/starnix_runner/bionic:root:syscall_stats
 ```
 
+## Logging
+
+By default, starnix compiles-out trace and debug logging in release builds for
+performance reasons. To compile-in trace and debug logging in release builds,
+set the `starnix_enable_trace_and_debug_logs_in_release` GN arg to `true`.
+
 ## Tracing
 
 To start a trace with an increased buffer size, run:

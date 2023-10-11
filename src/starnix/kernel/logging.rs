@@ -20,15 +20,25 @@ macro_rules! log {
     }};
 }
 
+pub const fn should_allow_trace_debug_logs() -> bool {
+    // Allow trace and debug logs if we are in a debug (non-release) build
+    // or feature `trace_and_debug_logs_in_release` is enabled.
+    cfg!(debug_assertions) || cfg!(feature = "trace_and_debug_logs_in_release")
+}
+
 macro_rules! log_trace {
     ($($arg:tt)*) => {
-        $crate::logging::log!(level = trace, $($arg)*)
+        if $crate::logging::should_allow_trace_debug_logs() {
+            $crate::logging::log!(level = trace, $($arg)*)
+        }
     };
 }
 
 macro_rules! log_debug {
     ($($arg:tt)*) => {
-        $crate::logging::log!(level = debug, $($arg)*)
+        if $crate::logging::should_allow_trace_debug_logs() {
+            $crate::logging::log!(level = debug, $($arg)*)
+        }
     };
 }
 
