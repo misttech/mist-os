@@ -8,6 +8,7 @@
 #include <lib/mmio-ptr/fake.h>
 #include <lib/mmio/mmio-buffer.h>
 
+#include <soc/aml-a311d/a311d-hw.h>
 #include <soc/aml-meson/aml-clk-common.h>
 #include <soc/aml-meson/axg-clk.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -216,6 +217,20 @@ TEST(ClkTestAml, G12aEnableDos) {
   EXPECT_OK(st);
 
   EXPECT_EQ(0x3ff, dos_data.Read32(0x3f01 * sizeof(uint32_t)));
+}
+
+TEST(ClkTestAml, G12bEnableAudio) {
+  auto buffer = fdf_testing::CreateMmioBuffer(A311D_HIU_LENGTH);
+  auto actual = buffer.View(0);
+
+  auto [dos_data, dos_buffer] = MakeDosbusMmio();
+  AmlClockTest clk(std::move(buffer), std::move(dos_buffer), PDEV_DID_AMLOGIC_G12B_CLK);
+
+  zx_status_t st = clk.ClockImplEnable(g12b_clk::G12B_CLK_AUDIO);
+  EXPECT_OK(st);
+
+  constexpr uint32_t kHhiGclkMpeg1Offset = 0x51;
+  EXPECT_EQ(0x1, actual.Read32(kHhiGclkMpeg1Offset * sizeof(uint32_t)));
 }
 
 TEST(ClkTestAml, ForceDisable) {
