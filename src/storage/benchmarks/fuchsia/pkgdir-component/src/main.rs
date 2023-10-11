@@ -16,6 +16,7 @@ enum IncomingService {
 
 #[fuchsia::main]
 async fn main() -> anyhow::Result<()> {
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
     let use_fxblob = pkgdir_config::Config::take_from_startup_handle().use_fxblob;
     let builder = blobfs::Client::builder().readable();
     let blobfs = if use_fxblob { builder.use_reader() } else { builder }

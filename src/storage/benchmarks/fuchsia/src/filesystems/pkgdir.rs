@@ -165,6 +165,17 @@ impl PkgDirRealm {
             .add_route(
                 Route::new()
                     .capability(
+                        Capability::protocol::<fidl_fuchsia_tracing_provider::RegistryMarker>(),
+                    )
+                    .from(Ref::parent())
+                    .to(&pkgdir),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(
                         Capability::directory("blob-exec")
                             .path("/blob/root")
                             .rights(fio::R_STAR_DIR),
