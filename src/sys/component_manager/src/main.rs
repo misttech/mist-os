@@ -37,6 +37,7 @@ mod diagnostics;
 mod directory_ready_notifier;
 mod elf_runner;
 mod framework;
+mod inspect_sink_provider;
 mod model;
 mod root_stop_notifier;
 mod runner;

@@ -200,7 +200,10 @@ rustc_binary("synthesis_reporter_bin") {
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/sys/lib/component-events",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "synthesis/reporter.rs" ]

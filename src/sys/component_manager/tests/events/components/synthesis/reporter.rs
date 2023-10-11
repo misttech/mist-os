@@ -5,30 +5,44 @@
 use {
     component_events::events::{DirectoryReady, Event, EventStream},
     fidl_fuchsia_component as fcomponent,
+    fuchsia_component::server::ServiceFs,
+    futures::FutureExt,
+    futures::StreamExt,
 };
 
 #[fuchsia::main]
 async fn main() {
-    // Validate that RUNNING and DirectoryReady is synthesized for root
-    let mut event_stream = EventStream::open().await.unwrap();
-    let mut found_directory_ready = false;
-    loop {
-        let event = event_stream.next().await.unwrap();
-        if matches!(
-            event,
-            fcomponent::Event {
-                header: Some(fcomponent::EventHeader {
-                    event_type: Some(DirectoryReady::TYPE),
-                    ..
-                }),
-                ..
-            }
-        ) {
-            found_directory_ready = true;
-        }
+    let mut fs = ServiceFs::new();
+    fs.dir("diagnostics");
+    fs.take_and_serve_directory_handle().unwrap();
 
-        if found_directory_ready {
-            break;
+    // wait for a DirectoryReady event to come over the event stream, then exit
+    let directory_ready_waiter = fuchsia_async::Task::spawn(async {
+        let mut event_stream = EventStream::open().await.unwrap();
+        let mut found_directory_ready = false;
+        loop {
+            let event = event_stream.next().await.unwrap();
+            if matches!(
+                event,
+                fcomponent::Event {
+                    header: Some(fcomponent::EventHeader {
+                        event_type: Some(DirectoryReady::TYPE),
+                        ..
+                    }),
+                    ..
+                }
+            ) {
+                found_directory_ready = true;
+            }
+
+            if found_directory_ready {
+                break;
+            }
         }
+    });
+
+    futures::select! {
+        () = fs.collect::<()>().fuse() => panic!("filesystem exited unexpectedly"),
+        () = directory_ready_waiter.fuse() => {},
     }
 }

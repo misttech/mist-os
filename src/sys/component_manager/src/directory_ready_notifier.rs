@@ -19,7 +19,7 @@ use {
     futures::stream::StreamExt,
     moniker::Moniker,
     std::{
-        sync::{Arc, Mutex, Weak},
+        sync::{Arc, Weak},
         time::Duration,
     },
     thiserror::Error,
@@ -38,14 +38,11 @@ const OPEN_OUT_SUBDIR_MAX_RETRIES: usize = 30;
 /// `DirectoryReady` event.
 pub struct DirectoryReadyNotifier {
     model: Weak<Model>,
-    /// Capabilities offered by component manager that we wish to provide through `DirectoryReady`
-    /// events. For example, the diagnostics directory hosting inspect data.
-    builtin_capabilities: Mutex<Vec<(String, fio::NodeProxy)>>,
 }
 
 impl DirectoryReadyNotifier {
     pub fn new(model: Weak<Model>) -> Self {
-        Self { model, builtin_capabilities: Mutex::new(Vec::new()) }
+        Self { model }
     }
 
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
@@ -54,16 +51,6 @@ impl DirectoryReadyNotifier {
             vec![EventType::Started],
             Arc::downgrade(self) as Weak<dyn Hook>,
         )]
-    }
-
-    pub fn register_component_manager_capability(
-        &self,
-        name: impl Into<String>,
-        node: fio::NodeProxy,
-    ) {
-        if let Ok(mut guard) = self.builtin_capabilities.lock() {
-            guard.push((name.into(), node));
-        }
     }
 
     async fn on_component_started(
@@ -279,32 +266,6 @@ impl DirectoryReadyNotifier {
         }
         Ok(node)
     }
-
-    async fn provide_builtin(&self, filter: &EventFilter) -> Vec<Event> {
-        if let Ok(capabilities) = self.builtin_capabilities.lock() {
-            (*capabilities)
-                .iter()
-                .filter_map(|(name, node)| {
-                    if !filter.contains("name", vec![name.to_string()]) {
-                        return None;
-                    }
-                    let (node_clone, server_end) = fidl::endpoints::create_proxy().unwrap();
-                    let event = node
-                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end)
-                        .map(|_| {
-                            Event::new_builtin(EventPayload::DirectoryReady {
-                                name: name.clone(),
-                                node: node_clone,
-                            })
-                        })
-                        .ok();
-                    event
-                })
-                .collect()
-        } else {
-            vec![]
-        }
-    }
 }
 
 fn filter_matching_exposes<'a>(
@@ -340,10 +301,10 @@ fn filter_matching_exposes<'a>(
 impl EventSynthesisProvider for DirectoryReadyNotifier {
     async fn provide(&self, component: ExtendedComponent, filter: &EventFilter) -> Vec<Event> {
         let component = match component {
-            ExtendedComponent::ComponentManager => {
-                return self.provide_builtin(filter).await;
-            }
             ExtendedComponent::ComponentInstance(component) => component,
+            ExtendedComponent::ComponentManager => {
+                return vec![];
+            }
         };
         let decl = match *component.lock_state().await {
             InstanceState::Resolved(ref s) => s.decl().clone(),

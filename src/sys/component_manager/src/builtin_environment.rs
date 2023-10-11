@@ -47,6 +47,7 @@ use {
             pkg_dir::PkgDirectory, realm::RealmCapabilityHost, realm_query::RealmQuery,
             route_validator::RouteValidator,
         },
+        inspect_sink_provider::InspectSinkProvider,
         model::events::registry::EventSubscription,
         model::{
             component::ComponentManagerInstance,
@@ -77,9 +78,7 @@ use {
         vdso_vmo::{get_next_vdso_vmo, get_stable_vdso_vmo, get_vdso_vmo},
         ElfRunner,
     },
-    fidl::endpoints::{
-        create_proxy, DiscoverableProtocolMarker, ProtocolMarker, RequestStream, ServerEnd,
-    },
+    fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, RequestStream},
     fidl_fuchsia_boot as fboot,
     fidl_fuchsia_component_internal::BuiltinBootResolver,
     fidl_fuchsia_diagnostics_types::Task as DiagnosticsTask,
@@ -94,7 +93,7 @@ use {
     moniker::{Moniker, MonikerBase},
     sandbox::Receiver,
     std::sync::Arc,
-    tracing::{info, warn},
+    tracing::info,
 };
 
 #[cfg(test)]
@@ -921,6 +920,10 @@ impl BuiltinEnvironment {
                 EventType::DirectoryReady,
                 directory_ready_notifier.clone(),
             );
+            event_registry.register_synthesis_provider(
+                EventType::CapabilityRequested,
+                Arc::new(InspectSinkProvider::new()),
+            );
             Arc::new(event_registry)
         };
         model.root().hooks.install(event_registry.hooks()).await;
@@ -1100,10 +1103,6 @@ impl BuiltinEnvironment {
             });
         }
 
-        inspect_runtime::serve(component::inspector(), &mut service_fs).unwrap_or_else(|error| {
-            warn!(%error, "Failed to serve inspect");
-        });
-
         Ok(service_fs)
     }
 
@@ -1116,10 +1115,6 @@ impl BuiltinEnvironment {
 
         // Bind to the channel
         service_fs.serve_connection(channel)?;
-
-        self.emit_diagnostics(&mut service_fs).unwrap_or_else(|error| {
-            warn!(%error, "Failed to serve diagnostics");
-        });
 
         // Start up ServiceFs
         self._service_fs_task = Some(fasync::Task::spawn(async move {
@@ -1145,35 +1140,6 @@ impl BuiltinEnvironment {
         self.bind_service_fs(server_end).await
     }
 
-    fn emit_diagnostics<'a>(
-        &self,
-        service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
-    ) -> Result<(), Error> {
-        let (service_fs_proxy, service_fs_server_end) =
-            create_proxy::<fio::DirectoryMarker>().unwrap();
-        service_fs.serve_connection(service_fs_server_end)?;
-
-        let (node, server_end) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-        service_fs_proxy.open(
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
-            "diagnostics",
-            ServerEnd::new(server_end.into_channel()),
-        )?;
-
-        self.directory_ready_notifier.register_component_manager_capability("diagnostics", node);
-
-        Ok(())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn emit_diagnostics_for_test<'a>(
-        &self,
-        service_fs: &mut ServiceFs<ServiceObj<'a, ()>>,
-    ) -> Result<(), Error> {
-        self.emit_diagnostics(service_fs)
-    }
-
     #[cfg(test)]
     /// Adds a protocol to the root sandbox, replacing prior entries. This must be called before
     /// the model is started.
@@ -1187,7 +1153,7 @@ impl BuiltinEnvironment {
     ) where
         P: ProtocolMarker,
     {
-        warn!("adding builtin capability {} to root sandbox", name);
+        tracing::warn!("adding builtin capability {} to root sandbox", name);
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
         self.sandbox.get_or_insert_protocol(name.clone()).insert_sender(sender);

@@ -17,6 +17,13 @@
             durability: "transient",
         },
     ],
+    capabilities: [
+        {
+            directory: "diagnostics",
+            rights: [ "connect" ],
+            path: "/diagnostics",
+        },
+    ],
     use: [
         {
             protocol: [ "fidl.examples.routing.echo.Echo" ],
@@ -26,6 +33,13 @@
             event_stream: [ "directory_ready_unscoped" ],
             from: "parent",
             filter: { name: "diagnostics" },
+        },
+    ],
+    expose: [
+        {
+            directory: "diagnostics",
+            from: "self",
+            to: "framework",
         },
     ],
 }

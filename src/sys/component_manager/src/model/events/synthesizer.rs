@@ -273,7 +273,6 @@ mod tests {
         cm_rust::{DirectoryDecl, ExposeDecl, ExposeDirectoryDecl, ExposeSource, ExposeTarget},
         cm_rust_testing::*,
         fidl_fuchsia_io as fio,
-        fuchsia_component::server::ServiceFs,
         routing::component_instance::ComponentInstanceInterface,
         std::collections::HashSet,
         vfs::pseudo_directory,
@@ -283,30 +282,24 @@ mod tests {
         registry: &'a EventRegistry,
         scope_monikers: Vec<Moniker>,
         events: Vec<EventType>,
-        include_builtin: bool,
     }
 
     #[fuchsia::test]
     async fn synthesize_directory_ready() {
         let test = setup_synthesis_test().await;
 
-        let mut fs = ServiceFs::new();
-        test.builtin_environment.emit_diagnostics_for_test(&mut fs).expect("emitting diagnostics");
-
         let registry = test.builtin_environment.event_registry.clone();
         let mut event_stream = create_stream(
             &test,
             CreateStreamArgs {
                 registry: &registry,
-                scope_monikers: vec![],
+                scope_monikers: vec![vec!["b"].try_into().unwrap()],
                 events: vec![EventType::DirectoryReady],
-                include_builtin: true,
             },
         )
         .await;
 
         let mut instances_with_diag_dirs = HashSet::<ExtendedMoniker>::from([
-            ExtendedMoniker::ComponentManager,
             ExtendedMoniker::from(Moniker::try_from(vec!["b"]).unwrap()),
             ExtendedMoniker::from(Moniker::try_from(vec!["b", "c"]).unwrap()),
             ExtendedMoniker::from(Moniker::try_from(vec!["b", "d"]).unwrap()),
@@ -333,7 +326,7 @@ mod tests {
     }
 
     async fn create_stream<'a>(test: &RoutingTest, args: CreateStreamArgs<'a>) -> EventStream {
-        let mut scopes = args
+        let scopes = args
             .scope_monikers
             .into_iter()
             .map(|moniker| EventDispatcherScope {
@@ -341,12 +334,6 @@ mod tests {
                 filter: EventFilter::debug(),
             })
             .collect::<Vec<_>>();
-        if args.include_builtin {
-            scopes.push(EventDispatcherScope {
-                moniker: ExtendedMoniker::ComponentManager,
-                filter: EventFilter::debug(),
-            });
-        }
         let events = args
             .events
             .into_iter()

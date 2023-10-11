@@ -17,7 +17,6 @@ enum IncomingRequest {
 async fn main() {
     let mut fs = ServiceFs::new_local();
     let inspector = fuchsia_inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs).unwrap();
 
     let config = Config::take_from_startup_handle();
     inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
@@ -25,6 +24,9 @@ async fn main() {
 
     fs.dir("svc").add_fidl_service(IncomingRequest::Puppet);
     fs.take_and_serve_directory_handle().unwrap();
+
+    let _inspect_server_task =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     fs.for_each_concurrent(None, move |request: IncomingRequest| {
         let receiver_config = receiver_config.clone();
         async move {
