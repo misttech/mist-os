@@ -5,5 +5,7 @@
 //! Synchronization objects used by Starnix
 
 mod interruptible_event;
+mod port_event;
 
 pub use interruptible_event::*;
+pub use port_event::*;

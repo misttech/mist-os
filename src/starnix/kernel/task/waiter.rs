@@ -4,11 +4,11 @@
 
 use fidl::AsHandleRef as _;
 use fuchsia_zircon as zx;
-use starnix_sync::{EventWaitGuard, InterruptibleEvent};
+use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc, Weak,
     },
 };
@@ -17,7 +17,6 @@ use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
 use crate::{
     fs::{FdEvents, FdNumber},
     lock::Mutex,
-    logging::*,
     signals::RunState,
     task::*,
     types::{Errno, *},
@@ -311,22 +310,11 @@ impl WaitCallback {
     }
 }
 
-/// Specifies the ordering for atomics accessed by both the "notifier" and
-/// "notifee" (the waiter).
-///
-/// Relaxed ordering because the [`Waiter`] does not provide any synchronization
-/// between the "notifier" and the "notifee". If a notifiee needs synchronization,
-/// it needs to perform that synchronization itself.
-///
-/// See [`Waiter.wait_until`] for more details.
-const ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE: Ordering = Ordering::Relaxed;
-
 /// Implementation of Waiter. We put the Waiter data in an Arc so that WaitQueue can tell when the
 /// Waiter has been destroyed by keeping a Weak reference. But this is an implementation detail and
 /// a Waiter should have a single owner. So the Arc is hidden inside Waiter.
 struct PortWaiter {
-    /// The underlying Zircon port that the thread sleeps in.
-    port: zx::Port,
+    port: PortEvent,
     callbacks: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
     next_key: AtomicU64,
     ignore_signals: bool,
@@ -336,9 +324,6 @@ struct PortWaiter {
     ///
     /// This lock is nested inside the WaitQueue.waiters lock.
     wait_queues: Mutex<HashMap<WaitKey, Weak<Mutex<WaitQueueImpl>>>>,
-    /// Indicates whether a user packet is sitting in the `zx::Port` to wake up
-    /// waiter after handling user events.
-    has_pending_user_packet: AtomicBool,
 }
 
 impl PortWaiter {
@@ -346,12 +331,11 @@ impl PortWaiter {
     fn new(ignore_signals: bool) -> Arc<Self> {
         profile_duration!("NewPortWaiter");
         Arc::new(PortWaiter {
-            port: zx::Port::create(),
+            port: PortEvent::new(),
             callbacks: Default::default(),
             next_key: AtomicU64::new(1),
             ignore_signals,
             wait_queues: Default::default(),
-            has_pending_user_packet: Default::default(),
         })
     }
 
@@ -365,59 +349,23 @@ impl PortWaiter {
         profile_duration!("PortWaiterWaitInternal");
 
         match self.port.wait(deadline) {
-            Ok(packet) => match packet.status() {
-                zx::sys::ZX_OK => {
-                    let contents = packet.contents();
-                    match contents {
-                        zx::PacketContents::SignalOne(sigpkt) => {
-                            profile_duration!("PortWaiterHandleSignalPacket");
-
-                            let key = WaitKey { raw: packet.key() };
-                            if let Some(callback) = self.remove_callback(&key) {
-                                match callback {
-                                    WaitCallback::SignalHandler(handler) => {
-                                        handler.handle(sigpkt.observed())
-                                    }
-                                    WaitCallback::EventHandler(_) => {
-                                        panic!("wrong type of handler called")
-                                    }
-                                }
-                            }
+            PortWaitResult::Notification { kind: NotifyKind::Regular } => Ok(()),
+            PortWaitResult::Notification { kind: NotifyKind::Interrupt } => error!(EINTR),
+            PortWaitResult::Signal { key, observed } => {
+                if let Some(callback) = self.remove_callback(&WaitKey { raw: key }) {
+                    match callback {
+                        WaitCallback::SignalHandler(handler) => {
+                            handler.handle(observed);
                         }
-                        zx::PacketContents::User(_) => {
-                            profile_duration!("PortWaiterHandleUserPacket");
-
-                            // User packet w/ OK status is only used to wake up
-                            // the waiter after handling starnix-internal events.
-                            //
-                            // Note that we can be woken up even when we will
-                            // not handle any user events. This is because right
-                            // after we set `has_pending_user_packet` to `false`,
-                            // another thread can immediately queue a new user
-                            // event and set `has_pending_user_packet` to `true`.
-                            // However, that event will be handled by us (by the
-                            // caller when this method returns) as if the event
-                            // was enqueued before we received this user packet.
-                            // Once the caller handles all the current user events,
-                            // we end up with no remaining user events but a user
-                            // packet sitting in the `zx::Port`.
-
-                            assert!(self
-                                .has_pending_user_packet
-                                .swap(false, ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE));
+                        WaitCallback::EventHandler(_) => {
+                            panic!("wrong type of handler called")
                         }
-                        _ => return error!(EBADMSG),
                     }
-                    Ok(())
                 }
-                zx::sys::ZX_ERR_CANCELED => error!(EINTR),
-                _ => {
-                    debug_assert!(false, "Unexpected status in port wait {}", packet.status());
-                    error!(EBADMSG)
-                }
-            },
-            Err(zx::Status::TIMED_OUT) => error!(ETIMEDOUT),
-            Err(errno) => Err(impossible_error(errno)),
+
+                Ok(())
+            }
+            PortWaitResult::TimedOut => error!(ETIMEDOUT),
         }
     }
 
@@ -494,10 +442,12 @@ impl PortWaiter {
         zx_signals: zx::Signals,
         handler: SignalHandler,
     ) -> Result<HandleWaitCanceler, zx::Status> {
+        profile_duration!("PortWaiterWakeOnZirconSignals");
+
         let callback = WaitCallback::SignalHandler(handler);
         let key = self.register_callback(callback);
-        handle.wait_async_handle(
-            &self.port,
+        self.port.object_wait_async(
+            handle,
             key.raw,
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
@@ -509,10 +459,7 @@ impl PortWaiter {
         profile_duration!("PortWaiterHandleEvent");
 
         scopeguard::defer! {
-            if !self.has_pending_user_packet.swap(true, ORDERING_FOR_ATOMICS_BETWEEN_NOTIFIER_AND_NOTIFEE) {
-                profile_duration!("PortWaiterEnqueueUserPacket");
-                self.queue_user_packet_data(zx::sys::ZX_OK)
-            }
+            self.port.notify(NotifyKind::Regular)
         }
 
         // Handling user events immediately when they are triggered breaks any
@@ -547,18 +494,11 @@ impl PortWaiter {
         }
     }
 
-    /// Queue a packet to the underlying Zircon port, which will cause the
-    /// waiter to wake up.
-    fn queue_user_packet_data(&self, status: i32) {
-        let packet = zx::Packet::from_user_packet(0, status, zx::UserPacket::default());
-        self.port.queue(&packet).map_err(impossible_error).unwrap();
-    }
-
     fn interrupt(&self) {
         if self.ignore_signals {
             return;
         }
-        self.queue_user_packet_data(zx::sys::ZX_ERR_CANCELED);
+        self.port.notify(NotifyKind::Interrupt);
     }
 }
 
