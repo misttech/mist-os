@@ -9,8 +9,18 @@ type CrossLibraryStruct = struct {
     value fuchsia.controller.test.NoopUnion;
 };
 
+type TestingEnum = strict enum : int32 {
+   FLIPPED_OTHER_TEST = 2;
+   TEST = -1;
+   OTHER_TEST = -2;
+};
+
 @discoverable
 closed protocol CrossLibraryNoop {
+    strict EnumMethod(struct {
+        enum_thing TestingEnum;
+    });
+
     strict UnionNoop(fuchsia.controller.test.NoopUnion);
 
     strict SendingProtocol(resource struct {

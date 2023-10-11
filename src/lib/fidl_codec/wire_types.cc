@@ -20,7 +20,7 @@ namespace {
 
 class ToStringVisitor : public TypeVisitor {
  public:
-  enum ExpandLevels {
+  enum ExpandLevels : uint8_t {
     kNone,
     kOne,
     kAll,
@@ -1006,6 +1006,13 @@ std::unique_ptr<Type> Type::ScalarTypeFromName(const std::string& type_name) {
   return std::make_unique<InvalidType>();
 }
 
+std::unique_ptr<Type> InternalTypeFromName(const std::string& type_name) {
+  if (type_name == "transport_error") {
+    return std::make_unique<EnumType>(Enum::TransportErrorEnum());
+  }
+  return std::make_unique<InvalidType>();
+}
+
 std::unique_ptr<Type> Type::TypeFromPrimitive(const rapidjson::Value& type) {
   if (!type.HasMember("subtype")) {
     FX_LOGS_OR_CAPTURE(ERROR) << "Invalid type";
@@ -1014,6 +1021,14 @@ std::unique_ptr<Type> Type::TypeFromPrimitive(const rapidjson::Value& type) {
 
   std::string subtype = type["subtype"].GetString();
   return ScalarTypeFromName(subtype);
+}
+
+std::unique_ptr<Type> Type::TypeFromInternal(const rapidjson::Value& type) {
+  if (!type.HasMember("subtype")) {
+    FX_LOGS_OR_CAPTURE(ERROR) << "Invalid internal type. Subtype missing";
+    return std::make_unique<InvalidType>();
+  }
+  return InternalTypeFromName(type["subtype"].GetString());
 }
 
 std::unique_ptr<Type> Type::TypeFromIdentifier(LibraryLoader* loader,
@@ -1080,6 +1095,9 @@ std::unique_ptr<Type> Type::GetType(LibraryLoader* loader, const rapidjson::Valu
   }
   if (kind == "identifier") {
     return Type::TypeFromIdentifier(loader, type);
+  }
+  if (kind == "internal") {
+    return Type::TypeFromInternal(type);
   }
   FX_LOGS_OR_CAPTURE(ERROR) << "Invalid type " << kind;
   return std::make_unique<InvalidType>();

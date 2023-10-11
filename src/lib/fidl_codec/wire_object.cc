@@ -6,7 +6,6 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <iomanip>
 #include <iostream>
 #include <memory>
 #include <sstream>
@@ -50,11 +49,11 @@ void NullValue::Visit(Visitor* visitor, const Type* for_type) const {
 }
 
 size_t RawValue::DisplaySize(const Type* /*for_type*/, size_t /*remaining_size*/) const {
-  return (data_.size() == 0) ? 0 : data_.size() * 3 - 1;
+  return data_.empty() ? 0 : data_.size() * 3 - 1;
 }
 
 void RawValue::PrettyPrint(const Type* for_type, PrettyPrinter& printer) const {
-  if (data_.size() == 0) {
+  if (data_.empty()) {
     return;
   }
   size_t buffer_size = data_.size() * 3;

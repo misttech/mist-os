@@ -8,6 +8,7 @@ import types
 
 from ._library import get_fidl_ir_map
 from ._library import load_module
+from ._fidl_common import TransportError
 
 
 class FIDLImportFinder(importlib.abc.MetaPathFinder):
@@ -15,15 +16,16 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
 
     def find_module(self, fullname: str, path=None):
         """Override from abc.MetaPathFinder."""
-        if fullname.startswith("fidl.") and not fullname.startswith("fidl._"):
-            return self
-        elif fullname.startswith("fidl._"):
+        if fullname.startswith("fidl._") or fullname == "fidl.TransportError":
             return __loader__
+        elif fullname.startswith("fidl."):
+            return self
 
     def load_module(self, fullname: str):
         """Override from abc.MetaPathFinder."""
         return load_module(fullname)
 
 
+sys.modules["fidl.TransportError"] = TransportError
 meta_hook = FIDLImportFinder()
 sys.meta_path.insert(0, meta_hook)

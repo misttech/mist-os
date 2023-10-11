@@ -7,6 +7,7 @@ import re
 import inspect
 import typing
 from dataclasses import dataclass
+from enum import IntEnum
 from typing import List, Tuple, Dict
 
 # These can be updated to use TypeAlias when python is updated to 3.10+
@@ -19,11 +20,22 @@ FIDL_HEADER_SIZE = 8
 FIDL_ORDINAL_SIZE = 8
 
 
+def internal_kind_to_type(internal_kind: str):
+    if internal_kind == "transport_error":
+        return TransportError
+    raise RuntimeError(f"Unrecognized internal type: {internal_kind}")
+
+
+class TransportError(IntEnum):
+    UNKNOWN_METHOD = -2
+
+
 @dataclass
 class GenericResult:
     fidl_type: str
     response: typing.Optional[object] = None
     err: typing.Optional[object] = None
+    transport_err: TransportError = None
 
     @property
     def __fidl_type__(self):

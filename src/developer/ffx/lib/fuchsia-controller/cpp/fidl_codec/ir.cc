@@ -79,7 +79,7 @@ PyObject *get_method_ordinal(PyObject *self, PyObject *args, PyObject *kwds) {  
   }
   fidl_codec::Protocol *codec_protocol;
   if (!lib->GetProtocolByName(protocol, &codec_protocol)) {
-    PyErr_Format(PyExc_RuntimeError, "Unable to find protocol %s under library %s", protocol,
+    PyErr_Format(PyExc_RuntimeError, "Unable to find protocol %s under library %s", protocol.data(),
                  library.c_str());
     return nullptr;
   }

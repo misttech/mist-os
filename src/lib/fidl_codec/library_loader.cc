@@ -9,7 +9,6 @@
 
 #include <fstream>
 #include <ios>
-#include <set>
 #include <sstream>
 
 #include <rapidjson/error/en.h>
@@ -17,7 +16,6 @@
 #include "src/lib/fidl_codec/builtin_semantic.h"
 #include "src/lib/fidl_codec/logger.h"
 #include "src/lib/fidl_codec/semantic_parser.h"
-#include "src/lib/fidl_codec/wire_object.h"
 #include "src/lib/fidl_codec/wire_types.h"
 
 // See library_loader.h for details.
@@ -27,7 +25,25 @@ namespace fidl_codec {
 EnumOrBits::EnumOrBits(const rapidjson::Value* json_definition)
     : json_definition_(json_definition) {}
 
+EnumOrBits::EnumOrBits(std::string name, uint64_t size, std::unique_ptr<Type> type,
+                       std::vector<EnumOrBitsMember> members)
+    : json_definition_(nullptr),
+      name_(std::move(name)),
+      size_(size),
+      type_(std::move(type)),
+      members_(std::move(members)) {}
+
 EnumOrBits::~EnumOrBits() = default;
+
+Enum::Enum(std::string name, uint64_t size, std::unique_ptr<Type> type,
+           std::vector<EnumOrBitsMember> members)
+    : EnumOrBits(std::move(name), size, std::move(type), std::move(members)) {}
+
+const Enum& Enum::TransportErrorEnum() {
+  static Enum result("TransportError", 4, std::make_unique<Int32Type>(),
+                     {EnumOrBitsMember("UNKNOWN_METHOD", 2, true)});
+  return result;
+}
 
 void EnumOrBits::DecodeTypes(bool is_scalar, const std::string& supertype_name,
                              Library* enclosing_library) {

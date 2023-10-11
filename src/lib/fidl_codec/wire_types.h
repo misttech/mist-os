@@ -8,9 +8,7 @@
 #include <lib/fit/function.h>
 #include <zircon/types.h>
 
-#include <sstream>
 #include <string>
-#include <vector>
 
 #include <rapidjson/document.h>
 
@@ -93,6 +91,11 @@ class Type {
   // "subtype" field that represents a scalar type (e.g., "float64", "uint32")
   static std::unique_ptr<Type> TypeFromPrimitive(const rapidjson::Value& type);
 
+  // Gets a Type object representing |type|, where |type| is a JSON object
+  // representing an "internal" fidl type, with the "subtype" field specifying
+  // what internal type is being represented.
+  static std::unique_ptr<Type> TypeFromInternal(const rapidjson::Value& type);
+
   // Gets a Type object representing the |type|.  |type| is a JSON object a
   // field "kind" that states the type.  "kind" is an identifier
   // (e.g.,"foo.bar/Baz").  |loader| is the set of libraries to use to lookup
@@ -167,7 +170,7 @@ class IntegralType : public Type {
 
 class Int8Type : public IntegralType<int8_t> {
  public:
-  enum class Kind { kChar, kDecimal };
+  enum class Kind : uint8_t { kChar, kDecimal };
   explicit Int8Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -180,7 +183,7 @@ class Int8Type : public IntegralType<int8_t> {
 
 class Int16Type : public IntegralType<int16_t> {
  public:
-  enum class Kind { kDecimal };
+  enum class Kind : uint8_t { kDecimal };
   explicit Int16Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override { return "int16"; }
@@ -193,7 +196,7 @@ class Int16Type : public IntegralType<int16_t> {
 
 class Int32Type : public IntegralType<int32_t> {
  public:
-  enum class Kind { kDecimal, kFutex };
+  enum class Kind : uint8_t { kDecimal, kFutex };
   explicit Int32Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -206,7 +209,7 @@ class Int32Type : public IntegralType<int32_t> {
 
 class Int64Type : public IntegralType<int64_t> {
  public:
-  enum class Kind { kDecimal, kDuration, kTime, kMonotonicTime };
+  enum class Kind : uint8_t { kDecimal, kDuration, kTime, kMonotonicTime };
   explicit Int64Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -219,7 +222,7 @@ class Int64Type : public IntegralType<int64_t> {
 
 class Uint8Type : public IntegralType<uint8_t> {
  public:
-  enum class Kind { kDecimal, kHexaDecimal, kPacketGuestVcpuType };
+  enum class Kind : uint8_t { kDecimal, kHexaDecimal, kPacketGuestVcpuType };
   explicit Uint8Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -232,7 +235,7 @@ class Uint8Type : public IntegralType<uint8_t> {
 
 class Uint16Type : public IntegralType<uint16_t> {
  public:
-  enum class Kind { kDecimal, kHexaDecimal, kPacketPageRequestCommand };
+  enum class Kind : uint8_t { kDecimal, kHexaDecimal, kPacketPageRequestCommand };
   explicit Uint16Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;
@@ -245,7 +248,7 @@ class Uint16Type : public IntegralType<uint16_t> {
 
 class Uint32Type : public IntegralType<uint32_t> {
  public:
-  enum class Kind {
+  enum class Kind : uint8_t {
     kBtiPerm,
     kCachePolicy,
     kChannelOption,
@@ -306,7 +309,16 @@ class Uint32Type : public IntegralType<uint32_t> {
 
 class Uint64Type : public IntegralType<uint64_t> {
  public:
-  enum class Kind { kDecimal, kHexaDecimal, kVaddr, kSize, kPaddr, kGpAddr, kUintptr, kKoid };
+  enum class Kind : uint8_t {
+    kDecimal,
+    kHexaDecimal,
+    kVaddr,
+    kSize,
+    kPaddr,
+    kGpAddr,
+    kUintptr,
+    kKoid
+  };
   explicit Uint64Type(Kind kind = Kind::kDecimal) : kind_(kind) {}
 
   std::string Name() const override;

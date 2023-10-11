@@ -7,7 +7,6 @@
 #include <zircon/types.h>
 
 #include <sstream>
-#include <string>
 
 namespace convert {
 

@@ -5,7 +5,6 @@
 #include "decode.h"
 
 #include <cinttypes>
-#include <iostream>
 #include <vector>
 
 #include "mod.h"
@@ -15,7 +14,7 @@
 
 namespace decode {
 
-enum Direction { REQUEST, RESPONSE };
+enum Direction : uint8_t { REQUEST, RESPONSE };
 
 PyObject *decode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds,  // NOLINT
                               Direction direction) {

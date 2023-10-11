@@ -11,3 +11,6 @@ class FuchsiaControllerTest(unittest.TestCase):
         fidl_codec.add_ir_path(
             "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.test.fidl.json"
         )
+        fidl_codec.add_ir_path(
+            "fidling/gen/src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia.controller.othertest.fidl.json"
+        )

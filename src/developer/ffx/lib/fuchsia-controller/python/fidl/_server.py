@@ -78,6 +78,9 @@ class ServerBase(object):
             raise e
 
     async def _handle_request_helper(self) -> bool:
+        # TODO(b/303532690): When attempting to decode a method that is
+        # unrecognized, there should be a message sent declaring this is
+        # an unknown method.
         try:
             msg, txid, ordinal = await self._channel_read_and_parse()
         except fc.ZxStatus as e:
@@ -107,6 +110,10 @@ class ServerBase(object):
             if type(res) is type(self).Error:
                 res = GenericResult(
                     fidl_type=info.response_identifier, err=res.error
+                )
+            elif type(res) is TransportError:
+                res = GenericResult(
+                    fidl_type=info.response_identifier, transport_err=res
                 )
             else:
                 res = GenericResult(

@@ -12,6 +12,7 @@ import sys
 import tempfile
 import os.path
 import asyncio
+from fidl import TransportError
 from fidl_codec import encode_fidl_message, method_ordinal
 from fuchsia_controller_py import Context, IsolateDir, Channel, ZxStatus
 
@@ -62,6 +63,14 @@ class StubFileServer(f_io.File.Server):
         return f_io.ReadableReadResponse(data=[1, 2, 3, 4])
 
 
+class FlexibleMethodTesterServer(fc_test.FlexibleMethodTester.Server):
+    def some_method(self):
+        # This should be handled internally, but right now there's not really
+        # a good way to force this interaction without making multiple FIDL
+        # versions run in this program simultaneously somehow.
+        return TransportError.UNKNOWN_METHOD
+
+
 class FailingFileServer(f_io.File.Server):
     def read(self, _: f_io.ReadableReadRequest):
         return self.Error(ZxStatus.ZX_ERR_PEER_CLOSED)
@@ -75,7 +84,7 @@ class TestingServer(fc_test.Testing.Server):
 
     def return_union_with_table(self):
         res = fc_test.TestingReturnUnionWithTableResponse()
-        res.y = fc_test.NoopTable(str="bazzz", integer=2)
+        res.y = fc_test.NoopTable(str="bazzz", integer=-2)
         return res
 
 
@@ -173,4 +182,12 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(res.y, "foobar")
         res = await t_client.return_union_with_table()
         self.assertEqual(res.y.str, "bazzz")
-        self.assertEqual(res.y.integer, 2)
+        self.assertEqual(res.y.integer, -2)
+
+    async def test_flexible_method_err(self):
+        client, server = Channel.create()
+        t_client = fc_test.FlexibleMethodTester.Client(client)
+        t_server = FlexibleMethodTesterServer(server)
+        server_task = asyncio.get_running_loop().create_task(t_server.serve())
+        res = await t_client.some_method()
+        self.assertEqual(res.transport_err, TransportError.UNKNOWN_METHOD)

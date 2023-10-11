@@ -260,3 +260,22 @@ class Encode(common.FuchsiaControllerTest):
         )
         msg = decode_fidl_request(bytes=b, handles=h)
         self.assertEqual(msg, {"value": 2})
+
+    def test_encode_decode_negative_enum(self):
+        obj = EncodeObj()
+        # This is a sepcial case because there is also a positive 2 represented in this enum.
+        # without a negative value check in the encoder path, this test will fail.
+        setattr(obj, "enum_thing", -2)
+        ordinal = method_ordinal(
+            protocol="fuchsia.controller.othertest/CrossLibraryNoop",
+            method="EnumMethod",
+        )
+        (b, h) = encode_fidl_message(
+            object=obj,
+            library="fuchsia.controller.othertest",
+            type_name="fuchsia.controller.othertest/CrossLibraryNoopEnumMethodRequest",
+            txid=5,
+            ordinal=ordinal,
+        )
+        msg = decode_fidl_request(bytes=b, handles=h)
+        self.assertEqual(msg, {"enum_thing": -2})

@@ -244,12 +244,17 @@ void ObjectConverter::VisitInt32Type(const fidl_codec::Int32Type* type) { VisitI
 void ObjectConverter::VisitInt64Type(const fidl_codec::Int64Type* type) { VisitInteger(true); }
 
 void ObjectConverter::VisitEnumType(const fidl_codec::EnumType* type) {
-  auto as_int = convert::PyLong_AsU64(obj_);
+  py::Object abs(PyNumber_Absolute(obj_));
+  bool negative = false;
+  if (!PyObject_RichCompareBool(abs.get(), obj_, Py_EQ)) {
+    negative = true;
+  }
+  auto as_int = convert::PyLong_AsU64(abs.get());
   if (as_int == convert::MINUS_ONE_U64 && PyErr_Occurred()) {
     return;
   }
   for (const auto& member : type->enum_definition().members()) {
-    if (member.absolute_value() == as_int) {
+    if (member.absolute_value() == as_int && member.negative() == negative) {
       result_ =
           std::make_unique<fidl_codec::IntegerValue>(member.absolute_value(), member.negative());
       return;

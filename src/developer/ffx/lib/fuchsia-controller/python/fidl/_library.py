@@ -31,7 +31,7 @@ from typing import (
 from fidl_codec import add_ir_path
 from ._client import FidlClient
 from ._server import ServerBase, MethodInfo
-from ._fidl_common import camel_case_to_snake_case
+from ._fidl_common import camel_case_to_snake_case, internal_kind_to_type
 
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
@@ -332,7 +332,7 @@ def fidl_import_to_library_path(name: str) -> str:
     try:
         return get_fidl_ir_map()[fidl_import_to_fidl_library(name)]
     except KeyError:
-        raise RuntimeError(
+        raise ImportError(
             f"Unable to import library {name}."
             + " Please ensure that the FIDL IR for this library has been created."
         )
@@ -380,6 +380,9 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         return wrap_optional(
             fidl_ident_to_py_library_member(type_ir["subtype"]) + ".Server"
         )
+    elif kind == "internal":
+        internal_kind = type_ir["subtype"]
+        return internal_kind_to_type(internal_kind)
     raise TypeError(
         f"As yet unsupported type in library {root_ir['name']}: {kind}"
     )

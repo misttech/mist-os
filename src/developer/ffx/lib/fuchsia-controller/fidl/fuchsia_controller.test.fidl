@@ -79,3 +79,9 @@ closed protocol Testing {
         client_thing client_end:OtherComposedProtocol;
     });
 };
+
+open protocol FlexibleMethodTester {
+    flexible SomeMethod() -> (struct {
+        some_bool_value bool;
+    }) error zx.Status;
+};
