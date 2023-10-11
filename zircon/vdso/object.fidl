@@ -1327,6 +1327,13 @@ closed protocol Object {
     ///     // performed actions on this VMO that would have caused |committed_bytes| to
     ///     // report a different value.
     ///     uint64_t committed_change_events;
+    ///
+    ///     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///     // content that has been populated and is being tracked by this vmo. This
+    ///     // can be greater than |committed_bytes| where content might be compressed
+    ///     // or otherwise tracked in a way that does not correlate directly to being
+    ///     // committed.
+    ///     uint64_t populated_bytes;
     /// } zx_info_vmo_t;
     /// ```
     ///
@@ -1661,6 +1668,13 @@ closed protocol Object {
     ///     // performed actions on this VMO that would have caused |committed_bytes| to
     ///     // report a different value.
     ///     uint64_t committed_change_events;
+    ///
+    ///     // If |ZX_INFO_VMO_TYPE(flags) == ZX_INFO_VMO_TYPE_PAGED|, the amount of
+    ///     // content that has been populated and is being tracked by this vmo. This
+    ///     // can be greater than |committed_bytes| where content might be compressed
+    ///     // or otherwise tracked in a way that does not correlate directly to being
+    ///     // committed.
+    ///     uint64_t populated_bytes;
     /// } zx_info_vmo_t;
     /// ```
     ///
