@@ -224,6 +224,10 @@ There are some typical objects that a component namespace might contain:
 - `dev/`: device tree (relevant portions visible to privileged components as needed)
   - `class/`, ...
 - `config/`: configuration data for the component
+  - `build-info/`: the canonical path for the build information files.
+  - `ssl/`: the canonical path for the SSL certificates
+  - `tzdata/`: time zone data files. The first sub-path should be the data format name,
+    such as `tzif2/...`, or `icudata/...`.
 
 ## Namespace Participants
 
