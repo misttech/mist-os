@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/rbe.gni")
 import("//build/toolchain/restat.gni")
 import("//build/tracer/tracer.gni")
 
@@ -49,8 +50,6 @@ if (current_os == "") {
 current_platform = "${current_os}-${current_cpu}"
 
 host_platform = "${host_os}-${host_cpu}"
-
-import("//build/toolchain/rbe.gni")
 
 if (target_os == "fuchsia") {
   target_toolchain = "//build/toolchain/fuchsia:${target_cpu}"
