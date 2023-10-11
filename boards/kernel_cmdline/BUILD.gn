@@ -7,7 +7,7 @@ import("//build/zbi/kernel_cmdline.gni")
 
 # This serves as an anchor point. By expressing a dependency on
 # //boards/kernel_cmdline, build arguments declared in this file
-# (e.g. pmm_checker_from_board) are brought into scope.
+# are brought into scope.
 group("kernel_cmdline") {
 }
 
@@ -19,20 +19,6 @@ kernel_cmdline("serial-legacy") {
 kernel_cmdline("disable-blobfs-compression") {
   args = [ "blobfs.write-compression-algorithm=UNCOMPRESSED" ]
   deps = [ "//build/validate:non_production_tag" ]
-}
-
-kernel_cmdline("pmm-checker") {
-  args = [
-    # Enable PMM checker to detect certain kinds of buffer overrun and
-    # use-after-free bugs.
-    "kernel.pmm-checker.enable=true",
-
-    # Use a small fill size to minimize performance impact.  In practice,
-    # corruption tends to happen at the start of a page so filling/checking only
-    # the first 16 bytes provides decent coverage without sacrificing
-    # performance.
-    "kernel.pmm-checker.fill-size=16",
-  ]
 }
 
 kernel_cmdline("enable-suspend") {
@@ -53,14 +39,6 @@ group("enable-suspend-from-board") {
   if (enable_suspend) {
     deps = [ ":enable-suspend" ]
   }
-}
-
-declare_args() {
-  # No longer used, will be removed in a subsequent CL.
-  pmm_checker_from_board = true
-}
-
-group("pmm-checker-from-board") {
 }
 
 # This collects settings not specific to any particular machine that are
