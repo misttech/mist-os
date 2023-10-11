@@ -19,6 +19,7 @@
             protocol: [
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
+                "fuchsia.feedback.DataProvider",
             ],
         },
     ],

@@ -38,5 +38,10 @@
             from: "parent",
             to: "#toolbox",
         },
+        {
+            protocol: "fuchsia.feedback.DataProvider",
+            from: "#feedback",
+            to: "#toolbox",
+        },
     ],
 }
