@@ -23,6 +23,7 @@ use tracing::trace;
 use crate::{
     context::SendFrameContext,
     device::{
+        self,
         queue::{
             rx::{
                 BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeFrameContext,
@@ -41,9 +42,8 @@ use crate::{
             ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::IpLinkDeviceState,
-        with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
-        DeviceIdDebugTag as _, DeviceLayerEventDispatcher, DeviceLayerTypes, DeviceSendFrameError,
-        FrameDestination,
+        Device, DeviceIdContext, DeviceIdDebugTag as _, DeviceLayerEventDispatcher,
+        DeviceLayerTypes, DeviceSendFrameError, FrameDestination,
     },
     device::{Id, Mtu, StrongId, WeakId},
     ip::types::RawMetric,
@@ -214,7 +214,7 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
     }
 }
 
-pub(super) struct LoopbackDeviceState {
+pub(crate) struct LoopbackDeviceState {
     mtu: Mtu,
     /// The routing metric of the loopback device this state is for.
     metric: RawMetric,
@@ -407,7 +407,9 @@ pub(super) fn get_routing_metric<NonSyncCtx: NonSyncContext, L>(
     ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
 ) -> RawMetric {
-    with_loopback_state(ctx, device_id, |mut state| state.cast_with(|s| &s.link.metric).copied())
+    device::integration::with_loopback_state(ctx, device_id, |mut state| {
+        state.cast_with(|s| &s.link.metric).copied()
+    })
 }
 
 /// Gets the MTU associated with this device.
@@ -415,7 +417,9 @@ pub(super) fn get_mtu<NonSyncCtx: NonSyncContext, L>(
     ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
 ) -> Mtu {
-    with_loopback_state(ctx, device_id, |mut state| state.cast_with(|s| &s.link.mtu).copied())
+    device::integration::with_loopback_state(ctx, device_id, |mut state| {
+        state.cast_with(|s| &s.link.mtu).copied()
+    })
 }
 
 impl<C: NonSyncContext> ReceiveQueueNonSyncContext<LoopbackDevice, LoopbackDeviceId<C>> for C {
@@ -442,7 +446,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
         device_id: &LoopbackDeviceId<C>,
         cb: F,
     ) -> O {
-        with_loopback_state(self, device_id, |mut state| {
+        device::integration::with_loopback_state(self, device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::LoopbackRxQueue>();
             cb(&mut x)
         })
@@ -522,11 +526,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
         device_id: &LoopbackDeviceId<C>,
         cb: F,
     ) -> O {
-        with_loopback_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
-            let mut locked = sync_ctx.cast_locked();
-            cb(&mut x, &mut locked)
-        })
+        device::integration::with_loopback_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut x = state.lock::<crate::lock_ordering::LoopbackRxDequeue>();
+                let mut locked = sync_ctx.cast_locked();
+                cb(&mut x, &mut locked)
+            },
+        )
     }
 }
 
@@ -559,7 +567,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         device_id: &LoopbackDeviceId<C>,
         cb: F,
     ) -> O {
-        with_loopback_state(self, device_id, |mut state| {
+        device::integration::with_loopback_state(self, device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::LoopbackTxQueue>();
             cb(&mut x)
         })
@@ -605,11 +613,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_loopback_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            let mut x = state.lock::<crate::lock_ordering::LoopbackTxDequeue>();
-            let mut locked = sync_ctx.cast_locked();
-            cb(&mut x, &mut locked)
-        })
+        device::integration::with_loopback_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut x = state.lock::<crate::lock_ordering::LoopbackTxDequeue>();
+                let mut locked = sync_ctx.cast_locked();
+                cb(&mut x, &mut locked)
+            },
+        )
     }
 }
 

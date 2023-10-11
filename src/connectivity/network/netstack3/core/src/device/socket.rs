@@ -23,10 +23,7 @@ use packet_formats::{
 
 use crate::{
     context::SendFrameContext,
-    device::{
-        with_ethernet_state_and_sync_ctx, with_loopback_state_and_sync_ctx, AnyDevice, Device,
-        DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId,
-    },
+    device::{self, AnyDevice, Device, DeviceId, DeviceIdContext, FrameDestination, WeakDeviceId},
     sync::{Mutex, PrimaryRc, RwLock, StrongRc},
     SyncCtx,
 };
@@ -1013,20 +1010,24 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
         cb: F,
     ) -> R {
         match device {
-            DeviceId::Ethernet(device) => {
-                with_ethernet_state_and_sync_ctx(self, device, |mut device_state, locked| {
+            DeviceId::Ethernet(device) => device::integration::with_ethernet_state_and_sync_ctx(
+                self,
+                device,
+                |mut device_state, locked| {
                     let device_sockets =
                         device_state.read_lock::<crate::lock_ordering::DeviceSockets>();
                     cb(&*device_sockets, &mut locked.cast_locked())
-                })
-            }
-            DeviceId::Loopback(device) => {
-                with_loopback_state_and_sync_ctx(self, device, |mut device_state, locked| {
+                },
+            ),
+            DeviceId::Loopback(device) => device::integration::with_loopback_state_and_sync_ctx(
+                self,
+                device,
+                |mut device_state, locked| {
                     let device_sockets =
                         device_state.read_lock::<crate::lock_ordering::DeviceSockets>();
                     cb(&*device_sockets, &mut locked.cast_locked())
-                })
-            }
+                },
+            ),
         }
     }
 
@@ -1039,20 +1040,24 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
         cb: F,
     ) -> R {
         match device {
-            DeviceId::Ethernet(device) => {
-                with_ethernet_state_and_sync_ctx(self, device, |mut device_state, locked| {
+            DeviceId::Ethernet(device) => device::integration::with_ethernet_state_and_sync_ctx(
+                self,
+                device,
+                |mut device_state, locked| {
                     let mut device_sockets =
                         device_state.write_lock::<crate::lock_ordering::DeviceSockets>();
                     cb(&mut *device_sockets, &mut locked.cast_locked())
-                })
-            }
-            DeviceId::Loopback(device) => {
-                with_loopback_state_and_sync_ctx(self, device, |mut device_state, locked| {
+                },
+            ),
+            DeviceId::Loopback(device) => device::integration::with_loopback_state_and_sync_ctx(
+                self,
+                device,
+                |mut device_state, locked| {
                     let mut device_sockets =
                         device_state.write_lock::<crate::lock_ordering::DeviceSockets>();
                     cb(&mut *device_sockets, &mut locked.cast_locked())
-                })
-            }
+                },
+            ),
         }
     }
 }

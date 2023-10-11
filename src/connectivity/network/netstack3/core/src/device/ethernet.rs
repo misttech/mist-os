@@ -39,6 +39,7 @@ use crate::{
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
+        self,
         arp::{
             ArpConfigContext, ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId,
             BufferArpContext, BufferArpSenderContext,
@@ -57,9 +58,8 @@ use crate::{
             NonSyncContext as SocketNonSyncContext, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::IpLinkDeviceState,
-        with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
-        DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
-        RecvIpFrameMeta,
+        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
+        EthernetDeviceId, FrameDestination, Mtu, RecvIpFrameMeta,
     },
     ip::{
         device::nud::{
@@ -105,7 +105,7 @@ pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
 {
     /// Calls the function with the ethernet device's static state and immutable
     /// reference to the dynamic state.
-    fn with_ethernet_device_state<
+    fn with_ethernet_state<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
     >(
@@ -116,7 +116,7 @@ pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
 
     /// Calls the function with the ethernet device's static state and mutable
     /// reference to the dynamic state.
-    fn with_ethernet_device_state_mut<
+    fn with_ethernet_state_mut<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
     >(
@@ -134,7 +134,7 @@ impl<NonSyncCtx: NonSyncContext, L> EthernetIpLinkDeviceStaticStateContext
         device_id: &EthernetDeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |state| {
+        device::integration::with_ethernet_state(self, device_id, |state| {
             cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
         })
     }
@@ -145,7 +145,7 @@ impl<
         L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
     > EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn with_ethernet_device_state<
+    fn with_ethernet_state<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
     >(
@@ -153,7 +153,7 @@ impl<
         device_id: &EthernetDeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_ethernet_state(self, device_id, |mut state| {
             let (dynamic_state, locked) =
                 state.read_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -163,7 +163,7 @@ impl<
         })
     }
 
-    fn with_ethernet_device_state_mut<
+    fn with_ethernet_state_mut<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
     >(
@@ -171,7 +171,7 @@ impl<
         device_id: &EthernetDeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_ethernet_state(self, device_id, |mut state| {
             let (mut dynamic_state, locked) =
                 state.write_lock_and::<crate::lock_ordering::EthernetDeviceDynamicState>();
             cb(
@@ -228,20 +228,24 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         device_id: &EthernetDeviceId<NonSyncCtx>,
         cb: F,
     ) -> O {
-        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            // We lock the state at the Ethernet IPv6 NUD lock level, but the
-            // callback needs access to the sync context as well as the NUD
-            // state, so we also cast its lock level to the same so that only
-            // locks that may be acquired _after_ the IPv6 NUD lock may be
-            // acquired in the callback.
-            type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
-            let mut nud = state.lock::<LockLevel>();
-            let mut locked = SyncCtxWithDeviceId {
-                device_id,
-                sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
-            };
-            cb(&mut nud, &mut locked)
-        })
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                // We lock the state at the Ethernet IPv6 NUD lock level, but the
+                // callback needs access to the sync context as well as the NUD
+                // state, so we also cast its lock level to the same so that only
+                // locks that may be acquired _after_ the IPv6 NUD lock may be
+                // acquired in the callback.
+                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
+                let mut nud = state.lock::<LockLevel>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
+                };
+                cb(&mut nud, &mut locked)
+            },
+        )
     }
 
     fn send_neighbor_solicitation(
@@ -297,7 +301,7 @@ impl<
 {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         let Self { device_id, sync_ctx } = self;
-        with_ethernet_state(sync_ctx, device_id, |mut state| {
+        device::integration::with_ethernet_state(sync_ctx, device_id, |mut state| {
             let mut state = state.cast();
             let x = state.read_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>().clone();
             x
@@ -395,20 +399,24 @@ impl<
         device_id: &EthernetDeviceId<BufferNonSyncCtx>,
         cb: F,
     ) -> O {
-        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            // We lock the state at the Ethernet IPv6 NUD lock level, but the
-            // callback needs access to the sync context as well as the NUD
-            // state, so we also cast its lock level to the same so that only
-            // locks that may be acquired _after_ the IPv6 NUD lock may be
-            // acquired in the callback.
-            type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
-            let mut nud = state.lock::<LockLevel>();
-            let mut locked = SyncCtxWithDeviceId {
-                device_id,
-                sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
-            };
-            cb(&mut nud, &mut locked)
-        })
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                // We lock the state at the Ethernet IPv6 NUD lock level, but the
+                // callback needs access to the sync context as well as the NUD
+                // state, so we also cast its lock level to the same so that only
+                // locks that may be acquired _after_ the IPv6 NUD lock may be
+                // acquired in the callback.
+                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
+                let mut nud = state.lock::<LockLevel>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
+                };
+                cb(&mut nud, &mut locked)
+            },
+        )
     }
 }
 
@@ -700,7 +708,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
         device_id: &EthernetDeviceId<C>,
         cb: F,
     ) -> O {
-        with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_ethernet_state(self, device_id, |mut state| {
             let mut x = state.lock::<crate::lock_ordering::EthernetTxQueue>();
             cb(&mut x)
         })
@@ -734,11 +742,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            let mut x = state.lock::<crate::lock_ordering::EthernetTxDequeue>();
-            let mut locked = sync_ctx.cast_locked();
-            cb(&mut x, &mut locked)
-        })
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut x = state.lock::<crate::lock_ordering::EthernetTxDequeue>();
+                let mut locked = sync_ctx.cast_locked();
+                cb(&mut x, &mut locked)
+            },
+        )
     }
 }
 
@@ -903,10 +915,9 @@ pub(super) fn receive_frame<
 
     let dst = ethernet.dst_mac();
 
-    let frame_dest = sync_ctx
-        .with_ethernet_device_state(device_id, |static_state, dynamic_state| {
-            deliver_as(static_state, dynamic_state, &dst)
-        });
+    let frame_dest = sync_ctx.with_ethernet_state(device_id, |static_state, dynamic_state| {
+        deliver_as(static_state, dynamic_state, &dst)
+    });
 
     let frame_dst = match frame_dest {
         None => {
@@ -972,7 +983,7 @@ pub(super) fn set_promiscuous_mode<
     device_id: &SC::DeviceId,
     enabled: bool,
 ) {
-    sync_ctx.with_ethernet_device_state_mut(device_id, |_static_state, dynamic_state| {
+    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         dynamic_state.promiscuous_mode = enabled
     })
 }
@@ -1001,7 +1012,7 @@ pub(super) fn join_link_multicast<
     device_id: &SC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
-    sync_ctx.with_ethernet_device_state_mut(device_id, |_static_state, dynamic_state| {
+    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         let groups = &mut dynamic_state.link_multicast_groups;
 
         match groups.insert(multicast_addr) {
@@ -1048,7 +1059,7 @@ pub(super) fn leave_link_multicast<
     device_id: &SC::DeviceId,
     multicast_addr: MulticastAddr<Mac>,
 ) {
-    sync_ctx.with_ethernet_device_state_mut(device_id, |_static_state, dynamic_state| {
+    sync_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
         let groups = &mut dynamic_state.link_multicast_groups;
 
         match groups.remove(multicast_addr) {
@@ -1088,7 +1099,7 @@ pub(super) fn get_mtu<
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> Mtu {
-    sync_ctx.with_ethernet_device_state(device_id, |_static_state, dynamic_state| {
+    sync_ctx.with_ethernet_state(device_id, |_static_state, dynamic_state| {
         dynamic_state.max_frame_size.as_mtu()
     })
 }
@@ -1168,7 +1179,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         _ctx: &mut C,
         device_id: &EthernetDeviceId<C>,
     ) -> Option<Ipv4Addr> {
-        with_ethernet_state(self, device_id, |mut state| {
+        device::integration::with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
             let x = ipv4.iter().next().map(|addr| addr.addr().get());
@@ -1195,11 +1206,15 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         device_id: &EthernetDeviceId<C>,
         cb: F,
     ) -> O {
-        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-            let mut locked = sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>();
-            cb(&mut arp, &mut locked)
-        })
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
+                let mut locked = sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>();
+                cb(&mut arp, &mut locked)
+            },
+        )
     }
 }
 
@@ -1226,14 +1241,18 @@ impl<
         device_id: &EthernetDeviceId<C>,
         cb: F,
     ) -> O {
-        with_ethernet_state_and_sync_ctx(self, device_id, |mut state, sync_ctx| {
-            let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-            let mut locked = SyncCtxWithDeviceId {
-                device_id,
-                sync_ctx: &mut sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
-            };
-            cb(&mut arp, &mut locked)
-        })
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
+                };
+                cb(&mut arp, &mut locked)
+            },
+        )
     }
 }
 
@@ -1297,7 +1316,7 @@ pub(super) fn set_mtu<
     device_id: &SC::DeviceId,
     mtu: Mtu,
 ) {
-    sync_ctx.with_ethernet_device_state_mut(device_id, |static_state, dynamic_state| {
+    sync_ctx.with_ethernet_state_mut(device_id, |static_state, dynamic_state| {
         if let Some(mut frame_size ) = MaxFrameSize::from_mtu(mtu) {
             // If `frame_size` is greater than what the device supports, set it
             // to maximum frame size the device supports.
@@ -1483,7 +1502,7 @@ mod tests {
     }
 
     impl EthernetIpLinkDeviceDynamicStateContext<FakeNonSyncCtx> for FakeCtx {
-        fn with_ethernet_device_state<
+        fn with_ethernet_state<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
         >(
@@ -1491,10 +1510,10 @@ mod tests {
             device_id: &FakeDeviceId,
             cb: F,
         ) -> O {
-            self.inner.with_ethernet_device_state(device_id, cb)
+            self.inner.with_ethernet_state(device_id, cb)
         }
 
-        fn with_ethernet_device_state_mut<
+        fn with_ethernet_state_mut<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
         >(
@@ -1502,12 +1521,12 @@ mod tests {
             device_id: &FakeDeviceId,
             cb: F,
         ) -> O {
-            self.inner.with_ethernet_device_state_mut(device_id, cb)
+            self.inner.with_ethernet_state_mut(device_id, cb)
         }
     }
 
     impl EthernetIpLinkDeviceDynamicStateContext<FakeNonSyncCtx> for FakeInnerCtx {
-        fn with_ethernet_device_state<
+        fn with_ethernet_state<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
         >(
@@ -1519,7 +1538,7 @@ mod tests {
             cb(&state.static_state, &state.dynamic_state)
         }
 
-        fn with_ethernet_device_state_mut<
+        fn with_ethernet_state_mut<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &mut DynamicEthernetDeviceState) -> O,
         >(

@@ -22,6 +22,7 @@ lib_sources = [
   "src/device/arp.rs",
   "src/device/ethernet.rs",
   "src/device/id.rs",
+  "src/device/integration.rs",
   "src/device/link.rs",
   "src/device/loopback.rs",
   "src/device/mod.rs",

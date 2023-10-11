@@ -92,7 +92,7 @@ impl<'a, C: NonSyncContext> SlaacAddresses<C> for SlaacAddrs<'a, C> {
     fn for_each_addr_mut<F: FnMut(SlaacAddressEntryMut<'_, C::Instant>)>(&mut self, mut cb: F) {
         let SlaacAddrs { sync_ctx, device_id, config: _, _marker } = self;
         let SyncCtxWithIpDeviceConfiguration { config: _, sync_ctx } = sync_ctx;
-        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
+        crate::device::integration::with_ip_device_state(sync_ctx, device_id, |mut state| {
             let addrs = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv6>>();
             addrs.iter().for_each(|entry| {
                 let addr_sub = entry.addr_sub;
@@ -233,7 +233,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv4>>> 
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::with_ip_device_state(self, device, |mut state| {
+        crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
             cb(&state)
         })
@@ -251,7 +251,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceGmp<Ipv6>>> 
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        crate::device::with_ip_device_state(self, device, |mut state| {
+        crate::device::integration::with_ip_device_state(self, device, |mut state| {
             let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
             cb(&state)
         })
@@ -627,7 +627,7 @@ where
         cb: F,
     ) -> O {
         let Self { config, sync_ctx } = self;
-        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
+        crate::device::integration::with_ip_device_state(sync_ctx, device_id, |mut state| {
             let mut flags = state.lock::<crate::lock_ordering::IpDeviceFlags<I>>();
             cb(*config, &mut *flags)
         })
@@ -908,7 +908,7 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, C: NonSyncContext> RsContext<C
         cb: F,
     ) -> O {
         let Self { config, sync_ctx } = self;
-        crate::device::with_ip_device_state(sync_ctx, device_id, |mut state| {
+        crate::device::integration::with_ip_device_state(sync_ctx, device_id, |mut state| {
             let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouterSolicitations>();
             cb(&mut state, Borrow::borrow(&*config).max_router_solicitations)
         })
@@ -1045,7 +1045,7 @@ impl<'a, Config, C: NonSyncContext> Ipv6RouteDiscoveryContext<C>
         cb: F,
     ) {
         let Self { config: _, sync_ctx } = self;
-        crate::device::with_ip_device_state_and_sync_ctx(
+        crate::device::integration::with_ip_device_state_and_sync_ctx(
             sync_ctx,
             device_id,
             |mut state, sync_ctx| {
@@ -1289,7 +1289,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, C: NonSyncContext> IgmpContext
             ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
-        crate::device::with_ip_device_state(sync_ctx, device, |mut state| {
+        crate::device::integration::with_ip_device_state(sync_ctx, device, |mut state| {
             // Note that changes to `ip_enabled` is not possible in this context
             // since IP enabled changes are only performed while the IP device
             // configuration lock is held exclusively. Since we have access to
@@ -1358,7 +1358,7 @@ impl<
             ip_config: IpDeviceConfiguration { gmp_enabled, forwarding_enabled: _ },
         } = Borrow::borrow(&*config);
 
-        crate::device::with_ip_device_state(sync_ctx, device, |mut state| {
+        crate::device::integration::with_ip_device_state(sync_ctx, device, |mut state| {
             let ip_enabled = state.lock::<crate::lock_ordering::IpDeviceFlags<Ipv6>>().ip_enabled;
             let mut state = state.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
             let enabled = ip_enabled && *gmp_enabled;
