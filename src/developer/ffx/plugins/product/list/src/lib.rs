@@ -8,6 +8,7 @@
 use ::gcs::client::{Client, ProgressResponse};
 use anyhow::{Context, Result};
 use errors::ffx_bail;
+use ffx_config::sdk::SdkVersion;
 use ffx_core::ffx_plugin;
 use ffx_product_list_args::ListCommand;
 use ffx_writer::Writer;
@@ -42,17 +43,31 @@ pub async fn pb_list(
     let mut output = stdout();
     let mut err_out = stderr();
     let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    if let Some(version) = cmd.version {
-        let pbs = pb_list_impl(&cmd.auth, cmd.base_url, &version, &ui).await?;
-        if writer.is_machine() {
-            writer.machine(&pbs)?;
-        } else {
-            let pb_names = pbs.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
-            let pb_string = pb_names.join("\n");
-            writeln!(writer, "{}", pb_string)?;
+    let version = match cmd.version {
+        Some(version) => version,
+        None => {
+            let sdk = ffx_config::global_env_context()
+                .context("loading global environment context")?
+                .get_sdk()
+                .await
+                .context("getting sdk env context")?;
+            match sdk.get_version() {
+                SdkVersion::Version(version) => version.to_string(),
+                SdkVersion::InTree => {
+                    ffx_bail!("Using in-tree sdk. Please specify the version through '--version'")
+                }
+                SdkVersion::Unknown => ffx_bail!("Unable to determine SDK version"),
+            }
         }
+    };
+
+    let pbs = pb_list_impl(&cmd.auth, cmd.base_url, &version, &ui).await?;
+    if writer.is_machine() {
+        writer.machine(&pbs)?;
     } else {
-        ffx_bail!("Currently we need the sdk version to exist for the lookup")
+        let pb_names = pbs.iter().map(|x| x.name.clone()).collect::<Vec<_>>();
+        let pb_string = pb_names.join("\n");
+        writeln!(writer, "{}", pb_string)?;
     }
 
     Ok(())
