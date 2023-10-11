@@ -101,7 +101,7 @@ when and how FIDL APIs change. The SDK category mechanism determines the
 
 ## Categories
 
-SDK categories have been implemented in the [`sdk_atom`][gn-sdk-atom] GN Rule.
+SDK categories have been implemented in the [`sdk_atom`](/docs/glossary#sdk-atom) GN Rule.
 Each SDK Atom has an `category` parameter with one of the following values:
 
 - `excluded`: the Atom may not be included in SDKs;

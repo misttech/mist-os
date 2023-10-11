@@ -108,5 +108,5 @@ or restrict these operations as described in the discipline spec.
 
 ## See also
 
- - [`zx_vmar_map()`]
- - [`zx_iob_create()`]
+- [`zx_vmar_map()`](/docs/reference/syscalls/vmar_map.md)
+- [`zx_iob_create()`](/docs/reference/syscalls/iob_create.md)

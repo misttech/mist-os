@@ -27,7 +27,7 @@ zx_status_t zx_restricted_unbind_state(uint32_t options);
 
 Unbind any restricted state VMO that may be bound to the calling thread.
 
-See also [`zx_restricted_bind_state`].
+See also [`zx_restricted_bind_state()`].
 
 It is not an error to call unbind on a thread that has no bound VMO.
 

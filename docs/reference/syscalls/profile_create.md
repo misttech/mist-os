@@ -136,7 +136,7 @@ right, or *root_job* is not a handle to the root job.
 ## See also
 
  - [`zx_object_set_profile()`]
- - [`zx_futex_wait()()`]
+ - [`zx_futex_wait()`]
 
 [`zx_object_set_profile()`]: object_set_profile.md
 [`zx_futex_wait()`]: futex_wait.md

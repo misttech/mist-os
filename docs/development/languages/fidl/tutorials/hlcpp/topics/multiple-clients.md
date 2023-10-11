@@ -51,7 +51,7 @@ connections to the same protocol:
 ```
 
 The code for setting up a proxy and making requests is the same as in the
-[client tutorial][client-tut-main] except it uses
+[client tutorial][client-main] except it uses
 an interface pointer set to simplify the process of broadcasting a message
 to a set of clients. An added benefit of using `fidl::InterfacePtrSet` and
 `fidl::BindingSet` is that any binding or interface pointer that experiences an

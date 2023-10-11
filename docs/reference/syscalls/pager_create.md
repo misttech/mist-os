@@ -33,6 +33,7 @@ will make an effort to ensure that the faults happen as quickly as possible (e.g
 present pages), but the precise behavior is implementation dependent.
 
 The returned handle will have the following rights:
+
  - **ZX_RIGHT_TRANSFER** - The handle may be transferred to another process.
  - **ZX_RIGHT_INSPECT** - May be inspected with [`zx_object_get_info()`].
  - **ZX_RIGHT_ATTACH_VMO** - May attach VMOs with [`zx_pager_create_vmo()`] and detach VMOs with
@@ -66,3 +67,4 @@ any value other than 0.
 [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
 [`zx_pager_op_range()`]: pager_op_range.md
 [`zx_pager_supply_pages()`]: pager_supply_pages.md
+[`zx_object_get_info()`]: object_get_info.md

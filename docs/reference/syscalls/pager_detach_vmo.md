@@ -34,6 +34,7 @@ kernel will resume and fault the threads that generated these requests. The fina
 service will receive is a **ZX_PAGER_VMO_COMPLETE** request.
 
 The following pager syscalls will fail on a detached VMO:
+
  - [`zx_pager_supply_pages()`]
  - [`zx_pager_op_range()`] with **ZX_PAGER_OP_DIRTY** and **ZX_PAGER_OP_FAIL**
 And the following will continue working as before the detach:
@@ -78,3 +79,5 @@ or *pager_vmo* does not have **ZX_RIGHT_WRITE**.
 [`zx_pager_create_vmo()`]: pager_create_vmo.md
 [`zx_pager_op_range()`]: pager_op_range.md
 [`zx_pager_query_dirty_ranges()`]: pager_query_dirty_ranges.md
+[`zx_pager_query_vmo_stats()`]: pager_query_vmo_stats.md
+[`zx_pager_supply_pages()`]: pager_supply_pages.md

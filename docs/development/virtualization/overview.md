@@ -326,8 +326,8 @@ For more information on how to launch and use virtualization on Fuchsia, see
 [define.mmio]: https://en.wikipedia.org/wiki/Memory-mapped_I/O
 [define.pio]: https://wiki.osdev.org/Port_IO
 [define.slat]: https://en.wikipedia.org/wiki/Second_Level_Address_Translation
-[example.pl011_cr_handler]:
-    https://cs.opensource.google/fuchsia/fuchsia/+/main:src/virtualization/bin/vmm/arch/arm64/pl011.cc;l=52;drc=9fcf7ef29730fa8ecc2f1cdbe025bb3ab9741a90
+[example.pl011_cr_handler]:  https://cs.opensource.google/fuchsia/fuchsia/+/main:src/virtualization/bin/vmm/arch/arm64/pl011.cc;l=52;drc=9fcf7ef29730fa8ecc2f1cdbe025bb3ab9741a90
+[example.register_sync_trap]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/virtualization/bin/vmm/arch/arm64/pl011.cc;l=47
 [example.update_registers]:
     https://cs.opensource.google/fuchsia/fuchsia/+/main:src/virtualization/bin/vmm/arch/arm64/vcpu.cc;l=56;drc=8c5ab55a0467643618ef12e0d2b987f9f3d24acd
 
