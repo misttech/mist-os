@@ -153,7 +153,7 @@ zx_status_t platform_start_cpu(cpu_num_t cpu_id, uint64_t mpid) {
   // Issue memory barrier before starting to ensure previous stores will be visible to new CPU.
   arch::ThreadMemoryBarrier();
 
-  uint32_t ret = power_cpu_on(mpid, kernel_entry_paddr);
+  uint32_t ret = power_cpu_on(mpid, kernel_entry_paddr, 0);
   dprintf(INFO, "Trying to start cpu %u, mpid %#" PRIx64 " returned: %d\n", cpu_id, mpid, (int)ret);
   if (ret != 0) {
     return ZX_ERR_INTERNAL;

@@ -71,7 +71,7 @@ uint32_t psci_get_feature(uint32_t psci_call);
 
 /* powers down the calling cpu - only returns if call fails */
 zx_status_t psci_cpu_off();
-zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry);
+zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context);
 int64_t psci_get_affinity_info(uint64_t mpid);
 zx::result<power_cpu_state> psci_get_cpu_state(uint64_t mpid);
 

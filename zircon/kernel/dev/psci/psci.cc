@@ -80,9 +80,9 @@ zx_status_t psci_cpu_off() {
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_OFF, 0, 0, 0));
 }
 
-zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry) {
+zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   LTRACEF("CPU_ON mpid %#" PRIx64 ", entry %#" PRIx64 "\n", mpid, entry);
-  return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, 0));
+  return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
 }
 
 int64_t psci_get_affinity_info(uint64_t mpid) {
@@ -210,7 +210,7 @@ static int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
     if (argc < 3) {
       goto notenoughargs;
     }
-    uint32_t ret = psci_cpu_on(argv[2].u, kernel_entry_paddr);
+    uint32_t ret = psci_cpu_on(argv[2].u, kernel_entry_paddr, 0);
     printf("psci_cpu_on returns %u\n", ret);
   } else if (!strcmp(argv[1].str, "affinity_info")) {
     if (argc < 4) {

@@ -13,7 +13,7 @@ static const struct pdev_power_ops default_ops = {
     .reboot = [](power_reboot_flags flags) -> zx_status_t { return ZX_OK; },
     .shutdown = []() -> zx_status_t { return ZX_OK; },
     .cpu_off = []() -> zx_status_t { return ZX_OK; },
-    .cpu_on = [](uint64_t mpid, paddr_t entry) -> zx_status_t { return ZX_OK; },
+    .cpu_on = [](uint64_t mpid, paddr_t entry, uint64_t context) -> zx_status_t { return ZX_OK; },
     .get_cpu_state = [](uint64_t hw_cpu_id) -> zx::result<power_cpu_state> {
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }};
@@ -23,8 +23,8 @@ static const struct pdev_power_ops* power_ops = &default_ops;
 void power_reboot(power_reboot_flags flags) { power_ops->reboot(flags); }
 void power_shutdown() { power_ops->shutdown(); }
 zx_status_t power_cpu_off() { return power_ops->cpu_off(); }
-zx_status_t power_cpu_on(uint64_t hw_cpu_id, paddr_t entry) {
-  return power_ops->cpu_on(hw_cpu_id, entry);
+zx_status_t power_cpu_on(uint64_t hw_cpu_id, paddr_t entry, uint64_t context) {
+  return power_ops->cpu_on(hw_cpu_id, entry, context);
 }
 zx::result<power_cpu_state> power_get_cpu_state(uint64_t hw_cpu_id) {
   return power_ops->get_cpu_state(hw_cpu_id);

@@ -141,10 +141,10 @@ void* platform_get_ramdisk(size_t* size) {
 }
 
 void platform_halt_cpu() {
-  arch::RiscvSbiRet result = sbi_hart_stop();
+  zx_status_t status = power_cpu_off();
 
   // Should not have returned
-  panic("sbi_hart_stop returned %ld\n", static_cast<long>(result.error));
+  panic("power_cpu_off returned %d\n", status);
 }
 
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {

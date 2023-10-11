@@ -142,10 +142,8 @@ void riscv64_sbi_early_init() {
   static const pdev_power_ops sbi_ops = {
       .reboot = [](power_reboot_flags flags) -> zx_status_t { return sbi_reset(); },
       .shutdown = sbi_shutdown,
-      // Null the cpu on/off with default hooks and use sbi directly for now.
-      // Their api isn't expressive enough for the sbi arguments.
-      .cpu_off = []() -> zx_status_t { PANIC_UNIMPLEMENTED; },
-      .cpu_on = [](uint64_t mpid, paddr_t entry) -> zx_status_t { PANIC_UNIMPLEMENTED; },
+      .cpu_off = sbi_hart_stop,
+      .cpu_on = sbi_hart_start,
       .get_cpu_state = sbi_get_cpu_state,
   };
 
@@ -181,14 +179,17 @@ arch::RiscvSbiRet sbi_send_ipi(arch::HartMask mask, arch::HartMaskBase mask_base
   return arch::RiscvSbi::SendIpi(mask, mask_base);
 }
 
-arch::RiscvSbiRet sbi_hart_start(arch::HartId hart_id, paddr_t start_addr, uint64_t priv) {
+zx_status_t sbi_hart_start(uint64_t id, paddr_t start_addr, uint64_t priv) {
+  arch::HartId hart_id = static_cast<arch::HartId>(id);
   LTRACEF("hart_id %lu, start_addr %#lx, priv %#lx\n", hart_id, start_addr, priv);
-  return arch::RiscvSbi::HartStart(hart_id, start_addr, priv);
+  arch::RiscvSbiRet ret = arch::RiscvSbi::HartStart(hart_id, start_addr, priv);
+  return riscv_status_to_zx_status(ret.error);
 }
 
-arch::RiscvSbiRet sbi_hart_stop() {
+zx_status_t sbi_hart_stop() {
   LTRACEF("local hart %u\n", riscv64_curr_hart_id());
-  return arch::RiscvSbi::HartStop();
+  arch::RiscvSbiRet ret = arch::RiscvSbi::HartStop();
+  return riscv_status_to_zx_status(ret.error);
 }
 
 arch::RiscvSbiRet sbi_remote_sfence_vma(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size) {
