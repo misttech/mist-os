@@ -1279,6 +1279,69 @@ assembly_input_bundle("minimal_userdebug_and_eng") {
 # (via the `:core_realm` AIB).  Each should list which feature_set_level and
 # build type that it is valid for.
 
+# Input groups
+#
+# feature_set_levels: minimal
+# build-types:all
+#
+# These AIBs are opaque groups of inputs that are common to many products, but
+# have not been organized into specific features yet.
+assembly_input_bundle("input_group_one") {
+  kernel_cmdline = [ "kernel.oom.behavior=reboot" ]
+  base_packages = [ "//src/sys/cache_manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [
+                    "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
+
+                    # TODO(fxbug.dev/80375): only include in eng builds
+                    "//src/sys/fuzzing/meta/fuzzing.core-shard.cml",
+                  ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# Bluetooth core support
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_core") {
+  base_packages = [
+    "//src/connectivity/bluetooth/core/bt-gap",
+    "//src/connectivity/bluetooth/core/bt-init",
+    "//src/connectivity/bluetooth/profiles/bt-rfcomm",
+    "//src/connectivity/bluetooth/tools/bt-snoop",
+  ]
+  base_driver_packages = [
+    {
+      package_target = "//src/connectivity/bluetooth/core/bt-host"
+      driver_components = [ "meta/driver.cm" ]
+    },
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # Driver Framework V1 support
 #
 # feature_set_levels: minimal

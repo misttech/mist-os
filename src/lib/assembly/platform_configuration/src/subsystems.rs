@@ -35,6 +35,7 @@ mod forensics;
 mod graphics;
 mod hwinfo;
 mod identity;
+mod input_groups;
 mod intl;
 mod kernel;
 mod media;
@@ -254,6 +255,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'identity' subsystem")?;
+
+    input_groups::InputGroupsSubsystem::define_configuration(
+        context,
+        &config.platform.input_groups,
+        builder,
+    )
+    .context("Configuring the 'input_groups' subsystem")?;
 
     media::MediaSubsystem::define_configuration(context, &config.platform.media, builder)
         .context("Configuring the 'media' subsystem")?;
