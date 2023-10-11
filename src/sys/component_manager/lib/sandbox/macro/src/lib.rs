@@ -90,47 +90,45 @@ pub fn derive_capability(input: TokenStream) -> TokenStream {
 
     TokenStream::from(quote! {
         impl #impl_generics TryFrom<::sandbox::AnyCapability> for #typename #where_clause {
-            type Error = ();
+            type Error = ::sandbox::ConversionError;
 
             fn try_from(value: ::sandbox::AnyCapability) -> Result<Self, Self::Error> {
                 if value.as_any().is::<Self>() {
                     return Ok(*value.into_any().downcast::<Self>().unwrap());
                 }
-                if let Ok(converted) = <::sandbox::AnyCapability as ::sandbox::Capability>::try_into_capability(value, std::any::TypeId::of::<Self>()) {
-                    return Ok(*converted.downcast::<Self>().unwrap());
-                }
-                return Err(());
+                let converted = <::sandbox::AnyCapability as ::sandbox::Capability>::try_into_capability(value, std::any::TypeId::of::<Self>())?;
+                Ok(*converted.downcast::<Self>().unwrap())
             }
         }
 
         impl #impl_generics_with_lifetime TryFrom<&#lifetime dyn ::sandbox::ErasedCapability> for &#lifetime #typename #where_clause {
-            type Error = ();
+            type Error = ::sandbox::ConversionError;
 
-            fn try_from(value: &dyn ::sandbox::ErasedCapability) -> Result<&#typename, ()> {
-                value.as_any().downcast_ref::<#typename>().ok_or(())
+            fn try_from(value: &dyn ::sandbox::ErasedCapability) -> Result<&#typename, Self::Error> {
+                value.as_any().downcast_ref::<#typename>().ok_or(::sandbox::ConversionError::NotSupported)
             }
         }
 
         impl #impl_generics_with_lifetime TryFrom<&#lifetime mut dyn ::sandbox::ErasedCapability> for &#lifetime mut #typename #where_clause {
-            type Error = ();
+            type Error = ::sandbox::ConversionError;
 
-            fn try_from(value: &mut dyn ::sandbox::ErasedCapability) -> Result<&mut #typename, ()> {
-                value.as_any_mut().downcast_mut::<#typename>().ok_or(())
+            fn try_from(value: &mut dyn ::sandbox::ErasedCapability) -> Result<&mut #typename, Self::Error> {
+                value.as_any_mut().downcast_mut::<#typename>().ok_or(::sandbox::ConversionError::NotSupported)
             }
         }
 
         impl #impl_generics_with_lifetime TryFrom<&#lifetime ::sandbox::AnyCapability> for &#lifetime #typename #where_clause {
-            type Error = ();
+            type Error = ::sandbox::ConversionError;
 
-            fn try_from(value: &::sandbox::AnyCapability) -> Result<&#typename, ()> {
+            fn try_from(value: &::sandbox::AnyCapability) -> Result<&#typename, Self::Error> {
                 value.as_ref().try_into()
             }
         }
 
         impl #impl_generics_with_lifetime TryFrom<&#lifetime mut ::sandbox::AnyCapability> for &#lifetime mut #typename #where_clause {
-            type Error = ();
+            type Error = ::sandbox::ConversionError;
 
-            fn try_from(value: &mut ::sandbox::AnyCapability) -> Result<&mut #typename, ()> {
+            fn try_from(value: &mut ::sandbox::AnyCapability) -> Result<&mut #typename, Self::Error> {
                 let borrowed: &mut dyn ::sandbox::ErasedCapability = <::sandbox::AnyCapability as ::std::borrow::BorrowMut<dyn ::sandbox::ErasedCapability>>::borrow_mut(value);
                 borrowed.try_into()
             }

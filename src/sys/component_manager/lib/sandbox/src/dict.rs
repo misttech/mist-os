@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCapability, AnyCast, Capability, Directory, Open},
+    crate::{AnyCapability, AnyCast, Capability, CloneError, ConversionError, Directory, Open},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -112,7 +112,7 @@ impl Dict {
                                 let (handle, fut) = value.try_clone()?.to_zx_handle();
                                 Ok((fsandbox::DictItem { key: key.clone(), value: handle }, fut))
                             })
-                            .collect::<Result<Vec<_>, ()>>()
+                            .collect::<Result<Vec<_>, CloneError>>()
                             .map_err(|_| fsandbox::DictError::NotCloneable)?;
                         let items: Vec<_> = items
                             .into_iter()
@@ -143,9 +143,10 @@ impl TryInto<Open> for Dict {
     fn try_into(self: Self) -> Result<Open, Self::Error> {
         let dir = pfs::simple();
         for (key, value) in self.entries.into_iter() {
+            let open: Open = value
+                .try_into()
+                .map_err(|err| TryIntoOpenError::ConvertIntoOpen { key: key.clone(), err })?;
             let key: Name = key.try_into().map_err(TryIntoOpenError::ParseNameError)?;
-            let open: Open =
-                value.try_into().map_err(|_| TryIntoOpenError::ValueDoesNotSupportOpen)?;
 
             match dir.add_entry_impl(key, open.into_remote(), false) {
                 Ok(()) => {}
@@ -182,9 +183,13 @@ pub enum TryIntoOpenError {
     #[error("key is not a valid `fuchsia.io` node name")]
     ParseNameError(#[from] vfs::name::ParseNameError),
 
-    /// A value does not support converting into an [Open] capability.
-    #[error("value does not support converting into an Open capability")]
-    ValueDoesNotSupportOpen,
+    /// A value could not be converted into an [Open] capability.
+    #[error("value at '{key}' could not be converted into an Open capability")]
+    ConvertIntoOpen {
+        key: String,
+        #[source]
+        err: ConversionError,
+    },
 }
 
 impl Capability for Dict {
@@ -199,29 +204,32 @@ impl Capability for Dict {
         (dict_client_end.into_handle(), Some(fut.boxed()))
     }
 
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         let entries: BTreeMap<Key, AnyCapability> = self
             .entries
             .iter()
             .map(|(key, value)| Ok((key.clone(), value.try_clone()?)))
-            .collect::<Result<Vec<_>, _>>()?
+            .collect::<Result<Vec<_>, CloneError>>()?
             .into_iter()
             .collect();
         Ok(Self { entries, not_found: self.not_found.clone() })
     }
 
-    fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
+    fn try_into_capability(
+        self,
+        type_id: std::any::TypeId,
+    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());
         } else if type_id == std::any::TypeId::of::<Open>() {
-            let open: Open = self.try_into().map_err(|_| ())?;
+            let open: Open = self.try_into().map_err(anyhow::Error::from)?;
             return Ok(Box::new(open));
         } else if type_id == std::any::TypeId::of::<Directory>() {
-            let open: Open = self.try_into().map_err(|_| ())?;
-            let directory: Directory = open.try_into().map_err(|_| ())?;
+            let open: Open = self.try_into().map_err(anyhow::Error::from)?;
+            let directory: Directory = open.into();
             return Ok(Box::new(directory));
         }
-        Err(())
+        Err(ConversionError::NotSupported)
     }
 }
 
@@ -512,7 +520,7 @@ mod tests {
         dict.entries.insert(CAP_KEY.to_string(), Box::new(Handle::from(event.into_handle())));
         assert_matches!(
             TryInto::<Open>::try_into(dict),
-            Err(TryIntoOpenError::ValueDoesNotSupportOpen)
+            Err(TryIntoOpenError::ConvertIntoOpen { .. })
         );
     }
 

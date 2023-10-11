@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability},
+    crate::{AnyCast, Capability, CloneError},
     fuchsia_zircon::{self as zx, HandleBased},
     futures::future::BoxFuture,
 };
@@ -36,7 +36,11 @@ impl Capability for Handle {
         (self.into(), None)
     }
 
-    fn try_clone(&self) -> Result<Self, ()> {
-        Ok(Self(self.0.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|_| ())?))
+    fn try_clone(&self) -> Result<Self, CloneError> {
+        // Try to duplicate.
+        if let Ok(dup) = self.0.duplicate_handle(zx::Rights::SAME_RIGHTS) {
+            return Ok(Self(dup));
+        }
+        Err(CloneError::NotSupported)
     }
 }

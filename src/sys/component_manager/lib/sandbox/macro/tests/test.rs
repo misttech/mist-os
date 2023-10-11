@@ -4,7 +4,7 @@
 
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::BoxFuture;
-use sandbox::{AnyCapability, Capability, ErasedCapability, Handle};
+use sandbox::{AnyCapability, Capability, CloneError, ConversionError, ErasedCapability, Handle};
 use std::any::{Any, TypeId};
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
@@ -18,7 +18,7 @@ impl Capability for TestHandle {
         (self.0, None)
     }
 
-    fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
+    fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ConversionError> {
         assert_eq!(type_id, TypeId::of::<Handle>());
         Ok(Box::new(Handle::from(self.0)))
     }
@@ -64,7 +64,7 @@ impl Capability for TestCloneable {
         unimplemented!()
     }
 
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
 }

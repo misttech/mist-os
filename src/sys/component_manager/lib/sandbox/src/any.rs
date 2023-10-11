@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{Capability, Handle},
+    crate::{Capability, CloneError, ConversionError, Handle},
     crate_local::{BoxConvert, BoxRemote, TryCloneAny},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
@@ -52,12 +52,18 @@ pub(crate) mod crate_local {
 
     /// An object-safe version of the [Convert] trait that operates on boxed types.
     pub trait BoxConvert {
-        fn try_into_capability(self: Box<Self>, type_id: TypeId) -> Result<Box<dyn Any>, ()>;
+        fn try_into_capability(
+            self: Box<Self>,
+            type_id: TypeId,
+        ) -> Result<Box<dyn Any>, ConversionError>;
     }
 
     impl<T: Capability> BoxConvert for T {
         #[inline]
-        fn try_into_capability(self: Box<Self>, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
+        fn try_into_capability(
+            self: Box<Self>,
+            type_id: TypeId,
+        ) -> Result<Box<dyn Any>, ConversionError> {
             (*self).try_into_capability(type_id)
         }
     }
@@ -65,11 +71,11 @@ pub(crate) mod crate_local {
     /// An object-safe trait that attempts to clone as a type-erased capability.
     pub trait TryCloneAny {
         /// Attempts to clone the type-erased capability.
-        fn try_clone_any(&self) -> Result<AnyCapability, ()>;
+        fn try_clone_any(&self) -> Result<AnyCapability, CloneError>;
     }
 
     impl<T: Capability + 'static> TryCloneAny for T {
-        fn try_clone_any(&self) -> Result<AnyCapability, ()> {
+        fn try_clone_any(&self) -> Result<AnyCapability, CloneError> {
             let clone = self.try_clone()?;
             let any: AnyCapability = Box::new(clone);
             Ok(any)
@@ -87,12 +93,12 @@ impl Capability for AnyCapability {
     }
 
     #[inline]
-    fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ()> {
+    fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ConversionError> {
         self.try_into_capability(type_id)
     }
 
     #[inline]
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.as_ref().try_clone_any()?)
     }
 }
@@ -127,7 +133,7 @@ impl<T: Any> AnyCast for T {
 
 #[cfg(test)]
 mod tests {
-    use crate::{AnyCapability, Capability, Handle};
+    use crate::{AnyCapability, Capability, CloneError, ConversionError, Handle};
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::future::BoxFuture;
     use std::any::TypeId;
@@ -144,7 +150,7 @@ mod tests {
         fn try_into_capability(
             self,
             type_id: std::any::TypeId,
-        ) -> Result<Box<dyn std::any::Any>, ()> {
+        ) -> Result<Box<dyn std::any::Any>, ConversionError> {
             assert_eq!(type_id, TypeId::of::<Handle>());
             Ok(Box::new(Handle::from(self.0)))
         }
@@ -195,7 +201,7 @@ mod tests {
             unimplemented!()
         }
 
-        fn try_clone(&self) -> Result<Self, ()> {
+        fn try_clone(&self) -> Result<Self, CloneError> {
             Ok(self.clone())
         }
     }

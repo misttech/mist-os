@@ -6,7 +6,24 @@ use {
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
     std::{any, fmt::Debug},
+    thiserror::Error,
 };
+
+#[derive(Error, Debug)]
+pub enum ConversionError {
+    #[error("conversion to type is not supported")]
+    NotSupported,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum CloneError {
+    #[error("cloning is not supported")]
+    NotSupported,
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
+}
 
 /// The capability trait, implemented by all capabilities.
 pub trait Capability: AnyCast + TryFrom<AnyCapability> + Debug + Send + Sync {
@@ -25,17 +42,20 @@ pub trait Capability: AnyCast + TryFrom<AnyCapability> + Debug + Send + Sync {
     /// Attempt to convert `self` to a capability of type `type_id`.
     ///
     /// The default implementation supports only the trivial conversion to `self`.
-    fn try_into_capability(self, type_id: any::TypeId) -> Result<Box<dyn any::Any>, ()> {
+    fn try_into_capability(
+        self,
+        type_id: any::TypeId,
+    ) -> Result<Box<dyn any::Any>, ConversionError> {
         if type_id == any::TypeId::of::<Self>() {
             return Ok(Box::new(self) as Box<dyn any::Any>);
         }
-        Err(())
+        Err(ConversionError::NotSupported)
     }
 
     /// Attempts to create a copy of the value.
     ///
     /// The default implementation always returns an error.
-    fn try_clone(&self) -> Result<Self, ()> {
-        Err(())
+    fn try_clone(&self) -> Result<Self, CloneError> {
+        Err(CloneError::NotSupported)
     }
 }

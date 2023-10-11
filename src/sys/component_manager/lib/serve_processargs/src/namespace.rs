@@ -10,6 +10,7 @@ use futures::{
 };
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
 use sandbox::{AnyCapability, Capability, Dict, Directory};
+use std::sync::Arc;
 use thiserror::Error;
 
 /// A builder object for assembling a program's incoming namespace.
@@ -30,9 +31,13 @@ pub enum BuildNamespaceError {
 
     #[error(
         "while installing capabilities within the namespace entry `{path}`, \
-        failed to convert the namespace entry to Directory"
+        failed to convert the namespace entry to Directory: {err}"
     )]
-    Conversion { path: NamespacePath },
+    Conversion {
+        path: NamespacePath,
+        #[source]
+        err: Arc<sandbox::ConversionError>,
+    },
 }
 
 impl NamespaceBuilder {
@@ -96,9 +101,9 @@ impl NamespaceBuilder {
             .flatten()
             .into_iter()
             .map(|(path, cap)| -> Result<NamespaceEntry, BuildNamespaceError> {
-                let directory: Directory = cap
-                    .try_into()
-                    .map_err(|()| BuildNamespaceError::Conversion { path: path.clone() })?;
+                let directory: Directory = cap.try_into().map_err(|err| {
+                    BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
+                })?;
                 let (client_end, fut) = Box::new(directory).to_zx_handle();
                 if let Some(fut) = fut {
                     futures.push(fut);

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::{AnyCast, Capability};
+use crate::{AnyCast, Capability, CloneError};
 use fuchsia_zircon as zx;
 use std::fmt::Debug;
 
@@ -17,7 +17,7 @@ impl<T: Debug + Clone + Send + Sync + 'static> Data<T> {
 }
 
 impl<T: Debug + Clone + Send + Sync + 'static> Capability for Data<T> {
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
 

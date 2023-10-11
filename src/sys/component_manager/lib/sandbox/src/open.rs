@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, Directory},
+    crate::{AnyCast, Capability, CloneError, ConversionError, Directory},
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
@@ -127,18 +127,21 @@ impl From<Open> for Directory {
 }
 
 impl Capability for Open {
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
 
-    fn try_into_capability(self, type_id: std::any::TypeId) -> Result<Box<dyn std::any::Any>, ()> {
+    fn try_into_capability(
+        self,
+        type_id: std::any::TypeId,
+    ) -> Result<Box<dyn std::any::Any>, ConversionError> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());
         } else if type_id == std::any::TypeId::of::<Directory>() {
-            let directory: Directory = self.try_into().map_err(|_| ())?;
+            let directory: Directory = self.try_into().map_err(anyhow::Error::from)?;
             return Ok(Box::new(directory));
         }
-        Err(())
+        Err(ConversionError::NotSupported)
     }
 
     /// Opens the capability with "." path when a request comes from the returned client endpoint.

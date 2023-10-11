@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{receiver::Message, AnyCast, Capability},
+    crate::{receiver::Message, AnyCast, Capability, CloneError},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -38,7 +38,7 @@ impl Clone for Sender {
 }
 
 impl Capability for Sender {
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
 

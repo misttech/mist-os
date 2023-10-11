@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AnyCapability, Capability};
+use crate::{AnyCapability, Capability, CloneError};
 use anyhow::Result;
 use fuchsia_zircon as zx;
 use futures::{future::BoxFuture, FutureExt};
@@ -57,7 +57,7 @@ impl std::fmt::Debug for Lazy {
 }
 
 impl Capability for Lazy {
-    fn try_clone(&self) -> Result<Self, ()> {
+    fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
     }
 
