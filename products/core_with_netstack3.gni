@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//products/common/core.gni")
+include_shell_commands_package = true
+
+product_bootfs_labels = []
+legacy_base_package_labels = []
 
 assembly_fshost = true
 
@@ -11,6 +14,8 @@ product_bootfs_labels +=
 
 legacy_base_package_labels +=
     [ "//src/connectivity/network/netcfg:config-default" ]
+
+legacy_universe_package_labels = [ "//bundles/tools" ]
 
 # Use the product assembly config target to specify the product configuration.
 #

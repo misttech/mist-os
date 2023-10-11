@@ -25,6 +25,10 @@ _base_driver_packages = [
 _platform_configuration_base = {
   build_type = "eng"
 
+  input_groups = {
+    group1 = true
+  }
+
   fonts = {
     enabled = true
   }

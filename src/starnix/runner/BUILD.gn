@@ -5,7 +5,6 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/starnix/kernel/starnix.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("runner") {
   deps = [
@@ -31,10 +30,6 @@ rustc_binary("starnix_runner_bin") {
   ]
 
   sources = [ "main.rs" ]
-}
-
-core_shard("starnix_runner_core_shard") {
-  shard_file = "meta/starnix_runner.core_shard.cml"
 }
 
 fuchsia_package_with_single_component("starnix_package") {

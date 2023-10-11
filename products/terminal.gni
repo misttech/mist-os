@@ -2,7 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//products/common/core.gni")
+include_shell_commands_package = true
+
+product_bootfs_labels = []
+legacy_base_package_labels = []
+legacy_cache_package_labels = []
+core_realm_shards = []
 
 assembly_fshost = true
 
@@ -74,3 +79,5 @@ fuchsia_structured_config_policy =
 
 # Include the session framework
 core_realm_shards += [ "//src/session/bin/session_manager:terminal_core_shard" ]
+
+legacy_universe_package_labels = [ "//bundles/tools" ]

@@ -14,6 +14,10 @@ product_assembly_configuration("terminal") {
   platform = {
     build_type = "eng"
 
+    input_groups = {
+      group1 = true
+    }
+
     storage = {
       configure_fshost = true
       filesystems = {
