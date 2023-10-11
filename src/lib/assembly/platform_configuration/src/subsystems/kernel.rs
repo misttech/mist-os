@@ -9,7 +9,7 @@ pub(crate) struct KernelSubsystem;
 
 impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
     fn define_configuration(
-        _context: &ConfigurationContext<'_>,
+        context: &ConfigurationContext<'_>,
         kernel_config: &PlatformKernelConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
@@ -22,6 +22,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         if kernel_config.lru_memory_compression {
             builder.platform_bundle("kernel_anonymous_memory_compression_eager_lru");
         }
+
+        // If the board supports the PMM checker, and this is an eng build-type
+        // build, enable the pmm checker.
+        if context.board_info.provides_feature("fuchsia::pmm_checker")
+            && context.build_type == &BuildType::Eng
+        {
+            builder.platform_bundle("kernel_pmm_checker_enabled");
+        }
+
         Ok(())
     }
 }

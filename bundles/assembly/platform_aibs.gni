@@ -73,6 +73,7 @@ bootstrap_eng_platform_aib_names = [
 
   # Kernel args
   "kernel_args_eng",
+  "kernel_pmm_checker_enabled",
 
   # SWD (Software Delivery)
   "no_update_checker",

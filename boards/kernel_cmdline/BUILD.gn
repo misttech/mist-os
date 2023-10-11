@@ -56,14 +56,11 @@ group("enable-suspend-from-board") {
 }
 
 declare_args() {
-  # Used to control whether board definitions include PMM checker options.
+  # No longer used, will be removed in a subsequent CL.
   pmm_checker_from_board = true
 }
 
 group("pmm-checker-from-board") {
-  if (pmm_checker_from_board) {
-    deps = [ ":pmm-checker" ]
-  }
 }
 
 # This collects settings not specific to any particular machine that are
@@ -148,7 +145,6 @@ kernel_cmdline("as370") {
 }
 
 kernel_cmdline("vim3") {
-  deps = [ ":pmm-checker-from-board" ]
   args = [
     # Prefer using the built-in NIC to the CDC-ether interface.
     # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
@@ -162,7 +158,6 @@ kernel_cmdline("vim3") {
 
 # Copy from vim3
 kernel_cmdline("av400") {
-  deps = [ ":pmm-checker-from-board" ]
   args = [
     # Prefer using the built-in NIC to the CDC-ether interface.
     # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off
@@ -173,7 +168,6 @@ kernel_cmdline("av400") {
 
 # Copy from av400
 kernel_cmdline("clover") {
-  deps = [ ":pmm-checker-from-board" ]
   args = [
     # Prefer using the built-in NIC to the CDC-ether interface.
     # TODO(https://fxbug.dev/117539): Update topopath when dwmac is off

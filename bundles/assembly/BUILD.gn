@@ -427,6 +427,23 @@ assembly_input_bundle("kernel_args_user") {
   ]
 }
 
+# Added when a board supports the PMM checker (ie, it's real hardware that can
+# do this without a large performance penalty), and when desired by the product
+# (based on build-type).
+assembly_input_bundle("kernel_pmm_checker_enabled") {
+  kernel_cmdline = [
+    # Enable PMM checker to detect certain kinds of buffer overrun and
+    # use-after-free bugs.
+    "kernel.pmm-checker.enable=true",
+
+    # Use a small fill size to minimize performance impact.  In practice,
+    # corruption tends to happen at the start of a page so filling/checking only
+    # the first 16 bytes provides decent coverage without sacrificing
+    # performance.
+    "kernel.pmm-checker.fill-size=16",
+  ]
+}
+
 ########
 #
 # The /core realm AIBs

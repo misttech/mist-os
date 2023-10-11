@@ -46,6 +46,7 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
 BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "bootstrap_eng",
     "kernel_args_eng",
+    "kernel_pmm_checker_enabled",
 ]
 
 # This is the combined set of valid AIBs for "bringup" builds (which are the
