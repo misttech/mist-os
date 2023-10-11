@@ -17,7 +17,7 @@ use std::io::Write;
 use utf8_path::path_relative_from;
 
 /// This plugin will get the path of image from the product bundle, based on the slot and image_type passed in.
-#[ffx_plugin("ffx_product_get_image_path")]
+#[ffx_plugin()]
 pub async fn pb_get_image_path(
     cmd: GetImagePathCommand,
     #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,

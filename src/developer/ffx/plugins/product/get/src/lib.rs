@@ -19,7 +19,7 @@ use std::{
 use structured_ui;
 
 /// `ffx product get` sub-command.
-#[ffx_plugin("product.experimental")]
+#[ffx_plugin()]
 pub async fn pb_get(cmd: GetCommand) -> Result<()> {
     if !cmd.experimental {
         // The --experimental flag is intentionally not advertised to the user,

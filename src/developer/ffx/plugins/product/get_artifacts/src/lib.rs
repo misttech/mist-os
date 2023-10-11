@@ -20,7 +20,7 @@ use utf8_path::path_relative_from;
 /// the product bundle. This group can be used for flashing,
 /// emulator or updating the device depends on the
 /// artifact_group parameter passed in.
-#[ffx_plugin("ffx_product_get_artifacts")]
+#[ffx_plugin()]
 pub async fn pb_get_artifacts(
     cmd: GetArtifactsCommand,
     #[ffx(machine = Vec<RepositoryConfig>)] mut writer: Writer,
