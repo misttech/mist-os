@@ -393,6 +393,10 @@ def write_toml_file(
                 deps.extend(expanded_deps)
                 continue
 
+            # ignore non-rust deps
+            if "crate_name" not in project.targets[dep]:
+                continue
+
             # this is a third-party dependency
             # TODO remove this when all things use GN. temporary hack?
             if "third_party/rust_crates:" in dep:
@@ -414,7 +418,7 @@ def write_toml_file(
                     # the dependency.
                     fout.write("optional = true\n")
             # this is a in-tree rust target
-            elif "crate_name" in project.targets[dep]:
+            else:
                 toolchain = extract_toolchain(dep)
                 version = version_from_toolchain(toolchain)
                 crate_name = lookup_gn_pkg_name(
