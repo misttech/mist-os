@@ -296,6 +296,9 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   std::unordered_map<allocation::GlobalBufferCollectionId, bool> buffer_collection_supports_display_
       FXL_GUARDED_BY(lock_);
 
+  // Keeps track of images imported to display.
+  std::unordered_set<allocation::GlobalImageId> display_imported_images_ FXL_GUARDED_BY(lock_);
+
   // Maps a buffer collection ID to a collection pixel format struct.
   // TODO(fxbug.dev/71344): Delete after we don't need the pixel format anymore.
   std::unordered_map<allocation::GlobalBufferCollectionId, fuchsia::sysmem::PixelFormat>

@@ -417,6 +417,7 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
     return false;
   }
 
+  display_imported_images_.insert(metadata.identifier);
   return true;
 }
 
@@ -429,8 +430,12 @@ void DisplayCompositor::ReleaseBufferImage(const allocation::GlobalImageId image
 
   const fuchsia::hardware::display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
   std::scoped_lock lock(lock_);
-  FX_DCHECK(display_coordinator_);
-  (*display_coordinator_)->ReleaseImage(fidl_image_id);
+
+  if (display_imported_images_.erase(image_id) == 1) {
+    FX_DCHECK(display_coordinator_);
+    (*display_coordinator_)->ReleaseImage(fidl_image_id);
+  }
+
   image_event_map_.erase(image_id);
 }
 
