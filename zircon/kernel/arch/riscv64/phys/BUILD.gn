@@ -16,7 +16,10 @@ if (toolchain_environment == "kernel.phys" ||
   static_library("address-space") {
     visibility = [ "//zircon/kernel/phys:*" ]
     sources = [ "address-space.cc" ]
-    deps = [ "//zircon/kernel/phys:address-space.header" ]
+    deps = [
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/phys:address-space.header",
+    ]
   }
 
   static_library("phys") {

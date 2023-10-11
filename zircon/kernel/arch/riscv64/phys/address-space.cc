@@ -6,12 +6,21 @@
 
 #include "phys/address-space.h"
 
-//
-// TODO(fxbug.dev/91187): Implement me.
-//
+#include <lib/arch/cache.h>
+#include <lib/arch/riscv64/page-table.h>
 
-void ArchSetUpAddressSpaceEarly() {}
+void ArchSetUpAddressSpaceEarly() {
+  AddressSpace aspace;
+  aspace.Init();
+  aspace.SetUpIdentityMappings();
+  aspace.ArchInstall();
+}
 
 void ArchSetUpAddressSpaceLate() {}
 
-void AddressSpace::ArchInstall() const {}
+void AddressSpace::ArchInstall() const {
+  arch::RiscvSatp::Modify([root = root_paddr()](auto& satp) {
+    satp.set_mode(arch::RiscvSatp::Mode::kSv39).set_root_address(root).set_asid(0);
+  });
+  arch::InvalidateLocalTlbs();  // Acts as a barrier as well.
+}
