@@ -96,6 +96,11 @@ zx::result<std::vector<std::string>> GetVisitorFiles(fdf::Namespace& incoming) {
   fidl::WireSyncClient directory{std::move(endpoints->client)};
   while (true) {
     auto result = directory->ReadDirents(fio::kMaxBuf);
+    if (!result.ok()) {
+      FDF_LOG(INFO, "ReadDirents call failed %s", result.status_string());
+      break;
+    }
+
     if (result->s != ZX_OK) {
       FDF_LOG(INFO, "ReadDirents failed %d", result->s);
       break;

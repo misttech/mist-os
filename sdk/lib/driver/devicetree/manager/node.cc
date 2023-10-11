@@ -70,7 +70,8 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     pbus_node_.properties() = node_properties_;
   }
 
-  FDF_LOG(DEBUG, "Adding node '%.*s' to pbus.", (int)name().size(), name().data());
+  FDF_LOG(DEBUG, "Adding node '%.*s' to pbus with instance id %d.", (int)name().size(),
+          name().data(), id_);
   fdf::Arena arena('PBUS');
   fidl::Arena fidl_arena;
   auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pbus_node_));
