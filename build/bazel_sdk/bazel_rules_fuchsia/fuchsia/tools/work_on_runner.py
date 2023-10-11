@@ -14,12 +14,73 @@ import time
 from copy import deepcopy
 
 
+def find_env_file_entry(cwd, key):
+    # tomllib was introduced in python 3.11 which is too new for most of our
+    # repos. If it is not available fall back to a regex
+    try:
+        import tomllib
+
+        loader = build_config_from_toml
+    except ImportError:
+        loader = build_config_from_regex
+
+    cwd = os.path.normpath(cwd)
+    while cwd != "/":
+        config_file = os.path.join(cwd, "fuchsia_env.toml")
+        if os.path.exists(config_file):
+            break
+        # move up a directory and reset our config_file
+        cwd = os.path.dirname(cwd)
+        config_file = None
+
+    if config_file:
+        return loader(config_file, key)
+    else:
+        return None
+
+
+def find_build_config_path(cwd):
+    return find_env_file_entry(cwd, "build_config_path")
+
+
+def find_build_out_dir(cwd):
+    return find_env_file_entry(cwd, "build_out_dir")
+
+
+def build_config_from_toml(file, key):
+    import tomllib
+
+    with open(file, "rb") as f:
+        data = tomllib.load(f)
+        try:
+            config_path = data["fuchsia"]["config"][key]
+            if os.path.isabs(config_path):
+                return config_path
+            else:
+                return os.path.join(os.path.dirname(file), config_path)
+        except Exception as e:
+            print(
+                f"fuchsia_env.toml file does not contain fuchsia.config.{key} entry"
+            )
+    return None
+
+
+def build_config_from_regex(file, key):
+    regex = re.compile('{} = "(.*)"'.format(key))
+    with open(file, "r") as f:
+        for line in f:
+            m = regex.match(line)
+            if m:
+                return m.group(1)
+    return None
+
+
 class FfxRunner:
-    def __init__(self, ffx, cwd):
+    def __init__(self, ffx, env_root):
         # We need to get a absolute path to ffx since we are running from the
         # repository root
         self.ffx = os.path.realpath(ffx)
-        self.cwd = cwd
+        self.env_root = env_root
 
     def run(self, *args):
         try:
@@ -42,7 +103,10 @@ class FfxRunner:
             raise e
 
     def _build_cmd(self, *args):
-        return [self.ffx] + list(args)
+        if self.env_root:
+            return [self.ffx, "--env-root", self.env_root] + list(args)
+        else:
+            return [self.ffx] + list(args)
 
 
 class Context:
@@ -78,14 +142,11 @@ class Context:
             )
 
     def get_out_dir(args, cwd):
-        if os.path.isabs(args.out):
-            return args.out
-        else:
-            return os.path.join(cwd, args.out)
+        return find_build_out_dir(cwd) or os.path.join(cwd, "out")
 
     def __init__(self, args):
         self.cwd = args.project_root
-        self._ffx_runner = FfxRunner(args.ffx, cwd=self.cwd)
+        self._ffx_runner = FfxRunner(args.ffx, env_root=args.project_root)
         self.out_dir = Context.get_out_dir(args, self.cwd)
         self.sdk_id = Context.get_sdk_id(args, self._ffx_runner)
         self.pb_name = args.product
@@ -120,7 +181,7 @@ class Step:
 class Startup(Step):
     def run(self, ctx):
         ctx.log(f"Starting up: ")
-        ctx.log(f"- Taret SDK ID: {ctx.sdk_id}")
+        ctx.log(f"- Target SDK ID: {ctx.sdk_id}")
         ctx.log(f"- Product: {ctx.pb_name}")
         ctx.log(f"- Target: {ctx.target}")
 
@@ -142,7 +203,7 @@ class SetDefaults(Step):
         self.original_build_config = None
 
     def run(self, ctx):
-        build_config_file = SetDefaults.find_build_config_path(ctx)
+        build_config_file = find_build_config_path(ctx.cwd)
         if build_config_file is None:
             return StepEarlyExit(
                 "cannot find build config file. do you have a fuchsia_env.toml file?"
@@ -183,7 +244,7 @@ class SetDefaults(Step):
 
     def cleanup(self, ctx):
         try:
-            config_file = SetDefaults.find_build_config_path(ctx)
+            config_file = find_build_config_path(ctx.cwd)
             if not ctx.keep_build_config:
                 os.remove(config_file)
 
@@ -194,56 +255,6 @@ class SetDefaults(Step):
                     f.write(json.dumps(self.original_build_config, indent=2))
         except:
             pass
-
-    def find_build_config_path(ctx):
-        # tomllib was introduced in python 3.11 which is too new for most of our
-        # repos. If it is not available fall back to a regex
-        try:
-            import tomllib
-
-            loader = SetDefaults.build_config_from_toml
-        except ImportError:
-            loader = SetDefaults.build_config_from_regex
-
-        cwd = os.path.normpath(ctx.cwd)
-        while cwd != "/":
-            config_file = os.path.join(cwd, "fuchsia_env.toml")
-            if os.path.exists(config_file):
-                break
-            # move up a directory and reset our config_file
-            cwd = os.path.dirname(cwd)
-            config_file = None
-
-        if config_file:
-            return loader(ctx, config_file)
-        else:
-            return None
-
-    def build_config_from_toml(ctx, file):
-        import tomllib
-
-        with open(file, "rb") as f:
-            data = tomllib.load(f)
-            try:
-                config_path = data["fuchsia"]["config"]["build_config_path"]
-                if os.path.isabs(config_path):
-                    return config_path
-                else:
-                    return os.path.join(os.path.dirname(file), config_path)
-            except Exception as e:
-                ctx.log(
-                    "fuchsia_env.toml file does not contain fuchsia.config.build_config_path entry"
-                )
-        return None
-
-    def build_config_from_regex(ctx, file):
-        regex = re.compile('build_config_path = "(.*)"')
-        with open(file, "r") as f:
-            for line in f:
-                m = regex.match(line)
-                if m:
-                    return m.group(1)
-        return None
 
 
 class FetchProductBundle(Step):
@@ -422,14 +433,8 @@ def main():
     )
 
     parser.add_argument(
-        "--out",
-        help="The out directory to put the product bundle",
-        default="out",
-    )
-
-    parser.add_argument(
         "--project-root",
-        help="The path to the project root.",
+        help="The path to the project root. This directory should contain the fuchsia-env.toml file",
         default=os.environ.get("BUILD_WORKSPACE_DIRECTORY"),
     )
 
