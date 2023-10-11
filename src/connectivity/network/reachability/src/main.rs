@@ -29,6 +29,10 @@ pub fn main() {
     handler.publish_service(fs.dir("svc"));
 
     let inspector = component::inspector();
+    // Report data on the size of the inspect VMO, and the number of allocation
+    // failures encountered. (Allocation failures can lead to missing data.)
+    component::serve_inspect_stats();
+
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .expect("publish Inspect task");
