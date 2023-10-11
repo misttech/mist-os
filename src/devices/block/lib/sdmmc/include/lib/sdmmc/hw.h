@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_LIB_SDMMC_INCLUDE_LIB_SDMMC_HW_H_
 #define SRC_DEVICES_BLOCK_LIB_SDMMC_INCLUDE_LIB_SDMMC_HW_H_
 
-#include <lib/ddk/device.h>
+#include <stdint.h>
 #include <zircon/compiler.h>
 
 __BEGIN_CDECLS
