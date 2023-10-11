@@ -27,7 +27,6 @@ scrutiny
 sdk
 session
 setui
-storage
 target
 test
 trace

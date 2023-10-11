@@ -74,7 +74,6 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/test:ffx_test",
   "//src/developer/ffx/plugins/trace:ffx_trace",
   "//src/developer/ffx/plugins/wlan:ffx_wlan",
-  "//src/storage/ffx:ffx_storage",
   "//src/virtualization/ffx:ffx_guest",
 ]
 
