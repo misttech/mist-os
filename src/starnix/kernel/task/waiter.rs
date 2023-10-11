@@ -1017,15 +1017,7 @@ impl WaitQueue {
 
     /// Returns whether there is no active waiters waiting on this `WaitQueue`.
     pub fn is_empty(&self) -> bool {
-        let mut waiters = &mut self.0.lock().waiters;
-        Self::retain_waiters_or_remove_from_wait_queues(&mut waiters, |entry| {
-            if entry.waiter.is_valid() {
-                Retention::Keep
-            } else {
-                Retention::Drop
-            }
-        });
-        waiters.is_empty()
+        self.0.lock().waiters.is_empty()
     }
 
     fn retain_waiters(
