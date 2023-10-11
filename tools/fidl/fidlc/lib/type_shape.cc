@@ -161,8 +161,6 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
             return DataSize(8);
           case flat::Decl::Kind::kUnion:
             switch (wire_format()) {
-              case WireFormat::kV1NoEe:
-                return DataSize(24);
               case WireFormat::kV2:
                 return DataSize(16);
             }
@@ -231,8 +229,6 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
 
   std::any Visit(const flat::Union& object) override {
     switch (wire_format()) {
-      case WireFormat::kV1NoEe:
-        return DataSize(24);
       case WireFormat::kV2:
         return DataSize(16);
     }
@@ -582,41 +578,6 @@ class DepthVisitor : public TypeShapeVisitor<DataSize> {
   DataSize Depth(const flat::Object* object) { return Depth(*object); }
 };
 
-// This visitor calculates depth according to the "old" wire format (i.e. with
-// static unions). It leverages |DepthVisitor| for any cases that are wire format
-// dependent, and overrides cases that are different in the old wire format (i.e.
-// unions).
-class OldWireFormatDepthVisitor final : public DepthVisitor {
- public:
-  // A wire format is provided here because the default constructor is disabled. In actuality,
-  // the wire format does not matter as this class is hardcoded to return depth under the
-  // "old" wire format.
-  explicit OldWireFormatDepthVisitor(WireFormat wire_format) : DepthVisitor(wire_format) {}
-
-  // A nullable static union introduces an extra level of depth, since it gets replaced with
-  // a presence pointer.
-  std::any Visit(const flat::IdentifierType& object) override {
-    if (object.nullability == types::Nullability::kNullable &&
-        object.type_decl->kind == flat::Decl::Kind::kUnion) {
-      return DataSize(1) + Depth(object.type_decl);
-    }
-
-    return DepthVisitor::Visit(object);
-  }
-
-  // Static unions do not introduce an extra level of depth because they hold data inline,
-  // without the use of an envelope
-  std::any Visit(const flat::Union& object) override {
-    DataSize max_depth;
-
-    for (const auto& member : object.members) {
-      max_depth = std::max(max_depth, Depth(member));
-    }
-
-    return max_depth;
-  }
-};
-
 class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
  public:
   std::any Visit(const flat::ArrayType& object) override {
@@ -915,9 +876,6 @@ class MaxOutOfLineVisitor final : public TypeShapeVisitor<DataSize> {
 
     DataSize envelope_size = 0;
     switch (wire_format()) {
-      case WireFormat::kV1NoEe:
-        envelope_size = 16;
-        break;
       case WireFormat::kV2:
         envelope_size = 8;
         break;
@@ -1444,13 +1402,6 @@ bool HasFlexibleEnvelope(const flat::Object& object, WireFormat wire_format) {
 }  // namespace
 
 namespace fidl {
-
-uint32_t OldWireFormatDepth(const flat::Object& object) {
-  OldWireFormatDepthVisitor v(WireFormat::kV1NoEe);
-  return object.Accept(&v);
-}
-
-uint32_t OldWireFormatDepth(const flat::Object* object) { return OldWireFormatDepth(*object); }
 
 TypeShape::TypeShape(const flat::Object& object, WireFormat wire_format)
     : inline_size(::AlignedSize(object, wire_format)),

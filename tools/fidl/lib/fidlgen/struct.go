@@ -124,16 +124,11 @@ type WireFormatVersion int
 
 const (
 	_ = iota
-	WireFormatVersionV1
 	WireFormatVersionV2
 )
 
 func getTypeShapeFunc(wireFormatVersion WireFormatVersion) func(Struct) TypeShape {
 	switch wireFormatVersion {
-	case WireFormatVersionV1:
-		return func(s Struct) TypeShape {
-			return s.TypeShapeV1
-		}
 	case WireFormatVersionV2:
 		return func(s Struct) TypeShape {
 			return s.TypeShapeV2
@@ -145,10 +140,6 @@ func getTypeShapeFunc(wireFormatVersion WireFormatVersion) func(Struct) TypeShap
 
 func getFieldShapeFunc(wireFormatVersion WireFormatVersion) func(StructMember) FieldShape {
 	switch wireFormatVersion {
-	case WireFormatVersionV1:
-		return func(s StructMember) FieldShape {
-			return s.FieldShapeV1
-		}
 	case WireFormatVersionV2:
 		return func(s StructMember) FieldShape {
 			return s.FieldShapeV2

@@ -34,16 +34,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -62,10 +52,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -75,16 +61,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -103,10 +79,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 2,
-            "padding": 1
-          },
           "field_shape_v2": {
             "offset": 2,
             "padding": 1
@@ -115,16 +87,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 4,
-        "alignment": 2,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 4,
         "alignment": 2,
@@ -152,16 +114,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -180,10 +132,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 1
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 1
@@ -193,16 +141,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -221,10 +159,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 2,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 2,
             "padding": 0
@@ -233,16 +167,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 4,
-        "alignment": 2,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 4,
         "alignment": 2,
@@ -270,16 +194,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -298,10 +212,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 1
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 1
@@ -311,16 +221,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -339,10 +239,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 2,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 2,
             "padding": 0
@@ -352,16 +248,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -380,10 +266,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 1
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 1
@@ -392,16 +274,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 6,
-        "alignment": 2,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 6,
         "alignment": 2,
@@ -429,16 +301,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -457,10 +319,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -470,16 +328,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -498,10 +346,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 2
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 2
@@ -510,16 +354,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 8,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 8,
         "alignment": 4,
@@ -547,16 +381,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -575,10 +399,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 2
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 2
@@ -588,16 +408,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -616,10 +426,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 0
@@ -628,16 +434,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 8,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 8,
         "alignment": 4,
@@ -665,16 +461,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -693,10 +479,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -706,16 +488,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -734,10 +506,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 3
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 3
@@ -746,16 +514,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 8,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 8,
         "alignment": 4,
@@ -783,16 +541,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -811,10 +559,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 3
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 3
@@ -824,16 +568,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -852,10 +586,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 0
@@ -864,16 +594,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 8,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 8,
         "alignment": 4,
@@ -901,16 +621,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -929,10 +639,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -942,16 +648,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -970,10 +666,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 4,
-            "padding": 1
-          },
           "field_shape_v2": {
             "offset": 4,
             "padding": 1
@@ -983,16 +675,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1011,10 +693,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 6,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 6,
             "padding": 0
@@ -1024,16 +702,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1052,10 +720,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 2
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 2
@@ -1064,16 +728,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 12,
-        "alignment": 4,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 12,
         "alignment": 4,
@@ -1101,16 +755,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1129,10 +773,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -1142,16 +782,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1170,10 +800,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 4
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 4
@@ -1182,16 +808,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1219,16 +835,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint32",
-            "type_shape_v1": {
-              "inline_size": 4,
-              "alignment": 4,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -1247,10 +853,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 4
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 4
@@ -1260,16 +862,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1288,10 +880,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -1300,16 +888,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1337,16 +915,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1365,10 +933,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -1378,16 +942,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1406,10 +960,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -1419,16 +969,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -1447,10 +987,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 10,
-            "padding": 5
-          },
           "field_shape_v2": {
             "offset": 10,
             "padding": 5
@@ -1459,16 +995,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1496,16 +1022,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1524,10 +1040,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -1537,16 +1049,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -1565,10 +1067,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 2,
-            "padding": 5
-          },
           "field_shape_v2": {
             "offset": 2,
             "padding": 5
@@ -1578,16 +1076,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1606,10 +1094,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -1618,16 +1102,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1655,16 +1129,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1683,10 +1147,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -1696,16 +1156,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1724,10 +1174,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 6
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 6
@@ -1736,16 +1182,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1773,16 +1209,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint16",
-            "type_shape_v1": {
-              "inline_size": 2,
-              "alignment": 2,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 2,
@@ -1801,10 +1227,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 6
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 6
@@ -1814,16 +1236,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1842,10 +1254,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -1854,16 +1262,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -1891,16 +1289,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1919,10 +1307,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -1932,16 +1316,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -1960,10 +1334,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 7
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 7
@@ -1972,16 +1342,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -2009,16 +1369,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint8",
-            "type_shape_v1": {
-              "inline_size": 1,
-              "alignment": 1,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -2037,10 +1387,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 0,
-            "padding": 7
-          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 7
@@ -2050,16 +1396,6 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
-            "type_shape_v1": {
-              "inline_size": 8,
-              "alignment": 8,
-              "depth": 0,
-              "max_handles": 0,
-              "max_out_of_line": 0,
-              "has_padding": false,
-              "has_envelope": false,
-              "has_flexible_envelope": false
-            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -2078,10 +1414,6 @@
             "column": 5,
             "length": 1
           },
-          "field_shape_v1": {
-            "offset": 8,
-            "padding": 0
-          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -2090,16 +1422,6 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
-      "type_shape_v1": {
-        "inline_size": 16,
-        "alignment": 8,
-        "depth": 0,
-        "max_handles": 0,
-        "max_out_of_line": 0,
-        "has_padding": true,
-        "has_envelope": false,
-        "has_flexible_envelope": false
-      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
