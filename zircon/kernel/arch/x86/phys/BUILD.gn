@@ -293,7 +293,7 @@ if (current_toolchain == default_toolchain) {
   # x86-specific definitions for things in <phys/address-space.h>.
   static_library("address-space") {
     visibility = [ "//zircon/kernel/phys:address-space" ]
-    sources = [ "address-space-identity.cc" ]
+    sources = [ "address-space-install.cc" ]
     if (toolchain_environment == "kernel.phys32") {
       sources += [ "address-space-32.cc" ]
     } else {

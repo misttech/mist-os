@@ -6,9 +6,12 @@
 
 #include "phys/address-space.h"
 
-void ArchSetUpAddressSpaceEarly() {
-  // TODO(mcgrathr): unclear if we need identity-mapping or can just leave
-  // translation turned off in the satp.
-}
+//
+// TODO(fxbug.dev/91187): Implement me.
+//
+
+void ArchSetUpAddressSpaceEarly() {}
 
 void ArchSetUpAddressSpaceLate() {}
+
+void AddressSpace::ArchInstall() const {}
