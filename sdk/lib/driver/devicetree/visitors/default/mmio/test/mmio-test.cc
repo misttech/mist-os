@@ -48,5 +48,55 @@ TEST(MmioVisitorTest, ReadRegSuccessfully) {
   ASSERT_EQ((uint64_t)REG_C_LENGTH_WORD0 << 32 | REG_C_LENGTH_WORD1, *(*mmio)[2].length());
 }
 
+TEST(MmioVisitorTest, TranslateRegSuccessfully) {
+  VisitorRegistry visitors;
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<BindPropertyVisitor>()).is_ok());
+
+  auto tester = std::make_unique<MmioVisitorTester>("/pkg/test-data/ranges.dtb");
+  MmioVisitorTester* mmio_tester = tester.get();
+  ASSERT_TRUE(visitors.RegisterVisitor(std::move(tester)).is_ok());
+  ASSERT_TRUE(mmio_tester->manager()->Walk(visitors).is_ok());
+  ASSERT_TRUE(mmio_tester->has_visited());
+  ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
+
+  auto parent_mmio = mmio_tester->env()
+                         .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
+                         .mmio();
+  auto child_mmio = mmio_tester->env()
+                        .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 2)
+                        .mmio();
+
+  ASSERT_TRUE(parent_mmio);
+  ASSERT_TRUE(child_mmio);
+  ASSERT_EQ(1lu, parent_mmio->size());
+  ASSERT_EQ(1lu, child_mmio->size());
+  ASSERT_EQ(RANGE_BASE, *(*parent_mmio)[0].base());
+  ASSERT_EQ(RANGE_OFFSET + RANGE_BASE, *(*child_mmio)[0].base());
+  ASSERT_EQ((uint64_t)RANGE_SIZE, *(*parent_mmio)[0].length());
+  ASSERT_EQ((uint64_t)RANGE_OFFSET_SIZE, *(*child_mmio)[0].length());
+}
+
+TEST(MmioVisitorTest, IgnoreRegWhichIsNotMmio) {
+  VisitorRegistry visitors;
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<BindPropertyVisitor>()).is_ok());
+
+  auto tester = std::make_unique<MmioVisitorTester>("/pkg/test-data/not-mmio.dtb");
+  MmioVisitorTester* mmio_tester = tester.get();
+  ASSERT_TRUE(visitors.RegisterVisitor(std::move(tester)).is_ok());
+  ASSERT_TRUE(mmio_tester->manager()->Walk(visitors).is_ok());
+  ASSERT_TRUE(mmio_tester->has_visited());
+  ASSERT_TRUE(mmio_tester->DoPublish().is_ok());
+
+  auto parent_mmio = mmio_tester->env()
+                         .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 1)
+                         .mmio();
+  auto child_mmio = mmio_tester->env()
+                        .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, 2)
+                        .mmio();
+
+  ASSERT_FALSE(parent_mmio);
+  ASSERT_FALSE(child_mmio);
+}
+
 }  // namespace
 }  // namespace fdf_devicetree

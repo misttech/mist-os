@@ -48,11 +48,32 @@ resource("mmio-dtb-file") {
   deps = [ ":mmio-dtb" ]
 }
 
+dtb("ranges-dtb") {
+  sources = [ "test/dts/ranges.dts.S" ]
+}
+
+resource("ranges-dtb-file") {
+  sources = get_target_outputs(":ranges-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":ranges-dtb" ]
+}
+
+dtb("not-mmio-dtb") {
+  sources = [ "test/dts/not-mmio.dts.S" ]
+}
+resource("not-mmio-dtb-file") {
+  sources = get_target_outputs(":not-mmio-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":not-mmio-dtb" ]
+}
+
 # can the two targets below be combined?
 fuchsia_unittest_package("mmio-visitor-test") {
   component_name = "mmio-visitor-test"
   deps = [
     ":mmio-dtb-file",
     ":mmio-visitor-test-bin",
+    ":not-mmio-dtb-file",
+    ":ranges-dtb-file",
   ]
 }

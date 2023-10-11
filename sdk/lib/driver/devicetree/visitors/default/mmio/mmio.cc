@@ -31,12 +31,17 @@ zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& d
   }
 
   for (uint32_t i = 0; i < reg_props->size(); i++) {
-    fuchsia_hardware_platform_bus::Mmio mmio;
-    mmio.base() = (*reg_props)[i].address();
-    mmio.length() = (*reg_props)[i].size();
-    node.AddMmio(std::move(mmio));
-    FDF_LOG(DEBUG, "MMIO [0x%0lx, 0x%lx) added to node '%s'.", *mmio.base(),
-            *mmio.base() + *mmio.length(), node.name().data());
+    if ((*reg_props)[i].size()) {
+      fuchsia_hardware_platform_bus::Mmio mmio;
+      mmio.base() = decoder.TranslateAddress(*(*reg_props)[i].address());
+      mmio.length() = (*reg_props)[i].size();
+      node.AddMmio(std::move(mmio));
+      FDF_LOG(DEBUG, "MMIO [0x%0lx, 0x%lx) added to node '%s'.", *mmio.base(),
+              *mmio.base() + *mmio.length(), node.name().data());
+    } else {
+      FDF_LOG(DEBUG, "Node '%s' reg is not mmio.", node.name().data());
+      break;
+    }
   }
 
   return zx::ok();
