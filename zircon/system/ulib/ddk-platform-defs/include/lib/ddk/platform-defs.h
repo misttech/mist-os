@@ -86,6 +86,7 @@
 #define PDEV_PID_AV400              0x0F
 #define PDEV_PID_PINECREST          0x10
 #define PDEV_PID_CLOVER             0x11
+#define PDEV_PID_VIOLET             0x12
 
 #define PDEV_DID_GAUSS_AUDIO_IN     0x01
 #define PDEV_DID_GAUSS_AUDIO_OUT    0x02

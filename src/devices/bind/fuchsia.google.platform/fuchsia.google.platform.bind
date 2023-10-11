@@ -24,6 +24,7 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   MOTMOT = 0x0E,
   PINECREST = 0x10,
   CLOVER = 0x11,
+  VIOLET = 0x12,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
