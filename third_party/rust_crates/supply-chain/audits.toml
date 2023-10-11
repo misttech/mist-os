@@ -221,3 +221,10 @@ who = "David Koloski <dkoloski@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 delta = "0.3.1 -> 0.3.15"
 notes = "Reviewed on https://fxrev.dev/907708"
+
+[[audits.utf8parse]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+version = "0.2.1"
+notes = "Reviewed on https://fxrev.dev/904811"
+
