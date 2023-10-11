@@ -381,11 +381,6 @@ class FidlDevice : public DdkFidlDeviceBase, public fidl::Server<fuchsia_hardwar
   zx_status_t Bind();
   void DdkRelease() { delete this; }
 
-  // SysmemProtocol FIDL implementation.
-  void ConnectServer(ConnectServerRequest& request,
-                     ConnectServerCompleter::Sync& completer) override;
-  void ConnectServerV2(ConnectServerV2Request& request,
-                       ConnectServerV2Completer::Sync& completer) override;
   void RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) override;
   void RegisterSecureMem(RegisterSecureMemRequest& request,
                          RegisterSecureMemCompleter::Sync& completer) override;

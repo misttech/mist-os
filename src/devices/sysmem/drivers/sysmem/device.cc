@@ -1243,30 +1243,6 @@ zx_status_t FidlDevice::Bind() {
   return ZX_OK;
 }
 
-void FidlDevice::ConnectServer(ConnectServerRequest& request,
-                               ConnectServerCompleter::Sync& completer) {
-  zx_status_t status =
-      sysmem_device_->CommonSysmemConnectV1(request.allocator_request().TakeChannel());
-  if (status != ZX_OK) {
-    completer.Close(status);
-    return;
-  }
-}
-
-void FidlDevice::ConnectServerV2(ConnectServerV2Request& request,
-                                 ConnectServerV2Completer::Sync& completer) {
-  if (!request.allocator_request().is_valid()) {
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  zx_status_t status =
-      sysmem_device_->CommonSysmemConnectV2(request.allocator_request().TakeChannel());
-  if (status != ZX_OK) {
-    completer.Close(status);
-    return;
-  }
-}
-
 void FidlDevice::RegisterHeap(RegisterHeapRequest& request,
                               RegisterHeapCompleter::Sync& completer) {
   zx_status_t status = sysmem_device_->CommonSysmemRegisterHeap(

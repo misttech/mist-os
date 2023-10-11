@@ -12,21 +12,6 @@ using zx;
 /// memory.
 @discoverable
 closed protocol Sysmem {
-    /// Takes the server end of a FIDL connection that'll serve
-    /// fuchsia.sysmem.Allocator.  If the connection fails, the channel will
-    /// close.
-    //
-    // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
-    strict ConnectServer(resource struct {
-        allocator_request server_end:fuchsia.sysmem.Allocator;
-    });
-
-    // TODO(fxb/104188): Maybe remove this method (see discussion in bug).
-    //@transitional("Switch to requesting Allocator instead of serving this method.")
-    strict ConnectServerV2(resource struct {
-        allocator_request server_end:fuchsia.sysmem2.Allocator;
-    });
-
     /// Takes the client end of a FIDL connection that'll serve
     /// fuchsia.sysmem2.Heap.
     strict RegisterHeap(resource struct {
