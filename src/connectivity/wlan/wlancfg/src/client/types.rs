@@ -7,8 +7,8 @@ use {
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     wlan_common::{
-        self, bss::BssDescription, channel::Channel, hasher::WlanHasher,
-        security::SecurityAuthenticator, sequestered::Sequestered,
+        self, bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
+        sequestered::Sequestered,
     },
     wlan_metrics_registry::{
         PolicyConnectionAttemptMigratedMetricDimensionReason,
@@ -197,7 +197,6 @@ pub struct ScannedCandidate {
     pub network_has_multiple_bss: bool,
     pub authenticator: SecurityAuthenticator,
     pub saved_network_info: InternalSavedNetworkData,
-    pub hasher: WlanHasher,
 }
 
 /// Selected network candidate for a connection.

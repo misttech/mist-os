@@ -1484,7 +1484,7 @@ mod tests {
             regulatory_manager::REGION_CODE_LEN,
             telemetry::{TelemetryEvent, TelemetrySender},
             util::testing::{
-                create_inspect_persistence_channel, create_wlan_hasher, fakes::FakeScanRequester,
+                create_inspect_persistence_channel, fakes::FakeScanRequester,
                 generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
                 poll_sme_req,
             },
@@ -1505,10 +1505,7 @@ mod tests {
         pin_utils::pin_mut,
         std::convert::TryFrom,
         test_case::test_case,
-        wlan_common::{
-            assert_variant, channel::Cbw, hasher::WlanHasher, random_fidl_bss_description,
-            RadioConfig,
-        },
+        wlan_common::{assert_variant, channel::Cbw, random_fidl_bss_description, RadioConfig},
     };
 
     // Responses that FakePhyManager will provide
@@ -1550,7 +1547,6 @@ mod tests {
         pub stats_receiver: ConnectionStatsReceiver,
         pub defect_sender: mpsc::UnboundedSender<Defect>,
         pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
-        pub hasher: WlanHasher,
     }
 
     /// Create a TestValues for a unit test.
@@ -1572,11 +1568,9 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let scan_requester = Arc::new(FakeScanRequester::new());
-        let hasher = create_wlan_hasher();
         let connection_selector = Arc::new(ConnectionSelector::new(
             saved_networks.clone(),
             scan_requester.clone(),
-            hasher.clone(),
             inspector.root().create_child("connection_selection"),
             persistence_req_sender,
             telemetry_sender.clone(),
@@ -1601,7 +1595,6 @@ mod tests {
             stats_receiver,
             defect_sender,
             defect_receiver,
-            hasher,
         }
     }
 
@@ -2489,7 +2482,6 @@ mod tests {
         let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester.clone(),
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4349,7 +4341,6 @@ mod tests {
         let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4408,7 +4399,6 @@ mod tests {
         let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4456,7 +4446,6 @@ mod tests {
         let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -4602,7 +4591,6 @@ mod tests {
         let connection_selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks,
             test_values.scan_requester,
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5258,7 +5246,6 @@ mod tests {
         let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5559,7 +5546,6 @@ mod tests {
         let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -5603,7 +5589,6 @@ mod tests {
         let selector = Arc::new(ConnectionSelector::new(
             test_values.saved_networks.clone(),
             test_values.scan_requester.clone(),
-            test_values.hasher.clone(),
             inspect::Inspector::default().root().create_child("connection_selector"),
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),

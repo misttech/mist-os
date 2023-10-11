@@ -14,10 +14,8 @@ use {
         channel::{mpsc, oneshot},
         Future, StreamExt,
     },
-    rand,
     std::pin::Pin,
     tracing::{error, info},
-    wlan_common::hasher::WlanHasher,
     wlan_mlme::{
         buffer::BufferProvider,
         device::{Device, DeviceInterface, DeviceOps, WlanSoftmacIfcProtocol},
@@ -258,10 +256,6 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         }
     };
 
-    // According to doc, `rand::random` uses ThreadRng, which is cryptographically secure:
-    // https://docs.rs/rand/0.5.0/rand/rngs/struct.ThreadRng.html
-    let wlan_hasher = WlanHasher::new(rand::random::<u64>().to_le_bytes());
-
     // TODO(fxbug.dev/113677): Get persistence working by adding the appropriate configs
     //                         in *.cml files
     let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
@@ -300,7 +294,6 @@ async fn wlansoftmac_thread<D: DeviceOps>(
         security_support,
         spectrum_management_support,
         inspect_usme_node,
-        wlan_hasher,
         persistence_req_sender,
         generic_sme_stream,
     ) {

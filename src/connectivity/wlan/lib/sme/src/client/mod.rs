@@ -39,7 +39,6 @@ use {
         bss::{BssDescription, Protection as BssProtection},
         capabilities::derive_join_capabilities,
         channel::Channel,
-        hasher::WlanHasher,
         ie::{self, rsn::rsne, wsc},
         scan::{Compatibility, ScanResult},
         security::{SecurityAuthenticator, SecurityDescriptor},
@@ -497,7 +496,6 @@ impl ClientSme {
         cfg: ClientConfig,
         info: fidl_mlme::DeviceInfo,
         inspect_node: fuchsia_inspect::Node,
-        hasher: WlanHasher,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         mac_sublayer_support: fidl_common::MacSublayerSupport,
         security_support: fidl_common::SecuritySupport,
@@ -506,7 +504,7 @@ impl ClientSme {
         let device_info = Arc::new(info);
         let (mlme_sink, mlme_stream) = mpsc::unbounded();
         let (mut timer, time_stream) = timer::create_timer();
-        let inspect = Arc::new(inspect::SmeTree::new(inspect_node, hasher));
+        let inspect = Arc::new(inspect::SmeTree::new(inspect_node));
         let _ = timer.schedule(event::InspectPulseCheck);
         let _ = timer.schedule(event::InspectPulsePersist);
         let mut auto_persist_last_pulse =
@@ -562,10 +560,7 @@ impl ClientSme {
             }
         };
 
-        info!(
-            "Received ConnectRequest for {}",
-            bss_description.to_string(&self.context.inspect.hasher)
-        );
+        info!("Received ConnectRequest for {}", bss_description);
 
         if self
             .cfg
@@ -599,9 +594,7 @@ impl ClientSme {
                     "{:?}",
                     format!(
                         "Failed to configure protection for network {} ({}): {:?}",
-                        self.context.inspect.hasher.hash_ssid(&bss_description.ssid),
-                        bss_description.bssid,
-                        error
+                        bss_description.ssid, bss_description.bssid, error
                     )
                 );
                 connect_txn_sink
@@ -824,7 +817,6 @@ mod tests {
     lazy_static! {
         static ref CLIENT_ADDR: MacAddr = [0x7A, 0xE7, 0x76, 0xD9, 0xF2, 0x67].into();
     }
-    const DUMMY_HASH_KEY: [u8; 8] = [88, 77, 66, 55, 44, 33, 22, 11];
 
     fn authentication_open() -> fidl_security::Authentication {
         fidl_security::Authentication { protocol: fidl_security::Protocol::Open, credentials: None }
@@ -1196,7 +1188,6 @@ mod tests {
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
-            WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             mac_sublayer_support,
             fake_security_support(),
@@ -1716,7 +1707,6 @@ mod tests {
             ClientConfig::from_config(SmeConfig::default().with_wep(), false),
             test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
-            WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             fake_mac_sublayer_support(),
             fake_security_support(),
@@ -1797,7 +1787,6 @@ mod tests {
             ClientConfig::default(),
             test_utils::fake_device_info(*CLIENT_ADDR),
             sme_root_node,
-            WlanHasher::new(DUMMY_HASH_KEY),
             persistence_req_sender,
             mac_sublayer_support,
             fake_security_support(),

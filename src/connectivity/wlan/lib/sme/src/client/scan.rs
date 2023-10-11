@@ -355,7 +355,6 @@ mod tests {
     use test_case::test_case;
     use wlan_common::{
         assert_variant, fake_bss_description, fake_fidl_bss_description,
-        hasher::WlanHasher,
         test_utils::{
             fake_capabilities::fake_5ghz_band_capability,
             fake_features::fake_spectrum_management_support_empty,
@@ -911,9 +910,7 @@ mod tests {
 
     fn sme_inspect() -> (Inspector, Arc<inspect::SmeTree>) {
         let inspector = Inspector::default();
-        let hasher = WlanHasher::new([88, 77, 66, 55, 44, 33, 22, 11]);
-        let sme_inspect =
-            Arc::new(inspect::SmeTree::new(inspector.root().create_child("sme"), hasher));
+        let sme_inspect = Arc::new(inspect::SmeTree::new(inspector.root().create_child("sme")));
         (inspector, sme_inspect)
     }
 }

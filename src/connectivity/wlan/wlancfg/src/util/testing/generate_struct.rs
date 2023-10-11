@@ -16,7 +16,6 @@ use {
     std::convert::TryFrom,
     wlan_common::{
         channel::{Cbw, Channel},
-        hasher::WlanHasher,
         random_fidl_bss_description,
         scan::Compatibility,
         security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor},
@@ -297,7 +296,6 @@ pub fn generate_random_scanned_candidate() -> types::ScannedCandidate {
         network_has_multiple_bss: rng.gen::<bool>(),
         authenticator: generate_random_authenticator(),
         saved_network_info: generate_random_saved_network_data(),
-        hasher: WlanHasher::new(rng.gen::<u64>().to_le_bytes()),
     }
 }
 

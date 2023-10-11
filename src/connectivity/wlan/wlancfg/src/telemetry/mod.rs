@@ -53,7 +53,6 @@ use {
         },
     },
     tracing::{error, info, warn},
-    wlan_common::hasher::WlanHasher,
     wlan_metrics_registry as metrics,
 };
 
@@ -415,7 +414,6 @@ pub fn serve_telemetry(
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
-    hasher: WlanHasher,
     inspect_node: InspectNode,
     external_inspect_node: InspectNode,
     persistence_req_sender: auto_persist::PersistenceReqSender,
@@ -437,7 +435,6 @@ pub fn serve_telemetry(
             monitor_svc_proxy,
             cobalt_1dot1_proxy,
             new_cobalt_1dot1_proxy,
-            hasher,
             inspect_node,
             external_inspect_node,
             persistence_req_sender,
@@ -560,13 +557,8 @@ fn inspect_create_counters(
     })
 }
 
-fn inspect_record_connection_status(
-    inspect_node: &InspectNode,
-    hasher: WlanHasher,
-    telemetry_sender: TelemetrySender,
-) {
+fn inspect_record_connection_status(inspect_node: &InspectNode, telemetry_sender: TelemetrySender) {
     inspect_node.record_lazy_child("connection_status", move|| {
-        let hasher = hasher.clone();
         let telemetry_sender = telemetry_sender.clone();
         async move {
             let inspector = Inspector::default();
@@ -592,7 +584,6 @@ fn inspect_record_connection_status(
                     snr_db: ap_state.tracked.signal.snr_db,
                     bssid: ap_state.original().bssid.to_string(),
                     ssid: ap_state.original().ssid.to_string(),
-                    ssid_hash: hasher.hash_ssid(&ap_state.original().ssid),
                     protection: format!("{:?}", ap_state.original().protection()),
                     channel: {
                         primary: fidl_channel.primary,
@@ -825,9 +816,6 @@ pub struct Telemetry {
     last_checked_connection_state: fasync::Time,
     stats_logger: StatsLogger,
 
-    // For hashing SSID and BSSID before outputting into Inspect
-    hasher: WlanHasher,
-
     // Inspect properties/nodes that telemetry hangs onto
     inspect_node: InspectNode,
     get_iface_stats_fail_count: UintProperty,
@@ -858,13 +846,12 @@ impl Telemetry {
         monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
         new_cobalt_1dot1_proxy: CreateMetricsLoggerFn,
-        hasher: WlanHasher,
         inspect_node: InspectNode,
         external_inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
     ) -> Self {
         let stats_logger = StatsLogger::new(cobalt_1dot1_proxy, &inspect_node);
-        inspect_record_connection_status(&inspect_node, hasher.clone(), telemetry_sender.clone());
+        inspect_record_connection_status(&inspect_node, telemetry_sender.clone());
         let get_iface_stats_fail_count = inspect_node.create_uint("get_iface_stats_fail_count", 0);
         let scan_events = inspect_node.create_child("scan_events");
         let connect_events = inspect_node.create_child("connect_events");
@@ -877,7 +864,6 @@ impl Telemetry {
             connection_state: ConnectionState::Idle(IdleState { connect_start_time: None }),
             last_checked_connection_state: fasync::Time::now(),
             stats_logger,
-            hasher,
             inspect_node,
             get_iface_stats_fail_count,
             scan_events_node: Mutex::new(AutoPersist::new(
@@ -1371,7 +1357,6 @@ impl Telemetry {
             network: {
                 bssid: ap_state.original().bssid.to_string(),
                 ssid: ap_state.original().ssid.to_string(),
-                ssid_hash: self.hasher.hash_ssid(&ap_state.original().ssid),
                 rssi_dbm: ap_state.tracked.signal.rssi_dbm,
                 snr_db: ap_state.tracked.signal.snr_db,
             },
@@ -1388,7 +1373,6 @@ impl Telemetry {
                 snr_db: info.ap_state.tracked.signal.snr_db,
                 bssid: info.ap_state.original().bssid.to_string(),
                 ssid: info.ap_state.original().ssid.to_string(),
-                ssid_hash: self.hasher.hash_ssid(&info.ap_state.original().ssid),
                 protection: format!("{:?}", info.ap_state.original().protection()),
                 channel: {
                     primary: fidl_channel.primary,
@@ -3555,8 +3539,8 @@ mod tests {
     use {
         super::*,
         crate::util::testing::{
-            create_inspect_persistence_channel, create_wlan_hasher, generate_random_bss,
-            generate_random_channel, generate_random_scanned_candidate,
+            create_inspect_persistence_channel, generate_random_bss, generate_random_channel,
+            generate_random_scanned_candidate,
         },
         diagnostics_assertions::{
             AnyBoolProperty, AnyNumericProperty, AnyStringProperty, NonZeroUintProperty,
@@ -3566,7 +3550,7 @@ mod tests {
         fidl_fuchsia_wlan_stats,
         fuchsia_inspect::Inspector,
         futures::{pin_mut, stream::FusedStream, task::Poll, TryStreamExt},
-        ieee80211_testutils::{BSSID_REGEX, SSID_HASH_REGEX, SSID_REGEX},
+        ieee80211_testutils::{BSSID_REGEX, SSID_REGEX},
         rand::Rng,
         regex::Regex,
         std::{cmp::min, collections::VecDeque, pin::Pin},
@@ -3710,7 +3694,6 @@ mod tests {
                         network: {
                             bssid: &*BSSID_REGEX,
                             ssid: &*SSID_REGEX,
-                            ssid_hash: &*SSID_HASH_REGEX,
                             rssi_dbm: AnyNumericProperty,
                             snr_db: AnyNumericProperty,
                         }
@@ -3736,7 +3719,6 @@ mod tests {
                         snr_db: AnyNumericProperty,
                         bssid: &*BSSID_REGEX,
                         ssid: &*SSID_REGEX,
-                        ssid_hash: &*SSID_HASH_REGEX,
                         protection: AnyStringProperty,
                         channel: {
                             primary: AnyNumericProperty,
@@ -3788,7 +3770,6 @@ mod tests {
                             snr_db: AnyNumericProperty,
                             bssid: &*BSSID_REGEX,
                             ssid: &*SSID_REGEX,
-                            ssid_hash: &*SSID_HASH_REGEX,
                             protection: AnyStringProperty,
                             channel: {
                                 primary: AnyNumericProperty,
@@ -7977,7 +7958,6 @@ mod tests {
                 let cobalt_1dot1_proxy = cobalt_1dot1_proxy.clone();
                 async move { Ok(cobalt_1dot1_proxy) }.boxed()
             }),
-            create_wlan_hasher(),
             inspect_node,
             external_inspect_node.create_child("stats"),
             persistence_req_sender,

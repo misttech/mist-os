@@ -21,9 +21,8 @@ use {
         channel::{mpsc, oneshot},
         select, StreamExt,
     },
-    rand,
     tracing::{error, info, warn},
-    wlan_common::{hasher::WlanHasher, sink::UnboundedSink},
+    wlan_common::sink::UnboundedSink,
     wlan_sme::{self, serve::create_sme},
 };
 
@@ -286,10 +285,6 @@ impl FullmacMlme {
         let spectrum_management_support =
             banjo_to_fidl::convert_spectrum_management_support(support);
 
-        // According to doc, `rand::random` uses ThreadRng, which is cryptographically secure:
-        // https://docs.rs/rand/0.5.0/rand/rngs/struct.ThreadRng.html
-        let wlan_hasher = WlanHasher::new(rand::random::<u64>().to_le_bytes());
-
         // TODO(fxbug.dev/113677): Get persistence working by adding the appropriate configs
         //                         in *.cml files
         let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
@@ -314,7 +309,6 @@ impl FullmacMlme {
             security_support,
             spectrum_management_support,
             inspect_usme_node,
-            wlan_hasher,
             persistence_req_sender,
             generic_sme_stream,
         ) {

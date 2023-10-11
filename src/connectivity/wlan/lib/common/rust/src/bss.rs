@@ -5,7 +5,6 @@
 use {
     crate::{
         channel::Channel,
-        hasher::WlanHasher,
         ie::{
             self,
             rsn::suite_filter,
@@ -465,21 +464,6 @@ impl BssDescription {
         }
     }
 
-    /// Returns an obfuscated string representation of the BssDescriptionExt suitable
-    /// for protecting the privacy of an SSID and BSSID.
-    // TODO(fxbug.dev/71906): Hashing SSID and BSSID should be removed once log redaction
-    // retains consistent identifiers across Inspect and syslog.
-    pub fn to_string(&self, hasher: &WlanHasher) -> String {
-        format!(
-            "SSID: {}, BSSID: {}, Protection: {}, Pri Chan: {}, Rx dBm: {}",
-            hasher.hash_ssid(&self.ssid),
-            self.bssid,
-            self.protection(),
-            self.channel.primary,
-            self.rssi_dbm,
-        )
-    }
-
     /// Returns a string representation of the BssDescriptionExt. This representation
     /// is not suitable for protecting the privacy of an SSID and BSSID.
     pub fn to_non_obfuscated_string(&self) -> String {
@@ -539,6 +523,19 @@ impl From<BssDescription> for fidl_internal::BssDescription {
     }
 }
 
+impl fmt::Display for BssDescription {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "SSID: {}, BSSID: {}, Protection: {}, Pri Chan: {}, Rx dBm: {}",
+            self.ssid,
+            self.bssid,
+            self.protection(),
+            self.channel.primary,
+            self.rssi_dbm,
+        )
+    }
+}
 // TODO(fxbug.dev/83708): The error printed should include a minimal amount of information
 // about the BSS Description that could not be converted to aid debugging.
 impl TryFrom<fidl_internal::BssDescription> for BssDescription {

@@ -14,7 +14,7 @@ use {
         },
         telemetry::{TelemetryEvent, TelemetrySender},
         util::listener,
-        util::testing::{create_inspect_persistence_channel, create_wlan_hasher, run_while},
+        util::testing::{create_inspect_persistence_channel, run_while},
     },
     anyhow::{format_err, Error},
     fidl::endpoints::{create_proxy, create_request_stream},
@@ -181,11 +181,10 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
     let (scan_request_sender, scan_request_receiver) =
         mpsc::channel(scan::SCAN_REQUEST_BUFFER_SIZE);
     let scan_requester = Arc::new(scan::ScanRequester { sender: scan_request_sender });
-    let hasher = create_wlan_hasher();
+
     let connection_selector = Arc::new(connection_selection::ConnectionSelector::new(
         saved_networks.clone(),
         scan_requester.clone(),
-        hasher.clone(),
         inspect::Inspector::default().root().create_child("connection_selector"),
         persistence_req_sender,
         telemetry_sender.clone(),

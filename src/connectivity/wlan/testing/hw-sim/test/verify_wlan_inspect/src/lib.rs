@@ -173,7 +173,6 @@ async fn verify_wlan_inspect() {
                             connected_to: contains {
                                 bssid: BSSID.to_string(),
                                 ssid: AP_SSID.to_string(),
-                                ssid_hash: AnyProperty,
                                 wsc: {
                                     device_name: "ASUS Router",
                                     manufacturer: "ASUSTek Computer Inc.",
@@ -246,7 +245,6 @@ async fn verify_wlan_inspect() {
                             prev_connected_to: contains {
                                 bssid: BSSID.to_string(),
                                 ssid: AP_SSID.to_string(),
-                                ssid_hash: AnyProperty,
                                 wsc: {
                                     device_name: "ASUS Router",
                                     manufacturer: "ASUSTek Computer Inc.",

@@ -21,10 +21,7 @@ use {
         sync::{Arc, Mutex},
     },
     tracing::{error, info, warn},
-    wlan_common::{
-        hasher::WlanHasher,
-        timer::{self, TimeEntry},
-    },
+    wlan_common::timer::{self, TimeEntry},
 };
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;
@@ -135,7 +132,6 @@ pub fn create_sme(
     security_support: fidl_common::SecuritySupport,
     spectrum_management_support: fidl_common::SpectrumManagementSupport,
     inspect_node: fuchsia_inspect::Node,
-    hasher: WlanHasher,
     persistence_req_sender: auto_persist::PersistenceReqSender,
     generic_sme_stream: <fidl_sme::GenericSmeMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
 ) -> Result<(MlmeStream, impl Future<Output = Result<(), anyhow::Error>>), anyhow::Error> {
@@ -155,7 +151,6 @@ pub fn create_sme(
                 receiver,
                 telemetry_endpoint_receiver,
                 inspect_node,
-                hasher,
                 persistence_req_sender,
             );
             (
@@ -350,8 +345,6 @@ mod tests {
         },
     };
 
-    const PLACEHOLDER_HASH_KEY: [u8; 8] = [88, 77, 66, 55, 44, 33, 22, 11];
-
     #[test]
     fn create_sme_fails_startup_role_unknown() {
         let mut _exec = fasync::TestExecutor::new();
@@ -375,7 +368,6 @@ mod tests {
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspect_node,
-            WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
         );
@@ -402,7 +394,6 @@ mod tests {
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspect_node,
-            WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
         )
@@ -455,7 +446,6 @@ mod tests {
             fake_security_support(),
             fake_spectrum_management_support_empty(),
             inspect_node,
-            WlanHasher::new(PLACEHOLDER_HASH_KEY),
             persistence_req_sender,
             generic_sme_stream,
         )?;

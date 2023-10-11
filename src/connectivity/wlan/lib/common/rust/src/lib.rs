@@ -19,7 +19,6 @@ pub mod data_writer;
 #[allow(unused)]
 pub mod energy;
 pub mod error;
-pub mod hasher;
 pub mod ie;
 pub mod mac;
 pub mod mgmt_writer;

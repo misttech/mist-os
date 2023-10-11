@@ -1258,7 +1258,6 @@ fn log_state_change(
                     ctx: msg,
                     bssid: bssid.to_string(),
                     ssid: ssid.to_string(),
-                    ssid_hash: context.inspect.hasher.hash_ssid(&ssid)
                 });
             }
             StateChangeContext::Msg(msg) => {
@@ -1342,7 +1341,6 @@ mod tests {
         fuchsia_inspect::Inspector,
         futures::{channel::mpsc, Stream, StreamExt},
         ieee80211::Ssid,
-        ieee80211_testutils::SSID_HASH_REGEX,
         link_state::{EstablishingRsna, LinkUp},
         std::{convert::TryFrom, sync::Arc, task::Poll},
         wlan_common::{
@@ -1350,7 +1348,6 @@ mod tests {
             bss::Protection as BssProtection,
             channel::{Cbw, Channel},
             fake_bss_description,
-            hasher::WlanHasher,
             ie::{
                 fake_ies::{fake_probe_resp_wsc_ie_bytes, get_vendor_ie_bytes_for_wsc_ie},
                 rsn::rsne::Rsne,
@@ -1425,7 +1422,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -1512,7 +1508,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -1606,7 +1601,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -1675,7 +1669,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -1736,7 +1729,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -1828,7 +1820,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                     "1": {
                         "@time": AnyNumericProperty,
@@ -2918,7 +2909,6 @@ mod tests {
                         to: CONNECTING_STATE,
                         bssid: bss2.bssid.to_string(),
                         ssid: bss2.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     },
                 },
             },
@@ -3400,7 +3390,6 @@ mod tests {
                         to: IDLE_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     }
                 },
             },
@@ -3437,7 +3426,6 @@ mod tests {
                         to: IDLE_STATE,
                         bssid: bss.bssid.to_string(),
                         ssid: bss.ssid.to_string(),
-                        ssid_hash: &*SSID_HASH_REGEX,
                     }
                 },
             },
@@ -3701,16 +3689,12 @@ mod tests {
             let (mlme_sink, mlme_stream) = mpsc::unbounded();
             let (timer, time_stream) = timer::create_timer();
             let inspector = Inspector::default();
-            let hasher = WlanHasher::new([88, 77, 66, 55, 44, 33, 22, 11]);
             let context = Context {
                 device_info: Arc::new(fake_device_info()),
                 mlme_sink: MlmeSink::new(mlme_sink),
                 timer,
                 att_id: 0,
-                inspect: Arc::new(inspect::SmeTree::new(
-                    inspector.root().create_child("usme"),
-                    hasher,
-                )),
+                inspect: Arc::new(inspect::SmeTree::new(inspector.root().create_child("usme"))),
                 mac_sublayer_support: fake_mac_sublayer_support(),
                 security_support: fake_security_support(),
             };

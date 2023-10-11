@@ -12,7 +12,6 @@ lazy_static! {
         Regex::new(r#"^(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$"#).unwrap();
     pub static ref BSSID_REGEX: Regex = MAC_ADDR_REGEX.clone();
     pub static ref SSID_REGEX: Regex = Regex::new(r#"^<ssid-[0-9a-fA-F]{0,64}>$"#).unwrap();
-    pub static ref SSID_HASH_REGEX: Regex = Regex::new(r#"^[0-9a-fA-F]*$"#).unwrap();
 }
 
 #[cfg(test)]

@@ -28,9 +28,7 @@ use {
     std::collections::HashMap,
     std::{collections::HashSet, sync::Arc},
     tracing::{debug, error, info, warn},
-    wlan_common::{
-        self, hasher::WlanHasher, security::SecurityAuthenticator, sequestered::Sequestered,
-    },
+    wlan_common::{self, security::SecurityAuthenticator, sequestered::Sequestered},
     wlan_inspect::wrappers::InspectWlanChan,
     wlan_metrics_registry::{
         SavedNetworkInScanResultMigratedMetricDimensionBssCount,
@@ -64,7 +62,6 @@ pub struct ConnectionSelector {
     saved_network_manager: Arc<dyn SavedNetworksManagerApi>,
     scan_requester: Arc<dyn scan::ScanRequestApi>,
     last_scan_result_time: Arc<Mutex<zx::Time>>,
-    hasher: WlanHasher,
     _inspect_node_root: Arc<Mutex<InspectNode>>,
     inspect_node_for_connection_selection: Arc<Mutex<AutoPersist<InspectBoundedListNode>>>,
     telemetry_sender: TelemetrySender,
@@ -74,7 +71,6 @@ impl ConnectionSelector {
     pub fn new(
         saved_network_manager: Arc<dyn SavedNetworksManagerApi>,
         scan_requester: Arc<dyn scan::ScanRequestApi>,
-        hasher: WlanHasher,
         inspect_node: InspectNode,
         persistence_req_sender: auto_persist::PersistenceReqSender,
         telemetry_sender: TelemetrySender,
@@ -92,7 +88,6 @@ impl ConnectionSelector {
             saved_network_manager,
             scan_requester,
             last_scan_result_time: Arc::new(Mutex::new(zx::Time::ZERO)),
-            hasher,
             _inspect_node_root: Arc::new(Mutex::new(inspect_node)),
             inspect_node_for_connection_selection: Arc::new(Mutex::new(
                 inspect_node_for_connection_selection,
@@ -237,12 +232,9 @@ impl ConnectionSelector {
                 vec![]
             }
             Ok(scan_results) => {
-                let candidates = merge_saved_networks_and_scan_data(
-                    &self.saved_network_manager,
-                    scan_results,
-                    &self.hasher,
-                )
-                .await;
+                let candidates =
+                    merge_saved_networks_and_scan_data(&self.saved_network_manager, scan_results)
+                        .await;
                 if network.is_none() {
                     *self.last_scan_result_time.lock().await = zx::Time::get_monotonic();
                     record_metrics_on_scan(candidates.clone(), &self.telemetry_sender);
@@ -383,7 +375,7 @@ impl types::ScannedCandidate {
 
         format!(
             "{}({:4}), {}({:6}), {:>4}dBm, channel {:8}, score {:4}{}{}{}{}",
-            self.hasher.hash_ssid(&self.network.ssid),
+            self.network.ssid,
             self.saved_security_type_to_string(),
             self.bss.bssid.to_string(),
             self.scanned_security_type_to_string(),
@@ -410,7 +402,6 @@ impl WriteInspect for types::ScannedCandidate {
     fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
         inspect_insert!(writer, var key: {
             ssid: self.network.ssid.to_string(),
-            ssid_hash: self.hasher.hash_ssid(&self.network.ssid),
             bssid: self.bss.bssid.to_string(),
             rssi: self.bss.rssi,
             score: scoring_functions::score_bss_scanned_candidate(self.clone()),
@@ -453,7 +444,6 @@ fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthe
 async fn merge_saved_networks_and_scan_data(
     saved_network_manager: &Arc<dyn SavedNetworksManagerApi>,
     mut scan_results: Vec<types::ScanResult>,
-    hasher: &WlanHasher,
 ) -> Vec<types::ScannedCandidate> {
     let mut merged_networks = vec![];
     for mut scan_result in scan_results.drain(..) {
@@ -466,7 +456,7 @@ async fn merge_saved_networks_and_scan_data(
                 let authenticator = match get_authenticator(&bss, &saved_config.credential) {
                     Some(authenticator) => authenticator,
                     None => {
-                        error!("Failed to create authenticator for bss candidate {:?} (SSID: {:?}). Removing from candidates.", bss.bssid, hasher.hash_ssid(&saved_config.ssid));
+                        error!("Failed to create authenticator for bss candidate {} (SSID: {}). Removing from candidates.", bss.bssid, saved_config.ssid);
                         continue;
                     }
                 };
@@ -487,7 +477,6 @@ async fn merge_saved_networks_and_scan_data(
                         past_connections: saved_config.perf_stats.past_connections.clone(),
                     },
                     bss,
-                    hasher: hasher.clone(),
                     authenticator,
                 };
                 merged_networks.push(scanned_candidate)
@@ -584,7 +573,7 @@ mod tests {
                 SavedNetworksManager,
             },
             util::testing::{
-                create_inspect_persistence_channel, create_wlan_hasher,
+                create_inspect_persistence_channel,
                 fakes::{FakeSavedNetworksManager, FakeScanRequester},
                 generate_channel, generate_random_bss, generate_random_connect_reason,
                 generate_random_scan_result, generate_random_scanned_candidate,
@@ -635,7 +624,6 @@ mod tests {
                 saved_network_manager.clone()
             },
             scan_requester.clone(),
-            create_wlan_hasher(),
             inspect_node,
             persistence_req_sender,
             TelemetrySender::new(telemetry_sender),
@@ -786,7 +774,6 @@ mod tests {
             recent_failures: recent_failures.clone(),
             past_connections: HistoricalListsByBssid::new(),
         };
-        let hasher = create_wlan_hasher();
         let wpa3_authenticator = select_authentication_method(
             HashSet::from([SecurityDescriptor::WPA3_PERSONAL]),
             &credential_1,
@@ -804,7 +791,6 @@ mod tests {
                 saved_network_info: expected_internal_data_1.clone(),
                 bss: mock_scan_results[0].entries[0].clone(),
                 authenticator: wpa3_authenticator.clone(),
-                hasher: hasher.clone(),
             },
             types::ScannedCandidate {
                 network: test_id_1.clone(),
@@ -814,7 +800,6 @@ mod tests {
                 saved_network_info: expected_internal_data_1.clone(),
                 bss: mock_scan_results[0].entries[1].clone(),
                 authenticator: wpa3_authenticator.clone(),
-                hasher: hasher.clone(),
             },
             types::ScannedCandidate {
                 network: test_id_1.clone(),
@@ -824,7 +809,6 @@ mod tests {
                 saved_network_info: expected_internal_data_1.clone(),
                 bss: mock_scan_results[0].entries[2].clone(),
                 authenticator: wpa3_authenticator.clone(),
-                hasher: hasher.clone(),
             },
             types::ScannedCandidate {
                 network: test_id_2.clone(),
@@ -838,7 +822,6 @@ mod tests {
                 },
                 bss: mock_scan_results[1].entries[0].clone(),
                 authenticator: open_authenticator.clone(),
-                hasher: hasher.clone(),
             },
         ];
 
@@ -846,7 +829,6 @@ mod tests {
         let results = merge_saved_networks_and_scan_data(
             &test_values.real_saved_network_manager,
             mock_scan_results,
-            &hasher,
         )
         .await;
 

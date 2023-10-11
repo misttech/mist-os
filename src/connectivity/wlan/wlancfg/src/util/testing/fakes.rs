@@ -26,7 +26,6 @@ use {
         sync::Arc,
     },
     tracing::{info, warn},
-    wlan_common::hasher::WlanHasher,
 };
 
 pub struct FakeSavedNetworksManager {
@@ -276,10 +275,6 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     ) -> PastConnectionList {
         self.past_connections_response.clone()
     }
-}
-
-pub fn create_wlan_hasher() -> WlanHasher {
-    WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes())
 }
 
 pub fn create_inspect_persistence_channel() -> (mpsc::Sender<String>, mpsc::Receiver<String>) {

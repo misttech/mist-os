@@ -20,7 +20,7 @@ use futures::{prelude::*, select};
 use pin_utils::pin_mut;
 use std::sync::{Arc, Mutex};
 use tracing::error;
-use wlan_common::{hasher::WlanHasher, scan::write_vmo};
+use wlan_common::scan::write_vmo;
 
 pub type Endpoint = ServerEnd<fidl_sme::ClientSmeMarker>;
 type Sme = client_sme::ClientSme;
@@ -37,7 +37,6 @@ pub fn serve(
         fidl::endpoints::ServerEnd<fidl_sme::TelemetryMarker>,
     >,
     inspect_node: fuchsia_inspect::Node,
-    hasher: WlanHasher,
     persistence_req_sender: auto_persist::PersistenceReqSender,
 ) -> (MlmeSink, MlmeStream, impl Future<Output = Result<(), anyhow::Error>>) {
     let wpa3_supported = security_support.mfp.supported
@@ -48,7 +47,6 @@ pub fn serve(
         cfg,
         device_info,
         inspect_node,
-        hasher,
         persistence_req_sender,
         mac_sublayer_support,
         security_support,
