@@ -35,7 +35,8 @@ use tracing::trace;
 
 use crate::{
     context::{
-        CounterContext, RecvFrameContext, RngContext, SendFrameContext, TimerContext, TimerHandler,
+        CounterContext, InstantBindingsTypes, RecvFrameContext, RngContext, SendFrameContext,
+        TimerContext, TimerHandler,
     },
     data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult},
     device::{
@@ -72,6 +73,8 @@ use crate::{
     sync::{Mutex, RwLock},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
+
+use super::{state::IpLinkDeviceStateSpec, DeviceLayerTypes};
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -482,7 +485,6 @@ impl MaxFrameSize {
 
 /// Builder for [`EthernetDeviceState`].
 pub(crate) struct EthernetDeviceStateBuilder {
-    debug_id: usize,
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxFrameSize,
     metric: RawMetric,
@@ -491,7 +493,6 @@ pub(crate) struct EthernetDeviceStateBuilder {
 impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
     pub(crate) fn new(
-        debug_id: usize,
         mac: UnicastAddr<Mac>,
         max_frame_size: MaxFrameSize,
         metric: RawMetric,
@@ -509,17 +510,16 @@ impl EthernetDeviceStateBuilder {
         // A few questions:
         // - How do we wire error information back up the call stack? Should
         //   this just return a Result or something?
-        Self { debug_id, mac, max_frame_size, metric }
+        Self { mac, max_frame_size, metric }
     }
 
     /// Build the `EthernetDeviceState` from this builder.
     pub(super) fn build<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>>(
         self,
     ) -> EthernetDeviceState<I, N> {
-        let Self { debug_id, mac, max_frame_size, metric } = self;
+        let Self { mac, max_frame_size, metric } = self;
 
         EthernetDeviceState {
-            debug_id,
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
             static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
@@ -560,9 +560,7 @@ pub(crate) struct StaticEthernetDeviceState {
 }
 
 /// The state associated with an Ethernet device.
-pub(crate) struct EthernetDeviceState<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> {
-    debug_id: usize,
-
+pub struct EthernetDeviceState<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> {
     /// IPv4 ARP state.
     ipv4_arp: Mutex<ArpState<EthernetLinkDevice, I, N>>,
 
@@ -576,14 +574,8 @@ pub(crate) struct EthernetDeviceState<I: Instant, N: LinkResolutionNotifier<Ethe
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
 }
 
-impl<I: Instant, N: LinkResolutionNotifier<EthernetLinkDevice>> EthernetDeviceState<I, N> {
-    pub(crate) fn debug_id(&self) -> usize {
-        self.debug_id
-    }
-}
-
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = StaticEthernetDeviceState;
     type Guard<'l> = &'l StaticEthernetDeviceState
@@ -595,7 +587,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::EthernetDeviceStati
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = DynamicEthernetDeviceState;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, DynamicEthernetDeviceState>
@@ -614,7 +606,7 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicSta
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = HeldDeviceSockets<C>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>
@@ -632,7 +624,7 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = NudState<Ipv6, EthernetLinkDevice, C::Instant, C::Notifier>;
     type Guard<'l> = crate::sync::LockGuard<'l, NudState<Ipv6, EthernetLinkDevice, C::Instant, C::Notifier>>
@@ -644,7 +636,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv6Nud>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = ArpState<EthernetLinkDevice, C::Instant, C::Notifier>;
     type Guard<'l> = crate::sync::LockGuard<'l, ArpState<EthernetLinkDevice, C::Instant, C::Notifier>>
@@ -656,7 +648,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetIpv4Arp>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
     type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
@@ -668,7 +660,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxQueue>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::EthernetTxDequeue>
-    for IpLinkDeviceState<C, C::EthernetDeviceState, EthernetDeviceState<C::Instant, C::Notifier>>
+    for IpLinkDeviceState<EthernetLinkDevice, C>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
@@ -1338,6 +1330,16 @@ impl Device for EthernetLinkDevice {}
 
 impl LinkDevice for EthernetLinkDevice {
     type Address = Mac;
+}
+
+impl<C: DeviceLayerTypes> IpLinkDeviceStateSpec<C> for EthernetLinkDevice {
+    type Link = EthernetDeviceState<
+        <C as InstantBindingsTypes>::Instant,
+        <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
+    >;
+    type External = C::EthernetDeviceState;
+    const IS_LOOPBACK: bool = false;
+    const DEBUG_TYPE: &'static str = "Ethernet";
 }
 
 /// Resolve the link-address of an Ethernet device's neighbor.
@@ -2641,7 +2643,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device = eth_device.clone().into();
-        let EthernetDeviceId(eth_device) = eth_device;
+        let eth_device = eth_device.device_state();
 
         // Enable the device and configure it to generate a link-local address.
         let _: Ipv6DeviceConfigurationUpdate = update_ipv6_configuration(

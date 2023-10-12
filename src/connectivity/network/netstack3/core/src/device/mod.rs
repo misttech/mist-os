@@ -40,13 +40,15 @@ use crate::{
             EthernetDeviceStateBuilder, EthernetIpLinkDeviceDynamicStateContext,
             EthernetLinkDevice, EthernetTimerId,
         },
-        loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState},
+        loopback::{
+            LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
+        },
         queue::{
             rx::ReceiveQueueHandler,
             tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
         },
         socket::HeldSockets,
-        state::IpLinkDeviceState,
+        state::{IpLinkDeviceState, IpLinkDeviceStateSpec},
     },
     error::{
         ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError,
@@ -65,7 +67,7 @@ use crate::{
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
     },
-    sync::{PrimaryRc, RwLock, StrongRc},
+    sync::{PrimaryRc, RwLock},
     trace_duration, BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
 
@@ -119,12 +121,9 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub(crate) struct DevicesIter<'s, C: NonSyncContext> {
-    ethernet: alloc::collections::hash_map::Values<
-        's,
-        StrongRc<EthernetReferenceState<C>>,
-        PrimaryRc<EthernetReferenceState<C>>,
-    >,
-    loopback: core::option::Iter<'s, PrimaryRc<LoopbackReferenceState<C>>>,
+    ethernet:
+        alloc::collections::hash_map::Values<'s, EthernetDeviceId<C>, EthernetPrimaryDeviceId<C>>,
+    loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<C>>,
 }
 
 impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
@@ -133,12 +132,8 @@ impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
     fn next(&mut self) -> Option<Self::Item> {
         let Self { ethernet, loopback } = self;
         ethernet
-            .map(|rc| EthernetDeviceId(PrimaryRc::clone_strong(rc)).into())
-            .chain(
-                loopback.map(|state| {
-                    DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state)))
-                }),
-            )
+            .map(|primary| primary.clone_strong().into())
+            .chain(loopback.map(|primary| primary.clone_strong().into()))
             .next()
     }
 }
@@ -200,7 +195,7 @@ pub(crate) fn snapshot_device_ids<T, C: NonSyncContext, F: FnMut(DeviceId<C>) ->
 ) -> impl IntoIterator<Item = T> {
     let mut sync_ctx = Locked::new(sync_ctx);
     let devices = sync_ctx.read_lock::<crate::lock_ordering::DeviceLayerState>();
-    let Devices { ethernet, loopback, ethernet_counter: _ } = &*devices;
+    let Devices { ethernet, loopback } = &*devices;
     DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }
         .filter_map(filter_map)
         .collect::<SmallVec<[T; 32]>>()
@@ -255,8 +250,8 @@ pub fn inspect_devices<C: NonSyncContext, V: DevicesVisitor<C>>(
     let devices = snapshot_device_ids(sync_ctx, Some).into_iter().map(|device| {
         let device_id = device.clone();
         let ip = match &device {
-            DeviceId::Ethernet(EthernetDeviceId(rc)) => &rc.ip,
-            DeviceId::Loopback(LoopbackDeviceId(rc)) => &rc.ip,
+            DeviceId::Ethernet(d) => &d.device_state().ip,
+            DeviceId::Loopback(d) => &d.device_state().ip,
         };
         let ipv4 =
             lock_order::lock::RwLockFor::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>::read_lock(
@@ -395,11 +390,8 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Devices<C: DeviceLayerTypes> {
-    // A monotonic counter to issue ethernet device IDs that are used for
-    // debugging.
-    ethernet_counter: usize,
-    ethernet: HashMap<StrongRc<EthernetReferenceState<C>>, PrimaryRc<EthernetReferenceState<C>>>,
-    loopback: Option<PrimaryRc<LoopbackReferenceState<C>>>,
+    ethernet: HashMap<EthernetDeviceId<C>, EthernetPrimaryDeviceId<C>>,
+    loopback: Option<LoopbackPrimaryDeviceId<C>>,
 }
 
 /// The state associated with the device layer.
@@ -462,21 +454,18 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
         metric: RawMetric,
         external_state: F,
     ) -> EthernetDeviceId<C> {
-        let Devices { ethernet_counter, ethernet, loopback: _ } = &mut *self.devices.write();
+        let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
-        let id = *ethernet_counter;
-        *ethernet_counter += 1;
-
-        let ptr = PrimaryRc::new(IpLinkDeviceState::new(
-            EthernetDeviceStateBuilder::new(id, mac, max_frame_size, metric).build(),
+        let primary = EthernetPrimaryDeviceId::new(IpLinkDeviceState::new(
+            EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
             external_state(),
             self.origin.clone(),
         ));
-        let strong_ptr = PrimaryRc::clone_strong(&ptr);
+        let id = primary.clone_strong();
 
-        assert!(ethernet.insert(strong_ptr.clone(), ptr).is_none());
-        debug!("adding Ethernet device with ID {} and MTU {:?}", id, max_frame_size);
-        EthernetDeviceId(strong_ptr)
+        assert!(ethernet.insert(id.clone(), primary).is_none());
+        debug!("adding Ethernet device {:?} with MTU {:?}", id, max_frame_size);
+        id
     }
 
     /// Adds a new loopback device to the device layer.
@@ -486,24 +475,25 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
         metric: RawMetric,
         external_state: F,
     ) -> Result<LoopbackDeviceId<C>, ExistsError> {
-        let Devices { ethernet_counter: _, ethernet: _, loopback } = &mut *self.devices.write();
+        let Devices { ethernet: _, loopback } = &mut *self.devices.write();
 
         if let Some(_) = loopback {
             return Err(ExistsError);
         }
 
-        let ptr = PrimaryRc::new(IpLinkDeviceState::new(
+        let primary = LoopbackPrimaryDeviceId::new(IpLinkDeviceState::new(
             LoopbackDeviceState::new(mtu, metric),
             external_state(),
             self.origin.clone(),
         ));
-        let id = PrimaryRc::clone_strong(&ptr);
 
-        *loopback = Some(ptr);
+        let id = primary.clone_strong();
+
+        *loopback = Some(primary);
 
         debug!("added loopback device");
 
-        Ok(LoopbackDeviceId(id))
+        Ok(id)
     }
 }
 
@@ -675,34 +665,48 @@ impl<R> RemoveDeviceResult<R, Never> {
 pub type RemoveDeviceResultWithContext<S, C> =
     RemoveDeviceResult<S, <C as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
-fn remove_device<NonSyncCtx: NonSyncContext, D: RemovableDeviceId<NonSyncCtx>>(
+fn remove_device<T: IpLinkDeviceStateSpec<NonSyncCtx>, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: D,
-) -> RemoveDeviceResultWithContext<D::ExternalState, NonSyncCtx> {
+    device: BaseDeviceId<T, NonSyncCtx>,
+    remove: impl FnOnce(
+        &mut Devices<NonSyncCtx>,
+        BaseDeviceId<T, NonSyncCtx>,
+    ) -> (BasePrimaryDeviceId<T, NonSyncCtx>, BaseDeviceId<T, NonSyncCtx>),
+) -> RemoveDeviceResultWithContext<T::External, NonSyncCtx>
+where
+    BaseDeviceId<T, NonSyncCtx>: Into<DeviceId<NonSyncCtx>>,
+{
     // Start cleaning up the device by disabling IP state. This removes timers
     // for the device that would otherwise hold references to defunct device
     // state.
-    {
+    let debug_references = {
         let mut sync_ctx = Locked::new(sync_ctx);
 
         let device = device.clone().into();
 
         crate::ip::device::clear_ipv4_device_state(&mut sync_ctx, ctx, &device);
         crate::ip::device::clear_ipv6_device_state(&mut sync_ctx, ctx, &device);
-    }
-    let (primary, strong) = device.remove(sync_ctx);
-    assert!(PrimaryRc::ptr_eq(&primary, &strong));
-    let debug_references = PrimaryRc::debug_references(&primary);
+        device.downgrade().debug_references()
+    };
+
+    tracing::debug!("removing {device:?}");
+    let (primary, strong) = {
+        let mut devices = sync_ctx.state.device.devices.write();
+        remove(&mut *devices, device)
+    };
+    assert_eq!(strong, primary);
     core::mem::drop(strong);
-    match PrimaryRc::unwrap_or_notify_with(primary, || {
+    match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
         let (notifier, receiver) =
-            NonSyncCtx::new_reference_notifier::<D::ExternalState, _>(debug_references);
+            NonSyncCtx::new_reference_notifier::<T::External, _>(debug_references);
         let notifier =
-            crate::sync::MapRcNotifier::new(notifier, |state| D::take_external_state(state));
+            crate::sync::MapRcNotifier::new(notifier, |state: IpLinkDeviceState<_, _>| {
+                state.external_state
+            });
         (notifier, receiver)
     }) {
-        Ok(s) => RemoveDeviceResult::Removed(D::take_external_state(s)),
+        Ok(s) => RemoveDeviceResult::Removed(s.external_state),
         Err(receiver) => RemoveDeviceResult::Deferred(receiver),
     }
 }
@@ -717,7 +721,14 @@ pub fn remove_ethernet_device<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: EthernetDeviceId<NonSyncCtx>,
 ) -> RemoveDeviceResultWithContext<NonSyncCtx::EthernetDeviceState, NonSyncCtx> {
-    remove_device(sync_ctx, ctx, device)
+    remove_device(sync_ctx, ctx, device, |devices, id| {
+        let removed = devices
+            .ethernet
+            .remove(&id)
+            .unwrap_or_else(|| panic!("no such Ethernet device: {id:?}"));
+
+        (removed, id)
+    })
 }
 
 /// Removes the Loopback device from the device layer.
@@ -730,7 +741,10 @@ pub fn remove_loopback_device<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: LoopbackDeviceId<NonSyncCtx>,
 ) -> RemoveDeviceResultWithContext<NonSyncCtx::LoopbackDeviceState, NonSyncCtx> {
-    remove_device(sync_ctx, ctx, device)
+    remove_device(sync_ctx, ctx, device, |devices, id| {
+        let removed = devices.loopback.take().expect("loopback device not installed");
+        (removed, id)
+    })
 }
 
 /// Adds a new Ethernet device to the stack.
@@ -819,7 +833,7 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
         DeviceId::Ethernet(id) => {
             Ok(self::ethernet::set_promiscuous_mode(&mut Locked::new(sync_ctx), ctx, id, enabled))
         }
-        DeviceId::Loopback(LoopbackDeviceId(_)) => Err(NotSupportedError),
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
 }
 
@@ -964,7 +978,7 @@ pub fn insert_static_arp_table_entry<NonSyncCtx: NonSyncContext>(
             addr,
             mac.into(),
         )),
-        DeviceId::Loopback(LoopbackDeviceId(_)) => Err(NotSupportedError),
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
 }
 
@@ -988,7 +1002,7 @@ pub fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
             addr,
             mac,
         )),
-        DeviceId::Loopback(LoopbackDeviceId(_)) => Err(NotSupportedError),
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => Err(NotSupportedError),
     }
 }
 

@@ -5,9 +5,7 @@
 //! The loopback device.
 
 use alloc::vec::Vec;
-use core::fmt::{self, Debug, Formatter};
 
-use derivative::Derivative;
 use lock_order::{
     lock::{LockFor, RwLockFor},
     relation::LockBefore,
@@ -24,6 +22,7 @@ use crate::{
     context::SendFrameContext,
     device::{
         self,
+        id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
         queue::{
             rx::{
                 BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeFrameContext,
@@ -41,13 +40,11 @@ use crate::{
             BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
             ParseSentFrameError, ReceivedFrame, SentFrame,
         },
-        state::IpLinkDeviceState,
-        Device, DeviceIdContext, DeviceIdDebugTag as _, DeviceLayerEventDispatcher,
-        DeviceLayerTypes, DeviceSendFrameError, FrameDestination,
+        state::{IpLinkDeviceState, IpLinkDeviceStateSpec},
+        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        DeviceSendFrameError, FrameDestination, Mtu,
     },
-    device::{Id, Mtu, StrongId, WeakId},
     ip::types::RawMetric,
-    sync::{StrongRc, WeakRc},
     NonSyncContext, SyncCtx,
 };
 
@@ -60,143 +57,30 @@ const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
 /// devices.
 ///
 /// [`WeakDeviceId`]: crate::device::WeakDeviceId
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub struct LoopbackWeakDeviceId<C: DeviceLayerTypes>(
-    pub(super) WeakRc<IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>>,
-);
-
-impl<C: DeviceLayerTypes> PartialEq for LoopbackWeakDeviceId<C> {
-    fn eq(&self, LoopbackWeakDeviceId(other): &LoopbackWeakDeviceId<C>) -> bool {
-        let LoopbackWeakDeviceId(me) = self;
-        WeakRc::ptr_eq(me, other)
-    }
-}
-
-impl<C: DeviceLayerTypes> PartialEq<LoopbackDeviceId<C>> for LoopbackWeakDeviceId<C> {
-    fn eq(&self, other: &LoopbackDeviceId<C>) -> bool {
-        <LoopbackDeviceId<C> as PartialEq<LoopbackWeakDeviceId<C>>>::eq(other, self)
-    }
-}
-
-impl<C: DeviceLayerTypes> Eq for LoopbackWeakDeviceId<C> {}
-
-impl<C: DeviceLayerTypes> Debug for LoopbackWeakDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "WeakLoopback")
-    }
-}
-
-impl<C: DeviceLayerTypes> WeakId for LoopbackWeakDeviceId<C>
-where
-    C::LoopbackDeviceState: Send + Sync,
-{
-    type Strong = LoopbackDeviceId<C>;
-}
-
-impl<C: DeviceLayerTypes> Id for LoopbackWeakDeviceId<C>
-where
-    C::LoopbackDeviceState: Send + Sync,
-{
-    fn is_loopback(&self) -> bool {
-        true
-    }
-}
-
-impl<C: DeviceLayerTypes> LoopbackWeakDeviceId<C> {
-    /// Attempts to upgrade the ID to a [`LoopbackDeviceId`], failing if the
-    /// device no longer exists.
-    pub fn upgrade(&self) -> Option<LoopbackDeviceId<C>> {
-        let Self(rc) = self;
-        rc.upgrade().map(LoopbackDeviceId)
-    }
-}
+pub type LoopbackWeakDeviceId<C> = BaseWeakDeviceId<LoopbackDevice, C>;
 
 /// A strong device ID identifying a loopback device.
 ///
 /// This device ID is like [`DeviceId`] but specifically for loopback devices.
 ///
 /// [`DeviceId`]: crate::device::DeviceId
-#[derive(Derivative)]
-#[derivative(Clone(bound = ""), Hash(bound = ""))]
-pub struct LoopbackDeviceId<C: DeviceLayerTypes>(
-    pub(super) StrongRc<IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>>,
-);
+pub type LoopbackDeviceId<C> = BaseDeviceId<LoopbackDevice, C>;
 
-impl<C: DeviceLayerTypes> PartialEq for LoopbackDeviceId<C> {
-    fn eq(&self, LoopbackDeviceId(other): &LoopbackDeviceId<C>) -> bool {
-        let LoopbackDeviceId(me) = self;
-        StrongRc::ptr_eq(me, other)
-    }
-}
+/// The primary reference for a loopback device.
+pub(crate) type LoopbackPrimaryDeviceId<C> = BasePrimaryDeviceId<LoopbackDevice, C>;
 
-impl<C: DeviceLayerTypes> PartialEq<LoopbackWeakDeviceId<C>> for LoopbackDeviceId<C> {
-    fn eq(&self, LoopbackWeakDeviceId(other): &LoopbackWeakDeviceId<C>) -> bool {
-        let LoopbackDeviceId(me) = self;
-        StrongRc::weak_ptr_eq(me, other)
-    }
-}
-
-impl<C: DeviceLayerTypes> Eq for LoopbackDeviceId<C> {}
-
-impl<C: DeviceLayerTypes> PartialOrd for LoopbackDeviceId<C> {
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl<C: DeviceLayerTypes> Ord for LoopbackDeviceId<C> {
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        let Self(me) = self;
-        let Self(other) = other;
-
-        StrongRc::ptr_cmp(me, other)
-    }
-}
-
-impl<C: DeviceLayerTypes> Debug for LoopbackDeviceId<C> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let Self(rc) = self;
-        write!(f, "Loopback(")?;
-        rc.external_state.id_debug_tag(f)?;
-        write!(f, ")")
-    }
-}
-
-impl<C: DeviceLayerTypes> StrongId for LoopbackDeviceId<C>
-where
-    C::LoopbackDeviceState: Send + Sync,
-{
-    type Weak = LoopbackWeakDeviceId<C>;
-}
-
-impl<C: DeviceLayerTypes> Id for LoopbackDeviceId<C>
-where
-    C::LoopbackDeviceState: Send + Sync,
-{
-    fn is_loopback(&self) -> bool {
-        true
-    }
-}
-
-impl<C: DeviceLayerTypes> LoopbackDeviceId<C> {
-    /// Returns a reference to the external state for the device.
-    pub fn external_state(&self) -> &C::LoopbackDeviceState {
-        let Self(rc) = self;
-        &rc.external_state
-    }
-
-    /// Returns a weak loopback device ID.
-    pub fn downgrade(&self) -> LoopbackWeakDeviceId<C> {
-        let Self(rc) = self;
-        LoopbackWeakDeviceId(StrongRc::downgrade(rc))
-    }
-}
-
+/// Loopback device domain.
 #[derive(Copy, Clone)]
-pub(super) enum LoopbackDevice {}
+pub enum LoopbackDevice {}
 
 impl Device for LoopbackDevice {}
+
+impl<C: DeviceLayerTypes> IpLinkDeviceStateSpec<C> for LoopbackDevice {
+    type Link = LoopbackDeviceState;
+    type External = C::LoopbackDeviceState;
+    const IS_LOOPBACK: bool = true;
+    const DEBUG_TYPE: &'static str = "Loopback";
+}
 
 impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
     for Locked<&SyncCtx<NonSyncCtx>, L>
@@ -214,7 +98,8 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
     }
 }
 
-pub(crate) struct LoopbackDeviceState {
+/// State for a loopback device.
+pub struct LoopbackDeviceState {
     mtu: Mtu,
     /// The routing metric of the loopback device this state is for.
     metric: RawMetric,
@@ -234,7 +119,7 @@ impl LoopbackDeviceState {
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
-    for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
+    for IpLinkDeviceState<LoopbackDevice, C>
 {
     type Data = ReceiveQueueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<(), Buf<Vec<u8>>>>
@@ -246,7 +131,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxQueue>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
-    for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
+    for IpLinkDeviceState<LoopbackDevice, C>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
@@ -258,7 +143,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackRxDequeue>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
-    for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
+    for IpLinkDeviceState<LoopbackDevice, C>
 {
     type Data = TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>;
     type Guard<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
@@ -270,7 +155,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxQueue>
 }
 
 impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
-    for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
+    for IpLinkDeviceState<LoopbackDevice, C>
 {
     type Data = DequeueState<(), Buf<Vec<u8>>>;
     type Guard<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
@@ -282,7 +167,7 @@ impl<C: NonSyncContext> LockFor<crate::lock_ordering::LoopbackTxDequeue>
 }
 
 impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
-    for IpLinkDeviceState<C, C::LoopbackDeviceState, LoopbackDeviceState>
+    for IpLinkDeviceState<LoopbackDevice, C>
 {
     type Data = HeldDeviceSockets<C>;
     type ReadGuard<'l> = crate::sync::RwLockReadGuard<'l, HeldDeviceSockets<C>>

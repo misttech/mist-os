@@ -24,12 +24,12 @@ use crate::{
     context::SendFrameContext,
     device::{
         ethernet::{self, EthernetLinkDevice, SyncCtxWithDeviceId},
-        loopback::{self, LoopbackDeviceId, LoopbackDeviceState},
+        loopback::{self, LoopbackDevice, LoopbackDeviceId},
         socket, AnyDevice, BufferTransmitQueueHandler, DeviceId, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter,
-        EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetReferenceState,
-        EthernetWeakDeviceId, IpLinkDeviceState, Ipv6DeviceLinkLayerAddr, LoopbackReferenceState,
-        OriginTracker, RecvFrameContext, RecvIpFrameMeta, WeakDeviceId,
+        EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetWeakDeviceId,
+        IpLinkDeviceState, Ipv6DeviceLinkLayerAddr, OriginTracker, RecvFrameContext,
+        RecvIpFrameMeta, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
@@ -101,7 +101,7 @@ where
                     )
                 }
             }
-            DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
         }
     }
 
@@ -126,14 +126,14 @@ where
                     )
                 }
             }
-            DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
         }
     }
 
     fn flush_neighbor_table(&mut self, ctx: &mut C, device_id: &DeviceId<C>) {
         match device_id {
             DeviceId::Ethernet(id) => NudHandler::<I, EthernetLinkDevice, _>::flush(self, ctx, &id),
-            DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
         }
     }
 }
@@ -223,7 +223,7 @@ impl<
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet_counter: _, ethernet, loopback } = &*devices;
+        let Devices { ethernet, loopback } = &*devices;
 
         cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
@@ -235,10 +235,7 @@ impl<
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
         let mut locked = self.cast_with(|s| &s.state.device);
         let devices = &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-        devices
-            .loopback
-            .as_ref()
-            .map(|state| DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))))
+        devices.loopback.as_ref().map(|primary| DeviceId::Loopback(primary.clone_strong()))
     }
 }
 
@@ -515,7 +512,7 @@ impl<
         cb: F,
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
-        let Devices { ethernet_counter: _, ethernet, loopback } = &*devices;
+        let Devices { ethernet, loopback } = &*devices;
 
         cb(DevicesIter { ethernet: ethernet.values(), loopback: loopback.iter() }, locked)
     }
@@ -527,10 +524,7 @@ impl<
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
         let mut locked = self.cast_with(|s| &s.state.device);
         let devices = &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-        devices
-            .loopback
-            .as_ref()
-            .map(|state| DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))))
+        devices.loopback.as_ref().map(|primary| DeviceId::Loopback(primary.clone_strong()))
     }
 }
 
@@ -709,7 +703,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
             DeviceId::Ethernet(id) => {
                 Some(Ipv6DeviceLinkLayerAddr::Mac(ethernet::get_mac(self, &id).get()))
             }
-            DeviceId::Loopback(LoopbackDeviceId(_)) => None,
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => None,
         }
     }
 
@@ -718,7 +712,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
             DeviceId::Ethernet(id) => {
                 Some(ethernet::get_mac(self, &id).to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC))
             }
-            DeviceId::Loopback(LoopbackDeviceId(_)) => None,
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => None,
         }
     }
 
@@ -729,7 +723,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
 
         match device_id {
             DeviceId::Ethernet(id) => ethernet::set_mtu(self, &id, mtu),
-            DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+            DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
         }
     }
 
@@ -955,15 +949,16 @@ pub(crate) fn with_ethernet_state_and_sync_ctx<
     NonSyncCtx: NonSyncContext,
     O,
     F: FnOnce(
-        Locked<&EthernetReferenceState<NonSyncCtx>, L>,
+        Locked<&IpLinkDeviceState<EthernetLinkDevice, NonSyncCtx>, L>,
         &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    EthernetDeviceId(state): &EthernetDeviceId<NonSyncCtx>,
+    id: &EthernetDeviceId<NonSyncCtx>,
     cb: F,
 ) -> O {
+    let state = id.device_state();
     // Make sure that the pointer belongs to this `sync_ctx`.
     assert_eq!(
         *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
@@ -979,7 +974,7 @@ pub(crate) fn with_ethernet_state_and_sync_ctx<
 pub(crate) fn with_ethernet_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(Locked<&EthernetReferenceState<NonSyncCtx>, L>) -> O,
+    F: FnOnce(Locked<&IpLinkDeviceState<EthernetLinkDevice, NonSyncCtx>, L>) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
@@ -994,7 +989,7 @@ pub(crate) fn with_ethernet_state<
 pub(crate) fn with_loopback_state<
     NonSyncCtx: NonSyncContext,
     O,
-    F: FnOnce(Locked<&'_ LoopbackReferenceState<NonSyncCtx>, L>) -> O,
+    F: FnOnce(Locked<&'_ IpLinkDeviceState<LoopbackDevice, NonSyncCtx>, L>) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
@@ -1010,18 +1005,16 @@ pub(crate) fn with_loopback_state_and_sync_ctx<
     NonSyncCtx: NonSyncContext,
     O,
     F: FnOnce(
-        Locked<
-            &IpLinkDeviceState<NonSyncCtx, NonSyncCtx::LoopbackDeviceState, LoopbackDeviceState>,
-            L,
-        >,
+        Locked<&IpLinkDeviceState<LoopbackDevice, NonSyncCtx>, L>,
         &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ) -> O,
     L,
 >(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
-    LoopbackDeviceId(state): &LoopbackDeviceId<NonSyncCtx>,
+    id: &LoopbackDeviceId<NonSyncCtx>,
     cb: F,
 ) -> O {
+    let state = id.device_state();
     // Make sure that the pointer belongs to this `sync_ctx`.
     assert_eq!(
         *sync_ctx.unlocked_access::<crate::lock_ordering::DeviceLayerStateOrigin>(),
@@ -1100,7 +1093,7 @@ fn join_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
     }
 }
 
@@ -1121,7 +1114,7 @@ fn leave_link_multicast_group<
             &id,
             MulticastAddr::from(&multicast_addr),
         ),
-        DeviceId::Loopback(LoopbackDeviceId(_)) => {}
+        DeviceId::Loopback(LoopbackDeviceId { .. }) => {}
     }
 }
 
