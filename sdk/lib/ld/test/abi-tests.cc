@@ -50,9 +50,11 @@ TEST(LdTests, AbiTypes) {
   EXPECT_THAT(storage, testing::Each(testing::Eq(std::byte(0))));
 }
 
-constexpr Module MakeModule(const char* name, const Module* next, const Module* prev) {
+constexpr Module MakeModule(const char* name, bool symbols_visible, const Module* next,
+                            const Module* prev) {
   Module result;
   result.link_map.name = name;
+  result.symbols_visible = symbols_visible;
   if (next) {
     result.link_map.next = &const_cast<Module*>(next)->link_map;
   }
@@ -64,10 +66,12 @@ constexpr Module MakeModule(const char* name, const Module* next, const Module* 
 
 constexpr const char* kName1 = "first";
 constexpr const char* kName2 = "second";
+constexpr const char* kName3 = "third";
 
-constexpr Module kModules[2] = {
-    MakeModule(kName1, &kModules[1], nullptr),
-    MakeModule(kName2, nullptr, &kModules[0]),
+constexpr Module kModules[3] = {
+    MakeModule(kName1, true, &kModules[1], nullptr),
+    MakeModule(kName2, false, &kModules[2], &kModules[0]),
+    MakeModule(kName3, true, nullptr, &kModules[1]),
 };
 
 TEST(LdTests, AbiModuleList) {
@@ -78,7 +82,23 @@ TEST(LdTests, AbiModuleList) {
   ASSERT_EQ(it++->link_map.name.get(), kName1);
   ASSERT_NE(it, modules.end());
   ASSERT_EQ(it++->link_map.name.get(), kName2);
+  ASSERT_NE(it, modules.end());
+  ASSERT_EQ(it++->link_map.name.get(), kName3);
   ASSERT_EQ(it, modules.end());
+}
+
+TEST(LdTests, AbiSymbolicModuleList) {
+  constexpr Abi abi{.loaded_modules{&kModules[0]}};
+  auto modules = ld::AbiLoadedSymbolModules(abi);
+  auto it = modules.begin();
+  ASSERT_NE(it, modules.end());
+  const char* c = it++->link_map.name.get();
+  ASSERT_EQ(c, kName1);
+  ASSERT_NE(it, modules.end());
+  ASSERT_EQ(it++->link_map.name.get(), kName3);
+  ASSERT_EQ(it, modules.end());
+  ASSERT_EQ((--it)->link_map.name.get(), kName3);
+  ASSERT_EQ((--it)->link_map.name.get(), kName1);
 }
 
 }  // namespace

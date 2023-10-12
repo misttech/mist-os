@@ -31,6 +31,7 @@ class LinkMapList {
   using value_type = ElementType;
   using reference = value_type&;
   using const_reference = const value_type&;
+  using pointer = value_type*;
   using difference_type = ptrdiff_t;
   using size_type = size_t;
 
@@ -162,6 +163,10 @@ template <typename ElementType, class Traits>
 template <bool Reverse, bool Const>
 class LinkMapList<ElementType, Traits>::IteratorImpl {
  public:
+  using value_type = LinkMapList<ElementType, Traits>::value_type;
+  using reference = LinkMapList<ElementType, Traits>::reference;
+  using pointer = LinkMapList<ElementType, Traits>::pointer;
+  using difference_type = LinkMapList<ElementType, Traits>::difference_type;
   using iterator_category = std::bidirectional_iterator_tag;
 
   constexpr IteratorImpl() = default;
@@ -172,6 +177,8 @@ class LinkMapList<ElementType, Traits>::IteratorImpl {
   template <bool C = Const, typename = std::enable_if_t<C>>
   constexpr IteratorImpl(const IteratorImpl<Reverse, false>& other)
       : list_(other.list_), pos_(other.pos_) {}
+
+  constexpr IteratorImpl& operator=(const IteratorImpl&) = default;
 
   constexpr bool operator==(const IteratorImpl& other) const { return pos_ == other.pos_; }
 

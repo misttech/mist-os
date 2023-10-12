@@ -19,7 +19,10 @@ group("tests") {
 }
 
 test("ld-unittests") {
-  sources = [ "abi-tests.cc" ]
+  sources = [
+    "abi-tests.cc",
+    "filter-view-tests.cc",
+  ]
   deps = [
     "..:headers",
     "../testing",

@@ -14,6 +14,7 @@
 #include <cstdint>
 
 #include "abi.h"
+#include "internal/filter-view.h"
 
 namespace ld {
 namespace abi {
@@ -149,6 +150,14 @@ using AbiModuleList = elfldltl::LinkMapList<
 template <class Elf = elfldltl::Elf<>>
 constexpr AbiModuleList<Elf> AbiLoadedModules(const abi::Abi<Elf>& abi) {
   return AbiModuleList<Elf>(abi.loaded_modules.get());
+}
+
+// This returns a view similar to AbiModuleList, but only for modules where
+// symbols_visible is true.
+template <class Elf = elfldltl::Elf<>>
+constexpr auto AbiLoadedSymbolModules(const abi::Abi<Elf>& abi) {
+  using Module = typename abi::Abi<Elf>::Module;
+  return ld::internal::filter_view{AbiLoadedModules(abi), &Module::symbols_visible};
 }
 
 }  // namespace ld
