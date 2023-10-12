@@ -156,7 +156,8 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
   std::vector<bool> block_bitmap;
   size_t vmo_size = fbl::round_up(length, kBlockSize);
   size_t file_size = GetSize();
-  block_t num_read_blocks = safemath::checked_cast<block_t>(vmo_size / kBlockSize);
+  const block_t num_requested_blocks = safemath::checked_cast<block_t>(vmo_size / kBlockSize);
+  block_t num_read_blocks = num_requested_blocks;
   block_t start_block = safemath::checked_cast<block_t>(offset / kBlockSize);
 
   // Just supply pages for appended or inline area without read I/Os.
@@ -188,7 +189,7 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
     if (addrs.is_error()) {
       return addrs.take_error();
     }
-    int i = 0;
+    uint32_t i = 0;
     block_t actual_read_blocks = 0;
     for (auto &addr : *addrs) {
       if (!block_bitmap[i++]) {
@@ -197,6 +198,11 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
       } else if (addr != kNewAddr && addr != kNullAddr) {
         // the number of blocks to be read.
         ++actual_read_blocks;
+      }
+
+      if (i == num_requested_blocks && actual_read_blocks == 0) {
+        // There is no need for read IO on the requested blocks, so we skip the readahead checks.
+        break;
       }
     }
     if (actual_read_blocks) {
