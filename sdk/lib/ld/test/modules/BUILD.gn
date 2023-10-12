@@ -24,8 +24,17 @@ executables = [
   ":passive-abi-basic.in-process",
   ":symbolic-namespace",
   ":symbolic-namespace.in-process",
+  ":many-deps",
+  ":many-deps.in-process",
 ]
-shlibs = [ ":ld-dep-a" ]
+shlibs = [
+  ":ld-dep-a",
+  ":ld-dep-b",
+  ":ld-dep-c",
+  ":ld-dep-d",
+  ":ld-dep-e",
+  ":ld-dep-f",
+]
 modules = []
 
 if (is_fuchsia) {
@@ -195,6 +204,32 @@ template("test_shared_library") {
   }
 }
 
+template("test_dep") {
+  test_shared_library("ld-dep-$target_name") {
+    deps = []
+    test_deps = []
+    forward_variables_from(invoker, "*")
+
+    decls = ""
+    syms = ""
+    foreach(dep, test_deps) {
+      deps += [ ":ld-dep-$dep" ]
+      decls += "extern \"C\" int64_t $dep();"
+      syms += "$dep, "
+    }
+
+    defines = [
+      "VALUE=$value",
+      "SYM=$target_name",
+      "DECLS=$decls",
+      "DEP_SYMS=$syms",
+    ]
+
+    sources = [ "dep-template.cc" ]
+    deps += [ "//zircon/system/public" ]
+  }
+}
+
 config("test-executable.in-process.config") {
   visibility = [ ":*" ]
   ldflags = [ "-Wl,-e,TestStart" ]
@@ -239,9 +274,8 @@ test_executable("ld-dep") {
   deps = [ "../.." ]
 }
 
-test_shared_library("ld-dep-a") {
-  sources = [ "a.cc" ]
-  deps = [ "//zircon/system/public" ]
+test_dep("a") {
+  value = 13
 }
 
 test_executable("basic-dep") {
@@ -261,6 +295,61 @@ test_executable("symbolic-namespace") {
   sources = [ "symbolic-namespace.cc" ]
   deps = [
     ":ld-dep-a",
+    "../..",
+  ]
+}
+
+# These show the dependency graph of the test and the expected return value of each dependency's
+# only symbol.
+#
+# many_deps -> (13 + -8 + 3 + 9 = 17)
+#   a -> 13
+#   b -> -2 (-2 + 2 + 13 + -21 = -8)
+#     c -> 2
+#     a -> 13
+#     d -> -5 (-5 + -16 = -21)
+#       c -> 2
+#       e -> -18
+#   f -> 3
+#   _ld_abi -> 9 (number of total modules including vdso which may not be depended on)
+
+test_dep("b") {
+  value = -2
+  test_deps = [
+    "a",
+    "c",
+    "d",
+  ]
+}
+
+test_dep("c") {
+  value = 2
+}
+
+test_dep("d") {
+  value = -5
+  test_deps = [
+    "c",
+    "e",
+  ]
+}
+
+test_dep("e") {
+  value = -18
+}
+
+test_dep("f") {
+  value = 3
+}
+
+test_executable("many-deps") {
+  can_be_in_process = true
+  sources = [ "many-deps.cc" ]
+
+  deps = [
+    ":ld-dep-a",
+    ":ld-dep-b",
+    ":ld-dep-f",
     "../..",
   ]
 }

@@ -122,4 +122,19 @@ TYPED_TEST(LdLoadTests, SymbolicNamespace) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, ManyDeps) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so", "libld-dep-b.so", "libld-dep-f.so",
+                                        "libld-dep-c.so", "libld-dep-d.so", "libld-dep-e.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("many-deps"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace
