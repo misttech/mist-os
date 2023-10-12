@@ -10,6 +10,7 @@ use std::sync::{Arc, Weak};
 use thiserror::Error;
 
 mod decl;
+mod route2;
 
 struct InterfaceInner {
     /// Capabilities offered to this interface, e.g. from the parent component.
@@ -31,7 +32,7 @@ struct InterfaceInner {
 /// Components have a single "outer" interface that is the capability boundary between the component
 /// and its parent.
 ///
-///     * The incoming dictionary contains all capapabilities routed from the parent,
+///     * The incoming dictionary contains all capabilities routed from the parent,
 ///       i.e. from `use` and `offer` from parent declarations.
 ///     * The outgoing dictionary contains all capabilities routed to the parent,
 ///       i.e. from `expose` declarations.

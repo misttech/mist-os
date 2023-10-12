@@ -21,8 +21,13 @@ rustc_test("bin") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
+    "//src/lib/replace-with",
     "//src/sys/component_manager/lib/sandbox",
+    "//src/sys/lib/cm_types",
+    "//src/sys/lib/moniker",
+    "//src/sys/lib/routing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
@@ -31,6 +36,9 @@ rustc_test("bin") {
   sources = [
     "src/decl.rs",
     "src/lib.rs",
+    "src/route2/component.rs",
+    "src/route2/mod.rs",
+    "src/route2/program.rs",
   ]
 }
 

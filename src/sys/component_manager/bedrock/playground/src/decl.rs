@@ -5,18 +5,15 @@
 pub type ComponentName = String;
 pub type CapabilityName = String;
 
-#[derive(Clone, Debug)]
-pub enum Availability {
-    Optional,
-    Required,
-    SameAsTarget,
-    Transitional,
-}
+pub use cm_types::Availability;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Ref {
-    // A standin for someplace where you can always get any capability.
-    // In reality this would be "self" or "framework".
+    /// In the main prototype this is a standin for someplace where you can
+    /// always get any capability. A data capability is created out of thin air.
+    /// In reality this would be "self" or "framework".
+    ///
+    /// In the `route2` prototype this means "self" i.e. the program.
     Hammerspace,
     Parent,
     Child(ComponentName),

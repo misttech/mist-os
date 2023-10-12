@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCast, Capability, CloneError, ConversionError, Directory},
+    crate::{
+        AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError, Directory, Request,
+        Router,
+    },
     core::fmt,
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
+    fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
     futures::future::BoxFuture,
@@ -52,6 +56,7 @@ use {
 /// is equivalent to two agents each opening one capability through their respective
 /// clones of the open capability.
 #[derive(Capability, Clone)]
+#[capability(as_trait(AsRouter))]
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -178,6 +183,34 @@ impl Capability for Open {
         .boxed();
 
         (client_end.into_handle(), Some(fut))
+    }
+}
+
+/// [`Open`] can vend out routers. Each request from the router will yield an [`Open`] object
+/// which will open paths relative to `request.relative_path` from the base [`Open`] object.
+impl AsRouter for Open {
+    fn as_router(&self) -> Router {
+        let open = self.clone();
+        let route_fn = move |request: Request, completer: Completer| {
+            let open = open.clone();
+            let inner_open = Open::new(
+                move |scope: ExecutionScope,
+                      flags: fio::OpenFlags,
+                      relative_path: Path,
+                      server_end: zx::Channel| {
+                    match request.relative_path.joining(relative_path) {
+                        Ok(path) => (open.open)(scope, flags, path, server_end),
+                        Err(status) => {
+                            let _ = server_end.close_with_epitaph(status);
+                        }
+                    }
+                },
+                fio::DirentType::Unknown,
+                request.flags,
+            );
+            completer.complete(Ok(Box::new(inner_open)));
+        };
+        Router::new(route_fn)
     }
 }
 

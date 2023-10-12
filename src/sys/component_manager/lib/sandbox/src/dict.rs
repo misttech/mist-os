@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AnyCapability, AnyCast, Capability, CloneError, ConversionError, Directory, Open},
-    anyhow::{Context, Error},
+    crate::{
+        AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError,
+        Directory, Open, Request, Router,
+    },
+    anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
@@ -16,6 +19,7 @@ use {
     std::collections::btree_map::Entry,
     std::collections::BTreeMap,
     std::fmt::Debug,
+    std::sync::Arc,
     thiserror::Error,
     vfs::{
         directory::{
@@ -33,6 +37,7 @@ pub type Key = String;
 
 /// A capability that represents a dictionary of capabilities.
 #[derive(Capability, Debug)]
+#[capability(as_trait(AsRouter))]
 pub struct Dict {
     pub entries: BTreeMap<Key, AnyCapability>,
 
@@ -230,6 +235,30 @@ impl Capability for Dict {
             return Ok(Box::new(directory));
         }
         Err(ConversionError::NotSupported)
+    }
+}
+
+/// Dictionary can vend out routers:
+/// - Such router will check if path is empty, then resolve the completer with the current object.
+/// - If not, find an entry, and:
+///   - Transform the request, get a router from the entry, and delegate to that router.
+///   - If no entry found, close the completer with an error.
+impl AsRouter for Dict {
+    fn as_router(&self) -> Router {
+        let dict: Dict = self.try_clone().unwrap();
+        let dict = Arc::new(dict);
+        let route_fn = move |mut request: Request, completer: Completer| {
+            let Some(name) = request.relative_path.next() else {
+                completer.complete(Ok(Box::new(dict.try_clone().unwrap())));
+                return;
+            };
+            let Some(capability) = dict.entries.get(&name) else {
+                completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
+                return;
+            };
+            Router::from(capability).route(request, completer);
+        };
+        Router::new(route_fn)
     }
 }
 

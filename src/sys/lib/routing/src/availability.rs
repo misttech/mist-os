@@ -71,7 +71,7 @@ impl AvailabilityState {
         }
     }
 
-    fn advance(
+    pub fn advance(
         &mut self,
         next_availability: &Availability,
     ) -> Result<(), AvailabilityRoutingError> {
