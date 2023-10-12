@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileOps},
+    fs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps},
     task::CurrentTask,
     types::*,
 };
@@ -28,7 +28,7 @@ impl FileOps for PidFdFileObject {
     fileops_impl_nonseekable!();
     fileops_impl_dataless!();
 
-    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
         Ok(self.pid)
     }
 }

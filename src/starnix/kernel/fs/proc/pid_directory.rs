@@ -85,7 +85,7 @@ impl FileOps for Arc<TaskDirectory> {
         self.file_ops.readdir(file, current_task, sink)
     }
 
-    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
         Ok(self.pid)
     }
 }

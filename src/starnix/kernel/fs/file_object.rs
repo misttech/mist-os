@@ -331,7 +331,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Returns the associated pid_t.
     ///
     /// Used by pidfd and `/proc/<pid>`. Unlikely to be used by other files.
-    fn as_pid(&self, _file: &FileHandle) -> Result<pid_t, Errno> {
+    fn as_pid(&self, _file: &FileObject) -> Result<pid_t, Errno> {
         error!(EBADF)
     }
 }
@@ -1298,7 +1298,7 @@ impl FileObject {
         self.ops().to_handle(self, current_task)
     }
 
-    pub fn as_pid(self: &Arc<Self>) -> Result<pid_t, Errno> {
+    pub fn as_pid(&self) -> Result<pid_t, Errno> {
         self.ops().as_pid(self)
     }
 
