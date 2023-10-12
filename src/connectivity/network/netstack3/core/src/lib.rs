@@ -197,6 +197,14 @@ impl<BT: BindingsTypes> StackState<BT> {
             |IpInvariant(state)| state.ipv6.as_ref().get_counters(),
         )
     }
+
+    pub(crate) fn get_v4_state(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>> {
+        &self.ipv4
+    }
+
+    pub(crate) fn get_v6_state(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
+        &self.ipv6
+    }
 }
 
 /// The non synchronized context for the stack with a buffer.

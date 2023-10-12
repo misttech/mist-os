@@ -882,6 +882,22 @@ impl<NonSyncCtx: NonSyncContext, I: Ip, L> CounterContext2<IpCounters<I>>
     }
 }
 
+impl<NonSyncCtx: NonSyncContext, L> CounterContext2<Ipv4Counters>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&Ipv4Counters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateCounters>())
+    }
+}
+
+impl<NonSyncCtx: NonSyncContext, L> CounterContext2<Ipv6Counters>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
+{
+    fn with_counters<O, F: FnOnce(&Ipv6Counters) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::Ipv6StateCounters>())
+    }
+}
+
 impl<I, C, L> IpStateContext<I, C> for Locked<&SyncCtx<C>, L>
 where
     I: IpLayerIpExt,
@@ -1117,6 +1133,7 @@ impl Ipv4StateBuilder {
             inner: Default::default(),
             icmp: icmp.build(),
             next_packet_id: Default::default(),
+            counters: Default::default(),
         }
     }
 }
@@ -1138,7 +1155,7 @@ impl Ipv6StateBuilder {
     ) -> Ipv6State<Instant, StrongDeviceId> {
         let Ipv6StateBuilder { icmp } = self;
 
-        Ipv6State { inner: Default::default(), icmp: icmp.build() }
+        Ipv6State { inner: Default::default(), icmp: icmp.build(), counters: Default::default() }
     }
 }
 
@@ -1146,6 +1163,13 @@ pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     icmp: Icmpv4State<Instant, StrongDeviceId::Weak>,
     next_packet_id: AtomicU16,
+    counters: Ipv4Counters,
+}
+
+impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv4State<Instant, StrongDeviceId> {
+    pub(crate) fn get_v4_counters(&self) -> &Ipv4Counters {
+        &self.counters
+    }
 }
 
 impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
@@ -1170,6 +1194,13 @@ fn gen_ipv4_packet_id<C, SC: Ipv4StateContext<C>>(sync_ctx: &mut SC) -> u16 {
 pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     icmp: Icmpv6State<Instant, StrongDeviceId::Weak>,
+    counters: Ipv6Counters,
+}
+
+impl<Instant: crate::Instant, StrongDeviceId: StrongId> Ipv6State<Instant, StrongDeviceId> {
+    pub(crate) fn get_v6_counters(&self) -> &Ipv6Counters {
+        &self.counters
+    }
 }
 
 impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
@@ -1380,13 +1411,6 @@ pub(crate) struct IpCountersInner {
     // Count of packets to be forwarded which are instead dropped because
     // routing is disabled.
     pub(crate) routing_disabled_per_device: Counter,
-    /// Count of incoming IPv6 multicast packets delivered.
-    pub(crate) deliver_multicast: Counter,
-    /// Count of incoming IPv6 unicast packets delivered.
-    pub(crate) deliver_unicast: Counter,
-    /// Count of incoming IPv6 packets dropped because the destination address
-    /// is only tentatively assigned to the device.
-    pub(crate) drop_for_tentative: Counter,
     /// Count of incoming packets forwarded to another host.
     pub(crate) forward: Counter,
     /// Count of incoming packets which cannot be forwarded because there is no
@@ -1394,10 +1418,27 @@ pub(crate) struct IpCountersInner {
     pub(crate) no_route_to_host: Counter,
     /// Count of ICMP error messages received.
     pub(crate) receive_icmp_error: Counter,
-    /// Count of incoming IPv6 packets dropped.
-    pub(crate) dropped: Counter,
+}
+
+/// IPv4-specific counters.
+#[derive(Default)]
+pub(crate) struct Ipv4Counters {
     /// Count of incoming IPv4 packets delivered.
     pub(crate) deliver: Counter,
+}
+
+/// IPv6-specific counters.
+#[derive(Default)]
+pub(crate) struct Ipv6Counters {
+    /// Count of incoming IPv6 multicast packets delivered.
+    pub(crate) deliver_multicast: Counter,
+    /// Count of incoming IPv6 unicast packets delivered.
+    pub(crate) deliver_unicast: Counter,
+    /// Count of incoming IPv6 packets dropped because the destination address
+    /// is only tentatively assigned to the device.
+    pub(crate) drop_for_tentative: Counter,
+    /// Count of incoming IPv6 packets dropped.
+    pub(crate) dropped: Counter,
     /// Count of incoming IPv6 packets dropped due to a non-unicast source address.
     pub(crate) non_unicast_source: Counter,
 }
@@ -1410,6 +1451,24 @@ impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCount
 
     fn access(&self) -> Self::Guard<'_> {
         self.state.get_ip_counters()
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv4StateCounters> for SyncCtx<C> {
+    type Data = Ipv4Counters;
+    type Guard<'l> = &'l Ipv4Counters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.get_v4_state().get_v4_counters()
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::Ipv6StateCounters> for SyncCtx<C> {
+    type Data = Ipv6Counters;
+    type Guard<'l> = &'l Ipv6Counters where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.state.get_v6_state().get_v6_counters()
     }
 }
 
@@ -1851,7 +1910,8 @@ pub(crate) fn receive_ipv4_packet<
     B: BufferMut,
     SC: BufferIpLayerContext<Ipv4, C, B>
         + BufferIpLayerContext<Ipv4, C, Buf<Vec<u8>>>
-        + CounterContext2<IpCounters<Ipv4>>,
+        + CounterContext2<IpCounters<Ipv4>>
+        + CounterContext2<Ipv4Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1863,7 +1923,7 @@ pub(crate) fn receive_ipv4_packet<
         return;
     }
 
-    sync_ctx.with_counters(|counters| {
+    sync_ctx.with_counters(|counters: &IpCounters<Ipv4>| {
         counters.receive_ip_packet.increment();
     });
     trace!("receive_ip_packet({device:?})");
@@ -2071,7 +2131,8 @@ pub(crate) fn receive_ipv6_packet<
     B: BufferMut,
     SC: BufferIpLayerContext<Ipv6, C, B>
         + BufferIpLayerContext<Ipv6, C, Buf<Vec<u8>>>
-        + CounterContext2<IpCounters<Ipv6>>,
+        + CounterContext2<IpCounters<Ipv6>>
+        + CounterContext2<Ipv6Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2083,7 +2144,7 @@ pub(crate) fn receive_ipv6_packet<
         return;
     }
 
-    sync_ctx.with_counters(|counters| {
+    sync_ctx.with_counters(|counters: &IpCounters<Ipv6>| {
         counters.receive_ip_packet.increment();
     });
     trace!("receive_ipv6_packet({:?})", device);
@@ -2148,7 +2209,7 @@ pub(crate) fn receive_ipv6_packet<
                 "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
                 packet.src_ip()
             );
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv6Counters| {
                 counters.non_unicast_source.increment();
             });
             return;
@@ -2345,7 +2406,7 @@ pub(crate) fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Drop { reason } => {
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv6Counters| {
                 counters.dropped.increment();
             });
             let src_ip = packet.src_ip();
@@ -2389,7 +2450,7 @@ enum DropReason {
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpLayerContext<Ipv4, C> + CounterContext2<IpCounters<Ipv4>>,
+    SC: IpLayerContext<Ipv4, C> + CounterContext2<IpCounters<Ipv4>> + CounterContext2<Ipv4Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2423,7 +2484,7 @@ fn receive_ipv4_packet_action<
             | Ipv4PresentAddressStatus::Multicast
             | Ipv4PresentAddressStatus::Unicast,
         ) => {
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv4Counters| {
                 counters.deliver.increment();
             });
             ReceivePacketAction::Deliver
@@ -2435,7 +2496,7 @@ fn receive_ipv4_packet_action<
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpLayerContext<Ipv6, C> + CounterContext2<IpCounters<Ipv6>>,
+    SC: IpLayerContext<Ipv6, C> + CounterContext2<IpCounters<Ipv6>> + CounterContext2<Ipv6Counters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2490,13 +2551,13 @@ fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(Ipv6PresentAddressStatus::Multicast) => {
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv6Counters| {
                 counters.deliver_multicast.increment();
             });
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastAssigned) => {
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv6Counters| {
                 counters.deliver_unicast.increment();
             });
             ReceivePacketAction::Deliver
@@ -2532,7 +2593,7 @@ fn receive_ipv6_packet_action<
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            sync_ctx.with_counters(|counters| {
+            sync_ctx.with_counters(|counters: &Ipv6Counters| {
                 counters.drop_for_tentative.increment();
             });
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
@@ -4886,7 +4947,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             buf,
         );
-        assert_eq!(sync_ctx.state.ipv6.inner.counters.non_unicast_source.get(), 1);
+        assert_eq!(sync_ctx.state.ipv6.counters.non_unicast_source.get(), 1);
     }
 
     #[test]
