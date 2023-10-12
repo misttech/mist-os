@@ -29,7 +29,6 @@ use crate::{
     },
     types::*,
 };
-use bitflags::bitflags;
 use derivative::Derivative;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
@@ -1619,7 +1618,7 @@ impl BinderThreadState {
     fn new(tid: pid_t) -> Self {
         Self {
             tid,
-            registration: RegistrationState::empty(),
+            registration: RegistrationState::default(),
             transactions: Default::default(),
             command_queue: Default::default(),
             request_kick: false,
@@ -1627,11 +1626,11 @@ impl BinderThreadState {
     }
 
     pub fn is_main_or_registered(&self) -> bool {
-        self.registration.intersects(RegistrationState::MAIN | RegistrationState::REGISTERED)
+        self.registration != RegistrationState::Unregistered
     }
 
     pub fn is_registered(&self) -> bool {
-        self.registration.intersects(RegistrationState::REGISTERED)
+        self.registration == RegistrationState::Auxilliary
     }
 
     pub fn is_available(&self) -> bool {
@@ -1667,8 +1666,10 @@ impl BinderThreadState {
             // This thread is already registered.
             error!(EINVAL)
         } else {
-            binder_process.thread_requested = false;
-            self.registration |= registration;
+            if registration == RegistrationState::Auxilliary {
+                binder_process.thread_requested = false;
+            }
+            self.registration = registration;
             Ok(())
         }
     }
@@ -1731,14 +1732,20 @@ impl Drop for BinderThreadState {
     }
 }
 
-bitflags! {
-    /// The registration state of a thread.
-    struct RegistrationState: u32 {
-        /// The thread is the main binder thread.
-        const MAIN = 1;
+/// The registration state of a thread.
+#[derive(Debug, PartialEq, Eq)]
+enum RegistrationState {
+    /// The thread is not registered.
+    Unregistered,
+    /// The thread is the main binder thread.
+    Main,
+    /// The thread is an auxiliary binder thread.
+    Auxilliary,
+}
 
-        /// The thread is an auxiliary binder thread.
-        const REGISTERED = 1 << 2;
+impl Default for RegistrationState {
+    fn default() -> Self {
+        Self::Unregistered
     }
 }
 
@@ -2922,14 +2929,14 @@ impl BinderDriver {
                 let mut proc_state = binder_proc.lock();
                 binder_thread
                     .lock()
-                    .handle_looper_registration(&mut proc_state, RegistrationState::MAIN)
+                    .handle_looper_registration(&mut proc_state, RegistrationState::Main)
             }
             binder_driver_command_protocol_BC_REGISTER_LOOPER => {
                 profile_duration!("RegisterLooper");
                 let mut proc_state = binder_proc.lock();
                 binder_thread
                     .lock()
-                    .handle_looper_registration(&mut proc_state, RegistrationState::REGISTERED)
+                    .handle_looper_registration(&mut proc_state, RegistrationState::Auxilliary)
             }
             binder_driver_command_protocol_BC_INCREFS
             | binder_driver_command_protocol_BC_ACQUIRE
@@ -6665,7 +6672,7 @@ pub mod tests {
         let fake_waiter = Waiter::new();
         {
             let mut client_state = client_thread.lock();
-            client_state.registration = RegistrationState::MAIN;
+            client_state.registration = RegistrationState::Main;
             client_state.command_queue.waiters.wait_async(&fake_waiter);
         }
 
@@ -7241,7 +7248,7 @@ pub mod tests {
         let fake_waiter = Waiter::new();
         {
             let mut thread_state = receiver_thread.lock();
-            thread_state.registration = RegistrationState::MAIN;
+            thread_state.registration = RegistrationState::Main;
             thread_state.command_queue.waiters.wait_async(&fake_waiter);
         }
 
