@@ -1515,21 +1515,24 @@ void riscv64_mmu_init() {
 }
 
 void Riscv64VmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {
+  LTRACEF("start %#lx, len %zu\n", start, len);
+
   // Validate we are operating on a kernel address range.
   DEBUG_ASSERT(is_kernel_address(start));
-  // use the physmap to clean the range to PoU, which is the point of where the instruction cache
-  // pulls from. Cleaning to PoU is potentially cheaper than cleaning to PoC, which is the default
-  // of arch_clean_cache_range.
-  // TODO(revest): Flush
-  // We can batch the icache invalidate and just perform it once at the end.
+
+  // Track that we'll need to fence.i at the end, the address is not important.
   need_invalidate_ = true;
 }
 
 void Riscv64VmICacheConsistencyManager::Finish() {
+  LTRACEF("need_invalidate %d\n", need_invalidate_);
   if (!need_invalidate_) {
     return;
   }
-  // TODO(revest): Flush
+
+  // Sync any address, since fence.i will dump the entire icache (for now).
+  arch_sync_cache_range(KERNEL_ASPACE_BASE, PAGE_SIZE);
+
   need_invalidate_ = false;
 }
 

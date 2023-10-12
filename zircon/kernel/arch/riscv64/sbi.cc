@@ -192,6 +192,15 @@ zx_status_t sbi_hart_stop() {
   return riscv_status_to_zx_status(ret.error);
 }
 
+arch::RiscvSbiRet sbi_remote_fencei(cpu_mask_t cpu_mask) {
+  arch::HartMask hart_mask = riscv64_cpu_mask_to_hart_mask(cpu_mask);
+  arch::HartMaskBase hart_mask_base = 0;
+
+  LTRACEF("cpu_mask %#x, hart_mask %#lx\n", cpu_mask, hart_mask);
+
+  return arch::RiscvSbi::RemoteFenceI(hart_mask, hart_mask_base);
+}
+
 arch::RiscvSbiRet sbi_remote_sfence_vma(cpu_mask_t cpu_mask, uintptr_t start, uintptr_t size) {
   arch::HartMask hart_mask = riscv64_cpu_mask_to_hart_mask(cpu_mask);
   arch::HartMaskBase hart_mask_base = 0;

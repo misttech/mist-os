@@ -156,6 +156,10 @@ inline RiscvSbiRet SystemReset(RiscvSbiResetType reset_type, RiscvSbiResetReason
 
 // Remote fence Extension calls
 
+inline RiscvSbiRet RemoteFenceI(HartMask hart_mask, HartMaskBase hart_mask_base) {
+  return SbiCall<RiscvSbiEid::kRfence, RiscvSbiRfence::kFenceI>(hart_mask, hart_mask_base);
+}
+
 inline RiscvSbiRet RemoteSfenceVma(HartMask hart_mask, HartMaskBase hart_mask_base,
                                    uintptr_t start_addr, uintptr_t size) {
   return SbiCall<RiscvSbiEid::kRfence, RiscvSbiRfence::kSfenceVma>(hart_mask, hart_mask_base,

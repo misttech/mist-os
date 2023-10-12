@@ -5,8 +5,13 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/cache.h>
+#include <trace.h>
 
+#include <arch/interrupt.h>
 #include <arch/ops.h>
+#include <arch/riscv64/sbi.h>
+
+#define LOCAL_TRACE 0
 
 extern "C" {
 
@@ -15,10 +20,21 @@ void arch_clean_cache_range(vaddr_t start, size_t len) {}
 void arch_clean_invalidate_cache_range(vaddr_t start, size_t len) {}
 void arch_invalidate_cache_range(vaddr_t start, size_t len) {}
 
+// Synchronize the instruction and data cache on all cpus.
+// Note: this is very expensive and requires a cross cpu interrupt via SBI.
 void arch_sync_cache_range(vaddr_t start, size_t len) {
-  // Dump all of the icache to synchronize with the dcache.
-  arch::GlobalCacheConsistencyContext gccc;
-  gccc.SyncRange(start, len);
+  LTRACEF("start %#lx, len %zu\n", start, len);
+
+  // To keep the cpu from changing between the local shootdown and the remote,
+  // disable interrupts around this operation.
+  InterruptDisableGuard irqd;
+
+  // Shootdown on the local core
+  __asm__("fence.i");
+
+  // Send the shootdown to the rest of the cores.
+  const cpu_mask_t cpu_mask = mask_all_but_one(arch_curr_cpu_num());
+  sbi_remote_fencei(cpu_mask);
 }
 
 }  // extern C
