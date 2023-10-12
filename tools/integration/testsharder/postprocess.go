@@ -33,10 +33,6 @@ const (
 	// The maximum total runs across all automatically multiplied tests.
 	MaxMultipliedRunsPerShard = 1000
 
-	// The maximum number of tests that a multiplier can match. testsharder will
-	// fail if this is exceeded.
-	maxMatchesPerMultiplier = 50
-
 	// The maximum number of multiplied shards allowed per environment.
 	maxMultipliedShardsPerEnv = 3
 

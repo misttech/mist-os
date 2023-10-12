@@ -260,11 +260,19 @@ func TestMatchModifiersToTests(t *testing.T) {
 		},
 		{
 			name:  "rejects multiplier that matches too many tests",
-			specs: makeTestSpecs(maxMatchesPerMultiplier+1, []build.Environment{aemuEnv}),
+			specs: makeTestSpecs(defaultMaxMatchesPerMultiplier+1, []build.Environment{aemuEnv}),
 			multipliers: []TestModifier{
 				{Name: "fuchsia-pkg", TotalRuns: 1},
 			},
-			err: errTooManyMultiplierMatches,
+			err: errors.New("fuchsia-pkg multiplier cannot match more than 50 tests, matched 51"),
+		},
+		{
+			name:  "rejects multiplier that matches too many tests against custom limit",
+			specs: makeTestSpecs(101, []build.Environment{aemuEnv}),
+			multipliers: []TestModifier{
+				{Name: "fuchsia-pkg", TotalRuns: 1, MaxMatches: 100},
+			},
+			err: errors.New("fuchsia-pkg multiplier cannot match more than 100 tests, matched 101"),
 		},
 		{
 			name:  "rejects invalid multiplier regex",
@@ -279,7 +287,7 @@ func TestMatchModifiersToTests(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			actual, err := matchModifiersToTests(context.Background(), tc.specs, tc.multipliers)
-			if !errors.Is(err, tc.err) {
+			if (!errors.Is(err, tc.err)) && (err.Error() != tc.err.Error()) {
 				t.Fatalf("got err: %s, want %s", err, tc.err)
 			}
 			if diff := cmp.Diff(actual, tc.expected); diff != "" {
