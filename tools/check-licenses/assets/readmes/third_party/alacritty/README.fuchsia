@@ -3,3 +3,10 @@ Name: Alacritty
 License File: LICENSE-APACHE
  -> License File Format: Single License
  -> License Classifications: Apache-2.0
+
+License File: vte/LICENSE-APACHE
+ -> License File Format: Single License
+
+License File: vte/LICENSE-MIT
+ -> License File Format: Single License
+ -> License Classifications: Copyright, MIT
