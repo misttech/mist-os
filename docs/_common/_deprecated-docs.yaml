@@ -11,3 +11,5 @@
 included:
 - from: /docs/contribute/fake-page.md
   to: /docs/contribute/docs/deprecation-notice.md
+- from: /docs/reference/platform-spec/testing/test-output-format.md
+  to: /docs/reference/testing/test-output-format.md

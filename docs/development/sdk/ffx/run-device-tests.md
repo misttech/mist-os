@@ -182,5 +182,5 @@ how to opt in.
 [fx-test]: /docs/development/testing/run_fuchsia_tests.md
 [sdk]: /docs/development/sdk/index.md
 [test-components]: /docs/development/testing/components/test_component.md
-[test-output]: /docs/reference/platform-spec/testing/test-output-format.md
+[test-output]: /docs/reference/testing/test-output-format.md
 [trf]: /docs/development/testing/components/test_runner_framework.md

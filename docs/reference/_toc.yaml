@@ -39,3 +39,6 @@ toc:
 - title: "Platform specifications"
   section:
   - include: /docs/reference/platform-spec/_toc.yaml
+- title: "Testing"
+  section:
+  - include: /docs/reference/testing/_toc.yaml
