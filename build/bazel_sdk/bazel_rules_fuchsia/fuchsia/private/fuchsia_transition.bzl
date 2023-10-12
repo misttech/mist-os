@@ -8,6 +8,7 @@ load(":fuchsia_select.bzl", "if_fuchsia")
 load(":utils.bzl", "alias", "forward_providers", "rule_variants")
 load("//:api_version.bzl", "DEFAULT_TARGET_API")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME")
+load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -24,6 +25,12 @@ FUCHSIA_PLATFORMS_MAP = {
     "x86_64": "fuchsia_x64",
     "aarch64": "fuchsia_arm64",
     "riscv64": "fuchsia_riscv64",
+}
+
+CPU_MAP = {
+    fuchsia_platforms.x64: "x86_64",
+    fuchsia_platforms.arm64: "aarch64",
+    fuchsia_platforms.riscv64: "riscv64",
 }
 
 _REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
@@ -69,13 +76,39 @@ def _update_fuchsia_api_level(settings, attr):
     return str(DEFAULT_TARGET_API)
     # fail("Packages must be built against an API level.")
 
+def _package_supplied_platform(attr):
+    # We should be pulling the platform off of the package but we need to clean
+    # up the usages of this transition before we can assume the target of the
+    # transition is always a package.
+    if hasattr(attr, "platform"):
+        platform = attr.platform
+
+        # if platform is not set fwe fall back to our old method for finding the
+        # platform until we transition all users.
+        if platform != None and platform != "":
+            if platform in ALL_SUPPORTED_PLATFORMS:
+                return platform
+            else:
+                fail("ERROR: Attempting to build a fuchsia package with an unsupported platform: ", platform)
+
+    return None
+
 def _fuchsia_transition_impl(settings, attr):
-    input_cpu = settings["//command_line_option:cpu"]
-    output_cpu = NATIVE_CPU_ALIASES.get(input_cpu, None)
+    fuchsia_platform = _package_supplied_platform(attr)
+
+    if fuchsia_platform == None:
+        input_cpu = settings["//command_line_option:cpu"]
+        output_cpu = NATIVE_CPU_ALIASES.get(input_cpu, None)
+    else:
+        output_cpu = CPU_MAP[fuchsia_platform]
 
     if not output_cpu:
         fail("Unrecognized cpu %s." % input_cpu)
-    fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
+
+    # allow for a soft transition
+    if fuchsia_platform == None:
+        fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
+
     copt = settings["//command_line_option:copt"] + (
         [] if "--debug" in settings["//command_line_option:copt"] else ["--debug"]
     )

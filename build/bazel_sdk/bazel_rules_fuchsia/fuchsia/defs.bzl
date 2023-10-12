@@ -112,6 +112,10 @@ load(
     "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
     _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
 )
+load(
+    "//fuchsia/constraints/platforms:supported_platforms.bzl",
+    _fuchsia_platforms = "fuchsia_platforms",
+)
 
 # Workspace-dependent rules.
 load(
@@ -159,3 +163,6 @@ get_driver_component_manifests = _get_driver_component_manifests
 if_fuchsia = _if_fuchsia
 clangd_compilation_database = _clangd_compilation_database
 fuchsia_toolchain_info = _fuchsia_toolchain_info
+
+# Platform definitions
+fuchsia_platforms = _fuchsia_platforms

@@ -5,6 +5,7 @@
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
@@ -46,7 +47,7 @@ def main():
             + "\nGenerated:\n"
             + str(gen)
         )
-        exit(1)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

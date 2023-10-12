@@ -41,6 +41,7 @@ def fuchsia_package(
         name,
         package_name = None,
         archive_name = None,
+        platform = None,
         components = [],
         resources = [],
         tools = [],
@@ -82,6 +83,7 @@ def fuchsia_package(
         tools: Additional tools that should be added to this package.
         package_name: An optional name to use for this package, defaults to name.
         archive_name: An option name for the far file.
+        platform: Optionally override the platform to build the package for.
         **kwargs: extra attributes to pass along to the build rule.
     """
 
@@ -96,6 +98,7 @@ def fuchsia_package(
         tools = tools,
         package_name = package_name or name,
         archive_name = archive_name,
+        platform = platform,
         **kwargs
     )
 
@@ -432,6 +435,13 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
 
             This value will be sent to the fidl compiler and cc_* rules when
             compiling dependencies.
+            """,
+        ),
+        "platform": attr.string(
+            doc = """The Fuchsia platform to build for.
+
+            If this value is not set we will fall back to the cpu setting to determine
+            the correct platform.
             """,
         ),
         "_fuchsia_sdk_debug_symbols": attr.label(
