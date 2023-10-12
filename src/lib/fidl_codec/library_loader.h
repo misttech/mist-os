@@ -98,13 +98,13 @@ class EnumOrBits {
   ~EnumOrBits();
 
   const std::string& name() const { return name_; }
-  uint64_t size_v2() const { return size_v2_; }
+  uint64_t size() const { return size_; }
   const Type* type() const { return type_.get(); }
 
   // Get a list of Enum members.
   const std::vector<EnumOrBitsMember>& members() const { return members_; }
 
-  uint64_t Size(WireVersion version) const { return size_v2_; }
+  uint64_t Size(WireVersion version) const { return size_; }
 
  protected:
   EnumOrBits(std::string name, uint64_t size_v2, std::unique_ptr<Type> type,
@@ -116,7 +116,7 @@ class EnumOrBits {
  private:
   const rapidjson::Value* json_definition_;
   std::string name_;
-  uint64_t size_v2_;
+  uint64_t size_;
   std::unique_ptr<Type> type_;
   std::vector<EnumOrBitsMember> members_;
 };
@@ -215,12 +215,11 @@ class StructMember {
   void reset_type();
   uint8_t id() const { return id_; }
 
-  uint64_t Offset(WireVersion version) const { return offset_v2_; }
+  uint64_t Offset(WireVersion version) const { return offset_; }
 
  private:
   const std::string name_;
-  uint64_t offset_v1_ = 0;
-  uint64_t offset_v2_ = 0;
+  uint64_t offset_ = 0;
   std::unique_ptr<Type> type_;
   uint8_t id_ = 0;
 };
@@ -249,8 +248,7 @@ class Struct final {
   Library* enclosing_library_;
   const rapidjson::Value* json_definition_;
   std::string name_;
-  uint32_t size_v1_ = 0;
-  uint32_t size_v2_ = 0;
+  uint32_t size_ = 0;
   std::vector<std::unique_ptr<StructMember>> members_;
 };
 

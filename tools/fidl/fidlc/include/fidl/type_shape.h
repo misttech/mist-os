@@ -21,11 +21,6 @@ struct OverlayMemberUsed;
 }  // namespace flat
 
 enum class WireFormat {
-  kV1NoEe,  // The v1-no-ee wire format, where "union" is an extensible union on-the-wire,
-            // but without efficient envelope support. Request and response structs do not receive
-            // any special treatment (e.g. having their size increased by 16 for the transactional
-            // header).
-
   kV2,  // The v2 wire format, using efficient envelopes. Request and response structs do not
         // receive any special treatment (e.g. having their size increased by 16 for the
         // transactional header).

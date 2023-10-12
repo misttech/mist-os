@@ -26,16 +26,6 @@
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
-        "type_shape_v1": {
-          "inline_size": 4,
-          "alignment": 4,
-          "depth": 0,
-          "max_handles": 0,
-          "max_out_of_line": 0,
-          "has_padding": false,
-          "has_envelope": false,
-          "has_flexible_envelope": false
-        },
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -65,16 +55,6 @@
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
-        "type_shape_v1": {
-          "inline_size": 8,
-          "alignment": 8,
-          "depth": 0,
-          "max_handles": 0,
-          "max_out_of_line": 0,
-          "has_padding": false,
-          "has_envelope": false,
-          "has_flexible_envelope": false
-        },
         "type_shape_v2": {
           "inline_size": 8,
           "alignment": 8,
@@ -143,16 +123,6 @@
       "type": {
         "kind": "primitive",
         "subtype": "uint32",
-        "type_shape_v1": {
-          "inline_size": 4,
-          "alignment": 4,
-          "depth": 0,
-          "max_handles": 0,
-          "max_out_of_line": 0,
-          "has_padding": false,
-          "has_envelope": false,
-          "has_flexible_envelope": false
-        },
         "type_shape_v2": {
           "inline_size": 4,
           "alignment": 4,
@@ -240,16 +210,6 @@
       "type": {
         "kind": "primitive",
         "subtype": "uint64",
-        "type_shape_v1": {
-          "inline_size": 8,
-          "alignment": 8,
-          "depth": 0,
-          "max_handles": 0,
-          "max_out_of_line": 0,
-          "has_padding": false,
-          "has_envelope": false,
-          "has_flexible_envelope": false
-        },
         "type_shape_v2": {
           "inline_size": 8,
           "alignment": 8,

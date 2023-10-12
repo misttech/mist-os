@@ -564,7 +564,6 @@ type Type struct {
 	ProtocolTransport  string
 	ObjType            uint32
 	ResourceIdentifier string
-	TypeShapeV1        TypeShape
 	TypeShapeV2        TypeShape
 	PointeeType        *Type
 }
@@ -578,10 +577,6 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 	}
 
 	err = json.Unmarshal(*obj["kind"], &t.Kind)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(*obj["type_shape_v1"], &t.TypeShapeV1)
 	if err != nil {
 		return err
 	}
@@ -711,7 +706,6 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 func (t *Type) MarshalJSON() ([]byte, error) {
 	obj := map[string]interface{}{
 		"kind":          t.Kind,
-		"type_shape_v1": t.TypeShapeV1,
 		"type_shape_v2": t.TypeShapeV2,
 	}
 	switch t.Kind {
@@ -1192,7 +1186,6 @@ type Union struct {
 	IsResult    bool          `json:"is_result"`
 	Members     []UnionMember `json:"members"`
 	Strictness  `json:"strict"`
-	TypeShapeV1 TypeShape `json:"type_shape_v1"`
 	TypeShapeV2 TypeShape `json:"type_shape_v2"`
 }
 
@@ -1213,7 +1206,6 @@ type Table struct {
 	resourceableLayoutDecl
 	Members     []TableMember `json:"members"`
 	Strictness  `json:"strict"`
-	TypeShapeV1 TypeShape `json:"type_shape_v1"`
 	TypeShapeV2 TypeShape `json:"type_shape_v2"`
 }
 
@@ -1264,7 +1256,6 @@ type Struct struct {
 	IsEmptySuccessStruct bool           `json:"is_empty_success_struct"`
 	Members              []StructMember `json:"members"`
 	MaxHandles           int            `json:"max_handles"`
-	TypeShapeV1          TypeShape      `json:"type_shape_v1"`
 	TypeShapeV2          TypeShape      `json:"type_shape_v2"`
 }
 
@@ -1274,7 +1265,6 @@ type StructMember struct {
 	Type              Type                    `json:"type"`
 	MaybeDefaultValue *Constant               `json:"maybe_default_value,omitempty"`
 	MaybeAlias        *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
-	FieldShapeV1      FieldShape              `json:"field_shape_v1"`
 	FieldShapeV2      FieldShape              `json:"field_shape_v2"`
 }
 
@@ -1308,7 +1298,6 @@ type Overlay struct {
 	resourceableLayoutDecl
 	Members     []OverlayMember `json:"members"`
 	Strictness  `json:"strict"`
-	TypeShapeV1 TypeShape `json:"type_shape_v1"`
 	TypeShapeV2 TypeShape `json:"type_shape_v2"`
 }
 
