@@ -63,6 +63,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "battery_manager",
     "bluetooth_core",
+    "brightness_manager",
     "common_minimal",
     "core_realm",
     "core_realm_networking",

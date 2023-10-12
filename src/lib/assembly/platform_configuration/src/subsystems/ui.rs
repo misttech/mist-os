@@ -69,6 +69,24 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
                 destination: "config.json".into(),
             })?;
         }
+
+        if let Some(brightness_manager) = &ui_config.brightness_manager {
+            builder.platform_bundle("brightness_manager");
+            let mut brightness_config =
+                builder.package("brightness_manager").component("meta/brightness_manager.cm")?;
+            if brightness_manager.with_display_power {
+                brightness_config
+                    .field("manage_display_power", true)?
+                    .field("power_on_delay_millis", 35)?
+                    .field("power_off_delay_millis", 85)?;
+            } else {
+                brightness_config
+                    .field("manage_display_power", false)?
+                    .field("power_on_delay_millis", 0)?
+                    .field("power_off_delay_millis", 0)?;
+            }
+        }
+
         Ok(())
     }
 }

@@ -2458,6 +2458,16 @@ assembly_input_bundle("sensors_framework") {
   ]
 }
 
+# Brightness Manager support
+#
+# features_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("brightness_manager") {
+  flexible_packages =
+      [ "//src/ui/bin/brightness_manager:brightness_manager_pkg" ]
+}
+
 # Example assembly input bundle for testing
 #
 # Restricted for testing assembly itself (and to provide example code)

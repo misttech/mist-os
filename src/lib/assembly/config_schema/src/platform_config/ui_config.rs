@@ -49,6 +49,10 @@ pub struct PlatformUiConfig {
     // The expected viewing distance for the display.
     #[serde(default)]
     pub viewing_distance: ViewingDistance,
+
+    /// Whether to include brightness manager, and the relevant configs.
+    #[serde(default)]
+    pub brightness_manager: Option<BrightnessManager>,
 }
 
 impl Default for PlatformUiConfig {
@@ -63,6 +67,7 @@ impl Default for PlatformUiConfig {
             display_rotation: Default::default(),
             display_pixel_density: Default::default(),
             viewing_distance: Default::default(),
+            brightness_manager: Default::default(),
         }
     }
 }
@@ -116,4 +121,10 @@ impl AsRef<str> for ViewingDistance {
             Self::Unknown => "unknown",
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase", deny_unknown_fields)]
+pub struct BrightnessManager {
+    pub with_display_power: bool,
 }
