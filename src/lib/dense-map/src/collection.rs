@@ -344,7 +344,7 @@ impl<K: DenseMapCollectionKey, T> DenseMapCollection<K, T> {
     pub fn iter(&self) -> impl ExactSizeIterator<Item = &T> {
         let Self { data, count, _marker } = self;
         SizeAugmentedIterator {
-            wrapped: data.iter().flat_map(|m| m.iter()).map(|(_, v)| v),
+            wrapped: data.iter().flat_map(|m| m.key_ordered_iter()).map(|(_, v)| v),
             remaining: *count,
         }
     }
@@ -353,7 +353,7 @@ impl<K: DenseMapCollectionKey, T> DenseMapCollection<K, T> {
     pub fn iter_mut(&mut self) -> impl ExactSizeIterator<Item = &mut T> {
         let Self { data, count, _marker } = self;
         SizeAugmentedIterator {
-            wrapped: data.iter_mut().flat_map(|m| m.iter_mut()).map(|(_, v)| v),
+            wrapped: data.iter_mut().flat_map(|m| m.key_ordered_iter_mut()).map(|(_, v)| v),
             remaining: *count,
         }
     }
@@ -454,9 +454,9 @@ mod tests {
     fn test_insert_and_get() {
         let mut t = TestCollection::new();
         let DenseMapCollection { data, count, _marker } = &t;
-        assert_empty(data[0].iter());
-        assert_empty(data[1].iter());
-        assert_empty(data[2].iter());
+        assert_empty(data[0].key_ordered_iter());
+        assert_empty(data[1].key_ordered_iter());
+        assert_empty(data[2].key_ordered_iter());
         assert_eq!(count, &0);
 
         assert_eq!(t.insert(&KEY_A, 1), None);

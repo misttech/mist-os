@@ -2664,7 +2664,7 @@ mod tests {
                 <A::AddrType as IpAddress>::Version::with_collection(
                     ctx.non_sync_ctx(),
                     |SocketCollection { received }| {
-                        assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
+                        assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], [_]);
                     },
                 )
             });
@@ -2689,7 +2689,7 @@ mod tests {
                 <A::AddrType as IpAddress>::Version::with_collection(
                     ctx.non_sync_ctx(),
                     |SocketCollection { received }| {
-                        assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
+                        assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                     },
                 )
             });
@@ -2735,7 +2735,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.iter().collect::<Vec<_>>()[..], [_]);
+                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], [_]);
                 },
             )
         });
@@ -2750,7 +2750,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -2788,7 +2788,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -2822,7 +2822,7 @@ mod tests {
             <A::AddrType as IpAddress>::Version::with_collection(
                 ctx.non_sync_ctx(),
                 |SocketCollection { received }| {
-                    assert_matches!(received.iter().collect::<Vec<_>>()[..], []);
+                    assert_matches!(received.key_ordered_iter().collect::<Vec<_>>()[..], []);
                 },
             )
         });
@@ -2992,7 +2992,7 @@ mod tests {
                     >>::with_collection(non_sync_ctx, |SocketCollection { received }| {
                         // Check the lone socket to see if the packets were
                         // received.
-                        let (_index, messages) = received.iter().next().unwrap();
+                        let (_index, messages) = received.key_ordered_iter().next().unwrap();
                         has_all_delivered(&messages.lock())
                     })
                 });

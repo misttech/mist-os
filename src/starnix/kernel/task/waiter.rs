@@ -619,7 +619,7 @@ impl Drop for Waiter {
         let wait_queues = std::mem::take(&mut *self.inner.wait_queues.lock()).into_values();
         for wait_queue in wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.lock().waiters.retain(|entry| entry.entry.waiter != *self)
+                wait_queue.lock().waiters.key_ordered_retain(|entry| entry.entry.waiter != *self)
             }
         }
     }
@@ -646,7 +646,10 @@ impl Drop for SimpleWaiter {
     fn drop(&mut self) {
         for wait_queue in &self.wait_queues {
             if let Some(wait_queue) = wait_queue.upgrade() {
-                wait_queue.lock().waiters.retain(|entry| entry.entry.waiter != self.event)
+                wait_queue
+                    .lock()
+                    .waiters
+                    .key_ordered_retain(|entry| entry.entry.waiter != self.event)
             }
         }
     }
@@ -914,7 +917,7 @@ impl WaitQueue {
     fn notify_events_count(&self, events: WaitEvents, mut limit: usize) -> usize {
         profile_duration!("NotifyEventsCount");
         let mut woken = 0;
-        self.0.lock().waiters.retain(|WaitEntryWithId { entry, id: _ }| {
+        self.0.lock().waiters.key_ordered_retain(|WaitEntryWithId { entry, id: _ }| {
             if limit > 0 && entry.filter.intercept(&events) {
                 if entry.waiter.notify(&entry.key, events) {
                     limit -= 1;
