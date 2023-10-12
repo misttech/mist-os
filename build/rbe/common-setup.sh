@@ -52,17 +52,18 @@ function timetrace() {
 
 # Normalize path: return an absolute path without any .. in the middle.
 # Following-symlinks is optional.
-function normalize_path() {
-  # $1 is the path to resolve
-  if which realpath 2>&1 > /dev/null
-  then realpath "$1"
-  elif which readlink 2>&1 > /dev/null
-  then readlink -f "$1"
-  else
-    msg "Error: Unable to normalize paths."
-    exit 1
-  fi
-}
+if which realpath 2>&1 > /dev/null; then
+  function normalize_path() {
+    realpath "$1"
+  }
+elif which readlink 2>&1 > /dev/null; then
+  function normalize_path() {
+    readlink -f "$1"
+  }
+else
+  msg "Error: Unable to normalize paths."
+  exit 1
+fi
 
 # This should point to $FUCHSIA_DIR for the Fuchsia project.
 # ../../ because this script lives in build/rbe.

@@ -15,6 +15,8 @@
 # readarray is only available in bash 4+
 # but 'read -r -a' works with bash 3.2.
 
+set -eu
+
 readonly script="$0"
 # assume script is always with path prefix, e.g. "./$script"
 readonly script_dir="${script%/*}"  # dirname
@@ -31,7 +33,6 @@ function join_by_char() {
   shift
   printf "%s" "$*"
 }
-
 
 # Relative path to exec_root without calling realpath/readlink.
 # Assume working dir is at or below exec_root.
@@ -92,6 +93,21 @@ function dmsg() {
   # echo "[$script_basename]" "$@"
   :
 }
+
+# Normalize path: return an absolute path without any .. in the middle.
+# Following-symlinks is optional.
+if which realpath 2>&1 > /dev/null; then
+  function normalize_path() {
+    realpath "$1"
+  }
+elif which readlink 2>&1 > /dev/null; then
+  function normalize_path() {
+    readlink -f "$1"
+  }
+else
+  msg "Error: Unable to normalize paths."
+  exit 1
+fi
 
 if [[ -z "$RBE_server_address" ]]
 then
@@ -251,7 +267,10 @@ fi
 
 if [[ "$compiler_type" == "gcc" ]]
 then
-  _local_exec_root="$(realpath "$exec_root")"  # note: realpath is not always available
+  _local_exec_root="$(normalize_path "$exec_root")" || {
+    msg "Unable to normalize path: $exec_root"
+    exit 1
+  }
   remote_compile_cmd=()
   for tok in "${local_compile_cmd[@]}"
   do
