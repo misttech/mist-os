@@ -92,9 +92,7 @@ func Validate(fvd *fvdpb.VirtualDevice, images build.ImageManifest) error {
 	// called (e.g. it could be a MinFS image which is created during a test run).
 	if fvd.Drive != nil && !fvd.Drive.IsFilename {
 		if err := uniqueImageExists(fvd.Drive.Image, "blk"); err != nil {
-			if innerErr := uniqueImageExists(fvd.Drive.Image, "fxfs-blk"); innerErr != nil {
-				return fmt.Errorf("%s and %s", err, innerErr)
-			}
+			return err
 		}
 	}
 
