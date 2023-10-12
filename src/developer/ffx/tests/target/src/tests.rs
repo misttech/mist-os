@@ -53,12 +53,10 @@ async fn test_target_flash_gigaboot(ctx: TestContext) {
         .expect("flash target");
     assert!(output.status.success(), "Failed to run command: {}\n{}", output.stdout, output.stderr);
 
-    std::thread::sleep(Duration::from_secs(4));
-
     emu.check_is_running().expect("Emulator exited unexpectedly");
 
     // Retry ffx target show as it may take the device up to 30 seconds to initialize SSH.
-    wait_for_target!(isolate, emu);
+    wait_for_target!(isolate, emu, 0);
     emu.check_is_running().expect("Emulator exited unexpectedly");
 }
 
@@ -105,12 +103,10 @@ async fn test_target_flash_from_product(ctx: TestContext) {
         .expect("flash target");
     assert!(output.status.success(), "Failed to run command: {}\n{}", output.stdout, output.stderr);
 
-    std::thread::sleep(Duration::from_secs(4));
-
     emu.check_is_running().expect("Emulator exited unexpectedly");
 
     // Retry ffx target show as it may take the device up to 30 seconds to initialize SSH.
-    wait_for_target!(isolate, emu);
+    wait_for_target!(isolate, emu, 0);
     emu.check_is_running().expect("Emulator exited unexpectedly");
 
     // At this point the target is in Product mode... flash again and verify
@@ -128,12 +124,10 @@ async fn test_target_flash_from_product(ctx: TestContext) {
         .expect("flash target");
     assert!(output.status.success(), "Failed to run command: {}\n{}", output.stdout, output.stderr);
 
-    std::thread::sleep(Duration::from_secs(4));
-
     emu.check_is_running().expect("Emulator exited unexpectedly");
 
     // Retry ffx target show as it may take the device up to 30 seconds to initialize SSH.
-    wait_for_target!(isolate, emu);
+    wait_for_target!(isolate, emu, 0);
     emu.check_is_running().expect("Emulator exited unexpectedly");
 }
 
@@ -289,43 +283,27 @@ async fn enter_fastboot(
     }
 }
 
-async fn wait_for_target(isolate: &Isolate, emu: &Emu, retries: i32) -> anyhow::Result<()> {
-    let mut times = retries;
-    while times >= 0 {
-        let out = isolate
-            .ffx(&["--target", emu.nodename(), "target", "show"])
-            .await
-            .expect("target show");
+async fn wait_for_target(isolate: &Isolate, emu: &Emu, timeout: i32) -> anyhow::Result<()> {
+    let out = isolate
+        .ffx(&["--target", emu.nodename(), "target", "wait", "-t", format!("{}", timeout).as_str()])
+        .await
+        .expect("target wait");
 
-        if times > 0 && !out.status.success() {
-            times -= 1;
-            continue;
-        }
-
-        if !out.status.success() {
-            anyhow::bail!("status is unexpected: {:?}", out)
-        }
-        if !out.stdout.contains("Product:") {
-            anyhow::bail!("stdout is unexpected: {:?}", out)
-        }
-        if !out.stderr.lines().count() == 0 {
-            anyhow::bail!("stderr is unexpected: {:?}", out)
-        }
-
-        return Ok(());
+    if !out.status.success() {
+        anyhow::bail!("target wait exited unsucessfully: {:?}", out);
     }
-    anyhow::bail!("Could not find target")
+    Ok(())
 }
 
 #[macro_export]
 /// Waits for an emulator to show up in the isolate's daemon by invoking
-/// ffx target show and looking for a successful command.
+/// ffx target wait and looking for a successful command.
 macro_rules! wait_for_target {
-    ($isolate: ident, $emu: ident, $retries: expr) => {
-        wait_for_target(&$isolate, &$emu, $retries).await.unwrap();
+    ($isolate: ident, $emu: ident, $timeout: expr) => {
+        wait_for_target(&$isolate, &$emu, $timeout).await.unwrap();
     };
     ($isolate: ident, $emu: ident) => {
         // Assume a reasonable default of 2 retries
-        wait_for_target!($isolate, $emu, 2)
+        wait_for_target!($isolate, $emu, 120)
     };
 }
