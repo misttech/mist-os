@@ -47,6 +47,16 @@
           "type": {
             "kind": "primitive",
             "subtype": "uint64",
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -70,6 +80,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -81,6 +95,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -99,6 +123,16 @@
             },
             "maybe_element_count": 1,
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 8,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -117,6 +151,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 8,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -128,6 +166,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -145,6 +193,16 @@
               "nullable": false
             },
             "element_count": 1,
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -163,6 +221,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 24,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 24,
             "padding": 0
@@ -176,6 +238,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -194,6 +266,16 @@
               },
               "maybe_element_count": 1,
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 8,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -206,6 +288,16 @@
               }
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -224,6 +316,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 32,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 32,
             "padding": 0
@@ -237,6 +333,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -254,6 +360,16 @@
                 "nullable": false
               },
               "element_count": 1,
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -266,6 +382,16 @@
               }
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -284,6 +410,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 48,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 48,
             "padding": 0
@@ -297,6 +427,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -315,6 +455,16 @@
               },
               "maybe_element_count": 1,
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 8,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -327,6 +477,16 @@
               }
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 64,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 32,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 64,
               "alignment": 8,
@@ -345,6 +505,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 64,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 64,
             "padding": 0
@@ -358,6 +522,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -375,6 +549,16 @@
                 "nullable": false
               },
               "element_count": 1,
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -387,6 +571,16 @@
               }
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 32,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 32,
               "alignment": 8,
@@ -405,6 +599,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 128,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 128,
             "padding": 0
@@ -416,6 +614,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -428,6 +636,16 @@
               }
             },
             "nullable": true,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -451,6 +669,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 160,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 160,
             "padding": 0
@@ -464,6 +686,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -476,6 +708,16 @@
                 }
               },
               "nullable": true,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -493,6 +735,16 @@
               "nullable": false
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -511,6 +763,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 176,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 176,
             "padding": 0
@@ -524,6 +780,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -536,6 +802,16 @@
                 }
               },
               "nullable": true,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -553,6 +829,16 @@
               "nullable": false
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 64,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 64,
               "alignment": 8,
@@ -571,6 +857,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 192,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 192,
             "padding": 0
@@ -582,6 +872,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -594,6 +894,16 @@
               }
             },
             "element_count": 1,
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -617,6 +927,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 256,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 256,
             "padding": 0
@@ -630,6 +944,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -642,6 +966,16 @@
                 }
               },
               "element_count": 1,
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -659,6 +993,16 @@
               "nullable": false
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -677,6 +1021,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 264,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 264,
             "padding": 0
@@ -690,6 +1038,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -702,6 +1060,16 @@
                 }
               },
               "element_count": 1,
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -719,6 +1087,16 @@
               "nullable": false
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 32,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 32,
               "alignment": 8,
@@ -737,6 +1115,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 280,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 280,
             "padding": 0
@@ -748,6 +1130,16 @@
             "subtype": "test.experimentalmaybefromalias/MyProtocol",
             "nullable": true,
             "protocol_transport": "Channel",
+            "type_shape_v1": {
+              "inline_size": 4,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 1,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 4,
               "alignment": 4,
@@ -771,6 +1163,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 312,
+            "padding": 4
+          },
           "field_shape_v2": {
             "offset": 312,
             "padding": 4
@@ -784,6 +1180,16 @@
               "subtype": "test.experimentalmaybefromalias/MyProtocol",
               "nullable": true,
               "protocol_transport": "Channel",
+              "type_shape_v1": {
+                "inline_size": 4,
+                "alignment": 4,
+                "depth": 0,
+                "max_handles": 1,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -801,6 +1207,16 @@
               "nullable": false
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 4294967295,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -819,6 +1235,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 320,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 320,
             "padding": 0
@@ -832,6 +1252,16 @@
               "subtype": "test.experimentalmaybefromalias/MyProtocol",
               "nullable": true,
               "protocol_transport": "Channel",
+              "type_shape_v1": {
+                "inline_size": 4,
+                "alignment": 4,
+                "depth": 0,
+                "max_handles": 1,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 4,
                 "alignment": 4,
@@ -849,6 +1279,16 @@
               "nullable": false
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 4,
+              "depth": 0,
+              "max_handles": 4,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 4,
@@ -867,6 +1307,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 336,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 336,
             "padding": 0
@@ -878,6 +1322,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint8",
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 1,
                 "alignment": 1,
@@ -890,6 +1344,16 @@
               }
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -913,6 +1377,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 352,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 352,
             "padding": 0
@@ -926,6 +1394,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint8",
+                "type_shape_v1": {
+                  "inline_size": 1,
+                  "alignment": 1,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 1,
                   "alignment": 1,
@@ -938,6 +1416,16 @@
                 }
               },
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -955,6 +1443,16 @@
               "nullable": false
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -973,6 +1471,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 368,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 368,
             "padding": 0
@@ -986,6 +1488,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint8",
+                "type_shape_v1": {
+                  "inline_size": 1,
+                  "alignment": 1,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 1,
                   "alignment": 1,
@@ -998,6 +1510,16 @@
                 }
               },
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1015,6 +1537,16 @@
               "nullable": false
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 64,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 64,
               "alignment": 8,
@@ -1033,6 +1565,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 384,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 384,
             "padding": 0
@@ -1042,6 +1578,16 @@
           "type": {
             "kind": "string",
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1065,6 +1611,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 448,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 448,
             "padding": 0
@@ -1076,6 +1626,16 @@
             "element_type": {
               "kind": "string",
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1093,6 +1653,16 @@
               "nullable": false
             },
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1111,6 +1681,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 464,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 464,
             "padding": 0
@@ -1122,6 +1696,16 @@
             "element_type": {
               "kind": "string",
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 4294967295,
+                "has_padding": true,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1139,6 +1723,16 @@
               "nullable": false
             },
             "element_count": 4,
+            "type_shape_v1": {
+              "inline_size": 64,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 4294967295,
+              "has_padding": true,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 64,
               "alignment": 8,
@@ -1157,6 +1751,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 480,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 480,
             "padding": 0
@@ -1168,6 +1766,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -1186,6 +1794,16 @@
             },
             "maybe_element_count": 2,
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 16,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1209,6 +1827,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 544,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 544,
             "padding": 0
@@ -1222,6 +1844,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -1240,6 +1872,16 @@
               },
               "maybe_element_count": 2,
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 16,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1258,6 +1900,16 @@
             },
             "maybe_element_count": 3,
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 96,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1276,6 +1928,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 560,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 560,
             "padding": 0
@@ -1289,6 +1945,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -1307,6 +1973,16 @@
               },
               "maybe_element_count": 2,
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 16,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1324,6 +2000,16 @@
               "nullable": false
             },
             "element_count": 3,
+            "type_shape_v1": {
+              "inline_size": 48,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 48,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 48,
               "alignment": 8,
@@ -1342,6 +2028,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 576,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 576,
             "padding": 0
@@ -1353,6 +2043,16 @@
             "element_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -1370,6 +2070,16 @@
               "nullable": false
             },
             "element_count": 2,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1393,6 +2103,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 624,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 624,
             "padding": 0
@@ -1406,6 +2120,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -1423,6 +2147,16 @@
                 "nullable": false
               },
               "element_count": 2,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1441,6 +2175,16 @@
             },
             "maybe_element_count": 3,
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 16,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 48,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 16,
               "alignment": 8,
@@ -1459,6 +2203,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 640,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 640,
             "padding": 0
@@ -1472,6 +2220,16 @@
               "element_type": {
                 "kind": "primitive",
                 "subtype": "uint64",
+                "type_shape_v1": {
+                  "inline_size": 8,
+                  "alignment": 8,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 8,
                   "alignment": 8,
@@ -1489,6 +2247,16 @@
                 "nullable": false
               },
               "element_count": 2,
+              "type_shape_v1": {
+                "inline_size": 16,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 16,
                 "alignment": 8,
@@ -1506,6 +2274,16 @@
               "nullable": false
             },
             "element_count": 3,
+            "type_shape_v1": {
+              "inline_size": 48,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 48,
               "alignment": 8,
@@ -1524,6 +2302,10 @@
             "column": 5,
             "length": 3
           },
+          "field_shape_v1": {
+            "offset": 656,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 656,
             "padding": 0
@@ -1532,6 +2314,16 @@
       ],
       "resource": true,
       "is_empty_success_struct": false,
+      "type_shape_v1": {
+        "inline_size": 704,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 4294967295,
+        "max_out_of_line": 4294967295,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 704,
         "alignment": 8,

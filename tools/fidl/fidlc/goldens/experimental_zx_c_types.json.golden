@@ -25,6 +25,16 @@
       "type": {
         "kind": "primitive",
         "subtype": "uchar",
+        "type_shape_v1": {
+          "inline_size": 1,
+          "alignment": 1,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
         "type_shape_v2": {
           "inline_size": 1,
           "alignment": 1,
@@ -58,6 +68,16 @@
       "type": {
         "kind": "primitive",
         "subtype": "uintptr64",
+        "type_shape_v1": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
         "type_shape_v2": {
           "inline_size": 8,
           "alignment": 8,
@@ -91,6 +111,16 @@
       "type": {
         "kind": "primitive",
         "subtype": "usize64",
+        "type_shape_v1": {
+          "inline_size": 8,
+          "alignment": 8,
+          "depth": 0,
+          "max_handles": 0,
+          "max_out_of_line": 0,
+          "has_padding": false,
+          "has_envelope": false,
+          "has_flexible_envelope": false
+        },
         "type_shape_v2": {
           "inline_size": 8,
           "alignment": 8,
@@ -133,6 +163,16 @@
       "members": [],
       "resource": false,
       "is_empty_success_struct": false,
+      "type_shape_v1": {
+        "inline_size": 1,
+        "alignment": 1,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 1,
         "alignment": 1,
@@ -160,6 +200,16 @@
           "type": {
             "kind": "primitive",
             "subtype": "usize64",
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -178,6 +228,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -187,6 +241,16 @@
           "type": {
             "kind": "primitive",
             "subtype": "uintptr64",
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -205,6 +269,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 8,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 8,
             "padding": 0
@@ -214,6 +282,16 @@
           "type": {
             "kind": "primitive",
             "subtype": "uchar",
+            "type_shape_v1": {
+              "inline_size": 1,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 1,
               "alignment": 1,
@@ -232,6 +310,10 @@
             "column": 5,
             "length": 2
           },
+          "field_shape_v1": {
+            "offset": 16,
+            "padding": 7
+          },
           "field_shape_v2": {
             "offset": 16,
             "padding": 7
@@ -243,6 +325,16 @@
             "pointee_type": {
               "kind": "primitive",
               "subtype": "uint64",
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -253,6 +345,16 @@
                 "has_envelope": false,
                 "has_flexible_envelope": false
               }
+            },
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
             },
             "type_shape_v2": {
               "inline_size": 8,
@@ -272,6 +374,10 @@
             "column": 5,
             "length": 7
           },
+          "field_shape_v1": {
+            "offset": 24,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 24,
             "padding": 0
@@ -285,6 +391,16 @@
               "pointee_type": {
                 "kind": "primitive",
                 "subtype": "uint32",
+                "type_shape_v1": {
+                  "inline_size": 4,
+                  "alignment": 4,
+                  "depth": 0,
+                  "max_handles": 0,
+                  "max_out_of_line": 0,
+                  "has_padding": false,
+                  "has_envelope": false,
+                  "has_flexible_envelope": false
+                },
                 "type_shape_v2": {
                   "inline_size": 4,
                   "alignment": 4,
@@ -296,6 +412,16 @@
                   "has_flexible_envelope": false
                 }
               },
+              "type_shape_v1": {
+                "inline_size": 8,
+                "alignment": 8,
+                "depth": 1,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 8,
                 "alignment": 8,
@@ -306,6 +432,16 @@
                 "has_envelope": false,
                 "has_flexible_envelope": false
               }
+            },
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 2,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
             },
             "type_shape_v2": {
               "inline_size": 8,
@@ -325,6 +461,10 @@
             "column": 5,
             "length": 11
           },
+          "field_shape_v1": {
+            "offset": 32,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 32,
             "padding": 0
@@ -337,6 +477,16 @@
               "kind": "identifier",
               "identifier": "test.experimentalzxctypes/Struct",
               "nullable": false,
+              "type_shape_v1": {
+                "inline_size": 1,
+                "alignment": 1,
+                "depth": 0,
+                "max_handles": 0,
+                "max_out_of_line": 0,
+                "has_padding": false,
+                "has_envelope": false,
+                "has_flexible_envelope": false
+              },
               "type_shape_v2": {
                 "inline_size": 1,
                 "alignment": 1,
@@ -347,6 +497,16 @@
                 "has_envelope": false,
                 "has_flexible_envelope": false
               }
+            },
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 1,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
             },
             "type_shape_v2": {
               "inline_size": 8,
@@ -366,6 +526,10 @@
             "column": 5,
             "length": 10
           },
+          "field_shape_v1": {
+            "offset": 40,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 40,
             "padding": 0
@@ -374,6 +538,16 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
+      "type_shape_v1": {
+        "inline_size": 48,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": true,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 48,
         "alignment": 8,

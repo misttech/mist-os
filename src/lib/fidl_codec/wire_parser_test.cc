@@ -1594,6 +1594,15 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
             "kind": "identifier",
             "identifier": "test.fidlcodec.examples/FidlCodecTestProtocolRequest",
             "nullable": false,
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": true,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1628,6 +1637,15 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
         {
           "type": {
             "kind": "primitive",
+            "type_shape_v1": {
+              "inline_size": 8,
+              "alignment": 8,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": true,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 8,
               "alignment": 8,
@@ -1644,6 +1662,10 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
             "line": 16,
             "column": 17
           },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 4
+          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 4
@@ -1651,6 +1673,15 @@ TEST_F(WireParserTest, BadSchemaPrintHex) {
         }
       ],
       "resource": false,
+      "type_shape_v1": {
+        "inline_size": 8,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": true,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 8,
         "alignment": 8,

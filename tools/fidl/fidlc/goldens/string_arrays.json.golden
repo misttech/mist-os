@@ -35,6 +35,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 100,
+            "type_shape_v1": {
+              "inline_size": 100,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 100,
               "alignment": 1,
@@ -53,6 +63,10 @@
             "column": 5,
             "length": 1
           },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -61,6 +75,16 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
+      "type_shape_v1": {
+        "inline_size": 100,
+        "alignment": 1,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 100,
         "alignment": 1,
@@ -88,6 +112,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 2,
+            "type_shape_v1": {
+              "inline_size": 2,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 1,
@@ -106,6 +140,10 @@
             "column": 5,
             "length": 1
           },
+          "field_shape_v1": {
+            "offset": 0,
+            "padding": 0
+          },
           "field_shape_v2": {
             "offset": 0,
             "padding": 0
@@ -114,6 +152,16 @@
       ],
       "resource": false,
       "is_empty_success_struct": false,
+      "type_shape_v1": {
+        "inline_size": 2,
+        "alignment": 1,
+        "depth": 0,
+        "max_handles": 0,
+        "max_out_of_line": 0,
+        "has_padding": false,
+        "has_envelope": false,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 2,
         "alignment": 1,
@@ -146,6 +194,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 100,
+            "type_shape_v1": {
+              "inline_size": 100,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 100,
               "alignment": 1,
@@ -168,6 +226,16 @@
       ],
       "strict": false,
       "resource": false,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 120,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -197,6 +265,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 2,
+            "type_shape_v1": {
+              "inline_size": 2,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 1,
@@ -219,6 +297,16 @@
       ],
       "strict": false,
       "resource": false,
+      "type_shape_v1": {
+        "inline_size": 16,
+        "alignment": 8,
+        "depth": 2,
+        "max_handles": 0,
+        "max_out_of_line": 24,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": true
+      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -251,6 +339,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 100,
+            "type_shape_v1": {
+              "inline_size": 100,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 100,
               "alignment": 1,
@@ -273,6 +371,16 @@
       "strict": true,
       "resource": false,
       "is_result": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 104,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,
@@ -303,6 +411,16 @@
           "type": {
             "kind": "string_array",
             "element_count": 2,
+            "type_shape_v1": {
+              "inline_size": 2,
+              "alignment": 1,
+              "depth": 0,
+              "max_handles": 0,
+              "max_out_of_line": 0,
+              "has_padding": false,
+              "has_envelope": false,
+              "has_flexible_envelope": false
+            },
             "type_shape_v2": {
               "inline_size": 2,
               "alignment": 1,
@@ -325,6 +443,16 @@
       "strict": true,
       "resource": false,
       "is_result": false,
+      "type_shape_v1": {
+        "inline_size": 24,
+        "alignment": 8,
+        "depth": 1,
+        "max_handles": 0,
+        "max_out_of_line": 8,
+        "has_padding": true,
+        "has_envelope": true,
+        "has_flexible_envelope": false
+      },
       "type_shape_v2": {
         "inline_size": 16,
         "alignment": 8,

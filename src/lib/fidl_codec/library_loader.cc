@@ -86,7 +86,7 @@ void EnumOrBits::DecodeTypes(bool is_scalar, const std::string& supertype_name,
     }
   }
 
-  size_ = type_->InlineSize(WireVersion::kWireV2);
+  size_v2_ = type_->InlineSize(WireVersion::kWireV2);
 }
 
 std::string Enum::GetName(uint64_t absolute_value, bool negative) const {
@@ -194,8 +194,10 @@ std::string Union::ToString(bool expand) const {
 StructMember::StructMember(Library* enclosing_library, const rapidjson::Value* json_definition)
     : name_(
           enclosing_library->ExtractString(json_definition, "struct member", "<unknown>", "name")),
-      offset_(enclosing_library->ExtractFieldOffset(json_definition, "struct member", name_,
-                                                    "field_shape_v2")),
+      offset_v1_(enclosing_library->ExtractFieldOffset(json_definition, "struct member", name_,
+                                                       "field_shape_v1")),
+      offset_v2_(enclosing_library->ExtractFieldOffset(json_definition, "struct member", name_,
+                                                       "field_shape_v2")),
       type_(enclosing_library->ExtractType(json_definition, "struct member", name_, "type")) {}
 
 StructMember::StructMember(std::string_view name, std::unique_ptr<Type> type)
@@ -228,9 +230,9 @@ void Struct::DecodeTypes() {
   if (!json_definition->HasMember("type_shape_v2")) {
     enclosing_library_->FieldNotFound("struct", name_, "type_shape_v2");
   } else {
-    const rapidjson::Value& type_shape = (*json_definition)["type_shape_v2"];
-    size_ = static_cast<uint32_t>(
-        enclosing_library_->ExtractUint64(&type_shape, "struct", name_, "inline_size"));
+    const rapidjson::Value& v2 = (*json_definition)["type_shape_v2"];
+    size_v2_ = static_cast<uint32_t>(
+        enclosing_library_->ExtractUint64(&v2, "struct", name_, "inline_size"));
   }
 
   if (!json_definition->HasMember("members")) {
@@ -253,7 +255,7 @@ StructMember* Struct::SearchMember(std::string_view name, uint32_t id) const {
   return nullptr;
 }
 
-uint32_t Struct::Size(WireVersion version) const { return size_; }
+uint32_t Struct::Size(WireVersion version) const { return size_v2_; }
 
 std::string Struct::ToString(bool expand) const {
   StructType type(*this, false);

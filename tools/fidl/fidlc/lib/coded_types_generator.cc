@@ -14,7 +14,7 @@
 namespace fidl {
 
 coded::MemcpyCompatibility ComputeMemcpyCompatibility(const flat::Type* type) {
-  auto typeshape = type->typeshape(fidl::WireFormat::kV2);
+  auto typeshape = type->typeshape(fidl::WireFormat::kV1NoEe);
   if (typeshape.max_out_of_line == 0 && typeshape.max_handles == 0 &&
       !typeshape.has_flexible_envelope && !typeshape.has_padding) {
     return coded::MemcpyCompatibility::kCanMemcpy;
@@ -237,7 +237,7 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
       auto name = NameFlatName(primitive_type->name);
       auto coded_primitive_type = std::make_unique<coded::PrimitiveType>(
           std::move(name), primitive_type->subtype,
-          primitive_type->typeshape(WireFormat::kV2).inline_size, context);
+          primitive_type->typeshape(WireFormat::kV1NoEe).inline_size, context);
       primitive_type_map_[primitive_type] = coded_primitive_type.get();
       coded_types_.push_back(std::move(coded_primitive_type));
       return coded_types_.back().get();
@@ -250,7 +250,7 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
       auto name = NameFlatName(internal_type->name);
       auto coded_internal_type = std::make_unique<coded::InternalType>(
           std::move(name), internal_type->subtype,
-          internal_type->typeshape(WireFormat::kV2).inline_size, context);
+          internal_type->typeshape(WireFormat::kV1NoEe).inline_size, context);
       internal_type_map_[internal_type] = coded_internal_type.get();
       coded_types_.push_back(std::move(coded_internal_type));
       return coded_types_.back().get();
@@ -507,10 +507,10 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
       auto primitive_type = static_cast<const flat::PrimitiveType*>(bits_decl->subtype_ctor->type);
       named_coded_types_.emplace(
           bits_decl->name,
-          std::make_unique<coded::BitsType>(std::move(bits_name), primitive_type->subtype,
-                                            primitive_type->typeshape(WireFormat::kV2).inline_size,
-                                            bits_decl->mask, NameFlatName(bits_decl->name),
-                                            bits_decl->strictness));
+          std::make_unique<coded::BitsType>(
+              std::move(bits_name), primitive_type->subtype,
+              primitive_type->typeshape(WireFormat::kV1NoEe).inline_size, bits_decl->mask,
+              NameFlatName(bits_decl->name), bits_decl->strictness));
       break;
     }
     case flat::Decl::Kind::kEnum: {
@@ -537,10 +537,10 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
       }
       named_coded_types_.emplace(
           enum_decl->name,
-          std::make_unique<coded::EnumType>(std::move(enum_name), enum_decl->type->subtype,
-                                            enum_decl->type->typeshape(WireFormat::kV2).inline_size,
-                                            std::move(members), NameFlatName(enum_decl->name),
-                                            enum_decl->strictness));
+          std::make_unique<coded::EnumType>(
+              std::move(enum_name), enum_decl->type->subtype,
+              enum_decl->type->typeshape(WireFormat::kV1NoEe).inline_size, std::move(members),
+              NameFlatName(enum_decl->name), enum_decl->strictness));
       break;
     }
     case flat::Decl::Kind::kProtocol: {

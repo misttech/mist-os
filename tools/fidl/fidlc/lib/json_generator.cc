@@ -880,10 +880,13 @@ void JSONGenerator::Generate(const flat::Compilation::Dependency& dependency) {
 }
 
 void JSONGenerator::GenerateTypeShapes(const flat::Object& object) {
+  GenerateObjectMember("type_shape_v1", TypeShape(object, WireFormat::kV1NoEe));
   GenerateObjectMember("type_shape_v2", TypeShape(object, WireFormat::kV2));
 }
 
 void JSONGenerator::GenerateFieldShapes(const flat::Struct::Member& struct_member) {
+  auto v1 = FieldShape(struct_member, WireFormat::kV1NoEe);
+  GenerateObjectMember("field_shape_v1", v1);
   auto v2 = FieldShape(struct_member, WireFormat::kV2);
   GenerateObjectMember("field_shape_v2", v2);
 }
