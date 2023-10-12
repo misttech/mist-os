@@ -257,7 +257,9 @@ pub async fn main() {
     let mut migration = Migration::new(DataPersistenceProvider {});
 
     let inspector = fuchsia_inspect::component::inspector();
-    inspect_runtime::serve(inspector, &mut fs).expect("failed to serve inspector");
+    let _inspect_server =
+        inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
+            .expect("failed to serve inspector");
     let inspect_nodes = InspectNodes::new(inspector, &migration);
 
     let () = fs
