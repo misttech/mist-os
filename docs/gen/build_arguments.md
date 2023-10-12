@@ -5445,14 +5445,6 @@ From //zircon/kernel/params.gni:109
 
 From //src/devices/bus/drivers/pci/pci.gni:10
 
-### pmm_checker_from_board
-
-No longer used, will be removed in a subsequent CL.
-
-**Current value (from the default):** `true`
-
-From //boards/kernel_cmdline/BUILD.gn:60
-
 ### pre_erase_flash
 
 **Current value (from the default):** `false`
@@ -8026,6 +8018,16 @@ NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
 **Current value (from the default):** `false`
 
 From //src/starnix/kernel/BUILD.gn:18
+
+### starnix_enable_trace_and_debug_logs_in_release
+
+Compiles-in trace and debug logging in release builds. By default, these
+logs are compiled-out for performance reasons. For more information, see
+https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:23
 
 ### target_cpu
 
