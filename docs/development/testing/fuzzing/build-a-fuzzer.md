@@ -11,14 +11,14 @@ that represent a specific output such as a library or executable.
 In order to make adding new fuzzers as easy as possible, Fuchsia provides fuzzing-related GN
 templates.
 
- * To create build rules for a fuzzer binary for Fuchsia, see the
+* To create build rules for a fuzzer binary for Fuchsia, see the
    [Fuchsia library fuzzer GN template](#fuchsia-library-fuzzer) for the appropriate language.
- * To create build rules for a fuzzer binary for your development host, see the
+* To create build rules for a fuzzer binary for your development host, see the
    [Host library fuzzer GN template](#host-library-fuzzer)
- * To create build rules for a fuzzer component, see
+* To create build rules for a fuzzer component, see
    [Fuchsia fuzzer component GN template](#fuchsia-fuzzer-component).
- * To create build rules for a package of fuzzer binaries, see
-   [Fuchsia fuzzer package GN template](#fuzzers-package).
+* To create build rules for a package of fuzzer binaries, see
+   [Fuchsia fuzzer package GN template](#fuchsia-fuzzer-package).
 
 Once you have defined your build rules, you can [build fuzzers with fx](#fx-set).
 
@@ -36,7 +36,7 @@ Each language has a specific fuzzer GN template:
 
    For example:
 
-   ```
+   ```gn
    import("//build/fuzz.gni")
 
    fuchsia_library_fuzzer("parser-fuzzer") {
@@ -60,7 +60,7 @@ Each language has a specific fuzzer GN template:
     `toy_example_arbitrary` [example](write-a-fuzzer.md#advanced), you would add the following to
     your `BUILD.gn`:
 
-    ```
+    ```gn
     import("//build/rust/rustc_fuzzer.gni")
 
     rustc_fuzzer("toy_example_arbitrary") {
@@ -71,7 +71,7 @@ Each language has a specific fuzzer GN template:
     `rustfunction` parameter. For example, using the `toy_example_u8`
     [example](write-a-fuzzer.md#basic), you would add the following to your `BUILD.gn`:
 
-    ```
+    ```gn
     import("//build/rust/rustc_fuzzer.gni")
 
     rustc_fuzzer("toy_example_raw_bytes") {
@@ -96,7 +96,7 @@ Each language has a specific fuzzer GN template:
     * You must explicitly provide the fuzz target function to the `rustc_fuzzer` with the
       `source_root` parameter. For example, in your `BUILD.gn`:
 
-      ```
+      ```gn
       import("//build/rust/rustc_fuzzer.gni")
 
       rustc_fuzzer("toy_example_with_main") {
@@ -117,14 +117,14 @@ Note: Since the generated unit test uses a zero-length input, your fuzzer _must 
 provided with a zero-length input. If a fuzzer input is shorter than your fuzzer's minimum input
 length, you can simply return early.
 
-## Host library fuzzer GN template {#fuchsia-library-fuzzer}
+## Host library fuzzer GN template {#host-library-fuzzer}
 
 You can also build fuzzers that run on your development host using the Fuchsia build system.
-To build host fuzzers, use the [`host_library_fuzzer`][host_library_fuzzer] GN template.
+To build host fuzzers, use the [`host_library_fuzzer`][host_library_fuzzer.gni] GN template.
 
 For example:
 
-```
+```gn
 host_library_fuzzer("my_host_fuzzer") {
   sources = [ ... ]
   deps = [ ... ]
@@ -134,14 +134,14 @@ host_library_fuzzer("my_host_fuzzer") {
 Host fuzzers can be built using [`fx`](#fx-set) without adding them to a Fuchsia component or
 package.
 
-## Fuchsia fuzzer component GN template
+## Fuchsia fuzzer component GN template {#fuchsia-fuzzer-component}
 
-The `fuchsia_fuzzer_component` [template][fuchsia.fuzzer_component.gni] creates a component used to
+The `fuchsia_fuzzer_component` [template][fuchsia_fuzzer_component.gni] creates a component used to
 run the fuzzer. It can include the usual component parameters, such as `component_name` and `deps`.
 
 For example:
 
-```
+```gn
 fuchsia_fuzzer_component("my-fuzzer-component") {
   component_name = "my-fuzzer"
   manifest = "meta/my-fuzzer.cml"
@@ -149,8 +149,8 @@ fuchsia_fuzzer_component("my-fuzzer-component") {
 }
 ```
 
-The [component manifest source][glossary.component_manifest_source] for library fuzzers must include
-the [default shard for libfuzzer][libfuzzer_default_shard]. The output name of the fuzzer must be
+The [component manifest source][glossary.manifest] for library fuzzers must include
+the default shard for libfuzzer. The output name of the fuzzer must be
 provided as the first program argument as a package-relative path. Additional arguments may include
 libFuzzer [options][options]{:.external}, or package-relative paths to directories of seed inputs
 known as [seed corpora][corpus]{:.external}.
@@ -176,12 +176,12 @@ For example:
 }
 ```
 
-A seed corpus should match a [`resource`][resource] target that is included in the component's
+A seed corpus should match a `resource` target that is included in the component's
 `deps`.
 
 For example:
 
-```
+```gn
 {% verbatim %}
 import("//build/dist/resource.gni")
 
@@ -198,9 +198,9 @@ resource("my-corpus") {
 
 ## Fuchsia fuzzer package GN template {#fuchsia-fuzzer-package}
 
-The `fuchsia_fuzzer_package` [template][fuchsia_fuzzer_package.gni] bundles fuzzer components into a
+The `fuchsia_fuzzer_package` [template][fuzzer_package.gni] bundles fuzzer components into a
 Fuchsia [package][glossary.package], similar to how `fuchsia_test_package` bundles test components.
-The `fuchsia_fuzzer_package` template is distinguished by adding a specific [build_rule][build_rule]
+The `fuchsia_fuzzer_package` template is distinguished by adding a specific build rule
 to annotate fuzzers when built by a fuzzing toolchain [variant][variants].
 
 Note: Executables built by these templates are only be capable of fuzzing if they are selected by a
@@ -216,7 +216,7 @@ For example, if the C++ toolchain has support for a hypotheical _examplesan_, th
 does not, and the _examplesan-fuzzer_ variant is selected, then the package definition below builds
 `my-cpp-fuzzer` for fuzzing and `my-rust-fuzzer` for testing only.
 
-```
+```gn
 fuchsia_fuzzer_package("my-fuzzers") {
   cpp_fuzz_components = [ ":my-cpp-fuzzer" ]
   rust_fuzz_components = [ ":my-rust-fuzzer" ]
@@ -230,7 +230,7 @@ A `fuchsia_fuzzer_package` can use all the same parameters as a [`fuchsia_packag
 
 For example:
 
-```
+```gn
 fuchsia_fuzzer_package("my-fuzzers") {
   package_name = "the-fuzzers"
   cpp_fuzz_components = [ ":my-fuzzer" ]
@@ -242,7 +242,7 @@ package. This typically means adding it to a group of tests.
 
 For example:
 
-```
+```gn
 group("tests") {
   deps = [
     ":my-test-package",
@@ -258,10 +258,10 @@ instrument them for fuzzing with an appropriate fuzzing variant. These are the
 [known variants][known_variants] that end in `-fuzzer`. Each one is an extension of a
 [sanitizer][sanitizers]{:.external} variant, including:
 
- * _asan_: Use [AddressSanitizer][asan]{:.external} to detect memory errors such as using memory
+* _asan_: Use [AddressSanitizer][asan]{:.external} to detect memory errors such as using memory
    after [freeing][asan-uaf]{:.external} or [returning][asan-uar]{:.external} it, overflowing
    [heap][asan-hbo]{:.external} and [stack][asan-sbo]{:.external} buffer overflows, and more.
- * _ubsan_: Use [UndefinedBehaviorSanitizer][ubsan]{:.external} to detect behavior that violates the
+* _ubsan_: Use [UndefinedBehaviorSanitizer][ubsan]{:.external} to detect behavior that violates the
    language specification such as [signed integer overflow][ubsan-sio]{:.external}, misaligned
    pointers, and [more][ubsan-all]{:.external}.
 
@@ -288,17 +288,18 @@ Additional `ffx fuzz` commands can be used to [run a fuzzer](run-a-fuzzer.md).
 [asan-sbo]: https://github.com/google/sanitizers/wiki/AddressSanitizerExampleStackOutOfBounds
 [asan-uaf]: https://github.com/google/sanitizers/wiki/AddressSanitizerExampleUseAfterFree
 [asan-uar]: https://github.com/google/sanitizers/wiki/AddressSanitizerExampleUseAfterReturn
-[cpp_fuzzer.gni]: /build/cpp/cpp_fuzzer.gni
+[corpus]: https://llvm.org/docs/LibFuzzer.html#corpus
 [fuchsia-gn]: /docs/development/build/build_system/intro.md
+[fuchsia_library_fuzzer.gni]: /build/fuzzing/fuchsia_library_fuzzer.gni
+[fuchsia_fuzzer_component.gni]: /build/fuzzing/fuchsia_fuzzer_component.gni
 [fuzz-target]: https://llvm.org/docs/LibFuzzer.html#fuzz-target
-[fuzzer.gni]: /build/fuzzing/fuzzer.gni
-[fuzzer_package.gni]: /build/fuzzing/fuzzer_package.gni
+[fuzzer_package.gni]: /build/fuzzing/fuchsia_fuzzer_package.gni
 [fx-build]: /docs/development/build/fx.md#execute-a-build
 [fx-set]: /docs/development/build/fx.md#configure-a-build
-[gn-deps]: https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#var_deps
 [gn-package]: /docs/development/components/build.md
 [gn-targets]: https://gn.googlesource.com/gn/+/HEAD/docs/language.md#Targets
 [gn-templates]: https://gn.googlesource.com/gn/+/HEAD/docs/language.md#Templates
+[host_library_fuzzer.gni]: /build/fuzzing/host_library_fuzzer.gni
 [known_variants]: /docs/gen/build_arguments.md#known_variants
 [options]: https://llvm.org/docs/LibFuzzer.html#options
 [rustc_fuzzer.gni]: /build/rust/rustc_fuzzer.gni

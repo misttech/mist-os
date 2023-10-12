@@ -33,9 +33,9 @@ If notice gaps in the code coverage, you can add individual inputs to a seed cor
 1. Add a directory to the source tree near your fuzzer.
 1. Add one or more files to this directory, each containing the raw bytes of a test input that
    causes the fuzzer to reach previously uncovered code.
-1. Add a [`resource`][resource] GN target for this directory and add it to the fuzzer's `deps`.
+1. Add a `resource` GN target for this directory and add it to the fuzzer's `deps`.
 1. Add an argument with the package-relative path to the fuzzer's
-   [component manifest source][component-manifest-source].
+   component manifest source.
 
 For example:
 
@@ -171,7 +171,7 @@ But this approach can fail when the fuzzer encounters "fuzzer-hostile" condition
     ```
 
 As a code maintainer, you can use conditional compilation to add workarounds to these conditions in
-the code being tested. libFuzzer refers to this as using a [fuzzer-friendly build mode][friendly].
+the code being tested. libFuzzer refers to this as using a fuzzer-friendly build mode.
 
 * {C/C++}
 
@@ -216,7 +216,7 @@ the code being tested. libFuzzer refers to this as using a [fuzzer-friendly buil
 
   Note: Go fuzzing is experimental and may not be supported on your development host.
 
-  Use the `fuzz` package. Since Go only performs [conditional compilation][go-build] at the file
+  Use the `fuzz` package. Since Go only performs conditional compilation at the file
   level, this package include two files that define an `const Enabled <bool>`. Which file is
   included, and therefore the value of `Enabled` is determined by whether the code is being built in
   a fuzzer variant or not.
@@ -277,8 +277,8 @@ fuzzer will use a dictionary to construct inputs that are more likely to be vali
 provide deeper coverage.
 
 If you know what sort of tokens your code expects, you can add them to a dictionary file, one per
-line. Then provide the file to the fuzzer as a [`resource`][resource] in the same manner as a seed
-corpus, and add them to the fuzzer's [component manifest source][component-manifest-source].
+line. Then provide the file to the fuzzer as a `resource` in the same manner as a seed
+corpus, and add them to the fuzzer's component manifest source.
 
 For example:
 
@@ -377,6 +377,8 @@ extern "C" LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 ```
 
 [asan]: https://clang.llvm.org/docs/AddressSanitizer.html
+[component-manifest-source]: /docs/glossary/README.md#component-manifest-source
+[cfg-attribute]: https://doc.rust-lang.org/reference/conditional-compilation.html#the-cfg-attribute
 [fuzzer-interface]: https://github.com/llvm/llvm-project/blob/HEAD/compiler-rt/lib/fuzzer/FuzzerInterface.h
 [golang-cgo]: https://golang.org/cmd/cgo/
 [manual-poison]: https://github.com/google/sanitizers/wiki/AddressSanitizerManualPoisoning

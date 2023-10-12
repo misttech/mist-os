@@ -175,6 +175,3 @@
 * [mundane](https://fuchsia-docs.firebaseapp.com/rust/mundane/index.html)
 
     A Rust crypto library backed by BoringSSL
-
-
-[rustdocs]: https://fuchsia-docs.firebaseapp.com/rust/

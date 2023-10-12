@@ -763,6 +763,9 @@ closed protocol Vmar {
     ///
     ///  - [`zx_vmar_map()`]
     ///  - [`zx_iob_create()`]
+    ///
+    /// [`zx_iob_create()`]: iob_create.md
+    /// [`zx_vmar_map()`]: vmar_map.md
     strict MapIob(resource struct {
         handle Handle:VMAR;
         options VmOption;

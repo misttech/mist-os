@@ -120,7 +120,7 @@ In the background, the request to the component framework gets routed to the ser
 * `IncomingService::Echo` is called with a `RequestStream`
   (typed-channel) of the `Echo` FIDL protocol that is registered with `add_fidl_service`. The
   incoming request channel is stored in `IncomingService::Echo` and is added to the stream of
-  incoming requests. `for_each_concurrent` consumes the `ServiceFs` into a [`Stream`] of type
+  incoming requests. `for_each_concurrent` consumes the `ServiceFs` into a `Stream` of type
   `IncomingService`. A handler is run for each entry in the stream, which matches over the incoming
   requests and dispatches to the `run_echo_server`. The resulting futures from each call to
   `run_echo_server` are run concurrently when the `ServiceFs` stream is `await`ed.

@@ -42,7 +42,7 @@ of a number of resources, all of *size* 1, which are used as privileged checks
 for syscalls.
 
 *parent_rsrc* must be a handle to a resource of *kind* **ZX_RSRC_KIND_ROOT**, or
-a resource that matches the requested *kind* and contains [*base*, *base*+*size*]
+a resource that matches the requested *kind* and contains \[*base*, *base*+*size*\]
 in its range.
 
 *options* must specify which kind of resource to create and may contain optional

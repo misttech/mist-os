@@ -30,11 +30,8 @@ Fuchsia's support for CPUs:
 
 - [Install Fuchsia on a NUC][install-fuchsia-on-nuc]
 - [Install Fuchsia on a Khadas VIM3 board][install-fuchsia-on-vim3]
-- Create a bootable Fuchsia image:
-  - [Install Fuchsia from a USB flash drive][prepare-usb]
 
 <!-- Reference links -->
 
 [install-fuchsia-on-nuc]: /docs/development/hardware/intel_nuc.md
-[install-fuchsia-on-nuc-legacy]: /docs/development/hardware/intel_nuc_with_zedboot.md
 [install-fuchsia-on-vim3]: /docs/development/hardware/khadas-vim3.md

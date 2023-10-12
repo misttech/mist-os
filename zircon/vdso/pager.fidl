@@ -60,6 +60,7 @@ closed protocol Pager {
     /// [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
+    /// [`zx_object_get_info()`]: object_get_info.md
     strict Create(struct {
         options uint32;
     }) -> (resource struct {
@@ -206,6 +207,7 @@ closed protocol Pager {
     /// service will receive is a **ZX_PAGER_VMO_COMPLETE** request.
     ///
     /// The following pager syscalls will fail on a detached VMO:
+    ///
     ///  - [`zx_pager_supply_pages()`]
     ///  - [`zx_pager_op_range()`] with **ZX_PAGER_OP_DIRTY** and **ZX_PAGER_OP_FAIL**
     /// And the following will continue working as before the detach:
@@ -250,6 +252,8 @@ closed protocol Pager {
     /// [`zx_pager_create_vmo()`]: pager_create_vmo.md
     /// [`zx_pager_op_range()`]: pager_op_range.md
     /// [`zx_pager_query_dirty_ranges()`]: pager_query_dirty_ranges.md
+    /// [`zx_pager_query_vmo_stats()`]: pager_query_vmo_stats.md
+    /// [`zx_pager_supply_pages()`]: pager_supply_pages.md
     strict DetachVmo(resource struct {
         pager Handle:PAGER;
         vmo Handle:VMO;

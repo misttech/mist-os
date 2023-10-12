@@ -110,3 +110,6 @@ or restrict these operations as described in the discipline spec.
 
  - [`zx_vmar_map()`]
  - [`zx_iob_create()`]
+
+[`zx_iob_create()`]: iob_create.md
+[`zx_vmar_map()`]: vmar_map.md

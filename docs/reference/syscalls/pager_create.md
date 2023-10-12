@@ -66,3 +66,4 @@ any value other than 0.
 [`zx_pager_detach_vmo()`]: pager_detach_vmo.md
 [`zx_pager_op_range()`]: pager_op_range.md
 [`zx_pager_supply_pages()`]: pager_supply_pages.md
+[`zx_object_get_info()`]: object_get_info.md

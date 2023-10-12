@@ -210,4 +210,4 @@ For a structured log with keys, this would look as follows in JSON:
 
 [archivist]: /docs/reference/diagnostics/inspect/tree.md#archivist
 [moniker]: /docs/reference/components/moniker.md
-[stream-diagnostics]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#ArchiveAccessor.StreamDiagnostics)
+[stream-diagnostics]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#ArchiveAccessor.StreamDiagnostics
