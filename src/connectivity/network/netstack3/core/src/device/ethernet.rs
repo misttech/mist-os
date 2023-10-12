@@ -1414,7 +1414,7 @@ mod tests {
                 nud::DynamicNeighborUpdateSource, slaac::SlaacConfiguration, IpAddressId as _,
                 IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             },
-            dispatch_receive_ip_packet_name, receive_ip_packet,
+            receive_ip_packet,
             testutil::is_in_ip_multicast,
         },
         testutil::{
@@ -1880,11 +1880,10 @@ mod tests {
             Buf::new(bytes, ..),
         );
 
-        let counter = match I::VERSION {
-            IpVersion::V4 => "receive_ipv4_packet",
-            IpVersion::V6 => "receive_ipv6_packet",
-        };
-        assert_eq!(get_counter_val(&non_sync_ctx, counter), expected_received);
+        assert_eq!(
+            sync_ctx.state.get_ip_counters::<I>().receive_ip_packet.get(),
+            expected_received
+        );
     }
 
     #[test]
@@ -2086,22 +2085,25 @@ mod tests {
             .unwrap()
             .unwrap_b();
 
-        let dispatch_receive_ip_packet_other_host_name =
-            &alloc::format!("{}_other_host", dispatch_receive_ip_packet_name::<I>());
-
         // Accept packet destined for this device if promiscuous mode is off.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 1);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
+        assert_eq!(
+            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            0
+        );
 
         // Accept packet destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
         assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
+        assert_eq!(
+            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            0
+        );
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
@@ -2127,7 +2129,10 @@ mod tests {
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 2);
-        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
+        assert_eq!(
+            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
+            0
+        );
 
         // Accept packet not destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&sync_ctx, &mut non_sync_ctx, &device, true)
@@ -2135,7 +2140,7 @@ mod tests {
         crate::device::receive_frame(&sync_ctx, &mut non_sync_ctx, &eth_device, buf);
         assert_eq!(sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet.get(), 3);
         assert_eq!(
-            get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name),
+            sync_ctx.state.get_ip_counters::<I>().dispatch_receive_ip_packet_other_host.get(),
             usize::from(is_other_host)
         );
     }

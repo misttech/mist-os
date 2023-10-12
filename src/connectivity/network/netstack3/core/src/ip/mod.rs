@@ -1373,6 +1373,33 @@ pub(crate) type IpCounters<I> = IpMarked<I, IpCountersInner>;
 pub(crate) struct IpCountersInner {
     /// Count of incoming IP packets that are dispatched to the appropriate protocol.
     pub(crate) dispatch_receive_ip_packet: Counter,
+    /// Count of incoming IP packets destined to another host.
+    pub(crate) dispatch_receive_ip_packet_other_host: Counter,
+    /// Count of incoming IP packets received by the stack.
+    pub(crate) receive_ip_packet: Counter,
+    // Count of packets to be forwarded which are instead dropped because
+    // routing is disabled.
+    pub(crate) routing_disabled_per_device: Counter,
+    /// Count of incoming IPv6 multicast packets delivered.
+    pub(crate) deliver_multicast: Counter,
+    /// Count of incoming IPv6 unicast packets delivered.
+    pub(crate) deliver_unicast: Counter,
+    /// Count of incoming IPv6 packets dropped because the destination address
+    /// is only tentatively assigned to the device.
+    pub(crate) drop_for_tentative: Counter,
+    /// Count of incoming packets forwarded to another host.
+    pub(crate) forward: Counter,
+    /// Count of incoming packets which cannot be forwarded because there is no
+    /// route to the destination host.
+    pub(crate) no_route_to_host: Counter,
+    /// Count of ICMP error messages received.
+    pub(crate) receive_icmp_error: Counter,
+    /// Count of incoming IPv6 packets dropped.
+    pub(crate) dropped: Counter,
+    /// Count of incoming IPv4 packets delivered.
+    pub(crate) deliver: Counter,
+    /// Count of incoming IPv6 packets dropped due to a non-unicast source address.
+    pub(crate) non_unicast_source: Counter,
 }
 
 impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IpStateCounters<I>>
@@ -1508,7 +1535,9 @@ fn dispatch_receive_ipv4_packet<
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
-            ctx.increment_debug_counter("dispatch_receive_ipv4_packet_other_host")
+            sync_ctx.with_counters(|counters| {
+                counters.dispatch_receive_ip_packet_other_host.increment();
+            });
         }
         FrameDestination::Individual { local: true }
         | FrameDestination::Multicast
@@ -1599,7 +1628,9 @@ fn dispatch_receive_ipv6_packet<
 
     match frame_dst {
         FrameDestination::Individual { local: false } => {
-            ctx.increment_debug_counter("dispatch_receive_ipv6_packet_other_host")
+            sync_ctx.with_counters(|counters| {
+                counters.dispatch_receive_ip_packet_other_host.increment();
+            });
         }
         FrameDestination::Individual { local: true }
         | FrameDestination::Multicast
@@ -1832,7 +1863,9 @@ pub(crate) fn receive_ipv4_packet<
         return;
     }
 
-    ctx.increment_debug_counter("receive_ipv4_packet");
+    sync_ctx.with_counters(|counters| {
+        counters.receive_ip_packet.increment();
+    });
     trace!("receive_ip_packet({device:?})");
 
     let mut packet: Ipv4Packet<_> = match try_parse_ip_packet!(buffer) {
@@ -2050,7 +2083,9 @@ pub(crate) fn receive_ipv6_packet<
         return;
     }
 
-    ctx.increment_debug_counter("receive_ipv6_packet");
+    sync_ctx.with_counters(|counters| {
+        counters.receive_ip_packet.increment();
+    });
     trace!("receive_ipv6_packet({:?})", device);
 
     let mut packet: Ipv6Packet<_> = match try_parse_ip_packet!(buffer) {
@@ -2113,7 +2148,9 @@ pub(crate) fn receive_ipv6_packet<
                 "receive_ipv6_packet: received packet from non-unicast source {}; dropping",
                 packet.src_ip()
             );
-            ctx.increment_debug_counter("receive_ipv6_packet: non-unicast source");
+            sync_ctx.with_counters(|counters| {
+                counters.non_unicast_source.increment();
+            });
             return;
         }
     };
@@ -2207,7 +2244,6 @@ pub(crate) fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
-            ctx.increment_debug_counter("receive_ipv6_packet::forward");
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv6_packet: forwarding");
@@ -2309,7 +2345,9 @@ pub(crate) fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Drop { reason } => {
-            ctx.increment_debug_counter("receive_ipv6_packet::drop");
+            sync_ctx.with_counters(|counters| {
+                counters.dropped.increment();
+            });
             let src_ip = packet.src_ip();
             debug!(
                 "receive_ipv6_packet: dropping packet from {src_ip} to {dst_ip} received on \
@@ -2351,7 +2389,7 @@ enum DropReason {
 /// Computes the action to take in order to process a received IPv4 packet.
 fn receive_ipv4_packet_action<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpLayerContext<Ipv4, C>,
+    SC: IpLayerContext<Ipv4, C> + CounterContext2<IpCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2385,7 +2423,9 @@ fn receive_ipv4_packet_action<
             | Ipv4PresentAddressStatus::Multicast
             | Ipv4PresentAddressStatus::Unicast,
         ) => {
-            ctx.increment_debug_counter("receive_ipv4_packet_action::deliver");
+            sync_ctx.with_counters(|counters| {
+                counters.deliver.increment();
+            });
             ReceivePacketAction::Deliver
         }
         None => receive_ip_packet_action_common::<Ipv4, _, _>(sync_ctx, ctx, dst_ip, device),
@@ -2395,7 +2435,7 @@ fn receive_ipv4_packet_action<
 /// Computes the action to take in order to process a received IPv6 packet.
 fn receive_ipv6_packet_action<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpLayerContext<Ipv6, C>,
+    SC: IpLayerContext<Ipv6, C> + CounterContext2<IpCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2450,11 +2490,15 @@ fn receive_ipv6_packet_action<
     };
     match highest_priority {
         Some(Ipv6PresentAddressStatus::Multicast) => {
-            ctx.increment_debug_counter("receive_ipv6_packet_action::deliver_multicast");
+            sync_ctx.with_counters(|counters| {
+                counters.deliver_multicast.increment();
+            });
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastAssigned) => {
-            ctx.increment_debug_counter("receive_ipv6_packet_action::deliver_unicast");
+            sync_ctx.with_counters(|counters| {
+                counters.deliver_unicast.increment();
+            });
             ReceivePacketAction::Deliver
         }
         Some(Ipv6PresentAddressStatus::UnicastTentative) => {
@@ -2488,7 +2532,9 @@ fn receive_ipv6_packet_action<
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            ctx.increment_debug_counter("receive_ipv6_packet_action::drop_for_tentative");
+            sync_ctx.with_counters(|counters| {
+                counters.drop_for_tentative.increment();
+            });
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
         None => receive_ip_packet_action_common::<Ipv6, _, _>(sync_ctx, ctx, dst_ip, device),
@@ -2500,7 +2546,7 @@ fn receive_ipv6_packet_action<
 fn receive_ip_packet_action_common<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
+    SC: IpLayerContext<I, C> + CounterContext2<IpCounters<I>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -2521,16 +2567,22 @@ fn receive_ip_packet_action_common<
         // case is a Destination Unreachable message, we interpret the RFC text
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
-        ctx.increment_debug_counter("receive_ip_packet_action_common::routing_disabled_per_device");
+        sync_ctx.with_counters(|counters| {
+            counters.routing_disabled_per_device.increment();
+        });
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     } else {
         match lookup_route_table(sync_ctx, ctx, None, *dst_ip) {
             Some(dst) => {
-                ctx.increment_debug_counter("receive_ip_packet_action_common::forward");
+                sync_ctx.with_counters(|counters| {
+                    counters.forward.increment();
+                });
                 ReceivePacketAction::Forward { dst }
             }
             None => {
-                ctx.increment_debug_counter("receive_ip_packet_action_common::no_route_to_host");
+                sync_ctx.with_counters(|counters| {
+                    counters.no_route_to_host.increment();
+                });
                 ReceivePacketAction::SendNoRouteToDest
             }
         }
@@ -2769,7 +2821,9 @@ impl<
         original_body: &[u8],
         err: Icmpv4ErrorCode,
     ) {
-        ctx.increment_debug_counter("InnerIcmpContext<Ipv4>::receive_icmp_error");
+        self.with_counters(|counters: &IpCounters<Ipv4>| {
+            counters.receive_icmp_error.increment();
+        });
         trace!("InnerIcmpContext<Ipv4>::receive_icmp_error({:?})", err);
 
         match original_proto {
@@ -2866,7 +2920,9 @@ impl<
         original_body: &[u8],
         err: Icmpv6ErrorCode,
     ) {
-        ctx.increment_debug_counter("InnerIcmpContext<Ipv6>::receive_icmp_error");
+        self.with_counters(|counters: &IpCounters<Ipv6>| {
+            counters.receive_icmp_error.increment();
+        });
         trace!("InnerIcmpContext<Ipv6>::receive_icmp_error({:?})", err);
 
         match original_next_header {
@@ -3083,15 +3139,6 @@ pub fn resolve_route<I: Ip, NonSyncCtx: NonSyncContext>(
             resolve_route_to_destination::<Ipv6, _, _>(&mut sync_ctx, None, None, destination)
         },
     )
-}
-
-// Used in testing in other modules.
-#[cfg(test)]
-pub(crate) fn dispatch_receive_ip_packet_name<I: Ip>() -> &'static str {
-    match I::VERSION {
-        IpVersion::V4 => "dispatch_receive_ipv4_packet",
-        IpVersion::V6 => "dispatch_receive_ipv6_packet",
-    }
 }
 
 #[cfg(test)]
@@ -4551,7 +4598,7 @@ mod tests {
         receive_ip_packet::<_, _, Ipv6>(&sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
 
         // Should not have dispatched the packet.
-        assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.receive_ip_packet.get(), 1);
         assert_eq!(sync_ctx.state.ipv6.inner.counters.dispatch_receive_ip_packet.get(), 0);
 
         // In IPv6, the next header value (ICMP(v4)) would have been considered
@@ -4839,7 +4886,7 @@ mod tests {
             FrameDestination::Individual { local: true },
             buf,
         );
-        assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet: non-unicast source"), 1);
+        assert_eq!(sync_ctx.state.ipv6.inner.counters.non_unicast_source.get(), 1);
     }
 
     #[test]
