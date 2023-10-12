@@ -299,7 +299,7 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   const vaddr_t base_;
   const size_t size_;
   const Type type_;
-  char name_[32] TA_GUARDED(lock_);
+  char name_[ZX_MAX_NAME_LEN] TA_GUARDED(lock_);
   bool aspace_destroyed_ TA_GUARDED(lock_) = false;
 
   // The high priority count is used to determine whether this aspace should perform page table

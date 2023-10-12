@@ -789,7 +789,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
 
   RegionList<VmAddressRegionOrMapping> subregions_ TA_GUARDED(lock());
 
-  const char name_[32] = {};
+  const char name_[ZX_MAX_NAME_LEN] = {};
 };
 
 // Helper object for managing a WAVL tree of protection ranges inside a VmMapping. For efficiency
