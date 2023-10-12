@@ -17,8 +17,6 @@ use fuchsia_zircon as zx;
 use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::StorageAccess;
 
-// TODO(fxb/79710): Separate the logic of communicating with external dependencies from internal
-// logic for settings.
 async fn reboot(service_context_handle: &ServiceContext) -> Result<(), ControllerError> {
     let hardware_power_statecontrol_admin = service_context_handle
         .connect::<fidl_fuchsia_hardware_power_statecontrol::AdminMarker>()
