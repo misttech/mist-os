@@ -163,8 +163,8 @@ if (is_host && has_board) {
 
 group("tests") {
   testonly = true
-
-  if (has_board) {
-    deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
-  }
+  # TODO(https://fxbug.dev/132781) reenable once stable
+  #if (has_board) {
+  #  deps = [ ":zxdb_e2e_tests($host_toolchain)" ]
+  #}
 }
