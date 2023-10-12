@@ -409,7 +409,7 @@ impl Drop for TransactionState {
         log_trace!("Dropping binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
-        for guard in &self.guards {
+        for guard in std::mem::take(&mut self.guards) {
             guard.release(&mut drop_actions);
         }
         if let Some(proc) = self.proc.upgrade() {
@@ -1454,7 +1454,7 @@ type RefCountActions = ReleaseGuard<Vec<RefCountAction>>;
 impl Releasable for Vec<RefCountAction> {
     type Context<'a> = ();
 
-    fn release(&self, _context: ()) {
+    fn release(self, _context: ()) {
         let mut cleanables =
             HashMap::<ArcKey<BinderProcess>, HashSet<ArcKey<BinderObject>>>::default();
         for action in self {
@@ -2141,7 +2141,7 @@ struct RefGuardInner<R: RefReleaser> {
 impl<R: RefReleaser> Releasable for RefGuardInner<R> {
     type Context<'a> = &'a mut RefCountActions;
 
-    fn release(&self, context: &mut RefCountActions) {
+    fn release(self, context: &mut RefCountActions) {
         R::dec_ref(&self.binder_object, context);
     }
 }

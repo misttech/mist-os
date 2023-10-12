@@ -33,7 +33,7 @@ pub struct KernelThreads {
     pub spawner: DynamicThreadSpawner,
 
     /// A task object for the kernel threads.
-    system_task: OnceCell<OwnedRef<CurrentTask>>,
+    system_task: OnceCell<OwnedRefByRef<CurrentTask>>,
 }
 
 impl Default for KernelThreads {
@@ -60,7 +60,7 @@ impl Drop for KernelThreads {
 impl KernelThreads {
     pub fn init(&self, kernel: &Arc<Kernel>, fs: Arc<FsContext>) -> Result<(), Errno> {
         self.system_task
-            .set(OwnedRef::new(Task::create_kernel_task(
+            .set(OwnedRefByRef::new(Task::create_kernel_task(
                 kernel,
                 CString::new("[kthreadd]").unwrap(),
                 fs,
@@ -75,9 +75,9 @@ impl KernelThreads {
 
     pub fn workaround_for_b297439724_new_system_task(
         &self,
-    ) -> Result<OwnedRef<CurrentTask>, Errno> {
+    ) -> Result<OwnedRefByRef<CurrentTask>, Errno> {
         let system_task = self.system_task();
-        Ok(OwnedRef::new(Task::create_kernel_task(
+        Ok(OwnedRefByRef::new(Task::create_kernel_task(
             system_task.kernel(),
             CString::new("[workaround_for_b297439724]").unwrap(),
             system_task.fs().clone(),

@@ -149,8 +149,8 @@ impl FdTableInner {
 impl Releasable for FdTableInner {
     type Context<'a> = &'a CurrentTask;
 
-    fn release(&self, _current_task: &CurrentTask) {
-        *self.map_handle.lock() = FdMap::default();
+    fn release(self, _current_task: &CurrentTask) {
+        // Nothing to do until FdMap is Releasable. This will drop this object.
     }
 }
 
@@ -369,14 +369,12 @@ impl FdTable {
     }
 }
 
-impl Releasable for FdTable {
+impl ReleasableByRef for FdTable {
     type Context<'a> = &'a CurrentTask;
     /// Drop the fd table, closing any files opened exclusively by this table.
     fn release(&self, current_task: &CurrentTask) {
-        let table = OwnedRef::take(&self.table.lock());
-        if let Some(table) = table {
-            table.release(current_task);
-        }
+        let table = OwnedRef::take(&mut self.table.lock());
+        table.release(current_task);
     }
 }
 

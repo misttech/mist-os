@@ -21,7 +21,7 @@ use crate::{
         errno,
         errno::{EINTR, EINVAL, ENOSYS},
         errno_from_code, error, off_t,
-        ownership::Releasable,
+        ownership::ReleasableByRef,
         statfs, time_from_timespec, uapi, Access, DeviceType, Errno, FileMode, OpenFlags,
         FUSE_SUPER_MAGIC,
     },

@@ -24,6 +24,9 @@
 //! repsent ownership, the `TempRef` must not be kept, in particular, the user should not do any
 //! blocking operation while having a `TempRef`.
 
+// Not all instance of OwnedRef and Releasable are used in non test code yet.
+#![allow(dead_code)]
+
 // TODO(fxbug.dev/131097): Create a linter to ensure TempRef is not held while calling any blocking
 // operation.
 
@@ -38,135 +41,37 @@ use std::{
     },
 };
 
+/// Macro to build a specific Releasable and OwnedRef.
+macro_rules! make_ownership_types {
+    ($($suffix:ident)?, $self:ty, $take_self:ty) => { paste::paste! {
+
 /// The base trait for explicit ownership. Any `Releasable` object must call `release` before
 /// being dropped.
-pub trait Releasable {
+pub trait [< Releasable $($suffix)? >] {
     type Context<'a>;
 
-    // TODO(https://fxbug.dev/131095): This method should take `self` instead of `&self`.
-    fn release(&self, c: Self::Context<'_>);
+    // TODO(https://fxbug.dev/131095): Only the `self` version should exist, but this is
+    // problematic with Task and CurrentTask at this point.
+    fn release(self: $self, c: Self::Context<'_>);
 }
 
 /// Releasing an option calls release if the option is not empty.
-impl<T: Releasable> Releasable for Option<T> {
+impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T> {
     type Context<'a> = T::Context<'a>;
 
-    fn release(&self, c: Self::Context<'_>) {
+    fn release(self: $self, c: Self::Context<'_>) {
         if let Some(v) = self {
             v.release(c);
         }
     }
 }
 
-/// A wrapper a round a Releasable object that will check, in test and when assertion are enabled,
-/// that the value has been released before being dropped.
-#[must_use = "ReleaseGuard must be released"]
-pub struct ReleaseGuard<T: Releasable> {
-    /// The wrapped value.
-    value: T,
-
-    /// A guard that will ensure a panic on drop if the ref has not been released.
-    drop_guard: DropGuard,
-}
-
-impl<T: Releasable> Releasable for ReleaseGuard<T> {
+impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for ReleaseGuard<T> {
     type Context<'a> = T::Context<'a>;
 
-    fn release(&self, c: Self::Context<'_>) {
+    fn release(self: $self, c: Self::Context<'_>) {
         self.drop_guard.disarm();
         self.value.release(c);
-    }
-}
-
-#[cfg(test)]
-impl<T: Releasable> ReleaseGuard<T> {
-    pub fn new_released(value: T) -> Self {
-        let result: Self = value.into();
-        result.drop_guard.disarm();
-        result
-    }
-}
-
-#[cfg(test)]
-impl<T: Releasable + Default> ReleaseGuard<T> {
-    pub fn default_released() -> Self {
-        Self::new_released(T::default())
-    }
-}
-
-impl<T: Releasable + std::fmt::Debug> std::fmt::Debug for ReleaseGuard<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.value.fmt(f)
-    }
-}
-
-impl<T: Releasable + Default> Default for ReleaseGuard<T> {
-    fn default() -> Self {
-        T::default().into()
-    }
-}
-
-impl<T: Releasable + Clone> Clone for ReleaseGuard<T> {
-    fn clone(&self) -> Self {
-        self.value.clone().into()
-    }
-}
-
-impl<T: Releasable> From<T> for ReleaseGuard<T> {
-    fn from(value: T) -> Self {
-        Self { value, drop_guard: Default::default() }
-    }
-}
-
-impl<T: Releasable> std::ops::Deref for ReleaseGuard<T> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.value
-    }
-}
-
-impl<T: Releasable> std::ops::DerefMut for ReleaseGuard<T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.value
-    }
-}
-
-impl<T: Releasable> std::borrow::Borrow<T> for ReleaseGuard<T> {
-    fn borrow(&self) -> &T {
-        self.deref()
-    }
-}
-
-impl<T: Releasable> std::convert::AsRef<T> for ReleaseGuard<T> {
-    fn as_ref(&self) -> &T {
-        self.deref()
-    }
-}
-
-impl<T: Releasable + PartialEq> PartialEq for ReleaseGuard<T> {
-    fn eq(&self, other: &ReleaseGuard<T>) -> bool {
-        **self == **other
-    }
-}
-
-impl<T: Releasable + Eq> Eq for ReleaseGuard<T> {}
-
-impl<T: Releasable + PartialOrd> PartialOrd for ReleaseGuard<T> {
-    fn partial_cmp(&self, other: &ReleaseGuard<T>) -> Option<std::cmp::Ordering> {
-        (**self).partial_cmp(&**other)
-    }
-}
-
-impl<T: Releasable + Ord> Ord for ReleaseGuard<T> {
-    fn cmp(&self, other: &ReleaseGuard<T>) -> std::cmp::Ordering {
-        (**self).cmp(&**other)
-    }
-}
-
-impl<T: Releasable + Hash> Hash for ReleaseGuard<T> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        (**self).hash(state)
     }
 }
 
@@ -174,35 +79,35 @@ impl<T: Releasable + Hash> Hash for ReleaseGuard<T> {
 /// dropped.
 /// `OwnedRef` will panic on Drop in debug builds if it has not been released.
 #[must_use = "OwnedRef must be released"]
-pub struct OwnedRef<T: Releasable> {
+pub struct [< OwnedRef $($suffix)? >]<T> {
     /// The shared data.
-    inner: Arc<RefInner<T>>,
+    inner: Option<Arc<RefInner<T>>>,
 
     /// A guard that will ensure a panic on drop if the ref has not been released.
     drop_guard: DropGuard,
 }
 
-impl<T: Releasable> OwnedRef<T> {
+impl<T> [< OwnedRef $($suffix)? >]<T> {
     pub fn new(value: T) -> Self {
-        Self { inner: Arc::new(RefInner::new(value)), drop_guard: Default::default() }
+        Self { inner: Some(Arc::new(RefInner::new(value))), drop_guard: Default::default() }
     }
 
-    pub fn new_cyclic<F>(data_fd: F) -> Self
+    pub fn new_cyclic<F>(data_fn: F) -> Self
     where
         F: FnOnce(WeakRef<T>) -> T,
     {
         let inner = Arc::new_cyclic(|weak_inner| {
             let weak = WeakRef(weak_inner.clone());
-            RefInner::new(data_fd(weak))
+            RefInner::new(data_fn(weak))
         });
-        Self { inner, drop_guard: Default::default() }
+        Self { inner: Some(inner), drop_guard: Default::default() }
     }
 
     /// Provides a raw pointer to the data.
     ///
     /// See `Arc::as_ptr`
     pub fn as_ptr(this: &Self) -> *const T {
-        &this.inner.value.value as *const T
+        &Self::inner(this).value.value as *const T
     }
 
     /// Returns true if the two objects point to the same allocation
@@ -212,114 +117,137 @@ impl<T: Releasable> OwnedRef<T> {
 
     /// Produce a `WeakRef` from a `OwnedRef`.
     pub fn downgrade(this: &Self) -> WeakRef<T> {
-        WeakRef(Arc::downgrade(&this.inner))
+        WeakRef(Arc::downgrade(Self::inner(this)))
     }
 
     /// Produce a `TempRef` from a `OwnedRef`. As an `OwnedRef` exists at the time of the creation,
     /// this cannot fail.
     pub fn temp(this: &Self) -> TempRef<'_, T> {
-        TempRef::new(this.inner.clone())
+        TempRef::new(Arc::clone(Self::inner(this)))
     }
 
+    fn inner(this: &Self) -> &Arc<RefInner<T>> {
+        this.inner.as_ref().expect("OwnedRef has been released.")
+    }
+}
+
+impl<T: [< Releasable $($suffix)? >]> [< OwnedRef $($suffix)? >]<T> {
     /// Take the releasable from the `OwnedRef`. Returns None if the `OwnedRef` is not the last
     /// reference to the data.
-    pub fn take(this: &Self) -> Option<impl for<'a> Releasable<Context<'a> = T::Context<'a>>> {
+    pub fn take(this: $take_self) -> Option<impl for<'a> [< Releasable $($suffix)? >]<Context<'a> = T::Context<'a>>> {
         this.drop_guard.disarm();
-        let previous_count = this.inner.owned_refs_count.fetch_sub(1, Ordering::Release);
+        let inner = Self::inner(&this);
+        let previous_count = inner.owned_refs_count.fetch_sub(1, Ordering::Release);
         if previous_count == 1 {
             fence(Ordering::Acquire);
-            this.inner.wait_for_no_ref();
-            Some(Arc::clone(&this.inner))
+            Some(Self::wait_and_take_inner(this))
         } else {
             None
         }
     }
 }
 
-impl<T: Releasable + std::fmt::Debug> std::fmt::Debug for OwnedRef<T> {
+impl<T: std::fmt::Debug> std::fmt::Debug for [< OwnedRef $($suffix)? >]<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("OwnedRef").field(&self.inner.value).finish()
+        f.debug_tuple("[< OwnedRef $($suffix)? >]").field(&Self::inner(self).value).finish()
     }
 }
 
-impl<T: Releasable> Clone for OwnedRef<T> {
+impl<T> Clone for [< OwnedRef $($suffix)? >]<T> {
     /// Clone the `OwnedRef`. Both the current and the new reference needs to be `release`d.
     fn clone(&self) -> Self {
-        let previous_count = self.inner.owned_refs_count.fetch_add(1, Ordering::Relaxed);
-        debug_assert!(previous_count > 0, "OwnedRef should not be used after being released.");
-        Self { inner: Arc::clone(&self.inner), drop_guard: Default::default() }
+        let inner = Self::inner(self);
+        let previous_count = inner.owned_refs_count.fetch_add(1, Ordering::Relaxed);
+        debug_assert!(previous_count > 0, "[< OwnedRef $($suffix)? >] should not be used after being released.");
+        Self { inner: Some(Arc::clone(inner)), drop_guard: Default::default() }
     }
 }
 
-impl<T: Releasable> Releasable for OwnedRef<T> {
+impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for [< OwnedRef $($suffix)? >]<T> {
     type Context<'a> = T::Context<'a>;
 
     /// Release the `OwnedRef`. If this is the last instance, this method will block until all
     /// `TempRef` instances are dropped, and will release the underlying object.
-    fn release(&self, c: Self::Context<'_>) {
-        if let Some(value) = OwnedRef::take(self) {
+    #[allow(unused_mut)]
+    fn release(mut self: $self, c: Self::Context<'_>) {
+        if let Some(mut value) = [< OwnedRef $($suffix)? >]::take(&mut self) {
             value.release(c);
         }
     }
 }
 
-impl<T: Releasable + Default> Default for OwnedRef<T> {
+impl<T: Default> Default for [< OwnedRef $($suffix)? >]<T> {
     fn default() -> Self {
         Self::new(T::default())
     }
 }
 
-impl<T: Releasable> std::ops::Deref for OwnedRef<T> {
+impl<T> std::ops::Deref for [< OwnedRef $($suffix)? >]<T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.inner.deref().value
+        &Self::inner(self).deref().value
     }
 }
 
-impl<T: Releasable> std::borrow::Borrow<T> for OwnedRef<T> {
+impl<T> std::borrow::Borrow<T> for [< OwnedRef $($suffix)? >]<T> {
     fn borrow(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T: Releasable> std::convert::AsRef<T> for OwnedRef<T> {
+impl<T> std::convert::AsRef<T> for [< OwnedRef $($suffix)? >]<T> {
     fn as_ref(&self) -> &T {
         self.deref()
     }
 }
 
-impl<T: Releasable + PartialEq> PartialEq for OwnedRef<T> {
-    fn eq(&self, other: &OwnedRef<T>) -> bool {
-        Arc::ptr_eq(&self.inner, &other.inner) || **self == **other
+impl<T: PartialEq> PartialEq for [< OwnedRef $($suffix)? >]<T> {
+    fn eq(&self, other: &[< OwnedRef $($suffix)? >]<T>) -> bool {
+        Arc::ptr_eq(Self::inner(self), Self::inner(other)) || **self == **other
     }
 }
 
-impl<T: Releasable + Eq> Eq for OwnedRef<T> {}
+impl<T: Eq> Eq for [< OwnedRef $($suffix)? >]<T> {}
 
-impl<T: Releasable + PartialOrd> PartialOrd for OwnedRef<T> {
-    fn partial_cmp(&self, other: &OwnedRef<T>) -> Option<std::cmp::Ordering> {
+impl<T: PartialOrd> PartialOrd for [< OwnedRef $($suffix)? >]<T> {
+    fn partial_cmp(&self, other: &[< OwnedRef $($suffix)? >]<T>) -> Option<std::cmp::Ordering> {
         (**self).partial_cmp(&**other)
     }
 }
 
-impl<T: Releasable + Ord> Ord for OwnedRef<T> {
-    fn cmp(&self, other: &OwnedRef<T>) -> std::cmp::Ordering {
+impl<T: Ord> Ord for [< OwnedRef $($suffix)? >]<T> {
+    fn cmp(&self, other: &[< OwnedRef $($suffix)? >]<T>) -> std::cmp::Ordering {
         (**self).cmp(&**other)
     }
 }
 
-impl<T: Releasable + Hash> Hash for OwnedRef<T> {
+impl<T: Hash> Hash for [< OwnedRef $($suffix)? >]<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
 }
 
+impl<T> From<&[< OwnedRef $($suffix)? >]<T>> for WeakRef<T> {
+    fn from(owner: &[< OwnedRef $($suffix)? >]<T>) -> Self {
+        [< OwnedRef $($suffix)? >]::downgrade(owner)
+    }
+}
+
+impl<'a, T> From<&'a [< OwnedRef $($suffix)? >]<T>> for TempRef<'a, T> {
+    fn from(owner: &'a [< OwnedRef $($suffix)? >]<T>) -> Self {
+        [< OwnedRef $($suffix)? >]::temp(owner)
+    }
+}
+
+}}}
+
 /// A weak reference to a shared owned object. The `upgrade` method try to build a `TempRef` from a
 /// `WeakRef` and will fail if there is no `OwnedRef` left.
-pub struct WeakRef<T: Releasable>(Weak<RefInner<T>>);
+#[derive(Debug)]
+pub struct WeakRef<T>(Weak<RefInner<T>>);
 
-impl<T: Releasable> WeakRef<T> {
+impl<T> WeakRef<T> {
     pub fn new() -> Self {
         Self(Weak::new())
     }
@@ -330,7 +258,7 @@ impl<T: Releasable> WeakRef<T> {
     /// blocking calls.
     pub fn upgrade(&self) -> Option<TempRef<'_, T>> {
         if let Some(value) = self.0.upgrade() {
-            // As soon as the Arc has been upgraded, creates a TempRef to ensure the futex is woken
+            // As soon as the Arc has been upgraded, creates a `TempRef` to ensure the futex is woken
             // up in case `upgrade` and `release` are racing.
             let temp_ref = TempRef::new(value);
             // Only returns a valid `TempRef` if there are still some un-released `OwnedRef`. As
@@ -357,21 +285,15 @@ impl<T: Releasable> WeakRef<T> {
     }
 }
 
-impl<T: Releasable> Default for WeakRef<T> {
+impl<T> Default for WeakRef<T> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Releasable> Clone for WeakRef<T> {
+impl<T> Clone for WeakRef<T> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
-    }
-}
-
-impl<T: Releasable> From<&OwnedRef<T>> for WeakRef<T> {
-    fn from(owner: &OwnedRef<T>) -> Self {
-        OwnedRef::downgrade(owner)
     }
 }
 
@@ -381,15 +303,15 @@ impl<T: Releasable> From<&OwnedRef<T>> for WeakRef<T> {
 /// owning such a refeence.
 // Until negative trait bound are implemented, using `*mut u8` to prevent transferring TempRef
 // across threads.
-pub struct TempRef<'a, T: Releasable>(Arc<RefInner<T>>, std::marker::PhantomData<(&'a T, *mut u8)>);
+pub struct TempRef<'a, T>(Arc<RefInner<T>>, std::marker::PhantomData<(&'a T, *mut u8)>);
 
-impl<'a, T: Releasable> Drop for TempRef<'a, T> {
+impl<'a, T> Drop for TempRef<'a, T> {
     fn drop(&mut self) {
         self.0.dec_temp_ref();
     }
 }
 
-impl<'a, T: Releasable> TempRef<'a, T> {
+impl<'a, T> TempRef<'a, T> {
     /// Build a new TempRef. Ensures `temp_refs_count` is correctly updated.
     fn new(inner: Arc<RefInner<T>>) -> Self {
         inner.inc_temp_ref();
@@ -412,7 +334,7 @@ impl<'a, T: Releasable> TempRef<'a, T> {
     ///
     /// # Safety
     ///
-    /// As TempRef must be dropped as soon as possible, this provided the way to block the release
+    /// As `TempRef` must be dropped as soon as possible, this provided the way to block the release
     /// of the related `OwnedRef`s and as such is considered unsafe. Any caller must ensure that
     /// the returned `TempRef` is not kept around while doing blocking calls.
     pub unsafe fn into_static(this: Self) -> TempRef<'static, T> {
@@ -420,19 +342,13 @@ impl<'a, T: Releasable> TempRef<'a, T> {
     }
 }
 
-impl<'a, T: Releasable> From<&'a OwnedRef<T>> for TempRef<'a, T> {
-    fn from(owner: &'a OwnedRef<T>) -> Self {
-        OwnedRef::temp(owner)
-    }
-}
-
-impl<'a, T: Releasable> From<&TempRef<'a, T>> for WeakRef<T> {
+impl<'a, T> From<&TempRef<'a, T>> for WeakRef<T> {
     fn from(temp_ref: &TempRef<'a, T>) -> Self {
         Self(Arc::downgrade(&temp_ref.0))
     }
 }
 
-impl<'a, T: Releasable> std::ops::Deref for TempRef<'a, T> {
+impl<'a, T> std::ops::Deref for TempRef<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -440,73 +356,195 @@ impl<'a, T: Releasable> std::ops::Deref for TempRef<'a, T> {
     }
 }
 
-impl<'a, T: Releasable> std::borrow::Borrow<T> for TempRef<'a, T> {
+impl<'a, T> std::borrow::Borrow<T> for TempRef<'a, T> {
     fn borrow(&self) -> &T {
         &self.0.deref().value
     }
 }
 
-impl<'a, T: Releasable> std::convert::AsRef<T> for TempRef<'a, T> {
+impl<'a, T> std::convert::AsRef<T> for TempRef<'a, T> {
     fn as_ref(&self) -> &T {
         &self.0.deref().value
     }
 }
 
-impl<'a, T: Releasable + PartialEq> PartialEq for TempRef<'a, T> {
+impl<'a, T: PartialEq> PartialEq for TempRef<'a, T> {
     fn eq(&self, other: &TempRef<'_, T>) -> bool {
         Arc::ptr_eq(&self.0, &other.0) || **self == **other
     }
 }
 
-impl<'a, T: Releasable + Eq> Eq for TempRef<'a, T> {}
+impl<'a, T: Eq> Eq for TempRef<'a, T> {}
 
-impl<'a, T: Releasable + PartialOrd> PartialOrd for TempRef<'a, T> {
+impl<'a, T: PartialOrd> PartialOrd for TempRef<'a, T> {
     fn partial_cmp(&self, other: &TempRef<'_, T>) -> Option<std::cmp::Ordering> {
         (**self).partial_cmp(&**other)
     }
 }
 
-impl<'a, T: Releasable + Ord> Ord for TempRef<'a, T> {
+impl<'a, T: Ord> Ord for TempRef<'a, T> {
     fn cmp(&self, other: &TempRef<'_, T>) -> std::cmp::Ordering {
         (**self).cmp(&**other)
     }
 }
 
-impl<'a, T: Releasable + Hash> Hash for TempRef<'a, T> {
+impl<'a, T: Hash> Hash for TempRef<'a, T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         (**self).hash(state)
     }
 }
 
-/// The internal data of `OwnedRef`/`WeakRef`/`TempRef`.
-///
-/// To ensure that `wait_for_no_ref` is correct, the following constraints must apply:
-/// - Once `owned_refs_count` reaches 0, it must never increase again.
-/// - The strong count of `Arc<Self>` must always be incremented before `temp_refs_count` is
-///   incremented.
-/// - Whenever a the strong count of `Arc<Self>` is incremented, `temp_ref_count` must be
-///   increased.
-/// This ensures that `wait_for_no_ref` will always be notified when it is waiting on the
-/// `temp_refs_count` futex and the number of `TempRef` reaches 0.
-struct RefInner<T: Releasable> {
-    /// The underlying value.
-    value: ReleaseGuard<T>,
-    /// The number of `OwnedRef` sharing this data.
-    owned_refs_count: AtomicUsize,
-    /// The number of `TempRef` sharing this data.
-    // This is close to a duplicate of the Arc strong_count, and could be replaced by it if this
-    // module reimplemented all of Arc/Weak. This can be changed without changing the API if this
-    // becomes a performance issue.
-    temp_refs_count: zx::sys::zx_futex_t,
+/// Wrapper around `TempRef` allowing to use it in a Set or as a key of a Map.
+pub struct TempRefKey<'a, T>(pub TempRef<'a, T>);
+impl<'a, T> PartialEq for TempRefKey<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        TempRef::ptr_eq(&self.0, &other.0)
+    }
 }
-
-impl<T: Releasable> Releasable for Arc<RefInner<T>> {
-    type Context<'a> = T::Context<'a>;
-    fn release(&self, c: Self::Context<'_>) {
-        self.value.release(c);
+impl<'a, T> Eq for TempRefKey<'a, T> {}
+impl<'a, T> Hash for TempRefKey<'a, T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        TempRef::as_ptr(&self.0).hash(state);
+    }
+}
+impl<'a, T> std::ops::Deref for TempRefKey<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &Self::Target {
+        self.0.deref()
     }
 }
 
+/// A wrapper a round a Releasable object that will check, in test and when assertion are enabled,
+/// that the value has been released before being dropped.
+#[must_use = "ReleaseGuard must be released"]
+pub struct ReleaseGuard<T> {
+    /// The wrapped value.
+    value: T,
+
+    /// A guard that will ensure a panic on drop if the ref has not been released.
+    drop_guard: DropGuard,
+}
+
+#[cfg(test)]
+impl<T> ReleaseGuard<T> {
+    pub fn new_released(value: T) -> Self {
+        let result: Self = value.into();
+        result.drop_guard.disarm();
+        result
+    }
+}
+
+#[cfg(test)]
+impl<T: Default> ReleaseGuard<T> {
+    pub fn default_released() -> Self {
+        Self::new_released(T::default())
+    }
+}
+
+impl<T: std::fmt::Debug> std::fmt::Debug for ReleaseGuard<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.value.fmt(f)
+    }
+}
+
+impl<T: Default> Default for ReleaseGuard<T> {
+    fn default() -> Self {
+        T::default().into()
+    }
+}
+
+impl<T: Clone> Clone for ReleaseGuard<T> {
+    fn clone(&self) -> Self {
+        self.value.clone().into()
+    }
+}
+
+impl<T> From<T> for ReleaseGuard<T> {
+    fn from(value: T) -> Self {
+        Self { value, drop_guard: Default::default() }
+    }
+}
+
+impl<T> std::ops::Deref for ReleaseGuard<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.value
+    }
+}
+
+impl<T> std::ops::DerefMut for ReleaseGuard<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.value
+    }
+}
+
+impl<T> std::borrow::Borrow<T> for ReleaseGuard<T> {
+    fn borrow(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<T> std::convert::AsRef<T> for ReleaseGuard<T> {
+    fn as_ref(&self) -> &T {
+        self.deref()
+    }
+}
+
+impl<T: PartialEq> PartialEq for ReleaseGuard<T> {
+    fn eq(&self, other: &ReleaseGuard<T>) -> bool {
+        **self == **other
+    }
+}
+
+impl<T: Eq> Eq for ReleaseGuard<T> {}
+
+impl<T: PartialOrd> PartialOrd for ReleaseGuard<T> {
+    fn partial_cmp(&self, other: &ReleaseGuard<T>) -> Option<std::cmp::Ordering> {
+        (**self).partial_cmp(&**other)
+    }
+}
+
+impl<T: Ord> Ord for ReleaseGuard<T> {
+    fn cmp(&self, other: &ReleaseGuard<T>) -> std::cmp::Ordering {
+        (**self).cmp(&**other)
+    }
+}
+
+impl<T: Hash> Hash for ReleaseGuard<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (**self).hash(state)
+    }
+}
+
+#[derive(Default, Debug)]
+struct DropGuard {
+    #[cfg(any(test, debug_assertions))]
+    released: std::sync::atomic::AtomicBool,
+}
+
+impl DropGuard {
+    #[inline(always)]
+    fn disarm(&self) {
+        #[cfg(any(test, debug_assertions))]
+        {
+            if self
+                .released
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_err()
+            {
+                panic!("Guard was disarmed twice");
+            }
+        }
+    }
+}
+
+#[cfg(any(test, debug_assertions))]
+impl Drop for DropGuard {
+    fn drop(&mut self) {
+        assert!(*self.released.get_mut());
+    }
+}
 #[cfg(any(test, debug_assertions))]
 thread_local! {
     /// Number of `TempRef` in the current thread. This is used to ensure there is no `TempRef`
@@ -525,7 +563,29 @@ pub fn debug_assert_no_local_temp_ref() {
     }
 }
 
-impl<T: Releasable> RefInner<T> {
+/// The internal data of `OwnedRef`/`WeakRef`/`TempRef`.
+///
+/// To ensure that `wait_for_no_ref_once` is correct, the following constraints must apply:
+/// - Once `owned_refs_count` reaches 0, it must never increase again.
+/// - The strong count of `Arc<Self>` must always be incremented before `temp_refs_count` is
+///   incremented.
+/// - Whenever a the strong count of `Arc<Self>` is incremented, `temp_ref_count` must be
+///   increased.
+/// This ensures that `wait_for_no_ref_once` will always be notified when it is waiting on the
+/// `temp_refs_count` futex and the number of `TempRef` reaches 0.
+struct RefInner<T> {
+    /// The underlying value.
+    value: ReleaseGuard<T>,
+    /// The number of `OwnedRef` sharing this data.
+    owned_refs_count: AtomicUsize,
+    /// The number of `TempRef` sharing this data.
+    // This is close to a duplicate of the Arc strong_count, and could be replaced by it if this
+    // module reimplemented all of Arc/Weak. This can be changed without changing the API if this
+    // becomes a performance issue.
+    temp_refs_count: zx::sys::zx_futex_t,
+}
+
+impl<T> RefInner<T> {
     fn new(value: T) -> Self {
         Self {
             value: value.into(),
@@ -566,68 +626,101 @@ impl<T: Releasable> RefInner<T> {
         }
     }
 
-    /// Wait for this Arc to be the only left reference to the data. This should only be called on
-    /// once the last `OwnedRef` has been released. This will wait for all existing `TempRef` to be
-    /// dropped before returning.
-    fn wait_for_no_ref(self: &Arc<Self>) {
+    /// Wait for `temp_refs_count` to reach 0 once using the futex.
+    fn wait_for_no_ref_once(self: &Arc<Self>) {
+        // Compute the current number of temp refs, and wait for it to drop to 0.
+        let current_value = self.temp_refs_count.load(Ordering::Acquire);
+        if current_value == 0 {
+            // It is already 0, return.
+            return;
+        }
+        // Otherwise, wait on the futex that will be waken up when the number of temp_ref drops
+        // to 0.
+        unsafe {
+            // SAFETY: This is a ffi call to a zircon syscall.
+            let result = zx::sys::zx_futex_wait(
+                &self.temp_refs_count,
+                current_value.into(),
+                zx::sys::ZX_HANDLE_INVALID,
+                zx::Time::INFINITE.into_nanos(),
+            );
+            debug_assert!(
+                result == zx::sys::ZX_OK || result == zx::sys::ZX_ERR_BAD_STATE,
+                "Unexpected result: {result}"
+            );
+        }
+    }
+}
+
+impl<T> OwnedRefByRef<T> {
+    /// Wait for this `OwnedRefByRef` to be the only left reference to the data. This should only
+    /// be called on once the last `OwnedRefByRef` has been released. This will wait for all
+    /// existing `TempRef >]` to be dropped before returning.
+    fn wait_and_take_inner(self: &Self) -> Arc<RefInner<T>> {
+        let inner = Self::inner(self);
+        loop {
+            // Ensure no more `OwnedRefByRef` exists.
+            debug_assert_eq!(inner.owned_refs_count.load(Ordering::Acquire), 0);
+            // If the strong count of the Arc is 1, there is no existing real `TempRef`. While
+            // some can be temporarily created in the `WeakRef::upgrade` method, they will be
+            // dropped immediately because `owned_refs_count` is 0. To be noted: the count might be
+            // greater than 1 because of one of these temporary `TempRef`, but the futex call
+            // will be woken up when they are dropped. Return.
+            if Arc::strong_count(inner) == 1 {
+                return Arc::clone(inner);
+            }
+
+            inner.wait_for_no_ref_once();
+        }
+    }
+}
+
+impl<T: ReleasableByRef> ReleasableByRef for Arc<RefInner<T>> {
+    type Context<'a> = T::Context<'a>;
+    fn release(self: &Self, c: Self::Context<'_>) {
+        self.value.release(c);
+    }
+}
+
+impl<T> OwnedRefByMut<T> {
+    /// Wait for this `OwnedRefByMut` to be the only left reference to the data. This should only
+    /// be called on once the last `OwnedRefByMut` has been released. This will wait for all
+    /// existing `TempRef >]` to be dropped before returning.
+    fn wait_and_take_inner(self: &mut Self) -> ReleaseGuard<T> {
+        let mut inner = self.inner.take().expect("OwnedRef has been released.");
+        loop {
+            // Ensure no more `OwnedRefByMut` exists.
+            debug_assert_eq!(inner.owned_refs_count.load(Ordering::Acquire), 0);
+            match Arc::try_unwrap(inner) {
+                Ok(value) => return value.value,
+                Err(value) => inner = value,
+            }
+            inner.wait_for_no_ref_once();
+        }
+    }
+}
+
+impl<T> OwnedRef<T> {
+    /// Wait for this `OwnedRef` to be the only left reference to the data. This should only be
+    /// called on once the last `OwnedRef` has been released. This will wait for all existing
+    /// `TempRef >]` to be dropped before returning.
+    fn wait_and_take_inner(self: &mut Self) -> ReleaseGuard<T> {
+        let mut inner = self.inner.take().expect("OwnedRef has been released.");
         loop {
             // Ensure no more `OwnedRef` exists.
-            debug_assert_eq!(self.owned_refs_count.load(Ordering::Acquire), 0);
-            // If the strong count of the Arc is 1, there is no existing real `TempRef`. While some
-            // can be temporarily created in the `WeakRef::upgrade` method, they will be dropped
-            // immediately because `owned_refs_count` is 0. To be noted: the count might be greater
-            // than 1 because of one of these temporary `TempRef`, but the futex call will be woken
-            // up when they are dropped.
-            // Return.
-            if Arc::strong_count(self) == 1 {
-                return;
+            debug_assert_eq!(inner.owned_refs_count.load(Ordering::Acquire), 0);
+            match Arc::try_unwrap(inner) {
+                Ok(value) => return value.value,
+                Err(value) => inner = value,
             }
-            // Compute the current number of temp refs, and wait for it to drop to 0.
-            let current_value = self.temp_refs_count.load(Ordering::Acquire);
-            if current_value == 0 {
-                // It is already 0, loop again.
-                continue;
-            }
-            // Otherwise, wait on the futex that will be waken up when the number of temp_ref drops
-            // to 0.
-            unsafe {
-                // SAFETY: This is a ffi call to a zircon syscall.
-                let result = zx::sys::zx_futex_wait(
-                    &self.temp_refs_count,
-                    current_value.into(),
-                    zx::sys::ZX_HANDLE_INVALID,
-                    zx::Time::INFINITE.into_nanos(),
-                );
-                debug_assert!(
-                    result == zx::sys::ZX_OK || result == zx::sys::ZX_ERR_BAD_STATE,
-                    "Unexpected result: {result}"
-                );
-            }
+            inner.wait_for_no_ref_once();
         }
     }
 }
 
-#[derive(Default, Debug)]
-struct DropGuard {
-    #[cfg(any(test, debug_assertions))]
-    released: std::sync::atomic::AtomicBool,
-}
-
-impl DropGuard {
-    #[inline(always)]
-    fn disarm(&self) {
-        #[cfg(any(test, debug_assertions))]
-        {
-            if self
-                .released
-                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
-                .is_err()
-            {
-                panic!("Guard was disarmed twice");
-            }
-        }
-    }
-}
+make_ownership_types!(ByRef, &Self, &Self);
+make_ownership_types!(ByMut, &mut Self, &mut Self);
+make_ownership_types!(, Self, &mut Self);
 
 /// Macro that ensure the releasable is released with the given context if the body returns an
 /// error.
@@ -676,13 +769,6 @@ pub(crate) use async_release_after;
 pub(crate) use release_after;
 pub(crate) use release_on_error;
 
-#[cfg(any(test, debug_assertions))]
-impl Drop for DropGuard {
-    fn drop(&mut self) {
-        assert!(*self.released.get_mut());
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -690,15 +776,23 @@ mod test {
     #[derive(Default)]
     struct Data;
 
-    impl Releasable for Data {
+    impl ReleasableByRef for Data {
         type Context<'a> = ();
         fn release(&self, _: ()) {}
+    }
+    impl ReleasableByMut for Data {
+        type Context<'a> = ();
+        fn release(&mut self, _: ()) {}
+    }
+    impl Releasable for Data {
+        type Context<'a> = ();
+        fn release(self, _: ()) {}
     }
 
     #[derive(Default)]
     struct DataWithMutableReleaseContext;
 
-    impl Releasable for DataWithMutableReleaseContext {
+    impl ReleasableByRef for DataWithMutableReleaseContext {
         type Context<'a> = &'a mut ();
         fn release(&self, _: &mut ()) {}
     }
@@ -706,11 +800,29 @@ mod test {
     #[::fuchsia::test]
     #[should_panic]
     fn drop_without_release() {
-        let _ = OwnedRef::new(Data {});
+        let _ = OwnedRefByRef::new(Data {});
     }
 
     #[::fuchsia::test]
-    fn test_creation_and_reference() {
+    fn test_creation_and_reference_by_ref() {
+        let value = OwnedRefByRef::new(Data {});
+        let reference = WeakRef::from(&value);
+        reference.upgrade().expect("upgrade");
+        value.release(());
+        assert!(reference.upgrade().is_none());
+    }
+
+    #[::fuchsia::test]
+    fn test_creation_and_reference_by_mut() {
+        let mut value = OwnedRefByMut::new(Data {});
+        let reference = WeakRef::from(&value);
+        reference.upgrade().expect("upgrade");
+        value.release(());
+        assert!(reference.upgrade().is_none());
+    }
+
+    #[::fuchsia::test]
+    fn test_creation_and_reference_by_val() {
         let value = OwnedRef::new(Data {});
         let reference = WeakRef::from(&value);
         reference.upgrade().expect("upgrade");
@@ -720,9 +832,9 @@ mod test {
 
     #[::fuchsia::test]
     fn test_clone() {
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         {
-            let value2 = OwnedRef::clone(&value);
+            let value2 = OwnedRefByRef::clone(&value);
             value2.release(());
         }
         #[allow(clippy::redundant_clone)]
@@ -742,7 +854,7 @@ mod test {
     #[::fuchsia::test]
     fn test_release_on_error() {
         fn release_on_error() -> Result<(), ()> {
-            let value = OwnedRef::new(Data {});
+            let value = OwnedRefByRef::new(Data {});
             release_on_error!(value, (), {
                 if true {
                     return Err(());
@@ -756,7 +868,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_into_static() {
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         let weak = WeakRef::from(&value);
         // SAFETY: This is safe, as static_ref remains on the stack.
         let static_ref = unsafe { TempRef::into_static(weak.upgrade().unwrap()) };
@@ -770,9 +882,9 @@ mod test {
     #[::fuchsia::test]
     fn test_debug_assert_no_local_temp_ref() {
         debug_assert_no_local_temp_ref();
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         debug_assert_no_local_temp_ref();
-        let _temp_ref = OwnedRef::temp(&value);
+        let _temp_ref = OwnedRefByRef::temp(&value);
         std::thread::spawn(|| {
             debug_assert_no_local_temp_ref();
         })
@@ -787,9 +899,9 @@ mod test {
     #[::fuchsia::test]
     #[should_panic]
     fn test_debug_assert_no_local_temp_ref_aborts() {
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         {
-            let _temp_ref = OwnedRef::temp(&value);
+            let _temp_ref = OwnedRefByRef::temp(&value);
             debug_assert_no_local_temp_ref();
         }
         // This code should not be reached, but ensures the test will fail is
@@ -800,9 +912,9 @@ mod test {
     #[::fuchsia::test]
     #[should_panic]
     fn test_clone_released_owned_ref_abort_in_test() {
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         value.release(());
-        let _ = OwnedRef::clone(&value);
+        let _ = OwnedRefByRef::clone(&value);
     }
 
     #[::fuchsia::test]
@@ -815,8 +927,8 @@ mod test {
     #[should_panic]
     fn test_double_release_release_guard() {
         let value = ReleaseGuard::<Data>::default();
-        value.release(());
-        value.release(());
+        ReleasableByRef::release(&value, ());
+        ReleasableByRef::release(&value, ());
     }
 
     #[::fuchsia::test]
@@ -826,7 +938,7 @@ mod test {
 
     #[::fuchsia::test]
     fn release_with_mutable_context() {
-        let value = OwnedRef::new(DataWithMutableReleaseContext {});
+        let value = OwnedRefByRef::new(DataWithMutableReleaseContext {});
         let mut context = ();
         value.release(&mut context);
     }
@@ -835,11 +947,11 @@ mod test {
     // real, high priority bug.
     #[::fuchsia::test]
     fn upgrade_while_release() {
-        let value = OwnedRef::new(Data {});
+        let value = OwnedRefByRef::new(Data {});
         // Run 10 threads trying to upgrade a weak pointer in a loop.
         for _ in 0..10 {
             std::thread::spawn({
-                let weak = OwnedRef::downgrade(&value);
+                let weak = OwnedRefByRef::downgrade(&value);
                 move || loop {
                     if weak.upgrade().is_none() {
                         return;
@@ -856,7 +968,7 @@ mod test {
     #[::fuchsia::test]
     fn new_cyclic() {
         let mut weak_value = None;
-        let value = OwnedRef::new_cyclic(|weak| {
+        let value = OwnedRefByRef::new_cyclic(|weak| {
             weak_value = Some(weak);
             Data {}
         });
@@ -868,11 +980,11 @@ mod test {
 
     #[::fuchsia::test]
     fn as_ptr() {
-        let value = OwnedRef::new(Data {});
-        let weak = OwnedRef::downgrade(&value);
+        let value = OwnedRefByRef::new(Data {});
+        let weak = OwnedRefByRef::downgrade(&value);
         let temp = weak.upgrade().expect("upgrade");
-        assert_eq!(OwnedRef::as_ptr(&value), weak.as_ptr());
-        assert_eq!(OwnedRef::as_ptr(&value), TempRef::as_ptr(&temp));
+        assert_eq!(OwnedRefByRef::as_ptr(&value), weak.as_ptr());
+        assert_eq!(OwnedRefByRef::as_ptr(&value), TempRef::as_ptr(&temp));
         std::mem::drop(temp);
         value.release(());
     }

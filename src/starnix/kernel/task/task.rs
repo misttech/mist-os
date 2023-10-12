@@ -51,7 +51,7 @@ use crate::{
 /// See also `Task` for more information about tasks.
 pub struct CurrentTask {
     /// The underlying task object.
-    pub task: OwnedRef<Task>,
+    pub task: OwnedRefByRef<Task>,
 
     /// A copy of the registers associated with the Zircon thread. Up-to-date values can be read
     /// from `self.handle.read_state_general_regs()`. To write these values back to the thread, call
@@ -70,7 +70,7 @@ pub struct CurrentTask {
 type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
-impl Releasable for CurrentTask {
+impl ReleasableByRef for CurrentTask {
     type Context<'a> = ();
 
     fn release(&self, _: ()) {
@@ -1454,7 +1454,7 @@ impl Task {
     }
 }
 
-impl Releasable for Task {
+impl ReleasableByRef for Task {
     type Context<'a> = &'a CurrentTask;
 
     fn release(&self, current_task: &CurrentTask) {
@@ -1482,7 +1482,7 @@ impl Releasable for Task {
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
         CurrentTask {
-            task: OwnedRef::new(task),
+            task: OwnedRefByRef::new(task),
             registers: RegisterState::default(),
             extended_pstate: ExtendedPstateState::default(),
             syscall_restart_func: None,

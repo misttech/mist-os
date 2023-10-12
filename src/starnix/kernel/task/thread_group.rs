@@ -259,7 +259,7 @@ impl ZombieProcess {
 impl Releasable for ZombieProcess {
     type Context<'a> = &'a mut PidTable;
 
-    fn release(&self, pids: &mut PidTable) {
+    fn release(self, pids: &mut PidTable) {
         pids.remove_zombie(self.pid);
     }
 }

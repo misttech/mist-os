@@ -7,9 +7,7 @@ use crate::{
     mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
     signals::{send_signal, SignalInfo},
-    task::waiter::WaitQueue,
-    task::StopState,
-    task::{CurrentTask, Kernel, Task, ThreadGroup},
+    task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
     types::*,
 };
 
@@ -186,7 +184,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
-        let task_ref = OwnedRef::temp(&current_task.task);
+        let task_ref = OwnedRefByRef::temp(&current_task.task);
         do_attach(&parent, (&task_ref).into())
     } else {
         error!(EPERM)
