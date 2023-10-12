@@ -255,7 +255,7 @@ TEST_F(InspectTest, RedactsWithJsonReplacers) {
       "\"2001::2\",\n"
       "\"AA-BB-CC-DD-EE-FF\",\n"  // MAC Addresses are redacted with manufacturer component
                                   // unredacted
-      "\"11-22-33-44-55-66\",\n"
+      "\"11:22:33:44:55:66\",\n"
       "1234567890abcdefABCDEF0123456789,\n"  // Long Hex numbers are not redacted
       "\"106986199446298680449\"]");         // Obfuscated Gaia IDs are not redacted
   SetUpInspectServer(std::make_unique<stubs::DiagnosticsArchive>(
@@ -275,7 +275,7 @@ TEST_F(InspectTest, RedactsWithJsonReplacers) {
 "<REDACTED-IPV6: 3>",
 "<REDACTED-IPV6: 4>",
 "AA-BB-CC-<REDACTED-MAC: 5>",
-"11-22-33-<REDACTED-MAC: 6>",
+"11:22:33:<REDACTED-MAC: 6>",
 1234567890abcdefABCDEF0123456789,
 "106986199446298680449"]
 ])");

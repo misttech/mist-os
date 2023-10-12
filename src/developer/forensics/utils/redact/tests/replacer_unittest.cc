@@ -317,14 +317,58 @@ TEST_P(IPv6ReplacerTest, ReplaceIPv6) {
   EXPECT_EQ(replacer(cache, param.text), param.expected_output);
 }
 
+TEST(MacReplacerTest, GetOuiPrefix) {
+  std::string mac_colons = "12:34:56:78:90:ff";
+  EXPECT_EQ(mac_utils::GetOuiPrefix(mac_colons), "12:34:56:");
+  std::string mac_dashes = "12-34-56-78-90-ff";
+  EXPECT_EQ(mac_utils::GetOuiPrefix(mac_dashes), "12-34-56-");
+  std::string mac_dots = "12.34.56.78.90.ff";
+  EXPECT_EQ(mac_utils::GetOuiPrefix(mac_dots), "12.34.56.");
+}
+
+TEST(MacReplacerTest, CanonicalizeMac) {
+  EXPECT_EQ(mac_utils::CanonicalizeMac("12:34:56:78:90:ff"), "12:34:56:78:90:ff");
+  EXPECT_EQ(mac_utils::CanonicalizeMac("12:34:56:78:90:FF"), "12:34:56:78:90:ff");
+  EXPECT_EQ(mac_utils::CanonicalizeMac("12-34-56-78-90-ff"), "12:34:56:78:90:ff");
+  EXPECT_EQ(mac_utils::CanonicalizeMac("12.34.56.78.90.ff"), "12:34:56:78:90:ff");
+}
+
 TEST(MacReplacerTest, ReplaceMac) {
   RedactionIdCache cache(inspect::UintProperty{});
   Replacer replacer = ReplaceMac();
   ASSERT_NE(replacer, nullptr);
 
-  std::string text = "MAC address: 00:0a:95:9F:68:16 12:34:95:9F:68:16";
+  std::string text = R"(
+00:0a:95:9F:68:16
+12-34-95-9F-68-16
+d.e.a.d.be.ef
+ff.f-ff:f-ff:f
+)";
   EXPECT_EQ(replacer(cache, text),
-            "MAC address: 00:0a:95:<REDACTED-MAC: 1> 12:34:95:<REDACTED-MAC: 2>");
+            R"(
+00:0a:95:<REDACTED-MAC: 1>
+12-34-95-<REDACTED-MAC: 2>
+d.e.a.<REDACTED-MAC: 3>
+ff.f-ff:<REDACTED-MAC: 4>
+)");
+}
+
+TEST(MacReplacerTest, ReplaceMacIgnoresDelimitersAndCaseForIds) {
+  RedactionIdCache cache(inspect::UintProperty{});
+  Replacer replacer = ReplaceMac();
+  ASSERT_NE(replacer, nullptr);
+
+  std::string text = R"(
+12-3f-95-9f-68-6
+12:3F:95:9F:68:06
+12.3f.95.9F.68.06
+)";
+  EXPECT_EQ(replacer(cache, text),
+            R"(
+12-3f-95-<REDACTED-MAC: 1>
+12:3F:95:<REDACTED-MAC: 1>
+12.3f.95.<REDACTED-MAC: 1>
+)");
 }
 
 TEST(SsidReplacerTest, ReplaceSsid) {

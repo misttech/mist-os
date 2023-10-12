@@ -255,6 +255,47 @@ std::string RedactIPv6(RedactionIdCache& cache, const std::string& match) {
 
 Replacer ReplaceIPv6() { return FunctionBasedReplacer(kIPv6Pattern, RedactIPv6); }
 
+namespace mac_utils {
+
+const size_t NUM_MAC_BYTES = 6;
+
+static constexpr re2::LazyRE2 kOui = MakeLazyRE2(R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))");
+
+std::string GetOuiPrefix(const std::string& mac) {
+  std::string oui;
+  if (!re2::RE2::PartialMatch(mac, *kOui, &oui)) {
+    oui = "regex error";
+  }
+  return oui;
+}
+
+std::string CanonicalizeMac(const std::string& original_mac) {
+  std::string lowercased_mac(original_mac);
+  std::transform(lowercased_mac.begin(), lowercased_mac.end(), lowercased_mac.begin(),
+                 [](char c) { return std::tolower(c); });
+
+  std::string canonical_mac = "00:00:00:00:00:00";
+  re2::StringPiece lowercased_mac_view(lowercased_mac);
+  for (size_t i = 0; i < NUM_MAC_BYTES; ++i) {
+    re2::StringPiece mac_byte;
+    re2::RE2::FindAndConsume(&lowercased_mac_view, R"(([0-9a-fA-F]{1,2}))", &mac_byte);
+
+    if (mac_byte.length() == 2) {
+      canonical_mac.replace(3 * i, 2, mac_byte.data(), 2);
+    } else if (mac_byte.length() == 1) {
+      canonical_mac.replace(3 * i + 1, 1, mac_byte.data(), 1);
+    } else {
+      // The regular expression used in |FindAndConsume()| above ensure |mac_byte|
+      // will have either 1 or 2 characters.
+      __builtin_unreachable();
+    }
+  }
+
+  return canonical_mac;
+}
+
+}  // namespace mac_utils
+
 namespace {
 
 constexpr std::string_view kMacPattern{
@@ -262,19 +303,9 @@ constexpr std::string_view kMacPattern{
     R"(\b(?:(?:[0-9a-fA-F]{1,2}(?:[\.:-])){3})(?:[0-9a-fA-F]{1,2}(?:[\.:-])){2}[0-9a-fA-F]{1,2}\b)"
     R"()\b)"};
 
-constexpr re2::LazyRE2 kOui = MakeLazyRE2(R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))");
-
-std::string GetOui(const std::string& match) {
-  std::string oui;
-  if (!re2::RE2::PartialMatch(match, *kOui, &oui)) {
-    oui = "regex error";
-  }
-  return oui;
-}
-
-std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
-  const int id = cache.GetId(match);
-  const std::string oui = GetOui(match);
+std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
+  const std::string oui = mac_utils::GetOuiPrefix(mac);
+  const int id = cache.GetId(mac_utils::CanonicalizeMac(mac));
   return fxl::StringPrintf("%s<REDACTED-MAC: %d>", oui.c_str(), id);
 }
 

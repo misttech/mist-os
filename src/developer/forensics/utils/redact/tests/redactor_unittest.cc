@@ -48,8 +48,8 @@ TEST_F(RedactorTest, Check) {
             "IPv6C: [::/0 via <REDACTED-IPV6: 6> nic 4]");
   EXPECT_EQ(Redact("IPv6LL: fe80::7d84:c1dc:ab34:656a"), "IPv6LL: fe80:<REDACTED-IPV6-LL: 7>");
   EXPECT_EQ(Redact("UUID: ddd0fA34-1016-11eb-adc1-0242ac120002"), "UUID: <REDACTED-UUID>");
-  EXPECT_EQ(Redact("MAC address: 00:0a:95:9F:68:16 12:34:95:9F:68:16"),
-            "MAC address: 00:0a:95:<REDACTED-MAC: 8> 12:34:95:<REDACTED-MAC: 9>");
+  EXPECT_EQ(Redact("MAC address: 00:0a:95:9F:68:16 12-34-95-9F-68-16"),
+            "MAC address: 00:0a:95:<REDACTED-MAC: 8> 12-34-95-<REDACTED-MAC: 9>");
   EXPECT_EQ(Redact("SSID: <ssid-666F6F> <ssid-77696669>"),
             "SSID: <REDACTED-SSID: 10> <REDACTED-SSID: 11>");
   EXPECT_EQ(Redact("HTTP: http://fuchsia.dev/"), "HTTP: <REDACTED-URL>");
@@ -166,8 +166,8 @@ TEST_F(RedactorTest, CheckJsonOnlyAddressesRedacted) {
             "v6_8_fields_colons: <REDACTED-IPV6: 20>::");
   EXPECT_EQ(RedactJson("obfuscated_gaia_id: 106986199446298680449"),
             "obfuscated_gaia_id: 106986199446298680449");
-  EXPECT_EQ(RedactJson("MAC address: 00:0a:95:9F:68:16 12:34:95:9F:68:16"),
-            "MAC address: 00:0a:95:<REDACTED-MAC: 21> 12:34:95:<REDACTED-MAC: 22>");
+  EXPECT_EQ(RedactJson("MAC address: 00:0a:95:9F:68:16 12-34-95-9F-68-16"),
+            "MAC address: 00:0a:95:<REDACTED-MAC: 21> 12-34-95-<REDACTED-MAC: 22>");
   EXPECT_EQ(RedactJson("SSID: <ssid-666F6F> <ssid-77696669>"),
             "SSID: <REDACTED-SSID: 23> <REDACTED-SSID: 24>");
 }
@@ -185,7 +185,7 @@ TEST_F(RedactorTest, RedactedJsonStillValid) {
       "2001::2"
     ],
     "mac_addrs" : [
-      "AA-BB-CC-DD-EE-FF",
+      "AA:BB:CC:DD:EE:FF",
       "11-22-33-44-55-66"
     ],
     "ssids" : [
@@ -219,7 +219,7 @@ TEST_F(RedactorTest, RedactedJsonStillValid) {
       "<REDACTED-IPV6: 4>"
     ],
     "mac_addrs" : [
-      "AA-BB-CC-<REDACTED-MAC: 5>",
+      "AA:BB:CC:<REDACTED-MAC: 5>",
       "11-22-33-<REDACTED-MAC: 6>"
     ],
     "ssids" : [
@@ -238,7 +238,7 @@ TEST_F(RedactorTest, CachePersistsAcrossTextAndJson) {
   std::string text = R"(
 IPv4: 1.2.3.4 5.6.7.8
 IPv6: 2001::1 2001::2
-MAC address: 00:0a:95:9F:68:16 12:34:95:9F:68:16
+MAC address: 00-0a-95-9F-68-16 12:34:95:9F:68:16
 SSID: <ssid-0123abcdef> <ssid-4567fedcba>
 )";
 
@@ -254,7 +254,7 @@ SSID: <ssid-0123abcdef> <ssid-4567fedcba>
       "2001::1"
     ],
     "mac_addrs" : [
-      "12:34:95:9F:68:16",
+      "12-34-95-9F-68-16",
       "00:0a:95:9F:68:16"
     ],
     "ssids" : [
@@ -268,7 +268,7 @@ SSID: <ssid-0123abcdef> <ssid-4567fedcba>
   EXPECT_EQ(Redact(text), R"(
 IPv4: <REDACTED-IPV4: 1> <REDACTED-IPV4: 2>
 IPv6: <REDACTED-IPV6: 3> <REDACTED-IPV6: 4>
-MAC address: 00:0a:95:<REDACTED-MAC: 5> 12:34:95:<REDACTED-MAC: 6>
+MAC address: 00-0a-95-<REDACTED-MAC: 5> 12:34:95:<REDACTED-MAC: 6>
 SSID: <REDACTED-SSID: 7> <REDACTED-SSID: 8>
 )");
   EXPECT_EQ(Redact(json), R"(
@@ -283,7 +283,7 @@ SSID: <REDACTED-SSID: 7> <REDACTED-SSID: 8>
       "<REDACTED-IPV6: 3>"
     ],
     "mac_addrs" : [
-      "12:34:95:<REDACTED-MAC: 6>",
+      "12-34-95-<REDACTED-MAC: 6>",
       "00:0a:95:<REDACTED-MAC: 5>"
     ],
     "ssids" : [
