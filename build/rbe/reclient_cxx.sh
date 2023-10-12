@@ -114,19 +114,34 @@ fi
 working_subdir=
 
 # Separate rewrapper options from the command, based on '--'.
+local_only=0
+use_py_wrapper=0
 rewrapper_opts=()
+
 for opt
 do
+  keep_opt=1
   # Extract optarg from --opt=optarg
   optarg=
   case "$opt" in
     -*=*) optarg="${opt#*=}" ;;  # remove-prefix, shortest-match
   esac
   case "$opt" in
-    --working-subdir=*) working_subdir="$optarg" ;;
+    --check-determinism | --compare )
+      # These are special modes that are only implemented in the Python wrapper.
+      use_py_wrapper=1
+      ;;
+    --miscomparison-export-dir )
+      # expects one argument, forwarded to next wrapper
+      use_py_wrapper=1
+      ;;
+    --local) local_only=1 ;;
+    --working-subdir=*) working_subdir="$optarg"; keep_opt=0 ;;
     --) shift; break ;;
-    *) rewrapper_opts+=( "$opt" ) ;;
   esac
+  if [[ "$keep_opt" == 1 ]]
+  then rewrapper_opts+=( "$opt" )
+  fi
   shift
 done
 
@@ -137,6 +152,14 @@ local_compile_cmd=( "$@" )
 
 if [[ "${#local_compile_cmd[@]}" == 0 ]]
 then exit
+fi
+
+# Only in special debug cases, fallback to the more elaborate Python wrapper.
+if [[ "$use_py_wrapper" == 1 ]]
+then
+  readonly python="$exec_root_rel"/prebuilt/third_party/python3/"${HOST_PLATFORM}"/bin/python3
+  exec "$python" -S "$script_dir"/cxx_remote_wrapper.py "${rewrapper_opts[@]}" -- "${local_compile_cmd[@]}"
+  # no return
 fi
 
 # Assume first token is the compiler (which is what rewrapper does).
@@ -154,7 +177,6 @@ esac
 dmsg "compiler type: $compiler_type"
 
 # Detect cases that are unsupported by re-client.
-local_only=0
 save_temps=0
 output=
 depfile=
