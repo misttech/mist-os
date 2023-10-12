@@ -31,7 +31,7 @@ use netstack_testing_common::{
         add_pure_ip_interface, create_ip_tun_port, create_tun_device, install_device,
         TUN_DEFAULT_PORT_ID,
     },
-    interfaces,
+    interfaces::{self, add_address_wait_assigned},
     realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
@@ -1106,6 +1106,119 @@ async fn add_address_and_detach<N: Netstack>(
         ) == subnet
     });
     assert_eq!(subnet_route_is_still_present, expect_subnet_route);
+}
+
+#[netstack_test]
+async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
+    const IPV4_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("127.0.0.1/8");
+    const IPV6_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("::1/128");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+
+    let (loopback_id, addresses) = assert_matches::assert_matches!(
+        realm.loopback_properties().await,
+        Ok(Some(
+            fidl_fuchsia_net_interfaces_ext::Properties {
+                id,
+                online: true,
+                addresses,
+                ..
+            },
+        )) => (id, addresses)
+    );
+    let addresses: Vec<_> = addresses
+        .into_iter()
+        .map(|fidl_fuchsia_net_interfaces_ext::Address { addr, .. }| addr)
+        .collect();
+    assert_eq!(addresses[..], [IPV4_LOOPBACK, IPV6_LOOPBACK]);
+
+    let root = realm
+        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
+        .expect("connect to protocol");
+
+    let (control, server_end) =
+        fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
+    let () = root.get_admin(loopback_id.get(), server_end).expect("get admin");
+
+    futures::stream::iter([IPV4_LOOPBACK, IPV6_LOOPBACK].into_iter())
+        .for_each_concurrent(None, |mut addr| {
+            let control = &control;
+            async move {
+                let did_remove = control
+                    .remove_address(&mut addr)
+                    .await
+                    .expect("remove_address")
+                    .expect("remove address");
+                assert!(did_remove, "{:?}", addr);
+            }
+        })
+        .await;
+
+    futures::stream::iter([fidl_subnet!("1.1.1.1/24"), fidl_subnet!("a::1/64")].into_iter())
+        .for_each_concurrent(None, |addr| {
+            add_address_wait_assigned(
+                &control,
+                addr,
+                finterfaces_admin::AddressParameters::default(),
+            )
+            .map(|res| {
+                let _: finterfaces_admin::AddressStateProviderProxy = res.expect("add address");
+            })
+        })
+        .await;
+}
+
+#[netstack_test]
+async fn remove_slaac_address<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("new sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "testif1").await.expect("join network");
+
+    // Wait for the SLAAC address to appear.
+    let mut slaac_addr = fnet_interfaces_ext::wait_interface_with_id(
+        iface.get_interface_event_stream().expect("get interface event stream"),
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |fnet_interfaces_ext::PropertiesAndState {
+             state: (),
+             properties:
+                 fnet_interfaces_ext::Properties {
+                     id: _,
+                     name: _,
+                     device_class: _,
+                     online: _,
+                     addresses,
+                     has_default_ipv4_route: _,
+                     has_default_ipv6_route: _,
+                 },
+         }| {
+            addresses.iter().find_map(
+                |&fnet_interfaces_ext::Address {
+                     addr: subnet @ fnet::Subnet { addr, prefix_len: _ },
+                     valid_until: _,
+                     assignment_state: _,
+                 }| {
+                    match addr {
+                        fnet::IpAddress::Ipv4(_) => None,
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                            let addr = net_types::ip::Ipv6Addr::from_bytes(addr);
+                            addr.is_unicast_link_local().then_some(subnet)
+                        }
+                    }
+                },
+            )
+        },
+    )
+    .await
+    .expect("wait for SLAAC address to appear");
+
+    let remove_addr_result = iface
+        .control()
+        .remove_address(&mut slaac_addr)
+        .await
+        .expect("interface should not have been removed");
+    assert_eq!(remove_addr_result, Ok(true));
 }
 
 #[netstack_test]

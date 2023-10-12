@@ -752,7 +752,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
 /// Removes the given `address` from the interface with the given `id`.
 ///
 /// Returns `true` if the address existed and was removed; otherwise `false`.
-async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool {
+async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> bool {
     let specified_addr = match address.addr.try_into_core() {
         Ok(addr) => addr,
         Err(e) => {
@@ -760,9 +760,9 @@ async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool
             return false;
         }
     };
+    let core_id =
+        ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
     let Some((worker, cancelation_sender)) = ({
-        let core_id =
-            ctx.non_sync_ctx().devices.get_core_id(id).expect("missing device info for interface");
         core_id.external_state().with_common_info_mut(|i| {
             i.addresses.get_mut(&specified_addr).map(
                 |devices::AddressInfo {
@@ -772,7 +772,17 @@ async fn remove_address(ctx: &Ctx, id: BindingId, address: fnet::Subnet) -> bool
             )
         })
     }) else {
-        return false;
+        // Even if the address is not in the bindings HashMap of addresses,
+        // it could still be in core (e.g. if it's a loopback address or a
+        // SLAAC address).
+        // TODO(https://fxbug.dev/135102): Rather than falling back in this way,
+        // make it impossible to make this mistake by centralizing the
+        // "source of truth" for addresses on a device.
+        let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
+        return match netstack3_core::del_ip_addr(sync_ctx, non_sync_ctx, &core_id, specified_addr) {
+            Ok(()) => true,
+            Err(netstack3_core::error::NotFoundError) => false,
+        };
     };
     let did_cancel_worker = match cancelation_sender {
         Some(cancelation_sender) => {

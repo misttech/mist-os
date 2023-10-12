@@ -16,11 +16,7 @@ use net_declare::{fidl_mac, fidl_subnet, net_mac, std_ip_v4, std_ip_v6, std_sock
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     get_component_moniker,
-    interfaces::add_address_wait_assigned,
-    realms::{
-        constants, KnownServiceProvider, Netstack, NetstackVersion, TestRealmExt as _,
-        TestSandboxExt as _,
-    },
+    realms::{constants, KnownServiceProvider, Netstack, TestSandboxExt as _},
     ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -93,73 +89,6 @@ async fn log_packets<N: Netstack>(name: &str) {
     .unwrap_or_else(|patterns| {
         panic!("log stream ended while still waiting for patterns {:?}", patterns)
     });
-}
-
-const IPV4_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("127.0.0.1/8");
-const IPV6_LOOPBACK: fidl_fuchsia_net::Subnet = fidl_subnet!("::1/128");
-
-#[netstack_test]
-async fn add_remove_address_on_loopback<N: Netstack>(name: &str) {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
-
-    let (loopback_id, addresses) = assert_matches::assert_matches!(
-        realm.loopback_properties().await,
-        Ok(Some(
-            fidl_fuchsia_net_interfaces_ext::Properties {
-                id,
-                online: true,
-                addresses,
-                ..
-            },
-        )) => (id, addresses)
-    );
-    let addresses: Vec<_> = addresses
-        .into_iter()
-        .map(|fidl_fuchsia_net_interfaces_ext::Address { addr, .. }| addr)
-        .collect();
-    assert_eq!(addresses[..], [IPV4_LOOPBACK, IPV6_LOOPBACK]);
-
-    let root = realm
-        .connect_to_protocol::<fidl_fuchsia_net_root::InterfacesMarker>()
-        .expect("connect to protocol");
-
-    let (control, server_end) =
-        fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints().expect("create proxy");
-    let () = root.get_admin(loopback_id.get(), server_end).expect("get admin");
-
-    futures::stream::iter([IPV4_LOOPBACK, IPV6_LOOPBACK].into_iter())
-        .for_each_concurrent(None, |mut addr| {
-            let control = &control;
-            async move {
-                let did_remove = control
-                    .remove_address(&mut addr)
-                    .await
-                    .expect("remove_address")
-                    .expect("remove address");
-                // Netstack3 does not allow addresses to be removed from the loopback device, for
-                // some reason?
-                if N::VERSION == NetstackVersion::Netstack3 {
-                    assert!(!did_remove, "{:?}", addr);
-                } else {
-                    assert!(did_remove, "{:?}", addr);
-                }
-            }
-        })
-        .await;
-
-    futures::stream::iter([fidl_subnet!("1.1.1.1/24"), fidl_subnet!("a::1/64")].into_iter())
-        .for_each_concurrent(None, |addr| {
-            add_address_wait_assigned(
-                &control,
-                addr,
-                finterfaces_admin::AddressParameters::default(),
-            )
-            .map(|res| {
-                let _: finterfaces_admin::AddressStateProviderProxy = res.expect("add address");
-            })
-        })
-        .await;
 }
 
 #[netstack_test]
