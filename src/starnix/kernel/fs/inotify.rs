@@ -6,10 +6,7 @@ use std::{
     borrow::Cow,
     collections::{HashMap, VecDeque},
     mem::size_of,
-    sync::{
-        atomic::{AtomicI32, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicI32, Ordering},
 };
 use zerocopy::AsBytes;
 
@@ -119,7 +116,7 @@ impl InotifyFileObject {
         &self,
         dir_entry: DirEntryHandle,
         mask: InotifyMask,
-        inotify_file: &Arc<FileObject>,
+        inotify_file: &FileHandle,
     ) -> Result<WdNumber, Errno> {
         let weak_key = WeakKey::from(inotify_file);
         if let Some(watch_id) = dir_entry.node.watchers.maybe_update(mask, &weak_key)? {
@@ -139,7 +136,7 @@ impl InotifyFileObject {
     /// Removes a watch to the inotify instance.
     ///
     /// Detaches the corresponding InotifyWatcher from FsNode.
-    pub fn remove_watch(&self, watch_id: WdNumber, file: &Arc<FileObject>) -> Result<(), Errno> {
+    pub fn remove_watch(&self, watch_id: WdNumber, file: &FileHandle) -> Result<(), Errno> {
         let dir_entry;
         {
             let mut state = self.state.lock();
@@ -437,7 +434,7 @@ impl InotifyWatchers {
         // Clone inotify references so that we don't hold watchers lock when notifying.
         struct InotifyWatch {
             watch_id: WdNumber,
-            file: Arc<FileObject>,
+            file: FileHandle,
             should_remove: bool,
         }
         let mut watches: Vec<InotifyWatch> = vec![];

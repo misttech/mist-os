@@ -967,9 +967,7 @@ mod test {
         (input_file, device_listener_stream, relay_thread)
     }
 
-    fn make_kernel_objects(
-        file: Arc<InputFile>,
-    ) -> (Arc<Kernel>, AutoReleasableTask, Arc<FileObject>) {
+    fn make_kernel_objects(file: Arc<InputFile>) -> (Arc<Kernel>, AutoReleasableTask, FileHandle) {
         let (kernel, current_task) = create_kernel_and_task();
         let file_object = FileObject::new(
             Box::new(file),

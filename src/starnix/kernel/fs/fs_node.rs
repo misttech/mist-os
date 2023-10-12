@@ -1038,7 +1038,7 @@ impl FsNode {
         {
             let mut flock_info = self.flock_info.lock();
             // This function will drop the flock from `file` because the `Weak<FileObject>` for
-            // `file` will no longer upgrade to an `Arc<FileObject>`.
+            // `file` will no longer upgrade to an `FileHandle`.
             flock_info.retain(|_| true);
         }
         self.record_lock_release(RecordLockOwner::FileObject(file.id()));
