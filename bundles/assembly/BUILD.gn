@@ -1371,7 +1371,6 @@ assembly_input_bundle("input_group_two") {
     "//src/connectivity/bluetooth/profiles/bt-avrcp-target",
     "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway:bt-hfp-audio-gateway-default",
     "//src/connectivity/location/emergency",
-    "//src/factory/factory_store_providers",
     "//src/media/sessions:mediasession",
   ]
   if (current_cpu != "riscv64") {
@@ -1393,7 +1392,6 @@ assembly_input_bundle("input_group_two") {
                     "//src/connectivity/bluetooth/profiles/bt-avrcp/meta/bt-avrcp.core_shard.cml",
                     "//src/connectivity/bluetooth/profiles/bt-hfp-audio-gateway/meta/bt-hfp-audio-gateway.core_shard.cml",
                     "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
-                    "//src/factory/factory_store_providers/meta/factory_store_providers.core_shard.cml",
                     "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
                     "//src/media/sessions/meta/mediasession.core_shard.cml",
                     "//src/session/bin/session_manager/meta/session.smart.from_platform.core_shard.cml",
