@@ -142,9 +142,14 @@ template <class ElementType>
 struct LinkMapListInFirstMemberTraits {
   using LinkMapType = decltype(std::declval<ElementType>().link_map);
 
-  static_assert(offsetof(ElementType, link_map) == 0);
-
   static const ElementType& LinkMapToElement(const LinkMapType& map) {
+    if constexpr (std::is_standard_layout_v<ElementType>) {
+      static_assert(offsetof(ElementType, link_map) == 0);
+    } else {
+      // It's not kosher to use offsetof here, but this should get compiled
+      // away so there's no runtime test at all (but maybe a runtime failure).
+      assert(&(reinterpret_cast<const ElementType&>(map).link_map) == &map);
+    }
     return reinterpret_cast<const ElementType&>(map);
   }
 
