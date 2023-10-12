@@ -50,6 +50,7 @@ class DwarfBinaryImpl final : public DwarfBinary {
   bool HasBinary() const override;
   llvm::object::ObjectFile* GetLLVMObjectFile() override;
   llvm::DWARFContext* GetLLVMContext() override;
+  std::unique_ptr<llvm::DWARFContext> CreateNewLLVMContext() override;
   uint64_t GetMappedLength() const override;
   const std::map<std::string, llvm::ELF::Elf64_Sym>& GetELFSymbols() const override;
   const std::map<std::string, uint64_t> GetPLTSymbols() const override;

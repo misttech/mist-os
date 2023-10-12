@@ -29,6 +29,8 @@ class ObjectFile;
 
 namespace zxdb {
 
+class DwarfBinary;
+
 class Index {
  public:
   Index() = default;
@@ -41,7 +43,7 @@ class Index {
   // Normal callers will want to use the fast path (which internally falls back to the slow path
   // for cross unit references). Tests can set the force_slow_path flag to cause everything to be
   // indexed with the slow path for validation purposes.
-  void CreateIndex(llvm::object::ObjectFile* object_file, bool force_slow_path = false);
+  void CreateIndex(DwarfBinary& binary, bool force_slow_path = false);
 
   // Dumps the file index to the stream for debugging.
   void DumpFileIndex(std::ostream& out) const;

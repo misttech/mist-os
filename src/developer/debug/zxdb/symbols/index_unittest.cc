@@ -29,7 +29,7 @@ TEST(Index, IndexDump) {
   ASSERT_TRUE(setup.Init("", false).ok());
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   // Symbol index.
   std::ostringstream out;
@@ -131,7 +131,7 @@ zxdb_symbol_test2.cc -> ../../src/developer/debug/zxdb/symbols/test_data/zxdb_sy
 
   // Test that the slow indexing path produces the same result as the fast path.
   Index slow_index;
-  slow_index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile(), true);
+  slow_index.CreateIndex(*setup.symbols()->binary(), true);
   out = std::ostringstream();
   slow_index.root().Dump(out, setup.symbols()->symbol_factory(), 0);
   EXPECT_EQ(kExpected, out.str());
@@ -142,7 +142,7 @@ TEST(Index, FindExactFunction) {
   ASSERT_TRUE(setup.Init("", false).ok());
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   // Standalone function search.
   auto result = index.FindExact(TestSymbolModule::SplitName(TestSymbolModule::kMyFunctionName));
@@ -187,7 +187,7 @@ TEST(Index, FindFileMatches) {
   ASSERT_TRUE(setup.Init("", false).ok());
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   // Simple filename-only query that succeeds.
   std::vector<std::string> result = index.FindFileMatches("zxdb_symbol_test.cc");
@@ -223,7 +223,7 @@ TEST(Index, FindFilePrefixes) {
   ASSERT_TRUE(setup.Init("", false).ok());
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   // Should find both files. Order not guaranteed.
   std::vector<std::string> result = index.FindFilePrefixes("z");
@@ -239,7 +239,7 @@ TEST(Index, DumpIndex) {
   ASSERT_TRUE(setup.Init("", false).ok());
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   std::cout << index.main_functions().size() << " main function(s) found.\n\n";
 
@@ -276,7 +276,7 @@ TEST(Index, BenchmarkIndexing) {
   int64_t load_complete_us = GetTickMicroseconds();
 
   Index index;
-  index.CreateIndex(setup.symbols()->binary()->GetLLVMObjectFile());
+  index.CreateIndex(*setup.symbols()->binary());
 
   int64_t index_complete_us = GetTickMicroseconds();
 

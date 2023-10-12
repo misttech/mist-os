@@ -47,6 +47,13 @@ class DwarfBinary {
   virtual llvm::object::ObjectFile* GetLLVMObjectFile() = 0;
   virtual llvm::DWARFContext* GetLLVMContext() = 0;
 
+  // Creates a new LLVM context, separate from the cached one returned by GetLLVMContext().
+  // This allows early destruction of the context for indexing to clear all of the cached
+  // structures.
+  //
+  // Danger: the DwarfBinary must outlive the returned pointer.
+  virtual std::unique_ptr<llvm::DWARFContext> CreateNewLLVMContext() = 0;
+
   // Returns the extent of the mapped segments in memory.
   virtual uint64_t GetMappedLength() const = 0;
 

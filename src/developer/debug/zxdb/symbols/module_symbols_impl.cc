@@ -161,8 +161,7 @@ ModuleSymbolsImpl::ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary,
     //
     // Although it will be slightly slower to create, the memory savings may make such a change
     // worth it for large programs.
-    if (llvm::object::ObjectFile* object_file = binary_->GetLLVMObjectFile())
-      index_.CreateIndex(object_file);
+    index_.CreateIndex(*binary_);
   }
 }
 

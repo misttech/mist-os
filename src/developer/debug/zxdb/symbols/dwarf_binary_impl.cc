@@ -24,7 +24,6 @@
 
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
-#include "src/developer/debug/zxdb/symbols/dwarf_context.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_unit_impl.h"
 #include "src/lib/elflib/elflib.h"
 
@@ -65,6 +64,21 @@ std::map<std::string, elflib::Elf64_Sym> GetMergedElfSymbols(elflib::ElfLib& elf
   }
 
   return result;
+}
+
+// This function exists to filter out specific errors when decompressing
+// .debug_gdb_scripts sections from compressed debuginfo files which fail in
+// LLVM.
+void LLVMErrorHandler(llvm::Error error) {
+  llvm::handleAllErrors(std::move(error), [](llvm::ErrorInfoBase& info) {
+    if (info.message().find("gdb_scripts")) {
+      // Suppress errors for decompressing the "debug_gdb_scripts" section in rust binaries.
+      return;
+    }
+
+    // Otherwise just pass through to the console like the defaut error handler.
+    LOGS(Error) << info.message();
+  });
 }
 
 }  // namespace
@@ -198,7 +212,7 @@ Err DwarfBinaryImpl::Load() {
   binary_buffer_ = std::move(binary_pair.second);
   binary_ = std::move(binary_pair.first);
 
-  context_ = GetDwarfContext(object_file());
+  context_ = CreateNewLLVMContext();
 
   return Err();
 }
@@ -206,6 +220,13 @@ Err DwarfBinaryImpl::Load() {
 llvm::object::ObjectFile* DwarfBinaryImpl::GetLLVMObjectFile() { return object_file(); }
 
 llvm::DWARFContext* DwarfBinaryImpl::GetLLVMContext() { return context(); }
+
+std::unique_ptr<llvm::DWARFContext> DwarfBinaryImpl::CreateNewLLVMContext() {
+  // Overwrite the default Error handler object, but leave everything else default.
+  return llvm::DWARFContext::create(*object_file(),
+                                    llvm::DWARFContext::ProcessDebugRelocations::Process, nullptr,
+                                    "", &LLVMErrorHandler);
+}
 
 uint64_t DwarfBinaryImpl::GetMappedLength() const { return mapped_length_; }
 
