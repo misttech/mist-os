@@ -19,6 +19,7 @@
 #include <arch/mp.h>
 #include <arch/ops.h>
 #include <arch/regs.h>
+#include <arch/riscv64/feature.h>
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <arch/vm.h>
@@ -60,6 +61,7 @@ extern "C" void riscv64_boot_cpu_init(PhysHandoff* handoff) {
 
 void arch_early_init() {
   riscv64_sbi_early_init();
+  riscv64_feature_early_init();
   riscv64_mmu_early_init();
   riscv64_mmu_early_init_percpu();
 
@@ -73,6 +75,8 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   // print some arch info
   dprintf(INFO, "RISCV: Boot HART ID %u\n", riscv64_boot_hart_id());
   dprintf(INFO, "RISCV: Supervisor mode\n");
+
+  riscv64_feature_init();
 
   riscv64_sbi_init();
 
