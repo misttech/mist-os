@@ -24,13 +24,13 @@
         binary: "bin/power-broker",
     },
     capabilities: [
-        { protocol: "fuchsia.power.broker.Control" },
+        { protocol: "fuchsia.power.broker.LevelControl" },
         { protocol: "fuchsia.power.broker.Lessor" },
         { protocol: "fuchsia.power.broker.Status" },
     ],
     use: [
         {
-            protocol: "fuchsia.power.broker.Control",
+            protocol: "fuchsia.power.broker.LevelControl",
             from: "self",
         },
         {
@@ -44,7 +44,7 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.power.broker.Control",
+            protocol: "fuchsia.power.broker.LevelControl",
             from: "self",
         },
         {

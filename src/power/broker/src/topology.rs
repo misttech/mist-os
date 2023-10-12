@@ -26,8 +26,8 @@ impl From<String> for ElementID {
 
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ElementLevel {
-    pub id: ElementID,
-    pub lvl: PowerLevel,
+    pub element: ElementID,
+    pub level: PowerLevel,
 }
 
 /// Power dependency from one element's PowerLevel to another.
@@ -50,26 +50,25 @@ impl Topology {
     }
 
     /// Get direct dependencies for the given Element and PowerLevel.
-    pub fn get_direct_deps(&self, id: &ElementID, lvl: &PowerLevel) -> Vec<Dependency> {
-        let source = ElementLevel { id: id.clone(), lvl: lvl.clone() };
+    pub fn get_direct_deps(&self, element_level: &ElementLevel) -> Vec<Dependency> {
         let targets = self
             .source_to_targets_dependencies
-            .get(&source)
+            .get(&element_level)
             .unwrap_or(&Vec::<ElementLevel>::new())
             .clone();
         targets
             .iter()
-            .map(|target| Dependency { level: source.clone(), requires: target.clone() })
+            .map(|target| Dependency { level: element_level.clone(), requires: target.clone() })
             .collect()
     }
 
     /// Walk the dependency graph using breadth-first search to get all
     /// transitive dependencies for the given Element and PowerLevel.
-    pub fn get_all_deps(&self, id: &ElementID, lvl: &PowerLevel) -> Vec<Dependency> {
+    pub fn get_all_deps(&self, element_level: &ElementLevel) -> Vec<Dependency> {
         let mut deps = Vec::<Dependency>::new();
-        let mut element_levels = vec![ElementLevel { id: id.clone(), lvl: lvl.clone() }];
+        let mut element_levels = vec![element_level.clone()];
         while let Some(source) = element_levels.pop() {
-            let direct_deps = self.get_direct_deps(&source.id, &source.lvl);
+            let direct_deps = self.get_direct_deps(&source);
             for dep in direct_deps {
                 element_levels.push(dep.requires.clone());
                 deps.push(dep);
@@ -81,10 +80,8 @@ impl Topology {
     /// Add a direct dependency to the Topology.
     pub fn add_direct_dep(&mut self, dep: &Dependency) {
         // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
-        let targets = self
-            .source_to_targets_dependencies
-            .entry(ElementLevel { id: dep.level.id.clone(), lvl: dep.level.lvl.clone() })
-            .or_insert(Vec::new());
+        let targets =
+            self.source_to_targets_dependencies.entry(dep.level.clone()).or_insert(Vec::new());
         targets.push(dep.requires.clone());
     }
 }
@@ -99,39 +96,57 @@ mod tests {
         let mut t = Topology::new();
         // A <- B <- C -> D
         let ba = Dependency {
-            level: ElementLevel { id: "B".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "B".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "A".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "A".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&ba);
         let cb = Dependency {
-            level: ElementLevel { id: "C".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "C".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "B".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "B".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cb);
         let cd = Dependency {
-            level: ElementLevel { id: "C".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "C".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "D".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "D".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cd);
 
-        let mut a_deps = t.get_direct_deps(&"A".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut a_deps = t.get_direct_deps(&ElementLevel {
+            element: "A".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
-        let mut b_deps = t.get_direct_deps(&"B".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut b_deps = t.get_direct_deps(&ElementLevel {
+            element: "B".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         b_deps.sort();
         assert_eq!(b_deps, [ba]);
 
-        let mut c_deps = t.get_direct_deps(&"C".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut c_deps = t.get_direct_deps(&ElementLevel {
+            element: "C".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         c_deps.sort();
         assert_eq!(c_deps, [cb, cd]);
     }
@@ -141,39 +156,57 @@ mod tests {
         let mut t = Topology::new();
         // A <- B <- C -> D
         let ba = Dependency {
-            level: ElementLevel { id: "B".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "B".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "A".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "A".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&ba);
         let cb = Dependency {
-            level: ElementLevel { id: "C".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "C".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "B".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "B".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cb);
         let cd = Dependency {
-            level: ElementLevel { id: "C".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
+            level: ElementLevel {
+                element: "C".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
             requires: ElementLevel {
-                id: "D".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: "D".into(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cd);
 
-        let mut a_deps = t.get_all_deps(&"A".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut a_deps = t.get_all_deps(&ElementLevel {
+            element: "A".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
-        let mut b_deps = t.get_all_deps(&"B".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut b_deps = t.get_all_deps(&ElementLevel {
+            element: "B".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         b_deps.sort();
         assert_eq!(b_deps, [ba.clone()]);
 
-        let mut c_deps = t.get_all_deps(&"C".into(), &PowerLevel::Binary(BinaryPowerLevel::On));
+        let mut c_deps = t.get_all_deps(&ElementLevel {
+            element: "C".into(),
+            level: PowerLevel::Binary(BinaryPowerLevel::On),
+        });
         c_deps.sort();
         assert_eq!(c_deps, [ba, cb, cd]);
     }

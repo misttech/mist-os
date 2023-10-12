@@ -20,30 +20,30 @@ type BinaryPowerLevel = strict enum : uint32 {
     ON = 1;
 };
 
-type PowerLevelError = flexible enum {
-    NOT_FOUND = 0;
-};
-
-// TODO(b/297543815) Temporary placeholder until a formal system of tokens
-// or paths is determined.
-// Provided by Element owner for now.
-alias ElementId = string:1024;
 // Unique ID provided by Power Broker (currently a UUID but subject to change).
 alias LeaseId = string:64;
+// Unique ID, provided by Power Broker. Could be a zx.Handle?
+// TODO(b/297543815): Temporary placeholder until a formal system of tokens
+// or paths is determined.
+alias ElementId = string:1024;
+
+type UpdateCurrentPowerLevelError = flexible enum {
+    NOT_FOUND = 0;
+};
 
 /// Offered by the Power Broker to managed Power Element owners to receive
 /// current power level status and initiate power level changes.
 @discoverable
-open protocol Control {
+open protocol LevelControl {
     /// Request made by element owners on behalf of a single power element to
     /// the Power Broker as a hanging GET:
     /// If last_required_level does not match the current required power level
     /// this will return immediately with the new required power level.
     /// If last_required_level matches the current level, the call will
     /// hang until the required level changes.
-    flexible GetRequiredLevelUpdate(resource struct {
+    flexible WatchRequiredLevel(resource struct {
         // TODO(b/297543815): See note on PowerLessor.Lease below.
-        element_id ElementId;
+        element ElementId;
         /// Provided by the client with the last level received, or None if
         /// this is the first call.
         last_required_level PowerLevel:optional;
@@ -52,19 +52,20 @@ open protocol Control {
     });
 
     /// Sent by the element on initial startup and whenever there is a change
-    /// in power level. Fire and forget.
+    /// in power level.
     flexible UpdateCurrentPowerLevel(resource struct {
-        element_id ElementId;
+        element ElementId;
         current_level PowerLevel;
-    });
+    }) -> () error UpdateCurrentPowerLevelError;
 };
 
 /// Offered by the Power Broker to consumer Power Element owners (elements
 /// that initiate leases).
 @discoverable
 open protocol Lessor {
-    /// Request made to indicate client is using a given element and needs it to be
-    /// at the given minimum power state.
+    /// Request made to indicate client intends to raise the given element
+    /// to the given power level and wants to have its direct and transitive
+    /// power dependencies satisfied.
     flexible Lease(resource struct {
         // TODO(b/297543815): Replace these. The method by which clients
         // identify their power elements and the elements they intend to use
@@ -73,11 +74,8 @@ open protocol Lessor {
         // component manifest as capabilities or some other method linked to
         // the topology definition, which is also TBD.
         /// ID and PowerLevel of the element requesting the lease
-        requesting_element_id ElementId;
-        requesting_element_level PowerLevel;
-        /// ID and PowerLevel of the element required by this lease
-        required_element_id ElementId;
-        required_element_level PowerLevel;
+        element ElementId;
+        level PowerLevel;
     }) -> (resource struct {
         lease_id LeaseId;
     });
@@ -88,12 +86,16 @@ open protocol Lessor {
     });
 };
 
+type PowerLevelError = flexible enum {
+    NOT_FOUND = 0;
+};
+
 /// Offered by the Power Broker to components (including drivers).
 @discoverable
 open protocol Status {
     /// Made by a component to get the current power level of an element.
     flexible GetPowerLevel(resource struct {
-        element_id ElementId;
+        element ElementId;
     }) -> (resource struct {
         cur_level PowerLevel;
     }) error PowerLevelError;
@@ -101,10 +103,10 @@ open protocol Status {
     /// Made by a component to listen for changes to element power levels.
     /// Request is made as a hanging GET which only returns if the new level
     /// has changed from the previous cur_level.
-    flexible GetPowerLevelOnChange(resource struct {
-        element_id ElementId;
-        cur_level PowerLevel;
+    flexible WatchPowerLevel(resource struct {
+        element ElementId;
+        last_level PowerLevel;
     }) -> (resource struct {
         new_level PowerLevel;
-    });
+    }) error PowerLevelError;
 };

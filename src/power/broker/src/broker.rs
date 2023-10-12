@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::topology::*;
 
 pub struct Broker {
-    lease_catalog: LeaseCatalog,
+    lease_catalog: Catalog,
     // The current level for each element, as reported to the broker.
     current: Levels,
     // The level for each element required by the topology.
@@ -21,7 +21,7 @@ pub struct Broker {
 impl Broker {
     pub fn new(topology: Topology) -> Self {
         Broker {
-            lease_catalog: LeaseCatalog::new(topology),
+            lease_catalog: Catalog::new(topology),
             current: Levels::new(),
             required: Levels::new(),
         }
@@ -60,24 +60,27 @@ impl Broker {
         self.required.subscribe(id)
     }
 
-    pub fn acquire_lease(&mut self, dependency: Dependency) -> Result<Lease, Error> {
-        let (original_lease, transitive_leases) = self.lease_catalog.acquire(dependency)?;
-        self.update_required_levels(&vec![original_lease.clone()]);
-        self.update_required_levels(&transitive_leases);
+    pub fn acquire_lease(
+        &mut self,
+        element: &ElementID,
+        level: &PowerLevel,
+    ) -> Result<Lease, Error> {
+        let (original_lease, claims) = self.lease_catalog.acquire(element, level)?;
+        self.update_required_levels(&claims);
         Ok(original_lease)
     }
 
     pub fn drop_lease(&mut self, lease_id: &LeaseID) -> Result<(), Error> {
-        let (original_lease, transitive_leases) = self.lease_catalog.drop(lease_id)?;
-        self.update_required_levels(&vec![original_lease]);
-        self.update_required_levels(&transitive_leases);
+        let (_, claims) = self.lease_catalog.drop(lease_id)?;
+        self.update_required_levels(&claims);
         Ok(())
     }
 
-    fn update_required_levels(&mut self, leases: &Vec<Lease>) {
-        for lease in leases {
-            let new_min_lvl = self.lease_catalog.calc_min_level(&lease.dependency.requires.id);
-            self.required.update(&lease.dependency.requires.id, &new_min_lvl);
+    fn update_required_levels(&mut self, claims: &Vec<Claim>) {
+        for claim in claims {
+            let new_min_level =
+                self.lease_catalog.calc_min_level(&claim.dependency.requires.element);
+            self.required.update(&claim.dependency.requires.element, &new_min_level);
         }
     }
 }
@@ -87,112 +90,147 @@ type LeaseID = String;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
     pub id: LeaseID,
-    pub dependency: Dependency,
-    pub originator_lease: LeaseID,
+    pub element: ElementID,
+    pub level: PowerLevel,
 }
 
 impl Lease {
-    fn new(dependency: Dependency, originator_lease: Option<&LeaseID>) -> Self {
+    fn new(element: &ElementID, level: &PowerLevel) -> Self {
         let id = LeaseID::from(Uuid::new_v4().as_simple().to_string());
-        Lease {
-            id: id.clone(),
+        Lease { id: id.clone(), element: element.clone(), level: level.clone() }
+    }
+}
+
+type ClaimID = String;
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
+struct Claim {
+    pub id: ClaimID,
+    pub dependency: Dependency,
+    pub lease_id: LeaseID,
+}
+
+impl Claim {
+    fn new(dependency: Dependency, lease_id: &LeaseID) -> Self {
+        Claim {
+            id: ClaimID::from(Uuid::new_v4().as_simple().to_string()),
             dependency,
-            originator_lease: originator_lease.cloned().unwrap_or(id.clone()),
+            lease_id: lease_id.clone(),
         }
     }
 }
 
-struct LeaseCatalog {
+struct Catalog {
     topology: Topology,
     leases: HashMap<LeaseID, Lease>,
-    ids_by_element: HashMap<ElementID, Vec<LeaseID>>,
-    ids_by_originator_id: HashMap<LeaseID, Vec<LeaseID>>,
+    claims: HashMap<ClaimID, Claim>,
+    claims_by_element: HashMap<ElementID, Vec<ClaimID>>,
+    claims_by_lease: HashMap<LeaseID, Vec<ClaimID>>,
 }
 
-impl LeaseCatalog {
+impl Catalog {
     fn new(topology: Topology) -> Self {
-        LeaseCatalog {
+        Catalog {
             topology,
             leases: HashMap::new(),
-            ids_by_element: HashMap::new(),
-            ids_by_originator_id: HashMap::new(),
+            claims: HashMap::new(),
+            claims_by_element: HashMap::new(),
+            claims_by_lease: HashMap::new(),
         }
     }
 
-    fn calc_min_level(&self, element_id: &ElementID) -> PowerLevel {
-        // TODO(b/299637587): support other power level types.
-        self.ids_by_element
-            .get(element_id)
-            .unwrap_or(&Vec::new())
+    fn calc_min_level(&self, element: &ElementID) -> PowerLevel {
+        let no_claims = Vec::new();
+        let element_claims = self
+            .claims_by_element
+            .get(element)
+            // Treat both missing key and empty vec as no claims.
+            .unwrap_or(&no_claims)
             .iter()
-            .filter_map(|id| self.leases.get(id))
-            .map(|x| x.dependency.requires.lvl)
+            .filter_map(|id| self.claims.get(id));
+        element_claims
+            .map(|x| x.dependency.requires.level)
             .max()
+            // No claims, default to OFF
+            // TODO(b/299637587): support other power level types.
             .unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off))
     }
 
-    fn add_internal(&mut self, lease: Lease) {
-        self.ids_by_element
-            .entry(lease.dependency.requires.id.clone())
+    fn add_claim(&mut self, claim: Claim) {
+        self.claims_by_element
+            .entry(claim.dependency.requires.element.clone())
             .or_insert(Vec::new())
-            .push(lease.id.clone());
-        self.ids_by_originator_id
-            .entry(lease.originator_lease.clone())
+            .push(claim.id.clone());
+        self.claims_by_lease
+            .entry(claim.lease_id.clone())
             .or_insert(Vec::new())
-            .push(lease.id.clone());
-        self.leases.insert(lease.id.clone(), lease);
+            .push(claim.id.clone());
+        self.claims.insert(claim.id.clone(), claim);
     }
 
-    /// Returns original lease, and a Vec of all transitive leases created
-    /// as a result of this call.
-    fn acquire(&mut self, dependency: Dependency) -> Result<(Lease, Vec<Lease>), Error> {
-        // TODO: Add lease validation and control.
-        let lease = Lease::new(dependency, None);
-        // Create internal leases for all of the transitive dependencies.
-        let mut transitive_leases = Vec::new();
-        for dependency in self
-            .topology
-            .get_all_deps(&lease.dependency.requires.id, &lease.dependency.requires.lvl)
+    fn remove_claim(&mut self, id: &ClaimID) -> Option<Claim> {
+        let Some(claim) = self.claims.remove(id) else {
+            return None;
+        };
+        if let Some(claim_ids) = self.claims_by_element.get_mut(&claim.dependency.requires.element)
         {
-            // TODO: Make sure this is permitted by Limiters (once we have them).
-            let dep_lease = Lease::new(dependency, Some(&lease.id));
-            transitive_leases.push(dep_lease);
+            claim_ids.retain(|x| x != id);
         }
-        self.add_internal(lease.clone());
-        for lease in transitive_leases.iter() {
-            tracing::info!("adding lease: {:?}", &lease);
-            self.add_internal(lease.clone());
+        if let Some(claim_ids) = self.claims_by_lease.get_mut(&claim.lease_id) {
+            claim_ids.retain(|x| x != id);
         }
-        Ok((lease, transitive_leases))
+        Some(claim)
     }
 
-    /// Returns original lease, and a Vec of all transitive leases dropped
+    /// Returns original lease, and a Vec of all claims created
     /// as a result of this call.
-    fn drop(&mut self, lease_id: &LeaseID) -> Result<(Lease, Vec<Lease>), Error> {
-        let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
-        let transitive_lease_ids = self
-            .ids_by_originator_id
-            .get(&lease.id)
-            .ok_or(anyhow!("{} not found by originator id", lease_id))?;
-        tracing::info!("transitive_lease_ids: {:?}", &transitive_lease_ids);
-        // Drop all internal leases created for the transitive dependencies.
-        let mut transitive_leases = Vec::new();
-        self.ids_by_element.entry(lease.dependency.requires.id.clone().into()).or_default();
-        for id in transitive_lease_ids {
-            // Remove from ids_by_element.
-            if let Some(lease_ids) = self.ids_by_element.get_mut(&id.clone().into()) {
-                lease_ids.retain(|x| x != id);
-            }
-            if id == &lease.id {
-                // Already removed from leases above.
-                continue;
-            }
-            let removed = self.leases.remove(id).ok_or(anyhow!("lease {id} not found"))?;
-            tracing::info!("removing lease: {:?}", &removed);
-            transitive_leases.push(removed);
+    fn acquire(
+        &mut self,
+        element: &ElementID,
+        level: &PowerLevel,
+    ) -> Result<(Lease, Vec<Claim>), Error> {
+        // TODO: Add lease validation and control.
+        let lease = Lease::new(&element, level);
+        self.leases.insert(lease.id.clone(), lease.clone());
+        // Create claims for all of the transitive dependencies.
+        // TODO(b/302381778): Do this in the proper order.
+        let mut claims = Vec::new();
+        let element_level = ElementLevel { element: element.clone(), level: level.clone() };
+        for dependency in self.topology.get_all_deps(&element_level) {
+            // TODO: Make sure this is permitted by Limiters (once we have them).
+            let dep_lease = Claim::new(dependency, &lease.id);
+            claims.push(dep_lease);
         }
-        self.ids_by_originator_id.remove(&lease.id);
-        Ok((lease, transitive_leases))
+        for claim in claims.iter() {
+            tracing::info!("adding claim: {:?}", &claim);
+            self.add_claim(claim.clone());
+        }
+        Ok((lease, claims))
+    }
+
+    /// Returns original lease, and a Vec of all claims dropped
+    /// as a result of this call.
+    fn drop(&mut self, lease_id: &LeaseID) -> Result<(Lease, Vec<Claim>), Error> {
+        let lease = self.leases.remove(lease_id).ok_or(anyhow!("{lease_id} not found"))?;
+        let claim_ids = self
+            .claims_by_lease
+            .get(&lease.id)
+            .ok_or(anyhow!("{} not found by originator id", lease_id))?
+            .clone();
+        tracing::info!("claim_ids: {:?}", &claim_ids);
+        // Drop all claims created for the transitive dependencies.
+        // TODO(b/302381778): Do this in the proper order.
+        let mut claims = Vec::new();
+        for id in claim_ids.into_iter() {
+            let res = self.remove_claim(&id);
+            if let Some(removed) = res {
+                tracing::info!("removing claim: {:?}", &removed);
+                claims.push(removed)
+            } else {
+                tracing::error!("remove_claim not found: {}", id);
+            }
+        }
+        Ok((lease, claims))
     }
 }
 
@@ -290,160 +328,411 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_lessor_acquire_drop() {
-        let mut lessor = LeaseCatalog::new(Topology::new());
+    fn test_catalog_acquire_drop_direct() {
+        // Create a topology of a child element with two direct dependencies.
+        // P1 <- C -> P2
+        let mut topology = Topology::new();
+        let child: ElementID = "C".into();
+        let parent1: ElementID = "P1".into();
+        let parent2: ElementID = "P2".into();
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: child.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: parent1.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: child.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: parent2.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        let mut catalog = Catalog::new(topology);
+        assert_eq!(
+            catalog.calc_min_level(&parent1.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent 1 should start with min level OFF"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&parent2.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent 2 should start with min level OFF"
+        );
 
-        let (lease, transitive_leases) = lessor
-            .acquire(Dependency {
-                level: ElementLevel {
-                    id: "A".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    id: "B".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+        // Acquire the lease, which should result in two claims, one
+        // for each dependency.
+        let (lease, claims) = catalog
+            .acquire(&child, &PowerLevel::Binary(BinaryPowerLevel::On))
             .expect("acquire failed");
-        assert_eq!(transitive_leases.len(), 0);
+        assert_eq!(claims.len(), 2);
         assert_ne!(lease.id, "");
-        assert_eq!(lease.dependency.level.id, "A".into());
-        assert_eq!(lease.dependency.level.lvl, PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(lease.dependency.requires.id, "B".into());
-        assert_eq!(lease.dependency.requires.lvl, PowerLevel::Binary(BinaryPowerLevel::On));
+        assert_eq!(lease.element, child.clone());
+        assert_eq!(lease.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        let claims_by_required_element: HashMap<ElementID, Claim> =
+            claims.into_iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
+        for parent in [&parent1, &parent2] {
+            let claim = claims_by_required_element
+                .get(&parent)
+                .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+            assert_ne!(claim.id, "");
+            assert_eq!(claim.lease_id, lease.id);
+            assert_eq!(claim.dependency.level.element, child.clone());
+            assert_eq!(claim.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
+            assert_eq!(claim.dependency.requires.element, parent.clone());
+            assert_eq!(claim.dependency.requires.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        }
+        assert_eq!(
+            catalog.calc_min_level(&parent1.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Parent 1 should now have min level ON from direct claim"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&parent2.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Parent 2 should now have min level ON from direct claim"
+        );
 
-        let (dropped, transitive_leases) = lessor.drop(&lease.id).expect("drop failed");
-        assert_eq!(transitive_leases.len(), 0);
+        // Now drop the lease and verify both claims are also dropped.
+        let (dropped, dropped_claims) = catalog.drop(&lease.id).expect("drop failed");
+        assert_eq!(dropped_claims.len(), 2);
         assert_eq!(dropped.id, lease.id);
-        assert_eq!(dropped.dependency.level.id, lease.dependency.level.id);
-        assert_eq!(dropped.dependency.level.lvl, lease.dependency.level.lvl);
-        assert_eq!(dropped.dependency.requires.id, lease.dependency.requires.id);
-        assert_eq!(dropped.dependency.requires.lvl, lease.dependency.requires.lvl);
+        assert_eq!(dropped.element, lease.element);
+        assert_eq!(dropped.level, lease.level);
+        let dropped_claims_by_required_element: HashMap<ElementID, Claim> = dropped_claims
+            .into_iter()
+            .map(|c| (c.dependency.requires.element.clone(), c))
+            .collect();
+        for parent in [&parent1, &parent2] {
+            let claim = dropped_claims_by_required_element
+                .get(&parent)
+                .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+            assert_eq!(claim, claims_by_required_element.get(&parent).unwrap());
+        }
+        assert_eq!(
+            catalog.calc_min_level(&parent1.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent 1 should now have min level OFF from dropped claim"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&parent2.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent 2 should now have min level OFF from dropped claim"
+        );
 
-        let extra_drop = lessor.drop(&lease.id);
+        // Try dropping the lease one more time, which should result in an error.
+        let extra_drop = catalog.drop(&lease.id);
         assert!(extra_drop.is_err());
     }
 
     #[fuchsia::test]
-    fn test_lessor_drop() {
-        let mut lessor = LeaseCatalog::new(Topology::new());
-
-        let (lease, transitive_leases) = lessor
-            .acquire(Dependency {
-                level: ElementLevel {
-                    id: "A".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    id: "B".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
-            .expect("acquire failed");
-        assert_eq!(transitive_leases.len(), 0);
-        assert_ne!(lease.id, "");
-        assert_eq!(lease.dependency.level.id, "A".into());
-        assert_eq!(lease.dependency.level.lvl, PowerLevel::Binary(BinaryPowerLevel::On));
-        assert_eq!(lease.dependency.requires.id, "B".into());
-        assert_eq!(lease.dependency.requires.lvl, PowerLevel::Binary(BinaryPowerLevel::On));
-    }
-
-    #[fuchsia::test]
-    fn test_lessor_acquire_drop_transitive() {
+    fn test_catalog_acquire_drop_transitive() {
+        // Create a topology of a child element with two chained transitive
+        // dependencies.
+        // C -> P -> GP
         let mut topology = Topology::new();
-        // A <- B <- C
-        let ba = Dependency {
-            level: ElementLevel { id: "B".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
-            requires: ElementLevel {
-                id: "A".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+        let child: ElementID = "C".into();
+        let parent: ElementID = "P".into();
+        let grandparent: ElementID = "GP".into();
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: child.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
-        };
-        topology.add_direct_dep(&ba);
-        let cb = Dependency {
-            level: ElementLevel { id: "C".into(), lvl: PowerLevel::Binary(BinaryPowerLevel::On) },
             requires: ElementLevel {
-                id: "B".into(),
-                lvl: PowerLevel::Binary(BinaryPowerLevel::On),
+                element: parent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
-        };
-        topology.add_direct_dep(&cb);
-        let mut lessor = LeaseCatalog::new(topology);
+        });
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: parent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: grandparent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        let mut catalog = Catalog::new(topology);
         assert_eq!(
-            lessor.calc_min_level(&"B".into()),
+            catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
-            "B should start with min lvl OFF"
+            "Parent should start with min level OFF"
         );
         assert_eq!(
-            lessor.calc_min_level(&"A".into()),
+            catalog.calc_min_level(&grandparent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
-            "A should start with min lvl OFF"
+            "Grandparent should start with min level OFF"
         );
 
-        let (original_lease, transitive_leases) = lessor
-            .acquire(Dependency {
-                level: ElementLevel {
-                    id: "C".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    id: "B".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+        // Acquire the lease, which should result in two claims, one
+        // for the direct parent dependency, and one for the transitive
+        // grandparent dependency.
+        let (lease, claims) = catalog
+            .acquire(&child.clone(), &PowerLevel::Binary(BinaryPowerLevel::On))
             .expect("acquire failed");
-        assert_eq!(transitive_leases.len(), 1);
+        assert_eq!(claims.len(), 2);
+        let claims_by_required_element: HashMap<ElementID, Claim> =
+            claims.into_iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
+        let parent_claim = claims_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_ne!(parent_claim.id, "");
+        assert_eq!(parent_claim.lease_id, lease.id);
+        assert_eq!(parent_claim.dependency.level.element, child.clone());
+        assert_eq!(parent_claim.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        assert_eq!(parent_claim.dependency.requires.element, parent.clone());
         assert_eq!(
-            lessor.calc_min_level(&"B".into()),
-            PowerLevel::Binary(BinaryPowerLevel::On),
-            "B should now have min lvl ON"
+            parent_claim.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        let grandparent_claim = claims_by_required_element
+            .get(&grandparent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", grandparent));
+        assert_ne!(grandparent_claim.id, "");
+        assert_eq!(grandparent_claim.lease_id, lease.id);
+        assert_eq!(grandparent_claim.dependency.level.element, parent.clone());
+        assert_eq!(
+            grandparent_claim.dependency.level.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        assert_eq!(grandparent_claim.dependency.requires.element, grandparent.clone());
+        assert_eq!(
+            grandparent_claim.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
         );
         assert_eq!(
-            lessor.calc_min_level(&"A".into()),
+            catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::On),
-            "A should now have min lvl ON from transitive lease"
+            "Parent should now have min level ON from direct claim"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should now have min level ON from transitive claim"
         );
 
-        let (dropped, dropped_transitive_leases) =
-            lessor.drop(&original_lease.id).expect("drop failed");
-        assert_eq!(dropped.id, original_lease.id);
-        assert_eq!(dropped_transitive_leases.len(), 1);
+        // Now drop the lease and verify both claims are also dropped.
+        let (dropped, dropped_claims) = catalog.drop(&lease.id).expect("drop failed");
+        assert_eq!(dropped.id, lease.id);
+        assert_eq!(dropped_claims.len(), 2);
+        let dropped_claims_by_required_element: HashMap<ElementID, Claim> = dropped_claims
+            .into_iter()
+            .map(|c| (c.dependency.requires.element.clone(), c))
+            .collect();
+        let dropped_parent_claim = dropped_claims_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_eq!(dropped_parent_claim, parent_claim);
+        let dropped_grandparent_claim = dropped_claims_by_required_element
+            .get(&grandparent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", grandparent));
+        assert_eq!(dropped_grandparent_claim, grandparent_claim);
         assert_eq!(
-            lessor.calc_min_level(&"B".into()),
+            catalog.calc_min_level(&parent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
-            "B should have min lvl OFF after lease drop"
+            "Parent should now have min level OFF after lease drop"
         );
         assert_eq!(
-            lessor.calc_min_level(&"A".into()),
+            catalog.calc_min_level(&grandparent.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
-            "A should have min lvl OFF after transitive lease drop of B on A"
+            "Grandparent should now have min level OFF after lease drop"
         );
     }
 
     #[fuchsia::test]
-    fn test_lessor_calc_min_level() {
-        let mut lessor = LeaseCatalog::new(Topology::new());
-        assert_eq!(lessor.calc_min_level(&"A".into()), PowerLevel::Binary(BinaryPowerLevel::Off));
-        assert_eq!(lessor.calc_min_level(&"B".into()), PowerLevel::Binary(BinaryPowerLevel::Off));
+    fn test_catalog_acquire_drop_shared() {
+        // Create a topology of two child elements with a shared
+        // parent and grandparent
+        // C1 \
+        //     > P -> GP
+        // C2 /
+        let mut topology = Topology::new();
+        let child1: ElementID = "C1".into();
+        let child2: ElementID = "C2".into();
+        let parent: ElementID = "P".into();
+        let grandparent: ElementID = "GP".into();
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: child1.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: parent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: child2.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: parent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        topology.add_direct_dep(&Dependency {
+            level: ElementLevel {
+                element: parent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+            requires: ElementLevel {
+                element: grandparent.clone(),
+                level: PowerLevel::Binary(BinaryPowerLevel::On),
+            },
+        });
+        let mut catalog = Catalog::new(topology);
+        assert_eq!(
+            catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent should start with min level OFF"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Grandparent should start with min level OFF"
+        );
 
-        let (lease, transitive_leases) = lessor
-            .acquire(Dependency {
-                level: ElementLevel {
-                    id: "A".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-                requires: ElementLevel {
-                    id: "B".into(),
-                    lvl: PowerLevel::Binary(BinaryPowerLevel::On),
-                },
-            })
+        // Acquire a lease for the first child.
+        let (lease1, claims1) = catalog
+            .acquire(&child1, &PowerLevel::Binary(BinaryPowerLevel::On))
             .expect("acquire failed");
-        assert_eq!(transitive_leases.len(), 0);
-        assert_eq!(lessor.calc_min_level(&"A".into()), PowerLevel::Binary(BinaryPowerLevel::Off));
-        assert_eq!(lessor.calc_min_level(&"B".into()), PowerLevel::Binary(BinaryPowerLevel::On));
+        assert_eq!(claims1.len(), 2);
+        assert_ne!(lease1.id, "");
+        assert_eq!(lease1.element, child1.clone());
+        assert_eq!(lease1.level, PowerLevel::Binary(BinaryPowerLevel::On));
 
-        lessor.drop(&lease.id).expect("drop failed");
-        assert_eq!(lessor.calc_min_level(&"A".into()), PowerLevel::Binary(BinaryPowerLevel::Off));
-        assert_eq!(lessor.calc_min_level(&"B".into()), PowerLevel::Binary(BinaryPowerLevel::Off));
+        let claims1_by_required_element: HashMap<ElementID, &Claim> =
+            claims1.iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
+        let parent_claim1 = claims1_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_ne!(parent_claim1.id, "");
+        assert_eq!(parent_claim1.lease_id, lease1.id);
+        assert_eq!(parent_claim1.dependency.level.element, child1.clone());
+        assert_eq!(parent_claim1.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        assert_eq!(parent_claim1.dependency.requires.element, parent.clone());
+        assert_eq!(
+            parent_claim1.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        let grandparent_claim1 = claims1_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_ne!(grandparent_claim1.id, "");
+        assert_eq!(grandparent_claim1.lease_id, lease1.id);
+        assert_eq!(grandparent_claim1.dependency.level.element, child1.clone());
+        assert_eq!(
+            grandparent_claim1.dependency.level.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        assert_eq!(grandparent_claim1.dependency.requires.element, parent.clone());
+        assert_eq!(
+            grandparent_claim1.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        assert_eq!(
+            catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Parent should now have min level ON"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should now have min level ON"
+        );
+
+        // Acquire a lease for the second child.
+        let (lease2, claims2) = catalog
+            .acquire(&child2, &PowerLevel::Binary(BinaryPowerLevel::On))
+            .expect("acquire failed");
+        assert_eq!(claims2.len(), 2);
+        assert_ne!(lease2.id, "");
+        assert_eq!(lease2.element, child2.clone());
+        assert_eq!(lease2.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        let claims2_by_required_element: HashMap<ElementID, &Claim> =
+            claims2.iter().map(|c| (c.dependency.requires.element.clone(), c)).collect();
+        let parent_claim2 = claims2_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_ne!(parent_claim2.id, "");
+        assert_eq!(parent_claim2.lease_id, lease2.id);
+        assert_eq!(parent_claim2.dependency.level.element, child2.clone());
+        assert_eq!(parent_claim2.dependency.level.level, PowerLevel::Binary(BinaryPowerLevel::On));
+        assert_eq!(parent_claim2.dependency.requires.element, parent.clone());
+        assert_eq!(
+            parent_claim2.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        let grandparent_claim2 = claims2_by_required_element
+            .get(&parent)
+            .unwrap_or_else(|| panic!("missing claim for {:?}", parent));
+        assert_ne!(grandparent_claim2.id, "");
+        assert_eq!(grandparent_claim2.lease_id, lease2.id);
+        assert_eq!(grandparent_claim2.dependency.level.element, child2.clone());
+        assert_eq!(
+            grandparent_claim2.dependency.level.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        assert_eq!(grandparent_claim2.dependency.requires.element, parent.clone());
+        assert_eq!(
+            grandparent_claim2.dependency.requires.level,
+            PowerLevel::Binary(BinaryPowerLevel::On)
+        );
+        assert_eq!(
+            catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Parent should still have min level ON"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should still have min level ON"
+        );
+
+        // Now drop the first lease. Parent should still have min level ON.
+        let (dropped1, dropped_claims1) = catalog.drop(&lease1.id).expect("drop failed");
+        assert_eq!(dropped_claims1.len(), 2);
+        assert_eq!(dropped1.id, lease1.id);
+        assert_eq!(dropped1.element, lease1.element);
+        assert_eq!(dropped1.level, lease1.level);
+        assert_eq!(dropped_claims1, claims1);
+        assert_eq!(
+            catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Parent should still have min level ON from the second claim"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::On),
+            "Grandparent should still have min level ON from the second claim"
+        );
+
+        // Now drop the second lease. Parent should now have min level OFF.
+        let (dropped2, dropped_claims2) = catalog.drop(&lease2.id).expect("drop failed");
+        assert_eq!(dropped_claims2.len(), 2);
+        assert_eq!(dropped2.id, lease2.id);
+        assert_eq!(dropped2.element, lease2.element);
+        assert_eq!(dropped2.level, lease2.level);
+        assert_eq!(dropped_claims2, claims2);
+        assert_eq!(
+            catalog.calc_min_level(&parent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Parent should now have min level OFF"
+        );
+        assert_eq!(
+            catalog.calc_min_level(&grandparent.clone()),
+            PowerLevel::Binary(BinaryPowerLevel::Off),
+            "Grandparent should now have min level OFF"
+        );
     }
 }

@@ -4,10 +4,18 @@
 
 use anyhow::Result;
 use fidl_fuchsia_power_broker::{
-    BinaryPowerLevel, ControlMarker, LessorMarker, PowerLevel, StatusMarker,
+    BinaryPowerLevel, LessorMarker, LevelControlMarker, PowerLevel, StatusMarker,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use std::{thread, time};
+
+// TODO(b/299463665): Remove these hard-coded element IDs once we can edit
+// the topology.
+// A <- B <- C -> D
+const ELEMENT_A: &str = "A";
+const ELEMENT_B: &str = "B";
+const ELEMENT_C: &str = "C";
+const ELEMENT_D: &str = "D";
 
 #[fuchsia::test]
 async fn test_single_element() -> Result<()> {
@@ -23,13 +31,12 @@ async fn test_single_element() -> Result<()> {
         .add_child("fake_driver", "#meta/fake-driver.cm", ChildOptions::new().eager())
         .await?;
     builder.init_mutable_config_to_empty(&fake_driver).await.unwrap();
-    const ELEMENT_1: &str = "1";
-    builder.set_config_value_string("fake_driver", "element_id", ELEMENT_1).await?;
+    builder.set_config_value_string("fake_driver", "element_id", ELEMENT_A).await?;
 
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<ControlMarker>())
+                .capability(Capability::protocol::<LevelControlMarker>())
                 .from(&power_broker)
                 .to(&fake_driver),
         )
@@ -64,7 +71,7 @@ async fn test_single_element() -> Result<()> {
     let initial: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
-        let power_level = power_status.get_power_level(ELEMENT_1).await?;
+        let power_level = power_status.get_power_level(ELEMENT_A.into()).await?;
         if power_level == Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
             break;
         }
@@ -80,18 +87,13 @@ async fn test_single_element() -> Result<()> {
 
     // acquire lease with PB, device should turn on
     let lease_id = power_lease
-        .lease(
-            "Test",
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-            ELEMENT_1,
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-        )
+        .lease(ELEMENT_B.into(), &PowerLevel::Binary(BinaryPowerLevel::On))
         .await
         .expect("Lease response not ok");
     let turning_on: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
-        let power_level = power_status.get_power_level(ELEMENT_1).await?;
+        let power_level = power_status.get_power_level(ELEMENT_A.into()).await?;
         if power_level == Ok(PowerLevel::Binary(BinaryPowerLevel::On)) {
             break;
         }
@@ -110,7 +112,7 @@ async fn test_single_element() -> Result<()> {
     let turning_off: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
-        let power_level = power_status.get_power_level(ELEMENT_1).await?;
+        let power_level = power_status.get_power_level(ELEMENT_A.into()).await?;
         if power_level == Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
             break;
         }
@@ -137,9 +139,10 @@ async fn test_multiple_elements() -> Result<()> {
         .await?;
 
     // Create two fake elements
-    const ELEMENT_1: &str = "1";
-    const ELEMENT_2: &str = "2";
-    let element_ids = [ELEMENT_1, ELEMENT_2];
+    // TODO(b/299463665): Specify the topology here
+    // Using hard-coded topology:
+    // A <- B <- C -> D
+    let element_ids = [ELEMENT_A, ELEMENT_D];
     for element_id in element_ids {
         let element_name = format!("fake_element_{}", element_id);
         let fake_element: fuchsia_component_test::ChildRef = builder
@@ -150,7 +153,7 @@ async fn test_multiple_elements() -> Result<()> {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<ControlMarker>())
+                    .capability(Capability::protocol::<LevelControlMarker>())
                     .from(&power_broker)
                     .to(&fake_element),
             )
@@ -187,7 +190,7 @@ async fn test_multiple_elements() -> Result<()> {
     loop {
         let mut all_connected: bool = true;
         for element_id in element_ids {
-            let power_level = power_status.get_power_level(element_id).await?;
+            let power_level = power_status.get_power_level(element_id.into()).await?;
             if power_level != Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
                 all_connected = false;
             }
@@ -205,20 +208,15 @@ async fn test_multiple_elements() -> Result<()> {
         thread::sleep(time::Duration::from_millis(100));
     }
 
-    // acquire lease for 1 with PB, 1 should turn on
+    // acquire lease for B with PB, A should turn on
     let lease_id = power_lease
-        .lease(
-            "Test",
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-            ELEMENT_1,
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-        )
+        .lease(ELEMENT_B.into(), &PowerLevel::Binary(BinaryPowerLevel::On))
         .await
         .expect("Lease response not ok");
     let turning_on: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
-        let power_level = power_status.get_power_level(ELEMENT_1).await?;
+        let power_level = power_status.get_power_level(ELEMENT_A.into()).await?;
         if power_level == Ok(PowerLevel::Binary(BinaryPowerLevel::On)) {
             break;
         }
@@ -227,19 +225,19 @@ async fn test_multiple_elements() -> Result<()> {
         }
         thread::sleep(time::Duration::from_millis(100));
     }
-    let power_level = power_status.get_power_level(ELEMENT_2).await?;
+    let power_level = power_status.get_power_level(ELEMENT_D.into()).await?;
     assert_eq!(
         power_level,
         Ok(PowerLevel::Binary(BinaryPowerLevel::Off)),
-        "Element 2 should still be OFF"
+        "Element D should still be OFF"
     );
 
-    // drop lease for 1 with PB, 1 should turn off again
+    // drop lease for B with PB, A should turn off again
     power_lease.drop_lease(&lease_id).expect("drop failed");
     let turning_off: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
-        let power_level = power_status.get_power_level(ELEMENT_1).await?;
+        let power_level = power_status.get_power_level(ELEMENT_A.into()).await?;
         if power_level == Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
             break;
         }
@@ -248,11 +246,11 @@ async fn test_multiple_elements() -> Result<()> {
         }
         thread::sleep(time::Duration::from_millis(100));
     }
-    let power_level = power_status.get_power_level(ELEMENT_2).await?;
+    let power_level = power_status.get_power_level(ELEMENT_D.into()).await?;
     assert_eq!(
         power_level,
         Ok(PowerLevel::Binary(BinaryPowerLevel::Off)),
-        "Element 2 should still be OFF"
+        "Element D should still be OFF"
     );
 
     Ok(())
@@ -270,11 +268,8 @@ async fn test_transitive_leases() -> Result<()> {
         .add_child("power_broker", "power-broker#meta/power-broker.cm", ChildOptions::new())
         .await?;
 
-    // Create three fake elements
-    const ELEMENT_A: &str = "A";
-    const ELEMENT_B: &str = "B";
-    const ELEMENT_C: &str = "C";
-    let element_ids = [ELEMENT_A, ELEMENT_B, ELEMENT_C];
+    // Create four fake elements
+    let element_ids = [ELEMENT_A, ELEMENT_B, ELEMENT_C, ELEMENT_D];
     for element_id in element_ids {
         let element_name = format!("fake_element_{}", element_id);
         let fake_element: fuchsia_component_test::ChildRef = builder
@@ -285,7 +280,7 @@ async fn test_transitive_leases() -> Result<()> {
         builder
             .add_route(
                 Route::new()
-                    .capability(Capability::protocol::<ControlMarker>())
+                    .capability(Capability::protocol::<LevelControlMarker>())
                     .from(&power_broker)
                     .to(&fake_element),
             )
@@ -322,7 +317,7 @@ async fn test_transitive_leases() -> Result<()> {
     loop {
         let mut all_connected: bool = true;
         for element_id in element_ids {
-            let power_level = power_status.get_power_level(element_id).await?;
+            let power_level = power_status.get_power_level(element_id.into()).await?;
             if power_level != Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
                 all_connected = false;
             }
@@ -340,23 +335,19 @@ async fn test_transitive_leases() -> Result<()> {
         thread::sleep(time::Duration::from_millis(100));
     }
 
-    // acquire lease for B with PB, both A and B should turn on
-    // because B has a dependency on A
+    // acquire lease for C with PB, A and B should turn on
+    // because C has a dependency on B and B has a dependency on A
+    // D should turn on because C has a dependency on it
     let lease_id = power_lease
-        .lease(
-            "Test",
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-            ELEMENT_B,
-            &PowerLevel::Binary(BinaryPowerLevel::On),
-        )
+        .lease(ELEMENT_C.into(), &PowerLevel::Binary(BinaryPowerLevel::On))
         .await
         .expect("Lease response not ok");
     let turning_on: time::Instant = time::Instant::now();
     let timeout = time::Duration::from_millis(5000);
     loop {
         let mut all_on: bool = true;
-        for element_id in [ELEMENT_A, ELEMENT_B] {
-            let power_level = power_status.get_power_level(element_id).await?;
+        for element_id in [ELEMENT_A, ELEMENT_B, ELEMENT_D] {
+            let power_level = power_status.get_power_level(element_id.into()).await?;
             if power_level != Ok(PowerLevel::Binary(BinaryPowerLevel::On)) {
                 all_on = false;
             }
@@ -369,7 +360,7 @@ async fn test_transitive_leases() -> Result<()> {
         }
         thread::sleep(time::Duration::from_millis(100));
     }
-    let power_level = power_status.get_power_level(ELEMENT_C).await?;
+    let power_level = power_status.get_power_level(ELEMENT_C.into()).await?;
     assert_eq!(
         power_level,
         Ok(PowerLevel::Binary(BinaryPowerLevel::Off)),
@@ -383,7 +374,7 @@ async fn test_transitive_leases() -> Result<()> {
     loop {
         let mut all_off: bool = true;
         for element_id in [ELEMENT_A, ELEMENT_B] {
-            let power_level = power_status.get_power_level(element_id).await?;
+            let power_level = power_status.get_power_level(element_id.into()).await?;
             if power_level != Ok(PowerLevel::Binary(BinaryPowerLevel::Off)) {
                 all_off = false;
             }
@@ -396,7 +387,7 @@ async fn test_transitive_leases() -> Result<()> {
         }
         thread::sleep(time::Duration::from_millis(100));
     }
-    let power_level = power_status.get_power_level(ELEMENT_C).await?;
+    let power_level = power_status.get_power_level(ELEMENT_C.into()).await?;
     assert_eq!(
         power_level,
         Ok(PowerLevel::Binary(BinaryPowerLevel::Off)),

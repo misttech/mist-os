@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Error};
+use anyhow::{anyhow, Context as _, Error};
 use fake_driver_config::Config;
-use fidl_fuchsia_power_broker::{BinaryPowerLevel, ControlMarker, ControlProxy, PowerLevel};
+use fidl_fuchsia_power_broker::{
+    BinaryPowerLevel, LevelControlMarker, LevelControlProxy, PowerLevel,
+};
 use fuchsia_component::client::connect_to_protocol;
 
 struct MockPowerElement {
@@ -26,8 +28,8 @@ async fn main() -> Result<(), Error> {
     let mut element = MockPowerElement { power_level: PowerLevel::Binary(BinaryPowerLevel::Off) };
     let config = Config::take_from_startup_handle();
 
-    let client: ControlProxy =
-        connect_to_protocol::<ControlMarker>().context("failed to connect to Control service")?;
+    let client: LevelControlProxy = connect_to_protocol::<LevelControlMarker>()
+        .context("failed to connect to LevelControl service")?;
 
     // Initially, the Power Level is Off.
     element.update_power_level(PowerLevel::Binary(BinaryPowerLevel::Off));
@@ -37,11 +39,16 @@ async fn main() -> Result<(), Error> {
     // minimum power level from the Power Broker.
     let mut last_required_level: Option<PowerLevel> = None;
     while let Ok(required_level) =
-        client.get_required_level_update(&config.element_id, last_required_level.as_ref()).await
+        client.watch_required_level(&config.element_id.clone(), last_required_level.as_ref()).await
     {
         last_required_level = Some(required_level.clone());
         element.update_power_level(required_level);
-        client.update_current_power_level(&config.element_id, &element.get_power_level())?;
+        let res = client
+            .update_current_power_level(&config.element_id.clone(), &element.get_power_level())
+            .await?;
+        if res.is_err() {
+            return Err(anyhow!("UpdateCurrentPowerLevelError: {:?}", res.err()));
+        }
     }
     Ok(())
 }

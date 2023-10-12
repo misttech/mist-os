@@ -19,7 +19,7 @@
         binary: "bin/fake-driver",
     },
     use: [
-        { protocol: "fuchsia.power.broker.Control" },
+        { protocol: "fuchsia.power.broker.LevelControl" },
     ],
     config: {
         element_id: {
