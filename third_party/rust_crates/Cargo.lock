@@ -118,7 +118,7 @@ dependencies = [
  "argh_shared",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -250,7 +250,7 @@ checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
 dependencies = [
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -267,7 +267,7 @@ checksum = "a564d521dd56509c4c47480d00b80ee55f7e385ae48db5744c67ad50c92d2ebf"
 dependencies = [
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -4209,9 +4209,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.23"
+version = "2.0.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59fb7d6d8281a51045d62b8eb3a7d1ce347b76f312af50cd3dc0af39c87c1737"
+checksum = "239814284fd6f1a4ffe4ca893952cdd93c224b6a1571c9a9eadd670295c0c9e2"
 dependencies = [
  "proc-macro2 1.0.63",
  "quote 1.0.29",
@@ -4328,7 +4328,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
 ]
 
 [[package]]
@@ -4340,7 +4340,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
  "test-case-core",
 ]
 
@@ -5060,9 +5060,9 @@ checksum = "541b12c998c5b56aa2b4e6f18f03664eef9a4fd0a246a55594efae6cc2d964b5"
 
 [[package]]
 name = "zerocopy"
-version = "0.7.0-alpha.5"
+version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a6af2a597c29c91408ca68b125c8fe551200e3ce57d94cecd0d389b3e119925"
+checksum = "4c19fae0c8a9efc6a8281f2e623db8af1db9e57852e04cde3e754dd2dc29340f"
 dependencies = [
  "byteorder",
  "zerocopy-derive",
@@ -5070,13 +5070,13 @@ dependencies = [
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.7.0-alpha.5"
+version = "0.7.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e195e4eb506e3be24f80be50b20df45b5e5d9820ed8d6eadac28ad8906e5e71"
+checksum = "fc56589e9ddd1f1c28d4b4b5c773ce232910a6bb67a70133d61c9e347585efe9"
 dependencies = [
  "proc-macro2 1.0.63",
  "quote 1.0.29",
- "syn 2.0.23",
+ "syn 2.0.32",
 ]
 
 [[package]]

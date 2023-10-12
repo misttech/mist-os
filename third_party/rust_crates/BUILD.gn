@@ -1119,7 +1119,7 @@ group("xml-rs") {
 }
 
 group("zerocopy") {
-  public_deps = [ ":zerocopy-v0_7_0-alpha_5" ]
+  public_deps = [ ":zerocopy-v0_7_11" ]
 }
 
 if (!(current_os == "fuchsia")) {
@@ -1522,7 +1522,7 @@ rust_proc_macro("argh_derive-v0_1_12") {
   deps += [ ":argh_shared-v0_1_12" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
@@ -1921,7 +1921,7 @@ rust_proc_macro("async-stream-impl-v0_3_5") {
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
@@ -1986,7 +1986,7 @@ rust_proc_macro("async-trait-v0_1_71") {
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
@@ -14520,18 +14520,18 @@ rust_library("syn-v1_0_98") {
   applicable_licenses = [ ":syn-v1_0_98.license" ]
 }
 
-license("syn-v2_0_23.license") {
+license("syn-v2_0_32.license") {
   public_package_name = "syn"
   license_files = [
-    "//third_party/rust_crates/vendor/syn-2.0.23/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/syn-2.0.23/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/syn-2.0.32/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/syn-2.0.32/LICENSE-MIT",
   ]
 }
 
-rust_library("syn-v2_0_23") {
+rust_library("syn-v2_0_32") {
   crate_name = "syn"
-  crate_root = "//third_party/rust_crates/vendor/syn-2.0.23/src/lib.rs"
-  output_name = "syn-1a0b6efb85ae9366"
+  crate_root = "//third_party/rust_crates/vendor/syn-2.0.32/src/lib.rs"
+  output_name = "syn-3ef52c352068209b"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -14544,8 +14544,8 @@ rust_library("syn-v2_0_23") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=1a0b6efb85ae9366",
-    "-Cextra-filename=-1a0b6efb85ae9366",
+    "-Cmetadata=3ef52c352068209b",
+    "-Cextra-filename=-3ef52c352068209b",
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -14555,13 +14555,12 @@ rust_library("syn-v2_0_23") {
     "--cfg=feature=\"printing\"",
     "--cfg=feature=\"proc-macro\"",
     "--cfg=feature=\"quote\"",
-    "--cfg=feature=\"visit\"",
     "--cfg=feature=\"visit-mut\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":syn-v2_0_23.license" ]
+  applicable_licenses = [ ":syn-v2_0_32.license" ]
 }
 
 license("synstructure-v0_12_1.license") {
@@ -14917,7 +14916,7 @@ rust_library("test-case-core-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
@@ -14950,7 +14949,7 @@ rust_proc_macro("test-case-macros-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
   deps += [ ":test-case-core-v3_2_1" ]
 
   rustenv = []
@@ -17652,70 +17651,70 @@ rust_library("xml-rs-v0_8_0") {
   applicable_licenses = [ ":xml-rs-v0_8_0.license" ]
 }
 
-license("zerocopy-v0_7_0-alpha_5.license") {
+license("zerocopy-v0_7_11.license") {
   public_package_name = "zerocopy"
-  license_files =
-      [ "//third_party/rust_crates/vendor/zerocopy-0.7.0-alpha.5/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/zerocopy-0.7.11/LICENSE" ]
 }
 
-rust_library("zerocopy-v0_7_0-alpha_5") {
+rust_library("zerocopy-v0_7_11") {
   crate_name = "zerocopy"
-  crate_root =
-      "//third_party/rust_crates/vendor/zerocopy-0.7.0-alpha.5/src/lib.rs"
-  output_name = "zerocopy-2977ee0d554be9ca"
+  crate_root = "//third_party/rust_crates/vendor/zerocopy-0.7.11/src/lib.rs"
+  output_name = "zerocopy-ff9dd6de05140af4"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":byteorder-v1_4_3" ]
-  deps += [ ":zerocopy-derive-v0_7_0-alpha_5($host_toolchain)" ]
+  deps += [ ":zerocopy-derive-v0_7_11($host_toolchain)" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=2977ee0d554be9ca",
-    "-Cextra-filename=-2977ee0d554be9ca",
+    "-Cmetadata=ff9dd6de05140af4",
+    "-Cextra-filename=-ff9dd6de05140af4",
     "--cfg=feature=\"byteorder\"",
     "--cfg=feature=\"default\"",
+    "--cfg=feature=\"derive\"",
     "--cfg=feature=\"simd\"",
+    "--cfg=feature=\"zerocopy-derive\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-v0_7_0-alpha_5.license" ]
+  applicable_licenses = [ ":zerocopy-v0_7_11.license" ]
 }
 
-license("zerocopy-derive-v0_7_0-alpha_5.license") {
+license("zerocopy-derive-v0_7_11.license") {
   public_package_name = "zerocopy_derive"
-  license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.7.0-alpha.5/LICENSE",
-  ]
+  license_files =
+      [ "//third_party/rust_crates/vendor/zerocopy-derive-0.7.11/LICENSE" ]
 }
 
-rust_proc_macro("zerocopy-derive-v0_7_0-alpha_5") {
+rust_proc_macro("zerocopy-derive-v0_7_11") {
   crate_name = "zerocopy_derive"
-  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.7.0-alpha.5/src/lib.rs"
-  output_name = "zerocopy_derive-6330c727c000fadc"
+  crate_root =
+      "//third_party/rust_crates/vendor/zerocopy-derive-0.7.11/src/lib.rs"
+  output_name = "zerocopy_derive-3254f1c5cf104e17"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
   deps += [ ":proc-macro2-v1_0_63" ]
   deps += [ ":quote-v1_0_29" ]
-  deps += [ ":syn-v2_0_23" ]
+  deps += [ ":syn-v2_0_32" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
     "--edition=2021",
-    "-Cmetadata=6330c727c000fadc",
-    "-Cextra-filename=-6330c727c000fadc",
+    "-Cmetadata=3254f1c5cf104e17",
+    "-Cextra-filename=-3254f1c5cf104e17",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-derive-v0_7_0-alpha_5.license" ]
+  applicable_licenses = [ ":zerocopy-derive-v0_7_11.license" ]
 }
 
 license("zeroize-v1_6_0.license") {
