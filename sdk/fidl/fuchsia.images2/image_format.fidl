@@ -5,6 +5,7 @@
 // TODO(dalesat): Consider changing this library name.
 // fuchsia.images is currently occupied by ImagePipe. Will we be able to use that name? When?
 // Is the term 'image' too generic?
+@available(added=HEAD)
 library fuchsia.images2;
 
 using fuchsia.math;
