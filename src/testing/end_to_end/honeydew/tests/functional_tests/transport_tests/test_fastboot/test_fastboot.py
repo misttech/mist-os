@@ -5,7 +5,6 @@
 """Mobly test for Fastboot transport."""
 
 import logging
-from typing import List
 
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts
@@ -93,7 +92,7 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             f"is not expected",
         )
 
-        cmd: List[str] = ["getvar", "hw-revision"]
+        cmd: list[str] = ["getvar", "hw-revision"]
         self.device.fastboot.run(cmd)
 
         self.device.fastboot.boot_to_fuchsia_mode()

@@ -5,7 +5,7 @@
 """Unit tests for
 honeydew.fuchsia_device.fuchsia_controller.fuchsia_device.py."""
 
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -27,13 +27,13 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 
-_INPUT_ARGS: Dict[str, str] = {
+_INPUT_ARGS: dict[str, str] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
 }
 
-_MOCK_DEVICE_PROPERTIES: Dict[str, Dict[str, Any]] = {
+_MOCK_DEVICE_PROPERTIES: dict[str, dict[str, Any]] = {
     "build_info": {
         "version": "123456",
     },
@@ -47,7 +47,7 @@ _MOCK_DEVICE_PROPERTIES: Dict[str, Dict[str, Any]] = {
     },
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",
@@ -59,7 +59,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"

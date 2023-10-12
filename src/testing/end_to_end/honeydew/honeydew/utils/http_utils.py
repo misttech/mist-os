@@ -7,18 +7,18 @@
 import json
 import logging
 import time
-from typing import Any, Dict, Iterable, Optional, Type
+from typing import Any, Iterable, Type
 import urllib.request
 
 from honeydew import errors
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "HTTP_RESPONSE": 30,
 }
 
-_DEFAULTS: Dict[str, int] = {
+_DEFAULTS: dict[str, int] = {
     "ATTEMPTS": 3,
     "INTERVAL": 1,
 }
@@ -26,13 +26,13 @@ _DEFAULTS: Dict[str, int] = {
 
 def send_http_request(
     url: str,
-    data: Optional[Dict[str, Any]] = None,
-    headers: Optional[Dict[str, Any]] = None,
+    data: dict[str, Any] | None = None,
+    headers: dict[str, Any] | None = None,
     timeout: float = _TIMEOUTS["HTTP_RESPONSE"],
     attempts: int = _DEFAULTS["ATTEMPTS"],
     interval: int = _DEFAULTS["INTERVAL"],
-    exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
-) -> Dict[str, Any]:
+    exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+) -> dict[str, Any]:
     """Send HTTP request and returns the string response.
 
     This method encodes data dict arg into utf-8 bytes and sets "Content-Type"

@@ -7,27 +7,27 @@
 import logging
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.transports import ffx as ffx_transport
 
-_DEFAULTS: Dict[str, Any] = {
+_DEFAULTS: dict[str, Any] = {
     "USERNAME": "fuchsia",
 }
 
-_CMDS: Dict[str, str] = {
+_CMDS: dict[str, str] = {
     "ECHO": "echo",
 }
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "COMMAND_ARG": 3,
     "COMMAND_RESPONSE": 60,
     "CONNECTION": 60,
 }
 
-_OPTIONS_LIST: List[str] = [
+_OPTIONS_LIST: list[str] = [
     "-oPasswordAuthentication=no",
     "-oStrictHostKeyChecking=no",
     f"-oConnectTimeout={_TIMEOUTS['COMMAND_ARG']}",
@@ -55,7 +55,7 @@ class SSH:
     """
 
     def __init__(
-        self, device_name: str, private_key: str, username: Optional[str] = None
+        self, device_name: str, private_key: str, username: str | None = None
     ) -> None:
         self._name: str = device_name
         self._private_key: str = private_key

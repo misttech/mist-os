@@ -5,7 +5,7 @@
 """Provides methods for Host-(Fuchsia)Target interactions via Fastboot."""
 import logging
 import subprocess
-from typing import Any, Dict, Iterable, List, Optional, Type
+from typing import Any, Iterable, Type
 
 from honeydew import errors
 from honeydew.interfaces.device_classes import affordances_capable
@@ -13,15 +13,15 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import common
 from honeydew.utils import properties
 
-_FASTBOOT_CMDS: Dict[str, List[str]] = {
+_FASTBOOT_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FUCHSIA_MODE": ["reboot"],
 }
 
-_FFX_CMDS: Dict[str, List[str]] = {
+_FFX_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FASTBOOT_MODE": ["target", "ssh", "dm", "reboot-bootloader"],
 }
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "FASTBOOT_CLI": 30,
     "FASTBOOT_MODE": 45,
     "FUCHSIA_MODE": 45,
@@ -47,7 +47,7 @@ class Fastboot:
         self,
         device_name: str,
         reboot_affordance: affordances_capable.RebootCapableDevice,
-        fastboot_node_id: Optional[str] = None,
+        fastboot_node_id: str | None = None,
     ) -> None:
         self._device_name: str = device_name
         self._reboot_affordance: affordances_capable.RebootCapableDevice = (
@@ -126,7 +126,7 @@ class Fastboot:
             True if in fastboot mode, False otherwise.
         """
         try:
-            target_info: Dict[str, Any] = self._get_target_info()
+            target_info: dict[str, Any] = self._get_target_info()
         except errors.FfxCommandError as err:
             _LOGGER.debug(err)
             return False
@@ -147,10 +147,10 @@ class Fastboot:
 
     def run(
         self,
-        cmd: List[str],
+        cmd: list[str],
         timeout: float = _TIMEOUTS["FASTBOOT_CLI"],
-        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
-    ) -> List[str]:
+        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+    ) -> list[str]:
         """Executes and returns the output of `fastboot -s {node} {cmd}`.
 
         Args:
@@ -174,7 +174,7 @@ class Fastboot:
 
         exceptions_to_skip = tuple(exceptions_to_skip or [])
 
-        fastboot_cmd: List[str] = ["fastboot", "-s", self.node_id] + cmd
+        fastboot_cmd: list[str] = ["fastboot", "-s", self.node_id] + cmd
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(fastboot_cmd))
             output: str = (
@@ -211,9 +211,7 @@ class Fastboot:
             ) from err
 
     # List all the private methods in alphabetical order
-    def _get_fastboot_node(
-        self, fastboot_node_id: Optional[str] = None
-    ) -> None:
+    def _get_fastboot_node(self, fastboot_node_id: str | None = None) -> None:
         """Gets the fastboot node id and stores it in `self._fastboot_node_id`.
 
         Runs `ffx target list` and look for corresponding device information.
@@ -228,7 +226,7 @@ class Fastboot:
             return
 
         try:
-            target: Dict[str, Any] = self._get_target_info()
+            target: dict[str, Any] = self._get_target_info()
 
             # USB based fastboot connection
             if target.get("serial", _NO_SERIAL) != _NO_SERIAL:
@@ -254,7 +252,7 @@ class Fastboot:
                 f"Failed to get the fastboot node id of '{self._device_name}'"
             ) from err
 
-    def _get_target_info(self) -> Dict[str, Any]:
+    def _get_target_info(self) -> dict[str, Any]:
         """Return the target information
 
         Returns:
@@ -278,7 +276,7 @@ class Fastboot:
             True if "address" field of `ffx target show` has one ip address,
             False otherwise.
         """
-        target: Dict[str, Any] = self._get_target_info()
+        target: dict[str, Any] = self._get_target_info()
         return len(target["addresses"]) == 1
 
     def _wait_for_fastboot_mode(

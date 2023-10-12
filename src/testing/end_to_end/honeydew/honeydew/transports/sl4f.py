@@ -8,7 +8,7 @@ import ipaddress
 import logging
 import sys
 import time
-from typing import Any, Dict, Iterable, List, Optional, Type
+from typing import Any, Iterable, Type
 
 from honeydew import custom_types
 from honeydew import errors
@@ -16,27 +16,27 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.utils import http_utils
 from honeydew.utils import properties
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "RESPONSE": 30,
 }
 
-_DEFAULTS: Dict[str, int] = {
+_DEFAULTS: dict[str, int] = {
     "ATTEMPTS": 3,
     "INTERVAL": 3,
 }
 
-_FFX_CMDS: Dict[str, List[str]] = {
+_FFX_CMDS: dict[str, list[str]] = {
     "START_SL4F": ["target", "ssh", "start_sl4f"],
 }
 
-_SL4F_PORT: Dict[str, int] = {
+_SL4F_PORT: dict[str, int] = {
     "LOCAL": 80,
     # To support common Fuchsia.git in-tree remote workflow where users are
     # running fx serve-remote
     "REMOTE": 9080,
 }
 
-_SL4F_METHODS: Dict[str, str] = {
+_SL4F_METHODS: dict[str, str] = {
     "GetDeviceName": "device_facade.GetDeviceName",
 }
 
@@ -88,7 +88,7 @@ class SL4F:
         Raises:
             errors.Sl4fError: If SL4F connection is not successful.
         """
-        get_device_name_resp: Dict[str, Any] = self.run(
+        get_device_name_resp: dict[str, Any] = self.run(
             method=_SL4F_METHODS["GetDeviceName"]
         )
         device_name: str = get_device_name_resp["result"]
@@ -101,12 +101,12 @@ class SL4F:
     def run(
         self,
         method: str,
-        params: Optional[Dict[str, Any]] = None,
+        params: dict[str, Any] | None = None,
         timeout: float = _TIMEOUTS["RESPONSE"],
         attempts: int = _DEFAULTS["ATTEMPTS"],
         interval: int = _DEFAULTS["INTERVAL"],
-        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
-    ) -> Dict[str, Any]:
+        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
+    ) -> dict[str, Any]:
         """Run the SL4F method on Fuchsia device and return the response.
 
         Args:
@@ -134,7 +134,7 @@ class SL4F:
 
         # id is required by the SL4F server to parse test_data but is not
         # currently used.
-        data: Dict[str, Any] = {
+        data: dict[str, Any] = {
             "jsonrpc": "2.0",
             "id": "",
             "method": method,
@@ -147,7 +147,7 @@ class SL4F:
             if attempt > 1:
                 time.sleep(interval)
             try:
-                http_response: Dict[str, Any] = http_utils.send_http_request(
+                http_response: dict[str, Any] = http_utils.send_http_request(
                     self.url,
                     data,
                     timeout=timeout,
@@ -156,7 +156,7 @@ class SL4F:
                     exceptions_to_skip=exceptions_to_skip,
                 )
 
-                error: Optional[str] = http_response.get("error")
+                error: str | None = http_response.get("error")
                 if not error:
                     return http_response
 

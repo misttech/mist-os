@@ -5,7 +5,6 @@
 """Abstract base class for Tracing affordance."""
 
 import abc
-from typing import List, Optional
 
 
 class Tracing(abc.ABC):
@@ -15,8 +14,8 @@ class Tracing(abc.ABC):
     @abc.abstractmethod
     def initialize(
         self,
-        categories: Optional[List[str]] = None,
-        buffer_size: Optional[int] = None,
+        categories: list[str] | None = None,
+        buffer_size: int | None = None,
     ) -> None:
         """Initializes a trace sessions.
 
@@ -39,7 +38,7 @@ class Tracing(abc.ABC):
 
     @abc.abstractmethod
     def terminate_and_download(
-        self, directory: str, trace_file: Optional[str] = None
+        self, directory: str, trace_file: str | None = None
     ) -> str:
         """Terminates the trace session and downloads the trace data to the
             specified directory.

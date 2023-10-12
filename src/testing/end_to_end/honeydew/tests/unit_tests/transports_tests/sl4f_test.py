@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.sl4f.py."""
 
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -16,7 +16,7 @@ from honeydew.transports import sl4f
 
 # pylint: disable=protected-access
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
 }
 
@@ -30,7 +30,7 @@ _SL4F_PORT_LOCAL = sl4f._SL4F_PORT["LOCAL"]
 _SL4F_PORT_REMOTE = sl4f._SL4F_PORT["REMOTE"]
 _SSH_PORT = 22
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "invalid-device_name": "invalid-device_name",
     "sl4f_server_address_ipv4": custom_types.Sl4fServerAddress(
@@ -64,7 +64,7 @@ _MOCK_ARGS: Dict[str, Any] = {
     "sl4f_url_v4": "http://{_IPV4}:{_SL4F_PORT_LOCAL}",
 }
 
-_EXPECTED_VALUES: Dict[str, Any] = {
+_EXPECTED_VALUES: dict[str, Any] = {
     "url_ipv4": f"http://{_IPV4}:{_SL4F_PORT_LOCAL}",
     "url_ipv6": f"http://[{_IPV6}]:{_SL4F_PORT_LOCAL}",
     "url_ipv6_localhost": f"http://[{_IPV6_LOCALHOST}]:{_SL4F_PORT_REMOTE}",
@@ -84,7 +84,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom test name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -231,9 +231,9 @@ class Sl4fTests(unittest.TestCase):
     ) -> None:
         """Testcase for SL4F.run() success case"""
         method: str = parameterized_dict["method"]
-        optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
+        optional_params: dict[str, Any] = parameterized_dict["optional_params"]
 
-        response: Dict[str, Any] = self.sl4f_obj.run(
+        response: dict[str, Any] = self.sl4f_obj.run(
             method=method, **optional_params
         )
 

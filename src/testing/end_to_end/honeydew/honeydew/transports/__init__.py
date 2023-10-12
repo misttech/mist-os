@@ -5,9 +5,8 @@
 """HoneyDew Transports module."""
 
 import enum
-from typing import List
 
-FUCHSIA_CONTROLLER_TRANSPORTS: List[str] = [
+FUCHSIA_CONTROLLER_TRANSPORTS: list[str] = [
     "fuchsia_controller",
     "fuchsia-controller",
     "fc",

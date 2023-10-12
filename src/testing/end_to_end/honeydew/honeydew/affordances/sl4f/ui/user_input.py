@@ -3,13 +3,13 @@
 # found in the LICENSE file.
 """UserInput affordance implementation using SL4F."""
 
-from typing import Any, Dict
+from typing import Any
 
 from honeydew.interfaces.affordances.ui import custom_types
 from honeydew.interfaces.affordances.ui import user_input
 from honeydew.transports import sl4f as sl4f_transport
 
-_SL4F_METHODS: Dict[str, str] = {
+_SL4F_METHODS: dict[str, str] = {
     "Tap": "input_facade.Tap",
 }
 
@@ -49,7 +49,7 @@ class UserInput(user_input.UserInput):
                 300.
         """
 
-        method_params: Dict[str, Any] = {
+        method_params: dict[str, Any] = {
             "x": location.x,
             "y": location.y,
             "width": touch_screen_size.width,

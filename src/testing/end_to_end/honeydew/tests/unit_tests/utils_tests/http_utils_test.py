@@ -6,7 +6,7 @@
 
 from http.client import RemoteDisconnected
 import json
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -16,7 +16,7 @@ from honeydew import errors
 from honeydew.utils import http_utils
 
 # pylint: disable=protected-access
-_PARAMS: Dict[str, Any] = {
+_PARAMS: dict[str, Any] = {
     "url": "http://12.34.56.78",
     "data": {
         "key1": "value1",
@@ -33,7 +33,7 @@ _PARAMS: Dict[str, Any] = {
     "exceptions_to_skip": [],
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "urlopen_resp": b'{"id": "", "result": "fuchsia-emulator", "error": null}'
 }
 
@@ -42,7 +42,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -113,12 +113,12 @@ class HttpUtilsTests(unittest.TestCase):
         urlopen_return_value.__enter__.return_value = urlopen_return_value
         mock_urlopen.return_value = urlopen_return_value
 
-        result: Dict[str, Any] = http_utils.send_http_request(
+        result: dict[str, Any] = http_utils.send_http_request(
             url=parameterized_dict["url"],
             **parameterized_dict["optional_params"],
         )
 
-        expected_output: Dict[str, Any] = json.loads(
+        expected_output: dict[str, Any] = json.loads(
             parameterized_dict["urlopen_resp"].decode("utf-8")
         )
 
@@ -138,7 +138,7 @@ class HttpUtilsTests(unittest.TestCase):
         """Testcase to make sure http_utils.send_http_request() do not
         fail when it receives an exception that is part of exceptions_to_skip
         input arg"""
-        response: Dict[str, Any] = http_utils.send_http_request(
+        response: dict[str, Any] = http_utils.send_http_request(
             url=_PARAMS["url"], exceptions_to_skip=[RemoteDisconnected]
         )
         self.assertEqual(response, {})

@@ -6,7 +6,7 @@
 
 import logging
 import subprocess
-from typing import Any, List, Optional, Type
+from typing import Any, Type
 
 from honeydew import custom_types
 from honeydew import errors
@@ -27,10 +27,10 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # List all the public methods in alphabetical order
 def create_device(
     device_name: str,
-    ssh_private_key: Optional[str] = None,
-    ssh_user: Optional[str] = None,
-    transport: Optional[transports.TRANSPORT] = None,
-    device_ip_port: Optional[custom_types.IpPort] = None,
+    ssh_private_key: str | None = None,
+    ssh_user: str | None = None,
+    transport: transports.TRANSPORT | None = None,
+    device_ip_port: custom_types.IpPort | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
@@ -84,7 +84,7 @@ def create_device(
 def get_all_affordances(
     device_name: str,
     transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT,
-) -> List[str]:
+) -> list[str]:
     """Returns list of all affordances implemented for the specified device
     using the specified transport.
 
@@ -104,7 +104,7 @@ def get_all_affordances(
         fuchsia_device_interface.FuchsiaDevice
     ] = _get_device_class(transport)
 
-    affordances: List[str] = []
+    affordances: list[str] = []
     for attr in dir(device_class):
         if attr.startswith("_"):
             continue

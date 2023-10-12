@@ -5,7 +5,7 @@
 """Unit tests for honeydew.__init__.py."""
 
 import subprocess
-from typing import Any, Dict, List
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -21,7 +21,7 @@ from honeydew.fuchsia_device.fuchsia_controller import (
 )
 from honeydew.fuchsia_device.sl4f import fuchsia_device as sl4f_fuchsia_device
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fcp.IsolateDir(), logs_dir="/tmp/logs"
     ),
@@ -32,7 +32,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
@@ -357,7 +357,7 @@ class InitTests(unittest.TestCase):
     def test_get_all_affordances_for_sl4f_based_device(self) -> None:
         """Test case for honeydew.get_all_affordances() for a SL4F based
         device."""
-        expected_affordances: List[str] = [
+        expected_affordances: list[str] = [
             "bluetooth_avrcp",
             "bluetooth_gap",
             "screenshot",
@@ -379,7 +379,7 @@ class InitTests(unittest.TestCase):
     def test_get_all_affordances_for_fc_based_device(self) -> None:
         """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
         based device."""
-        expected_affordances: List[str] = [
+        expected_affordances: list[str] = [
             "bluetooth_avrcp",
             "bluetooth_gap",
             "screenshot",

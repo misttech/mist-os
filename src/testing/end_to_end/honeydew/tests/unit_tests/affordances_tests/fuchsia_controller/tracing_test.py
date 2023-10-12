@@ -5,7 +5,7 @@
 """Unit tests for honeydew.affordances.fuchsia_controller.tracing.py."""
 
 import tempfile
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -23,7 +23,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_{test_label}"

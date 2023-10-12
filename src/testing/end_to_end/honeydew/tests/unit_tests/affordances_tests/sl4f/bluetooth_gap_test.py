@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.sl4f.bluetooth.py."""
 
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -17,13 +17,13 @@ from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing import bluetooth
 
-_SAMPLE_ADDRESS_OUTPUT: Dict[str, Any] = {
+_SAMPLE_ADDRESS_OUTPUT: dict[str, Any] = {
     "id": "",
     "result": "[address (public) 20:1F:3B:62:E9:D2]",
     "error": None,
 }
 
-_SAMPLE_KNOWN_DEVICES_OUTPUT: Dict[str, Any] = {
+_SAMPLE_KNOWN_DEVICES_OUTPUT: dict[str, Any] = {
     "id": "",
     "result": {
         "16085008211800713200": {
@@ -48,7 +48,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"

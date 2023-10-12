@@ -8,7 +8,7 @@ import base64
 from datetime import datetime
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from honeydew import errors
 from honeydew.interfaces.affordances import tracing
@@ -17,7 +17,7 @@ from honeydew.transports import sl4f as sl4f_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_SL4F_METHODS: Dict[str, str] = {
+_SL4F_METHODS: dict[str, str] = {
     "Initialize": "tracing_facade.Initialize",
     "Start": "tracing_facade.Start",
     "Stop": "tracing_facade.Stop",
@@ -60,8 +60,8 @@ class Tracing(tracing.Tracing):
     # List all the public methods in alphabetical order
     def initialize(
         self,
-        categories: Optional[List[str]] = None,
-        buffer_size: Optional[int] = None,
+        categories: list[str] | None = None,
+        buffer_size: int | None = None,
     ) -> None:
         """Initializes a trace sessions.
 
@@ -79,7 +79,7 @@ class Tracing(tracing.Tracing):
                 "initialized only once"
             )
         _LOGGER.info("Initializing trace session on '%s'", self._name)
-        method_params: Dict[str, Any] = {}
+        method_params: dict[str, Any] = {}
         if categories:
             method_params["categories"] = categories
         if buffer_size:
@@ -146,7 +146,7 @@ class Tracing(tracing.Tracing):
         self._session_initialized = False
 
     def terminate_and_download(
-        self, directory: str, trace_file: Optional[str] = None
+        self, directory: str, trace_file: str | None = None
     ) -> str:
         """Terminates the trace session and downloads the trace data to the
             specified directory.
@@ -174,7 +174,7 @@ class Tracing(tracing.Tracing):
             )
 
         _LOGGER.info("Terminating trace session on '%s'", self._name)
-        resp: Dict[str, Any] = self._sl4f.run(method=_SL4F_METHODS["Terminate"])
+        resp: dict[str, Any] = self._sl4f.run(method=_SL4F_METHODS["Terminate"])
         self._tracing_active = False
         self._session_initialized = False
 

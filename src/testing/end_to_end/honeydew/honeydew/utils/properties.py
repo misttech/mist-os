@@ -5,7 +5,7 @@
 """Utility module for different type of property decorators in HoneyDew."""
 
 import functools
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 
 class DynamicProperty(property):
@@ -14,9 +14,9 @@ class DynamicProperty(property):
     def __init__(
         self,
         fget: Callable[[Any], Any],
-        fset: Optional[Callable[[Any, Any], None]] = None,
-        fdel: Optional[Callable[[Any], None]] = None,
-        doc: Optional[str] = None,
+        fset: Callable[[Any, Any], None] | None = None,
+        fdel: Callable[[Any], None] | None = None,
+        doc: str | None = None,
     ) -> None:
         if not doc:
             doc = fget.__doc__

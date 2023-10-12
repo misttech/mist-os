@@ -8,14 +8,14 @@ import atexit
 import json
 import logging
 import subprocess
-from typing import Any, Dict, Iterable, List, Optional, Type
+from typing import Any, Iterable, Type
 
 import fuchsia_controller_py as fuchsia_controller
 
 from honeydew import custom_types
 from honeydew import errors
 
-_FFX_CMDS: Dict[str, List[str]] = {
+_FFX_CMDS: dict[str, list[str]] = {
     "TARGET_ADD": ["target", "add"],
     "TARGET_SHOW": ["target", "show", "--json"],
     "TARGET_SSH_ADDRESS": ["target", "get-ssh-address"],
@@ -23,15 +23,15 @@ _FFX_CMDS: Dict[str, List[str]] = {
     "TARGET_WAIT": ["target", "wait", "--timeout"],
 }
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "FFX_CLI": 10,
     "TARGET_WAIT": 15,
 }
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_ISOLATE_DIR: Optional[fuchsia_controller.IsolateDir] = None
-_LOGS_DIR: Optional[str] = None
+_ISOLATE_DIR: fuchsia_controller.IsolateDir | None = None
+_LOGS_DIR: str | None = None
 
 _DEVICE_NOT_CONNECTED: str = "Timeout attempting to reach target"
 
@@ -126,7 +126,7 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = FFX._generate_ffx_cmd(
+        cmd: list[str] = FFX._generate_ffx_cmd(
             target=None, cmd=_FFX_CMDS["TARGET_ADD"]
         )
         cmd.append(str(target_ip_port))
@@ -165,7 +165,7 @@ class FFX:
 
     def get_target_information(
         self, timeout: float = _TIMEOUTS["FFX_CLI"]
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Executed and returns the output of `ffx -t {target} target show`.
 
         Args:
@@ -178,11 +178,11 @@ class FFX:
             subprocess.TimeoutExpired: In case of timeout
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = _FFX_CMDS["TARGET_SHOW"]
+        cmd: list[str] = _FFX_CMDS["TARGET_SHOW"]
         try:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
-            ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
+            ffx_target_show_info: list[dict[str, Any]] = json.loads(output)
             _LOGGER.debug(
                 "`%s` returned: %s", " ".join(cmd), ffx_target_show_info
             )
@@ -198,7 +198,7 @@ class FFX:
 
     def get_target_list(
         self, timeout: float = _TIMEOUTS["FFX_CLI"]
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Executed and returns the output of `ffx --machine json target list`.
 
         Args:
@@ -210,11 +210,11 @@ class FFX:
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = _FFX_CMDS["TARGET_LIST"]
+        cmd: list[str] = _FFX_CMDS["TARGET_LIST"]
         try:
             output: str = self.run(cmd=cmd, timeout=timeout)
 
-            ffx_target_list_info: List[Dict[str, Any]] = json.loads(output)
+            ffx_target_list_info: list[dict[str, Any]] = json.loads(output)
             _LOGGER.debug(
                 "`%s` returned: %s", " ".join(cmd), ffx_target_list_info
             )
@@ -256,13 +256,13 @@ class FFX:
         #  },
 
         try:
-            ffx_target_show_info: List[
-                Dict[str, Any]
+            ffx_target_show_info: list[
+                dict[str, Any]
             ] = self.get_target_information(timeout)
-            target_entry: Dict[str, Any] = self._get_label_entry(
+            target_entry: dict[str, Any] = self._get_label_entry(
                 ffx_target_show_info, label_value="target"
             )
-            name_entry: Dict[str, Any] = self._get_label_entry(
+            name_entry: dict[str, Any] = self._get_label_entry(
                 target_entry["child"], label_value="name"
             )
             return name_entry["value"]
@@ -285,7 +285,7 @@ class FFX:
         Raises:
             errors.FfxCommandError: In case of failure.
         """
-        cmd: List[str] = _FFX_CMDS["TARGET_SSH_ADDRESS"]
+        cmd: list[str] = _FFX_CMDS["TARGET_SSH_ADDRESS"]
         try:
             output: str = self.run(cmd=cmd, timeout=timeout)
             output = output.strip()
@@ -293,7 +293,7 @@ class FFX:
 
             # in '[fe80::6a47:a931:1e84:5077%qemu]:22', ":22" is SSH port.
             # Ports can be 1-5 chars, clip off everything after the last ':'.
-            ssh_info: List[str] = output.rsplit(":", 1)
+            ssh_info: list[str] = output.rsplit(":", 1)
             ssh_ip: str = ssh_info[0].replace("[", "").replace("]", "")
             ssh_port: int = int(ssh_info[1])
 
@@ -349,13 +349,13 @@ class FFX:
         #         ]
         #     },
         # ]
-        target_show_info: List[Dict[str, Any]] = self.get_target_information(
+        target_show_info: list[dict[str, Any]] = self.get_target_information(
             timeout=timeout
         )
-        build_entry: Dict[str, Any] = self._get_label_entry(
+        build_entry: dict[str, Any] = self._get_label_entry(
             target_show_info, label_value="build"
         )
-        board_entry: Dict[str, Any] = self._get_label_entry(
+        board_entry: dict[str, Any] = self._get_label_entry(
             build_entry["child"], label_value="board"
         )
         return board_entry["value"]
@@ -396,9 +396,9 @@ class FFX:
 
     def run(
         self,
-        cmd: List[str],
+        cmd: list[str],
         timeout: float = _TIMEOUTS["FFX_CLI"],
-        exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None,
+        exceptions_to_skip: Iterable[Type[Exception]] | None = None,
     ) -> str:
         """Executes and returns the output of `ffx -t {target} {cmd}`.
 
@@ -416,7 +416,7 @@ class FFX:
         """
         exceptions_to_skip = tuple(exceptions_to_skip or [])
 
-        ffx_cmd: List[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+        ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
             output: str = subprocess.check_output(
@@ -457,8 +457,8 @@ class FFX:
             subprocess.TimeoutExpired: In case of FFX command timeout.
             errors.FfxCommandError: In case of other FFX command failure.
         """
-        cmd: List[str] = _FFX_CMDS["TARGET_WAIT"] + [str(timeout)]
-        ffx_cmd: List[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
+        cmd: list[str] = _FFX_CMDS["TARGET_WAIT"] + [str(timeout)]
+        ffx_cmd: list[str] = FFX._generate_ffx_cmd(cmd=cmd, target=self._target)
 
         try:
             _LOGGER.debug("Executing command `%s`", " ".join(ffx_cmd))
@@ -491,13 +491,13 @@ class FFX:
 
     # List all private methods in alphabetical order
     @staticmethod
-    def _generate_ffx_args(target: Optional[str]) -> List[str]:
+    def _generate_ffx_args(target: str | None) -> list[str]:
         """Generates all the arguments that need to be used with FFX command.
 
         Returns:
             List of FFX arguments.
         """
-        ffx_args: List[str] = []
+        ffx_args: list[str] = []
 
         # Do not change this sequence
         if target:
@@ -507,7 +507,7 @@ class FFX:
         if _ISOLATE_DIR:
             ffx_args.extend(["--isolate-dir", _ISOLATE_DIR.directory()])
 
-        config: Dict[str, Any] = {}
+        config: dict[str, Any] = {}
 
         # To collect FFX logs
         if _LOGS_DIR:
@@ -518,7 +518,7 @@ class FFX:
         return ffx_args
 
     @staticmethod
-    def _generate_ffx_cmd(cmd: List[str], target: Optional[str]) -> List[str]:
+    def _generate_ffx_cmd(cmd: list[str], target: str | None) -> list[str]:
         """Generates the FFX command that need to be passed
         subprocess.check_output.
 
@@ -528,12 +528,12 @@ class FFX:
         Returns:
             FFX command to be run as list of string.
         """
-        ffx_args: List[str] = FFX._generate_ffx_args(target)
+        ffx_args: list[str] = FFX._generate_ffx_args(target)
         return ["ffx"] + ffx_args + cmd
 
     def _get_label_entry(
-        self, data: List[Dict[str, Any]], label_value: str
-    ) -> Dict[str, Any]:
+        self, data: list[dict[str, Any]], label_value: str
+    ) -> dict[str, Any]:
         """Find and return ("label", label_value) entry in (list of dict) data
         provided.
 

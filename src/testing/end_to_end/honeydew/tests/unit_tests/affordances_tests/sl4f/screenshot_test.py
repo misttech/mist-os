@@ -5,7 +5,7 @@
 """Unit tests for honeydew.affordances.sl4f.screenshot.py."""
 
 import base64
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -24,7 +24,7 @@ class ScreenshotSL4FTests(unittest.TestCase):
         self.screenshot_obj = sl4f_screenshot.Screenshot(sl4f=self.sl4f_obj)
 
     def test_take_screenshot(self) -> None:
-        result_value: Dict[str, Any] = {
+        result_value: dict[str, Any] = {
             "data": base64.b64encode("this_is_a_img".encode("utf-8")).decode(
                 "utf-8"
             ),

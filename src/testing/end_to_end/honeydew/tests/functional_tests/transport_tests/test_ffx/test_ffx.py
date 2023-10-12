@@ -5,7 +5,6 @@
 """Mobly test for FFX transport."""
 
 import logging
-from typing import List
 
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts
@@ -90,7 +89,7 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_ffx_run(self) -> None:
         """Test case for FFX.run()."""
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
-        cmd: List[str] = ["target", "ssh", "ls"]
+        cmd: list[str] = ["target", "ssh", "ls"]
         self.device.ffx.run(cmd)
 
 

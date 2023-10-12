@@ -8,7 +8,6 @@ import asyncio
 from datetime import datetime
 import logging
 import os
-from typing import Dict, List, Optional
 
 import fidl.fuchsia_tracing as f_tracing
 import fidl.fuchsia_tracing_controller as f_tracingcontroller
@@ -20,7 +19,7 @@ from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import fuchsia_controller as fc_transport
 
-_FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
+_FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "TracingController": custom_types.FidlEndpoint(
         "/core/trace_manager", "fuchsia.tracing.controller.Controller"
     ),
@@ -41,10 +40,9 @@ class Tracing(tracing.Tracing):
         self._name: str = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
 
-        self._trace_controller_proxy: Optional[
-            f_tracingcontroller.Controller.Client
-        ]
-        self._trace_socket: Optional[fc.Socket]
+        self._trace_controller_proxy: f_tracingcontroller.Controller.Client | None
+
+        self._trace_socket: fc.Socket | None
         self._session_initialized: bool
         self._tracing_active: bool
 
@@ -65,8 +63,8 @@ class Tracing(tracing.Tracing):
     # List all the public methods in alphabetical order
     def initialize(
         self,
-        categories: Optional[List[str]] = None,
-        buffer_size: Optional[int] = None,
+        categories: list[str] | None = None,
+        buffer_size: int | None = None,
     ) -> None:
         """Initializes a trace session.
 
@@ -185,7 +183,7 @@ class Tracing(tracing.Tracing):
         self._terminate(download=False)
 
     def terminate_and_download(
-        self, directory: str, trace_file: Optional[str] = None
+        self, directory: str, trace_file: str | None = None
     ) -> str:
         """Terminates the trace session and downloads the trace data to the
             specified directory.
@@ -248,7 +246,7 @@ class Tracing(tracing.Tracing):
                 # writing to the socket.
                 # ZX_ERR_SHOULD_WAIT is expected when the socket has more data
                 # to read.
-                zx_status: Optional[int] = (
+                zx_status: int | None = (
                     status.args[0] if len(status.args) > 0 else None
                 )
                 if zx_status == fc.ZxStatus.ZX_ERR_PEER_CLOSED:
@@ -277,7 +275,7 @@ class Tracing(tracing.Tracing):
         """
         assert self._trace_controller_proxy is not None
 
-        drain_task: Optional[asyncio.Task] = None
+        drain_task: asyncio.Task | None = None
         async with asyncio.TaskGroup() as tg:
             if download:
                 drain_task = tg.create_task(self._drain_socket_async())

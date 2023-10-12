@@ -7,7 +7,7 @@
 import base64
 from http.client import RemoteDisconnected
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 from honeydew import custom_types
 from honeydew.affordances.sl4f import tracing as tracing_sl4f
@@ -44,7 +44,7 @@ from honeydew.interfaces.device_classes import transports_capable
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.utils import properties
 
-_SL4F_METHODS: Dict[str, str] = {
+_SL4F_METHODS: dict[str, str] = {
     "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",
     "GetProductInfo": "hwinfo_facade.HwinfoGetProductInfo",
     "GetVersion": "device_facade.GetVersion",
@@ -55,7 +55,7 @@ _SL4F_METHODS: Dict[str, str] = {
     "Snapshot": "feedback_data_provider_facade.GetSnapshot",
 }
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "SNAPSHOT": 60,
 }
 
@@ -91,8 +91,8 @@ class FuchsiaDevice(
     def __init__(
         self,
         device_name: str,
-        ssh_private_key: Optional[str] = None,
-        ssh_user: Optional[str] = None,
+        ssh_private_key: str | None = None,
+        ssh_user: str | None = None,
     ) -> None:
         super().__init__(device_name, ssh_private_key, ssh_user)
         _LOGGER.debug("Initializing SL4F-based FuchsiaDevice")
@@ -217,7 +217,7 @@ class FuchsiaDevice(
 
     # List all private properties in alphabetical order
     @property
-    def _build_info(self) -> Dict[str, Any]:
+    def _build_info(self) -> dict[str, Any]:
         """Returns the build information of the device.
 
         Returns:
@@ -226,13 +226,13 @@ class FuchsiaDevice(
         Raises:
             errors.Sl4fError: On SL4F communication failure.
         """
-        get_version_resp: Dict[str, Any] = self.sl4f.run(
+        get_version_resp: dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["GetVersion"]
         )
         return {"version": get_version_resp["result"]}
 
     @property
-    def _device_info(self) -> Dict[str, Any]:
+    def _device_info(self) -> dict[str, Any]:
         """Returns the device information of the device.
 
         Returns:
@@ -241,13 +241,13 @@ class FuchsiaDevice(
         Raises:
             errors.Sl4fError: On SL4F communication failure.
         """
-        get_device_info_resp: Dict[str, Any] = self.sl4f.run(
+        get_device_info_resp: dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["GetDeviceInfo"]
         )
         return get_device_info_resp["result"]
 
     @property
-    def _product_info(self) -> Dict[str, Any]:
+    def _product_info(self) -> dict[str, Any]:
         """Returns the product information of the device.
 
         Returns:
@@ -256,7 +256,7 @@ class FuchsiaDevice(
         Raises:
             errors.Sl4fError: On SL4F communication failure.
         """
-        get_product_info_resp: Dict[str, Any] = self.sl4f.run(
+        get_product_info_resp: dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["GetProductInfo"]
         )
         return get_product_info_resp["result"]
@@ -301,7 +301,7 @@ class FuchsiaDevice(
         Returns:
             Bytes containing snapshot data as a zip archive.
         """
-        snapshot_resp: Dict[str, Any] = self.sl4f.run(
+        snapshot_resp: dict[str, Any] = self.sl4f.run(
             method=_SL4F_METHODS["Snapshot"], timeout=_TIMEOUTS["SNAPSHOT"]
         )
         snapshot_base64_encoded_str: str = snapshot_resp["result"]["zip"]

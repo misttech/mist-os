@@ -5,7 +5,6 @@
 """Provides Host-(Fuchsia)Target interactions via Fuchsia-Controller."""
 
 import logging
-from typing import Dict, Optional
 
 import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
 import fuchsia_controller_py as fuchsia_controller
@@ -16,7 +15,7 @@ from honeydew.transports import ffx as ffx_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
+_FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "RemoteControl": custom_types.FidlEndpoint(
         "/core/remote-control", "fuchsia.developer.remotecontrol.RemoteControl"
     ),
@@ -46,12 +45,12 @@ class FuchsiaController:
             ffx_config: custom_types.FFXConfig = ffx_transport.get_config()
 
             # To run Fuchsia-Controller in isolation
-            isolate_dir: Optional[
-                fuchsia_controller.IsolateDir
-            ] = ffx_config.isolate_dir
+            isolate_dir: fuchsia_controller.IsolateDir | None = (
+                ffx_config.isolate_dir
+            )
 
             # To collect Fuchsia-Controller logs
-            config: Dict[str, str] = {}
+            config: dict[str, str] = {}
             if ffx_config.logs_dir:
                 config["log.dir"] = ffx_config.logs_dir
                 config["log.level"] = "debug"

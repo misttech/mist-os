@@ -6,7 +6,7 @@
 
 import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import fidl.fuchsia_buildinfo as f_buildinfo
 import fidl.fuchsia_diagnostics as f_diagnostics
@@ -53,7 +53,7 @@ from honeydew.transports import (
 )
 from honeydew.utils import properties
 
-_FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
+_FC_PROXIES: dict[str, custom_types.FidlEndpoint] = {
     "BuildInfo": custom_types.FidlEndpoint(
         "/core/build-info", "fuchsia.buildinfo.Provider"
     ),
@@ -74,7 +74,7 @@ _FC_PROXIES: Dict[str, custom_types.FidlEndpoint] = {
     ),
 }
 
-_LOG_SEVERITIES: Dict[custom_types.LEVEL, f_diagnostics.Severity] = {
+_LOG_SEVERITIES: dict[custom_types.LEVEL, f_diagnostics.Severity] = {
     custom_types.LEVEL.INFO: f_diagnostics.Severity.INFO,
     custom_types.LEVEL.WARNING: f_diagnostics.Severity.WARN,
     custom_types.LEVEL.ERROR: f_diagnostics.Severity.ERROR,
@@ -113,8 +113,8 @@ class FuchsiaDevice(
     def __init__(
         self,
         device_name: str,
-        ssh_private_key: Optional[str] = None,
-        ssh_user: Optional[str] = None,
+        ssh_private_key: str | None = None,
+        ssh_user: str | None = None,
     ) -> None:
         super().__init__(device_name, ssh_private_key, ssh_user)
         _LOGGER.debug("Initializing Fuchsia-Controller based FuchsiaDevice")
@@ -229,7 +229,7 @@ class FuchsiaDevice(
 
     # List all private properties in alphabetical order
     @property
-    def _build_info(self) -> Dict[str, Any]:
+    def _build_info(self) -> dict[str, Any]:
         """Returns the build information of the device.
 
         Returns:
@@ -254,7 +254,7 @@ class FuchsiaDevice(
             ) from status
 
     @property
-    def _device_info(self) -> Dict[str, Any]:
+    def _device_info(self) -> dict[str, Any]:
         """Returns the device information of the device.
 
         Returns:
@@ -277,7 +277,7 @@ class FuchsiaDevice(
             ) from status
 
     @property
-    def _product_info(self) -> Dict[str, Any]:
+    def _product_info(self) -> dict[str, Any]:
         """Returns the product information of the device.
 
         Returns:
@@ -344,7 +344,7 @@ class FuchsiaDevice(
         except fcp.ZxStatus as status:
             # ZX_ERR_PEER_CLOSED is expected in this instance because the device
             # powered off.
-            zx_status: Optional[int] = (
+            zx_status: int | None = (
                 status.args[0] if len(status.args) > 0 else None
             )
             if zx_status != fcp.ZxStatus.ZX_ERR_PEER_CLOSED:

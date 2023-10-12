@@ -9,7 +9,7 @@ from datetime import datetime
 import logging
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable
 
 from honeydew import custom_types
 from honeydew import errors
@@ -26,7 +26,7 @@ from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import ssh as ssh_transport
 from honeydew.utils import properties
 
-_TIMEOUTS: Dict[str, float] = {
+_TIMEOUTS: dict[str, float] = {
     "SLEEP": 0.5,
     "OFFLINE_ATTEMPT": 2,
 }
@@ -50,14 +50,14 @@ class BaseFuchsiaDevice(
     def __init__(
         self,
         device_name: str,
-        ssh_private_key: Optional[str] = None,
-        ssh_user: Optional[str] = None,
+        ssh_private_key: str | None = None,
+        ssh_user: str | None = None,
     ) -> None:
         _LOGGER.debug("Initializing FuchsiaDevice")
         self._name: str = device_name
-        self._ssh_private_key: Optional[str] = ssh_private_key
-        self._ssh_user: Optional[str] = ssh_user
-        self._on_device_boot_fns: List[Callable[[], None]] = []
+        self._ssh_private_key: str | None = ssh_private_key
+        self._ssh_user: str | None = ssh_user
+        self._on_device_boot_fns: list[Callable[[], None]] = []
         self.health_check()
 
     # List all the persistent properties in alphabetical order
@@ -231,7 +231,7 @@ class BaseFuchsiaDevice(
     def power_cycle(
         self,
         power_switch: power_switch_interface.PowerSwitch,
-        outlet: Optional[int] = None,
+        outlet: int | None = None,
     ) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 
@@ -293,9 +293,7 @@ class BaseFuchsiaDevice(
         """Register a function that will be called in on_device_boot."""
         self._on_device_boot_fns.append(fn)
 
-    def snapshot(
-        self, directory: str, snapshot_file: Optional[str] = None
-    ) -> str:
+    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
         """Captures the snapshot of the device.
 
         Args:
@@ -397,7 +395,7 @@ class BaseFuchsiaDevice(
     # List all private properties in alphabetical order
     @property
     @abc.abstractmethod
-    def _build_info(self) -> Dict[str, Any]:
+    def _build_info(self) -> dict[str, Any]:
         """Returns the build information of the device.
 
         Returns:
@@ -410,7 +408,7 @@ class BaseFuchsiaDevice(
 
     @property
     @abc.abstractmethod
-    def _device_info(self) -> Dict[str, Any]:
+    def _device_info(self) -> dict[str, Any]:
         """Returns the device information of the device.
 
         Returns:
@@ -423,7 +421,7 @@ class BaseFuchsiaDevice(
 
     @property
     @abc.abstractmethod
-    def _product_info(self) -> Dict[str, Any]:
+    def _product_info(self) -> dict[str, Any]:
         """Returns the product information of the device.
 
         Returns:

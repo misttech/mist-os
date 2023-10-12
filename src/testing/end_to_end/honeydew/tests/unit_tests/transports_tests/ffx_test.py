@@ -5,7 +5,7 @@
 """Unit tests for honeydew.transports.ffx.py."""
 
 import subprocess
-from typing import Any, Dict, List
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -41,7 +41,7 @@ _FFX_TARGET_SHOW_OUTPUT: bytes = (
     r'"value":"2023-02-01T17:26:40+00:00"}]}]'
 ).encode()
 
-_FFX_TARGET_SHOW_JSON: List[Dict[str, Any]] = [
+_FFX_TARGET_SHOW_JSON: list[dict[str, Any]] = [
     {
         "title": "Target",
         "label": "target",
@@ -100,7 +100,7 @@ _FFX_TARGET_LIST_OUTPUT: str = (
     '"addresses":["fe80::6a47:a931:1e84:5077%qemu"],"is_default":true}]\n'
 )
 
-_FFX_TARGET_LIST_JSON: List[Dict[str, Any]] = [
+_FFX_TARGET_LIST_JSON: list[dict[str, Any]] = [
     {
         "nodename": "fuchsia-emulator",
         "rcs_state": "Y",
@@ -112,12 +112,12 @@ _FFX_TARGET_LIST_JSON: List[Dict[str, Any]] = [
     }
 ]
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: dict[str, Any] = {
     "target": "fuchsia-emulator",
     "run_cmd": ffx._FFX_CMDS["TARGET_SHOW"],
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT,
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
     "ffx_target_ssh_address_output": f"[{_SSH_ADDRESS}%{_SSH_ADDRESS_SCOPE}]:{_SSH_PORT}",
@@ -125,7 +125,7 @@ _MOCK_ARGS: Dict[str, Any] = {
     "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
 }
 
-_EXPECTED_VALUES: Dict[str, Any] = {
+_EXPECTED_VALUES: dict[str, Any] = {
     "ffx_target_show_output": _FFX_TARGET_SHOW_OUTPUT.decode(),
     "ffx_target_show_json": _FFX_TARGET_SHOW_JSON,
     "ffx_target_list_json": _FFX_TARGET_LIST_JSON,
@@ -136,7 +136,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"

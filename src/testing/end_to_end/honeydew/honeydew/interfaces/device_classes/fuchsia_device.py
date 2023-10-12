@@ -5,7 +5,7 @@
 """Abstract base class for Fuchsia device."""
 
 import abc
-from typing import Callable, Dict, Optional
+from typing import Callable
 
 from honeydew import custom_types
 from honeydew.interfaces.affordances import session
@@ -21,7 +21,7 @@ from honeydew.interfaces.auxiliary_devices import (
 )
 from honeydew.utils import properties
 
-TIMEOUTS: Dict[str, float] = {
+TIMEOUTS: dict[str, float] = {
     "OFFLINE": 60,
     "ONLINE": 120,
 }
@@ -200,7 +200,7 @@ class FuchsiaDevice(abc.ABC):
     def power_cycle(
         self,
         power_switch: power_switch_interface.PowerSwitch,
-        outlet: Optional[int] = None,
+        outlet: int | None = None,
     ) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 
@@ -219,9 +219,7 @@ class FuchsiaDevice(abc.ABC):
         """Register a function that will be called in on_device_boot."""
 
     @abc.abstractmethod
-    def snapshot(
-        self, directory: str, snapshot_file: Optional[str] = None
-    ) -> str:
+    def snapshot(self, directory: str, snapshot_file: str | None = None) -> str:
         """Captures the snapshot of the device.
 
         Args:

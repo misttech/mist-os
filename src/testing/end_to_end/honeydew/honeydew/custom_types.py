@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import enum
 import ipaddress
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 import fuchsia_controller_py as fuchsia_controller
 
@@ -114,8 +114,8 @@ class FFXConfig:
         logs_dir: FFX logs directory
     """
 
-    isolate_dir: Optional[fuchsia_controller.IsolateDir] = None
-    logs_dir: Optional[str] = None
+    isolate_dir: fuchsia_controller.IsolateDir | None = None
+    logs_dir: str | None = None
 
 
 @dataclass

@@ -4,11 +4,11 @@
 """Abstract base class for UserInput affordance."""
 
 import abc
-from typing import Any, Dict
+from typing import Any
 
 from honeydew.interfaces.affordances.ui import custom_types
 
-DEFAULTS: Dict[str, Any] = {
+DEFAULTS: dict[str, Any] = {
     "TOUCH_SCREEN_SIZE": custom_types.Size(width=1000, height=1000),
     "TAP_EVENT_COUNT": 1,
     "DURATION": 300,

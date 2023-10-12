@@ -5,7 +5,7 @@
 """Unit tests for honeydew.transports.fastboot.py."""
 
 import subprocess
-from typing import Any, Dict, List
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -22,7 +22,7 @@ _TCP_BASED_DEVICE_NAME = "fuchsia-54b2-038b-6e90"
 _TCP_IP_ADDRESS = "fe80::56b2:3ff:fe8b:6e90%enxa0cec8f442ce"
 _TCP_BASED_FASTBOOT_NODE_ID = f"tcp:{_TCP_IP_ADDRESS}"
 
-_USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: Dict[str, Any] = {
+_USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: dict[str, Any] = {
     "nodename": _USB_BASED_DEVICE_NAME,
     "rcs_state": "Y",
     "serial": _USB_BASED_FASTBOOT_NODE_ID,
@@ -35,7 +35,7 @@ _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: Dict[str, Any] = {
     "is_default": True,
 }
 
-_USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: Dict[str, Any] = {
+_USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: dict[str, Any] = {
     "nodename": _USB_BASED_DEVICE_NAME,
     "rcs_state": "N",
     "serial": _USB_BASED_FASTBOOT_NODE_ID,
@@ -45,7 +45,7 @@ _USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: Dict[str, Any] = {
     "is_default": True,
 }
 
-_TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: Dict[str, Any] = {
+_TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: dict[str, Any] = {
     "nodename": _TCP_BASED_DEVICE_NAME,
     "rcs_state": "Y",
     "serial": "<unknown>",
@@ -55,7 +55,7 @@ _TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE: Dict[str, Any] = {
     "is_default": True,
 }
 
-_TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: Dict[str, Any] = {
+_TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: dict[str, Any] = {
     "nodename": _TCP_BASED_DEVICE_NAME,
     "rcs_state": "N",
     "serial": "<unknown>",
@@ -65,7 +65,7 @@ _TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE: Dict[str, Any] = {
     "is_default": True,
 }
 
-_TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE_WITH_TWO_IPS: Dict[str, Any] = {
+_TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE_WITH_TWO_IPS: dict[str, Any] = {
     "nodename": _TCP_BASED_DEVICE_NAME,
     "rcs_state": "N",
     "serial": "<unknown>",
@@ -75,12 +75,12 @@ _TCP_BASED_TARGET_WHEN_IN_FASTBOOT_MODE_WITH_TWO_IPS: Dict[str, Any] = {
     "is_default": True,
 }
 
-_FFX_TARGET_LIST_WHEN_IN_FUCHSIA_MODE: List[Dict[str, Any]] = [
+_FFX_TARGET_LIST_WHEN_IN_FUCHSIA_MODE: list[dict[str, Any]] = [
     _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
     _TCP_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
 ]
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": _USB_BASED_DEVICE_NAME,
     "fastboot_node_id": _USB_BASED_FASTBOOT_NODE_ID,
     "run_cmd": ["getvar", "hw-revision"],
@@ -93,13 +93,13 @@ _INPUT_ARGS: Dict[str, Any] = {
     ],
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "ffx_target_info_when_in_fuchsia_mode": _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
     "ffx_target_info_when_in_fastboot_mode": _USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE,
     "fastboot_getvar_hw_revision": b"hw-revision: core.x64-b4\nFinished. Total time: 0.000s\n",
 }
 
-_EXPECTED_VALUES: Dict[str, Any] = {
+_EXPECTED_VALUES: dict[str, Any] = {
     "fastboot_run_getvar_hw_revision": ["hw-revision: core.x64-b4"],
 }
 
@@ -108,7 +108,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_{test_label}"

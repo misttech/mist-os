@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.transports.fuchsia_controller.py."""
 
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -16,11 +16,11 @@ from honeydew.transports import (
     fuchsia_controller as fuchsia_controller_transport,
 )
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "ffx_config": custom_types.FFXConfig(
         isolate_dir=fuchsia_controller.IsolateDir("/tmp/isolate"),
         logs_dir="/tmp/logs",

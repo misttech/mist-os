@@ -5,7 +5,7 @@
 """Unit tests for honeydew.transports.ssh.py."""
 
 import subprocess
-from typing import Any, Dict
+from typing import Any
 import unittest
 from unittest import mock
 
@@ -15,13 +15,13 @@ from honeydew import custom_types
 from honeydew import errors
 from honeydew.transports import ssh
 
-_INPUT_ARGS: Dict[str, Any] = {
+_INPUT_ARGS: dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
 }
 
-_MOCK_ARGS: Dict[str, Any] = {
+_MOCK_ARGS: dict[str, Any] = {
     "target_ssh_address": custom_types.TargetSshAddress(
         ip="11.22.33.44", port=22
     ),
@@ -32,7 +32,7 @@ def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
     test_func_name: str = testcase_func.__name__
 
-    params_dict: Dict[str, Any] = param.args[0]
+    params_dict: dict[str, Any] = param.args[0]
     test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
