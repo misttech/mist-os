@@ -58,6 +58,8 @@ impl IsolatedEmulator {
         rx_got_emu_msg: oneshot::Receiver<()>,
     ) {
         let cmds = &[
+            "component list",
+            "component show core/sshd-host",
             "threads --all-processes",
             "iquery show bootstrap/driver_manager",
             "/bin/log_listener --dump_logs yes",
@@ -172,7 +174,7 @@ impl IsolatedEmulator {
         )?);
 
         let diagnostic_task = if do_diagnostics {
-            // 5 seconds after we see the initial Zircon boot msg, request
+            // 8 seconds after we see the initial Zircon boot msg, request
             // diagnostics.  This will pretty much always be before we know
             // that something has failed; but unfortunately the usual failure
             // means that we don't have any logs after 10 seconds, maybe because
@@ -180,7 +182,7 @@ impl IsolatedEmulator {
             // to grab the information while we can.
             Some(fuchsia_async::Task::spawn(Self::diagnostics_after_startup(
                 emu.stdin.take().expect("Failed to open stdin of emulator"),
-                Duration::from_secs(5),
+                Duration::from_secs(8),
                 rx_got_emu_msg,
             )))
         } else {
