@@ -14,6 +14,7 @@
 
 #include <arch/arm64.h>
 #include <arch/arm64/mp.h>
+#include <arch/arm64/registers.h>
 #include <arch/arm64/uarch.h>
 #include <kernel/thread.h>
 
@@ -26,6 +27,9 @@ static_assert(sizeof(arm64_context_switch_frame) % 16 == 0, "");
 void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   // zero out the entire arch state
   t->arch() = {};
+
+  // Set MDSCR to the default value.
+  t->arch().mdscr_el1 = MSDCR_EL1_INITIAL_VALUE;
 
   // create a default stack frame on the stack
   vaddr_t stack_top = t->stack().top();

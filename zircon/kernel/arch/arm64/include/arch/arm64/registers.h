@@ -19,6 +19,11 @@ inline constexpr uint32_t kArmUserVisibleFlags = 0xf0000000;
 // Monitor Debug System Control Register. It's the main control register fot the debug
 // implementation.
 
+// Initial value for MSDCR_EL1 when starting userspace, which disables all debug exceptions.
+// Instruction Breakpoint Exceptions (software breakpoints) cannot be disabled and MDSCR does not
+// affect single-step behaviour.
+inline constexpr uint32_t MSDCR_EL1_INITIAL_VALUE = 0;
+
 #define ARM64_MDSCR_EL1_SS (1u << 0)
 #define ARM64_MDSCR_EL1_SS_SHIFT 0
 #define ARM64_MDSCR_EL1_ERR (1u << 6)

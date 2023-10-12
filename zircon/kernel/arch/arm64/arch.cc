@@ -45,11 +45,6 @@
 // Counter-timer Kernel Control Register, EL1.
 static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
 
-// Initial value for MSDCR_EL1 when starting userspace, which disables all debug exceptions.
-// Instruction Breakpoint Exceptions (software breakpoints) cannot be disabled and MDSCR does not
-// affect single-step behaviour.
-static constexpr uint32_t MSDCR_EL1_INITIAL_VALUE = 0;
-
 // Performance Monitors Count Enable Set, EL0.
 static constexpr uint64_t PMCNTENSET_EL0_ENABLE = 1UL << 31;  // Enable cycle count register.
 
@@ -252,8 +247,6 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
   iframe->usp = sp;
   iframe->elr = pc;
   iframe->spsr = spsr;
-
-  iframe->mdscr = MSDCR_EL1_INITIAL_VALUE;
 }
 
 // Switch to user mode, set the user stack pointer to user_stack_top, put the svc stack pointer to

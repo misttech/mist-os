@@ -5,18 +5,25 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <zircon/compiler.h>
+
 #ifndef ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARCH_THREAD_H_
 #define ZIRCON_KERNEL_ARCH_ARM64_INCLUDE_ARCH_ARCH_THREAD_H_
 
 #define CURRENT_PERCPU_PTR_OFFSET 16
 #define CURRENT_SCSP_OFFSET 24
 
+#if __has_feature(shadow_call_stack)
+#define CURRENT_MDSCR_OFFSET 56
+#else
+#define CURRENT_MDSCR_OFFSET 48
+#endif
+
 #ifndef __ASSEMBLER__
 
 #include <assert.h>
 #include <stddef.h>
 #include <sys/types.h>
-#include <zircon/compiler.h>
 #include <zircon/tls.h>
 
 #include <arch/arm64/registers.h>
@@ -86,12 +93,16 @@ struct arch_thread {
   uint64_t tpidr_el0;
   uint64_t tpidrro_el0;
 
+  // The value of the mdscr_el1 register at the time the thread entered the kernel. Stored here
+  // instead of the iframe to allow access without needing to be suspended or in an exception.
+  uint64_t mdscr_el1;
+
+  // Saved fpu state.
+  struct fpstate fpstate;
   // Counts how many times the usermode thread generated the exception that
   // is used to restore |fpstate|. After some number of them it is more efficient to
   // restore fpu state eagerly and not pay for the exception itself.
   uint32_t fp_restore_count;
-  // Saved fpu state.
-  struct fpstate fpstate;
 
   // |track_debug_state| tells whether the kernel should keep track of the whole debug state for
   // this thread. Normally this is set explicitly by an user that wants to make use of HW
@@ -111,6 +122,8 @@ static_assert(thread_pointer_offsetof(unsafe_sp) == ZX_TLS_UNSAFE_SP_OFFSET,
               "unsafe_sp field in wrong place");
 static_assert(thread_pointer_offsetof(current_percpu_ptr) == CURRENT_PERCPU_PTR_OFFSET,
               "per cpu ptr offset in wrong place");
+static_assert(thread_pointer_offsetof(mdscr_el1) == CURRENT_MDSCR_OFFSET,
+              "mdscr_el1 offset in wrong place");
 #if __has_feature(shadow_call_stack)
 static_assert(thread_pointer_offsetof(shadow_call_sp) == CURRENT_SCSP_OFFSET,
               "shadow call stack pointer offset in wrong place");

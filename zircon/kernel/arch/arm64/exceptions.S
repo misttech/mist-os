@@ -52,13 +52,15 @@ mrs   x9, sp_el0
 // x10 (containing elr_el1) is used in syscall handler
 mrs   x10, elr_el1
 mrs   x11, spsr_el1
-mrs   x12, mdscr_el1
 stp   lr,  x9, [sp, ARM64_IFRAME_OFFSET_LR]
 .cfi_rel_offset lr, ARM64_IFRAME_OFFSET_LR
 .cfi_rel_offset sp, ARM64_IFRAME_OFFSET_USP
 stp   x10, x11, [sp, ARM64_IFRAME_OFFSET_ELR]
 .cfi_rel_offset elr1, ARM64_IFRAME_OFFSET_ELR
-stp   x12, xzr,[sp, ARM64_IFRAME_OFFSET_MDSCR]
+// Store mdscr into the arch_thread structure.
+mrs x11, tpidr_el1
+mrs x12, mdscr_el1
+str x12, [x11, CURRENT_MDSCR_OFFSET]
 .endm
 
 // Once we pop the stack past the saved sp_el0, elr_el1 the userspace values
@@ -73,13 +75,16 @@ cfi_register_is_zero DW_REG_ELR_mode
 
 // Reverse regsave above, popping the full register state off of the stack.
 .macro regrestore, from_lower_el_64
+// Restore MDSCR from the arch_thread structure.
+mrs x11, tpidr_el1
+ldr x12, [x11, CURRENT_MDSCR_OFFSET]
+msr mdscr_el1, x12
+// Restore the rest of the registers from the stack.
 ldp   lr,  x9, [sp, ARM64_IFRAME_OFFSET_LR]
 ldp   x10, x11, [sp, ARM64_IFRAME_OFFSET_ELR]
-ldr   x12, [sp, ARM64_IFRAME_OFFSET_MDSCR]
 msr   sp_el0, x9
 msr   elr_el1, x10
 msr   spsr_el1, x11
-msr   mdscr_el1, x12
 ldp   x0, x1, [sp, ARM64_IFRAME_OFFSET_R]
 ldp   x2, x3, [sp, ARM64_IFRAME_OFFSET_R + (2 * 8)]
 ldp   x4, x5, [sp, ARM64_IFRAME_OFFSET_R + (4 * 8)]

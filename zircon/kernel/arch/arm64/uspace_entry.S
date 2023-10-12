@@ -13,10 +13,12 @@
 // void arm64_uspace_entry(iframe_t* iframe, vaddr_t kstack) __NO_RETURN;
 // optionally vaddr_t scsp
 FUNCTION(arm64_uspace_entry)
-#if __has_feature(shadow_call_stack)
     mrs x16, tpidr_el1
+#if __has_feature(shadow_call_stack)
     str x2, [x16, CURRENT_SCSP_OFFSET]
 #endif
+    ldr x16, [x16, CURRENT_MDSCR_OFFSET]
+    msr mdscr_el1, x16
 
     mov sp, x1
     ldr x16, [x0, ARM64_IFRAME_OFFSET_USP]
@@ -25,8 +27,6 @@ FUNCTION(arm64_uspace_entry)
     msr elr_el1, x16
     ldr x16, [x0, ARM64_IFRAME_OFFSET_SPSR]
     msr spsr_el1, x16
-    ldr x16, [x0, ARM64_IFRAME_OFFSET_MDSCR]
-    msr mdscr_el1, x16
 
     // Setting x0 deferred to last, we're still using it.
     ldp x1, x2, [x0, ARM64_IFRAME_OFFSET_R + (1 * 8)]

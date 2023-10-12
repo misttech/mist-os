@@ -86,7 +86,7 @@ zx_status_t arch_get_single_step(Thread* thread, zx_thread_state_single_step_t* 
   }
   iframe_t* regs = thread->arch().suspended_general_regs;
 
-  const bool mdscr_ss_enable = !!(regs->mdscr & kMdscrSSMask);
+  const bool mdscr_ss_enable = !!(thread->arch().mdscr_el1 & kMdscrSSMask);
   const bool spsr_ss_enable = !!(regs->spsr & kSSMaskSPSR);
 
   *out = mdscr_ss_enable && spsr_ss_enable;
@@ -109,10 +109,10 @@ zx_status_t arch_set_single_step(Thread* thread, const zx_thread_state_single_st
   }
   iframe_t* regs = thread->arch().suspended_general_regs;
   if (*in) {
-    regs->mdscr |= kMdscrSSMask;
+    thread->arch().mdscr_el1 |= kMdscrSSMask;
     regs->spsr |= kSSMaskSPSR;
   } else {
-    regs->mdscr &= ~kMdscrSSMask;
+    thread->arch().mdscr_el1 &= ~kMdscrSSMask;
     regs->spsr &= ~kSSMaskSPSR;
   }
   return ZX_OK;

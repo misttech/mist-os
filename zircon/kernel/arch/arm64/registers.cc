@@ -11,14 +11,12 @@
 #include <vm/vm.h>
 
 void arm64_set_debug_state_for_thread(Thread* thread, bool active) {
-  iframe_t* iframe = thread->arch().suspended_general_regs;
-  DEBUG_ASSERT(iframe);
   if (active) {
-    iframe->mdscr |= ARM64_MDSCR_EL1_MDE;  // MDE enables hardware exceptions.
-    iframe->mdscr |= ARM64_MDSCR_EL1_KDE;  // KDE enables local debugging in EL0.
+    thread->arch().mdscr_el1 |= ARM64_MDSCR_EL1_MDE;  // MDE enables hardware exceptions.
+    thread->arch().mdscr_el1 |= ARM64_MDSCR_EL1_KDE;  // KDE enables local debugging in EL0.
   } else {
-    iframe->mdscr &= ~ARM64_MDSCR_EL1_MDE;  // MDE enables hardware exceptions.
-    iframe->mdscr &= ~ARM64_MDSCR_EL1_KDE;  // KDE enables local debugging in EL0.
+    thread->arch().mdscr_el1 &= ~ARM64_MDSCR_EL1_MDE;  // MDE enables hardware exceptions.
+    thread->arch().mdscr_el1 &= ~ARM64_MDSCR_EL1_KDE;  // KDE enables local debugging in EL0.
   }
 }
 
