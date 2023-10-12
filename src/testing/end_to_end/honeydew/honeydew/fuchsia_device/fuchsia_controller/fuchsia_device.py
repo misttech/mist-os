@@ -19,22 +19,6 @@ import fuchsia_controller_py as fcp
 from honeydew import custom_types
 from honeydew import errors
 from honeydew.affordances.fuchsia_controller import tracing as tracing_fc
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
-    bluetooth_avrcp as bluetooth_avrcp_fc,
-)
-from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
-    bluetooth_gap as bluetooth_gap_fc,
-)
-from honeydew.affordances.fuchsia_controller.ui import (
-    screenshot as screenshot_fc,
-)
-from honeydew.affordances.fuchsia_controller.ui import (
-    user_input as user_input_fc,
-)
-from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
-from honeydew.affordances.fuchsia_controller.wlan import (
-    wlan_policy as wlan_policy_fc,
-)
 from honeydew.fuchsia_device import base_fuchsia_device
 from honeydew.interfaces.affordances import tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
@@ -146,7 +130,7 @@ class FuchsiaDevice(
         Returns:
             bluetooth_avrcp.BluetoothAvrcp object
         """
-        return bluetooth_avrcp_fc.BluetoothAvrcp()
+        raise NotImplementedError
 
     @properties.Affordance
     def bluetooth_gap(self) -> bluetooth_gap_interface.BluetoothGap:
@@ -155,7 +139,7 @@ class FuchsiaDevice(
         Returns:
             bluetooth_gap.BluetoothGap object
         """
-        return bluetooth_gap_fc.BluetoothGap()
+        raise NotImplementedError
 
     @properties.Affordance
     def screenshot(self) -> screenshot.Screenshot:
@@ -164,7 +148,7 @@ class FuchsiaDevice(
         Returns:
             screenshot.Screenshot object
         """
-        return screenshot_fc.Screenshot()
+        raise NotImplementedError
 
     @properties.Affordance
     def tracing(self) -> tracing.Tracing:
@@ -186,7 +170,7 @@ class FuchsiaDevice(
         Returns:
             user_input.UserInput object
         """
-        return user_input_fc.UserInput()
+        raise NotImplementedError
 
     @properties.Affordance
     def wlan_policy(self) -> wlan_policy.WlanPolicy:
@@ -195,7 +179,7 @@ class FuchsiaDevice(
         Returns:
             wlan_policy.WlanPolicy object
         """
-        return wlan_policy_fc.WlanPolicy()
+        raise NotImplementedError
 
     @properties.Affordance
     def wlan(self) -> wlan.Wlan:
@@ -204,7 +188,7 @@ class FuchsiaDevice(
         Returns:
             wlan.Wlan object
         """
-        return wlan_fc.Wlan()
+        raise NotImplementedError
 
     # List all the public methods in alphabetical order
     def close(self) -> None:

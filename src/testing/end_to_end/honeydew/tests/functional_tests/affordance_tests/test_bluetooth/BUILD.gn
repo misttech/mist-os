@@ -15,16 +15,6 @@ if (is_host) {
     environments = [ sherlock_env ]
   }
 
-  python_mobly_test("bluetooth_avrcp_test_fc") {
-    main_source = "test_bluetooth_avrcp.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
-    transport = "fuchsia-controller"
-    environments = [ sherlock_env ]
-  }
-
   python_mobly_test("bluetooth_gap_test") {
     main_source = "test_bluetooth_gap.py"
     libraries = [
@@ -34,23 +24,11 @@ if (is_host) {
     environments = [ sherlock_env ]
   }
 
-  python_mobly_test("bluetooth_gap_test_fc") {
-    main_source = "test_bluetooth_gap.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
-    transport = "fuchsia-controller"
-    environments = [ sherlock_env ]
-  }
-
   group("tests") {
     testonly = true
     public_deps = [
       ":bluetooth_avrcp_test($host_toolchain)",
-      ":bluetooth_avrcp_test_fc($host_toolchain)",
       ":bluetooth_gap_test($host_toolchain)",
-      ":bluetooth_gap_test_fc($host_toolchain)",
     ]
   }
 

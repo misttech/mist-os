@@ -43,14 +43,6 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan_policy.save_network()
             * wlan_policy.get_saved_networks()
         """
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.wlan_policy.create_client_controller()
-                self.device.wlan_policy.remove_all_networks()
-                self.device.wlan_policy.save_network("test", SecurityType.NONE)
-                self.device.wlan_policy.get_saved_networks()
-            return
-
         self.device.wlan_policy.create_client_controller()
         self.device.wlan_policy.remove_all_networks()
         networks: list[

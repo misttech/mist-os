@@ -15,16 +15,6 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
-  python_mobly_test("screenshot_test_fc") {
-    main_source = "test_screenshot.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
-    transport = "fuchsia-controller"
-    environments = [ emu_env ]
-  }
-
   python_mobly_test("user_input_test") {
     main_source = "test_user_input.py"
     libraries = [
@@ -34,23 +24,11 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
-  python_mobly_test("user_input_test_fc") {
-    main_source = "test_user_input.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
-    ]
-    transport = "fuchsia-controller"
-    environments = [ emu_env ]
-  }
-
   group("tests") {
     testonly = true
     public_deps = [
       ":screenshot_test($host_toolchain)",
-      ":screenshot_test_fc($host_toolchain)",
       ":user_input_test($host_toolchain)",
-      ":user_input_test_fc($host_toolchain)",
     ]
   }
 
@@ -80,11 +58,5 @@ if (is_host) {
   group("unstable_non_sl4f_emulator_tests") {
     testonly = true
     public_deps = []
-
-    # TODO(b/296269354): Uncomment after updating builders to target "workbench"
-    # public_deps = [
-    #   ":screenshot_test_fc($host_toolchain)",
-    #   ":user_input_test_fc($host_toolchain)",
-    # ]
   }
 }

@@ -36,11 +36,6 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
 
         This test gets physical specifications for implementing WLAN on this device.
         """
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.wlan.get_phy_ids()
-            return
-
         res = self.device.wlan.get_phy_ids()
         asserts.assert_is_not_none(res, [])
 

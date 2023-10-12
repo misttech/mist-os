@@ -38,11 +38,6 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         super().teardown_test()
 
     def test_take_screenshot(self) -> None:
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.screenshot.take()
-            return
-
         self.device.session.add_component(EXAMPLE_URL)
 
         image = self.device.screenshot.take()

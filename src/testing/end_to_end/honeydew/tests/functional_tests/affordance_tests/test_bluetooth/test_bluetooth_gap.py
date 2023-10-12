@@ -37,12 +37,6 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         input_mode = BluetoothAcceptPairing.DEFAULT_INPUT_MODE
         output_mode = BluetoothAcceptPairing.DEFAULT_OUTPUT_MODE
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.accept_pairing(
-                    input_mode, output_mode
-                )
-            return
 
         self.device.bluetooth_gap.accept_pairing(input_mode, output_mode)
 
@@ -51,10 +45,6 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         identifier = "000000000"
         transport = BluetoothConnectionType.CLASSIC
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.connect_device(identifier, transport)
-            return
 
         with asserts.assert_raises(Sl4fError):
             self.device.bluetooth_gap.connect_device(identifier, transport)
@@ -63,41 +53,22 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for bluetooth.forget_device()"""
 
         identifier = "000000000"
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.forget_device(identifier)
-            return
 
         self.device.bluetooth_gap.forget_device(identifier)
 
     def test_get_active_adapter_address(self) -> None:
         """Test case for bluetooth.get_active_adapter_address()"""
 
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.get_active_adapter_address()
-            return
-
         self.device.bluetooth_gap.get_active_adapter_address()
 
     def test_get_connected_devices(self) -> None:
         """Test case for bluetooth.get_connected_devices()"""
-
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.get_connected_devices()
-            return
 
         res = self.device.bluetooth_gap.get_connected_devices()
         asserts.assert_equal(res, [])
 
     def test_get_known_remote_devices(self) -> None:
         """Test case for bluetooth.get_known_remote_devices()"""
-
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.get_known_remote_devices()
-            return
 
         self.device.bluetooth_gap.get_known_remote_devices()
 
@@ -106,30 +77,16 @@ class BluetoothGapAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         identifier = "000000000"
         transport = BluetoothConnectionType.CLASSIC
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.pair_device(identifier, transport)
-            return
 
         self.device.bluetooth_gap.pair_device(identifier, transport)
 
     def test_request_discovery(self) -> None:
         """Test case for bluetooth.request_discovery()"""
 
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.request_discovery(True)
-            return
-
         self.device.bluetooth_gap.request_discovery(True)
 
     def test_bluetooth_set_discoverable(self) -> None:
         """Test case for bluetooth_gap.set_discoverable()"""
-
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_gap.set_discoverable(True)
-            return
 
         self.device.bluetooth_gap.set_discoverable(True)
 

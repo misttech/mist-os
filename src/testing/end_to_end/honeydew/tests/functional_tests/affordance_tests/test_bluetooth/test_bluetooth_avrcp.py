@@ -33,40 +33,19 @@ class BluetoothAvrcpAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_avrcp_init(self) -> None:
         """Test for Bluetooth.avrcp_init() method."""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_avrcp.init_avrcp(target_id="0")
-            return
-
         self.device.bluetooth_avrcp.init_avrcp(target_id="0")
 
     def test_list_received_requests(self) -> None:
         """Test for Bluetooth.list_received_requests() method."""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_avrcp.list_received_requests()
-            return
-
         res = self.device.bluetooth_avrcp.list_received_requests()
         assert len(res) == 0
 
     def test_publish_mock_player(self) -> None:
         """Test for Bluetooth.publish_mock_player() method."""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_avrcp.publish_mock_player()
-            return
-
         self.device.bluetooth_avrcp.publish_mock_player()
 
     def test_send_avrcp_command(self) -> None:
         """Test for Bluetooth.send_avrcp_command() method."""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_avrcp.send_avrcp_command(
-                    BluetoothAvrcpCommand.PLAY
-                )
-            return
         # Currently fails sending commands since we only test single device
         with asserts.assert_raises(Sl4fError):
             self.device.bluetooth_avrcp.send_avrcp_command(
@@ -75,11 +54,6 @@ class BluetoothAvrcpAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_stop_mock_player(self) -> None:
         """Test for Bluetooth.stop_mock_player() method"""
-        if self._is_fuchsia_controller_based_device(self.device):
-            with asserts.assert_raises(NotImplementedError):
-                self.device.bluetooth_avrcp.stop_mock_player()
-            return
-
         self.device.bluetooth_avrcp.stop_mock_player()
 
 
