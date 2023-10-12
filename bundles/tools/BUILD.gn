@@ -15,7 +15,6 @@ group("tools") {
     "//src/camera:tools",
     "//src/connectivity:tools",
     "//src/connectivity/bluetooth/tools",
-    "//src/connectivity/bluetooth/tools/bt-snoop",
     "//src/developer/debug/zxdb:zxdb_host",
     "//src/developer/fastboot",
     "//src/devices/bundles:tools",
