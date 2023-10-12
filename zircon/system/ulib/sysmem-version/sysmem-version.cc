@@ -48,20 +48,25 @@ struct IsFidlScalar<T, typename std::enable_if<fidl::IsFidlType<T>::value &&
                                                 internal::HasOperatorUInt64<T>::value)>::type>
     : std::true_type {};
 
-template <typename V2Type, typename V1Type, typename Enable = void>
-struct IsCompatibleFidlScalarTypes : std::false_type {};
-template <typename V2Type, typename V1Type>
-struct IsCompatibleFidlScalarTypes<
-    V2Type, V1Type,
+template <typename DstType, typename SrcType, bool allow_bigger_src, typename Enable = void>
+struct IsCompatibleAssignmentFidlScalarTypes : std::false_type {};
+template <typename DstType, typename SrcType, bool allow_bigger_src>
+struct IsCompatibleAssignmentFidlScalarTypes<
+    DstType, SrcType, allow_bigger_src,
     typename std::enable_if<
         // must be able to write to v2
-        !std::is_const<typename std::remove_reference_t<V2Type>>::value &&
-        IsFidlScalar<RemoveCVRef_t<V2Type>>::value && IsFidlScalar<RemoveCVRef_t<V1Type>>::value &&
-        std::is_same<FidlUnderlyingTypeOrType_t<RemoveCVRef_t<V2Type>>,
-                     FidlUnderlyingTypeOrType_t<RemoveCVRef_t<V1Type>>>::value>::type>
-    : std::true_type {};
-template <typename V2, typename V1>
-inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarTypes<V2, V1>::value;
+        !std::is_const<typename std::remove_reference_t<DstType>>::value &&
+        IsFidlScalar<RemoveCVRef_t<DstType>>::value &&
+        IsFidlScalar<RemoveCVRef_t<SrcType>>::value &&
+        (std::is_same<FidlUnderlyingTypeOrType_t<RemoveCVRef_t<DstType>>,
+                      FidlUnderlyingTypeOrType_t<RemoveCVRef_t<SrcType>>>::value ||
+         (std::is_same<RemoveCVRef_t<DstType>, uint64_t>::value &&
+          std::is_same<RemoveCVRef_t<SrcType>, uint32_t>::value) ||
+         (allow_bigger_src && std::is_same<RemoveCVRef_t<DstType>, uint32_t>::value &&
+          std::is_same<RemoveCVRef_t<SrcType>, uint64_t>::value))>::type> : std::true_type {};
+template <typename DstType, typename SrcType, bool allow_bigger_src = false>
+inline constexpr bool IsCompatibleAssignmentFidlScalarTypes_v =
+    IsCompatibleAssignmentFidlScalarTypes<DstType, SrcType, allow_bigger_src>::value;
 
 // The C++ style guide discourages macros, but does not prohibit them.  To operate on a bunch of
 // separate fields with different names, it's a choice among tons of error-prone repetitive
@@ -94,7 +99,7 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
     using V2FieldType = std::remove_reference_t<decltype(v2b.field_name().value())>;       \
     /* double parens are significant here */                                               \
     using V1FieldType = std::remove_reference_t<decltype((v1.field_name()))>;              \
-    static_assert(IsCompatibleFidlScalarTypes_v<V2FieldType, V1FieldType>);                \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V2FieldType, V1FieldType>);      \
     using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                      \
     using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                      \
     if (std::is_same<bool, RemoveCVRef_t<V1FieldType>>::value ||                           \
@@ -109,7 +114,7 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
     using V2FieldType = std::remove_reference_t<decltype(v2b.field_name())>;             \
     /* double parens are significant here */                                             \
     using V1FieldType = std::remove_reference_t<decltype((v1.field_name))>;              \
-    static_assert(IsCompatibleFidlScalarTypes_v<V2FieldType, V1FieldType>);              \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V2FieldType, V1FieldType>);    \
     using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                    \
     using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                    \
     if (std::is_same<bool, RemoveCVRef_t<V1FieldType>>::value ||                         \
@@ -125,7 +130,7 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
     using V2FieldType = std::remove_reference_t<decltype(v2b.field_name())>;                  \
     /* double parens are significant here */                                                  \
     using V1FieldType = std::remove_reference_t<decltype((v1.field_name))>;                   \
-    static_assert(IsCompatibleFidlScalarTypes_v<V2FieldType, V1FieldType>);                   \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V2FieldType, V1FieldType>);         \
     using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                         \
     using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                         \
     if (std::is_same<bool, RemoveCVRef_t<V1FieldType>>::value ||                              \
@@ -140,7 +145,7 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
   do {                                                                                            \
     using V1FieldType = std::remove_reference_t<decltype(v1.field_name())>;                       \
     using V2FieldType = std::remove_reference_t<decltype(v2.field_name().value())>;               \
-    static_assert(IsCompatibleFidlScalarTypes<V1FieldType, V2FieldType>::value);                  \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V1FieldType, V2FieldType>);             \
     using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                             \
     using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                             \
     if (v2.field_name().has_value()) {                                                            \
@@ -150,11 +155,34 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
       v1.field_name() = static_cast<V1FieldType>(0);                                              \
     }                                                                                             \
   } while (false)
+
+#define PROCESS_SCALAR_FIELD_V2_BIGGER(field_name)                                                 \
+  do {                                                                                             \
+    using V1FieldType = std::remove_reference_t<decltype(v1.field_name())>;                        \
+    using V2FieldType = std::remove_reference_t<decltype(v2.field_name().value())>;                \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V1FieldType, V2FieldType, true>);        \
+    using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                              \
+    using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                              \
+    if (v2.field_name().has_value()) {                                                             \
+      if (*v2.field_name() == std::numeric_limits<V2FieldType>::max()) {                           \
+        v1.field_name() = std::numeric_limits<V1FieldType>::max();                                 \
+      } else if (*v2.field_name() > std::numeric_limits<V1FieldType>::max()) {                     \
+        LOG(ERROR, "V2 field value too large for V1: %s %" PRIu64, #field_name, *v2.field_name()); \
+        return fpromise::error();                                                                  \
+      } else {                                                                                     \
+        v1.field_name() = static_cast<V1FieldType>(static_cast<V1UnderlyingType>(                  \
+            static_cast<V2UnderlyingType>(v2.field_name().value())));                              \
+      }                                                                                            \
+    } else {                                                                                       \
+      v1.field_name() = static_cast<V1FieldType>(0);                                               \
+    }                                                                                              \
+  } while (false)
+
 #define PROCESS_WIRE_SCALAR_FIELD_V2(field_name)                                          \
   do {                                                                                    \
     using V1FieldType = decltype(v1.field_name);                                          \
     using V2FieldType = std::remove_reference_t<decltype(v2.field_name())>;               \
-    static_assert(IsCompatibleFidlScalarTypes<V1FieldType, V2FieldType>::value);          \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V1FieldType, V2FieldType>);     \
     using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                     \
     using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                     \
     if (v2.has_##field_name()) {                                                          \
@@ -166,11 +194,35 @@ inline constexpr bool IsCompatibleFidlScalarTypes_v = IsCompatibleFidlScalarType
     }                                                                                     \
   } while (false)
 
+#define PROCESS_WIRE_SCALAR_FIELD_V2_BIGGER(field_name)                                           \
+  do {                                                                                            \
+    using V1FieldType = decltype(v1.field_name);                                                  \
+    using V2FieldType = std::remove_reference_t<decltype(v2.field_name())>;                       \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<V1FieldType, V2FieldType, true>);       \
+    using V1UnderlyingType = FidlUnderlyingTypeOrType_t<V1FieldType>;                             \
+    using V2UnderlyingType = FidlUnderlyingTypeOrType_t<V2FieldType>;                             \
+    if (v2.has_##field_name()) {                                                                  \
+      if (v2.field_name() == std::numeric_limits<V2FieldType>::max()) {                           \
+        v1.field_name = std::numeric_limits<V1FieldType>::max();                                  \
+      } else if (v2.field_name() >                                                                \
+                 std::numeric_limits<std::remove_reference_t<decltype(v1.field_name)>>::max()) {  \
+        LOG(ERROR, "V2 field value too large for V1: %s %" PRIu64, #field_name, v2.field_name()); \
+        return fpromise::error();                                                                 \
+      } else {                                                                                    \
+        /* This intentionally allows for implicit conversions for flexible enums */               \
+        v1.field_name = static_cast<V1FieldType>(                                                 \
+            static_cast<V1UnderlyingType>(static_cast<V2UnderlyingType>(v2.field_name())));       \
+      }                                                                                           \
+    } else {                                                                                      \
+      v1.field_name = static_cast<V1FieldType>(0);                                                \
+    }                                                                                             \
+  } while (false)
+
 #define ASSIGN_SCALAR(dst, src)                                                                    \
   do {                                                                                             \
     using DstType = typename std::remove_reference_t<decltype((dst))>;                             \
     using SrcType = typename std::remove_reference_t<decltype((src))>;                             \
-    static_assert(IsCompatibleFidlScalarTypes_v<DstType, SrcType>);                                \
+    static_assert(IsCompatibleAssignmentFidlScalarTypes_v<DstType, SrcType>);                      \
     using DstUnderlyingType = FidlUnderlyingTypeOrType_t<DstType>;                                 \
     using SrcUnderlyingType = FidlUnderlyingTypeOrType_t<SrcType>;                                 \
     /* This intentionally allows for implicit conversions for flexible enums */                    \
@@ -552,8 +604,8 @@ fpromise::result<fuchsia_sysmem2::wire::BufferMemoryConstraints>
 V2CopyFromV1BufferMemoryConstraints(fidl::AnyArena& allocator,
                                     const fuchsia_sysmem::wire::BufferMemoryConstraints& v1) {
   fuchsia_sysmem2::wire::BufferMemoryConstraints v2b(allocator);
-  PROCESS_WIRE_SCALAR_FIELD_V1(min_size_bytes);
-  PROCESS_WIRE_SCALAR_FIELD_V1(max_size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V1_WITH_ALLOCATOR(min_size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V1_WITH_ALLOCATOR(max_size_bytes);
   PROCESS_WIRE_SCALAR_FIELD_V1(physically_contiguous_required);
   PROCESS_WIRE_SCALAR_FIELD_V1(secure_required);
   PROCESS_WIRE_SCALAR_FIELD_V1(ram_domain_supported);
@@ -662,7 +714,7 @@ fuchsia_sysmem2::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
 fuchsia_sysmem2::wire::BufferMemorySettings V2CopyFromV1BufferMemorySettings(
     fidl::AnyArena& allocator, const fuchsia_sysmem::wire::BufferMemorySettings& v1) {
   fuchsia_sysmem2::wire::BufferMemorySettings v2b(allocator);
-  PROCESS_WIRE_SCALAR_FIELD_V1(size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V1_WITH_ALLOCATOR(size_bytes);
   PROCESS_WIRE_SCALAR_FIELD_V1(is_physically_contiguous);
   PROCESS_WIRE_SCALAR_FIELD_V1(is_secure);
   PROCESS_WIRE_SCALAR_FIELD_V1(coherency_domain);
@@ -870,8 +922,8 @@ V1CopyFromV2BufferCollectionConstraints(
 fpromise::result<fuchsia_sysmem::BufferMemoryConstraints> V1CopyFromV2BufferMemoryConstraints(
     const fuchsia_sysmem2::BufferMemoryConstraints& v2) {
   fuchsia_sysmem::BufferMemoryConstraints v1;
-  PROCESS_SCALAR_FIELD_V2(min_size_bytes);
-  PROCESS_SCALAR_FIELD_V2(max_size_bytes);
+  PROCESS_SCALAR_FIELD_V2_BIGGER(min_size_bytes);
+  PROCESS_SCALAR_FIELD_V2_BIGGER(max_size_bytes);
   PROCESS_SCALAR_FIELD_V2(physically_contiguous_required);
   PROCESS_SCALAR_FIELD_V2(secure_required);
   PROCESS_SCALAR_FIELD_V2(ram_domain_supported);
@@ -895,8 +947,8 @@ fpromise::result<fuchsia_sysmem::BufferMemoryConstraints> V1CopyFromV2BufferMemo
 fpromise::result<fuchsia_sysmem::wire::BufferMemoryConstraints> V1CopyFromV2BufferMemoryConstraints(
     const fuchsia_sysmem2::wire::BufferMemoryConstraints& v2) {
   fuchsia_sysmem::wire::BufferMemoryConstraints v1{};
-  PROCESS_WIRE_SCALAR_FIELD_V2(min_size_bytes);
-  PROCESS_WIRE_SCALAR_FIELD_V2(max_size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V2_BIGGER(min_size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V2_BIGGER(max_size_bytes);
   PROCESS_WIRE_SCALAR_FIELD_V2(physically_contiguous_required);
   PROCESS_WIRE_SCALAR_FIELD_V2(secure_required);
   PROCESS_WIRE_SCALAR_FIELD_V2(ram_domain_supported);
@@ -939,27 +991,27 @@ fuchsia_sysmem::wire::BufferUsage V1CopyFromV2BufferUsage(
 }
 
 // v2 must have all fields set.
-fuchsia_sysmem::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
+fpromise::result<fuchsia_sysmem::BufferMemorySettings> V1CopyFromV2BufferMemorySettings(
     const fuchsia_sysmem2::BufferMemorySettings& v2) {
   fuchsia_sysmem::BufferMemorySettings v1;
-  PROCESS_SCALAR_FIELD_V2(size_bytes);
+  PROCESS_SCALAR_FIELD_V2_BIGGER(size_bytes);
   PROCESS_SCALAR_FIELD_V2(is_physically_contiguous);
   PROCESS_SCALAR_FIELD_V2(is_secure);
   PROCESS_SCALAR_FIELD_V2(coherency_domain);
   PROCESS_SCALAR_FIELD_V2(heap);
-  return v1;
+  return fpromise::ok(v1);
 }
 
 // v2 must have all fields set.
-fuchsia_sysmem::wire::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
+fpromise::result<fuchsia_sysmem::wire::BufferMemorySettings> V1CopyFromV2BufferMemorySettings(
     const fuchsia_sysmem2::wire::BufferMemorySettings& v2) {
   fuchsia_sysmem::wire::BufferMemorySettings v1{};
-  PROCESS_WIRE_SCALAR_FIELD_V2(size_bytes);
+  PROCESS_WIRE_SCALAR_FIELD_V2_BIGGER(size_bytes);
   PROCESS_WIRE_SCALAR_FIELD_V2(is_physically_contiguous);
   PROCESS_WIRE_SCALAR_FIELD_V2(is_secure);
   PROCESS_WIRE_SCALAR_FIELD_V2(coherency_domain);
   PROCESS_WIRE_SCALAR_FIELD_V2(heap);
-  return v1;
+  return fpromise::ok(v1);
 }
 
 fuchsia_sysmem::PixelFormatType V1CopyFromV2PixelFormatType(
@@ -1035,7 +1087,16 @@ fpromise::result<fuchsia_sysmem::ImageFormatConstraints> V1CopyFromV2ImageFormat
   PROCESS_SCALAR_FIELD_V2(max_bytes_per_row);
 
   if (v2.max_surface_width_times_surface_height().has_value()) {
-    v1.max_coded_width_times_coded_height() = *v2.max_surface_width_times_surface_height();
+    using V1Type = std::remove_reference_t<decltype(v1.max_coded_width_times_coded_height())>;
+    using V2Type = std::remove_reference_t<decltype(*v2.max_surface_width_times_surface_height())>;
+    if (*v2.max_surface_width_times_surface_height() == std::numeric_limits<V2Type>::max()) {
+      v1.max_coded_width_times_coded_height() = std::numeric_limits<V1Type>::max();
+    } else if (*v2.max_surface_width_times_surface_height() > std::numeric_limits<V1Type>::max()) {
+      LOG(ERROR, "max_surface_width_times_surface_height too large for v1");
+      return fpromise::error();
+    }
+    v1.max_coded_width_times_coded_height() =
+        static_cast<V1Type>(*v2.max_surface_width_times_surface_height());
   }
   v1.layers() = 1;
 
@@ -1178,7 +1239,11 @@ fpromise::result<fuchsia_sysmem::wire::ImageFormat2> V1CopyFromV2ImageFormat(
 fpromise::result<fuchsia_sysmem::SingleBufferSettings> V1CopyFromV2SingleBufferSettings(
     const fuchsia_sysmem2::SingleBufferSettings& v2) {
   fuchsia_sysmem::SingleBufferSettings v1;
-  v1.buffer_settings() = V1CopyFromV2BufferMemorySettings(v2.buffer_settings().value());
+  auto buffer_settings_result = V1CopyFromV2BufferMemorySettings(v2.buffer_settings().value());
+  if (buffer_settings_result.is_error()) {
+    return fpromise::error();
+  }
+  v1.buffer_settings() = std::move(buffer_settings_result.value());
   v1.has_image_format_constraints() = v2.image_format_constraints().has_value();
   if (v2.image_format_constraints().has_value()) {
     auto image_format_constraints_result =
@@ -1195,7 +1260,11 @@ fpromise::result<fuchsia_sysmem::SingleBufferSettings> V1CopyFromV2SingleBufferS
 fpromise::result<fuchsia_sysmem::wire::SingleBufferSettings> V1CopyFromV2SingleBufferSettings(
     const fuchsia_sysmem2::wire::SingleBufferSettings& v2) {
   fuchsia_sysmem::wire::SingleBufferSettings v1{};
-  v1.buffer_settings = V1CopyFromV2BufferMemorySettings(v2.buffer_settings());
+  auto buffer_settings_result = V1CopyFromV2BufferMemorySettings(v2.buffer_settings());
+  if (buffer_settings_result.is_error()) {
+    return fpromise::error();
+  }
+  v1.buffer_settings = std::move(buffer_settings_result.value());
   v1.has_image_format_constraints = v2.has_image_format_constraints();
   if (v2.has_image_format_constraints()) {
     auto image_format_constraints_result =

@@ -104,7 +104,8 @@ class SystemRamMemoryAllocator : public MemoryAllocator {
     ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
     ZX_DEBUG_ASSERT_MSG(
         fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
-        "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
+        "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(),
+        size);
     zx_status_t status = zx::vmo::create(size, 0, parent_vmo);
     if (status != ZX_OK) {
       return status;
@@ -154,7 +155,8 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
     ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
     ZX_DEBUG_ASSERT_MSG(
         fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
-        "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
+        "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(),
+        size);
     zx::vmo result_parent_vmo;
     // This code is unlikely to work after running for a while and physical
     // memory is more fragmented than early during boot. The

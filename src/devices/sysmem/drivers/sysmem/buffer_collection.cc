@@ -679,7 +679,6 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo> BufferCollection::CloneR
       // since any client holding a sysmem weak VMO handle needs to know when to close that handle
       // asap.
       ZX_DEBUG_ASSERT(vmo_buffer.vmo().has_value() == vmo_buffer.close_weak_asap().has_value());
-      // We'll move any aux_vmo separately below.
       auto attenuated_vmo_buffer_result =
           sysmem::V2CloneVmoBuffer(vmo_buffer, GetClientVmoRights());
       if (attenuated_vmo_buffer_result.is_error()) {

@@ -18,16 +18,12 @@ type VmoBuffer = resource table {
     /// BufferMemorySettings.size_bytes before the end of the VMO.
     2: vmo_usable_start uint64;
 
-    /// This ordinal is ok to re-use in sysmem2; nothing ever actually used this
-    /// ordinal for anything (aux_vmo never used in sysmem2).
-    3: reserved;
-
     /// This field is set iff the |vmo| is a sysmem weak VMO handle. The client
     /// must keep |close_weak_asap| around for as long as |vmo|, and must notice
     /// ZX_EVENTPAIR_PEER_CLOSED; if that signal occurs, the client must close
     /// |vmo| asap. Not doing so is considered a VMO leak and in that case
     /// sysmem will eventually complain loudly via syslog (currently 5s later).
-    4: close_weak_asap zx.Handle:EVENTPAIR;
+    3: close_weak_asap zx.Handle:EVENTPAIR;
 };
 
 const MAX_COUNT_BUFFER_COLLECTION_INFO_BUFFERS uint32 = 128;
@@ -92,7 +88,7 @@ type SingleBufferSettings = table {
 
 /// These are memory-related settings for all buffers of a buffer collection.
 type BufferMemorySettings = table {
-    1: size_bytes uint32;
+    1: size_bytes uint64;
     2: is_physically_contiguous bool;
     3: is_secure bool;
     4: coherency_domain CoherencyDomain;

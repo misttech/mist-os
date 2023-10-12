@@ -2810,7 +2810,7 @@ bool LogicalBufferCollection::AccumulateConstraintBufferMemory(
   // actual size of page size, we do permit treating buffers as if they're 1
   // byte, mainly for testing reasons, and to avoid any unnecessary dependence
   // or assumptions re. page size.
-  acc->min_size_bytes() = std::max(*acc->min_size_bytes(), 1u);
+  acc->min_size_bytes() = std::max(*acc->min_size_bytes(), 1ul);
   acc->max_size_bytes() = std::min(*acc->max_size_bytes(), *c.max_size_bytes());
 
   acc->physically_contiguous_required() =
@@ -3440,18 +3440,13 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
     // preventing unpredictable memory pressure caused by a fuzzer or similar source of
     // unpredictability in tests.
     LogError(FROM_HERE,
-             "GenerateUnpopulatedBufferCollectionInfo() failed because size %u > "
+             "GenerateUnpopulatedBufferCollectionInfo() failed because size %" PRIu64
+             " > "
              "max_allocation_size %ld",
              *buffer_settings.size_bytes(), parent_device_->settings().max_allocation_size);
     return fpromise::error(ZX_ERR_NO_MEMORY);
   }
 
-  // We initially set vmo_usable_start to bit-fields indicating whether vmo and aux_vmo fields will
-  // be set to valid handles later.  This is for purposes of comparison with a later
-  // BufferCollectionInfo after an AttachToken().  Before sending to the client, the
-  // vmo_usable_start is set to 0.  Even if later we need a non-zero vmo_usable_start to be compared
-  // we are extremely unlikely to want a buffer to start at an offset that isn't divisible by 4, so
-  // using the two low-order bits for this seems reasonable enough.
   for (uint32_t i = 0; i < result.buffers()->size(); ++i) {
     fuchsia_sysmem2::VmoBuffer vmo_buffer;
     vmo_buffer.vmo_usable_start() = 0ul;
@@ -4009,8 +4004,8 @@ void LogicalBufferCollection::LogConstraints(
     LogInfo(FROM_HERE, "!c.has_buffer_memory_constraints()");
   } else {
     const fuchsia_sysmem2::BufferMemoryConstraints& bmc = *c.buffer_memory_constraints();
-    LOG_UINT32_FIELD(FROM_HERE, bmc, min_size_bytes);
-    LOG_UINT32_FIELD(FROM_HERE, bmc, max_size_bytes);
+    LOG_UINT64_FIELD(FROM_HERE, bmc, min_size_bytes);
+    LOG_UINT64_FIELD(FROM_HERE, bmc, max_size_bytes);
     LOG_BOOL_FIELD(FROM_HERE, bmc, physically_contiguous_required);
     LOG_BOOL_FIELD(FROM_HERE, bmc, secure_required);
     LOG_BOOL_FIELD(FROM_HERE, bmc, cpu_domain_supported);
@@ -4048,7 +4043,7 @@ void LogicalBufferCollection::LogConstraints(
     LOG_UINT32_FIELD(FROM_HERE, ifc, min_bytes_per_row);
     LOG_UINT32_FIELD(FROM_HERE, ifc, max_bytes_per_row);
 
-    LOG_UINT32_FIELD(FROM_HERE, ifc, max_surface_width_times_surface_height);
+    LOG_UINT64_FIELD(FROM_HERE, ifc, max_surface_width_times_surface_height);
 
     LogInfo(FROM_HERE, "size_alignment.width: %u", ifc.size_alignment()->width());
     LogInfo(FROM_HERE, "size_alignment.height: %u", ifc.size_alignment()->height());

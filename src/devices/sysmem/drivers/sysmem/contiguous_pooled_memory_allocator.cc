@@ -432,7 +432,7 @@ zx_status_t ContiguousPooledMemoryAllocator::Allocate(
   ZX_DEBUG_ASSERT_MSG(size % zx_system_get_page_size() == 0, "size: 0x%" PRIx64, size);
   ZX_DEBUG_ASSERT_MSG(
       fbl::round_up(*settings.buffer_settings()->size_bytes(), zx_system_get_page_size()) == size,
-      "size_bytes: %u size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
+      "size_bytes: %" PRIu64 " size: 0x%" PRIx64, *settings.buffer_settings()->size_bytes(), size);
   if (!is_ready_) {
     LOG(ERROR, "allocation_name_: %s is not ready_, failing", allocation_name_);
     return ZX_ERR_BAD_STATE;

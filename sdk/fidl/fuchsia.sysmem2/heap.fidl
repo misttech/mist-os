@@ -124,7 +124,7 @@ closed protocol Heap {
         size uint64;
         settings SingleBufferSettings;
         buffer_collection_id uint64;
-        buffer_index uint32;
+        buffer_index uint64;
     }) -> (resource struct {
         vmo zx.Handle:<VMO>;
     }) error zx.Status;
@@ -158,7 +158,7 @@ closed protocol Heap {
     /// processing [`fuchsia.sysmem2.Allocator.GetVmoInfo`].
     strict DeleteVmo(resource struct {
         buffer_collection_id uint64;
-        buffer_index uint32;
+        buffer_index uint64;
         vmo zx.Handle:<VMO>;
     }) -> ();
 

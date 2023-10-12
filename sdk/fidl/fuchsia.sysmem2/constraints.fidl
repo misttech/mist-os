@@ -129,11 +129,6 @@ type BufferCollectionConstraints = table {
     /// error.
     8: image_format_constraints
             vector<ImageFormatConstraints>:MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS;
-
-    // Was need_clear_aux_buffers_for_secure.
-    9: reserved;
-    // Was allow_clear_aux_buffers_for_secure.
-   10: reserved;
 };
 
 /// Known heap types.
@@ -162,9 +157,9 @@ type HeapType = flexible enum : uint64 {
 };
 
 type BufferMemoryConstraints = table {
-    1: min_size_bytes uint32;
-    /// un-set is treated as 0xFFFFFFFF.
-    2: max_size_bytes uint32;
+    1: min_size_bytes uint64;
+    /// un-set is treated as 0xFFFFFFFFFFFFFFFF.
+    2: max_size_bytes uint64;
 
     3: physically_contiguous_required bool;
 
@@ -318,7 +313,7 @@ type ImageFormatConstraints = table {
     ///
     /// Receiving from sysmem, this field will always be set, and can be set to
     /// 0xFFFFFFFF.
-    8: max_surface_width_times_surface_height uint32;
+    8: max_surface_width_times_surface_height uint64;
 
     /// * `size.width % size_alignment.width` must be 0.
     /// * `size.height % size_alignment.height` must be 0. Un-set is treated as

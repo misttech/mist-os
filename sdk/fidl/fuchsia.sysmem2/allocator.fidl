@@ -187,7 +187,7 @@ closed protocol Allocator {
         /// different clients). The buffer_index is only unique across logical
         /// buffers in a collection; for a given logical buffer, the combination
         /// of buffer_collection_id and buffer_index is unique per boot.
-        2: buffer_index uint32;
+        2: buffer_index uint64;
 
         /// The close_weak_asap eventpair will be present iff the vmo handle is
         /// "weak" from sysmem's point of view. This "weak" concept is a sysmem

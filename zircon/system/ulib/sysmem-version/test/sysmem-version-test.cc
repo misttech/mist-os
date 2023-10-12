@@ -966,7 +966,9 @@ TEST(SysmemVersion, BufferMemorySettings) {
     auto v2_1 = sysmem::V2CopyFromV1BufferMemorySettings(snap_1->value());
     // clone
     auto v2_2 = v2_1;
-    auto v1_2 = sysmem::V1CopyFromV2BufferMemorySettings(v2_2);
+    auto v1_2_result = sysmem::V1CopyFromV2BufferMemorySettings(v2_2);
+    ASSERT_TRUE(v1_2_result.is_ok());
+    auto v1_2 = std::move(v1_2_result.value());
     auto snap_2 = SnapMoveFrom(std::move(v1_2));
     EXPECT_TRUE(IsEqual(*snap_1, *snap_2));
   }
@@ -979,7 +981,9 @@ TEST(SysmemVersion, BufferMemorySettingsWire) {
     auto snap_1 = SnapMoveFrom(std::move(v1_1));
     auto v2_1 = sysmem::V2CopyFromV1BufferMemorySettings(allocator, snap_1->value());
     auto v2_2 = sysmem::V2CloneBufferMemorySettings(allocator, v2_1);
-    auto v1_2 = sysmem::V1CopyFromV2BufferMemorySettings(v2_2);
+    auto v1_2_result = sysmem::V1CopyFromV2BufferMemorySettings(v2_2);
+    ASSERT_TRUE(v1_2_result.is_ok());
+    auto v1_2 = std::move(v1_2_result.value());
     auto snap_2 = SnapMoveFrom(std::move(v1_2));
     EXPECT_TRUE(IsEqual(*snap_1, *snap_2));
   }

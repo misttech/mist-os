@@ -281,10 +281,10 @@ V1CopyFromV2BufferMemoryConstraints(const fuchsia_sysmem2::wire::BufferMemoryCon
 [[nodiscard]] fuchsia_sysmem::wire::BufferUsage V1CopyFromV2BufferUsage(
     const fuchsia_sysmem2::wire::BufferUsage& v2);
 
-[[nodiscard]] fuchsia_sysmem::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
-    const fuchsia_sysmem2::BufferMemorySettings& v2);
-[[nodiscard]] fuchsia_sysmem::wire::BufferMemorySettings V1CopyFromV2BufferMemorySettings(
-    const fuchsia_sysmem2::wire::BufferMemorySettings& v2);
+[[nodiscard]] fpromise::result<fuchsia_sysmem::BufferMemorySettings>
+V1CopyFromV2BufferMemorySettings(const fuchsia_sysmem2::BufferMemorySettings& v2);
+[[nodiscard]] fpromise::result<fuchsia_sysmem::wire::BufferMemorySettings>
+V1CopyFromV2BufferMemorySettings(const fuchsia_sysmem2::wire::BufferMemorySettings& v2);
 
 [[nodiscard]] fuchsia_sysmem::PixelFormat V1CopyFromV2PixelFormat(const PixelFormatAndModifier& v2);
 [[nodiscard]] fuchsia_sysmem::wire::PixelFormat V1WireCopyFromV2PixelFormat(
