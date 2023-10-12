@@ -239,7 +239,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     dynamic_ = dynamic;
   }
 
-  bool IsLoaded() const { return module_; }
+  bool IsLoaded() const { return HasModule(); }
 
   template <typename Allocator, typename... LoaderArgs>
   static List MakePreloadedList(Diagnostics& diag, Allocator& allocator,

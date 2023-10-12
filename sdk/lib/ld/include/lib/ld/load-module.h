@@ -89,6 +89,8 @@ class LoadModule {
     return name == name_ || (module_ && name == module_->soname);
   }
 
+  constexpr bool HasModule() const { return module_; }
+
   // This should be used only after EmplaceModule or (successful) NewModule.
   constexpr Module& module() {
     assert(module_);
@@ -169,7 +171,7 @@ class LoadModule {
     module_ = &module;
   }
 
- protected:
+ private:
   using ModuleStorage =
       std::conditional_t<InlineModule == LoadModuleInline::kYes, std::optional<Module>, Module*>;
 
