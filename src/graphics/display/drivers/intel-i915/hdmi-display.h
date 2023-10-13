@@ -41,11 +41,11 @@ class HdmiDisplay : public DisplayDevice {
                           TranscoderId transcoder_id) final;
   bool PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final;
-  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_10khz) final;
+  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_khz) final;
   // Hdmi doesn't need the clock rate when changing the transcoder
-  uint32_t LoadClockRateForTranscoder(TranscoderId transcoder_id) final { return 0; }
+  int32_t LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) final { return 0; }
 
-  bool CheckPixelRate(uint64_t pixel_rate) final;
+  bool CheckPixelRate(int64_t pixel_rate_hz) final;
 
   ddk::I2cImplProtocolClient i2c() final { return i2c_; }
 

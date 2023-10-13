@@ -215,10 +215,10 @@ class DpDisplay : public DisplayDevice {
                           TranscoderId transcoder_id) final;
   bool PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
                           TranscoderId transcoder_id) final;
-  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_10khz) final;
-  uint32_t LoadClockRateForTranscoder(TranscoderId transcoder_id) final;
+  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_khz) final;
+  int32_t LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) final;
 
-  bool CheckPixelRate(uint64_t pixel_rate) final;
+  bool CheckPixelRate(int64_t pixel_rate_hz) final;
 
   ddk::I2cImplProtocolClient i2c() final { return i2c_; }
 

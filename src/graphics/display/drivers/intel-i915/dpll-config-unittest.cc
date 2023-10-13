@@ -182,31 +182,31 @@ TEST(CreateDpllOscillatorConfigForHdmiTigerLakeTest, DisplayPortTable) {
   // Values" pages 178-179.
 
   struct TableRow {
-    int32_t link_rate;
+    int32_t link_rate_khz;
     int32_t frequency;
     int8_t divider;
   };
   static constexpr TableRow kTableRows[] = {
       // The algorithm solutions match the table for the cases below.
-      {.link_rate = 5'400'000, .frequency = 8'100'000, .divider = 3},
-      {.link_rate = 2'160'000, .frequency = 8'640'000, .divider = 8},
-      {.link_rate = 4'320'000, .frequency = 8'640'000, .divider = 4},
-      {.link_rate = 6'480'000, .frequency = 9'720'000, .divider = 3},
-      {.link_rate = 8'100'000, .frequency = 8'100'000, .divider = 2},
+      {.link_rate_khz = 5'400'000, .frequency = 8'100'000, .divider = 3},
+      {.link_rate_khz = 2'160'000, .frequency = 8'640'000, .divider = 8},
+      {.link_rate_khz = 4'320'000, .frequency = 8'640'000, .divider = 4},
+      {.link_rate_khz = 6'480'000, .frequency = 9'720'000, .divider = 3},
+      {.link_rate_khz = 8'100'000, .frequency = 8'100'000, .divider = 2},
 
       // The algorithm finds different values from the table. The solutions
       // here are better than the table's solutions in respect to the
       // algorithm's stated goal of minimizing DCO frequency deviation from the
       // centrer frequency.
-      {.link_rate = 2'700'000, .frequency = 9'450'000, .divider = 7},
-      {.link_rate = 1'620'000, .frequency = 9'720'000, .divider = 12},
-      {.link_rate = 3'240'000, .frequency = 9'720'000, .divider = 6},
+      {.link_rate_khz = 2'700'000, .frequency = 9'450'000, .divider = 7},
+      {.link_rate_khz = 1'620'000, .frequency = 9'720'000, .divider = 12},
+      {.link_rate_khz = 3'240'000, .frequency = 9'720'000, .divider = 6},
   };
 
   for (const TableRow& test_row : kTableRows) {
-    const int32_t afe_clock_khz = static_cast<int32_t>(test_row.link_rate / 2);
+    const int32_t afe_clock_khz = static_cast<int32_t>(test_row.link_rate_khz / 2);
     SCOPED_TRACE(testing::Message()
-                 << "Link rate: " << test_row.link_rate << " kHz AFE clock: " << afe_clock_khz);
+                 << "Link rate: " << test_row.link_rate_khz << " kHz AFE clock: " << afe_clock_khz);
 
     const DpllOscillatorConfig dco_config =
         CreateDpllOscillatorConfigForHdmiTigerLake(afe_clock_khz);
@@ -221,26 +221,26 @@ TEST(CreateDpllOscillatorConfigForDisplayPortTigerLakeTest, DisplayPortTable) {
   // Values" pages 178-179.
 
   struct TableRow {
-    int32_t link_rate;
+    int32_t link_rate_khz;
     int32_t frequency;
     int8_t divider;
   };
   static constexpr TableRow kTableRows[] = {
       // The algorithm solutions match the table for the cases below.
-      {.link_rate = 5'400'000, .frequency = 8'100'000, .divider = 3},
-      {.link_rate = 2'700'000, .frequency = 8'100'000, .divider = 6},
-      {.link_rate = 1'620'000, .frequency = 8'100'000, .divider = 10},
-      {.link_rate = 3'240'000, .frequency = 8'100'000, .divider = 5},
-      {.link_rate = 2'160'000, .frequency = 8'640'000, .divider = 8},
-      {.link_rate = 4'320'000, .frequency = 8'640'000, .divider = 4},
-      {.link_rate = 6'480'000, .frequency = 9'720'000, .divider = 3},
-      {.link_rate = 8'100'000, .frequency = 8'100'000, .divider = 2},
+      {.link_rate_khz = 5'400'000, .frequency = 8'100'000, .divider = 3},
+      {.link_rate_khz = 2'700'000, .frequency = 8'100'000, .divider = 6},
+      {.link_rate_khz = 1'620'000, .frequency = 8'100'000, .divider = 10},
+      {.link_rate_khz = 3'240'000, .frequency = 8'100'000, .divider = 5},
+      {.link_rate_khz = 2'160'000, .frequency = 8'640'000, .divider = 8},
+      {.link_rate_khz = 4'320'000, .frequency = 8'640'000, .divider = 4},
+      {.link_rate_khz = 6'480'000, .frequency = 9'720'000, .divider = 3},
+      {.link_rate_khz = 8'100'000, .frequency = 8'100'000, .divider = 2},
   };
 
   for (const TableRow& test_row : kTableRows) {
-    const int32_t afe_clock_khz = static_cast<int32_t>(test_row.link_rate / 2);
+    const int32_t afe_clock_khz = static_cast<int32_t>(test_row.link_rate_khz / 2);
     SCOPED_TRACE(testing::Message()
-                 << "Link rate: " << test_row.link_rate << " kHz AFE clock: " << afe_clock_khz);
+                 << "Link rate: " << test_row.link_rate_khz << " kHz AFE clock: " << afe_clock_khz);
 
     const DpllOscillatorConfig dco_config =
         CreateDpllOscillatorConfigForDisplayPortTigerLake(afe_clock_khz);

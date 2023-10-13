@@ -71,10 +71,10 @@ class FakeDisplay : public DisplayDevice {
                           TranscoderId transcoder_id) final {
     return true;
   }
-  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_10khz) final { return {}; }
-  uint32_t LoadClockRateForTranscoder(TranscoderId transcoder_id) final { return 0; }
+  DdiPllConfig ComputeDdiPllConfig(int32_t pixel_clock_khz) final { return {}; }
+  int32_t LoadPixelRateForTranscoderKhz(TranscoderId transcoder_id) final { return 0; }
   ddk::I2cImplProtocolClient i2c() final { return {}; }
-  bool CheckPixelRate(uint64_t pixel_rate) final { return true; }
+  bool CheckPixelRate(int64_t pixel_rate_hz) final { return true; }
 };
 
 // This tests if the PipeManager can allocate pipe for display devices and

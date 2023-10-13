@@ -248,8 +248,9 @@ class Controller : public DeviceType,
   void UpdateAllocations(
       const uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                                [registers::kImagePlaneCount],
-      const uint64_t display_rate[PipeIds<registers::Platform::kKabyLake>().size()]
-                                 [registers::kImagePlaneCount]) __TA_REQUIRES(display_lock_);
+      const uint64_t data_rate_bytes_per_frame[PipeIds<registers::Platform::kKabyLake>().size()]
+                                              [registers::kImagePlaneCount])
+      __TA_REQUIRES(display_lock_);
   // Reallocates the pipe buffers when a pipe comes online/goes offline. This is a
   // long-running operation, as shifting allocations between pipes requires waiting
   // for vsync.

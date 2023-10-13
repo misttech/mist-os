@@ -1243,17 +1243,17 @@ bool Controller::CalculateMinimumAllocations(
 void Controller::UpdateAllocations(
     const uint16_t min_allocs[PipeIds<registers::Platform::kKabyLake>().size()]
                              [registers::kImagePlaneCount],
-    const uint64_t data_rate[PipeIds<registers::Platform::kKabyLake>().size()]
-                            [registers::kImagePlaneCount]) {
+    const uint64_t data_rate_bytes_per_frame[PipeIds<registers::Platform::kKabyLake>().size()]
+                                            [registers::kImagePlaneCount]) {
   uint16_t allocs[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
 
   for (unsigned pipe_num = 0; pipe_num < PipeIds<registers::Platform::kKabyLake>().size();
        pipe_num++) {
-    uint64_t total_data_rate = 0;
+    uint64_t total_data_rate_bytes_per_frame = 0;
     for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
-      total_data_rate += data_rate[pipe_num][plane_num];
+      total_data_rate_bytes_per_frame += data_rate_bytes_per_frame[pipe_num][plane_num];
     }
-    if (total_data_rate == 0) {
+    if (total_data_rate_bytes_per_frame == 0) {
       for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
         allocs[pipe_num][plane_num] = 0;
       }
@@ -1272,8 +1272,9 @@ void Controller::UpdateAllocations(
           continue;
         }
 
-        double blocks = buffers_per_pipe * static_cast<double>(data_rate[pipe_num][plane_num]) /
-                        static_cast<double>(total_data_rate);
+        double blocks = buffers_per_pipe *
+                        static_cast<double>(data_rate_bytes_per_frame[pipe_num][plane_num]) /
+                        static_cast<double>(total_data_rate_bytes_per_frame);
         allocs[pipe_num][plane_num] = static_cast<uint16_t>(blocks);
       }
 
@@ -1284,7 +1285,7 @@ void Controller::UpdateAllocations(
           done = false;
           allocs[pipe_num][plane_num] = min_allocs[pipe_num][plane_num];
           forced_alloc[plane_num] = true;
-          total_data_rate -= data_rate[pipe_num][plane_num];
+          total_data_rate_bytes_per_frame -= data_rate_bytes_per_frame[pipe_num][plane_num];
           buffers_per_pipe -= allocs[pipe_num][plane_num];
         }
       }
@@ -1359,13 +1360,14 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
   }
 
   // Calculate the data rates and store the minimum allocations
-  uint64_t data_rate[PipeIds<registers::Platform::kKabyLake>().size()][registers::kImagePlaneCount];
+  uint64_t data_rate_bytes_per_frame[PipeIds<registers::Platform::kKabyLake>().size()]
+                                    [registers::kImagePlaneCount];
   for (Pipe* pipe : *pipe_manager_) {
     PipeId pipe_id = pipe->pipe_id();
     for (unsigned plane_num = 0; plane_num < registers::kImagePlaneCount; plane_num++) {
       const layer_t* layer;
       if (!GetPlaneLayer(pipe, plane_num, banjo_display_configs, &layer)) {
-        data_rate[pipe_id][plane_num] = 0;
+        data_rate_bytes_per_frame[pipe_id][plane_num] = 0;
       } else if (layer->type == LAYER_TYPE_PRIMARY) {
         const primary_layer_t* primary = &layer->cfg.primary;
 
@@ -1385,10 +1387,11 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
         ZX_DEBUG_ASSERT(bytes_per_pixel == ImageFormatStrideBytesPerWidthPixel(
                                                GetImportedImagePixelFormat(&primary->image)));
 
-        data_rate[pipe_id][plane_num] = uint64_t{scaled_width} * scaled_height * bytes_per_pixel;
+        data_rate_bytes_per_frame[pipe_id][plane_num] =
+            uint64_t{scaled_width} * scaled_height * bytes_per_pixel;
       } else if (layer->type == LAYER_TYPE_CURSOR) {
         // Use a tiny data rate so the cursor gets the minimum number of buffers
-        data_rate[pipe_id][plane_num] = 1;
+        data_rate_bytes_per_frame[pipe_id][plane_num] = 1;
       } else {
         // Other layers don't use pipe/planes, so GetPlaneLayer should have returned false
         ZX_ASSERT(false);
@@ -1429,7 +1432,7 @@ void Controller::ReallocatePlaneBuffers(cpp20::span<const display_config_t*> ban
   }
 
   // It's not necessary to flush the buffer changes since the pipe allocs didn't change
-  UpdateAllocations(min_allocs, data_rate);
+  UpdateAllocations(min_allocs, data_rate_bytes_per_frame);
 
   if (reallocate_pipes) {
     DoPipeBufferReallocation(active_allocation);
@@ -1535,33 +1538,34 @@ bool Controller::CheckDisplayLimits(
       return false;
     }
 
-    uint64_t max_pipe_pixel_rate;
-    auto cd_freq = registers::CdClockCtl::Get().ReadFrom(mmio_space()).cd_freq_decimal();
+    int64_t max_pipe_pixel_rate_hz;
+    auto cd_freq_khz = registers::CdClockCtl::Get().ReadFrom(mmio_space()).cd_freq_decimal();
 
-    if (cd_freq == registers::CdClockCtl::FreqDecimal(307200)) {
-      max_pipe_pixel_rate = 307200000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(308570)) {
-      max_pipe_pixel_rate = 308570000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(337500)) {
-      max_pipe_pixel_rate = 337500000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(432000)) {
-      max_pipe_pixel_rate = 432000000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(450000)) {
-      max_pipe_pixel_rate = 450000000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(540000)) {
-      max_pipe_pixel_rate = 540000000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(617140)) {
-      max_pipe_pixel_rate = 617140000;
-    } else if (cd_freq == registers::CdClockCtl::FreqDecimal(675000)) {
-      max_pipe_pixel_rate = 675000000;
+    if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(307'200)) {
+      max_pipe_pixel_rate_hz = 307'200'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(308'570)) {
+      max_pipe_pixel_rate_hz = 308'570'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(337'500)) {
+      max_pipe_pixel_rate_hz = 337'500'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(432'000)) {
+      max_pipe_pixel_rate_hz = 432'000'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(450'000)) {
+      max_pipe_pixel_rate_hz = 450'000'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(540'000)) {
+      max_pipe_pixel_rate_hz = 540'000'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(617'140)) {
+      max_pipe_pixel_rate_hz = 617'140'000;
+    } else if (cd_freq_khz == registers::CdClockCtl::FreqDecimal(675'000)) {
+      max_pipe_pixel_rate_hz = 675'000'000;
     } else {
       ZX_ASSERT(false);
     }
 
     // Either the pipe pixel rate or the link pixel rate can't support a simple
     // configuration at this display resolution.
-    if (max_pipe_pixel_rate < banjo_display_config->mode.pixel_clock_10khz * 10000 ||
-        !display->CheckPixelRate(banjo_display_config->mode.pixel_clock_10khz * 10000)) {
+    static constexpr int64_t kHzPer10Khz = int64_t{10'000};
+    const int64_t pixel_clock_hz = banjo_display_config->mode.pixel_clock_10khz * kHzPer10Khz;
+    if (max_pipe_pixel_rate_hz < pixel_clock_hz || !display->CheckPixelRate(pixel_clock_hz)) {
       return false;
     }
 
@@ -1582,9 +1586,9 @@ bool Controller::CheckDisplayLimits(
       min_plane_ratio = std::min(plane_ratio, min_plane_ratio);
     }
 
-    max_pipe_pixel_rate =
-        static_cast<uint64_t>(min_plane_ratio * static_cast<double>(max_pipe_pixel_rate));
-    if (max_pipe_pixel_rate < banjo_display_config->mode.pixel_clock_10khz * 10000) {
+    max_pipe_pixel_rate_hz =
+        static_cast<int64_t>(min_plane_ratio * static_cast<double>(max_pipe_pixel_rate_hz));
+    if (max_pipe_pixel_rate_hz < pixel_clock_hz) {
       for (unsigned j = 0; j < banjo_display_config->layer_count; j++) {
         if (banjo_display_config->layer_list[j]->type != LAYER_TYPE_PRIMARY) {
           continue;

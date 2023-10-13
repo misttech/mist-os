@@ -266,8 +266,7 @@ bool HdmiDisplay::PipeConfigEpilogue(const display_mode_t& mode, PipeId pipe_id,
   return true;
 }
 
-DdiPllConfig HdmiDisplay::ComputeDdiPllConfig(int32_t pixel_clock_10khz) {
-  const int32_t pixel_clock_khz = pixel_clock_10khz * 10;
+DdiPllConfig HdmiDisplay::ComputeDdiPllConfig(int32_t pixel_clock_khz) {
   return DdiPllConfig{
       .ddi_clock_khz = pixel_clock_khz * 5,
       .spread_spectrum_clocking = false,
@@ -276,7 +275,7 @@ DdiPllConfig HdmiDisplay::ComputeDdiPllConfig(int32_t pixel_clock_10khz) {
   };
 }
 
-bool HdmiDisplay::CheckPixelRate(uint64_t pixel_rate_hz) {
+bool HdmiDisplay::CheckPixelRate(int64_t pixel_rate_hz) {
   // Pixel rates of 300M/165M pixels per second for HDMI/DVI. The Intel docs state
   // that the maximum link bit rate of an HDMI port is 3GHz, not 3.4GHz that would
   // be expected  based on the HDMI spec.
@@ -284,7 +283,8 @@ bool HdmiDisplay::CheckPixelRate(uint64_t pixel_rate_hz) {
     return false;
   }
 
-  DdiPllConfig pll_config = ComputeDdiPllConfig(static_cast<int32_t>(pixel_rate_hz / 10'000));
+  int32_t pixel_rate_khz = static_cast<int32_t>(pixel_rate_hz / 1'000);
+  DdiPllConfig pll_config = ComputeDdiPllConfig(pixel_rate_khz);
   if (pll_config.IsEmpty()) {
     return false;
   }
