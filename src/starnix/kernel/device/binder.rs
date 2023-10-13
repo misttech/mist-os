@@ -37,6 +37,7 @@ use fuchsia_zircon as zx;
 use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
+    ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
@@ -343,7 +344,7 @@ struct BinderProcessState {
     /// allocated to them. When the process frees a transaction buffer with `BC_FREE_BUFFER`, the
     /// state is dropped, releasing temporary strong references and the memory allocated to the
     /// transaction.
-    active_transactions: BTreeMap<UserAddress, ActiveTransaction>,
+    active_transactions: BTreeMap<UserAddress, ReleaseGuard<ActiveTransaction>>,
     /// The list of processes that should be notified if this process dies.
     death_subscribers: Vec<(WeakRef<BinderProcess>, binder_uintptr_t)>,
     /// Whether the binder connection for this process is closed. Once closed, any blocking
@@ -413,6 +414,12 @@ struct ActiveTransaction {
     /// The state associated with the transaction. Not read, exists to be dropped along with the
     /// [`ActiveTransaction`] object.
     _state: TransactionState,
+}
+
+impl Releasable for ActiveTransaction {
+    type Context<'a> = ();
+
+    fn release(self, _: ()) {}
 }
 
 /// State held for the duration of a transaction. When a transaction completes (or fails), this
@@ -694,28 +701,30 @@ impl BinderProcess {
         log_trace!("BinderProcess id={} freeing buffer {:?}", self.identifier, buffer_ptr);
         // Drop the state associated with the now completed transaction.
         let active_transaction = self.lock().active_transactions.remove(&buffer_ptr);
+        release_after!(active_transaction, (), {
+            // Check if this was a oneway transaction and schedule the next oneway if this is the case.
+            if let Some(ActiveTransaction {
+                request_type: RequestType::Oneway { object }, ..
+            }) = active_transaction.as_ref().map(|at| at.deref())
+            {
+                let mut object_state = object.lock();
+                assert!(
+                    object_state.handling_oneway_transaction,
+                    "freeing a oneway buffer implies that a oneway transaction was being handled"
+                );
+                if let Some(transaction) = object_state.oneway_transactions.pop_front() {
+                    // Drop the lock, as we've completed all mutations and don't want to hold this
+                    // lock while acquiring any others.
+                    drop(object_state);
 
-        // Check if this was a oneway transaction and schedule the next oneway if this is the case.
-        if let Some(ActiveTransaction { request_type: RequestType::Oneway { object }, .. }) =
-            active_transaction
-        {
-            let mut object_state = object.lock();
-            assert!(
-                object_state.handling_oneway_transaction,
-                "freeing a oneway buffer implies that a oneway transaction was being handled"
-            );
-            if let Some(transaction) = object_state.oneway_transactions.pop_front() {
-                // Drop the lock, as we've completed all mutations and don't want to hold this
-                // lock while acquiring any others.
-                drop(object_state);
-
-                // Schedule the transaction
-                self.enqueue_command(Command::OnewayTransaction(transaction));
-            } else {
-                // No more oneway transactions queued, mark the queue handling as done.
-                object_state.handling_oneway_transaction = false;
+                    // Schedule the transaction
+                    self.enqueue_command(Command::OnewayTransaction(transaction));
+                } else {
+                    // No more oneway transactions queued, mark the queue handling as done.
+                    object_state.handling_oneway_transaction = false;
+                }
             }
-        }
+        });
 
         // Reclaim the memory.
         let mut shared_memory_lock = self.shared_memory.lock();
@@ -1000,6 +1009,10 @@ impl Releasable for BinderProcess {
                         .enqueue_command(Command::DeadReply { pop_transaction: true });
                 }
             }
+        }
+
+        for transaction in state.active_transactions.into_values() {
+            transaction.release(())
         }
 
         state.handles.release(());
@@ -3169,7 +3182,8 @@ impl BinderDriver {
                             ActiveTransaction {
                                 request_type: RequestType::Oneway { object: object.clone() },
                                 _state: transaction_state.into(),
-                            },
+                            }
+                            .into(),
                         );
 
                         // Oneway transactions are enqueued on the binder object and processed one at a time.
@@ -3211,7 +3225,8 @@ impl BinderDriver {
                             ActiveTransaction {
                                 request_type: RequestType::RequestResponse,
                                 _state: transaction_state.into(),
-                            },
+                            }
+                            .into(),
                         );
 
                         (
@@ -3266,7 +3281,8 @@ impl BinderDriver {
             ActiveTransaction {
                 request_type: RequestType::RequestResponse,
                 _state: transaction_state.into(),
-            },
+            }
+            .into(),
         );
 
         // Schedule the transaction on the target process' command queue.
