@@ -58,8 +58,9 @@ use crate::bindings::{
     },
     trace_duration,
     util::{
-        ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl, NeedsDataNotifier,
-        NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
+        AllowBindingIdFromWeak, ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl,
+        NeedsDataNotifier, NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext,
+        TryIntoFidlWithContext,
     },
     BindingsNonSyncCtxImpl, Ctx,
 };
@@ -863,8 +864,9 @@ where
         let (accepted, addr, peer) =
             accept::<I, _>(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
         let addr = addr
+            .map_zone(AllowBindingIdFromWeak)
             .try_into_fidl_with_ctx(non_sync_ctx)
-            .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"))
+            .unwrap_or_else(|never| match never {})
             .into_sock_addr();
         let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
         let (client, request_stream) = crate::bindings::socket::create_request_stream();
@@ -1629,9 +1631,9 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for SocketAddr<A, D>
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    D: TryIntoFidlWithContext<NonZeroU64>,
 {
-    type Error = DeviceNotFoundError;
+    type Error = D::Error;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
         self,

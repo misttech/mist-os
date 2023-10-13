@@ -275,7 +275,6 @@ pub(crate) async fn yielding_data_notifier_loop<
         }
     }
 }
-
 /// A core type which can be fallibly converted from the FIDL type `F`.
 ///
 /// For all `C: TryFromFidl<F>`, we provide a blanket impl of
@@ -943,9 +942,9 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (SocketZonedIpAddr<A, D>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    D: TryIntoFidlWithContext<NonZeroU64>,
 {
-    type Error = DeviceNotFoundError;
+    type Error = D::Error;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
         self,
@@ -960,9 +959,9 @@ impl<A: IpAddress, D> TryIntoFidlWithContext<<A::Version as IpSockAddrExt>::Sock
     for (Option<SocketZonedIpAddr<A, D>>, NonZeroU16)
 where
     A::Version: IpSockAddrExt,
-    D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
+    D: TryIntoFidlWithContext<NonZeroU64>,
 {
-    type Error = DeviceNotFoundError;
+    type Error = D::Error;
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(
         self,
@@ -1025,6 +1024,23 @@ impl TryIntoFidlWithContext<BindingId> for WeakDeviceId<BindingsNonSyncCtxImpl> 
         ctx: &C,
     ) -> Result<BindingId, DeviceNotFoundError> {
         self.upgrade().map(|d| ctx.get_binding_id(d)).ok_or(DeviceNotFoundError)
+    }
+}
+
+/// A wrapper type that provides an infallible conversion from a
+/// [`WeakDeviceId`] to [`BindingId`].
+///
+/// By default we don't want to provide this conversion infallibly and hidden
+/// behind the conversion traits, so `AllowBindingIdFromWeak` acts as an
+/// explicit opt-in for that conversion.
+pub(crate) struct AllowBindingIdFromWeak(pub(crate) WeakDeviceId<BindingsNonSyncCtxImpl>);
+
+impl TryIntoFidlWithContext<BindingId> for AllowBindingIdFromWeak {
+    type Error = Never;
+
+    fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<BindingId, Never> {
+        let Self(weak) = self;
+        Ok(weak.bindings_id().id)
     }
 }
 
