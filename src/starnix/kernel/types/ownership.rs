@@ -66,6 +66,17 @@ impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for Option<T>
     }
 }
 
+/// Releasing a result calls release on the value if the result is ok.
+impl<T: [< Releasable $($suffix)? >], E> [< Releasable $($suffix)? >] for Result<T, E> {
+    type Context<'a> = T::Context<'a>;
+
+    fn release(self: $self, c: Self::Context<'_>) {
+        if let Ok(v) = self {
+            v.release(c);
+        }
+    }
+}
+
 impl<T: [< Releasable $($suffix)? >]> [< Releasable $($suffix)? >] for ReleaseGuard<T> {
     type Context<'a> = T::Context<'a>;
 
