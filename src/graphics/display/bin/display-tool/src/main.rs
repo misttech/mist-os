@@ -18,6 +18,7 @@ mod commands;
 mod draw;
 mod fps;
 mod rgb;
+mod runner;
 
 /// Top-level list of this tool's command-line arguments
 #[derive(FromArgs)]

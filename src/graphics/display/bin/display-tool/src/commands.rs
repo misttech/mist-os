@@ -7,8 +7,8 @@ use {
     display_utils::{Coordinator, DisplayId, PixelFormat},
 };
 
+mod bouncing_squares;
 mod display_color_layer;
-mod double_buffered_fence_loop;
 mod static_config_vsync_loop;
 
 use crate::rgb::Rgb888;
@@ -99,5 +99,5 @@ pub async fn squares(coordinator: &Coordinator, id: Option<DisplayId>) -> Result
             .ok_or_else(|| format_err!("display with id '{:?}' not found", id))?,
     };
 
-    double_buffered_fence_loop::run(coordinator, display).await
+    bouncing_squares::run(coordinator, display).await
 }
