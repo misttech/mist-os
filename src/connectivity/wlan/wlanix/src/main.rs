@@ -24,6 +24,7 @@ use {
 mod ifaces;
 #[allow(unused)]
 mod nl80211;
+mod security;
 
 use {
     ifaces::{ClientIface, IfaceManager},
@@ -282,9 +283,12 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
         }
         fidl_wlanix::SupplicantStaNetworkRequest::Select { responder } => {
             info!("fidl_wlanix::SupplicantStaNetworkRequest::Select");
-            let ssid = sta_network_state.lock().ssid.clone();
+            let (ssid, passphrase) = {
+                let state = sta_network_state.lock();
+                (state.ssid.clone(), state.passphrase.clone())
+            };
             let result = match ssid {
-                Some(ssid) => match iface.connect_to_network(&ssid[..]).await {
+                Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase).await {
                     Ok(connected_result) => {
                         info!("Connected to requested network");
                         let event = fidl_wlanix::SupplicantStaIfaceCallbackOnStateChangedRequest {
@@ -1031,7 +1035,7 @@ mod tests {
     }
 
     #[test]
-    fn test_supplicant_sta_network_connect_flow() {
+    fn test_supplicant_sta_open_network_connect_flow() {
         let (mut test_helper, mut test_fut) = setup_supplicant_test();
 
         let result = test_helper.supplicant_sta_network_proxy.set_ssid(
@@ -1054,12 +1058,57 @@ mod tests {
             *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
             Some(vec![b'f', b'o', b'o'])
         );
+        assert_eq!(
+            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_passphrase.lock(),
+            None
+        );
         let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
         let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
         assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
         assert_eq!(on_state_changed.bssid, Some([42, 42, 42, 42, 42, 42]));
         assert_eq!(on_state_changed.id, Some(1));
         assert_eq!(on_state_changed.ssid, Some(vec![b'f', b'o', b'o']));
+    }
+
+    #[test]
+    fn test_supplicant_sta_protected_network_connect_flow() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        let result = test_helper.supplicant_sta_network_proxy.set_ssid(
+            &fidl_wlanix::SupplicantStaNetworkSetSsidRequest {
+                ssid: Some(vec![b'f', b'o', b'o']),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let result = test_helper.supplicant_sta_network_proxy.set_psk_passphrase(
+            &fidl_wlanix::SupplicantStaNetworkSetPskPassphraseRequest {
+                passphrase: Some(vec![b'p', b'a', b's', b's']),
+                ..Default::default()
+            },
+        );
+        assert_variant!(result, Ok(()));
+
+        let mut network_select_fut = test_helper.supplicant_sta_network_proxy.select();
+        assert_variant!(test_helper.exec.run_until_stalled(&mut network_select_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut network_select_fut),
+            Poll::Ready(Ok(Ok(())))
+        );
+
+        assert_eq!(
+            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_ssid.lock(),
+            Some(vec![b'f', b'o', b'o'])
+        );
+        assert_eq!(
+            *test_helper.iface_manager.client_iface.as_ref().unwrap().connected_passphrase.lock(),
+            Some(vec![b'p', b'a', b's', b's'])
+        );
+        let mut next_callback_fut = test_helper.supplicant_sta_iface_callback_stream.next();
+        let on_state_changed = assert_variant!(test_helper.exec.run_until_stalled(&mut next_callback_fut), Poll::Ready(Some(Ok(fidl_wlanix::SupplicantStaIfaceCallbackRequest::OnStateChanged { payload, .. }))) => payload);
+        assert_eq!(on_state_changed.new_state, Some(fidl_wlanix::StaIfaceCallbackState::Completed));
     }
 
     struct SupplicantTestHelper {

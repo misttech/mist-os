@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use {
+    crate::security::{get_authenticator, Credential},
     anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     fidl::endpoints::create_proxy,
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_common_security as fidl_security,
+    fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_device_service as fidl_device_service,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::TimeoutExt,
@@ -16,7 +17,7 @@ use {
     parking_lot::Mutex,
     std::{collections::HashMap, convert::TryFrom, sync::Arc},
     tracing::info,
-    wlan_common::bss::BssDescription,
+    wlan_common::{bss::BssDescription, scan::Compatibility},
 };
 
 #[async_trait]
@@ -81,6 +82,7 @@ impl IfaceManager for DeviceMonitorIfaceManager {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct ConnectedResult {
     pub ssid: Vec<u8>,
     pub bssid: Bssid,
@@ -90,7 +92,11 @@ pub(crate) struct ConnectedResult {
 pub(crate) trait ClientIface: Sync + Send {
     async fn trigger_scan(&self) -> Result<(), Error>;
     fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult>;
-    async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error>;
+    async fn connect_to_network(
+        &self,
+        ssid: &[u8],
+        passphrase: Option<Vec<u8>>,
+    ) -> Result<ConnectedResult, Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -118,24 +124,45 @@ impl ClientIface for SmeClientIface {
         self.last_scan_results.lock().clone()
     }
 
-    async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
+    async fn connect_to_network(
+        &self,
+        ssid: &[u8],
+        passphrase: Option<Vec<u8>>,
+    ) -> Result<ConnectedResult, Error> {
         let last_scan_results = self.last_scan_results.lock().clone();
-        let selected_bss_description = last_scan_results
+        let selected_scan_result = last_scan_results
             .iter()
             .filter_map(|r| {
+                let bss_description = BssDescription::try_from(r.bss_description.clone());
+                let compatibility =
+                    r.compatibility.clone().map(|c| Compatibility::try_from(*c)).transpose();
                 // TODO(fxbug.dev/128604): handle the case when there are multiple BSS candidates
-                BssDescription::try_from(r.bss_description.clone())
-                    .ok()
-                    .filter(|bss_description| bss_description.ssid == *ssid)
+                match (bss_description, compatibility) {
+                    (Ok(bss_description), Ok(compatibility)) if bss_description.ssid == *ssid => {
+                        Some((bss_description, compatibility))
+                    }
+                    _ => None,
+                }
             })
             .next();
 
-        let bss_description = match selected_bss_description {
-            Some(bss_description) => bss_description,
+        let (bss_description, compatibility) = match selected_scan_result {
+            Some(scan_result) => scan_result,
             None => {
                 return Err(format_err!("Requested network not found"));
             }
         };
+
+        let credential = passphrase.map(|p| Credential::Password(p)).unwrap_or(Credential::None);
+        let authenticator =
+            match get_authenticator(bss_description.bssid, compatibility, &credential) {
+                Some(authenticator) => authenticator,
+                None => {
+                    return Err(format_err!(
+                        "Failed to create authenticator for requested network"
+                    ));
+                }
+            };
 
         info!("Selected BSS to connect to");
         let (connect_txn, remote) = create_proxy()?;
@@ -144,10 +171,7 @@ impl ClientIface for SmeClientIface {
             ssid: bss_description.ssid.clone().into(),
             bss_description: bss_description.into(),
             multiple_bss_candidates: false,
-            authentication: fidl_security::Authentication {
-                protocol: fidl_security::Protocol::Open,
-                credentials: None,
-            },
+            authentication: authenticator.into(),
             deprecated_scan_type: fidl_common::ScanType::Passive,
         };
         self.sme_proxy.connect(&connect_req, Some(remote))?;
@@ -170,6 +194,7 @@ impl ClientIface for SmeClientIface {
 }
 
 /// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
+/// TODO(fxbug.dev/134895): Function taken from wlancfg. Dedupe later.
 async fn wait_for_connect_result(
     mut stream: fidl_sme::ConnectTransactionEventStream,
 ) -> Result<fidl_sme::ConnectResult, Error> {
@@ -242,11 +267,12 @@ pub mod test_utils {
 
     pub struct TestClientIface {
         pub connected_ssid: Mutex<Option<Vec<u8>>>,
+        pub connected_passphrase: Mutex<Option<Vec<u8>>>,
     }
 
     impl TestClientIface {
         pub fn new() -> Self {
-            Self { connected_ssid: Mutex::new(None) }
+            Self { connected_ssid: Mutex::new(None), connected_passphrase: Mutex::new(None) }
         }
     }
 
@@ -258,8 +284,13 @@ pub mod test_utils {
         fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult> {
             vec![fake_scan_result()]
         }
-        async fn connect_to_network(&self, ssid: &[u8]) -> Result<ConnectedResult, Error> {
+        async fn connect_to_network(
+            &self,
+            ssid: &[u8],
+            passphrase: Option<Vec<u8>>,
+        ) -> Result<ConnectedResult, Error> {
             *self.connected_ssid.lock() = Some(ssid.to_vec());
+            *self.connected_passphrase.lock() = passphrase;
             Ok(ConnectedResult { ssid: ssid.to_vec(), bssid: [42, 42, 42, 42, 42, 42].into() })
         }
     }
@@ -302,9 +333,13 @@ mod tests {
     use {
         super::*,
         fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async as fasync,
+        fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync,
         futures::{task::Poll, StreamExt},
-        wlan_common::assert_variant,
+        ieee80211::Ssid,
+        test_case::test_case,
+        wlan_common::{
+            assert_variant, fake_fidl_bss_description, test_utils::fake_stas::FakeProtectionCfg,
+        },
     };
 
     fn setup_test() -> (
@@ -390,5 +425,184 @@ mod tests {
         responder.send(Ok(result)).expect("Failed to send result");
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(())));
         assert_eq!(iface.get_last_scan_results().len(), 1);
+    }
+
+    #[test_case(
+        FakeProtectionCfg::Open,
+        vec![fidl_security::Protocol::Open],
+        None,
+        fidl_security::Authentication {
+            protocol: fidl_security::Protocol::Open,
+            credentials: None
+        };
+        "open"
+    )]
+    #[test_case(
+        FakeProtectionCfg::Wpa2,
+        vec![fidl_security::Protocol::Wpa2Personal],
+        Some(b"password".to_vec()),
+        fidl_security::Authentication {
+            protocol: fidl_security::Protocol::Wpa2Personal,
+            credentials: Some(Box::new(fidl_security::Credentials::Wpa(
+                fidl_security::WpaCredentials::Passphrase(b"password".to_vec())
+            )))
+        };
+        "wpa2"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_connect_to_network(
+        fake_protection_cfg: FakeProtectionCfg,
+        mutual_security_protocols: Vec<fidl_security::Protocol>,
+        passphrase: Option<Vec<u8>>,
+        expected_authentication: fidl_security::Authentication,
+    ) {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(
+            1,
+            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
+        );
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        let bss_description = fake_fidl_bss_description!(protection => fake_protection_cfg,
+            ssid: Ssid::try_from("foo").unwrap(),
+            bssid: [1, 2, 3, 4, 5, 6],
+        );
+        *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
+            bss_description: bss_description.clone(),
+            compatibility: Some(Box::new(fidl_sme::Compatibility { mutual_security_protocols })),
+            timestamp_nanos: 1,
+        }];
+
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, connect_txn) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+        assert_eq!(req.bss_description, bss_description);
+        assert_eq!(req.authentication, expected_authentication);
+
+        let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+        let result = connect_txn_handle.send_on_connect_result(&fidl_sme::ConnectResult {
+            code: fidl_ieee80211::StatusCode::Success,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        });
+        assert_variant!(result, Ok(()));
+
+        let connect_result =
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        let connected_result = assert_variant!(connect_result, Ok(r) => r);
+        assert_eq!(connected_result.ssid, vec![b'f', b'o', b'o']);
+        assert_eq!(connected_result.bssid, Bssid::from([1, 2, 3, 4, 5, 6]));
+    }
+
+    #[test_case(
+        false,
+        FakeProtectionCfg::Open,
+        vec![fidl_security::Protocol::Open],
+        None;
+        "network_not_found"
+    )]
+    #[test_case(
+        true,
+        FakeProtectionCfg::Open,
+        vec![fidl_security::Protocol::Open],
+        Some(b"password".to_vec());
+        "open_with_password"
+    )]
+    #[test_case(
+        true,
+        FakeProtectionCfg::Wpa2,
+        vec![fidl_security::Protocol::Wpa2Personal],
+        None;
+        "wpa2_without_password"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_connect_rejected(
+        has_network: bool,
+        fake_protection_cfg: FakeProtectionCfg,
+        mutual_security_protocols: Vec<fidl_security::Protocol>,
+        passphrase: Option<Vec<u8>>,
+    ) {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut _sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(
+            1,
+            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
+        );
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        if has_network {
+            let bss_description = fake_fidl_bss_description!(protection => fake_protection_cfg,
+                ssid: Ssid::try_from("foo").unwrap(),
+                bssid: [1, 2, 3, 4, 5, 6],
+            );
+            *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
+                bss_description: bss_description.clone(),
+                compatibility: Some(Box::new(fidl_sme::Compatibility {
+                    mutual_security_protocols,
+                })),
+                timestamp_nanos: 1,
+            }];
+        }
+
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], passphrase);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Err(_e)));
+    }
+
+    #[test]
+    fn test_connect_fails_at_sme() {
+        let (mut exec, _monitor_stream, manager) = setup_test();
+        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>()
+            .expect("Failed to create device monitor service");
+        manager.ifaces.lock().insert(
+            1,
+            Arc::new(SmeClientIface { sme_proxy, last_scan_results: Arc::new(Mutex::new(vec![])) }),
+        );
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+
+        let bss_description = fake_fidl_bss_description!(Open,
+            ssid: Ssid::try_from("foo").unwrap(),
+            bssid: [1, 2, 3, 4, 5, 6],
+        );
+        *iface.last_scan_results.lock() = vec![fidl_sme::ScanResult {
+            bss_description: bss_description.clone(),
+            compatibility: Some(Box::new(fidl_sme::Compatibility {
+                mutual_security_protocols: vec![fidl_security::Protocol::Open],
+            })),
+            timestamp_nanos: 1,
+        }];
+
+        let mut connect_fut = iface.connect_to_network(&[b'f', b'o', b'o'], None);
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (req, connect_txn) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+        assert_eq!(req.bss_description, bss_description);
+        assert_eq!(
+            req.authentication,
+            fidl_security::Authentication {
+                protocol: fidl_security::Protocol::Open,
+                credentials: None,
+            }
+        );
+
+        let connect_txn_handle = connect_txn.into_stream_and_control_handle().unwrap().1;
+        let result = connect_txn_handle.send_on_connect_result(&fidl_sme::ConnectResult {
+            code: fidl_ieee80211::StatusCode::RefusedExternalReason,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        });
+        assert_variant!(result, Ok(()));
+
+        let connect_result =
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        assert_variant!(connect_result, Err(_e));
     }
 }
