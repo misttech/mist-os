@@ -135,7 +135,7 @@ impl FsManagementFilesystemInstance {
 #[async_trait]
 impl Filesystem for FsManagementFilesystemInstance {
     async fn shutdown(&mut self) {
-        if let Some(fs) = &mut self.serving_filesystem {
+        if let Some(fs) = self.serving_filesystem.take() {
             match fs {
                 FsType::SingleVolume(fs) => fs.shutdown().await.expect("Failed to stop filesystem"),
                 FsType::MultiVolume(fs) => fs.shutdown().await.expect("Failed to stop filesystem"),
@@ -154,17 +154,15 @@ impl CacheClearableFilesystem for FsManagementFilesystemInstance {
         // Remount the filesystem to guarantee that all cached data from reads and write is cleared.
         let serving_filesystem = self.serving_filesystem.take().unwrap();
         let serving_filesystem = match serving_filesystem {
-            FsType::SingleVolume(mut serving_filesystem) => {
+            FsType::SingleVolume(serving_filesystem) => {
                 serving_filesystem.shutdown().await.expect("Failed to stop the filesystem");
-                drop(serving_filesystem);
                 let mut serving_filesystem =
                     self.fs.serve().await.expect("Failed to start the filesystem");
                 serving_filesystem.bind_to_path(MOUNT_PATH).expect("Failed to bind the filesystem");
                 FsType::SingleVolume(serving_filesystem)
             }
-            FsType::MultiVolume(mut serving_filesystem) => {
+            FsType::MultiVolume(serving_filesystem) => {
                 serving_filesystem.shutdown().await.expect("Failed to stop the filesystem");
-                drop(serving_filesystem);
                 let mut serving_filesystem =
                     self.fs.serve_multi_volume().await.expect("Failed to start the filesystem");
                 let vol = serving_filesystem

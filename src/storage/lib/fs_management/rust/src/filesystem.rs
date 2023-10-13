@@ -6,7 +6,7 @@
 
 use {
     crate::{
-        error::{KillError, QueryError, ShutdownError},
+        error::{QueryError, ShutdownError},
         ComponentType, FSConfig, Options,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
@@ -17,21 +17,19 @@ use {
     fidl_fuchsia_fs_startup::{CheckOptions, StartupMarker},
     fidl_fuchsia_fxfs::MountOptions,
     fidl_fuchsia_io as fio,
-    fuchsia_async::OnSignals,
     fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol,
         connect_to_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
         open_childs_exposed_directory,
     },
-    fuchsia_zircon::{self as zx, AsHandleRef as _, Process, Signals, Status, Task},
+    fuchsia_zircon::{self as zx, AsHandleRef as _, Status},
     std::{
         collections::HashMap,
         sync::{
-            atomic::{AtomicU64, Ordering},
+            atomic::{AtomicBool, AtomicU64, Ordering},
             Arc,
         },
     },
-    tracing::warn,
 };
 
 /// Asynchronously manages a block device for filesystem operations.
@@ -137,8 +135,11 @@ impl Filesystem {
                     .await?
                     .map_err(|e| anyhow!("create_child failed: {:?}", e))?;
 
-                let component =
-                    Arc::new(DynamicComponentInstance { name, collection: collection_ref.name });
+                let component = Arc::new(DynamicComponentInstance {
+                    name,
+                    collection: collection_ref.name,
+                    should_not_drop: AtomicBool::new(false),
+                });
 
                 let proxy = open_childs_exposed_directory(
                     component.name.clone(),
@@ -223,9 +224,8 @@ impl Filesystem {
             self.component = None;
         }
         Ok(ServingSingleVolumeFilesystem {
-            process: None,
-            _component: component,
-            exposed_dir,
+            component,
+            exposed_dir: Some(exposed_dir),
             root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel())
                 .into_proxy()?,
             binding: None,
@@ -252,7 +252,7 @@ impl Filesystem {
             .map_err(Status::from_raw)?;
 
         Ok(ServingMultiVolumeFilesystem {
-            _component: self.component.clone(),
+            component: self.component.clone(),
             exposed_dir: Some(exposed_dir),
             volumes: HashMap::default(),
         })
@@ -263,10 +263,20 @@ impl Filesystem {
 struct DynamicComponentInstance {
     name: String,
     collection: String,
+    should_not_drop: AtomicBool,
+}
+
+impl DynamicComponentInstance {
+    fn forget(&self) {
+        self.should_not_drop.store(true, Ordering::Relaxed);
+    }
 }
 
 impl Drop for DynamicComponentInstance {
     fn drop(&mut self) {
+        if self.should_not_drop.load(Ordering::Relaxed) {
+            return;
+        }
         if let Ok(realm_proxy) = connect_to_protocol::<RealmMarker>() {
             let _ = realm_proxy.destroy_child(&fdecl::ChildRef {
                 name: self.name.clone(),
@@ -312,10 +322,9 @@ pub type ServingFilesystem = ServingSingleVolumeFilesystem;
 
 /// Asynchronously manages a serving filesystem. Created from [`Filesystem::serve()`].
 pub struct ServingSingleVolumeFilesystem {
-    // If the filesystem is running as a component, there will be no process.
-    process: Option<Process>,
-    _component: Option<Arc<DynamicComponentInstance>>,
-    exposed_dir: fio::DirectoryProxy,
+    component: Option<Arc<DynamicComponentInstance>>,
+    // exposed_dir will always be Some, except when the filesystem is shutting down.
+    exposed_dir: Option<fio::DirectoryProxy>,
     root_dir: fio::DirectoryProxy,
 
     // The path in the local namespace that this filesystem is bound to (optional).
@@ -325,7 +334,7 @@ pub struct ServingSingleVolumeFilesystem {
 impl ServingSingleVolumeFilesystem {
     /// Returns a proxy to the exposed directory of the serving filesystem.
     pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
-        &self.exposed_dir
+        self.exposed_dir.as_ref().unwrap()
     }
 
     /// Returns a proxy to the root directory of the serving filesystem.
@@ -361,6 +370,14 @@ impl ServingSingleVolumeFilesystem {
         info.ok_or(QueryError::DirectoryEmptyResult)
     }
 
+    /// Take the exposed dir from this filesystem instance, dropping the management struct without
+    /// shutting the filesystem down. This leaves the caller with the responsibility of shutting
+    /// down the filesystem, and the filesystem component if necessary.
+    pub fn take_exposed_dir(mut self) -> fio::DirectoryProxy {
+        self.component.take().expect("BUG: component missing").forget();
+        self.exposed_dir.take().expect("BUG: exposed dir missing")
+    }
+
     /// Attempts to shutdown the filesystem using the
     /// [`fidl_fuchsia_fs::AdminProxy::shutdown()`] FIDL method and waiting for the filesystem
     /// process to terminate.
@@ -368,36 +385,12 @@ impl ServingSingleVolumeFilesystem {
     /// # Errors
     ///
     /// Returns [`Err`] if the shutdown failed or the filesystem process did not terminate.
-    pub async fn shutdown(&mut self) -> Result<(), ShutdownError> {
-        async fn do_shutdown(exposed_dir: &fio::DirectoryProxy) -> Result<(), Error> {
-            connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(exposed_dir)?
-                .shutdown()
-                .await?;
-            Ok(())
-        }
-
-        if let Err(e) = do_shutdown(&self.exposed_dir).await {
-            if let Some(process) = self.process.take() {
-                if process.kill().is_ok() {
-                    let _ = OnSignals::new(&process, Signals::PROCESS_TERMINATED).await;
-                }
-            }
-            return Err(e.into());
-        }
-
-        if let Some(process) = self.process.take() {
-            let _ = OnSignals::new(&process, Signals::PROCESS_TERMINATED)
-                .await
-                .map_err(ShutdownError::ProcessTerminatedSignal)?;
-
-            let info = process.info().map_err(ShutdownError::GetProcessReturnCode)?;
-            if info.return_code != 0 {
-                warn!(
-                    code = info.return_code,
-                    "process returned non-zero exit code after shutdown"
-                );
-            }
-        }
+    pub async fn shutdown(mut self) -> Result<(), ShutdownError> {
+        connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(
+            &self.exposed_dir.take().expect("BUG: exposed dir missing"),
+        )?
+        .shutdown()
+        .await?;
         Ok(())
     }
 
@@ -407,29 +400,21 @@ impl ServingSingleVolumeFilesystem {
     ///
     /// Returns [`Err`] if the filesystem process could not be terminated. There is no way to
     /// recover the [`Filesystem`] from this error.
-    pub async fn kill(mut self) -> Result<(), Error> {
-        // Prevent the drop impl from killing the process again.
-        if let Some(process) = self.process.take() {
-            process.kill().map_err(KillError::TaskKill)?;
-            let _ = OnSignals::new(&process, Signals::PROCESS_TERMINATED)
-                .await
-                .map_err(KillError::ProcessTerminatedSignal)?;
-        } else {
-            // For components, just shut down the filesystem.
-            self.shutdown().await?;
-        }
+    pub async fn kill(self) -> Result<(), Error> {
+        // For components, just shut down the filesystem.
+        // TODO(fxbug.dev/293949323): Figure out a way to make this more abrupt - the use-cases are
+        // either testing or when the filesystem isn't responding.
+        self.shutdown().await?;
         Ok(())
     }
 }
 
 impl Drop for ServingSingleVolumeFilesystem {
     fn drop(&mut self) {
-        if let Some(process) = self.process.take() {
-            let _ = process.kill();
-        } else {
-            // For components, make a best effort attempt to shut down to the filesystem.
+        // Make a best effort attempt to shut down to the filesystem, if we need to.
+        if let Some(exposed_dir) = self.exposed_dir.take() {
             if let Ok(proxy) =
-                connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(&self.exposed_dir)
+                connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(&exposed_dir)
             {
                 let _ = proxy.shutdown();
             }
@@ -440,7 +425,7 @@ impl Drop for ServingSingleVolumeFilesystem {
 /// Asynchronously manages a serving multivolume filesystem. Created from
 /// [`Filesystem::serve_multi_volume()`].
 pub struct ServingMultiVolumeFilesystem {
-    _component: Option<Arc<DynamicComponentInstance>>,
+    component: Option<Arc<DynamicComponentInstance>>,
     // exposed_dir will always be Some, except in Self::shutdown.
     exposed_dir: Option<fio::DirectoryProxy>,
     volumes: HashMap<String, ServingVolume>,
@@ -658,7 +643,7 @@ impl ServingMultiVolumeFilesystem {
     /// Provides access to the internal |exposed_dir| for use in testing
     /// callsites which need directory access.
     pub fn exposed_dir(&self) -> &fio::DirectoryProxy {
-        self.exposed_dir.as_ref().unwrap()
+        self.exposed_dir.as_ref().expect("BUG: exposed dir missing")
     }
 
     /// Attempts to shutdown the filesystem using the [`fidl_fuchsia_fs::AdminProxy::shutdown()`]
@@ -667,14 +652,22 @@ impl ServingMultiVolumeFilesystem {
     /// # Errors
     ///
     /// Returns [`Err`] if the shutdown failed.
-    pub async fn shutdown(&mut self) -> Result<(), ShutdownError> {
+    pub async fn shutdown(mut self) -> Result<(), ShutdownError> {
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(
             // Take exposed_dir so we don't attempt to shut down again in Drop.
-            &self.exposed_dir.take().unwrap(),
+            &self.exposed_dir.take().expect("BUG: exposed dir missing"),
         )?
         .shutdown()
         .await?;
         Ok(())
+    }
+
+    /// Take the exposed dir from this filesystem instance, dropping the management struct without
+    /// shutting the filesystem down. This leaves the caller with the responsibility of shutting
+    /// down the filesystem, and the filesystem component if necessary.
+    pub fn take_exposed_dir(mut self) -> fio::DirectoryProxy {
+        self.component.take().expect("BUG: missing component").forget();
+        self.exposed_dir.take().expect("BUG: exposed dir missing")
     }
 }
 
@@ -752,7 +745,7 @@ mod tests {
 
         blobfs.format().await.expect("failed to format blobfs");
 
-        let mut serving = blobfs.serve().await.expect("failed to serve blobfs the first time");
+        let serving = blobfs.serve().await.expect("failed to serve blobfs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -792,7 +785,7 @@ mod tests {
         );
 
         serving.shutdown().await.expect("failed to shutdown blobfs the first time");
-        let mut serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
+        let serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
         {
             let test_file = fuchsia_fs::directory::open_file(
                 serving.root(),
@@ -887,7 +880,7 @@ mod tests {
         let mut minfs = new_fs(&mut ramdisk, Minfs::default()).await;
 
         minfs.format().await.expect("failed to format minfs");
-        let mut serving = minfs.serve().await.expect("failed to serve minfs the first time");
+        let serving = minfs.serve().await.expect("failed to serve minfs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -920,7 +913,7 @@ mod tests {
         );
 
         serving.shutdown().await.expect("failed to shutdown minfs the first time");
-        let mut serving = minfs.serve().await.expect("failed to serve minfs the second time");
+        let serving = minfs.serve().await.expect("failed to serve minfs the second time");
 
         {
             let test_file = fuchsia_fs::directory::open_file(
@@ -977,6 +970,49 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn minfs_take_exposed_dir_does_not_drop() {
+        let block_size = 512;
+        let test_content = b"test content";
+        let test_file_name = "test-file";
+        let mut ramdisk = ramdisk(block_size).await;
+        let mut minfs = new_fs(&mut ramdisk, Minfs::default()).await;
+
+        minfs.format().await.expect("failed to format fxfs");
+
+        let fs = minfs.serve().await.expect("failed to serve fxfs");
+        let file = {
+            let file = fuchsia_fs::directory::open_file(
+                fs.root(),
+                test_file_name,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+            )
+            .await
+            .unwrap();
+            fuchsia_fs::file::write(&file, test_content).await.unwrap();
+            file.close().await.expect("close fidl error").expect("close error");
+            fuchsia_fs::directory::open_file(
+                fs.root(),
+                test_file_name,
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .unwrap()
+        };
+
+        let exposed_dir = fs.take_exposed_dir();
+
+        assert_eq!(fuchsia_fs::file::read(&file).await.unwrap(), test_content);
+
+        connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(&exposed_dir)
+            .expect("connecting to admin marker")
+            .shutdown()
+            .await
+            .expect("shutdown failed");
+    }
+
+    #[fuchsia::test]
     async fn f2fs_format_fsck_success() {
         let block_size = 4096;
         let mut ramdisk = ramdisk(block_size).await;
@@ -995,7 +1031,7 @@ mod tests {
         let mut f2fs = new_fs(&mut ramdisk, F2fs::default()).await;
 
         f2fs.format().await.expect("failed to format f2fs");
-        let mut serving = f2fs.serve().await.expect("failed to serve f2fs the first time");
+        let serving = f2fs.serve().await.expect("failed to serve f2fs the first time");
 
         // snapshot of FilesystemInfo
         let fs_info1 =
@@ -1030,7 +1066,7 @@ mod tests {
         assert_eq!(fs_info2.used_bytes - fs_info1.used_bytes, expected_size2 as u64);
 
         serving.shutdown().await.expect("failed to shutdown f2fs the first time");
-        let mut serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
+        let serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
 
         {
             let test_file = fuchsia_fs::directory::open_file(
@@ -1146,5 +1182,52 @@ mod tests {
         // fs.open_volume("foo", MountOptions{crypt: None, as_blob: false}).await
         //    .expect("Open volume failed");
         assert_eq!(fs.has_volume("foo").await.expect("has_volume"), true);
+    }
+
+    #[fuchsia::test]
+    async fn fxfs_take_exposed_dir_does_not_drop() {
+        let block_size = 512;
+        let test_content = b"test content";
+        let test_file_name = "test-file";
+        let mut ramdisk = ramdisk(block_size).await;
+        let mut fxfs = new_fs(&mut ramdisk, Fxfs::default()).await;
+
+        fxfs.format().await.expect("failed to format fxfs");
+
+        let mut fs = fxfs.serve_multi_volume().await.expect("failed to serve fxfs");
+        let file = {
+            let vol = fs
+                .create_volume("foo", MountOptions { crypt: None, as_blob: false })
+                .await
+                .expect("Create volume failed");
+            let file = fuchsia_fs::directory::open_file(
+                vol.root(),
+                test_file_name,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE,
+            )
+            .await
+            .unwrap();
+            fuchsia_fs::file::write(&file, test_content).await.unwrap();
+            file.close().await.expect("close fidl error").expect("close error");
+            fuchsia_fs::directory::open_file(
+                vol.root(),
+                test_file_name,
+                fio::OpenFlags::RIGHT_READABLE,
+            )
+            .await
+            .unwrap()
+        };
+
+        let exposed_dir = fs.take_exposed_dir();
+
+        assert_eq!(fuchsia_fs::file::read(&file).await.unwrap(), test_content);
+
+        connect_to_protocol_at_dir_root::<fidl_fuchsia_fs::AdminMarker>(&exposed_dir)
+            .expect("connecting to admin marker")
+            .shutdown()
+            .await
+            .expect("shutdown failed");
     }
 }

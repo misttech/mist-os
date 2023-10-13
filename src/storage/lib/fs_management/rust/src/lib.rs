@@ -23,7 +23,7 @@ use {
 };
 
 // Re-export errors as public.
-pub use error::{CommandError, KillError, LaunchProcessError, QueryError, ShutdownError};
+pub use error::{QueryError, ShutdownError};
 
 pub const BLOBFS_TYPE_GUID: [u8; 16] = [
     0x0e, 0x38, 0x67, 0x29, 0x4c, 0x13, 0xbb, 0x4c, 0xb6, 0xda, 0x17, 0xe7, 0xce, 0x1c, 0xa4, 0x5d,

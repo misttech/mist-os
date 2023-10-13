@@ -1048,7 +1048,7 @@ mod tests {
                 blobfs.format().await.expect("format blobfs failed");
                 blobfs.fsck().await.expect("fsck failed");
                 // Mount blobfs
-                let mut serving = blobfs.serve().await.expect("serve blobfs failed");
+                let serving = blobfs.serve().await.expect("serve blobfs failed");
 
                 let content = String::from("Hello world!").into_bytes();
                 let merkle_root_hash =
@@ -1077,7 +1077,7 @@ mod tests {
                 // Check that blobfs can be successfully unmounted
                 serving.shutdown().await.expect("shutdown blobfs failed");
 
-                let mut serving = blobfs.serve().await.expect("serve blobfs failed");
+                let serving = blobfs.serve().await.expect("serve blobfs failed");
                 {
                     let file = fuchsia_fs::directory::open_file(
                         serving.root(),

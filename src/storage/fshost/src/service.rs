@@ -208,9 +208,8 @@ async fn wipe_storage_fxblob(
         "svc/fuchsia.fxfs.BlobCreator",
         blob_creator.into_channel().into(),
     )?;
-    // Forget the fxfs instance so it's not dropped, because the drop impl shuts down the
-    // filesystem.
-    std::mem::forget(serving_fxfs);
+    // Prevent fs_management from shutting down the filesystem when it's dropped.
+    let _ = serving_fxfs.take_exposed_dir();
     Ok(())
 }
 
@@ -328,9 +327,8 @@ async fn wipe_storage_fvm(
     blobfs.format().await.context("Failed to format blobfs")?;
     let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
     clone_onto_no_describe(started_blobfs.root(), None, blobfs_root)?;
-    // We use forget() here to ensure that our Blobfs instance is not dropped, which would cause the
-    // filesystem to shutdown.
-    std::mem::forget(started_blobfs);
+    // Prevent fs_management from shutting down the filesystem when it's dropped.
+    let _ = started_blobfs.take_exposed_dir();
     Ok(())
 }
 
@@ -468,7 +466,7 @@ async fn write_data_file(
     write(&file_proxy, &contents).await.context("writing file contents")?;
 
     data.shutdown(filesystem.as_mut()).await.context("shutting down data")?;
-    if let Some(mut fs) = filesystem {
+    if let Some(fs) = filesystem {
         fs.shutdown().await.context("shutting down filesystem")?;
     }
     return Ok(());
