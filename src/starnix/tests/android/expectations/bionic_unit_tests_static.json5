@@ -273,6 +273,11 @@
                 "sys_hwprobe.__riscv_hwprobe",
                 "sys_hwprobe.__riscv_hwprobe_fail",
                 "sys_hwprobe.__riscv_hwprobe_syscall_vdso",
+
+                // These tests are skipped on low memory devices.
+                "malloc.zeroed_allocations_small_medium_sizes",
+                "malloc.zeroed_allocations_large_sizes",
+                "malloc.zeroed_allocations_realloc",
             ],
         },
     ],
