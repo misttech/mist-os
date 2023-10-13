@@ -14,7 +14,8 @@ use futures::StreamExt;
 async fn main() {
     // Set up inspect and serving.
     let mut fs = ServiceFs::new();
-    inspect_runtime::serve(inspector(), &mut fs).unwrap();
+    let _inspect_server =
+        inspect_runtime::publish(inspector(), inspect_runtime::PublishOptions::default());
     fs.dir("svc").add_fidl_service(|requests: PuppetRequestStream| requests);
     fs.take_and_serve_directory_handle().unwrap();
 
