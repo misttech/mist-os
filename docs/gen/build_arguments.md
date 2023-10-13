@@ -4558,16 +4558,6 @@ From //boards/common/x64-common.gni:106
 
 From //build/images/filesystem_limits.gni:12
 
-### max_fuchsia_zbi_size
-
-Maximum allowable size for fuchsia.zbi and zedboot.zbi.
-A number greater than zero informs the rust toolchain to optimize for space.
-TODO(b/291953514): Enforce this by implementing an image size checker.
-
-**Current value (from the default):** `0`
-
-From //build/images/filesystem_limits.gni:22
-
 ### max_log_disk_usage
 
 Controls how many bytes of space on disk are used to persist device logs.
@@ -4576,12 +4566,6 @@ Should be a string value that only contains digits.
 **Current value (from the default):** `"0"`
 
 From //src/diagnostics/log_listener/BUILD.gn:11
-
-### max_zedboot_zbi_size
-
-**Current value (from the default):** `0`
-
-From //build/images/filesystem_limits.gni:23
 
 ### mbedtls_config_file
 
@@ -8010,15 +7994,6 @@ Whether or not logging is disabled globally.
 
 From //src/starnix/kernel/BUILD.gn:14
 
-### starnix_disable_tracing
-
-Whether or not tracing is disabled globally.
-NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
-
-**Current value (from the default):** `false`
-
-From //src/starnix/kernel/BUILD.gn:18
-
 ### starnix_enable_trace_and_debug_logs_in_release
 
 Compiles-in trace and debug logging in release builds. By default, these
@@ -8027,7 +8002,15 @@ https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:23
+From //src/starnix/kernel/BUILD.gn:22
+
+### starnix_enable_tracing
+
+Whether or not tracing is enabled globally.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:17
 
 ### target_cpu
 
