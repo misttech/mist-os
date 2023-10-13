@@ -20,8 +20,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <arch/arm64/hypervisor/gic/gicv2.h>
-#include <arch/arm64/periphmap.h>
 #include <arch/ops.h>
 #include <arch/regs.h>
 #include <dev/interrupt.h>
@@ -37,14 +35,24 @@
 #include <lk/init.h>
 #include <pdev/interrupt.h>
 
-#include "arm_gicv2m_pcie.h"
-
 #include <ktl/enforce.h>
 
 #define LOCAL_TRACE 0
 
+#if defined(__aarch64__)
 #include <arch/arm64.h>
+#include <arch/arm64/hypervisor/gic/gicv2.h>
+#include <arch/arm64/periphmap.h>
+
+#include "arm_gicv2m_pcie.h"
 #define IFRAME_PC(frame) ((frame)->elr)
+#define get_vaddr_from_paddr(paddr) reinterpret_cast<zx_vaddr_t>((periph_paddr_to_vaddr(paddr)))
+#elif defined(__riscv)
+#include <arch/riscv64.h>
+#include <vm/physmap.h>
+#define IFRAME_PC(frame) ((frame)->regs.pc)
+#define get_vaddr_from_paddr(paddr) reinterpret_cast<zx_vaddr_t>((paddr_to_physmap(paddr)))
+#endif
 
 // Values read from the config.
 vaddr_t arm_gicv2_gic_base = 0;
@@ -418,7 +426,7 @@ static const struct pdev_interrupt_ops gic_ops = {
 void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   ASSERT(config.mmio_phys);
 
-  arm_gicv2_gic_base = periph_paddr_to_vaddr(config.mmio_phys);
+  arm_gicv2_gic_base = get_vaddr_from_paddr(config.mmio_phys);
   ASSERT(arm_gicv2_gic_base);
   mmio_phys = config.mmio_phys;
   msi_frame_phys = config.msi_frame_phys;
@@ -448,7 +456,7 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
     static vaddr_t GICV2M_REG_FRAMES_VIRT[] = {0};
 
     GICV2M_REG_FRAMES[0] = msi_frame_phys;
-    GICV2M_REG_FRAMES_VIRT[0] = periph_paddr_to_vaddr(msi_frame_phys);
+    GICV2M_REG_FRAMES_VIRT[0] = get_vaddr_from_paddr((msi_frame_phys));
     ASSERT(GICV2M_REG_FRAMES_VIRT[0]);
     arm_gicv2m_init(GICV2M_REG_FRAMES, GICV2M_REG_FRAMES_VIRT, ktl::size(GICV2M_REG_FRAMES));
   }
@@ -463,13 +471,17 @@ void ArmGicInitEarly(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   status = gic_register_sgi_handler(MP_IPI_HALT + ipi_base, &arm_ipi_halt_handler);
   DEBUG_ASSERT(status == ZX_OK);
 
+#if defined(__aarch64__)
   gicv2_hw_interface_register();
+#endif
 }
 
 void ArmGicInitLate(const zbi_dcfg_arm_gic_v2_driver_t& config) {
   ASSERT(mmio_phys);
 
+#if defined(__aarch64__)
   arm_gicv2_pcie_init(use_msi);
+#endif
 
   // Place the physical address of the GICv2 registers on the MMIO deny list.
   // Users will not be able to create MMIO resources which permit mapping of the
