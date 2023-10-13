@@ -5,7 +5,6 @@
 package main
 
 import (
-	"flag"
 	"strings"
 	"testing"
 
@@ -13,8 +12,6 @@ import (
 	resultpb "go.chromium.org/luci/resultdb/proto/v1"
 	"google.golang.org/protobuf/testing/protocmp"
 )
-
-var testDataDir = flag.String("test_data_dir", "testdata", "Path to testdata/; only used in GN build")
 
 func TestStringPairConvert(t *testing.T) {
 	tests := []struct {
