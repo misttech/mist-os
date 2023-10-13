@@ -10,6 +10,7 @@ use fidl_fuchsia_developer_remotecontrol::{
     ConnectCapabilityError, IdentifyHostError, RemoteControlMarker, RemoteControlProxy,
 };
 use fidl_fuchsia_overnet_protocol::NodeId;
+use fidl_fuchsia_sys2::{RealmQueryMarker, RealmQueryProxy};
 use futures::{StreamExt, TryFutureExt};
 use std::{
     hash::{Hash, Hasher},
@@ -22,6 +23,8 @@ pub use fidl_fuchsia_io::OpenFlags;
 pub use fidl_fuchsia_sys2::OpenDirType;
 
 pub mod toolbox;
+
+const REMOTE_CONTROL_MONIKER: &str = "core/remote-control";
 
 #[derive(Debug, Clone)]
 pub struct RcsConnection {
@@ -276,4 +279,21 @@ pub async fn open_with_timeout<P: DiscoverableProtocolMarker>(
 ) -> Result<()> {
     open_with_timeout_at(dur, moniker, capability_set, P::PROTOCOL_NAME, rcs_proxy, server_end)
         .await
+}
+
+pub async fn root_realm_query(
+    rcs_proxy: &RemoteControlProxy,
+    timeout: Duration,
+) -> Result<RealmQueryProxy> {
+    let (proxy, server_end) = fidl::endpoints::create_proxy::<RealmQueryMarker>()?;
+    open_with_timeout_at(
+        timeout,
+        REMOTE_CONTROL_MONIKER,
+        OpenDirType::NamespaceDir,
+        &format!("svc/{}.root", RealmQueryMarker::PROTOCOL_NAME),
+        rcs_proxy,
+        server_end.into_channel(),
+    )
+    .await?;
+    Ok(proxy)
 }

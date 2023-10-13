@@ -8,8 +8,7 @@ use {
     component_debug::cli::show_cmd_print,
     ffx_session_show_args::SessionShowCommand,
     fho::{FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_developer_remotecontrol as rc, fidl_fuchsia_sys2 as fsys,
-    fuchsia_zircon_status::Status,
+    fidl_fuchsia_developer_remotecontrol as rc,
 };
 
 const DETAILS_FAILURE: &str = "Could not get session information from the target. This may be
@@ -39,14 +38,9 @@ async fn show_impl<W: std::io::Write>(
     _cmd: SessionShowCommand,
     writer: &mut W,
 ) -> Result<()> {
-    let (query_proxy, query_server) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
-        .context("creating query proxy")?;
-    rcs_proxy
-        .root_realm_query(query_server)
-        .await?
-        .map_err(|i| Status::ok(i).unwrap_err())
+    let query_proxy = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
+        .await
         .context("opening realm query")?;
-
     show_cmd_print("core/session-manager/session:session".to_string(), query_proxy, writer)
         .await
         .context(DETAILS_FAILURE)?;

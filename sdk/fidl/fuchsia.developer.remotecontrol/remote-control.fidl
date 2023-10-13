@@ -45,6 +45,8 @@ closed protocol RemoteControl {
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RealmQuery`] protocol.
+    @deprecated(
+            "Please use `OpenCapability` to connect to `fuchsia.sys2.RealmQuery.root` in the namespace of `core/remote-control`")
     strict RootRealmQuery(resource struct {
         server server_end:sys2.RealmQuery;
     }) -> () error zx.Status;

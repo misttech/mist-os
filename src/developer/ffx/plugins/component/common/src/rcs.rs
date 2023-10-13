@@ -25,11 +25,9 @@ pub async fn connect_to_lifecycle_controller(
 pub async fn connect_to_realm_query(
     rcs_proxy: &rc::RemoteControlProxy,
 ) -> Result<fsys::RealmQueryProxy> {
-    let (realm_query, server_end) = create_proxy::<fsys::RealmQueryMarker>()?;
-    rcs_proxy
-        .root_realm_query(server_end)
-        .await?
-        .map_err(|i| ffx_error!("Could not open RealmQuery: {}", Status::from_raw(i)))?;
+    let realm_query = rcs::root_realm_query(&rcs_proxy, std::time::Duration::from_secs(15))
+        .await
+        .map_err(|err| ffx_error!("Could not open RealmQuery: {err}"))?;
     Ok(realm_query)
 }
 

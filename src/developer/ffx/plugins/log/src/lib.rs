@@ -9,7 +9,6 @@ use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
-use fidl_fuchsia_sys2 as fsys;
 use log_command::{
     log_formatter::{
         dump_logs_from_socket, BootTimeAccessor, DefaultLogFormatter, LogEntry, LogFormatter,
@@ -61,8 +60,7 @@ pub async fn log_impl(
     target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
 ) -> Result<(), LogError> {
-    let (instance_getter, server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()?;
-    rcs_proxy.root_realm_query(server_end).await??;
+    let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     log_main(writer, rcs_proxy, target_collection_proxy, cmd, LogSymbolizer::new(), instance_getter)
         .await
 }

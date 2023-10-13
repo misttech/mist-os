@@ -187,25 +187,8 @@ impl DiagnosticsProvider for HostArchiveReader {
 async fn connect_realm_query(
     rcs_proxy: &RemoteControlProxy,
 ) -> Result<fsys2::RealmQueryProxy, Error> {
-    // Connect RootRealmQuery.
-    let (realm_query_proxy, realm_query_server_end) =
-        fidl::endpoints::create_proxy::<fsys2::RealmQueryMarker>()
-            .map_err(|e| Error::IOError("create realm query proxy".into(), e.into()))?;
-    flatten_proxy_connection(
-        rcs_proxy.root_realm_query(realm_query_server_end).await,
-        "RootRealmQuery",
-    )
-    .await?;
-
+    let realm_query_proxy = rcs::root_realm_query(rcs_proxy, std::time::Duration::from_secs(15))
+        .await
+        .map_err(|e| Error::IOError("create realm query proxy".into(), e.into()))?;
     Ok(realm_query_proxy)
-}
-
-/// Helper method to unwrap `RemoteControlProxy` creation.
-async fn flatten_proxy_connection(
-    entry_point: Result<Result<(), i32>, fidl::Error>,
-    step_name: &str,
-) -> Result<(), Error> {
-    entry_point
-        .map_err(|e| Error::IOError("talking to RemoteControlProxy".into(), e.into()))?
-        .map_err(|e| Error::IOError(step_name.into(), anyhow!("{:?}", e)))
 }

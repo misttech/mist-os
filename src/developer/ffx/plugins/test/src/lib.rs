@@ -403,6 +403,7 @@ async fn get_tests<W: Write>(
 mod test {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_sys2 as fsys;
     use futures::prelude::*;
     use lazy_static::lazy_static;
     use std::num::NonZeroU32;
@@ -480,16 +481,22 @@ mod test {
                             server_channels.push(server.into_channel());
                             responder.send(Ok(())).expect("error sending EchoString response");
                         }
-
-                        fremotecontrol::RemoteControlRequest::RootRealmQuery {
-                            server,
+                        fremotecontrol::RemoteControlRequest::OpenCapability {
+                            moniker,
+                            capability_set,
+                            capability_name,
+                            server_channel,
+                            flags: _,
                             responder,
                         } => {
-                            server_channels.push(server.into_channel());
+                            assert_eq!(moniker, "core/remote-control");
+                            assert_eq!(capability_set, fsys::OpenDirType::NamespaceDir);
+                            assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
+                            server_channels.push(server_channel);
                             responder.send(Ok(())).expect("error sending EchoString response");
                         }
-                        _ => {
-                            panic!("Not implemented: {:?}", request);
+                        other => {
+                            unreachable!("Got unexpected request: {other:?}");
                         }
                     }
                 }

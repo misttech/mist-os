@@ -13,7 +13,6 @@ use fidl_fuchsia_driver_registrar as fdr;
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sys2 as fsys;
 use fidl_fuchsia_test_manager as ftm;
-use fuchsia_zircon_status::Status;
 
 struct DriverConnector {
     remote_control: Option<rc::RemoteControlProxy>,
@@ -90,15 +89,9 @@ impl DriverConnector {
             rcs_proxy: &rc::RemoteControlProxy,
             query: &str,
         ) -> Result<Vec<String>> {
-            let (query_proxy, query_server) =
-                fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
-                    .context("creating realm query proxy")?;
-            rcs_proxy
-                .root_realm_query(query_server)
-                .await?
-                .map_err(|i| Status::ok(i).unwrap_err())
+            let query_proxy = rcs::root_realm_query(rcs_proxy, std::time::Duration::from_secs(15))
+                .await
                 .context("opening query")?;
-
             Ok(capability::get_all_route_segments(query.to_string(), &query_proxy)
                 .await?
                 .iter()

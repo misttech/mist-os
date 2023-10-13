@@ -4,10 +4,8 @@
 
 use anyhow::{bail, Context, Result};
 use component_debug::cli;
-use fidl::Status;
 use fidl_fuchsia_developer_remotecontrol as rc;
 use fidl_fuchsia_starnix_container::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_sys2 as fsys;
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -22,14 +20,8 @@ async fn find_session_container(rcs_proxy: &rc::RemoteControlProxy) -> Result<St
                 .unwrap();
     }
 
-    let (query_proxy, query_server_end) = fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
-        .context("creating query proxy")?;
-    rcs_proxy
-        .root_realm_query(query_server_end)
-        .await?
-        .map_err(|i| Status::ok(i).unwrap_err())
-        .context("opening realm query")?;
-
+    let query_proxy =
+        rcs::root_realm_query(&rcs_proxy, TIMEOUT).await.context("opening realm query")?;
     let instances = cli::list::get_instances_matching_filter(None, &query_proxy).await?;
     let containers: Vec<_> = instances
         .into_iter()

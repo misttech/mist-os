@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
-use ffx_command::FfxContext;
+use anyhow::{Context, Result};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_sys2::OpenDirType;
@@ -43,10 +42,10 @@ where
     // message. This just avoids an indentation or having to break this out
     // into another single-use function. It's kind of a reverse `?`.
     let Some(backup) = backup_moniker.as_ref().map(|s| s.as_ref()) else {
-        toolbox_res.with_user_message(|| toolbox_error_message(protocol_name))?;
+        toolbox_res.context(toolbox_error_message(protocol_name))?;
         return Ok(proxy);
     };
-    let Err(toolbox_err) = toolbox_res else {
+    let Err(_toolbox_err) = toolbox_res else {
         return Ok(proxy);
     };
 
@@ -66,9 +65,7 @@ where
     // stack the errors together so we can see both of them in the log if
     // we want to and then provide an error message that indicates we tried
     // both and could find it at neither.
-    moniker_res
-        .bug_context(toolbox_err)
-        .with_user_message(|| backup_error_message(protocol_name, &backup))?;
+    moniker_res.context(backup_error_message(protocol_name, &backup))?;
     Ok(proxy)
 }
 

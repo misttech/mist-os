@@ -21,7 +21,6 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
 };
-use fidl_fuchsia_sys2::OpenDirType;
 use futures::{
     channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     future::{select, Either},
@@ -262,7 +261,7 @@ pub async fn handle_rcs_connection(
                 responder,
             } => {
                 assert_eq!(moniker, rcs::toolbox::MONIKER);
-                assert_eq!(capability_set, OpenDirType::NamespaceDir);
+                assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                 let scheduler_2 = scheduler.clone();
                 scheduler.spawn(async move {
                     handle_open_capability(&capability_name, server_channel, scheduler_2).await

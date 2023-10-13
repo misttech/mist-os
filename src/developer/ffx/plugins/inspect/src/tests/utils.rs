@@ -105,14 +105,26 @@ pub fn make_inspects_for_lifecycle() -> Vec<InspectData> {
 
 pub fn setup_fake_rcs() -> RemoteControlProxy {
     let mock_realm_query = iquery_test_support::MockRealmQuery::default();
-    let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<<fidl_fuchsia_developer_remotecontrol::RemoteControlProxy as fidl::endpoints::Proxy>::Protocol>().unwrap();
+    let (proxy, mut stream) =
+        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
     fuchsia_async::Task::local(async move {
         let querier = Arc::new(mock_realm_query);
         while let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::RootRealmQuery { server, responder } => {
+                RemoteControlRequest::OpenCapability {
+                    moniker,
+                    capability_set,
+                    capability_name,
+                    server_channel,
+                    flags: _,
+                    responder,
+                } => {
+                    assert_eq!(moniker, "core/remote-control");
+                    assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
+                    assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
                     let querier = Arc::clone(&querier);
-                    fuchsia_async::Task::local(querier.serve(server)).detach();
+                    fuchsia_async::Task::local(querier.serve(ServerEnd::new(server_channel)))
+                        .detach();
                     responder.send(Ok(())).unwrap();
                 }
                 _ => unreachable!("Not implemented"),
@@ -137,11 +149,6 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
         let querier = Arc::new(mock_realm_query);
         if let Ok(Some(req)) = stream.try_next().await {
             match req {
-                RemoteControlRequest::RootRealmQuery { server, responder } => {
-                    let querier = Arc::clone(&querier);
-                    fuchsia_async::Task::local(async move { querier.serve(server).await }).detach();
-                    responder.send(Ok(())).unwrap();
-                }
                 RemoteControlRequest::OpenCapability {
                     moniker,
                     capability_set,
@@ -150,13 +157,29 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                     flags: _,
                     responder,
                 } => {
-                    assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
-                    assert_eq!(moniker, expected_moniker);
-                    assert_eq!(capability_name, expected_protocol);
-                    let task =
-                        handle_remote_control_connect(responder, server_channel, accessor_proxy);
-                    let mut tasks = running_tasks_clone.lock().unwrap();
-                    tasks.push(task);
+                    if moniker == "core/remote-control" {
+                        assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
+                        assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
+                        let querier = Arc::clone(&querier);
+                        let mut tasks = running_tasks_clone.lock().unwrap();
+                        tasks.push(fuchsia_async::Task::spawn(async move {
+                            querier.serve(ServerEnd::new(server_channel)).await
+                        }));
+                        responder.send(Ok(())).unwrap();
+                    } else if moniker == expected_moniker {
+                        assert_eq!(capability_set, fsys::OpenDirType::ExposedDir);
+                        assert_eq!(moniker, expected_moniker);
+                        assert_eq!(capability_name, expected_protocol);
+                        let task = handle_remote_control_connect(
+                            responder,
+                            server_channel,
+                            accessor_proxy,
+                        );
+                        let mut tasks = running_tasks_clone.lock().unwrap();
+                        tasks.push(task);
+                    } else {
+                        panic!("Got unexpected moniker: {moniker}");
+                    }
                 }
                 _ => unreachable!("Not implemented"),
             }
