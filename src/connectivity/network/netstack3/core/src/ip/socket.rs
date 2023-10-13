@@ -1642,20 +1642,16 @@ mod tests {
     }
 
     trait IpSocketIpExt: Ip + TestIpExt + IcmpIpExt + IpExt + crate::ip::IpExt {
-        const DISPATCH_RECEIVE_COUNTER: &'static str;
         fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr>;
     }
 
     impl IpSocketIpExt for Ipv4 {
-        const DISPATCH_RECEIVE_COUNTER: &'static str = "dispatch_receive_ipv4_packet";
         fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr> {
             let [a, b, c, _] = Ipv4::MULTICAST_SUBNET.network().ipv4_bytes();
             SpecifiedAddr::new(Ipv4Addr::new([a, b, c, host])).unwrap()
         }
     }
     impl IpSocketIpExt for Ipv6 {
-        const DISPATCH_RECEIVE_COUNTER: &'static str = "dispatch_receive_ipv6_packet";
-
         fn multicast_addr(host: u8) -> SpecifiedAddr<Self::Addr> {
             let mut bytes = Ipv6::MULTICAST_SUBNET.network().ipv6_bytes();
             bytes[15] = host;
