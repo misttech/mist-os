@@ -181,7 +181,7 @@ impl JobPolicyAllowlists {
     fn merge(self, another: JobPolicyAllowlists) -> Result<Self, Error> {
         return Ok(JobPolicyAllowlists {
             ambient_mark_vmo_exec: merge_vec!(self, another, ambient_mark_vmo_exec),
-            main_process_critical: merge_field!(self, another, main_process_critical),
+            main_process_critical: merge_vec!(self, another, main_process_critical),
             create_raw_processes: merge_vec!(self, another, create_raw_processes),
         });
     }
