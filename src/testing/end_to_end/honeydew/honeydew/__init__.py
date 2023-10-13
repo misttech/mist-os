@@ -6,7 +6,7 @@
 
 import logging
 import subprocess
-from typing import Any, Type
+from typing import Type
 
 from honeydew import custom_types
 from honeydew import errors
@@ -19,9 +19,10 @@ from honeydew.interfaces.device_classes import (
     fuchsia_device as fuchsia_device_interface,
 )
 from honeydew.transports import ffx as ffx_transport
-from honeydew.utils import properties
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+_AFFORDANCE_NOT_IMPLEMENTED: str = "raise NotImplementedError"
 
 
 # List all the public methods in alphabetical order
@@ -79,48 +80,6 @@ def create_device(
         raise errors.FuchsiaDeviceError(
             f"Failed to create device for '{device_name}'"
         ) from err
-
-
-def get_all_affordances(
-    device_name: str,
-    transport: transports.TRANSPORT = transports.DEFAULT_TRANSPORT,
-) -> list[str]:
-    """Returns list of all affordances implemented for the specified device
-    using the specified transport.
-
-    Please note that this method returns list of affordances implemented for
-    this device. This is not same as affordances supported by the device.
-
-    Args:
-        device_name: Device name returned by `ffx target list`.
-
-        transport: Transport to use to perform host-target interactions.
-            If not set, transports.DEFAULT_TRANSPORT will be used.
-
-    Returns:
-        List of affordances.
-    """
-    device_class: Type[
-        fuchsia_device_interface.FuchsiaDevice
-    ] = _get_device_class(transport)
-
-    affordances: list[str] = []
-    for attr in dir(device_class):
-        if attr.startswith("_"):
-            continue
-        attr_type: Any = getattr(device_class, attr, None)
-        if isinstance(attr_type, properties.Affordance):
-            affordances.append(attr)
-
-    _LOGGER.debug(
-        "All the affordances implemented for '%s' using '%s' transport "
-        "are '%s'",
-        device_name,
-        transport,
-        affordances,
-    )
-
-    return affordances
 
 
 # List all the private methods

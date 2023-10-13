@@ -354,50 +354,6 @@ class InitTests(unittest.TestCase):
 
         mock_get_device_class.assert_called()
 
-    def test_get_all_affordances_for_sl4f_based_device(self) -> None:
-        """Test case for honeydew.get_all_affordances() for a SL4F based
-        device."""
-        expected_affordances: list[str] = [
-            "bluetooth_avrcp",
-            "bluetooth_gap",
-            "screenshot",
-            "session",
-            "tracing",
-            "user_input",
-            "wlan",
-            "wlan_policy",
-        ]
-
-        self.assertEqual(
-            honeydew.get_all_affordances(
-                device_name="fuchsia-emulator",
-                transport=honeydew.transports.TRANSPORT.SL4F,
-            ),
-            expected_affordances,
-        )
-
-    def test_get_all_affordances_for_fc_based_device(self) -> None:
-        """Test case for honeydew.get_all_affordances() for a Fuchsia-Controller
-        based device."""
-        expected_affordances: list[str] = [
-            "bluetooth_avrcp",
-            "bluetooth_gap",
-            "screenshot",
-            "session",
-            "tracing",
-            "user_input",
-            "wlan",
-            "wlan_policy",
-        ]
-
-        self.assertEqual(
-            honeydew.get_all_affordances(
-                device_name="fuchsia-emulator",
-                transport=honeydew.transports.TRANSPORT.FUCHSIA_CONTROLLER,
-            ),
-            expected_affordances,
-        )
-
 
 if __name__ == "__main__":
     unittest.main()
