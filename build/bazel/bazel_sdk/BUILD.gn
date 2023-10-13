@@ -139,6 +139,7 @@ template("bazel_sdk_tests_for") {
       ]
       deps = [ "//build/bazel:generate_fuchsia_sdk_repository" ]
     }
+    pool = "//:console"
     hermetic_deps = false
     no_output_dir_leaks = true
   }
