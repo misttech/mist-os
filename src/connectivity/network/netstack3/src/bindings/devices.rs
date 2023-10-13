@@ -4,6 +4,7 @@
 
 use std::{
     collections::hash_map::{self, HashMap},
+    fmt::{self, Debug, Display},
     num::NonZeroU64,
     ops::{Deref as _, DerefMut as _},
 };
@@ -207,17 +208,13 @@ pub(crate) fn spawn_tx_task(
 /// Static information common to all devices.
 #[derive(Derivative, Debug)]
 pub(crate) struct StaticCommonInfo {
+    // TODO(https://fxbug.dev/133946): Move binding id and name out of static
+    // common info, they're available directly from the core device identifiers
+    // now.
     pub(crate) binding_id: BindingId,
     pub(crate) name: String,
     #[derivative(Debug = "ignore")]
     pub(crate) tx_notifier: NeedsDataNotifier,
-}
-
-impl StaticCommonInfo {
-    fn write_id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let Self { binding_id, name, .. } = self;
-        write!(f, "{binding_id}=>{name}")
-    }
 }
 
 /// Information common to all devices.
@@ -270,12 +267,6 @@ impl LoopbackInfo {
     }
 }
 
-impl netstack3_core::device::DeviceIdDebugTag for LoopbackInfo {
-    fn id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.static_common_info.write_id_debug_tag(f)
-    }
-}
-
 /// Information associated with FIDL Protocol workers.
 #[derive(Debug)]
 pub(crate) struct FidlWorkerInfo<R> {
@@ -318,8 +309,20 @@ impl NetdeviceInfo {
     }
 }
 
-impl netstack3_core::device::DeviceIdDebugTag for NetdeviceInfo {
-    fn id_debug_tag(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.static_common_info.write_id_debug_tag(f)
+pub(crate) struct DeviceIdAndName {
+    pub(crate) id: BindingId,
+    pub(crate) name: String,
+}
+
+impl Debug for DeviceIdAndName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { id, name } = self;
+        write!(f, "{id}=>{name}")
+    }
+}
+
+impl Display for DeviceIdAndName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
     }
 }

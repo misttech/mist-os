@@ -4,6 +4,7 @@
 
 //! Common device identifier types.
 
+use alloc::sync::Arc;
 use core::fmt::{self, Debug};
 use core::hash::Hash;
 
@@ -13,10 +14,10 @@ use crate::{
     device::{
         ethernet::EthernetLinkDevice,
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
-        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState},
-        DeviceIdDebugTag, DeviceLayerTypes,
+        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, WeakCookie},
+        DeviceLayerTypes,
     },
-    sync::{PrimaryRc, StrongRc, WeakRc},
+    sync::{PrimaryRc, StrongRc},
 };
 
 /// An identifier for a device.
@@ -85,11 +86,11 @@ impl<C: DeviceLayerTypes> WeakDeviceId<C> {
     /// Creates a [`DebugReferences`] instance for this device.
     pub fn debug_references(&self) -> DebugReferences<C> {
         DebugReferences(match self {
-            Self::Loopback(LoopbackWeakDeviceId { rc }) => {
-                DebugReferencesInner::Loopback(rc.debug_references())
+            Self::Loopback(LoopbackWeakDeviceId { cookie }) => {
+                DebugReferencesInner::Loopback(cookie.weak_ref.debug_references())
             }
-            Self::Ethernet(EthernetWeakDeviceId { rc }) => {
-                DebugReferencesInner::Ethernet(rc.debug_references())
+            Self::Ethernet(EthernetWeakDeviceId { cookie }) => {
+                DebugReferencesInner::Ethernet(cookie.weak_ref.debug_references())
             }
         })
     }
@@ -227,11 +228,25 @@ impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
 /// Allows multiple device implementations to share the same shape for
 /// maintaining reference identifiers.
 #[derive(Derivative)]
-#[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
+#[derivative(Clone(bound = ""))]
 pub struct BaseWeakDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
-    rc: WeakRc<BaseDeviceState<T, C>>,
+    cookie: Arc<WeakCookie<T, C>>,
+}
+
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq for BaseWeakDeviceId<T, C> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cookie.weak_ref.ptr_eq(&other.cookie.weak_ref)
+    }
+}
+
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Eq for BaseWeakDeviceId<T, C> {}
+
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Hash for BaseWeakDeviceId<T, C> {
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.cookie.weak_ref.hash(state)
+    }
 }
 
 impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BaseDeviceId<T, C>>
@@ -244,10 +259,8 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BaseDeviceId<T, C>>
 
 impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BaseWeakDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // TODO(https://fxbug.dev/133946): Replace pointer value with bindings
-        // debug information.
-        let Self { rc } = self;
-        write!(f, "Weak{}({:?})", T::DEBUG_TYPE, rc.ptr_debug())
+        let Self { cookie } = self;
+        write!(f, "Weak{}({:?})", T::DEBUG_TYPE, &cookie.bindings_id)
     }
 }
 
@@ -265,8 +278,8 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseWeakDeviceId<T, C> {
     /// Attempts to upgrade the ID to a strong ID, failing if the
     /// device no longer exists.
     pub fn upgrade(&self) -> Option<BaseDeviceId<T, C>> {
-        let Self { rc } = self;
-        rc.upgrade().map(|rc| BaseDeviceId { rc })
+        let Self { cookie } = self;
+        cookie.weak_ref.upgrade().map(|rc| BaseDeviceId { rc })
     }
 }
 
@@ -285,9 +298,9 @@ pub struct BaseDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
 impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BaseWeakDeviceId<T, C>>
     for BaseDeviceId<T, C>
 {
-    fn eq(&self, BaseWeakDeviceId { rc: other_rc }: &BaseWeakDeviceId<T, C>) -> bool {
+    fn eq(&self, BaseWeakDeviceId { cookie }: &BaseWeakDeviceId<T, C>) -> bool {
         let Self { rc: me_rc } = self;
-        StrongRc::weak_ptr_eq(me_rc, other_rc)
+        StrongRc::weak_ptr_eq(me_rc, &cookie.weak_ref)
     }
 }
 
@@ -318,12 +331,7 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> Ord for BaseDeviceId<T, C> {
 impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BaseDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { rc } = self;
-
-        // TODO(https://fxbug.dev/133946): Replace ID debug tag with bindings
-        // device identifier information.
-        write!(f, "{}(", T::DEBUG_TYPE)?;
-        rc.external_state.id_debug_tag(f)?;
-        write!(f, ")")
+        write!(f, "{}({:?})", T::DEBUG_TYPE, &rc.weak_cookie.bindings_id)
     }
 }
 
@@ -349,12 +357,7 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseDeviceId<T, C> {
     /// Downgrades the ID to an [`EthernetWeakDeviceId`].
     pub fn downgrade(&self) -> BaseWeakDeviceId<T, C> {
         let Self { rc } = self;
-        // TODO(https://fxbug.dev/133946): Include identifying information from
-        // bindings in the weak ID.
-
-        // When we downgrade an ethernet device reference we keep a copy of the
-        // debug ID to help debugging.
-        BaseWeakDeviceId { rc: StrongRc::downgrade(rc) }
+        BaseWeakDeviceId { cookie: Arc::clone(&rc.weak_cookie) }
     }
 }
 
@@ -368,12 +371,7 @@ pub(crate) struct BasePrimaryDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
 impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BasePrimaryDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { rc } = self;
-
-        // TODO(https://fxbug.dev/133946): Replace ID debug tag with bindings
-        // device identifier information.
-        write!(f, "Primary{}(", T::DEBUG_TYPE)?;
-        rc.external_state.id_debug_tag(f)?;
-        write!(f, ")")
+        write!(f, "Primary{}({:?})", T::DEBUG_TYPE, &rc.weak_cookie.bindings_id)
     }
 }
 
@@ -383,8 +381,18 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> BasePrimaryDeviceId<T, C> {
         BaseDeviceId { rc: PrimaryRc::clone_strong(rc) }
     }
 
-    pub(crate) fn new(state: BaseDeviceState<T, C>) -> Self {
-        Self { rc: PrimaryRc::new(state) }
+    pub(crate) fn new(
+        ip: IpLinkDeviceState<T, C>,
+        external_state: T::External<C>,
+        bindings_id: C::DeviceIdentifier,
+    ) -> Self {
+        Self {
+            rc: PrimaryRc::new_cyclic(move |weak_ref| BaseDeviceState {
+                ip,
+                external_state,
+                weak_cookie: Arc::new(WeakCookie { bindings_id, weak_ref }),
+            }),
+        }
     }
 
     pub(crate) fn into_inner(self) -> PrimaryRc<BaseDeviceState<T, C>> {

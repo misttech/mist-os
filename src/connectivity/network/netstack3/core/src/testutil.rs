@@ -12,8 +12,9 @@ use core::time::Duration;
 use core::{
     convert::Infallible as Never,
     ffi::CStr,
-    fmt::Debug,
+    fmt::{self, Debug, Display},
     ops::{Deref, DerefMut},
+    sync::atomic::AtomicUsize,
 };
 
 use net_types::{
@@ -1179,6 +1180,7 @@ impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
 impl DeviceLayerStateTypes for FakeNonSyncCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();
+    type DeviceIdentifier = MonotonicIdentifier;
 }
 
 impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
@@ -1411,6 +1413,41 @@ pub fn clear_routes_and_remove_ethernet_device<NonSyncCtx: crate::NonSyncContext
         crate::device::RemoveDeviceResult::Deferred(_reference_receiver) => {
             panic!("failed to remove ethernet device")
         }
+    }
+}
+
+/// A convenient monotonically increasing identifier to use as the bindings'
+/// `DeviceIdentifier` in tests.
+pub struct MonotonicIdentifier(usize);
+
+impl Debug for MonotonicIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // NB: This type is used as part of the debug implementation in device
+        // IDs which should provide enough context themselves on the type. For
+        // brevity we omit the type name.
+        let Self(id) = self;
+        Debug::fmt(id, f)
+    }
+}
+
+impl Display for MonotonicIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+static MONOTONIC_COUNTER: AtomicUsize = AtomicUsize::new(1);
+
+impl MonotonicIdentifier {
+    /// Creates a new identifier with the next value.
+    pub fn new() -> Self {
+        Self(MONOTONIC_COUNTER.fetch_add(1, core::sync::atomic::Ordering::SeqCst))
+    }
+}
+
+impl Default for MonotonicIdentifier {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

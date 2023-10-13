@@ -1091,6 +1091,7 @@ impl<C: crate::NonSyncContext> LockFor<crate::lock_ordering::AllDeviceSockets> f
 mod testutil {
     use crate::context::testutil::FakeNonSyncCtx;
     use crate::device::DeviceLayerStateTypes;
+    use crate::testutil::MonotonicIdentifier;
 
     use super::*;
 
@@ -1101,6 +1102,7 @@ mod testutil {
     impl<TimerId, Event: Debug, State> DeviceLayerStateTypes for FakeNonSyncCtx<TimerId, Event, State> {
         type EthernetDeviceState = ();
         type LoopbackDeviceState = ();
+        type DeviceIdentifier = MonotonicIdentifier;
     }
 
     impl<TimerId, Event: Debug, State, DeviceId> NonSyncContext<DeviceId>

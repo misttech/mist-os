@@ -53,8 +53,8 @@ use tracing::{error, info};
 use util::{ConversionContext, IntoFidl as _};
 
 use devices::{
-    BindingId, DeviceSpecificInfo, Devices, DynamicCommonInfo, DynamicNetdeviceInfo, LoopbackInfo,
-    NetdeviceInfo, StaticCommonInfo,
+    BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
+    DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo, StaticCommonInfo,
 };
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use timers::TimerDispatcher;
@@ -472,6 +472,7 @@ impl TimerContext<TimerId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl {
 impl DeviceLayerStateTypes for BindingsNonSyncCtxImpl {
     type LoopbackDeviceState = LoopbackInfo;
     type EthernetDeviceState = NetdeviceInfo;
+    type DeviceIdentifier = DeviceIdAndName;
 }
 
 impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
@@ -905,7 +906,7 @@ impl Netstack {
                     .notify(InterfaceUpdate::OnlineChanged(true))
                     .expect("interfaces worker not running");
 
-                LoopbackInfo {
+                let loopback_info = LoopbackInfo {
                     static_common_info: StaticCommonInfo {
                         binding_id,
                         name: LOOPBACK_NAME.to_string(),
@@ -920,7 +921,9 @@ impl Netstack {
                     }
                     .into(),
                     rx_notifier: loopback_rx_notifier,
-                }
+                };
+
+                (loopback_info, DeviceIdAndName { id: binding_id, name: LOOPBACK_NAME.to_string() })
             },
         )
         .expect("error adding loopback device");

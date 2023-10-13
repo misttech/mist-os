@@ -402,7 +402,7 @@ impl DeviceHandler {
                 let binding_id = non_sync_ctx.devices.alloc_new_id();
 
                 let name = name.unwrap_or_else(|| format!("eth{}", binding_id));
-                devices::NetdeviceInfo {
+                let info = devices::NetdeviceInfo {
                     handler: PortHandler {
                         id: binding_id,
                         port_id: port,
@@ -433,11 +433,13 @@ impl DeviceHandler {
                     .into(),
                     static_common_info: devices::StaticCommonInfo {
                         binding_id,
-                        name,
+                        name: name.clone(),
                         tx_notifier: Default::default(),
                     },
                 }
-                .into()
+                .into();
+
+                (info, devices::DeviceIdAndName { id: binding_id, name })
             },
         );
 

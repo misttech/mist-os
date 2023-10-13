@@ -18,7 +18,7 @@ mod state;
 use alloc::{collections::HashMap, vec::Vec};
 use core::{
     convert::Infallible as Never,
-    fmt::{self, Debug, Formatter},
+    fmt::{Debug, Display},
     marker::PhantomData,
 };
 
@@ -447,22 +447,26 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
     /// `add` adds a new `EthernetDeviceState` with the given MAC address and
     /// maximum frame size. The frame size is the limit on the size of the data
     /// payload and the header but not the FCS.
-    pub(crate) fn add_ethernet_device<F: FnOnce() -> C::EthernetDeviceState>(
+    pub(crate) fn add_ethernet_device<
+        F: FnOnce() -> (C::EthernetDeviceState, C::DeviceIdentifier),
+    >(
         &self,
         mac: UnicastAddr<Mac>,
         max_frame_size: ethernet::MaxFrameSize,
         metric: RawMetric,
-        external_state: F,
+        bindings_state: F,
     ) -> EthernetDeviceId<C> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
-        let primary = EthernetPrimaryDeviceId::new(BaseDeviceState {
-            ip: IpLinkDeviceStateInner::new(
+        let (external_state, bindings_id) = bindings_state();
+        let primary = EthernetPrimaryDeviceId::new(
+            IpLinkDeviceStateInner::new(
                 EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
                 self.origin.clone(),
             ),
-            external_state: external_state(),
-        });
+            external_state,
+            bindings_id,
+        );
         let id = primary.clone_strong();
 
         assert!(ethernet.insert(id.clone(), primary).is_none());
@@ -471,11 +475,13 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
     }
 
     /// Adds a new loopback device to the device layer.
-    pub(crate) fn add_loopback_device<F: FnOnce() -> C::LoopbackDeviceState>(
+    pub(crate) fn add_loopback_device<
+        F: FnOnce() -> (C::LoopbackDeviceState, C::DeviceIdentifier),
+    >(
         &self,
         mtu: Mtu,
         metric: RawMetric,
-        external_state: F,
+        bindings_state: F,
     ) -> Result<LoopbackDeviceId<C>, ExistsError> {
         let Devices { ethernet: _, loopback } = &mut *self.devices.write();
 
@@ -483,13 +489,12 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
             return Err(ExistsError);
         }
 
-        let primary = LoopbackPrimaryDeviceId::new(BaseDeviceState {
-            ip: IpLinkDeviceStateInner::new(
-                LoopbackDeviceState::new(mtu, metric),
-                self.origin.clone(),
-            ),
-            external_state: external_state(),
-        });
+        let (external_state, bindings_id) = bindings_state();
+        let primary = LoopbackPrimaryDeviceId::new(
+            IpLinkDeviceStateInner::new(LoopbackDeviceState::new(mtu, metric), self.origin.clone()),
+            external_state,
+            bindings_id,
+        );
 
         let id = primary.clone_strong();
 
@@ -504,27 +509,14 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
 /// Provides associated types used in the device layer.
 pub trait DeviceLayerStateTypes: InstantContext {
     /// The state associated with loopback devices.
-    type LoopbackDeviceState: DeviceIdDebugTag + Send + Sync;
+    type LoopbackDeviceState: Send + Sync;
 
     /// The state associated with ethernet devices.
-    type EthernetDeviceState: DeviceIdDebugTag + Send + Sync;
-}
+    type EthernetDeviceState: Send + Sync;
 
-/// Provides ancillary debug information for device states that are added to
-/// DeviceId's fmt::Debug implementations.
-pub trait DeviceIdDebugTag {
-    /// Appends a debug tag for this device to the provided formatter.
-    ///
-    /// This method is used specifically by [`DeviceId`] to tag device debug
-    /// information provided by [`NonSyncCtx`].
-    fn id_debug_tag(&self, f: &mut Formatter<'_>) -> fmt::Result;
-}
-
-/// Provide debug tag implementation when there's no external device state.
-impl DeviceIdDebugTag for () {
-    fn id_debug_tag(&self, _: &mut Formatter<'_>) -> fmt::Result {
-        Ok(())
-    }
+    /// An opaque identifier that is available from both strong and weak device
+    /// references.
+    type DeviceIdentifier: Send + Sync + Debug + Display;
 }
 
 /// Provides associated types used in the device layer.
@@ -753,15 +745,15 @@ pub fn remove_loopback_device<NonSyncCtx: NonSyncContext>(
 /// Adds a new Ethernet device to the stack.
 pub fn add_ethernet_device_with_state<
     NonSyncCtx: NonSyncContext,
-    F: FnOnce() -> NonSyncCtx::EthernetDeviceState,
+    F: FnOnce() -> (NonSyncCtx::EthernetDeviceState, NonSyncCtx::DeviceIdentifier),
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
     metric: RawMetric,
-    external_state: F,
+    bindings_state: F,
 ) -> EthernetDeviceId<NonSyncCtx> {
-    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, external_state)
+    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, bindings_state)
 }
 
 /// Adds a new Ethernet device to the stack.
@@ -774,6 +766,7 @@ pub(crate) fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
 ) -> EthernetDeviceId<NonSyncCtx>
 where
     NonSyncCtx::EthernetDeviceState: Default,
+    NonSyncCtx::DeviceIdentifier: Default,
 {
     add_ethernet_device_with_state(sync_ctx, mac, max_frame_size, metric, Default::default)
 }
@@ -785,14 +778,14 @@ where
 /// returned.
 pub fn add_loopback_device_with_state<
     NonSyncCtx: NonSyncContext,
-    F: FnOnce() -> NonSyncCtx::LoopbackDeviceState,
+    F: FnOnce() -> (NonSyncCtx::LoopbackDeviceState, NonSyncCtx::DeviceIdentifier),
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
     metric: RawMetric,
-    external_state: F,
+    bindings_state: F,
 ) -> Result<LoopbackDeviceId<NonSyncCtx>, crate::error::ExistsError> {
-    sync_ctx.state.device.add_loopback_device(mtu, metric, external_state)
+    sync_ctx.state.device.add_loopback_device(mtu, metric, bindings_state)
 }
 
 /// Adds a new loopback device to the stack.
@@ -808,6 +801,7 @@ pub(crate) fn add_loopback_device<NonSyncCtx: NonSyncContext>(
 ) -> Result<LoopbackDeviceId<NonSyncCtx>, crate::error::ExistsError>
 where
     NonSyncCtx::LoopbackDeviceState: Default,
+    NonSyncCtx::DeviceIdentifier: Default,
 {
     add_loopback_device_with_state(sync_ctx, mtu, metric, Default::default)
 }

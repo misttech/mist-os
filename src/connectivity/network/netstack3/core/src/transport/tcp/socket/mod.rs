@@ -3428,7 +3428,10 @@ mod tests {
         },
         sync::Mutex,
         testutil::ContextPair,
-        testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
+        testutil::{
+            new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, MonotonicIdentifier,
+            TestIpExt,
+        },
         transport::tcp::{
             buffer::{
                 testutil::{
@@ -3602,6 +3605,7 @@ mod tests {
     impl<D: FakeStrongDeviceId> DeviceLayerStateTypes for TcpNonSyncCtx<D> {
         type LoopbackDeviceState = ();
         type EthernetDeviceState = ();
+        type DeviceIdentifier = MonotonicIdentifier;
     }
 
     impl<D: FakeStrongDeviceId> TracingContext for TcpNonSyncCtx<D> {
