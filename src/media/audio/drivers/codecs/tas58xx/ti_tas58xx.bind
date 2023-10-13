@@ -7,6 +7,7 @@ composite tas58xx;
 using fuchsia.gpio;
 using fuchsia.i2c;
 using fuchsia.ti.platform;
+using fuchsia.platform;
 
 primary node "i2c" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.i2c.BIND_FIDL_PROTOCOL.DEVICE;
@@ -21,4 +22,10 @@ node "gpio-fault" {
 
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
+node "pdev" {
+  fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.ti.platform.BIND_PLATFORM_DEV_VID.TI;
+  fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.ti.platform.BIND_PLATFORM_DEV_DID.TAS58xx;
 }
