@@ -294,6 +294,8 @@ fn load_assembly_manifest(
             }
             Ok(())
         };
+        let mut has_zbi = false;
+        let mut has_vbmeta = false;
         for image in manifest.images.into_iter() {
             match image {
                 Image::BasePackage(..) => {}
@@ -305,11 +307,23 @@ fn load_assembly_manifest(
                     extract_packages(contents.packages)?;
                     images.push(Image::BlobFS { path, contents: BlobfsContents::default() });
                 }
-                Image::ZBI { .. }
+                Image::ZBI { .. } => {
+                    if has_zbi {
+                        anyhow::bail!("Found more than one zbi");
+                    }
+                    images.push(image);
+                    has_zbi = true;
+                }
+                Image::VBMeta(_) => {
+                    if has_vbmeta {
+                        anyhow::bail!("Found more than one zbi");
+                    }
+                    images.push(image);
+                    has_vbmeta = true;
+                }
                 // We don't need to extract packages from `FxfsSparse`, since it exists only if
                 // `Fxfs` also exists (and always contains the same set of packages).
-                | Image::FxfsSparse { .. }
-                | Image::VBMeta(_)
+                Image::FxfsSparse { .. }
                 | Image::FVM(_)
                 | Image::FVMSparse(_)
                 | Image::FVMFastboot(_)
@@ -524,6 +538,47 @@ mod test {
                 virtual_devices_path: None,
             })
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_pb_create_a_and_r_with_multiple_zbi() {
+        let temp = TempDir::new().unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let pb_dir = tempdir.join("pb");
+
+        let partitions_path = tempdir.join("partitions.json");
+        let partitions_file = File::create(&partitions_path).unwrap();
+        serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
+
+        let system_path = tempdir.join("system.json");
+        let mut manifest = AssemblyManifest::default();
+        manifest.images = vec![
+            Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
+            Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
+        ];
+        manifest.write(&system_path).unwrap();
+
+        assert!(pb_create_with_sdk_version(
+            CreateCommand {
+                product_name: String::default(),
+                product_version: String::default(),
+                partitions: partitions_path,
+                system_a: Some(system_path.clone()),
+                system_b: None,
+                system_r: Some(system_path.clone()),
+                tuf_keys: None,
+                update_package_version_file: None,
+                update_package_epoch: None,
+                virtual_device: vec![],
+                recommended_device: None,
+                out_dir: pb_dir.clone(),
+                delivery_blob_type: None,
+                with_deprecated_flash_manifest: false,
+            },
+            /*sdk_version=*/ "",
+        )
+        .await
+        .is_err());
     }
 
     #[fuchsia::test]
