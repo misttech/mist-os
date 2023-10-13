@@ -854,8 +854,10 @@ impl WaitQueue {
 
         let wait_key = entry.key;
         let waiter_id = self.add_waiter(entry);
+        let wait_queue = Arc::downgrade(&self.0);
+        waiter.inner.wait_queues.lock().insert(wait_key, wait_queue.clone());
         WaitCanceler::new_inner(WaitCancelerInner::Queue(WaitCancelerQueue {
-            wait_queue: Arc::downgrade(&self.0),
+            wait_queue,
             waiter: waiter.weak(),
             wait_key,
             waiter_id,
