@@ -67,7 +67,7 @@ fuchsia_trace::string_name_macro!(trace_arg_lock_contention_time, "lock_contenti
 macro_rules! ignore_unused_variables_if_disable_tracing {
     ($($val:expr),*) => {
         $(
-            #[cfg(feature = "disable_tracing")]
+            #[cfg(not(feature = "tracing"))]
             { let _ = &$val; }
         )*
     };
@@ -75,7 +75,7 @@ macro_rules! ignore_unused_variables_if_disable_tracing {
 
 macro_rules! trace_instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::instant!($category, $name, $scope $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -86,9 +86,9 @@ macro_rules! trace_instant {
 // lifetime of the `_scope` variable corresponds to the duration.
 macro_rules! trace_duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         let _args = [$(fuchsia_trace::ArgValue::of($key, $val)),*];
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         let _scope = fuchsia_trace::duration(fuchsia_trace::cstr!($category), fuchsia_trace::cstr!($name), &_args);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -97,7 +97,7 @@ macro_rules! trace_duration {
 
 macro_rules! trace_duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::duration_begin!($category, $name $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -106,7 +106,7 @@ macro_rules! trace_duration_begin {
 
 macro_rules! trace_duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::duration_end!($category, $name $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -117,7 +117,7 @@ macro_rules! trace_flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         let _flow_id: fuchsia_trace::Id = $flow_id;
 
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::flow_begin!($category, $name, _flow_id $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -128,7 +128,7 @@ macro_rules! trace_flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         let _flow_id: fuchsia_trace::Id = $flow_id;
 
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::flow_step!($category, $name, _flow_id $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);
@@ -139,7 +139,7 @@ macro_rules! trace_flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
         let _flow_id: fuchsia_trace::Id = $flow_id;
 
-        #[cfg(not(feature = "disable_tracing"))]
+        #[cfg(feature = "tracing")]
         fuchsia_trace::flow_end!($category, $name, _flow_id $(, $key => $val)*);
 
         ignore_unused_variables_if_disable_tracing!($($val),*);

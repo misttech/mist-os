@@ -13,9 +13,8 @@ declare_args() {
   # Whether or not logging is disabled globally.
   starnix_disable_logging = false
 
-  # Whether or not tracing is disabled globally.
-  # NOTE(https://fxbug.dev/124980) this slows down some microbenchmarks.
-  starnix_disable_tracing = false
+  # Whether or not tracing is enabled globally.
+  starnix_enable_tracing = false
 
   # Compiles-in trace and debug logging in release builds. By default, these
   # logs are compiled-out for performance reasons. For more information, see
@@ -396,8 +395,8 @@ rustc_binary("starnix_kernel_bin") {
   if (starnix_disable_logging) {
     features = [ "disable_logging" ]
   }
-  if (starnix_disable_tracing) {
-    features += [ "disable_tracing" ]
+  if (starnix_enable_tracing) {
+    features += [ "tracing" ]
   }
   if (starnix_enable_trace_and_debug_logs_in_release) {
     features += [ "trace_and_debug_logs_in_release" ]

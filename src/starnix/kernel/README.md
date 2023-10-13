@@ -276,9 +276,13 @@ ffx inspect show core/starnix_runner/bionic:root:syscall_stats
 
 By default, starnix compiles-out trace and debug logging in release builds for
 performance reasons. To compile-in trace and debug logging in release builds,
-set the `starnix_enable_trace_and_debug_logs_in_release` GN arg to `true`.
+set the `starnix_enable_trace_and_debug_logs_in_release` GN arg to `true` and
+rebuild.
 
 ## Tracing
+
+By default, starnix compiles-out tracing. To compile-in tracking, set the
+`starnix_enable_tracing` GN arg to `true` and rebuild.
 
 To start a trace with an increased buffer size, run:
 
@@ -301,9 +305,6 @@ select avg(dur), count(*)
 from slice join args using (arg_set_id)
 where key='name' and display_value='clock_getres' and name='RunTaskLoop'
 ```
-
-Tracing can be compiled out by setting `starnix_disable_tracing=true` in your
-GN args.
 
 [adb.docs]: https://developer.android.com/studio/command-line/adb#copyfiles
 [local-args]: /docs/development/build/fx.md#defining_persistent_local_build_arguments
