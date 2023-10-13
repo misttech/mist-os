@@ -3326,7 +3326,7 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
     fn connect(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError>;
@@ -3336,23 +3336,26 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
     fn bind(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
 
     /// Gets the socket information of an ICMP socket.
-    fn get_info(&mut self, ctx: &mut C, id: SocketId<I>)
-        -> SocketInfo<I::Addr, Self::WeakDeviceId>;
+    fn get_info(
+        &mut self,
+        ctx: &mut C,
+        id: &SocketId<I>,
+    ) -> SocketInfo<I::Addr, Self::WeakDeviceId>;
 
     fn set_device(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError>;
 
-    fn get_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId>;
+    fn get_bound_device(&mut self, ctx: &C, id: &SocketId<I>) -> Option<Self::WeakDeviceId>;
 }
 
 /// A handler trait for ICMP sockets that also allows sending/receiving on the
@@ -3364,7 +3367,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
     fn send(
         &mut self,
         ctx: &mut C,
-        conn: SocketId<I>,
+        conn: &SocketId<I>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>>;
 
@@ -3372,7 +3375,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
     fn send_to(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         body: B,
     ) -> Result<
@@ -3390,27 +3393,27 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
     fn connect(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         remote_id: NonZeroU16,
     ) -> Result<(), datagram::ConnectError> {
-        datagram::connect(self, ctx, id, remote_ip, (), remote_id)
+        datagram::connect(self, ctx, id.clone(), remote_ip, (), remote_id)
     }
 
     fn bind(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         local_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         icmp_id: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
-        datagram::listen(self, ctx, id, local_ip, icmp_id)
+        datagram::listen(self, ctx, id.clone(), local_ip, icmp_id)
     }
 
     fn get_info(
         &mut self,
         _ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
     ) -> SocketInfo<I::Addr, Self::WeakDeviceId> {
         self.with_sockets_state(|_sync_ctx, state| {
             match state.get(id.get_key_index()).expect("invalid socket ID") {
@@ -3457,14 +3460,14 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
     fn set_device(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         device_id: Option<&Self::DeviceId>,
     ) -> Result<(), SocketError> {
-        datagram::set_device(self, ctx, id, device_id)
+        datagram::set_device(self, ctx, id.clone(), device_id)
     }
 
-    fn get_bound_device(&mut self, ctx: &C, id: SocketId<I>) -> Option<Self::WeakDeviceId> {
-        datagram::get_bound_device(self, ctx, id)
+    fn get_bound_device(&mut self, ctx: &C, id: &SocketId<I>) -> Option<Self::WeakDeviceId> {
+        datagram::get_bound_device(self, ctx, id.clone())
     }
 }
 
@@ -3478,23 +3481,23 @@ impl<
     fn send(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         body: B,
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
-        datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id, body)
+        datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id.clone(), body)
     }
 
     fn send_to(
         &mut self,
         ctx: &mut C,
-        id: SocketId<I>,
+        id: &SocketId<I>,
         remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         body: B,
     ) -> Result<
         (),
         either::Either<LocalAddressError, datagram::SendToError<packet_formats::error::ParseError>>,
     > {
-        datagram::send_to::<_, _, _, Icmp, _>(self, ctx, id, remote_ip, (), body)
+        datagram::send_to::<_, _, _, Icmp, _>(self, ctx, id.clone(), remote_ip, (), body)
     }
 }
 
@@ -3515,7 +3518,7 @@ pub fn new_socket<I: Ip, C: NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId<I
 pub fn connect<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     remote_id: NonZeroU16,
 ) -> Result<(), datagram::ConnectError> {
@@ -3542,7 +3545,7 @@ pub fn connect<I: Ip, C: NonSyncContext>(
 pub fn bind<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     local_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     icmp_id: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
@@ -3568,7 +3571,7 @@ pub fn bind<I: Ip, C: NonSyncContext>(
 pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     body: B,
 ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>> {
     net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx, body)), id), |(
@@ -3585,7 +3588,7 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
 pub fn send_to<I: Ip, B: BufferMut, C: NonSyncContext + BufferNonSyncContext<B>>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
     remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
     body: B,
 ) -> Result<
@@ -3643,7 +3646,7 @@ pub enum SocketInfo<A: IpAddress, D> {
 pub fn get_info<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
-    id: SocketId<I>,
+    id: &SocketId<I>,
 ) -> SocketInfo<I::Addr, crate::device::WeakDeviceId<C>> {
     net_types::map_ip_twice!(I, (IpInvariant((sync_ctx, ctx)), id), |(
         IpInvariant((sync_ctx, ctx)),
@@ -3666,7 +3669,7 @@ pub fn set_device<I: Ip, C: crate::NonSyncContext>(
 ) -> Result<(), SocketError> {
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,
-        (IpInvariant((sync_ctx, ctx, device_id)), id.clone()),
+        (IpInvariant((sync_ctx, ctx, device_id)), id),
         |(IpInvariant((sync_ctx, ctx, device_id)), id)| {
             IpInvariant(SocketHandler::<I, _>::set_device(
                 &mut Locked::new(sync_ctx),
@@ -3687,7 +3690,7 @@ pub fn get_bound_device<I: Ip, C: crate::NonSyncContext>(
 ) -> Option<crate::device::WeakDeviceId<C>> {
     let IpInvariant(device) = net_types::map_ip_twice!(
         I,
-        (IpInvariant((sync_ctx, ctx)), id.clone()),
+        (IpInvariant((sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {
             IpInvariant(SocketHandler::<I, _>::get_bound_device(
                 &mut Locked::new(sync_ctx),
@@ -4643,24 +4646,24 @@ mod tests {
                     .expect("failed to set SO_BINDTODEVICE");
             }
             core::mem::drop((local_device_ids, remote_device_ids));
-            bind(sync_ctx, non_sync_ctx, conn, None, NonZeroU16::new(icmp_id)).unwrap();
+            bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(icmp_id)).unwrap();
             match send_type {
                 IcmpSendType::Send => {
                     connect(
                         sync_ctx,
                         non_sync_ctx,
-                        conn,
+                        &conn,
                         Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         REMOTE_ID,
                     )
                     .unwrap();
-                    send(sync_ctx, non_sync_ctx, conn, buf).unwrap();
+                    send(sync_ctx, non_sync_ctx, &conn, buf).unwrap();
                 }
                 IcmpSendType::SendTo => {
                     send_to(
                         sync_ctx,
                         non_sync_ctx,
-                        conn,
+                        &conn,
                         Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(remote_addr))),
                         buf,
                     )
@@ -4988,12 +4991,12 @@ mod tests {
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(sync_ctx, non_sync_ctx, conn, None, NonZeroU16::new(ICMP_ID))
+            SocketHandler::bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
                 .unwrap();
             SocketHandler::connect(
                 sync_ctx,
                 non_sync_ctx,
-                conn,
+                &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V4.remote_ip))),
                 REMOTE_ID,
             )
@@ -5296,12 +5299,12 @@ mod tests {
             // evidence of a bug; we may just have to update this test to
             // accommodate whatever new ID allocation scheme is being used.
             assert_eq!(conn, SocketId::new(0));
-            SocketHandler::bind(sync_ctx, non_sync_ctx, conn, None, NonZeroU16::new(ICMP_ID))
+            SocketHandler::bind(sync_ctx, non_sync_ctx, &conn, None, NonZeroU16::new(ICMP_ID))
                 .unwrap();
             SocketHandler::connect(
                 sync_ctx,
                 non_sync_ctx,
-                conn,
+                &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(FAKE_CONFIG_V6.remote_ip))),
                 REMOTE_ID,
             )
@@ -5812,7 +5815,7 @@ mod tests {
             SocketHandler::<Ipv6, _>::connect(
                 sync_ctx,
                 non_sync_ctx,
-                conn,
+                &conn,
                 Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(
                     SpecifiedAddr::new(net_ip_v6!("::ffff:192.0.2.1")).unwrap(),
                 ))),
@@ -5832,7 +5835,7 @@ mod tests {
         SocketHandler::<I, _>::connect(
             sync_ctx,
             non_sync_ctx,
-            conn,
+            &conn,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
@@ -5849,7 +5852,7 @@ mod tests {
             .unwrap()
             .into_inner();
         assert_matches!(
-            BufferSocketHandler::<I, _, _>::send(sync_ctx, non_sync_ctx, conn, buf,),
+            BufferSocketHandler::<I, _, _>::send(sync_ctx, non_sync_ctx, &conn, buf,),
             Err(datagram::SendError::SerializeError(
                 packet_formats::error::ParseError::NotExpected
             ))
@@ -5864,26 +5867,26 @@ mod tests {
 
         let id = SocketHandler::<I, _>::create(sync_ctx);
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
             SocketInfo::Unbound
         );
 
-        SocketHandler::<I, _>::bind(sync_ctx, non_sync_ctx, id, None, Some(ICMP_ID)).unwrap();
+        SocketHandler::<I, _>::bind(sync_ctx, non_sync_ctx, &id, None, Some(ICMP_ID)).unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
             SocketInfo::Bound { local_ip: None, id: ICMP_ID, device: None }
         );
 
         SocketHandler::<I, _>::connect(
             sync_ctx,
             non_sync_ctx,
-            id,
+            &id,
             Some(SocketZonedIpAddr::from(ZonedAddr::Unzoned(I::FAKE_CONFIG.remote_ip))),
             REMOTE_ID,
         )
         .unwrap();
         assert_eq!(
-            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, id),
+            SocketHandler::<I, _>::get_info(sync_ctx, non_sync_ctx, &id),
             SocketInfo::Connected {
                 local_ip: I::FAKE_CONFIG.local_ip,
                 remote_ip: I::FAKE_CONFIG.remote_ip,
