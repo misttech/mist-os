@@ -6,13 +6,13 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "llvm/DebugInfo/DWARF/DWARFUnit.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_unit.h"
 
 namespace zxdb {
 
-DwarfDieScanner::DwarfDieScanner(llvm::DWARFUnit* unit) : unit_(unit) {
-  die_count_ = unit_->getNumDIEs();
+DwarfDieScanner::DwarfDieScanner(const DwarfUnit& unit) : unit_(unit) {
+  die_count_ = unit_.GetDieCount();
 
   // We prefer not to reallocate and normally the C++ component depth is < 8.
   tree_stack_.reserve(8);
@@ -24,7 +24,7 @@ const llvm::DWARFDebugInfoEntry* DwarfDieScanner::Prepare() {
   if (done())
     return nullptr;
 
-  cur_die_ = unit_->getDIEAtIndex(die_index_).getDebugInfoEntry();
+  cur_die_ = unit_.GetLLVMDieAtIndex(die_index_).getDebugInfoEntry();
 
   uint32_t parent_idx = cur_die_->getParentIdx().value_or(kNoParent);
 
@@ -60,7 +60,7 @@ void DwarfDieScanner::Advance() {
 }
 
 uint32_t DwarfDieScanner::GetParentIndex(uint32_t index) const {
-  return unit_->getDIEAtIndex(index).getDebugInfoEntry()->getParentIdx().value_or(kNoParent);
+  return unit_.GetLLVMDieAtIndex(index).getDebugInfoEntry()->getParentIdx().value_or(kNoParent);
 }
 
 }  // namespace zxdb

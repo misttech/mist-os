@@ -19,7 +19,6 @@ namespace llvm {
 class DWARFCompileUnit;
 class DWARFContext;
 class DWARFDie;
-class DWARFUnit;
 
 namespace object {
 class ObjectFile;
@@ -30,6 +29,7 @@ class ObjectFile;
 namespace zxdb {
 
 class DwarfBinary;
+class DwarfUnit;
 
 class Index {
  public:
@@ -87,10 +87,10 @@ class Index {
   size_t CountSymbolsIndexed() const;
 
  private:
-  void IndexCompileUnit(llvm::DWARFContext* context, llvm::DWARFUnit* unit, unsigned unit_index,
+  void IndexCompileUnit(llvm::DWARFContext* context, const DwarfUnit& unit, unsigned unit_index,
                         bool force_slow_path);
 
-  void IndexCompileUnitSourceFiles(llvm::DWARFContext* context, llvm::DWARFUnit* unit,
+  void IndexCompileUnitSourceFiles(llvm::DWARFContext* context, const DwarfUnit& unit,
                                    unsigned unit_index);
 
   // Populates the file_name_index_ given a now-unchanging files_ map.

@@ -26,11 +26,16 @@ class DwarfUnitImpl : public DwarfUnit {
   llvm::DWARFUnit* unit() const { return binary_ ? unit_ : nullptr; }
 
   // DwarfUnit implementation.
+  llvm::DWARFUnit* GetLLVMUnit() const override;
   uint64_t GetOffset() const override;
   uint64_t FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const override;
   std::string GetCompilationDir() const override;
   const LineTable& GetLineTable() const override;
   const llvm::DWARFDebugLine::LineTable* GetLLVMLineTable() const override;
+  uint64_t GetDieCount() const override;
+  llvm::DWARFDie GetLLVMDieAtIndex(uint64_t index) const override;
+  llvm::DWARFDie GetLLVMDieAtOffset(uint64_t offset) const override;
+  uint64_t GetIndexForLLVMDie(const llvm::DWARFDie& die) const override;
 
  private:
   FRIEND_REF_COUNTED_THREAD_SAFE(DwarfUnitImpl);

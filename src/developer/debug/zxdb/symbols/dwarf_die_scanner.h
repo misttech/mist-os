@@ -14,11 +14,12 @@
 namespace llvm {
 
 class DWARFDebugInfoEntry;
-class DWARFUnit;
 
 }  // namespace llvm
 
 namespace zxdb {
+
+class DwarfUnit;
 
 // This is a helper class for generating a zxdb::Index.
 //
@@ -41,8 +42,8 @@ class DwarfDieScanner {
  public:
   static constexpr uint32_t kNoParent = static_cast<uint32_t>(-1);
 
-  // The unit pointer must outlive this class.
-  explicit DwarfDieScanner(llvm::DWARFUnit* unit);
+  // The unit must outlive this class.
+  explicit DwarfDieScanner(const DwarfUnit& unit);
 
   ~DwarfDieScanner();
 
@@ -82,10 +83,10 @@ class DwarfDieScanner {
     bool inside_function;
   };
 
-  llvm::DWARFUnit* unit_;
+  const DwarfUnit& unit_;
 
-  uint32_t die_count_ = 0;
-  uint32_t die_index_ = 0;
+  uint64_t die_count_ = 0;
+  uint64_t die_index_ = 0;
 
   const llvm::DWARFDebugInfoEntry* cur_die_ = nullptr;
 

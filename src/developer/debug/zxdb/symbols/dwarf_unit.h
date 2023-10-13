@@ -13,6 +13,10 @@
 #include "src/lib/fxl/memory/ref_counted.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
 
+namespace llvm {
+class DWARFDie;
+}
+
 namespace zxdb {
 
 class LineTable;
@@ -34,6 +38,10 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   // Creates a weak pointer to this class. The units can get removed when modules or process are
   // unloaded so if you need to keep a pointer, either keep a weak ptr or an owning refptr.
   fxl::WeakPtr<DwarfUnit> GetWeakPtr() const { return weak_factory_.GetWeakPtr(); }
+
+  // Returns the LLVM unit for this object. Ideally this would be removed but it is necessary since
+  // we expose a number of LLVM DIE helpers.
+  virtual llvm::DWARFUnit* GetLLVMUnit() const = 0;
 
   // Returns the DIE offset, if possible, for the function covering the given absolute/relative
   // address. This will the most specific inlined subroutine if there are any. Returns 0 on failure.
@@ -67,6 +75,17 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   // every time this is called. Therefore, we'd want to cache it on a DwarfUnit. But to be useful
   // the DwarfUnits must themselves be cached in the DwarfBinary whic does not happen yet.
   virtual const llvm::DWARFDebugLine::LineTable* GetLLVMLineTable() const = 0;
+
+  // Returns the number of DIEs in this unit.
+  virtual uint64_t GetDieCount() const = 0;
+
+  // Looks up a DIE in this unit by index or byte offset.
+  virtual llvm::DWARFDie GetLLVMDieAtIndex(uint64_t index) const = 0;
+  virtual llvm::DWARFDie GetLLVMDieAtOffset(uint64_t offset) const = 0;
+
+  // Back-computes the index for the given DIE in this unit. The DIE must be part of this unit or
+  // the returned value will be incorrect (it just does a simple offset conversion).
+  virtual uint64_t GetIndexForLLVMDie(const llvm::DWARFDie& die) const = 0;
 
  protected:
   FRIEND_REF_COUNTED_THREAD_SAFE(DwarfUnit);

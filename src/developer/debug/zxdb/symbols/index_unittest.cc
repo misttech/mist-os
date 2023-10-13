@@ -270,7 +270,7 @@ TEST(Index, BenchmarkIndexing) {
   const char kFilename[] = "chrome";
   int64_t begin_us = GetTickMicroseconds();
 
-  TestSymbolModule setup(kFileName, "");
+  TestSymbolModule setup(kFilename, "");
   ASSERT_TRUE(setup.Init("", false).ok());
 
   int64_t load_complete_us = GetTickMicroseconds();
