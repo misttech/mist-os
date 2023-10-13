@@ -27,7 +27,7 @@
 
 // Save the full register state on the stack.
 // NOTE: Must stay in sync with the iframe_t definition in arch/regs.h
-.macro regsave
+.macro regsave, from_lower_el_64
 // The first push decrements the SP as a side effect. In the case of a stack
 // overflow will result in an immediate fault, instead of 'walking the stack'
 // downwards in an exception loop if the sp were decremented first.
@@ -57,10 +57,15 @@ stp   lr,  x9, [sp, ARM64_IFRAME_OFFSET_LR]
 .cfi_rel_offset sp, ARM64_IFRAME_OFFSET_USP
 stp   x10, x11, [sp, ARM64_IFRAME_OFFSET_ELR]
 .cfi_rel_offset elr1, ARM64_IFRAME_OFFSET_ELR
-// Store mdscr into the arch_thread structure.
+.if \from_lower_el_64
+// Save the user's mdscr value in the arch_thread struct. Because this value is
+// saved in the struct instead of on the stack, we must ensure that we don't
+// overwrite a previously saved value when we re-enter the kernel. Only
+// save/restore on user/kernel transitions.
 mrs x11, tpidr_el1
 mrs x12, mdscr_el1
 str x12, [x11, CURRENT_MDSCR_OFFSET]
+.endif
 .endm
 
 // Once we pop the stack past the saved sp_el0, elr_el1 the userspace values
@@ -75,10 +80,13 @@ cfi_register_is_zero DW_REG_ELR_mode
 
 // Reverse regsave above, popping the full register state off of the stack.
 .macro regrestore, from_lower_el_64
-// Restore MDSCR from the arch_thread structure.
+.if \from_lower_el_64
+// See comment about mdscr in regsave macro for why we only restore if
+// we came from usermode.
 mrs x11, tpidr_el1
 ldr x12, [x11, CURRENT_MDSCR_OFFSET]
 msr mdscr_el1, x12
+.endif
 // Restore the rest of the registers from the stack.
 ldp   lr,  x9, [sp, ARM64_IFRAME_OFFSET_LR]
 ldp   x10, x11, [sp, ARM64_IFRAME_OFFSET_ELR]
@@ -225,7 +233,7 @@ mark_lr_sp_inaccessible
 // the inner routine.
 .macro invalid_exception, which
     start_isr_func_cfi
-    regsave
+    regsave 0
     restore_fixed_regs x9
     mov x0, sp
     mov x1, #\which
@@ -235,7 +243,7 @@ mark_lr_sp_inaccessible
 
 .macro irq_exception, from_lower_el_64
     start_isr_func_cfi
-    regsave
+    regsave \from_lower_el_64
 .if \from_lower_el_64
     restore_fixed_regs x9
     mov x1, #ARM64_EXCEPTION_FLAG_LOWER_EL
@@ -255,7 +263,7 @@ mark_lr_sp_inaccessible
 // TODO: find the appropriate place to reenable FIQs here when they're needed.
 .macro sync_exception, from_lower_el_64
     start_isr_func_cfi
-    regsave
+    regsave \from_lower_el_64
     mrs x9, esr_el1
 .if \from_lower_el_64
     restore_fixed_regs x11
@@ -284,7 +292,7 @@ mark_lr_sp_inaccessible
 
 .macro serror_exception, from_lower_el_64
      start_isr_func_cfi
-     regsave
+     regsave \from_lower_el_64
  .if \from_lower_el_64
      restore_fixed_regs x9
      mov x1, #ARM64_EXCEPTION_FLAG_LOWER_EL
