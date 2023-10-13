@@ -4,8 +4,6 @@
 
 """Utilities for changing the build configuration to fuchsia."""
 
-load(":fuchsia_select.bzl", "if_fuchsia")
-load(":utils.bzl", "alias", "forward_providers", "rule_variants")
 load("//:api_version.bzl", "DEFAULT_TARGET_API")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME")
 load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
@@ -148,62 +146,3 @@ fuchsia_transition = transition(
         "//command_line_option:platforms",
     ],
 )
-
-def _forward_default_info(ctx):
-    return forward_providers(ctx, ctx.attr.actual)
-
-(
-    _with_fuchsia_transition,
-    _with_fuchsia_transition_for_run,
-    _with_fuchsia_transition_for_test,
-) = rule_variants(
-    variants = (None, "executable", "test"),
-    implementation = _forward_default_info,
-    doc = """Transitions build-only, build + run, or build + test targets.""",
-    attrs = {
-        "actual": attr.label(
-            doc = "The target to transition.",
-            mandatory = True,
-        ),
-    },
-)
-
-def with_fuchsia_transition(
-        *,
-        name,
-        actual,
-        executable = True,
-        testonly = False,
-        **kwargs):
-    """
-    Applies fuchsia_transition on a target.
-
-    Args:
-        name: The target name.
-        actual: The target to apply to.
-        executable: Whether `target`[DefaultInfo] has an executable.
-        testonly: Whether this is a test target.
-        **kwargs: Additional kwargs to forward to the rule.
-    """
-    if not executable:
-        transition = _with_fuchsia_transition
-    elif not testonly:
-        transition = _with_fuchsia_transition_for_run
-    else:
-        transition = _with_fuchsia_transition_for_test
-    transition(
-        name = name + "_with_transition",
-        actual = actual,
-        testonly = testonly,
-        **kwargs
-    )
-    alias(
-        name = name,
-        actual = if_fuchsia(
-            actual,
-            if_not = name + "_with_transition",
-        ),
-        executable = executable,
-        testonly = testonly,
-        **kwargs
-    )

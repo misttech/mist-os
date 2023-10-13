@@ -174,7 +174,6 @@ def fuchsia_package_tasks(
     fuchsia_task_register_debug_symbols(
         name = debug_symbols_task,
         deps = [package],
-        apply_fuchsia_transition = True,
         tags = top_level_tags,
         **kwargs
     )
@@ -211,7 +210,6 @@ def fuchsia_package_tasks(
             debug_symbols_task,
             publish_only_task,
         ],
-        apply_fuchsia_transition = True,
         tags = top_level_tags,
         **kwargs
     )
@@ -226,7 +224,6 @@ def fuchsia_package_tasks(
         publish_task = publish_task,
         top_level_name = name,
         is_test = is_test,
-        apply_fuchsia_transition = True,
         tags = top_level_tags,
         **kwargs
     )
@@ -256,7 +253,6 @@ def fuchsia_package_tasks(
             ] + ([] if package_repository_name else [
                 verbs.delete_repo(anonymous_publish_task),
             ]),
-            apply_fuchsia_transition = True,
             tags = top_level_tags + manual_test,
             **kwargs
         )
@@ -283,7 +279,6 @@ def fuchsia_package_tasks(
             ] + ([] if package_repository_name else [
                 verbs.delete_repo(anonymous_publish_task),
             ]),
-            apply_fuchsia_transition = True,
             tags = top_level_tags,
             **kwargs
         )
@@ -300,7 +295,6 @@ def fuchsia_package_tasks(
         component_run_tasks = component_run_tasks,
         is_test = is_test,
         package = package,
-        apply_fuchsia_transition = True,
         tags = top_level_tags,
         **kwargs
     )

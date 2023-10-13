@@ -9,7 +9,6 @@ load(
     "alias",
     "collect_runfiles",
     "rule_variants",
-    "with_fuchsia_transition",
     "wrap_executable",
 )
 
@@ -115,7 +114,6 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
     def macro(
             *,
             name,
-            apply_fuchsia_transition = False,
             testonly = False,
             tags = None,
             visibility = None,
@@ -128,7 +126,7 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
             **kwargs
         )
 
-        (with_fuchsia_transition if apply_fuchsia_transition else alias)(
+        alias(
             name = name,
             actual = name + "_base",
             executable = True,

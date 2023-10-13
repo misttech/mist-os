@@ -4,7 +4,6 @@
 
 """Common utilities used for workflows/tasks."""
 
-load("//fuchsia/private:fuchsia_transition.bzl", _with_fuchsia_transition = "with_fuchsia_transition")
 load(
     "//fuchsia/private:utils.bzl",
     _alias = "alias",
@@ -22,7 +21,6 @@ flatten = _flatten
 label_name = _label_name
 normalized_target_name = _normalized_target_name
 rule_variants = _rule_variants
-with_fuchsia_transition = _with_fuchsia_transition
 wrap_executable = _wrap_executable
 
 def full_product_bundle_url(ctx, pb_info):
