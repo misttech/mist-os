@@ -76,7 +76,7 @@ func bindWatcher(t *testing.T, watcherCollection *dnsServerWatcherCollection) *n
 	if err != nil {
 		t.Fatalf("failed to create DnsServerWatcher channel pair: %s", err)
 	}
-	if err := watcherCollection.Bind(request); err != nil {
+	if err := watcherCollection.Bind(context.Background(), request.Channel); err != nil {
 		t.Fatalf("failed to bind watcher: %s", err)
 	}
 	return watcher

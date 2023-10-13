@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"syscall/zx"
 	"syscall/zx/fidl"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
@@ -110,9 +111,11 @@ func newDnsServerWatcherCollection(getServersCacheAndChannel func() ([]dns.Serve
 
 // Bind binds a new fuchsia.net.name.DnsServerWatcher request to the collection of watchers and
 // starts serving on its channel.
-func (c *dnsServerWatcherCollection) Bind(request name.DnsServerWatcherWithCtxInterfaceRequest) error {
+//
+// TODO(https://fxbug.dev/134162): Inline this into main.go once GetDnsServerWatcher is removed.
+func (c *dnsServerWatcherCollection) Bind(ctx context.Context, ch zx.Channel) error {
 	go func() {
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
 		watcher := dnsServerWatcher{
@@ -123,11 +126,10 @@ func (c *dnsServerWatcherCollection) Bind(request name.DnsServerWatcherWithCtxIn
 		stub := name.DnsServerWatcherWithCtxStub{
 			Impl: &watcher,
 		}
-		component.Serve(ctx, &stub, request.Channel, component.ServeOptions{
+		component.Serve(ctx, &stub, ch, component.ServeOptions{
 			Concurrent: true,
 			OnError: func(err error) {
-				// NB: this protocol is not discoverable, so the bindings do not include its name.
-				_ = syslog.WarnTf("fuchsia.net.name.DnsServerWatcher", "%s", err)
+				_ = syslog.WarnTf(name.DnsServerWatcherName, "%s", err)
 			},
 		})
 	}()

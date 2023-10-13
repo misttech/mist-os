@@ -7,6 +7,7 @@
 package netstack
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"syscall/zx/fidl"
@@ -151,7 +152,7 @@ func (ni *stackImpl) SetInterfaceIpForwardingDeprecated(_ fidl.Context, id uint6
 }
 
 func (ni *stackImpl) GetDnsServerWatcher(ctx_ fidl.Context, watcher name.DnsServerWatcherWithCtxInterfaceRequest) error {
-	return ni.dnsWatchers.Bind(watcher)
+	return ni.dnsWatchers.Bind(context.Background(), watcher.Channel)
 }
 
 func (ni *stackImpl) SetDhcpClientEnabled(ctx_ fidl.Context, id uint64, enable bool) (stack.StackSetDhcpClientEnabledResult, error) {

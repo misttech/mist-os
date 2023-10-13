@@ -16,6 +16,7 @@
         {
             protocol: [
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.stack.Log",
             ],
         },
@@ -35,6 +36,7 @@
         {
             protocol: [
                 "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.stack.Log",
             ],
             from: "self",

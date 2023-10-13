@@ -38,6 +38,7 @@ import (
 	"fidl/fuchsia/net/debug"
 	"fidl/fuchsia/net/interfaces"
 	"fidl/fuchsia/net/interfaces/admin"
+	"fidl/fuchsia/net/name"
 	"fidl/fuchsia/net/neighbor"
 	"fidl/fuchsia/net/root"
 	fnetRoutes "fidl/fuchsia/net/routes"
@@ -696,6 +697,11 @@ func Main() {
 			},
 		)
 	}
+
+	componentCtx.OutgoingService.AddService(
+		name.DnsServerWatcherName,
+		dnsWatchers.Bind,
+	)
 
 	{
 		stub := stack.LogWithCtxStub{Impl: &logImpl{
