@@ -15,10 +15,4 @@ declare_args() {
   # both slot A and slot B of the system.
   # False means no limit.
   blobfs_capacity = false
-
-  # Maximum allowable size for fuchsia.zbi and zedboot.zbi.
-  # A number greater than zero informs the rust toolchain to optimize for space.
-  # TODO(b/291953514): Enforce this by implementing an image size checker.
-  max_fuchsia_zbi_size = 0
-  max_zedboot_zbi_size = 0
 }
