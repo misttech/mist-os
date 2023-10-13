@@ -70,7 +70,8 @@ The `OpenAndGetVmo` benchmarks measure how long it takes to open a package and
 get the VMO for a blob within it. Notably, `OpenAndGetVmo` goes through the
 package directory as opposed to directly opening the blob through Blobfs/Fxblob,
 and thus allows us to more accurately measure open times via SWD.
-* `OpenAndGetVmoMetafarBlob` creates and opens a metafile (prefix "meta/" in the resource path).
+
+* `OpenAndGetVmoMetaFile` creates and opens a metafile (prefix "meta/" in the resource path).
 * `OpenAndGetVmoContentBlob` creates and opens a content blob (non-"meta" prefix in the
   resource path i.e. "data/").
 

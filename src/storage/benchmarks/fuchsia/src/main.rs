@@ -5,9 +5,9 @@
 use {
     crate::{
         blob_benchmarks::{
-            OpenAndGetVmoContentBlob, OpenAndGetVmoMetaFarBlob, PageInBlobRandomCompressed,
-            PageInBlobSequentialCompressed, PageInBlobSequentialUncompressed, WriteBlob,
-            WriteRealisticBlobs,
+            OpenAndGetVmoContentBlobCold, OpenAndGetVmoContentBlobWarm, OpenAndGetVmoMetaFileCold,
+            OpenAndGetVmoMetaFileWarm, PageInBlobRandomCompressed, PageInBlobSequentialCompressed,
+            PageInBlobSequentialUncompressed, WriteBlob, WriteRealisticBlobs,
         },
         block_devices::FvmVolumeFactory,
         filesystems::{Blobfs, F2fs, Fxblob, Fxfs, Memfs, Minfs, PkgDirTest},
@@ -133,7 +133,12 @@ fn add_blob_benchmarks(benchmark_set: &mut BenchmarkSet) {
     );
     add_benchmarks!(
         benchmark_set,
-        [OpenAndGetVmoContentBlob::new(), OpenAndGetVmoMetaFarBlob::new()],
+        [
+            OpenAndGetVmoContentBlobCold::new(),
+            OpenAndGetVmoContentBlobWarm::new(),
+            OpenAndGetVmoMetaFileCold::new(),
+            OpenAndGetVmoMetaFileWarm::new(),
+        ],
         [PkgDirTest::new_fxblob(), PkgDirTest::new_blobfs()]
     );
 }

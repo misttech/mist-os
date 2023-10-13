@@ -29,38 +29,34 @@ use {
 const RNG_SEED: u64 = 0xda782a0c3ce1819a;
 
 macro_rules! open_and_get_vmo_benchmark {
-    ($benchmark:ident, $resource_path:expr) => {
+    ($benchmark:ident, $resource_path:expr, $cold:expr) => {
         #[derive(Clone)]
         pub struct $benchmark {
             resource_path: String,
+            cold: bool,
         }
 
         impl $benchmark {
             pub fn new() -> Self {
-                Self { resource_path: $resource_path.to_string() }
+                Self { resource_path: $resource_path.to_string(), cold: $cold }
             }
 
-            async fn run_test(&self, pkgdir: fio::DirectoryProxy) -> Vec<OperationDuration> {
-                const SAMPLES: usize = 10;
-                let mut durations = Vec::with_capacity(SAMPLES);
-                for _ in 0..SAMPLES {
-                    let timer = OperationTimer::start();
-                    let file = {
-                        trace_duration!("benchmark", "open-file");
-                        fuchsia_fs::directory::open_file(
-                            &pkgdir,
-                            &self.resource_path,
-                            fio::OpenFlags::RIGHT_READABLE,
-                        )
-                        .await
-                        .expect("failed to open blob")
-                    };
-                    trace_duration!("benchmark", "get-vmo");
-                    let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
+            async fn run_test(&self, pkgdir: &fio::DirectoryProxy) -> OperationDuration {
+                let timer = OperationTimer::start();
+                let file = {
+                    trace_duration!("benchmark", "open-file");
+                    fuchsia_fs::directory::open_file(
+                        pkgdir,
+                        &self.resource_path,
+                        fio::OpenFlags::RIGHT_READABLE,
+                    )
+                    .await
+                    .expect("failed to open blob")
+                };
+                trace_duration!("benchmark", "get-vmo");
+                let _ = file.get_backing_memory(fio::VmoFlags::READ).await.unwrap().unwrap();
 
-                    durations.push(timer.stop())
-                }
-                durations
+                timer.stop()
             }
         }
 
@@ -84,12 +80,26 @@ macro_rules! open_and_get_vmo_benchmark {
                 }
 
                 fs.clear_cache().await;
-
                 let pkgdir_client_end =
                     fs.pkgdir_proxy().open_package_directory(&meta.merkle).await.unwrap().unwrap();
-                let pkgdir = pkgdir_client_end.into_proxy().unwrap();
+                let mut pkgdir = pkgdir_client_end.into_proxy().unwrap();
 
-                self.run_test(pkgdir).await
+                const SAMPLES: usize = 10;
+                let mut durations = Vec::with_capacity(SAMPLES);
+                for _ in 0..SAMPLES {
+                    durations.push(self.run_test(&pkgdir).await);
+                    if self.cold {
+                        fs.clear_cache().await;
+                        let pkgdir_client_end = fs
+                            .pkgdir_proxy()
+                            .open_package_directory(&meta.merkle)
+                            .await
+                            .unwrap()
+                            .unwrap();
+                        pkgdir = pkgdir_client_end.into_proxy().unwrap();
+                    }
+                }
+                durations
             }
 
             fn name(&self) -> String {
@@ -99,8 +109,10 @@ macro_rules! open_and_get_vmo_benchmark {
     };
 }
 
-open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFarBlob, "meta/bar");
-open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlob, "data/foo");
+open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFileCold, "meta/bar", true);
+open_and_get_vmo_benchmark!(OpenAndGetVmoMetaFileWarm, "meta/bar", false);
+open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlobCold, "data/foo", true);
+open_and_get_vmo_benchmark!(OpenAndGetVmoContentBlobWarm, "data/foo", false);
 
 macro_rules! page_in_benchmark {
     ($benchmark:ident, $data_gen_fn:ident, $page_iter_gen_fn:ident) => {
@@ -447,12 +459,18 @@ mod tests {
 
     #[fuchsia::test]
     async fn open_and_get_vmo_blobfs_test() {
-        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_blobfs(), 10).await;
+        check_benchmark(OpenAndGetVmoContentBlobCold::new(), PkgDirTest::new_blobfs(), 10).await;
+        check_benchmark(OpenAndGetVmoContentBlobWarm::new(), PkgDirTest::new_blobfs(), 10).await;
+        check_benchmark(OpenAndGetVmoMetaFileCold::new(), PkgDirTest::new_blobfs(), 10).await;
+        check_benchmark(OpenAndGetVmoMetaFileWarm::new(), PkgDirTest::new_blobfs(), 10).await;
     }
 
     #[fuchsia::test]
     async fn open_and_get_vmo_fxblob_test() {
-        check_benchmark(OpenAndGetVmoContentBlob::new(), PkgDirTest::new_fxblob(), 10).await;
+        check_benchmark(OpenAndGetVmoContentBlobCold::new(), PkgDirTest::new_fxblob(), 10).await;
+        check_benchmark(OpenAndGetVmoContentBlobWarm::new(), PkgDirTest::new_fxblob(), 10).await;
+        check_benchmark(OpenAndGetVmoMetaFileCold::new(), PkgDirTest::new_fxblob(), 10).await;
+        check_benchmark(OpenAndGetVmoMetaFileWarm::new(), PkgDirTest::new_fxblob(), 10).await;
     }
 
     #[fuchsia::test]
