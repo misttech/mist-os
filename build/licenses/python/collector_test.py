@@ -89,13 +89,26 @@ class CollectorTest(unittest.TestCase):
         )
 
     def _add_applicable_licenses_metadata(
-        self, target: str, licenses: List[str], target_type="action"
+        self,
+        target: str,
+        licenses: List[str],
+        target_type="action",
+        third_party_resources: List[str] = None,
     ):
+        target_label = GnLabel.from_str(target)
+        if not third_party_resources:
+            third_party_resources = []
         self.metadata_db.add_applicable_licenses_metadata(
             application=GnApplicableLicensesMetadata(
-                target_label=GnLabel.from_str(target),
+                target_label=target_label,
                 target_type=target_type,
                 license_labels=tuple([GnLabel.from_str(s) for s in licenses]),
+                third_party_resources=tuple(
+                    [
+                        target_label.create_child_from_str(s)
+                        for s in third_party_resources
+                    ]
+                ),
             )
         )
 
@@ -193,7 +206,10 @@ class CollectorTest(unittest.TestCase):
             "third_party/foo/README.fuchsia", name="Foo", license_files=[]
         )
         self._assert_errors(
-            [CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES]
+            [
+                CollectorErrorKind.NO_LICENSE_FILE_IN_README,
+                CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
+            ]
         )
 
     def test_target_with_readme_but_license_file_not_found(self):
@@ -207,7 +223,6 @@ class CollectorTest(unittest.TestCase):
         self._assert_errors(
             [
                 CollectorErrorKind.LICENSE_FILE_IN_README_NOT_FOUND,
-                CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
             ]
         )
 

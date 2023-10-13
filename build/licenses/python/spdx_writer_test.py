@@ -133,7 +133,8 @@ class SpdxWriterTest(unittest.TestCase):
                 {
                     "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:bar/license2"
                 }
-            ]
+            ],
+            "_hint": "unit test"
         },
         {
             "name": "Bar Pkg",
@@ -143,7 +144,8 @@ class SpdxWriterTest(unittest.TestCase):
                 {
                     "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:bar/license"
                 }
-            ]
+            ],
+            "_hint": "unit test"
         },
         {
             "name": "Foo Pkg",
@@ -153,7 +155,8 @@ class SpdxWriterTest(unittest.TestCase):
                 {
                     "url": "https://cs.opensource.google/fuchsia/fuchsia/+/main:foo/license"
                 }
-            ]
+            ],
+            "_hint": "unit test"
         }
     ]
 }""",

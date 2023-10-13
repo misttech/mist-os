@@ -29,7 +29,7 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
             },
             {
                 # al2
-                "target_label": "//bar(//toolchain)",
+                "target_label": "//bar:bar(//toolchain)",
                 "license_labels": ["//bar:lic(//toolchain)"],
             },
         ]
@@ -73,10 +73,10 @@ class GnLicenseMetadataDBTest(unittest.TestCase):
         )
 
         al2 = db.applicable_licenses_by_target[
-            GnLabel.from_str("//bar(//toolchain)")
+            GnLabel.from_str("//bar:bar(//toolchain)")
         ]
         self.assertEqual(
-            al2.target_label, GnLabel.from_str("//bar(//toolchain)")
+            al2.target_label, GnLabel.from_str("//bar:bar(//toolchain)")
         )
         self.assertEqual(
             al2.license_labels, (GnLabel.from_str("//bar:lic(//toolchain)"),)

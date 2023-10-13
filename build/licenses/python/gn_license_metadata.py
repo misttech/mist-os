@@ -28,6 +28,9 @@ class GnLicenseMetadata:
         assert (
             target_label.toolchain
         ), f"Label must have a toolchain part: {target_label}"
+        assert (
+            target_label.is_local_name
+        ), f"Label must have a `:name` part: {target_label}"
 
         public_package_name = dict["public_package_name"]
         license_files = [
@@ -48,9 +51,13 @@ class GnApplicableLicensesMetadata:
     target_label: GnLabel
     target_type: str
     license_labels: Tuple[GnLabel]
+    third_party_resources: Tuple[GnLabel]
 
     def is_applicable_licenses_metadata_dict(dict) -> bool:
         return "license_labels" in dict
+
+    def is_group(self):
+        return self.target_type == "group"
 
     def from_json_dict(data) -> "GnApplicableLicensesMetadata":
         assert isinstance(data, dict)
@@ -59,13 +66,26 @@ class GnApplicableLicensesMetadata:
         assert (
             target_label.toolchain
         ), f"Label must have a toolchain part: {target_label}"
+        assert (
+            target_label.is_local_name
+        ), f"Label must have a `:name` part: {target_label}"
 
         license_labels = [GnLabel.from_str(s) for s in data["license_labels"]]
+
+        third_party_resources = []
+        if "third_party_resources" in data:
+            third_party_resources = [
+                target_label.create_child_from_str(s)
+                for s in data["third_party_resources"]
+            ]
+        else:
+            third_party_resources = []
 
         return GnApplicableLicensesMetadata(
             target_label=target_label,
             target_type=target_type,
             license_labels=tuple(license_labels),
+            third_party_resources=tuple(third_party_resources),
         )
 
 
@@ -125,12 +145,9 @@ class GnLicenseMetadataDB:
     def add_applicable_licenses_metadata(
         self, application: GnApplicableLicensesMetadata
     ):
-        if application.target_label in self.applicable_licenses_by_target:
-            # TODO(133723): Change to error once there are no more targets suffering from fxb/133723.
-            logging.warn(
-                f"Multiple applicable_licences metadata entries for {application.target_label}, probably due to fxb/133723."
-            )
-            return
+        assert (
+            application.target_label not in self.applicable_licenses_by_target
+        ), f"Multiple applicable_licenses metadata entries for {application.target_label} ({application.target_type}), probably due to fxb/133723)."
         self.applicable_licenses_by_target[
             application.target_label
         ] = application

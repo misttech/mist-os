@@ -16,6 +16,7 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.gn_str, "//path/to/foo")
         self.assertEqual(label.path, Path("path/to/foo"))
         self.assertEqual(label.name, "foo")
+        self.assertFalse(label.is_local_name)
         self.assertIsNone(label.toolchain)
 
     def test_from_str_with_toolchain(self):
@@ -31,6 +32,15 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.gn_str, "//path/to/foo:bar")
         self.assertEqual(label.path, Path("path/to/foo"))
         self.assertEqual(label.name, "bar")
+        self.assertTrue(label.is_local_name)
+        self.assertIsNone(label.toolchain)
+
+    def test_from_str_with_redundant_local_name(self):
+        label = GnLabel.from_str("//path/to/foo:foo")
+        self.assertEqual(label.gn_str, "//path/to/foo:foo")
+        self.assertEqual(label.path, Path("path/to/foo"))
+        self.assertEqual(label.name, "foo")
+        self.assertTrue(label.is_local_name)
         self.assertIsNone(label.toolchain)
 
     def test_from_str_with_local_name_and_toolchain(self):
@@ -39,6 +49,14 @@ class GnLabelTest(unittest.TestCase):
         self.assertEqual(label.gn_str, "//path/to/foo:bar(//some/toolchain)")
         self.assertEqual(label.path, Path("path/to/foo"))
         self.assertEqual(label.name, "bar")
+        self.assertEqual(label.toolchain, toolchain)
+
+    def test_from_str_with_dot_dot(self):
+        toolchain = GnLabel.from_str("//some/toolchain")
+        label = GnLabel.from_str("//path/to/foo/../bar:baz(//some/toolchain)")
+        self.assertEqual(label.gn_str, "//path/to/bar:baz(//some/toolchain)")
+        self.assertEqual(label.path, Path("path/to/bar"))
+        self.assertEqual(label.name, "baz")
         self.assertEqual(label.toolchain, toolchain)
 
     def test_from_str_root_path(self):
@@ -63,9 +81,24 @@ class GnLabelTest(unittest.TestCase):
         self.assertIsNone(label.toolchain)
 
     def test_parent_label(self):
-        label = GnLabel.from_path(Path("path/to/foo"))
+        label = GnLabel.from_str("//path/to/foo")
         self.assertTrue(label.has_parent_label())
         self.assertEqual(label.parent_label(), GnLabel.from_str("//path/to"))
+
+    def test_parent_label_for_local_name(self):
+        label = GnLabel.from_str("//path/to/foo:name")
+        self.assertTrue(label.has_parent_label())
+        self.assertEqual(
+            label.parent_label(), GnLabel.from_str("//path/to/foo")
+        )
+
+    def test_parent_label_for_redundant_local(self):
+        label = GnLabel.from_str("//path/to/foo:foo")
+        self.assertTrue(label.is_local_name)
+        self.assertTrue(label.has_parent_label())
+        self.assertEqual(
+            label.parent_label(), GnLabel.from_str("//path/to/foo")
+        )
 
     def test_parent_label_of_root_label(self):
         label = GnLabel.from_str("//")
@@ -182,18 +215,31 @@ class GnLabelTest(unittest.TestCase):
             GnLabel.from_str("//baz:qux"),
         )
 
-        # .. in the middle of the path is not supported
+        # Going back too much is not supported
         with self.assertRaises(AssertionError) as context:
-            parent.create_child_from_str("foo/../baz:qux")
+            parent.create_child_from_str("../../../../baz:qux")
         self.assertEqual(
-            ".. is not supported but got //path/to/foo/foo/../baz:qux",
+            ".. goes back beyond the base path: path/to/foo/../../../../baz",
             str(context.exception),
         )
 
-        # Going back beyond the root path is not supported
+        self.assertEqual(
+            parent.create_child_from_str("bar/../baz"),
+            GnLabel.from_str("//path/to/foo/baz"),
+        )
+
+        self.assertEqual(
+            parent.create_child_from_str("bar/../../../baz"),
+            GnLabel.from_str("//path/baz"),
+        )
+
+        # Going back too much is not supported
         with self.assertRaises(AssertionError) as context:
-            parent.create_child_from_str("../../../../baz:qux")
-        self.assertEqual("Can't apply ../baz:qux to //", str(context.exception))
+            child = parent.create_child_from_str("bar/../../../../../baz:qux")
+        self.assertEqual(
+            ".. goes back beyond the base path: path/to/foo/bar/../../../../../baz",
+            str(context.exception),
+        )
 
     def test_create_child_from_str_with_dot_dot_with_local_name(self):
         parent = GnLabel.from_str("//path/to/foo:bar")
@@ -216,19 +262,6 @@ class GnLabelTest(unittest.TestCase):
             GnLabel.from_str("//baz:qux"),
         )
 
-        # .. in the middle of the path is not supported
-        with self.assertRaises(AssertionError) as context:
-            parent.create_child_from_str("foo/../baz:qux")
-        self.assertEqual(
-            ".. is not supported but got //path/to/foo/foo/../baz:qux",
-            str(context.exception),
-        )
-
-        # Going back beyond the root path is not supported
-        with self.assertRaises(AssertionError) as context:
-            parent.create_child_from_str("../../../../baz:qux")
-        self.assertEqual("Can't apply ../baz:qux to //", str(context.exception))
-
     def test_create_child_from_str_with_colon(self):
         self.assertEqual(
             GnLabel.from_str("//path/to/foo").create_child_from_str(":bar"),
@@ -238,7 +271,8 @@ class GnLabelTest(unittest.TestCase):
         with self.assertRaises(AssertionError) as context:
             GnLabel.from_str("//path/to/foo:bar").create_child_from_str(":baz")
         self.assertEqual(
-            "Can't apply :baz to //path/to/foo:bar", str(context.exception)
+            "Can't apply :baz to //path/to/foo:bar because both have :",
+            str(context.exception),
         )
 
     def test_gt(self):

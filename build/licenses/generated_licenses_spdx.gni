@@ -20,6 +20,17 @@ import("//build/python/python_action.gni")
 #     correspond with a stable, developer-friendly, short name of
 #     the target.
 #
+#   compare_with_legacy_spdx (optional)
+#     Compares the output to reference spdx file.
+#
+#   debug_hints (optional)
+#     Will add "_hint" elements to output spdx for debugging purposes.
+#     Default is false.
+#
+#   ignore_licenses_errors (optional)
+#     When true, generation will ignore license collection errors
+#     and only log them as warnings.
+#
 template("generated_licenses_spdx") {
   assert(defined(invoker.target), "Must specify `target`")
   assert(defined(invoker.spdx_root_package_name),
@@ -80,6 +91,15 @@ template("generated_licenses_spdx") {
         "--compare-with-legacy-spdx",
         rebase_path(invoker.compare_with_legacy_spdx, root_build_dir),
       ]
+    }
+
+    if (defined(invoker.debug_hints) && invoker.debug_hints) {
+      args += [ "--debug-hints" ]
+    }
+
+    if (defined(invoker.ignore_licenses_errors) &&
+        invoker.ignore_licenses_errors) {
+      args += [ "--ignore-licenses-errors" ]
     }
 
     if (!defined(deps)) {

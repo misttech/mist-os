@@ -7,7 +7,6 @@
 from collections import defaultdict
 import enum
 import logging
-from pathlib import Path
 from readme_fuchsia import ReadmesDB, Readme
 from gn_license_metadata import (
     GnApplicableLicensesMetadata,
@@ -61,6 +60,8 @@ class CollectorErrorKind(enum.Enum):
 
     APPLICABLE_LICENSE_REFERENCE_DOES_NOT_EXIST = 5
 
+    THIRD_PARTY_RESOURCE_WITHOUT_LICENSE = 6
+
 
 @dataclasses.dataclass(frozen=True)
 class CollectorError:
@@ -78,7 +79,9 @@ class CollectorStats:
     targets_loaded: int = 0
     targets_scanned: int = 0
     targets_with_licenses: int = 0
+    unique_labels: int = 0
     unique_licenses: int = 0
+    unique_resources: int = 0
     licenses_from_readmes: int = 0
     licenses_from_metadata: int = 0
     licenses_from_golibs: int = 0
@@ -91,16 +94,30 @@ class Collector:
     file_access: FileAccess
     metadata_db: GnLicenseMetadataDB
     readmes_db: ReadmesDB
+    unique_labels: Set[GnLabel] = dataclasses.field(default_factory=set)
     unique_licenses: Set[CollectedLicense] = dataclasses.field(
         default_factory=set
     )
+    unique_resources: Set[GnLabel] = dataclasses.field(default_factory=set)
     errors: List[CollectorError] = dataclasses.field(default_factory=list)
     stats: CollectorStats = dataclasses.field(default_factory=CollectorStats)
 
     def _add_error(self, error: CollectorError):
+        logging.debug(
+            "Collection error %s for %s: %s",
+            error.kind.name,
+            error.target_label,
+            error.debug_hint,
+        )
         self.errors.append(error)
 
     def _add_license(self, lic: CollectedLicense):
+        logging.debug(
+            "Collected license %s %s: %s",
+            lic.public_name,
+            lic.license_files,
+            lic.debug_hint,
+        )
         if lic not in self.unique_licenses:
             self.unique_licenses.add(lic)
             self.stats.unique_licenses += 1
@@ -121,6 +138,7 @@ class Collector:
         license_metadata = self.metadata_db.licenses_by_label[
             license_metadata_label
         ]
+
         self._add_license(
             CollectedLicense.create(
                 public_name=license_metadata.public_package_name,
@@ -132,16 +150,7 @@ class Collector:
     def _add_license_from_readme(
         self, readme: Readme, used_by_target: GnLabel
     ) -> bool:
-        # Ensure readme has files:
-        if not readme.license_files:
-            self._add_error(
-                CollectorError(
-                    kind=CollectorErrorKind.NO_LICENSE_FILE_IN_README,
-                    target_label=used_by_target,
-                    debug_hint=f"In {readme.readme_label}",
-                )
-            )
-            return False
+        assert readme.license_files
 
         # Ensure files actually exist:
         for lic_file in readme.license_files:
@@ -153,7 +162,7 @@ class Collector:
                         debug_hint=f"Looking for {lic_file} specified in {readme.readme_label}",
                     )
                 )
-                return False
+                return
 
         license = CollectedLicense.create(
             public_name=readme.package_name,
@@ -163,12 +172,13 @@ class Collector:
 
         self.stats.licenses_from_readmes += len(readme.license_files)
         self._add_license(license)
-        return True
 
     def _add_licenses_for_golib(
         self, label: GnLabel, original_label=None
     ) -> bool:
         assert label.is_3p_golib()
+
+        logging.debug("Custom golib handling for %s", label)
 
         if not original_label:
             original_label = label
@@ -219,63 +229,92 @@ class Collector:
                     parent_lib, original_label=original_label
                 )
 
-    def _scan_target(self, target_metadata: GnApplicableLicensesMetadata):
-        self.stats.targets_scanned += 1
+    def _scan_label(self, label: GnLabel, resource_of: GnLabel = None):
+        if label in self.unique_labels:
+            return
+        else:
+            self.unique_labels.add(label)
+            self.stats.unique_labels += 1
 
         license_found = False
 
-        label = target_metadata.target_label
-        license_labels = target_metadata.license_labels
-        if license_labels:
-            self.stats.targets_with_licenses += 1
-            license_found = True
-            for license_label in license_labels:
-                self.stats.licenses_from_metadata += 1
-                self._add_license_from_metadata(
-                    license_metadata_label=license_label,
-                    used_by_target=label,
-                )
+        target_metadata: GnApplicableLicensesMetadata = None
+        if label in self.metadata_db.applicable_licenses_by_target:
+            self.stats.targets_scanned += 1
+            target_metadata = self.metadata_db.applicable_licenses_by_target[
+                label
+            ]
+            license_labels = target_metadata.license_labels
+            if license_labels:
+                self.stats.targets_with_licenses += 1
+                license_found = True
+                for license_label in license_labels:
+                    self.stats.licenses_from_metadata += 1
+                    self._add_license_from_metadata(
+                        license_metadata_label=license_label,
+                        used_by_target=label,
+                    )
 
         if not license_found and label.is_3p_golib():
             license_found = self._add_licenses_for_golib(label)
 
         if not license_found:
             readme = self.readmes_db.find_readme_for_label(label)
-            if readme and readme.license_files:
-                license_found = self._add_license_from_readme(
-                    readme, used_by_target=label
-                )
-
-        if target_metadata.target_type == "group":
-            # TODO(133985): Handle prebuilt and direct source dependencies.
-            return
+            if readme:
+                if readme.license_files:
+                    license_found = True
+                    self._add_license_from_readme(readme, used_by_target=label)
+                else:
+                    self._add_error(
+                        CollectorError(
+                            kind=CollectorErrorKind.NO_LICENSE_FILE_IN_README,
+                            target_label=label,
+                            debug_hint=f"At {readme.readme_label}",
+                        )
+                    )
 
         if (
             not license_found
             and label.is_3rd_party()
-            and target_metadata != "group"
+            and not (target_metadata and target_metadata.is_group())
         ):
-            # 3P Targets require applicable licenses.
-            self._add_error(
-                CollectorError(
-                    kind=CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
-                    target_label=label,
-                    debug_hint=None,
+            if resource_of:
+                # Resources require license info.
+                self._add_error(
+                    CollectorError(
+                        kind=CollectorErrorKind.THIRD_PARTY_RESOURCE_WITHOUT_LICENSE,
+                        target_label=label,
+                        debug_hint=f"A resource of {resource_of}",
+                    )
                 )
-            )
+            else:
+                # 3P Targets require applicable licenses.
+                self._add_error(
+                    CollectorError(
+                        kind=CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES,
+                        target_label=label,
+                        debug_hint=None,
+                    )
+                )
 
-        # TODO(133985): Handle prebuilt and direct source dependencies.
+        # Handle 3p resources:
+        if target_metadata and target_metadata.third_party_resources:
+            resources = target_metadata.third_party_resources
+            logging.debug("Target %s uses 3p resources: %s", label, resources)
+            for resource_label in resources:
+                self._scan_label(resource_label, resource_of=label)
 
     def collect(self):
         # Reset
         self.stats = CollectorStats()
         self.errors.clear()
         self.unique_licenses.clear()
+        self.unique_resources
 
         for (
             target_metadata
         ) in self.metadata_db.applicable_licenses_by_target.values():
-            self._scan_target(target_metadata)
+            self._scan_label(target_metadata.target_label)
 
     def log_errors(self, log_level: int = logging.ERROR):
         errors_by_kind: Dict[
@@ -301,7 +340,7 @@ class Collector:
                 )
             sub_message_lines.sort()
 
-            max_lines = 500
+            max_lines = 100
             if max_lines < len(sub_message_lines):
                 trim_message = (
                     f"  (and {len(sub_message_lines) - max_lines} more)"

@@ -40,6 +40,7 @@ group("baz") {
 generated_licenses_spdx("actual_spdx") {
   target = ":baz"
   spdx_root_package_name = "Example"
+  debug_hints = false
   output = "${target_out_dir}/actual.spdx.json"
 }
 

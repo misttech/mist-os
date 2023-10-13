@@ -7,7 +7,7 @@
 
 import dataclasses
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 from file_access import FileAccess
 from gn_label import GnLabel
 from readme_fuchsia import Readme, ReadmesDB
@@ -58,49 +58,94 @@ class MockFileAccess(FileAccess):
 
 class ReadmesDBTest(unittest.TestCase):
     db: ReadmesDB
+    mock_content_by_path: Dict[Path, str]
 
     def setUp(self) -> None:
-        readme_content_by_path = {
-            Path(
-                "foo/README.fuchsia"
-            ): "Name: Never used - overrided via assets",
-            Path("foo/bar/README.fuchsia"): "Name: Bar",
-            Path(
-                "vendor/google/tools/check-licenses/assets/readmes/foo/README.fuchsia"
-            ): "Name: Foo",
-            Path(
-                "vendor/google/tools/check-licenses/assets/readmes/foo/baz/README.fuchsia"
-            ): "Name: Baz",
-            Path(
-                "tools/check-licenses/assets/readmes/foo/qax/README.fuchsia"
-            ): "Name: Qax",
-        }
+        self.mock_content_by_path = {}
 
         file_access = MockFileAccess(
             fuchsia_source_path=None,
-            readme_content_by_path=readme_content_by_path,
+            readme_content_by_path=self.mock_content_by_path,
         )
         self.db = ReadmesDB(file_access=file_access)
 
         return super().setUp()
 
-    def test_find_readme(self):
-        readme = self.db.find_readme_for_label(GnLabel.from_str("//foo:x"))
-        self.assertEqual(readme.package_name, "Foo")
+    def _mock_readme_files(self, file_paths: List[str]):
+        for path in file_paths:
+            self.mock_content_by_path[Path(path)] = "Name: Foo"
 
-        readme = self.db.find_readme_for_label(
-            GnLabel.from_str("//something:x")
-        )
+    def _assert_found_readme(self, for_label: str, expected_readme_path: str):
+        readme = self.db.find_readme_for_label(GnLabel.from_str(for_label))
+        self.assertIsNotNone(readme)
+        self.assertEqual(readme.readme_label.path, Path(expected_readme_path))
+
+    def _assert_readme_not_found(self, for_label: str):
+        readme = self.db.find_readme_for_label(GnLabel.from_str(for_label))
         self.assertIsNone(readme)
 
-        readme = self.db.find_readme_for_label(GnLabel.from_str("//foo/bar"))
-        self.assertEqual(readme.package_name, "Bar")
+    def test_find_readme_in_same_folder(self):
+        self._mock_readme_files(["foo/README.fuchsia"])
+        self._assert_found_readme("//foo", "foo/README.fuchsia")
+        self._assert_found_readme("//foo:foo", "foo/README.fuchsia")
+        self._assert_found_readme("//foo:bar", "foo/README.fuchsia")
 
-        readme = self.db.find_readme_for_label(GnLabel.from_str("//foo/baz"))
-        self.assertEqual(readme.package_name, "Baz")
+    def test_find_readme_for_sub_folder(self):
+        self._mock_readme_files(["foo/README.fuchsia"])
+        self._assert_found_readme("//foo/bar", "foo/README.fuchsia")
+        self._assert_found_readme("//foo/bar/baz", "foo/README.fuchsia")
 
-        readme = self.db.find_readme_for_label(GnLabel.from_str("//foo/qax"))
-        self.assertEqual(readme.package_name, "Qax")
+    def test_barrier_folders(self):
+        self._mock_readme_files(["foo/README.fuchsia"])
+
+        self._assert_found_readme("//foo", "foo/README.fuchsia")
+
+        self._assert_readme_not_found("//foo/third_party:bar")
+        self._assert_readme_not_found("//foo/third_party/bar")
+        self._assert_readme_not_found("//foo/third_party/bar:baz")
+        self._assert_readme_not_found("//foo/third_party/bar/baz")
+        self._assert_readme_not_found("//foo/thirdparty/bar")
+        self._assert_readme_not_found("//foo/prebuilt/bar")
+        self._assert_readme_not_found("//foo/prebuilts/bar")
+
+    def test_find_closest_readme(self):
+        self._mock_readme_files(
+            [
+                "foo/README.fuchsia",
+                "foo/bar/README.fuchsia",
+                "foo/bar/baz/README.fuchsia",
+            ]
+        )
+        self._assert_found_readme("//foo", "foo/README.fuchsia")
+        self._assert_found_readme("//foo/qaz", "foo/README.fuchsia")
+        self._assert_found_readme("//foo/bar", "foo/bar/README.fuchsia")
+        self._assert_found_readme("//foo/bar/qaz", "foo/bar/README.fuchsia")
+        self._assert_found_readme("//foo/bar/baz", "foo/bar/baz/README.fuchsia")
+        self._assert_found_readme(
+            "//foo/bar/baz/qaz", "foo/bar/baz/README.fuchsia"
+        )
+
+    def test_find_in_assets_folders(self):
+        self._mock_readme_files(
+            [
+                "foo/README.fuchsia",
+                "tools/check-licenses/assets/readmes/foo/README.fuchsia",
+                "vendor/google/tools/check-licenses/assets/readmes/foo/README.fuchsia",
+                "bar/README.fuchsia",
+                "tools/check-licenses/assets/readmes/bar/README.fuchsia",
+            ]
+        )
+
+        # vendor/google/tools/check-licenses/assets takes precedence
+        self._assert_found_readme(
+            "//foo",
+            "vendor/google/tools/check-licenses/assets/readmes/foo/README.fuchsia",
+        )
+
+        # otherwise tools/check-licenses/assets takes precedence
+        self._assert_found_readme(
+            "//bar", "tools/check-licenses/assets/readmes/bar/README.fuchsia"
+        )
 
 
 if __name__ == "__main__":

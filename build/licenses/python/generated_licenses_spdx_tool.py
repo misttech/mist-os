@@ -52,10 +52,16 @@ def main():
         help="Path to the generated dep file",
     )
     parser.add_argument(
-        "--fail-on-collector-errors",
-        type=bool,
+        "--ignore-licenses-errors",
+        action="store_true",
         default=False,
-        help="Tool will fail when encountering collector errors",
+        help="Tool will fail when encountering license collection errors",
+    )
+    parser.add_argument(
+        "--debug-hints",
+        action="store_true",
+        default=False,
+        help="Embeds '_hint' keys in the output SPDX for debugging purposes",
     )
     # TODO(132725): Remove once migration completes.
     parser.add_argument(
@@ -90,11 +96,11 @@ def main():
     collector.collect()
 
     if collector.errors:
-        if args.fail_on_collector_errors:
+        if args.ignore_licenses_errors:
+            collector.log_errors(log_level=logging.WARNING)
+        else:
             collector.log_errors(log_level=logging.ERROR)
             return -1
-        else:
-            collector.log_errors(log_level=logging.WARNING)
 
     logging.info(f"Collection stats: {collector.stats}")
 
@@ -104,11 +110,15 @@ def main():
         file_access=file_access,
     )
 
+    debug_hints = args.debug_hints
+
     for collected_license in collector.unique_licenses:
         spdx_writer.add_license(
             public_package_name=collected_license.public_name,
             license_labels=collected_license.license_files,
-            collection_hint=collected_license.debug_hint,
+            collection_hint=collected_license.debug_hint
+            if debug_hints
+            else None,
         )
 
     spdx_output_path = Path(args.spdx_output)

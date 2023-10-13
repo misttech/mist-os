@@ -115,6 +115,8 @@ class SpdxWriter:
                         }
                     ],
                 }
+                if collection_hint:
+                    extracted_license["_hint"] = collection_hint
                 self.license_json_by_ref[license_ref] = extracted_license
                 self.extracted_licenses.append(extracted_license)
 
@@ -123,11 +125,6 @@ class SpdxWriter:
             "name": public_package_name,
             "licenseConcluded": " AND ".join(license_refs),
         }
-        if collection_hint:
-            # TODO(133985): this breaks the golden tests due to per-arch diffs.
-            # Put behind a flag and disable in tests?
-            # package_json["sourceInformation"] = collection_hint
-            pass
         self.package_json_by_ids[package_id] = package_json
         self.document_describes.append(package_id)
         self.packages.append(package_json)

@@ -29,18 +29,24 @@ class GnLabel:
         assert original_str.startswith(
             "//"
         ), f"label must start with // but got {original_str}"
-        assert (
-            ".." not in original_str
-        ), f".. is not supported but got {original_str}"
-        label_and_toolchain = original_str.split("(", maxsplit=1)
-        if len(label_and_toolchain) == 2:
-            toolchain = GnLabel.from_str(label_and_toolchain[1][:-1])
-        else:
-            assert len(label_and_toolchain) == 1
-            toolchain = None
-        label = label_and_toolchain[0]
+
+        label = original_str
+        toolchain = None
+        # Extract toolchain part
+        if original_str.endswith(")"):
+            toolchain_begin = original_str.rfind("(")
+            if toolchain_begin != -1:
+                toolchain_str = original_str[toolchain_begin + 1 : -1]
+                toolchain = GnLabel.from_str(toolchain_str)
+                label = original_str[0:toolchain_begin]
+
         path_and_name = label.split(":", maxsplit=1)
-        path = Path(path_and_name[0][2:])  # remove '//'
+
+        path_str = path_and_name[0][2:]  # remove '//'
+        if ".." in path_str:
+            path_str = GnLabel._resolve_dot_dot(path_str)
+        path = Path(path_str)
+
         if len(path_and_name) == 2:
             name = path_and_name[1]
             is_local_name = True
@@ -49,8 +55,15 @@ class GnLabel:
             name = str(path.name)
             is_local_name = False
 
+        gn_str = ["//", path_str]
+        if is_local_name:
+            gn_str.extend([":", name])
+        if toolchain:
+            gn_str.extend(["(", toolchain.gn_str, ")"])
+        gn_str = "".join(gn_str)
+
         return GnLabel(
-            gn_str=original_str,
+            gn_str=gn_str,
             name=name,
             is_local_name=is_local_name,
             path=path,
@@ -82,9 +95,11 @@ class GnLabel:
     def parent_label(self) -> "GnLabel":
         """Returns //foo/bar for //foo/bar/baz and //foo/bar:baz"""
         assert self.has_parent_label(), f"{self} has no parent label"
-        if self.name == self.path.name:
+        if not self.is_local_name and self.name == self.path.name:
+            # Return //foo for //foo/bar
             return GnLabel.from_path(self.path.parent)
         else:
+            # Return //foo/bar for //foo/bar:bar and //foo/bar:baz
             return GnLabel.from_path(self.path)
 
     def has_parent_label(self) -> bool:
@@ -127,11 +142,6 @@ class GnLabel:
     def is_3p_golib(self) -> bool:
         return self.gn_str.startswith("//third_party/golibs:")
 
-    def create_child(self, child_path: Path) -> "GnLabel":
-        """Create a child label relative to this label"""
-        assert isinstance(child_path, Path)
-        return GnLabel.from_path(self.path / child_path)
-
     def create_child_from_str(self, child_path_str: str) -> "GnLabel":
         """Create a GnLabel relative to this label from a child path GN string"""
         if child_path_str.startswith("//"):
@@ -139,16 +149,13 @@ class GnLabel:
         elif child_path_str.startswith(":"):
             assert (
                 not self.is_local_name
-            ), f"Can't apply {child_path_str} to {self}"
+            ), f"Can't apply {child_path_str} to {self} because both have :"
             return GnLabel.from_str(f"//{self.path}:{child_path_str[1:]}")
         elif child_path_str.startswith("../"):
-            assert (
-                self.has_parent_label()
-            ), f"Can't apply {child_path_str} to {self}"
-            parent_label = self.parent_label()
-            if self.is_local_name:
-                parent_label = parent_label.parent_label()
-            return parent_label.create_child_from_str(child_path_str[3:])
+            parent_path = (
+                self.parent_label().path if self.is_local_name else self.path
+            )
+            return GnLabel.from_path(parent_path / Path(child_path_str))
         else:
             return GnLabel.from_path(self.path / Path(child_path_str))
 
@@ -160,3 +167,18 @@ class GnLabel:
 
     def __gt__(self, other: "GnLabel") -> bool:
         return self.gn_str > other.gn_str
+
+    def _resolve_dot_dot(path: str) -> str:
+        """Resolves .. elements in a path string"""
+        assert "//" not in path
+        input_parts = path.split("/")
+        output_parts = []
+        for part in input_parts:
+            if part != "..":
+                output_parts.append(part)
+            else:
+                assert (
+                    len(output_parts) > 0
+                ), f".. goes back beyond the base path: {path}"
+                output_parts.pop()
+        return "/".join(output_parts)
