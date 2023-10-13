@@ -988,13 +988,9 @@ impl<'a> NetCfg<'a> {
         .fuse();
         futures::pin_mut!(if_watcher_event_stream);
 
-        let (dns_server_watcher, dns_server_watcher_req) =
-            fidl::endpoints::create_proxy::<fnet_name::DnsServerWatcherMarker>()
-                .context("error creating dns server watcher")?;
-        let () = self
-            .stack
-            .get_dns_server_watcher(dns_server_watcher_req)
-            .context("get dns server watcher")?;
+        let dns_server_watcher =
+            fuchsia_component::client::connect_to_protocol::<fnet_name::DnsServerWatcherMarker>()
+                .context("error connecting to dns server watcher")?;
         let netstack_dns_server_stream = dns_server_watcher::new_dns_server_stream(
             DnsServersUpdateSource::Netstack,
             dns_server_watcher,

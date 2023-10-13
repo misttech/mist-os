@@ -117,6 +117,7 @@
             protocol: [
                 "fuchsia.net.filter.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.stack.Stack",
             ],
             from: "#netstack",

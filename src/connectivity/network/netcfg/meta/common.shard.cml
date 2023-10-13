@@ -23,6 +23,7 @@
                 "fuchsia.net.filter.Filter",
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.name.LookupAdmin",
                 "fuchsia.net.stack.Stack",
             ],

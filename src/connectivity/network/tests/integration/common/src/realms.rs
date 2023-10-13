@@ -73,6 +73,7 @@ impl NetstackVersion {
                 fnet_filter::FilterMarker::PROTOCOL_NAME,
                 fnet_interfaces_admin::InstallerMarker::PROTOCOL_NAME,
                 fnet_interfaces::StateMarker::PROTOCOL_NAME,
+                fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
                 fnet_root::InterfacesMarker::PROTOCOL_NAME,
                 fnet_routes::StateMarker::PROTOCOL_NAME,
                 fnet_routes::StateV4Marker::PROTOCOL_NAME,
@@ -380,6 +381,11 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                                     )),
                                     fnetemul::Capability::ChildDep(protocol_dep::<
                                         fnet_stack::StackMarker,
+                                    >(
+                                        constants::netstack::COMPONENT_NAME,
+                                    )),
+                                    fnetemul::Capability::ChildDep(protocol_dep::<
+                                        fnet_name::DnsServerWatcherMarker,
                                     >(
                                         constants::netstack::COMPONENT_NAME,
                                     )),
