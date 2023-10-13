@@ -309,14 +309,14 @@ fn load_assembly_manifest(
                 }
                 Image::ZBI { .. } => {
                     if has_zbi {
-                        anyhow::bail!("Found more than one zbi");
+                        anyhow::bail!("Found more than one ZBI");
                     }
                     images.push(image);
                     has_zbi = true;
                 }
                 Image::VBMeta(_) => {
                     if has_vbmeta {
-                        anyhow::bail!("Found more than one zbi");
+                        anyhow::bail!("Found more than one VBMeta");
                     }
                     images.push(image);
                     has_vbmeta = true;
