@@ -153,6 +153,7 @@ USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + 
     "minimal_userdebug_and_eng",
     "mdns_fuchsia_device_wired_service",
     "radar_proxy_with_injector",
+    "sl4f",
 ]
 USERDEBUG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES_RISCV64 + USER_PLATFORM_AIB_NAMES_EXCLUDED_FROM_RISCV64
 

@@ -444,6 +444,38 @@ assembly_input_bundle("kernel_pmm_checker_enabled") {
   ]
 }
 
+# sl4f: Scripting Layer for Fuchsia
+#
+# Often used for manipulating device during E2E tests.
+assembly_input_bundle("sl4f") {
+  # We currently include SL4F in cache to support E2E tests that
+  # either do not download fuchsia packages or cannot start
+  # package serving due to network limitations.
+  cache_packages = [ "//src/testing/sl4f" ]
+
+  base_packages = [ "//src/sys/bin/start_sl4f" ]
+  shell_commands = [
+    {
+      package = "start_sl4f"
+      components = [ "start_sl4f" ]
+    },
+  ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/testing/sl4f/meta/sl4f_assembly.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 ########
 #
 # The /core realm AIBs

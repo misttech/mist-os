@@ -62,6 +62,10 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             _ => {}
         }
 
+        if config.include_sl4f {
+            builder.platform_bundle("sl4f");
+        }
+
         Ok(())
     }
 }
