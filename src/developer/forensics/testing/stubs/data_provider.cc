@@ -139,7 +139,10 @@ void DataProviderReturnsOnDemand::GetSnapshotInternal(
     const zx::duration timeout, const std::string& uuid,
     fit::callback<void(feedback::Annotations, fuchsia::feedback::Attachment)> callback) {
   snapshot_internal_callbacks_.push(std::move(callback));
+  pending_uuids_.push_back(uuid);
 }
+
+std::deque<std::string> DataProviderReturnsOnDemand::GetPendingUuids() { return pending_uuids_; }
 
 void DataProviderReturnsOnDemand::PopSnapshotCallback() {
   FX_CHECK(!snapshot_callbacks_.empty());
@@ -158,6 +161,7 @@ void DataProviderReturnsOnDemand::PopSnapshotInternalCallback() {
   snapshot_internal_callbacks_.front()(BuildFeedbackAnnotations(annotations_),
                                        BuildAttachment(snapshot_key_));
   snapshot_internal_callbacks_.pop();
+  pending_uuids_.pop_front();
 }
 
 void DataProviderSnapshotOnly::GetSnapshot(fuchsia::feedback::GetSnapshotParameters params,

@@ -8,6 +8,7 @@
 #include <lib/fit/function.h>
 #include <lib/zx/time.h>
 
+#include <deque>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -382,7 +383,63 @@ TEST_F(SnapshotCollectorTest, Check_SetsPresenceAnnotations) {
   EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
               IsSupersetOf({
                   Pair("debug.snapshot.shared-request.num-clients", std::to_string(1)),
-                  Pair(feedback::kSnapshotUuid, report->SnapshotUuid()),
+              }));
+}
+
+TEST_F(SnapshotCollectorTest, Check_SetsSnapshotUuidAnnotation) {
+  auto data_provider_owned =
+      std::make_unique<stubs::DataProviderReturnsOnDemand>(kDefaultAnnotations, kDefaultArchiveKey);
+  stubs::DataProviderReturnsOnDemand* data_provider = data_provider_owned.get();
+
+  SetUpDataProviderServer(std::move(data_provider_owned));
+  SetUpDefaultSnapshotManager();
+
+  std::optional<Report> report{std::nullopt};
+  ScheduleGetReportAndThen(zx::duration::infinite(), 0,
+                           ([&report](Report& new_report) { report = std::move(new_report); }));
+
+  RunLoopFor(kWindow);
+
+  const std::deque<std::string> pending_uuids = data_provider->GetPendingUuids();
+  ASSERT_EQ(pending_uuids.size(), 1u);
+  const std::string& intended_uuid = pending_uuids[0];
+
+  data_provider->PopSnapshotInternalCallback();
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(report.has_value());
+  EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
+              IsSupersetOf({
+                  Pair(feedback::kSnapshotUuid, intended_uuid),
+              }));
+}
+
+TEST_F(SnapshotCollectorTest, Check_SetsSnapshotUuidAnnotationDespiteUnsuccessfulCollection) {
+  auto data_provider_owned =
+      std::make_unique<stubs::DataProviderReturnsOnDemand>(kDefaultAnnotations, kDefaultArchiveKey);
+  stubs::DataProviderReturnsOnDemand* data_provider = data_provider_owned.get();
+
+  SetUpDataProviderServer(std::move(data_provider_owned));
+  SetUpDefaultSnapshotManager();
+
+  std::optional<Report> report{std::nullopt};
+  ScheduleGetReportAndThen(zx::duration::infinite(), 0,
+                           ([&report](Report& new_report) { report = std::move(new_report); }));
+
+  // Send shutdown signal while DataProvider is collecting the snapshot.
+  RunLoopFor(kWindow);
+  snapshot_collector_->Shutdown();
+
+  const std::deque<std::string> pending_uuids = data_provider->GetPendingUuids();
+  ASSERT_EQ(pending_uuids.size(), 1u);
+  const std::string& intended_uuid = pending_uuids[0];
+
+  RunLoopUntilIdle();
+
+  ASSERT_TRUE(report.has_value());
+  EXPECT_THAT(BuildFeedbackAnnotations(report->Annotations().Raw()),
+              IsSupersetOf({
+                  Pair(feedback::kSnapshotUuid, intended_uuid),
               }));
 }
 

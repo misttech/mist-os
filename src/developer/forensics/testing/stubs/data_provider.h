@@ -160,6 +160,10 @@ class DataProviderReturnsOnDemand : public DataProviderBase {
   void GetSnapshotInternal(zx::duration timeout, const std::string& uuid,
                            GetSnapshotInternalCallback callback) override;
 
+  // Returns the Uuids for snapshots requested through GetSnapshotInternal that have not yet been
+  // popped via PopSnapshotInternalCallback.
+  std::deque<std::string> GetPendingUuids();
+
   void PopSnapshotCallback();
   void PopSnapshotInternalCallback();
 
@@ -168,6 +172,7 @@ class DataProviderReturnsOnDemand : public DataProviderBase {
   const std::string snapshot_key_;
   std::queue<GetSnapshotCallback> snapshot_callbacks_;
   std::queue<GetSnapshotInternalCallback> snapshot_internal_callbacks_;
+  std::deque<std::string> pending_uuids_;
 };
 
 class DataProviderSnapshotOnly : public DataProviderBase {
