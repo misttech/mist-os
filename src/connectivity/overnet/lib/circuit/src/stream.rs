@@ -340,6 +340,11 @@ pub fn stream() -> (Reader, Writer) {
 
 #[cfg(test)]
 mod test {
+    use futures::task::noop_waker;
+    use futures::FutureExt;
+    use std::future::Future;
+    use std::task::{Context, Poll};
+
     use super::*;
 
     impl protocol::ProtocolMessage for [u8; 4] {
@@ -473,6 +478,70 @@ mod test {
             reader.read(1, |_| Ok(((), 1))).await,
             Err(Error::ConnectionClosed(None))
         ));
+    }
+
+    #[fuchsia::test]
+    async fn reader_sees_closed_when_polling() {
+        let (reader, writer) = stream();
+        writer
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+
+        let got = reader.read(8, |buf| Ok((buf[..8].to_vec(), 8))).await.unwrap();
+
+        assert_eq!(vec![1, 2, 3, 4, 5, 6, 7, 8], got);
+
+        let fut = reader
+            .read(1, |_| -> Result<((), usize)> { panic!("This read should never succeed!") });
+        let mut fut = std::pin::pin!(fut);
+
+        assert!(fut.poll_unpin(&mut Context::from_waker(&noop_waker())).is_pending());
+
+        std::mem::drop(writer);
+
+        assert!(matches!(
+            fut.poll_unpin(&mut Context::from_waker(&noop_waker())),
+            Poll::Ready(Err(Error::ConnectionClosed(None)))
+        ));
+    }
+
+    #[fuchsia::test]
+    async fn reader_sees_closed_separate_task() {
+        let (reader, writer) = stream();
+        writer
+            .write(8, |buf| {
+                buf[..8].copy_from_slice(&[1, 2, 3, 4, 5, 6, 7, 8]);
+                Ok(8)
+            })
+            .unwrap();
+
+        let got = reader.read(8, |buf| Ok((buf[..8].to_vec(), 8))).await.unwrap();
+
+        assert_eq!(vec![1, 2, 3, 4, 5, 6, 7, 8], got);
+
+        let (sender, receiver) = oneshot::channel();
+        let task = fuchsia_async::Task::spawn(async move {
+            let fut = reader.read(1, |_| Ok(((), 1)));
+            let mut fut = std::pin::pin!(fut);
+            let mut writer = Some(writer);
+            let fut = futures::future::poll_fn(move |cx| {
+                let ret = fut.as_mut().poll(cx);
+
+                if writer.take().is_some() {
+                    assert!(matches!(ret, Poll::Pending));
+                }
+
+                ret
+            });
+            assert!(matches!(fut.await, Err(Error::ConnectionClosed(None))));
+            sender.send(()).unwrap();
+        });
+
+        receiver.await.unwrap();
+        task.await;
     }
 
     #[fuchsia::test]
