@@ -225,6 +225,9 @@ class __TA_SCOPED_CAPABILITY
   // Returns true if this guard wraps |lock|.
   bool wraps_lock(const LockType& lock) const { return &lock == validator_.lock(); }
 
+  // Read-only access to the underlying |lock|.
+  const LockType* lock() const { return validator_.lock(); }
+
   // Releases this scoped capability without releasing the underlying lock or
   // un-tracking the lock in the validator. Returns an rvalue reference to the
   // lock state and validator state which may be adopted by another Guard.

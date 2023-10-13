@@ -65,6 +65,12 @@ class TA_CAP("mutex") Mutex {
   // a lock. The asserts may be optimized away in release builds.
   void AssertHeld() const TA_ASSERT() { DEBUG_ASSERT(IsHeld()); }
 
+  // Is the mutex contested i.e. is at least one thread blocked waiting on it?
+  //
+  // The contested flag does not track threads which are spin-waiting on the
+  // Mutex and have yet to enter a blocking phase.
+  bool IsContested() const { return val() & STATE_FLAG_CONTESTED; }
+
  protected:
   // TimesliceExtension is used to control whether a timeslice extension will be
   // set and if so, what value will be used.
@@ -238,6 +244,9 @@ class TA_CAP("mutex") CriticalMutex : private Mutex {
 
   // See |Mutex::AssertHeld|.
   void AssertHeld() const TA_ASSERT() { return Mutex::AssertHeld(); }
+
+  // See |Mutex::IsContested|.
+  bool IsContested() const { return Mutex::IsContested(); }
 
  private:
   // This field must not be accessed concurrently.  Be sure to only access it

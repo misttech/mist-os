@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <trace.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -1396,6 +1397,7 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     const size_t first_page_offset = ROUNDDOWN(src_offset, PAGE_SIZE);
     const size_t last_page_offset = ROUNDDOWN(end_offset - 1, PAGE_SIZE);
     size_t remaining_pages = (last_page_offset - first_page_offset) / PAGE_SIZE + 1;
+    size_t pages_since_last_unlock = 0;
     __UNINITIALIZED zx::result<VmCowPages::LookupCursor> cursor =
         GetLookupCursorLocked(first_page_offset, remaining_pages * PAGE_SIZE);
     if (cursor.is_error()) {
@@ -1466,6 +1468,39 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
       src_offset += tocopy;
       dest_offset += tocopy;
       remaining_pages--;
+
+      // Periodically yield the lock in order to allow other read or write
+      // operations to advance sooner than they otherwise would.
+      constexpr size_t kPagesBetweenUnlocks = 16;
+      if (unlikely(++pages_since_last_unlock == kPagesBetweenUnlocks)) {
+        pages_since_last_unlock = 0;
+        if (guard->lock()->IsContested()) {
+          // Just drop the lock and re-acquire it. There is no need to yield.
+          //
+          // Since the lock is contested, the empty |CallUnlocked| will:
+          // 1. Immediately grant the lock to another thread. This thread may
+          //   continue running until #3, or it may be descheduled.
+          // 2. Run the empty lambda.
+          // 3. Attempt to re-acquire the lock. There are 3 possibilities:
+          //   3a. Mutex is owned by the other thread, and is contested (there
+          //       are more waiters besides the other thread). This thread will
+          //       immediately block on the Mutex.
+          //   3b. Mutex is owned by the other thread, and uncontested. This
+          //       thread will spin on the Mutex, and block after some time.
+          //   3c. Mutex is un-owned.  This thread will immediately own the
+          //       Mutex again and continue running.
+          //
+          // Thus, there is no danger of thrashing here. The other thread will
+          // always get the Mutex, even without an explicit yield.
+          guard->CallUnlocked([]() {});
+
+          status = check_and_trim();
+          if (status == ZX_OK) {
+            break;
+          }
+          return status;
+        }
+      }
     }
   }
 
