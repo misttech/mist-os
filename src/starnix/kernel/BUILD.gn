@@ -123,6 +123,7 @@ rustc_binary("starnix_kernel_bin") {
     "//src/starnix/lib/filter_methods_macro",
     "//src/starnix/lib/kill_job_on_panic",
     "//src/starnix/lib/linux_uapi",
+    "//src/starnix/lib/lock-sequence",
     "//src/starnix/lib/magma",
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/starnix-sync",

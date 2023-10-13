@@ -3,8 +3,13 @@
 // found in the LICENSE file.
 
 // Use these crates so that we don't need to make the dependency conditional.
+#[cfg(test)]
+use core::marker::PhantomData;
 use fuchsia_sync as _;
 use lock_api as _;
+use lock_sequence as _;
+#[cfg(test)]
+use lock_sequence::{lock::LockFor, relation::LockBefore, relation::LockLevel, Locked};
 use parking_lot as _;
 
 #[cfg(not(any(test, debug_assertions)))]
@@ -61,9 +66,53 @@ pub fn ordered_lock<'a, T>(
     }
 }
 
+/// A wrapper for mutex that requires a `Locked` context to acquire.
+/// This context must be of a level that precedes `L` in the lock ordering graph
+/// where `L` is a level associated with this mutex.
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub struct OrderedMutex<T, L: LockLevel<Source = Self>> {
+    mutex: Mutex<T>,
+    _phantom: PhantomData<L>,
+}
+
+#[cfg(test)]
+impl<T, L: LockLevel<Source = Self>> LockFor<L> for OrderedMutex<T, L> {
+    type Data = T;
+    type Guard<'a> = MutexGuard<'a, T> where T: 'a, L: 'a;
+    fn lock(&self) -> Self::Guard<'_> {
+        self.mutex.lock()
+    }
+}
+
+#[cfg(test)]
+impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
+    pub fn new(t: T) -> Self {
+        Self { mutex: Mutex::new(t), _phantom: Default::default() }
+    }
+
+    pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'a, P>) -> <Self as LockFor<L>>::Guard<'a>
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.lock(self)
+    }
+
+    pub fn lock_and<'a, P>(
+        &'a self,
+        locked: &'a mut Locked<'a, P>,
+    ) -> (<Self as LockFor<L>>::Guard<'a>, Locked<'a, L>)
+    where
+        P: LockBefore<L> + LockLevel,
+    {
+        locked.lock_and(self)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use lock_sequence::Unlocked;
 
     #[::fuchsia::test]
     fn test_lock_ordering() {
@@ -80,5 +129,42 @@ mod test {
             assert_eq!(*g1, 1);
             assert_eq!(*g2, 2);
         }
+    }
+
+    mod lock_levels {
+        //! Lock ordering tree:
+        //! A -> B -> C
+
+        use crate::lock::OrderedMutex;
+        use lock_sequence::{impl_lock_after, lock_level, relation::LockAfter, Unlocked};
+
+        lock_level!(A, OrderedMutex<u8, A>);
+        lock_level!(B, OrderedMutex<u16, B>);
+        lock_level!(C, OrderedMutex<u32, C>);
+
+        impl LockAfter<Unlocked> for A {}
+        impl_lock_after!(A => B);
+        impl_lock_after!(B => C);
+    }
+
+    use lock_levels::{A, B, C};
+
+    #[test]
+    fn test_ordered_mutex() {
+        let a: OrderedMutex<u8, A> = OrderedMutex::new(15);
+        let _b: OrderedMutex<u16, B> = OrderedMutex::new(30);
+        let c: OrderedMutex<u32, C> = OrderedMutex::new(45);
+
+        let mut locked = Unlocked::new();
+
+        let (a_data, mut next_locked) = a.lock_and(&mut locked);
+        let c_data = c.lock(&mut next_locked);
+
+        // This won't compile
+        //let _b_data = _b.lock(&mut locked);
+        //let _b_data = _b.lock(&mut next_locked);
+
+        assert_eq!(&*a_data, &15);
+        assert_eq!(&*c_data, &45);
     }
 }
