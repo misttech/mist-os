@@ -69,8 +69,13 @@ enum class Type : uint64_t {
   // Data structures related to legacy boot protocols.
   kLegacyBootData,
 
-  // Identity-mapping page tables.
-  kIdentityPageTables,
+  // Identity-mapping page tables intended only for the lifetime of the phys
+  // program in execution.
+  kTemporaryIdentityPageTables,
+
+  // Page tables that describe mappings intended to exist into the kernel
+  // proper's lifetime.
+  kKernelPageTables,
 
   // A firmware-provided devicetree blob.
   kDevicetreeBlob,

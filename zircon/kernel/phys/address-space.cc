@@ -26,15 +26,15 @@
 #include <ktl/enforce.h>
 
 void AddressSpace::AllocateRootPageTables() {
-  auto temp_allocator = temporary_allocator();
-
-  ktl::optional<uint64_t> lower_root = temp_allocator(
+  // See allocator descriptions for the appropriate use-cases.
+  auto lower_allocator = kDualSpaces ? temporary_allocator() : permanent_allocator();
+  ktl::optional<uint64_t> lower_root = lower_allocator(
       LowerPaging::kTableSize<LowerPaging::kFirstLevel>, LowerPaging::kTableAlignment);
   ZX_ASSERT_MSG(lower_root, "failed to allocate %sroot page table", kDualSpaces ? "lower " : "");
   lower_root_paddr_ = *lower_root;
 
   if constexpr (kDualSpaces) {
-    ktl::optional<uint64_t> upper_root = temp_allocator(
+    ktl::optional<uint64_t> upper_root = permanent_allocator()(
         UpperPaging::kTableSize<UpperPaging::kFirstLevel>, UpperPaging::kTableAlignment);
     ZX_ASSERT_MSG(upper_root, "failed to allocate upper root page table");
     upper_root_paddr_ = *upper_root;
@@ -47,14 +47,17 @@ fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t s
                 "virtual address %#" PRIx64 " must be < %#" PRIx64 " or >= %#" PRIx64, vaddr,
                 kLowerVirtualAddressRangeEnd, kUpperVirtualAddressRangeStart);
 
-  auto temp_allocator = temporary_allocator();
+  bool upper = vaddr >= kUpperVirtualAddressRangeStart;
   if constexpr (kDualSpaces) {
-    if (vaddr >= kUpperVirtualAddressRangeStart) {
-      return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, temp_allocator, state_, vaddr, size,
-                              paddr, settings);
+    if (upper) {
+      return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, permanent_allocator(), state_, vaddr,
+                              size, paddr, settings);
     }
   }
-  return LowerPaging::Map(lower_root_paddr_, paddr_to_io_, temp_allocator, state_, vaddr, size,
+
+  // See allocator descriptions for the appropriate use-cases.
+  auto lower_allocator = upper ? permanent_allocator() : temporary_allocator();
+  return LowerPaging::Map(lower_root_paddr_, paddr_to_io_, lower_allocator, state_, vaddr, size,
                           paddr, settings);
 }
 

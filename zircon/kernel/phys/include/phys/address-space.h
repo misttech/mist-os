@@ -188,12 +188,19 @@ class AddressSpace {
     return addr;
   }
 
-  // TODO(fxbug.dev/91187): Use a different type indicating permanent mappings
-  // in the following cases:
-  // * Allocation of tables in the upper address space;
-  // * Allocation of the root page table when the address space is unified.
+  // An allocator of temporary, identity-mapping page tables, used in the following cases:
+  // * When kDualSpaces is true, the lower root page table.
+  // * Non-root tables for pages in the lower address space.
   auto temporary_allocator() {
-    return ktl::bind_front(&AddressSpace::AllocatePageTable<memalloc::Type::kIdentityPageTables>,
+    return ktl::bind_front(
+        &AddressSpace::AllocatePageTable<memalloc::Type::kTemporaryIdentityPageTables>, this);
+  }
+
+  // An allocator of permanent, kernel page tables, used in the following cases:
+  // * When kDualSpaces is false, the root page table.
+  // * Tables for pages in the upper address space.
+  auto permanent_allocator() {
+    return ktl::bind_front(&AddressSpace::AllocatePageTable<memalloc::Type::kKernelPageTables>,
                            this);
   }
 

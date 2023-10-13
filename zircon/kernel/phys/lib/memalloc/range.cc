@@ -43,8 +43,10 @@ std::string_view ToString(Type type) {
       return "data ZBI"sv;
     case Type::kLegacyBootData:
       return "legacy boot data";
-    case Type::kIdentityPageTables:
-      return "identity page tables"sv;
+    case Type::kTemporaryIdentityPageTables:
+      return "temporary identity page tables"sv;
+    case Type::kKernelPageTables:
+      return "kernel page tables";
     case Type::kDevicetreeBlob:
       return "devicetree blob"sv;
     case Type::kPhysScratch:
