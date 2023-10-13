@@ -504,6 +504,15 @@ struct TransientTransactionState<'a> {
     transient_fds: Vec<FdNumber>,
 }
 
+impl<'a> Releasable for TransientTransactionState<'a> {
+    type Context<'b> = ();
+    fn release(self, _: ()) {
+        for fd in &self.transient_fds {
+            let _: Result<(), Errno> = self.accessor.close_fd(*fd);
+        }
+    }
+}
+
 impl<'a> std::fmt::Debug for TransientTransactionState<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TransientTransactionState")
@@ -517,7 +526,7 @@ impl<'a> std::fmt::Debug for TransientTransactionState<'a> {
 impl<'a> TransientTransactionState<'a> {
     /// Creates a new [`TransientTransactionState`], whose resources will belong to `accessor` and
     /// `target_proc` for FDs and binder handles respectively.
-    fn new(accessor: &'a dyn ResourceAccessor, target_proc: &BinderProcess) -> Self {
+    fn new(accessor: &'a dyn ResourceAccessor, target_proc: &BinderProcess) -> ReleaseGuard<Self> {
         TransientTransactionState {
             state: Some(TransactionState {
                 kernel: accessor.kernel().clone(),
@@ -531,6 +540,7 @@ impl<'a> TransientTransactionState<'a> {
             accessor,
             transient_fds: vec![],
         }
+        .into()
     }
 
     /// Schedule `handle` to have its strong reference count decremented when the transaction ends
@@ -557,19 +567,13 @@ impl<'a> TransientTransactionState<'a> {
     }
 }
 
-impl<'a> Drop for TransientTransactionState<'a> {
-    fn drop(&mut self) {
-        for fd in &self.transient_fds {
-            let _: Result<(), Errno> = self.accessor.close_fd(*fd);
-        }
-    }
-}
-
-impl<'a> From<TransientTransactionState<'a>> for TransactionState {
-    fn from(mut transient: TransientTransactionState<'a>) -> Self {
+impl<'a> From<ReleaseGuard<TransientTransactionState<'a>>> for TransactionState {
+    fn from(mut transient: ReleaseGuard<TransientTransactionState<'a>>) -> Self {
         // Clear the transient FD list, so that these FDs no longer get closed.
         transient.transient_fds.clear();
-        transient.state.take().unwrap()
+        let result = transient.state.take().unwrap();
+        transient.release(());
+        result
     }
 }
 
@@ -3435,7 +3439,8 @@ impl BinderDriver {
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
         security_context: Option<&[u8]>,
-    ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError> {
+    ) -> Result<(TransactionBuffers, ReleaseGuard<TransientTransactionState<'a>>), TransactionError>
+    {
         profile_duration!("CopyTransactionBuffers");
         // Get the shared memory of the target process.
         let mut shared_memory_lock = target_proc.shared_memory.lock();
@@ -3515,122 +3520,184 @@ impl BinderDriver {
         offsets: &[binder_uintptr_t],
         transaction_data: &mut [u8],
         sg_buffer: &mut SharedBuffer<'_, u8>,
-    ) -> Result<TransientTransactionState<'a>, TransactionError> {
+    ) -> Result<ReleaseGuard<TransientTransactionState<'a>>, TransactionError> {
         profile_duration!("TranslateObjects");
         let mut transaction_state =
             TransientTransactionState::new(target_resource_accessor, target_proc);
+        release_on_error!(transaction_state, (), {
+            let mut sg_remaining_buffer = sg_buffer.user_buffer();
+            let mut sg_buffer_offset = 0;
+            for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
+                // Bounds-check the offset.
+                if object_offset >= transaction_data.len() {
+                    return error!(EINVAL)?;
+                }
+                let serialized_object =
+                    SerializedBinderObject::from_bytes(&transaction_data[object_offset..])?;
+                let translated_object = match serialized_object {
+                    SerializedBinderObject::Handle { handle, flags, cookie } => {
+                        match handle {
+                            Handle::ContextManager => {
+                                // The special handle 0 does not need to be translated. It is universal.
+                                serialized_object
+                            }
+                            Handle::Object { index } => {
+                                let mut actions = RefCountActions::default();
+                                release_after!(
+                                    actions,
+                                    (),
+                                    || -> Result::<SerializedBinderObject, TransactionError> {
+                                        let source_proc = source_proc.lock();
+                                        let proxy = source_proc
+                                            .handles
+                                            .get(index)
+                                            .ok_or(TransactionError::Failure)?;
+                                        let binder_object = if proxy.owner.as_ptr() == target_proc {
+                                            // The binder object belongs to the receiving process.
 
-        let mut sg_remaining_buffer = sg_buffer.user_buffer();
-        let mut sg_buffer_offset = 0;
-        for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
-            // Bounds-check the offset.
-            if object_offset >= transaction_data.len() {
-                return error!(EINVAL)?;
-            }
-            let serialized_object =
-                SerializedBinderObject::from_bytes(&transaction_data[object_offset..])?;
-            let translated_object = match serialized_object {
-                SerializedBinderObject::Handle { handle, flags, cookie } => {
-                    match handle {
-                        Handle::ContextManager => {
-                            // The special handle 0 does not need to be translated. It is universal.
-                            serialized_object
-                        }
-                        Handle::Object { index } => {
-                            let mut actions = RefCountActions::default();
-                            release_after!(
-                                actions,
-                                (),
-                                || -> Result::<SerializedBinderObject, TransactionError> {
-                                    let source_proc = source_proc.lock();
-                                    let proxy = source_proc
-                                        .handles
-                                        .get(index)
-                                        .ok_or(TransactionError::Failure)?;
-                                    let binder_object = if proxy.owner.as_ptr() == target_proc {
-                                        // The binder object belongs to the receiving process.
+                                            // 1. Add a guard on the object in the transaction to
+                                            //    ensures the receiving process keep it alive until the
+                                            //    transactions is finished
+                                            let guard = proxy.inc_strong(&mut actions);
+                                            transaction_state.push_guard(guard);
 
-                                        // 1. Add a guard on the object in the transaction to
-                                        //    ensures the receiving process keep it alive until the
-                                        //    transactions is finished
-                                        let guard = proxy.inc_strong(&mut actions);
-                                        transaction_state.push_guard(guard);
+                                            // 2. Convert the binder object from a handle to a local object.
+                                            SerializedBinderObject::Object {
+                                                local: proxy.local,
+                                                flags,
+                                            }
+                                        } else {
+                                            // The binder object does not belong to the receiving
+                                            // process.
 
-                                        // 2. Convert the binder object from a handle to a local object.
-                                        SerializedBinderObject::Object { local: proxy.local, flags }
-                                    } else {
-                                        // The binder object does not belong to the receiving
-                                        // process.
-
-                                        // Insert the handle in the handle table of the receiving process
-                                        // and add a strong reference to it to ensure it survives for the
-                                        // lifetime of the transaction.
-                                        let new_handle = source_proc.insert_for_transaction(
-                                            target_proc,
-                                            proxy.clone(),
-                                            &mut actions,
-                                        );
-                                        // Tie this handle's strong reference to be held as long as this
-                                        // buffer.
-                                        transaction_state.push_handle(new_handle);
-                                        SerializedBinderObject::Handle {
-                                            handle: new_handle,
-                                            flags,
-                                            cookie,
-                                        }
-                                    };
-                                    Ok(binder_object)
-                                }
-                            )?
+                                            // Insert the handle in the handle table of the receiving process
+                                            // and add a strong reference to it to ensure it survives for the
+                                            // lifetime of the transaction.
+                                            let new_handle = source_proc.insert_for_transaction(
+                                                target_proc,
+                                                proxy.clone(),
+                                                &mut actions,
+                                            );
+                                            // Tie this handle's strong reference to be held as long as this
+                                            // buffer.
+                                            transaction_state.push_handle(new_handle);
+                                            SerializedBinderObject::Handle {
+                                                handle: new_handle,
+                                                flags,
+                                                cookie,
+                                            }
+                                        };
+                                        Ok(binder_object)
+                                    }
+                                )?
+                            }
                         }
                     }
-                }
-                SerializedBinderObject::Object { local, flags } => {
-                    let mut actions = RefCountActions::default();
-                    release_after!(actions, (), {
-                        // We are passing a binder object across process boundaries. We need
-                        // to translate this address to some handle.
+                    SerializedBinderObject::Object { local, flags } => {
+                        let mut actions = RefCountActions::default();
+                        release_after!(actions, (), {
+                            // We are passing a binder object across process boundaries. We need
+                            // to translate this address to some handle.
 
-                        // Register this binder object if it hasn't already been registered.
-                        let mut source_proc = source_proc.lock();
-                        let object =
-                            source_proc.find_or_register_object(source_thread, local, flags);
-                        // Create a handle in the receiving process that references the binder object
-                        // in the sender's process.
-                        let handle =
-                            source_proc.insert_for_transaction(target_proc, object, &mut actions);
-                        // Tie this handle's strong reference to be held as long as this buffer.
-                        transaction_state.push_handle(handle);
+                            // Register this binder object if it hasn't already been registered.
+                            let mut source_proc = source_proc.lock();
+                            let object =
+                                source_proc.find_or_register_object(source_thread, local, flags);
+                            // Create a handle in the receiving process that references the binder object
+                            // in the sender's process.
+                            let handle = source_proc.insert_for_transaction(
+                                target_proc,
+                                object,
+                                &mut actions,
+                            );
+                            // Tie this handle's strong reference to be held as long as this buffer.
+                            transaction_state.push_handle(handle);
 
-                        // Translate the serialized object into a handle.
-                        SerializedBinderObject::Handle { handle, flags, cookie: 0 }
-                    })
-                }
-                SerializedBinderObject::File { fd, flags, cookie } => {
-                    let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;
-                    let new_fd = target_resource_accessor.add_file_with_flags(file, fd_flags)?;
-
-                    // Close this FD if the transaction fails.
-                    transaction_state.push_transient_fd(new_fd);
-
-                    SerializedBinderObject::File { fd: new_fd, flags, cookie }
-                }
-                SerializedBinderObject::Buffer { buffer, length, flags, parent, parent_offset } => {
-                    // Copy the memory pointed to by this buffer object into the receiver.
-                    if length > sg_remaining_buffer.length {
-                        return error!(EINVAL)?;
+                            // Translate the serialized object into a handle.
+                            SerializedBinderObject::Handle { handle, flags, cookie: 0 }
+                        })
                     }
-                    source_resource_accessor.read_memory_to_slice(
+                    SerializedBinderObject::File { fd, flags, cookie } => {
+                        let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;
+                        let new_fd =
+                            target_resource_accessor.add_file_with_flags(file, fd_flags)?;
+
+                        // Close this FD if the transaction fails.
+                        transaction_state.push_transient_fd(new_fd);
+
+                        SerializedBinderObject::File { fd: new_fd, flags, cookie }
+                    }
+                    SerializedBinderObject::Buffer {
                         buffer,
-                        &mut sg_buffer.as_mut_bytes()[sg_buffer_offset..sg_buffer_offset + length],
-                    )?;
+                        length,
+                        flags,
+                        parent,
+                        parent_offset,
+                    } => {
+                        // Copy the memory pointed to by this buffer object into the receiver.
+                        if length > sg_remaining_buffer.length {
+                            return error!(EINVAL)?;
+                        }
+                        source_resource_accessor.read_memory_to_slice(
+                            buffer,
+                            &mut sg_buffer.as_mut_bytes()
+                                [sg_buffer_offset..sg_buffer_offset + length],
+                        )?;
 
-                    let translated_buffer_address = sg_remaining_buffer.address;
+                        let translated_buffer_address = sg_remaining_buffer.address;
 
-                    // If the buffer has a parent, it means that the parent buffer has a pointer to
-                    // this buffer. This pointer will need to be translated to the receiver's
-                    // address space.
-                    if flags & BINDER_BUFFER_FLAG_HAS_PARENT != 0 {
+                        // If the buffer has a parent, it means that the parent buffer has a pointer to
+                        // this buffer. This pointer will need to be translated to the receiver's
+                        // address space.
+                        if flags & BINDER_BUFFER_FLAG_HAS_PARENT != 0 {
+                            // The parent buffer must come earlier in the object list and already be
+                            // copied into the receiver's address space. Otherwise we would be fixing
+                            // up memory in the sender's address space, which is marked const in the
+                            // userspace runtime.
+                            if parent >= offset_idx {
+                                return error!(EINVAL)?;
+                            }
+
+                            // Find the parent buffer payload. There is a pointer in the buffer
+                            // that points to this object.
+                            let parent_buffer_payload = find_parent_buffer(
+                                transaction_data,
+                                sg_buffer,
+                                offsets[parent] as usize,
+                            )?;
+
+                            // Bounds-check that the offset is within the buffer.
+                            if parent_offset >= parent_buffer_payload.len() {
+                                return error!(EINVAL)?;
+                            }
+
+                            // Patch the pointer with the translated address.
+                            translated_buffer_address
+                                .write_to_prefix(&mut parent_buffer_payload[parent_offset..])
+                                .ok_or_else(|| errno!(EINVAL))?;
+                        }
+
+                        // Update the scatter-gather buffer to account for the buffer we just wrote.
+                        // We pad the length of this buffer so that the next buffer starts at an aligned
+                        // offset.
+                        let padded_length =
+                            round_up_to_increment(length, std::mem::size_of::<binder_uintptr_t>())?;
+                        sg_remaining_buffer = UserBuffer {
+                            address: sg_remaining_buffer.address + padded_length,
+                            length: sg_remaining_buffer.length - padded_length,
+                        };
+                        sg_buffer_offset += padded_length;
+
+                        // Patch this buffer with the translated address.
+                        SerializedBinderObject::Buffer {
+                            buffer: translated_buffer_address,
+                            length,
+                            flags,
+                            parent,
+                            parent_offset,
+                        }
+                    }
+                    SerializedBinderObject::FileArray { num_fds, parent, parent_offset } => {
                         // The parent buffer must come earlier in the object list and already be
                         // copied into the receiver's address space. Otherwise we would be fixing
                         // up memory in the sender's address space, which is marked const in the
@@ -3639,8 +3706,7 @@ impl BinderDriver {
                             return error!(EINVAL)?;
                         }
 
-                        // Find the parent buffer payload. There is a pointer in the buffer
-                        // that points to this object.
+                        // Find the parent buffer payload. The file descriptor array is in here.
                         let parent_buffer_payload = find_parent_buffer(
                             transaction_data,
                             sg_buffer,
@@ -3652,77 +3718,36 @@ impl BinderDriver {
                             return error!(EINVAL)?;
                         }
 
-                        // Patch the pointer with the translated address.
-                        translated_buffer_address
-                            .write_to_prefix(&mut parent_buffer_payload[parent_offset..])
-                            .ok_or_else(|| errno!(EINVAL))?;
+                        // Verify alignment and size before reading the data as a [u32].
+                        let (layout, _) = zerocopy::Ref::<&mut [u8], [u32]>::new_slice_from_prefix(
+                            &mut parent_buffer_payload[parent_offset..],
+                            num_fds,
+                        )
+                        .ok_or_else(|| errno!(EINVAL))?;
+                        let fd_array = layout.into_mut_slice();
+
+                        // Dup each file descriptor and re-write the value of the new FD.
+                        for fd in fd_array {
+                            let (file, flags) = source_resource_accessor
+                                .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
+                            let new_fd =
+                                target_resource_accessor.add_file_with_flags(file, flags)?;
+
+                            // Close this FD if the transaction ends either by success or failure.
+                            transaction_state.push_owned_fd(new_fd);
+
+                            *fd = new_fd.raw() as u32;
+                        }
+
+                        SerializedBinderObject::FileArray { num_fds, parent, parent_offset }
                     }
+                };
 
-                    // Update the scatter-gather buffer to account for the buffer we just wrote.
-                    // We pad the length of this buffer so that the next buffer starts at an aligned
-                    // offset.
-                    let padded_length =
-                        round_up_to_increment(length, std::mem::size_of::<binder_uintptr_t>())?;
-                    sg_remaining_buffer = UserBuffer {
-                        address: sg_remaining_buffer.address + padded_length,
-                        length: sg_remaining_buffer.length - padded_length,
-                    };
-                    sg_buffer_offset += padded_length;
+                translated_object.write_to(&mut transaction_data[object_offset..])?;
+            }
 
-                    // Patch this buffer with the translated address.
-                    SerializedBinderObject::Buffer {
-                        buffer: translated_buffer_address,
-                        length,
-                        flags,
-                        parent,
-                        parent_offset,
-                    }
-                }
-                SerializedBinderObject::FileArray { num_fds, parent, parent_offset } => {
-                    // The parent buffer must come earlier in the object list and already be
-                    // copied into the receiver's address space. Otherwise we would be fixing
-                    // up memory in the sender's address space, which is marked const in the
-                    // userspace runtime.
-                    if parent >= offset_idx {
-                        return error!(EINVAL)?;
-                    }
-
-                    // Find the parent buffer payload. The file descriptor array is in here.
-                    let parent_buffer_payload =
-                        find_parent_buffer(transaction_data, sg_buffer, offsets[parent] as usize)?;
-
-                    // Bounds-check that the offset is within the buffer.
-                    if parent_offset >= parent_buffer_payload.len() {
-                        return error!(EINVAL)?;
-                    }
-
-                    // Verify alignment and size before reading the data as a [u32].
-                    let (layout, _) = zerocopy::Ref::<&mut [u8], [u32]>::new_slice_from_prefix(
-                        &mut parent_buffer_payload[parent_offset..],
-                        num_fds,
-                    )
-                    .ok_or_else(|| errno!(EINVAL))?;
-                    let fd_array = layout.into_mut_slice();
-
-                    // Dup each file descriptor and re-write the value of the new FD.
-                    for fd in fd_array {
-                        let (file, flags) = source_resource_accessor
-                            .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
-                        let new_fd = target_resource_accessor.add_file_with_flags(file, flags)?;
-
-                        // Close this FD if the transaction ends either by success or failure.
-                        transaction_state.push_owned_fd(new_fd);
-
-                        *fd = new_fd.raw() as u32;
-                    }
-
-                    SerializedBinderObject::FileArray { num_fds, parent, parent_offset }
-                }
-            };
-
-            translated_object.write_to(&mut transaction_data[object_offset..])?;
-        }
-
+            Ok(())
+        });
         Ok(transaction_state)
     }
 
@@ -5221,7 +5246,7 @@ pub mod tests {
 
         // Copy the data from process 1 to process 2
         const kSecContext: &[u8] = b"hello\0";
-        let (buffers, _transaction_state) = test
+        let (buffers, transaction_state) = test
             .driver
             .copy_transaction_buffers(
                 &sender.task,
@@ -5259,6 +5284,7 @@ pub mod tests {
         vmo.read(&mut buffer, (security_context_buffer.address - BASE_ADDR) as u64)
             .expect("failed to read security_context");
         assert_eq!(&buffer[..], kSecContext);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -5334,6 +5360,7 @@ pub mod tests {
             &sender.thread.lock().command_queue.commands.front(),
             Some(Command::AcquireRef(BINDER_OBJECT))
         );
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -5387,7 +5414,8 @@ pub mod tests {
                 &mut transaction_data,
                 &mut allocations.scatter_gather_buffer,
             )
-            .expect("failed to translate handles");
+            .expect("failed to translate handles")
+            .release(());
 
         // Verify that the transaction data was mutated.
         let mut expected_transaction_data = vec![];
@@ -5483,6 +5511,7 @@ pub mod tests {
             .expect("expected handle not present");
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
         assert_eq!(object.local, binder_object);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -5607,6 +5636,7 @@ pub mod tests {
             .expect("expected handle not present");
         assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
         assert_eq!(object.local, binder_object_addr);
+        transaction_state.release(());
     }
 
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
@@ -5694,7 +5724,7 @@ pub mod tests {
         };
 
         // Perform the translation and copying.
-        let (buffers, _) = test
+        let (buffers, transaction_state) = test
             .driver
             .copy_transaction_buffers(
                 &sender.task,
@@ -5706,6 +5736,7 @@ pub mod tests {
                 None,
             )
             .expect("copy_transaction_buffers");
+        transaction_state.release(());
         let data_buffer = buffers.data;
 
         // Read back the translated objects from the receiver's memory.
@@ -6328,8 +6359,8 @@ pub mod tests {
         let fd = transient_state.state.as_ref().unwrap().owned_fds[0];
         assert!(receiver.task.files.get(fd).is_ok(), "file should be translated");
 
-        // Drop the result, which should close the fds in the receiver.
-        std::mem::drop(transient_state);
+        // Release the result, which should close the fds in the receiver.
+        transient_state.release(());
         assert!(receiver.task.files.get(fd).expect_err("file should be closed") == EBADF);
     }
 
@@ -6896,8 +6927,8 @@ pub mod tests {
 
         assert!(!receiver.task.files.get_all_fds().is_empty(), "receiver should have a file");
 
-        // Simulate an error, which will drop the transaction state.
-        drop(transaction_state);
+        // Simulate an error, which will release the transaction state.
+        transaction_state.release(());
 
         assert!(receiver.task.files.get_all_fds().is_empty(), "receiver should not have any files");
     }
@@ -6962,7 +6993,7 @@ pub mod tests {
 
         // Simulate a successful transaction by converting the transient state.
         let transaction_state: TransactionState = transaction_state.into();
-        drop(transaction_state);
+        std::mem::drop(transaction_state);
 
         // Verify that a strong release command is sent to the sender process.
         assert_matches!(
