@@ -1760,7 +1760,7 @@ void Dispatcher::ThreadPool::ThreadWakeupPrologue() {
   zx_status_t status = SetRoleProfile();
   if (status != ZX_OK) {
     // Failing to set the role profile is not a fatal error.
-    LOGF(ERROR, "Failed to set scheduler role: %d\n", status);
+    LOGF(WARNING, "Failed to set scheduler role: %d\n", status);
   }
   driver_context::SetRoleProfileStatus(status);
 }
