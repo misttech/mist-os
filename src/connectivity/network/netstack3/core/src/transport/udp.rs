@@ -5,7 +5,6 @@
 //! The User Datagram Protocol (UDP).
 
 use alloc::{collections::hash_map::DefaultHasher, vec::Vec};
-use assert_matches::assert_matches;
 use core::{
     convert::Infallible,
     fmt::Debug,
@@ -57,12 +56,12 @@ use crate::{
             self, AddrEntry, BoundSocketState as DatagramBoundSocketState,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
-            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket,
-            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, IpOptions,
-            LocalIdentifierAllocator, MaybeDualStack, MulticastMembershipInterfaceSelector,
-            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
-            SetMulticastMembershipError, ShutdownType, SocketHopLimits,
-            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
+            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt,
+            DualStackIpSocket, EitherIpSocket, ExpectedConnError, ExpectedUnboundError,
+            FoundSockets, InUseError, IpOptions, LocalIdentifierAllocator, MaybeDualStack,
+            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
+            SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
+            SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult,
@@ -435,7 +434,7 @@ impl DatagramSocketSpec for Udp {
     fn make_receiving_map_id<I: IpExt, D: WeakId>(
         s: Self::SocketId<I>,
     ) -> I::DualStackReceivingId<Udp> {
-        I::dual_stack_receiver(s)
+        I::into_dual_stack_receiving_id(s)
     }
 
     fn make_packet<I: IpExt, B: BufferMut>(
@@ -710,25 +709,6 @@ fn lookup<'s, I: Ip + IpExt, D: WeakId>(
         }
     }
     .into_iter()
-}
-
-// TODO(https://fxbug.dev/21198): Remove this function before making it possible
-// to insert IPv6 sockets into the IPv4 map.
-fn assert_is_ip_socket<I: Ip + IpExt>(id: &I::DualStackReceivingId<Udp>) -> &SocketId<I> {
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct RxIdWrapper<'a, I: IpExt>(&'a I::DualStackReceivingId<Udp>);
-    I::map_ip(
-        RxIdWrapper(id),
-        |RxIdWrapper(id)| {
-            assert_matches!(
-                id, EitherIpSocket::V4(id) => id,
-                "TODO(https://fxbug.dev/21198): deliver IPv4 packets
-                to IPv6 sockets"
-            )
-        },
-        |RxIdWrapper(id)| id,
-    )
 }
 
 /// Helper function to allocate a listen port.
@@ -1164,8 +1144,11 @@ where
 /// An implementation of [`IpTransportContext`] for UDP.
 pub(crate) enum UdpIpTransportContext {}
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportContext<I, C, SC>
-    for UdpIpTransportContext
+impl<
+        I: IpExt,
+        C: StateNonSyncContext<I> + StateNonSyncContext<I::OtherVersion>,
+        SC: StateContext<I, C>,
+    > IpTransportContext<I, C, SC> for UdpIpTransportContext
 {
     fn receive_icmp_error(
         sync_ctx: &mut SC,
@@ -1223,8 +1206,21 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> IpTransportCon
                             let id = match id {
                                 LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
                             };
-                            let id = assert_is_ip_socket::<I>(id);
-                            ctx.receive_icmp_error(*id, err);
+                            match I::as_dual_stack_ip_socket(id) {
+                                DualStackIpSocket::CurrentStack(id) => {
+                                    ctx.receive_icmp_error(*id, err)
+                                }
+                                DualStackIpSocket::OtherStack(_id) => {
+                                    // TODO(https://fxbug.dev/21198): Handle
+                                    // ICMPv4 error codes on DualStack IPv6
+                                    // sockets.
+                                    trace!(
+                                        "UdpIpTransportContext::receive_icmp_error: Support for
+                                        ICMPv4 error codes on IPv6 Dual Stack sockets is
+                                        unimplemented."
+                                    );
+                                }
+                            }
                         } else {
                             trace!(
                                 "UdpIpTransportContext::receive_icmp_error: Got ICMP error
@@ -7476,7 +7472,7 @@ where {
                         .try_insert(c, options, EitherIpSocket::V4(SocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Conn(
-                                assert_is_ip_socket::<Ipv4>(&entry.id()).clone(),
+                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => *id),
                                 entry.get_addr().clone(),
                             )
                         })
@@ -7486,7 +7482,7 @@ where {
                         .try_insert(l, options, EitherIpSocket::V4(SocketId::from(socket_index)))
                         .map(|entry| {
                             Socket::Listener(
-                                assert_is_ip_socket::<Ipv4>(&entry.id()).clone(),
+                                assert_matches!(entry.id(), EitherIpSocket::V4(id) => *id),
                                 entry.get_addr().clone(),
                             )
                         })
