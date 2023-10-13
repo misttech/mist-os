@@ -291,6 +291,23 @@ impl<T> Primary<T> {
         }
     }
 
+    /// Constructs a new `Primary<T>` while giving you a Weak<T> to the
+    /// allocation, to allow you to construct a `T` which holds a weak pointer
+    /// to itself.
+    ///
+    /// Like for [`Arc::new_cyclic`], the `Weak` reference provided to `data_fn`
+    /// cannot be upgraded until the [`Primary`] is constructed.
+    pub fn new_cyclic(data_fn: impl FnOnce(Weak<T>) -> T) -> Primary<T> {
+        Primary {
+            inner: core::mem::ManuallyDrop::new(alloc::sync::Arc::new_cyclic(move |weak| Inner {
+                marked_for_destruction: AtomicBool::new(false),
+                callers: caller::Callers::default(),
+                data: core::mem::ManuallyDrop::new(data_fn(Weak(weak.clone()))),
+                notifier: crate::Mutex::new(None),
+            })),
+        }
+    }
+
     /// Clones a strongly-held reference.
     #[cfg_attr(feature = "rc-debug-names", track_caller)]
     pub fn clone_strong(Self { inner }: &Self) -> Strong<T> {
@@ -854,5 +871,20 @@ mod tests {
         let map_notifier = MapNotifier::new(notifier.clone(), |data| (data, data + 1));
         Primary::unwrap_with_notifier(primary, map_notifier);
         assert_eq!(notifier.take(), Some((10, 11)));
+    }
+
+    #[test]
+    fn new_cyclic() {
+        #[derive(Debug)]
+        struct Data {
+            value: i32,
+            weak: Weak<Data>,
+        }
+
+        let primary = Primary::new_cyclic(|weak| Data { value: 2, weak });
+        assert_eq!(primary.value, 2);
+        let strong = primary.weak.upgrade().unwrap();
+        assert_eq!(strong.value, 2);
+        assert!(Primary::ptr_eq(&primary, &strong));
     }
 }
