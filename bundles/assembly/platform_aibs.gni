@@ -202,6 +202,9 @@ user_platform_aib_names =
       # Kernel Compression
       "kernel_anonymous_memory_compression",
       "kernel_anonymous_memory_compression_eager_lru",
+
+      # Recovery
+      "factory_reset_trigger",
     ]
 
 if (current_cpu != "riscv64") {

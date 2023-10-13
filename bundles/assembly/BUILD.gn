@@ -1004,6 +1004,23 @@ assembly_input_bundle("feedback_low_memory_product_config") {
       [ "//src/developer/forensics:feedback_low_memory_product_config" ]
 }
 
+assembly_input_bundle("factory_reset_trigger") {
+  base_packages = [ "//src/recovery/factory-reset-trigger" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/recovery/factory-reset-trigger/meta/factory-reset-trigger.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 ########
 #
 # The "minimal" AIBs

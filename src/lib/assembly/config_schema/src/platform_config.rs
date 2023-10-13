@@ -20,6 +20,7 @@ pub mod intl_config;
 pub mod kernel_config;
 pub mod media_config;
 pub mod paravirtualization_config;
+pub mod recovery_config;
 pub mod session_manager_config;
 pub mod setui_config;
 pub mod starnix_config;
@@ -101,6 +102,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for paravirtualization.
     #[serde(default)]
     pub paravirtualization: paravirtualization_config::PlatformParavirtualizationConfig,
+
+    /// Platform configuration options for recovery.
+    #[serde(default)]
+    pub recovery: recovery_config::RecoveryConfig,
 
     /// Platform configuration options for the session manager.
     #[serde(default)]
