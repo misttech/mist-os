@@ -11,6 +11,12 @@ Concretely, the FEC is charged with approving or rejecting Fuchsia RFCs
 using the [Fuchsia RFC Process][rfc-process] and resolving technical disputes
 that cannot be resolved within subteams.
 
+## How to Contact
+
+Members of the FEC can be reached by emailing
+eng-council@fuchsia.dev. Public discussions involving FEC should use
+the eng-council-discuss@fuchsia.dev list.
+
 ## Goals
 
 The goal of the FEC is to drive technical excellence in the

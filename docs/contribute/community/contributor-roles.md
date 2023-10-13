@@ -129,6 +129,8 @@ has comprehensive knowledge of the code in that subtree. Owners are listed in
 `OWNERS` files. For directories or files that are outside of an Owner's
 responsibility, that Owner has the same privileges as a Committer.
 
+Committers are encouraged to keep `OWNERS` files up to date.
+
 #### Responsibilities {#responsibilities}
 
 In addition to the responsibilities of a Committer and Member, Owners
@@ -155,43 +157,35 @@ To become an Owner you must do the following:
 
 ### Global Approver {#global-approver}
 
-A Global Approver is an Owner in the [root `OWNERS` file](/OWNERS){:.external}.
-A Global Approver often makes large-scale changes that affect the entire Fuchsia
-codebase. For example, Global Approvers are people who tend to maintain
-various languages, toolchains, and other build system components.
+A Global Approver is a member of the owners-override@fuchsia.dev
+group.  A Global Approver can invoke the Owners-override bit in
+Gerrit, which waives `OWNERS` requirements for a change.
 
-For the full set of Global Approver expectations as well as the list of current
-Global Approvers, see [the root `OWNERS` file](/OWNERS){:.external}.
+While Global Approvers are empowered to provide an Owners-override +1
+to large-scale changes, Global Approvers are not expected to have
+comprehensive knowledge of the entire Fuchsia codebase. It is expected
+that global approval will be used primarily in cases where the changes
+systematic, largely mechanical, and impacts a large fraction of the
+codebase.
 
-While Global Approvers are empowered to provide a [Code-Review +2](https://gerrit-review.googlesource.com/Documentation/config-labels.html){:.external}
-to large-scale changes, Global Approvers are not expected to have comprehensive
-knowledge of the entire Fuchsia codebase.
+Currently, members of [Fuchsia Engineering Council][fec] are global
+approvers, as well as a small number of reviewers to cover timezones
+with no FEC member. Committers that encounter cases where existing
+code owners are can't provide review coverage are encouraged to first
+send a change to update the local `OWNERS` file, or to add a
+top-level, per-file rule to cover a certain type of file, like
+`**/BUILD.gn` or `**/*.md`. For cases where this proves insufficient,
+committers should send email to owners-override@fuchsia.dev to discuss
+the issue.
 
 #### Responsibilities {#responsibilities}
 
 In addition to the responsibilities of a Member, Committer, and Owner, Global
 Approvers are responsible for the following:
 
-*   Approving large scale changes within the Fuchsia codebase with a +2
-    in Gerrit.
+*   Approving large scale changes within the Fuchsia codebase with an
+    Owners-override +1 in Gerrit.
 *   Providing timely reviews for large scale changes.
-
-#### Become a Global Approver {#become-a-global-approver}
-
-To become a Global Approver you must do the following:
-
-*   Demonstrate considerable proficiency in making large-scale changes across
-    the entire Fuchsia codebase.
-*   Self-nominate or get nominated by another Committer.
-    *  To self-nominate, do the following:
-        * [Submit a Gerrit change](/docs/development/source_code/contribute_changes.md)
-          that adds yourself to the [root `OWNERS` file](/OWNERS){:.external}.
-          Current Owners will evaluate your change and either accept or reject your
-          request.
-        * Email all [existing Global Approvers](/OWNERS){:.external}
-          with your associated Gerrit change and wait one business day for discussion
-          and approval. If you are being nominated, existing Global Approvers will be
-          emailed by the individual nominating you.
 
 ## Code review actions {#code-review-actions}
 
@@ -426,3 +420,5 @@ code review:
 *   Do I need **API-Review +1**?
     * Changes affecting the Fuchsia API surface require **API-Review +1**, and the
     code review tool will only show the API-Review flag when it is needed.
+
+[fec]: /docs/contribute/governance/eng_council.md

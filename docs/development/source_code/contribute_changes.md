@@ -94,8 +94,10 @@ After creating a change, to request a code review, do the following:
 1. Click **ADD REVIEWER**.
 1. Add reviewers by email address.
 
-   You can refer to the `OWNERS` file, located in the directory where you're making
-   your change or in one of its parents to find the best reviewers for your change.
+   You can refer to the `OWNERS` file, located in the directory where
+   you're making your change or in one of its parents to find the best
+   reviewers for your change. For more information about Fuchsia
+   OWNERS, see [OWNERS][owners].
 
 1. Click **SEND**.
 
@@ -230,3 +232,4 @@ information on the structure of the Fuchsia repository.
 [user-review-ui]: https://gerrit-review.googlesource.com/Documentation/user-review-ui.html
 [config-labels]: https://gerrit-review.googlesource.com/Documentation/config-labels.html
 [committer]: /docs/contribute/community/contributor-roles.md#committer
+[owners]: /docs/development/source_code/owners.md

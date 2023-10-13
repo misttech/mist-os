@@ -48,5 +48,17 @@ per-file main.c = validuser3@example.com
 *   When applicable, `include` owners from another file rather than listing individuals.
     This creates fewer "sources of truth" and makes OWNERS maintenance easier.
 
+## Owners override
+
+In some cases, the author of a change may wish to override OWNERS
+approval. This is appropriate primarily in cases where a change is
+mostly mechanical but touches a large fraction of the codebase, for
+example a trivial change to the signature of a commonly used API. CL
+authors can add owners-override@fuchsia.dev to the reviewer list to
+request owners override. This process should be used sparingly and
+review by local owners is preferred whenever it does not present and
+undue burden on developers.
+
+
 [find-owners]: https://gerrit.googlesource.com/plugins/find-owners/+/HEAD/src/main/resources/Documentation/about.md
 [owners-syntax]: https://gerrit.googlesource.com/plugins/find-owners/+/HEAD/src/main/resources/Documentation/syntax.md
