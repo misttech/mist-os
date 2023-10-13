@@ -432,8 +432,6 @@ impl DeviceHandler {
                     }
                     .into(),
                     static_common_info: devices::StaticCommonInfo {
-                        binding_id,
-                        name: name.clone(),
                         tx_notifier: Default::default(),
                     },
                 }
@@ -444,11 +442,10 @@ impl DeviceHandler {
         );
 
         state_entry.insert(core_id.downgrade());
+        let binding_id = core_id.bindings_id().id;
         let core_id: DeviceId<_> = core_id.into();
         let external_state = core_id.external_state();
-        let devices::StaticCommonInfo { binding_id, name: _, tx_notifier } =
-            external_state.static_common_info();
-        let binding_id = *binding_id;
+        let devices::StaticCommonInfo { tx_notifier } = external_state.static_common_info();
         let task =
             crate::bindings::devices::spawn_tx_task(&tx_notifier, ctx.clone(), core_id.clone());
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();

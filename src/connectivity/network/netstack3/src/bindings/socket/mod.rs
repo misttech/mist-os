@@ -34,8 +34,8 @@ use netstack3_core::{
 
 use crate::bindings::{
     devices::{
-        BindingId, DeviceSpecificInfo, Devices, DynamicCommonInfo, DynamicNetdeviceInfo,
-        LoopbackInfo, NetdeviceInfo, StaticCommonInfo,
+        BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
+        DynamicNetdeviceInfo, LoopbackInfo, NetdeviceInfo,
     },
     util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     Ctx, DeviceIdExt as _,
@@ -95,9 +95,7 @@ pub(crate) async fn serve(
                         BindingId::new(index)
                             .ok_or(DeviceNotFoundError)
                             .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
-                            .map(|core_id: DeviceId<_>| {
-                                core_id.external_state().static_common_info().name.clone()
-                            })
+                            .map(|core_id: DeviceId<_>| core_id.bindings_id().name.clone())
                             .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
                     };
                     responder
@@ -110,7 +108,7 @@ pub(crate) async fn serve(
                         let devices = AsRef::<Devices<_>>::as_ref(non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
-                            .map(|d| d.external_state().static_common_info().binding_id.get())
+                            .map(|d| d.bindings_id().id.get())
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };
@@ -194,13 +192,12 @@ fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
                     .map(fidl_fuchsia_net_ext::FromExt::from_ext)
                     .collect();
 
+                let DeviceIdAndName { id, name } = d.bindings_id();
                 let info = d.external_state();
                 let flags = flags_for_device(&info);
-                let StaticCommonInfo { binding_id, name, tx_notifier: _ } =
-                    info.static_common_info();
 
                 psocket::InterfaceAddresses {
-                    id: Some(binding_id.get()),
+                    id: Some(id.get()),
                     name: Some(name.clone()),
                     addresses: Some(addresses),
                     interface_flags: Some(flags),

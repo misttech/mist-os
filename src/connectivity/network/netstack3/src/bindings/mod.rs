@@ -336,7 +336,7 @@ where
     }
 
     fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
-        core_id.external_state().static_common_info().binding_id
+        core_id.bindings_id().id
     }
 }
 
@@ -485,8 +485,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
 
     fn wake_tx_task(&mut self, device: &DeviceId<BindingsNonSyncCtxImpl>) {
         let external_state = device.external_state();
-        let StaticCommonInfo { binding_id: _, name: _, tx_notifier } =
-            external_state.static_common_info();
+        let StaticCommonInfo { tx_notifier } = external_state.static_common_info();
         tx_notifier.schedule()
     }
 
@@ -908,11 +907,7 @@ impl Netstack {
                     .expect("interfaces worker not running");
 
                 let loopback_info = LoopbackInfo {
-                    static_common_info: StaticCommonInfo {
-                        binding_id,
-                        name: LOOPBACK_NAME.to_string(),
-                        tx_notifier: Default::default(),
-                    },
+                    static_common_info: StaticCommonInfo { tx_notifier: Default::default() },
                     dynamic_common_info: DynamicCommonInfo {
                         mtu: DEFAULT_LOOPBACK_MTU,
                         admin_enabled: true,
@@ -933,11 +928,10 @@ impl Netstack {
             loopback.external_state();
         let rx_task =
             crate::bindings::devices::spawn_rx_task(rx_notifier, self.ctx.clone(), &loopback);
+        let binding_id = loopback.bindings_id().id;
         let loopback: DeviceId<_> = loopback.into();
         let external_state = loopback.external_state();
-        let StaticCommonInfo { binding_id, name: _, tx_notifier } =
-            external_state.static_common_info();
-        let binding_id = *binding_id;
+        let StaticCommonInfo { tx_notifier } = external_state.static_common_info();
         devices.add_device(binding_id, loopback.clone());
         let tx_task = crate::bindings::devices::spawn_tx_task(
             tx_notifier,

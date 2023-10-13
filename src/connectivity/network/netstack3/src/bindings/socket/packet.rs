@@ -41,7 +41,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryFromFidlWithContext,
         TryIntoCoreWithContext as _, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
+    BindingsNonSyncCtxImpl, Ctx,
 };
 
 /// State held in the non-sync context for a single socket.
@@ -192,7 +192,7 @@ impl MessageData {
         Self {
             packet_type,
             info,
-            interface_id: device.external_state().static_common_info().binding_id.get(),
+            interface_id: device.bindings_id().id.get(),
             interface_type: iface_type(device),
         }
     }

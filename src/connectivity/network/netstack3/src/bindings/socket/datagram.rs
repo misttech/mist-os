@@ -56,7 +56,7 @@ use crate::bindings::{
         DeviceNotFoundError, IntoCore as _, IntoFidl, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
     },
-    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _, StaticCommonInfo,
+    BindingsNonSyncCtxImpl, Ctx,
 };
 
 use super::{
@@ -1643,14 +1643,12 @@ where
             None => return Ok(None),
             Some(d) => d,
         };
+        // NB: Even though we can get the device name from a weak device, ensure
+        // that we do not return a device that was removed from the stack. This
+        // matches Linux behavior.
         device
             .upgrade()
-            .map(|core_id| {
-                let state = core_id.external_state();
-                let StaticCommonInfo { binding_id: _, name, tx_notifier: _ } =
-                    state.static_common_info();
-                Some(name.to_string())
-            })
+            .map(|core_id| Some(core_id.bindings_id().name.clone()))
             .ok_or(fposix::Errno::Enodev)
     }
 

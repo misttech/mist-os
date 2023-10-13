@@ -26,9 +26,7 @@ use netstack3_core::{
 };
 use tracing::warn;
 
-use crate::bindings::{
-    interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx, DeviceIdExt as _,
-};
+use crate::bindings::{interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -111,9 +109,7 @@ impl Devices<DeviceId<BindingsNonSyncCtxImpl>> {
         self.id_map
             .read()
             .iter()
-            .find_map(|(_binding_id, c)| {
-                (c.external_state().static_common_info().name == name).then_some(c)
-            })
+            .find_map(|(_binding_id, c)| (c.bindings_id().name == name).then_some(c))
             .cloned()
     }
 }
@@ -208,11 +204,6 @@ pub(crate) fn spawn_tx_task(
 /// Static information common to all devices.
 #[derive(Derivative, Debug)]
 pub(crate) struct StaticCommonInfo {
-    // TODO(https://fxbug.dev/133946): Move binding id and name out of static
-    // common info, they're available directly from the core device identifiers
-    // now.
-    pub(crate) binding_id: BindingId,
-    pub(crate) name: String,
     #[derivative(Debug = "ignore")]
     pub(crate) tx_notifier: NeedsDataNotifier,
 }

@@ -8,8 +8,10 @@
 //! Inspect.
 
 use super::{
-    devices::{DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo},
-    BindingsNonSyncCtxImpl, Ctx, DeviceIdExt, StackTime, StaticCommonInfo,
+    devices::{
+        DeviceIdAndName, DeviceSpecificInfo, DynamicCommonInfo, DynamicNetdeviceInfo, NetdeviceInfo,
+    },
+    BindingsNonSyncCtxImpl, Ctx, StackTime,
 };
 use fuchsia_inspect::ArrayProperty as _;
 use net_types::{
@@ -83,10 +85,7 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                 inspector.root().record_child(format!("{}", i), |node| {
                     let ip::types::Entry { subnet, device, gateway, metric } = route;
                     node.record_string("Destination", format!("{}", subnet));
-                    node.record_uint(
-                        "InterfaceId",
-                        device.external_state().static_common_info().binding_id.into(),
-                    );
+                    node.record_uint("InterfaceId", device.bindings_id().id.into());
                     match gateway {
                         Some(gateway) => {
                             node.record_string("Gateway", format!("{}", gateway));
@@ -129,8 +128,7 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
             let Self(inspector) = self;
             for device::InspectDeviceState { device_id, addresses } in devices {
                 let external_state = device_id.external_state();
-                let StaticCommonInfo { binding_id, name, tx_notifier: _ } =
-                    external_state.static_common_info();
+                let DeviceIdAndName { id: binding_id, name } = device_id.bindings_id();
                 inspector.root().record_child(format!("{binding_id}"), |node| {
                     node.record_string("Name", &name);
                     node.record_uint("InterfaceId", (*binding_id).into());
@@ -196,11 +194,9 @@ pub(crate) fn neighbors(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                 Item = ip::device::nud::NeighborStateInspect<LinkAddress, StackTime>,
             >,
         ) {
-            use crate::bindings::DeviceIdExt as _;
             let Self(inspector) = self;
-            let device_state = device.external_state();
-            let name = &device_state.static_common_info().name;
-            inspector.root().record_child(format!("{name}"), |node| {
+            let name = &device.bindings_id().name;
+            inspector.root().record_child(name, |node| {
                 for (i, neighbor) in neighbors.enumerate() {
                     let ip::device::nud::NeighborStateInspect {
                         state,

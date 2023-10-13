@@ -94,6 +94,14 @@ impl<C: DeviceLayerTypes> WeakDeviceId<C> {
             }
         })
     }
+
+    /// Returns the bindings identifier associated with the device.
+    pub fn bindings_id(&self) -> &C::DeviceIdentifier {
+        match self {
+            WeakDeviceId::Ethernet(id) => id.bindings_id(),
+            WeakDeviceId::Loopback(id) => id.bindings_id(),
+        }
+    }
 }
 
 enum DebugReferencesInner<C: DeviceLayerTypes> {
@@ -199,6 +207,14 @@ impl<C: DeviceLayerTypes> DeviceId<C> {
             DeviceId::Loopback(id) => id.downgrade().into(),
         }
     }
+
+    /// Returns the bindings identifier associated with the device.
+    pub fn bindings_id(&self) -> &C::DeviceIdentifier {
+        match self {
+            DeviceId::Ethernet(id) => id.bindings_id(),
+            DeviceId::Loopback(id) => id.bindings_id(),
+        }
+    }
 }
 
 impl<C: DeviceLayerTypes> Id for DeviceId<C> {
@@ -281,6 +297,11 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseWeakDeviceId<T, C> {
         let Self { cookie } = self;
         cookie.weak_ref.upgrade().map(|rc| BaseDeviceId { rc })
     }
+
+    /// Returns the bindings identifier associated with the device.
+    pub fn bindings_id(&self) -> &C::DeviceIdentifier {
+        &self.cookie.bindings_id
+    }
 }
 
 /// A base device identifier.
@@ -352,6 +373,11 @@ impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseDeviceId<T, C> {
     /// Returns a reference to the external state for the device.
     pub fn external_state(&self) -> &T::External<C> {
         &self.rc.external_state
+    }
+
+    /// Returns the bindings identifier associated with the device.
+    pub fn bindings_id(&self) -> &C::DeviceIdentifier {
+        &self.rc.weak_cookie.bindings_id
     }
 
     /// Downgrades the ID to an [`EthernetWeakDeviceId`].

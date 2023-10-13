@@ -1245,7 +1245,7 @@ mod tests {
     use net_types::ip::{Ipv4Addr, Ipv6Addr};
     use test_case::test_case;
 
-    use crate::bindings::{integration_tests::TestStack, DeviceIdExt as _};
+    use crate::bindings::integration_tests::TestStack;
 
     use super::*;
 
@@ -1283,7 +1283,7 @@ mod tests {
         }
 
         fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
-            core_id.external_state().static_common_info().binding_id
+            core_id.bindings_id().id
         }
     }
 
@@ -1294,7 +1294,7 @@ mod tests {
         }
 
         fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
-            core_id.external_state().static_common_info().binding_id
+            core_id.bindings_id().id
         }
     }
 

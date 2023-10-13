@@ -673,7 +673,7 @@ async fn dispatch_control_request(
 async fn wait_for_device_removal<T: 'static>(
     id: BindingId,
     result: netstack3_core::device::RemoveDeviceResultWithContext<T, BindingsNonSyncCtxImpl>,
-    weak_id: netstack3_core::device::WeakDeviceId<BindingsNonSyncCtxImpl>,
+    weak_id: &netstack3_core::device::WeakDeviceId<BindingsNonSyncCtxImpl>,
 ) -> T {
     let mut receiver = match result {
         netstack3_core::device::RemoveDeviceResult::Removed(r) => {
@@ -703,7 +703,7 @@ async fn wait_for_device_removal<T: 'static>(
 ///
 /// Panics if `id` points to a loopback device.
 async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
-    let devices::NetdeviceInfo { handler, mac: _, static_common_info, dynamic: _ } = {
+    let (devices::NetdeviceInfo { handler, mac: _, static_common_info: _, dynamic: _ }, weak_id) = {
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let core_id =
             non_sync_ctx.devices.remove_device(id).expect("device was not removed since retrieval");
@@ -718,7 +718,8 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                 let result =
                     netstack3_core::device::remove_ethernet_device(sync_ctx, non_sync_ctx, core_id);
                 non_sync_ctx.remove_routes_on_device(&weak_id).await;
-                wait_for_device_removal(id, result, weak_id).await
+                let info = wait_for_device_removal(id, result, &weak_id).await;
+                (info, weak_id)
             }
             DeviceId::Loopback(core_id) => {
                 // We want to remove the routes on the device _after_ we mark
@@ -732,7 +733,7 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
                     static_common_info: _,
                     dynamic_common_info: _,
                     rx_notifier: _,
-                } = wait_for_device_removal(id, result, weak_id).await;
+                } = wait_for_device_removal(id, result, &weak_id).await;
                 // Allow the loopback interface to be removed as part of clean
                 // shutdown, but emit a warning about it.
                 tracing::warn!("loopback interface was removed");
@@ -741,12 +742,11 @@ async fn remove_interface(ctx: &mut Ctx, id: BindingId) {
         }
     };
 
-    let crate::bindings::devices::StaticCommonInfo { binding_id: _, name, tx_notifier: _ } =
-        static_common_info;
+    let id = weak_id.bindings_id();
     handler.uninstall().await.unwrap_or_else(|e| {
-        tracing::warn!("error uninstalling netdevice handler for interface {}: {:?}", id, e)
+        tracing::warn!("error uninstalling netdevice handler for interface {:?}: {:?}", id, e)
     });
-    tracing::info!("device {id}({name}) removal complete");
+    tracing::info!("device {id:?} removal complete");
 }
 
 /// Removes the given `address` from the interface with the given `id`.
