@@ -39,6 +39,9 @@ extern zx_status_t ffx_connect_target_proxy(ffx_env_context_t* ctx, zx_handle_t*
 extern zx_status_t ffx_connect_remote_control_proxy(ffx_env_context_t* ctx, zx_handle_t* out);
 extern zx_status_t ffx_connect_device_proxy(ffx_env_context_t* ctx, const char* moniker,
                                             const char* capability_name, zx_handle_t* out);
+// Attempts to wait (blocking) for a target to become available. Waits for `timeout_seconds`
+// fractional seconds before timing out.
+extern zx_status_t ffx_target_wait(ffx_env_context_t* ctx, double timeout_seconds);
 extern void ffx_close_handle(zx_handle_t handle);
 
 extern void ffx_channel_create(ffx_lib_context_t* ctx, uint32_t options, zx_handle_t* out0,

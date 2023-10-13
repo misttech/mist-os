@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Result;
+use anyhow::{Context as _, Result};
 use errors::FfxError;
 use ffx_config::EnvironmentContext;
 use fidl::{endpoints::create_proxy, prelude::*};
@@ -12,6 +12,7 @@ use fidl_fuchsia_developer_ffx::{
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use futures::{select, Future, FutureExt};
 use std::time::Duration;
+use thiserror::Error;
 use timeout::timeout;
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
@@ -168,4 +169,32 @@ pub async fn maybe_inline_target(
         }
         None => None,
     }
+}
+
+#[derive(Debug, Error)]
+pub enum KnockError {
+    #[error("critical error encountered: {0:?}")]
+    CriticalError(anyhow::Error),
+    #[error("non-critical error encountered: {0:?}")]
+    NonCriticalError(#[from] anyhow::Error),
+}
+
+const RCS_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// Attempts to "knock" a target to determine if it is up and connectable via RCS.
+///
+/// This is intended to be run in a loop, with a non-critical error implying the caller
+/// should call again, and a critical error implying the caller should raise the error
+/// and no longer loop.
+pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
+    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
+        .map_err(|e| KnockError::NonCriticalError(e.into()))?;
+    timeout(RCS_TIMEOUT, target.open_remote_control(remote_server_end))
+        .await
+        .context("timing out")?
+        .context("opening remote_control")?
+        .map_err(|e| anyhow::anyhow!("open remote control err: {:?}", e))?;
+    rcs::knock_rcs(&rcs_proxy)
+        .await
+        .map_err(|e| KnockError::NonCriticalError(anyhow::anyhow!("{e:?}")))
 }

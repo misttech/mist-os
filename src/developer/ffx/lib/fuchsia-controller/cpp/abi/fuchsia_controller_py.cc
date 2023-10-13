@@ -192,9 +192,21 @@ PyObject *Context_connect_remote_control_proxy(Context *self, PyObject *args) {
   return PyObject_CallFunction(reinterpret_cast<PyObject *>(&channel::ChannelType), "I", handle);
 }
 
+PyObject *Context_target_wait(Context *self, PyObject *args) {
+  double timeout;
+  if (!PyArg_ParseTuple(args, "d", &timeout)) {
+    return nullptr;
+  }
+  if (ffx_target_wait(self->env_context, timeout) != ZX_OK) {
+    return nullptr;
+  }
+  Py_RETURN_NONE;
+}
+
 PyMethodDef Context_methods[] = {
     {"connect_daemon_protocol", reinterpret_cast<PyCFunction>(Context_connect_daemon_protocol),
      METH_O, nullptr},
+    {"target_wait", reinterpret_cast<PyCFunction>(Context_target_wait), METH_VARARGS, nullptr},
     {"connect_target_proxy", reinterpret_cast<PyCFunction>(Context_connect_target_proxy),
      METH_NOARGS, nullptr},
     {"connect_device_proxy", reinterpret_cast<PyCFunction>(Context_connect_device_proxy),

@@ -2,19 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use errors::FfxError;
+use ffx_target::KnockError;
 use ffx_wait_args::WaitCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_developer_ffx::{DaemonError, TargetCollectionProxy, TargetMarker, TargetQuery};
-use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
 use fuchsia_async::WakeupTime;
 use futures::future::Either;
 use std::time::Duration;
-use thiserror::Error;
-use timeout::timeout;
 
 #[derive(FfxTool)]
 pub struct WaitTool {
@@ -67,16 +65,6 @@ async fn wait_for_device(target_collection: TargetCollectionProxy, cmd: WaitComm
     }
 }
 
-const RCS_TIMEOUT: Duration = Duration::from_secs(3);
-
-#[derive(Debug, Error)]
-enum KnockError {
-    #[error("critical error encountered: {0:?}")]
-    CriticalError(anyhow::Error),
-    #[error("non-critical error encountered: {0:?}")]
-    NonCriticalError(#[from] anyhow::Error),
-}
-
 async fn knock_target(
     ffx: &ffx_command::Ffx,
     target_collection_proxy: &TargetCollectionProxy,
@@ -84,8 +72,6 @@ async fn knock_target(
     let default_target = ffx.target().await?;
     let (target_proxy, target_remote) =
         create_proxy::<TargetMarker>().map_err(|e| KnockError::NonCriticalError(e.into()))?;
-    let (rcs_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()
-        .map_err(|e| KnockError::NonCriticalError(e.into()))?;
     // If you are reading this plugin for example code, this is an example of what you
     // should generally not be doing to connect to a daemon protocol. This is maintained
     // by the FFX team directly.
@@ -103,23 +89,7 @@ async fn knock_target(
         .map_err(|e| {
             KnockError::CriticalError(errors::ffx_error!("Error opening target: {:?}", e).into())
         })?;
-
-    timeout(RCS_TIMEOUT, target_proxy.open_remote_control(remote_server_end))
-        .await
-        .context("timing out")?
-        .context("opening remote_control")?
-        .map_err(|e| anyhow!("open remote control err: {:?}", e))?;
-    rcs::knock_rcs(&rcs_proxy).await.map_err(|e| {
-        KnockError::NonCriticalError(
-            FfxError::TargetConnectionError {
-                err: e,
-                target: default_target.clone(),
-                is_default_target: default_target.is_some(),
-                logs: None,
-            }
-            .into(),
-        )
-    })
+    ffx_target::knock_target(&target_proxy).await
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@ use ffx_daemon::DaemonConfig;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
+use fidl_fuchsia_developer_ffx::TargetProxy;
 use fuchsia_zircon_types as zx_types;
 use std::path::PathBuf;
 use std::sync::{Arc, Weak};
@@ -30,8 +31,7 @@ pub struct FfxConfigEntry {
 pub struct EnvContext {
     lib_ctx: Weak<LibContext>,
     injector: Box<dyn Injector + Send + Sync>,
-    #[allow(unused)]
-    context: EnvironmentContext,
+    pub(crate) context: EnvironmentContext,
 }
 
 impl EnvContext {
@@ -107,6 +107,10 @@ impl EnvContext {
         let res = hdl.raw_handle();
         std::mem::forget(hdl);
         Ok(res)
+    }
+
+    pub async fn target_proxy_factory(&self) -> Result<TargetProxy> {
+        self.injector.target_factory().await
     }
 
     pub async fn connect_remote_control_proxy(&self) -> Result<zx_types::zx_handle_t> {

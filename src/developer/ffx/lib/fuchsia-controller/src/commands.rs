@@ -6,6 +6,7 @@ use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use crate::waker::handle_notifier_waker;
+use ffx_target::{knock_target, KnockError};
 use fidl::{
     AsHandleRef, HandleBased, HandleDisposition, HandleOp, ObjectType, Peered, Rights, Status,
 };
@@ -19,6 +20,8 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
 use std::task::{Context, Poll};
+use std::time::Duration;
+use timeout::timeout;
 
 type Responder<T> = mpsc::SyncSender<T>;
 type CmdResult<T> = Result<T, zx_status::Status>;
@@ -119,6 +122,11 @@ pub(crate) enum LibraryCommand {
     SocketWrite {
         socket: fidl::Socket,
         buf: ExtBuffer<u8>,
+        responder: Responder<zx_status::Status>,
+    },
+    TargetWait {
+        env: Arc<EnvContext>,
+        timeout: f64,
         responder: Responder<zx_status::Status>,
     },
 }
@@ -423,6 +431,55 @@ impl LibraryCommand {
                     Err(e) => e,
                 };
                 responder.send(status).unwrap();
+            }
+            Self::TargetWait { env, timeout: timeout_float, responder } => {
+                let target = match env.target_proxy_factory().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        env.write_err(e);
+                        responder.send(zx_status::Status::INTERNAL).unwrap();
+                        return;
+                    }
+                };
+                let default_target = match ffx_target::resolve_default_target(&env.context).await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        env.write_err(e);
+                        responder.send(zx_status::Status::INTERNAL).unwrap();
+                        return;
+                    }
+                };
+                let knock_fut = async {
+                    loop {
+                        break match knock_target(&target).await {
+                            Ok(()) => Ok(()),
+                            Err(KnockError::NonCriticalError(_)) => continue,
+                            Err(KnockError::CriticalError(e)) => Err(e),
+                        };
+                    }
+                };
+                let err = match timeout(Duration::from_secs_f64(timeout_float), knock_fut).await {
+                    Ok(res) => match res {
+                        Ok(()) => {
+                            responder.send(zx_status::Status::OK).unwrap();
+                            return;
+                        }
+                        Err(e) => e,
+                    },
+                    Err(e) => {
+                        anyhow::anyhow!(
+                            "timeout attempting to knock target {} {}: {:?}",
+                            default_target
+                                .as_ref()
+                                .map(ToString::to_string)
+                                .unwrap_or("unspecified".to_owned()),
+                            if default_target.is_none() { "(default)" } else { "" },
+                            e
+                        )
+                    }
+                };
+                env.write_err(err);
+                responder.send(zx_status::Status::INTERNAL).unwrap();
             }
         }
     }

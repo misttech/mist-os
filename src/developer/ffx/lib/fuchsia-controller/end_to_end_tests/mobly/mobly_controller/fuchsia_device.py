@@ -111,28 +111,10 @@ class FuchsiaDevice(object):
             TimeoutError: in the event that the timeout has been reached before the target device
             is considered online.
         """
-        start_time = time.time()
-        end_time = start_time + timeout
-        while time.time() < end_time:
-            try:
-                logging.debug(
-                    f"Attempting to get proxy info from {self.config['name']}"
-                )
-                target = ffx.Target.Client(self.ctx.connect_target_proxy())
-                info = await target.identity()
-                if info.target_info.rcs_state == ffx.RemoteControlState.UP:
-                    logging.debug(
-                        f"Determining target {self.config['name']} online due to state"
-                    )
-                    break
-            except RuntimeError:
-                logging.debug(f"Failed to get info from {self.config['name']}")
-                pass
-            await asyncio.sleep(TIMEOUTS["SLEEP"])
-        else:
-            raise TimeoutError(
-                f"'{self.config['name']}' failed to go offline in {timeout}s."
-            )
+        try:
+            self.ctx.target_wait(timeout)
+        except ZxStatus:
+            raise TimeoutError()
 
 
 def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
