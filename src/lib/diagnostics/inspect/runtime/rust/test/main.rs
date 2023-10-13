@@ -32,7 +32,7 @@ async fn main() {
     });
     if args().nth(1) == Some("--use-diagnostics-dir".to_string()) {
         let mut fs = ServiceFs::new();
-        inspect_runtime::serve(component::inspector(), &mut fs).unwrap();
+        inspect_runtime::deprecated::serve(component::inspector(), &mut fs).unwrap();
         fs.take_and_serve_directory_handle().unwrap();
 
         fs.collect::<()>().await;

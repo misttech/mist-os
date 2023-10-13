@@ -514,7 +514,7 @@ mod tests {
             }
             .boxed()
         });
-        inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspector");
+        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
 
         // Create a connection to the ServiceFs.
         let (h0, h1) = fidl::endpoints::create_endpoints();
@@ -616,7 +616,7 @@ mod tests {
         // One is an inspect file, and one is not.
         let mut fs = ServiceFs::new();
         let inspector = inspector_for_reader_test();
-        inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspector");
+        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
 
         // Create a connection to the ServiceFs.
         let (h0, h1) = fidl::endpoints::create_endpoints();

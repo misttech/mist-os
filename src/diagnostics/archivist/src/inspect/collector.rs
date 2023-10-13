@@ -335,7 +335,7 @@ mod tests {
             }
             .boxed()
         });
-        inspect_runtime::serve(&inspector, &mut fs).expect("failed to serve inspector");
+        inspect_runtime::deprecated::serve(&inspector, &mut fs).expect("failed to serve inspector");
 
         // Create a connection to the ServiceFs.
         let (h0, h1) = fidl::endpoints::create_endpoints();

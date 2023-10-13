@@ -16,7 +16,7 @@ async fn main() -> Result<(), Error> {
     component::health().set_ok();
 
     let mut fs = ServiceFs::new();
-    inspect_runtime::serve(&inspector, &mut fs)?;
+    inspect_runtime::deprecated::serve(&inspector, &mut fs)?;
     fs.take_and_serve_directory_handle()?;
     Ok(fs.collect().await)
 }
