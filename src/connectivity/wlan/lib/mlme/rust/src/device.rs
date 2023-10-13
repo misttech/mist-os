@@ -351,9 +351,9 @@ pub struct WlanSoftmacIfcProtocolOps {
         packet: *const WlanTxPacket,
         status: i32,
     ),
-    report_tx_status: extern "C" fn(
+    report_tx_result: extern "C" fn(
         ctx: &mut crate::DriverEventSink,
-        tx_status: *const banjo_common::WlanTxResult,
+        tx_result: *const banjo_common::WlanTxResult,
     ),
     scan_complete: extern "C" fn(ctx: &mut crate::DriverEventSink, status: i32, scan_id: u64),
 }
@@ -376,7 +376,7 @@ extern "C" fn handle_complete_tx(
     // TODO(fxbug.dev/85924): Implement this to support asynchronous packet delivery.
 }
 #[no_mangle]
-extern "C" fn handle_report_tx_status(
+extern "C" fn handle_report_tx_result(
     ctx: &mut crate::DriverEventSink,
     tx_result_in: *const banjo_common::WlanTxResult,
 ) {
@@ -397,7 +397,7 @@ extern "C" fn handle_scan_complete(ctx: &mut crate::DriverEventSink, status: i32
 const PROTOCOL_OPS: WlanSoftmacIfcProtocolOps = WlanSoftmacIfcProtocolOps {
     recv: handle_recv,
     complete_tx: handle_complete_tx,
-    report_tx_status: handle_report_tx_status,
+    report_tx_result: handle_report_tx_result,
     scan_complete: handle_scan_complete,
 };
 
