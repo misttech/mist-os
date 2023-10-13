@@ -99,7 +99,7 @@
             {{/if}}
 
             {{#if (eq device.cpu.architecture "riscv64")}}
-                "rv64",
+                "rv64,svpbmt=true,v=true,vext_spec=v1.0",
             {{/if}}
         {{else}} {{! acceleration == "hyper" }}
             {{#if (eq host.os "linux")}}

@@ -232,7 +232,7 @@ func (q *QEMUCommandBuilder) SetTarget(target Target, kvm bool) {
 		if kvm {
 			q.recordError(fmt.Errorf("KVM is not supported for RISC-V 64 bit yet"))
 		} else {
-			q.SetFlag("-cpu", "rv64")
+			q.SetFlag("-cpu", "rv64,svpbmt=true,v=true,vext_spec=v1.0")
 			q.SetFlag("-machine", "virt")
 			q.SetFlag("-accel", "tcg,thread=multi")
 		}

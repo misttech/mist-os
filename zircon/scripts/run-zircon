@@ -553,7 +553,7 @@ case $ARCH in
         ;;
     riscv64)
         QEMU=${QEMUDIR}qemu-system-riscv64
-        ARGS+=" -cpu rv64"
+        ARGS+=" -cpu rv64,svpbmt=true,v=true,vext_spec=v1.0"
         ARGS+=" -machine virt"
         ARGS+=" -object rng-random,filename=/dev/urandom,id=rng0"
         ARGS+=" -device virtio-rng-device,rng=rng0"
