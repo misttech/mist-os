@@ -413,13 +413,15 @@ struct ActiveTransaction {
     request_type: RequestType,
     /// The state associated with the transaction. Not read, exists to be dropped along with the
     /// [`ActiveTransaction`] object.
-    _state: TransactionState,
+    state: ReleaseGuard<TransactionState>,
 }
 
 impl Releasable for ActiveTransaction {
     type Context<'a> = ();
 
-    fn release(self, _: ()) {}
+    fn release(self, context: ()) {
+        self.state.release(context);
+    }
 }
 
 /// State held for the duration of a transaction. When a transaction completes (or fails), this
@@ -443,12 +445,13 @@ struct TransactionState {
     owned_fds: Vec<FdNumber>,
 }
 
-impl Drop for TransactionState {
-    fn drop(&mut self) {
-        log_trace!("Dropping binder TransactionState");
+impl Releasable for TransactionState {
+    type Context<'a> = ();
+    fn release(self, _: ()) {
+        log_trace!("Releasing binder TransactionState");
         let mut drop_actions = RefCountActions::default();
         // Release the owned objects unconditionally.
-        for guard in std::mem::take(&mut self.guards) {
+        for guard in self.guards {
             guard.release(&mut drop_actions);
         }
         if let Some(proc) = self.proc.upgrade() {
@@ -497,7 +500,7 @@ impl Drop for TransactionState {
 /// can be converted into a [`TransactionState`] to be held for the lifetime of the transaction.
 struct TransientTransactionState<'a> {
     /// The part of the transient state that will live for the lifetime of the transaction.
-    state: Option<TransactionState>,
+    state: Option<ReleaseGuard<TransactionState>>,
     /// The task to which the transient file descriptors belong.
     accessor: &'a dyn ResourceAccessor,
     /// The file descriptors to close in case of an error.
@@ -506,10 +509,11 @@ struct TransientTransactionState<'a> {
 
 impl<'a> Releasable for TransientTransactionState<'a> {
     type Context<'b> = ();
-    fn release(self, _: ()) {
+    fn release(self, context: ()) {
         for fd in &self.transient_fds {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
+        self.state.release(context);
     }
 }
 
@@ -528,15 +532,18 @@ impl<'a> TransientTransactionState<'a> {
     /// `target_proc` for FDs and binder handles respectively.
     fn new(accessor: &'a dyn ResourceAccessor, target_proc: &BinderProcess) -> ReleaseGuard<Self> {
         TransientTransactionState {
-            state: Some(TransactionState {
-                kernel: accessor.kernel().clone(),
-                proc: target_proc.weak_self.clone(),
-                pid: target_proc.pid,
-                remote_resource_accessor: target_proc.remote_resource_accessor.clone(),
-                guards: vec![],
-                handles: vec![],
-                owned_fds: vec![],
-            }),
+            state: Some(
+                TransactionState {
+                    kernel: accessor.kernel().clone(),
+                    proc: target_proc.weak_self.clone(),
+                    pid: target_proc.pid,
+                    remote_resource_accessor: target_proc.remote_resource_accessor.clone(),
+                    guards: vec![],
+                    handles: vec![],
+                    owned_fds: vec![],
+                }
+                .into(),
+            ),
             accessor,
             transient_fds: vec![],
         }
@@ -567,12 +574,12 @@ impl<'a> TransientTransactionState<'a> {
     }
 }
 
-impl<'a> From<ReleaseGuard<TransientTransactionState<'a>>> for TransactionState {
-    fn from(mut transient: ReleaseGuard<TransientTransactionState<'a>>) -> Self {
+impl<'a> ReleaseGuard<TransientTransactionState<'a>> {
+    fn into_state(mut self, context: ()) -> ReleaseGuard<TransactionState> {
         // Clear the transient FD list, so that these FDs no longer get closed.
-        transient.transient_fds.clear();
-        let result = transient.state.take().unwrap();
-        transient.release(());
+        self.transient_fds.clear();
+        let result = self.state.take().unwrap();
+        self.release(context);
         result
     }
 }
@@ -993,7 +1000,7 @@ impl<'a> BinderProcessGuard<'a> {
 impl Releasable for BinderProcess {
     type Context<'a> = ();
 
-    fn release(self, _: ()) {
+    fn release(self, context: ()) {
         log_trace!("Releasing BinderProcess id={}", self.identifier);
         let state = self.state.into_inner();
         // Notify any subscribers that the objects this process owned are now dead.
@@ -1016,10 +1023,10 @@ impl Releasable for BinderProcess {
         }
 
         for transaction in state.active_transactions.into_values() {
-            transaction.release(())
+            transaction.release(context)
         }
 
-        state.handles.release(());
+        state.handles.release(context);
     }
 }
 
@@ -3185,7 +3192,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::Oneway { object: object.clone() },
-                                _state: transaction_state.into(),
+                                state: transaction_state.into_state(()),
                             }
                             .into(),
                         );
@@ -3228,7 +3235,7 @@ impl BinderDriver {
                             buffers.data.address,
                             ActiveTransaction {
                                 request_type: RequestType::RequestResponse,
-                                _state: transaction_state.into(),
+                                state: transaction_state.into_state(()),
                             }
                             .into(),
                         );
@@ -3284,7 +3291,7 @@ impl BinderDriver {
             buffers.data.address,
             ActiveTransaction {
                 request_type: RequestType::RequestResponse,
-                _state: transaction_state.into(),
+                state: transaction_state.into_state(()),
             }
             .into(),
         );
@@ -6856,7 +6863,7 @@ pub mod tests {
             .expect("failed to translate handles");
 
         // Simulate success by converting the transient state.
-        let _transaction_state: TransactionState = transient_transaction_state.into();
+        let transaction_state = transient_transaction_state.into_state(());
 
         // The receiver should now have a file.
         let receiver_fd =
@@ -6885,6 +6892,7 @@ pub mod tests {
         });
 
         assert_eq!(expected_transaction_data, transaction_data);
+        transaction_state.release(());
     }
 
     #[fuchsia::test]
@@ -6992,8 +7000,8 @@ pub mod tests {
         sender.thread.lock().command_queue.commands.pop_front().unwrap();
 
         // Simulate a successful transaction by converting the transient state.
-        let transaction_state: TransactionState = transaction_state.into();
-        std::mem::drop(transaction_state);
+        let transaction_state = transaction_state.into_state(());
+        transaction_state.release(());
 
         // Verify that a strong release command is sent to the sender process.
         assert_matches!(
