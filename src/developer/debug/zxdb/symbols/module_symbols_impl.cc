@@ -700,12 +700,12 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
                                                         int line_number,
                                                         const ResolveOptions& options,
                                                         std::vector<Location>* output) const {
-  const std::vector<unsigned>* units = index_.FindFileUnitIndices(canonical_file);
+  const std::vector<size_t>* units = index_.FindFileUnitIndices(canonical_file);
   if (!units)
     return;
 
   std::vector<LineMatch> matches;
-  for (unsigned index : *units) {
+  for (size_t index : *units) {
     fxl::RefPtr<DwarfUnit> unit = binary_->GetUnitAtIndex(index);
     const LineTable& line_table = unit->GetLineTable();
 

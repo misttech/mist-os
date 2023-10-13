@@ -26,6 +26,7 @@ class DWARFFormValue;
 namespace zxdb {
 
 class ConstValue;
+class DwarfBinary;
 
 // Decodes the desired attributes of a given DWARF Debug Info Entry ("DIE").
 //
@@ -55,8 +56,9 @@ class DwarfDieDecoder {
     uint64_t value = 0;
   };
 
-  // The context and unit must outlive this class.
+  // The context/binary must outlive this class. Prefer the DwarfBinary version when possible.
   explicit DwarfDieDecoder(llvm::DWARFContext* context);
+  explicit DwarfDieDecoder(DwarfBinary& binary);
   ~DwarfDieDecoder();
 
   // Adds a check for the given attribute. If the attribute is encountered, the given boolean will

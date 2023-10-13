@@ -47,13 +47,6 @@ class DwarfBinary {
   virtual llvm::object::ObjectFile* GetLLVMObjectFile() = 0;
   virtual llvm::DWARFContext* GetLLVMContext() = 0;
 
-  // Creates a new LLVM context, separate from the cached one returned by GetLLVMContext().
-  // This allows early destruction of the context for indexing to clear all of the cached
-  // structures.
-  //
-  // Danger: the DwarfBinary must outlive the returned pointer.
-  virtual std::unique_ptr<llvm::DWARFContext> CreateNewLLVMContext() = 0;
-
   // Returns the extent of the mapped segments in memory.
   virtual uint64_t GetMappedLength() const = 0;
 
@@ -83,6 +76,9 @@ class DwarfBinary {
   // The index is the address index within that compilation unit's table. This is an index into the
   // table (of address-sized entries) rather than a byte index.
   virtual std::optional<uint64_t> GetDebugAddrEntry(uint64_t addr_base, uint64_t index) const = 0;
+
+  // Looks up a DIE by offset. This DIE can be in any unit.
+  virtual llvm::DWARFDie GetLLVMDieAtOffset(uint64_t offset) const = 0;
 };
 
 }  // namespace zxdb

@@ -10,6 +10,7 @@
 #include "llvm/DebugInfo/DWARF/DWARFFormValue.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
 #include "src/developer/debug/zxdb/symbols/const_value.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_binary.h"
 
 namespace zxdb {
 
@@ -22,6 +23,8 @@ constexpr int kMaxAbstractOriginRefsToFollow = 8;
 }  // namespace
 
 DwarfDieDecoder::DwarfDieDecoder(llvm::DWARFContext* context) : context_(context) {}
+
+DwarfDieDecoder::DwarfDieDecoder(DwarfBinary& binary) : context_(binary.GetLLVMContext()) {}
 
 DwarfDieDecoder::~DwarfDieDecoder() = default;
 

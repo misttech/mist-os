@@ -212,21 +212,19 @@ Err DwarfBinaryImpl::Load() {
   binary_buffer_ = std::move(binary_pair.second);
   binary_ = std::move(binary_pair.first);
 
-  context_ = CreateNewLLVMContext();
+  // Overwrite the default Error handler object, but leave everything else default.
+  context_ = llvm::DWARFContext::create(*GetLLVMObjectFile(),
+                                        llvm::DWARFContext::ProcessDebugRelocations::Process,
+                                        nullptr, "", &LLVMErrorHandler);
 
   return Err();
 }
 
-llvm::object::ObjectFile* DwarfBinaryImpl::GetLLVMObjectFile() { return object_file(); }
-
-llvm::DWARFContext* DwarfBinaryImpl::GetLLVMContext() { return context(); }
-
-std::unique_ptr<llvm::DWARFContext> DwarfBinaryImpl::CreateNewLLVMContext() {
-  // Overwrite the default Error handler object, but leave everything else default.
-  return llvm::DWARFContext::create(*object_file(),
-                                    llvm::DWARFContext::ProcessDebugRelocations::Process, nullptr,
-                                    "", &LLVMErrorHandler);
+llvm::object::ObjectFile* DwarfBinaryImpl::GetLLVMObjectFile() {
+  return static_cast<llvm::object::ObjectFile*>(binary_.get());
 }
+
+llvm::DWARFContext* DwarfBinaryImpl::GetLLVMContext() { return context_.get(); }
 
 uint64_t DwarfBinaryImpl::GetMappedLength() const { return mapped_length_; }
 
@@ -289,6 +287,10 @@ std::optional<uint64_t> DwarfBinaryImpl::GetDebugAddrEntry(uint64_t addr_base,
   uint64_t result;
   memcpy(&result, string_ref.bytes_begin() + offset, kTargetPointerSize);
   return result;
+}
+
+llvm::DWARFDie DwarfBinaryImpl::GetLLVMDieAtOffset(uint64_t offset) const {
+  return context_->getDIEForOffset(offset);
 }
 
 }  // namespace zxdb

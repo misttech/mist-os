@@ -16,6 +16,8 @@ namespace zxdb {
 DwarfUnitImpl::DwarfUnitImpl(DwarfBinaryImpl* binary, llvm::DWARFUnit* unit)
     : binary_(binary->GetWeakPtr()), unit_(unit) {}
 
+DwarfBinary* DwarfUnitImpl::GetBinary() const { return binary_.get(); }
+
 llvm::DWARFUnit* DwarfUnitImpl::GetLLVMUnit() const { return unit_; }
 
 uint64_t DwarfUnitImpl::FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const {
@@ -59,7 +61,7 @@ const LineTable& DwarfUnitImpl::GetLineTable() const {
 const llvm::DWARFDebugLine::LineTable* DwarfUnitImpl::GetLLVMLineTable() const {
   if (!binary_)
     return nullptr;
-  return binary_->context()->getLineTableForUnit(unit_);
+  return binary_->GetLLVMContext()->getLineTableForUnit(unit_);
 }
 
 uint64_t DwarfUnitImpl::GetDieCount() const { return unit_->getNumDIEs(); }

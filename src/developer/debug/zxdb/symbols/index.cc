@@ -157,8 +157,8 @@ size_t RecursiveCountDies(const IndexNode& node) {
 class UnitIndexer {
  public:
   // All passed-in objects must outlive this class.
-  explicit UnitIndexer(llvm::DWARFContext* context, const DwarfUnit& unit)
-      : context_(context), unit_(unit), scanner_(unit), name_decoder_(context) {
+  explicit UnitIndexer(const DwarfUnit& unit)
+      : unit_(unit), scanner_(unit), name_decoder_(*unit.GetBinary()) {
     // The indexable array is 1:1 with the scanner entries.
     indexable_.resize(scanner_.die_count());
 
@@ -216,7 +216,6 @@ class UnitIndexer {
   // required to stay in the index fast path.
   bool GetAbstractOriginIndex(uint32_t source, uint32_t* abstract_origin_index) const;
 
-  llvm::DWARFContext* context_;
   const DwarfUnit& unit_;
 
   bool force_slow_path_ = false;  // See setter above.
@@ -236,7 +235,7 @@ class UnitIndexer {
 
 // The symbol storage will be filled with the indexable entries.
 void UnitIndexer::Scan(std::vector<IndexNode::SymbolRef>* main_functions) {
-  DwarfDieDecoder decoder(context_);
+  DwarfDieDecoder decoder(*unit_.GetBinary());
 
   // The offset of the declaration. This can be unit-relative or .debug_info-relative (global).
   llvm::DWARFDie decl_die;
@@ -321,7 +320,7 @@ void UnitIndexer::Scan(std::vector<IndexNode::SymbolRef>* main_functions) {
       // should be relatively quick and there should still be an overall speedup when using
       // -gsimple-template-names due to the drastically reduced symbol size.
       llvm::DWARFDie type_die;
-      DwarfDieDecoder type_decoder(context_);
+      DwarfDieDecoder type_decoder(*unit_.GetBinary());
       type_decoder.AddReference(llvm::dwarf::DW_AT_type, &type_die);
 
       if (!type_decoder.Decode(llvm::DWARFDie(unit_.GetLLVMUnit(), die))) {
@@ -530,7 +529,7 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
   llvm::DWARFDie die;
   if (named_ref.decl_offset()) {
     // When there's a separate declaration, its parent encodes the scope information.
-    die = context_->getDIEForOffset(named_ref.decl_offset());
+    die = unit_.GetBinary()->GetLLVMDieAtOffset(named_ref.decl_offset());
     if (!die)
       return;  // Invalid decl offset, skip indexing.
     if (name.empty()) {
@@ -542,7 +541,7 @@ void UnitIndexer::AddStandaloneEntryToIndex(uint32_t index_me, IndexNode* index_
   } else {
     // When there's no declaration, the name will already have been filled in (if present) to the
     // named_ref.
-    die = context_->getDIEForOffset(named_ref.offset());
+    die = unit_.GetBinary()->GetLLVMDieAtOffset(named_ref.offset());
   }
 
   if (name.empty())
@@ -626,19 +625,10 @@ void RecursiveFindExact(const IndexNode* node, const Identifier& input, size_t i
 }  // namespace
 
 void Index::CreateIndex(DwarfBinary& binary, bool force_slow_path) {
-  // Create a new context which we can discard at the end of indexing. The context accumulates a
-  // lot of cached data that we don't usually need.
-  //
-  // TODO This is a bit confusing because the DwarfUnit object will use the DwarfBinary's context
-  // for some operations, and we'll use this context for some others. We should remove this
-  // duplicate context to avoid this, and then the Context parameters to the other functions in this
-  // file can also be cleaned up.
-  std::unique_ptr<llvm::DWARFContext> context = binary.CreateNewLLVMContext();
-
   size_t unit_count = binary.GetUnitCount();
   for (size_t i = 0; i < unit_count; i++) {
     if (auto unit_ref_ptr = binary.GetUnitAtIndex(i))
-      IndexCompileUnit(context.get(), *unit_ref_ptr, i, force_slow_path);
+      IndexCompileUnit(*unit_ref_ptr, i, force_slow_path);
   }
 
   IndexFileNames();
@@ -685,7 +675,7 @@ std::vector<std::string> Index::FindFilePrefixes(const std::string& prefix) cons
   return result;
 }
 
-const std::vector<unsigned>* Index::FindFileUnitIndices(const std::string& name) const {
+const std::vector<size_t>* Index::FindFileUnitIndices(const std::string& name) const {
   auto found = files_.find(name);
   if (found == files_.end())
     return nullptr;
@@ -694,21 +684,19 @@ const std::vector<unsigned>* Index::FindFileUnitIndices(const std::string& name)
 
 size_t Index::CountSymbolsIndexed() const { return RecursiveCountDies(root_); }
 
-void Index::IndexCompileUnit(llvm::DWARFContext* context, const DwarfUnit& unit,
-                             unsigned unit_index, bool force_slow_path) {
-  UnitIndexer indexer(context, unit);
+void Index::IndexCompileUnit(const DwarfUnit& unit, size_t unit_index, bool force_slow_path) {
+  UnitIndexer indexer(unit);
   indexer.set_force_slow_path(force_slow_path);
 
   indexer.Scan(&main_functions_);
   indexer.Index(&root_);
 
-  IndexCompileUnitSourceFiles(context, unit, unit_index);
+  IndexCompileUnitSourceFiles(unit, unit_index);
 }
 
 // TODO: It might be nice if the DwarfUnit knew its own undex so it didn't need to be passed in
 // separately.
-void Index::IndexCompileUnitSourceFiles(llvm::DWARFContext* context, const DwarfUnit& unit,
-                                        unsigned unit_index) {
+void Index::IndexCompileUnitSourceFiles(const DwarfUnit& unit, size_t unit_index) {
   const llvm::DWARFDebugLine::LineTable* line_table = unit.GetLLVMLineTable();
   if (!line_table)
     return;  // No line table for this unit.

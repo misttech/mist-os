@@ -26,6 +26,7 @@ class DwarfUnitImpl : public DwarfUnit {
   llvm::DWARFUnit* unit() const { return binary_ ? unit_ : nullptr; }
 
   // DwarfUnit implementation.
+  DwarfBinary* GetBinary() const override;
   llvm::DWARFUnit* GetLLVMUnit() const override;
   uint64_t GetOffset() const override;
   uint64_t FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const override;

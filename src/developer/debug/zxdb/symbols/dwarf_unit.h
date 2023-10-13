@@ -19,6 +19,7 @@ class DWARFDie;
 
 namespace zxdb {
 
+class DwarfBinary;
 class LineTable;
 
 // Represents a DWARF unit in the binary file. The primary purpose of this class is to allow
@@ -38,6 +39,10 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   // Creates a weak pointer to this class. The units can get removed when modules or process are
   // unloaded so if you need to keep a pointer, either keep a weak ptr or an owning refptr.
   fxl::WeakPtr<DwarfUnit> GetWeakPtr() const { return weak_factory_.GetWeakPtr(); }
+
+  // Returns the binary this unit is a member of. May return null if the binary has been destroyed
+  // out from under the reference-counted unit pointer.
+  virtual DwarfBinary* GetBinary() const = 0;
 
   // Returns the LLVM unit for this object. Ideally this would be removed but it is necessary since
   // we expose a number of LLVM DIE helpers.
@@ -80,6 +85,10 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   virtual uint64_t GetDieCount() const = 0;
 
   // Looks up a DIE in this unit by index or byte offset.
+  //
+  // The byte offset is the absolute offset within the entire binary, but it must be a member of
+  // this unit (LLVM does a binary search in the unit's DIE array for the DIE with the given
+  // offset). See DwarfBinary::GetLLVMDieAtOffset() to query across units.
   virtual llvm::DWARFDie GetLLVMDieAtIndex(uint64_t index) const = 0;
   virtual llvm::DWARFDie GetLLVMDieAtOffset(uint64_t offset) const = 0;
 

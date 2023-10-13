@@ -17,7 +17,6 @@
 namespace llvm {
 
 class DWARFCompileUnit;
-class DWARFContext;
 class DWARFDie;
 
 namespace object {
@@ -70,9 +69,9 @@ class Index {
   // Looks up the given exact file path and returns all compile units it appears in. The file must
   // be an exact match (normally it's one of the results from FindFileMatches).
   //
-  // The contents of the vector are indices into the compilation unit array. (see
-  // llvm::DWARFContext::getCompileUnitAtIndex).
-  const std::vector<unsigned>* FindFileUnitIndices(const std::string& name) const;
+  // The contents of the vector are indices into the compilation unit array (see
+  // DwarfUnit::GetUnitAtIndex()).
+  const std::vector<size_t>* FindFileUnitIndices(const std::string& name) const;
 
   // See main_functions_ below.
   const std::vector<IndexNode::SymbolRef>& main_functions() const { return main_functions_; }
@@ -87,11 +86,8 @@ class Index {
   size_t CountSymbolsIndexed() const;
 
  private:
-  void IndexCompileUnit(llvm::DWARFContext* context, const DwarfUnit& unit, unsigned unit_index,
-                        bool force_slow_path);
-
-  void IndexCompileUnitSourceFiles(llvm::DWARFContext* context, const DwarfUnit& unit,
-                                   unsigned unit_index);
+  void IndexCompileUnit(const DwarfUnit& unit, size_t unit_index, bool force_slow_path);
+  void IndexCompileUnitSourceFiles(const DwarfUnit& unit, size_t unit_index);
 
   // Populates the file_name_index_ given a now-unchanging files_ map.
   void IndexFileNames();
@@ -102,14 +98,13 @@ class Index {
   // Maps full path names to compile units that reference them. This must not be mutated once the
   // file_name_index_ is built.
   //
-  // The contents of the vector are indices into the compilation unit array. (see
-  // llvm::DWARFContext::getCompileUnitAtIndex). These are "unsigned" type because that's what LLVM
-  // uses for these indices.
+  // The contents of the vector are indices into the compilation unit array (see
+  // DwarfBinary::GetUnitAtIndex()).
   //
   // This is a map, not a multimap, because some files will appear in many compilation units. I
   // suspect it's better to avoid duplicating the names (like a multimap would) and eating the cost
   // of indirect heap allocations for vectors in the single-item case.
-  using FileIndex = std::map<std::string, std::vector<unsigned>>;
+  using FileIndex = std::map<std::string, std::vector<size_t>>;
   FileIndex files_;
 
   // Maps the last file name component (the part following the last slash) to the set of entries in
