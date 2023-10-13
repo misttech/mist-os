@@ -2,7 +2,7 @@
   "name": "download",
   "description": "Retrieve image data.",
   "examples": [
-    "Auth flow choices for --auth include:\n  `--auth no-auth` do not use auth.\n  `--auth oob` to use Out-of-Band auth (deprecated).\n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\n  `--auth device-experimental` to use device flow.\n  `--auth <path/to/exe>` run tool at given path which will print an access token to stdout and exit 0.\n    \n  `--auth default` let the tool decide which auth flow to use.\n\nLegacy mode is used to download legacy, PBv1 product bundles:\n   ffx product download --legacy-release 11 core.x64"
+    "Auth flow choices for --auth include:\n  `--auth no-auth` do not use auth.\n  `--auth oob` to use Out-of-Band auth (deprecated).\n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\n  `--auth device-experimental` to use device flow.\n  `--auth <path/to/exe>` run tool at given path which will print an access token to stdout and exit 0.\n    \n  `--auth default` let the tool decide which auth flow to use."
   ],
   "flags": [
     {
@@ -32,18 +32,6 @@
       "short": null,
       "description": "use specific auth flow for oauth2 (see examples; default: pkce).",
       "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "legacy-release"
-        }
-      },
-      "optionality": "optional",
-      "long": "--legacy-release",
-      "short": null,
-      "description": "legacy release version to get. This is the \"F\" release number, and gets the latest version of the product bundle for that version. Required when using the use-legacy flag. This value can be the integer part, \"11\", which results in latest F11 build, or a full version number such as \"11.20230306.3.112\"",
-      "hidden": false
     }
   ],
   "notes": [],
@@ -51,14 +39,14 @@
   "positionals": [
     {
       "name": "manifest_url",
-      "description": "url to the transfer manifest of the product bundle to download. If using legacy mode, this is the product name.",
+      "description": "url to the transfer manifest of the product bundle to download.",
       "optionality": "required",
       "hidden": false
     },
     {
       "name": "product_dir",
-      "description": "local name of the product bundle directory. If downloading a legacy product bundle, this argument is not used. The PBv1 product bundles are stored in the internal product bundle index.",
-      "optionality": "optional",
+      "description": "local name of the product bundle directory.",
+      "optionality": "required",
       "hidden": false
     }
   ],

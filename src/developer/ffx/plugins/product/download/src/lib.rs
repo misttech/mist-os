@@ -7,12 +7,12 @@
 //! - acquire related data files, such as disk partition images (data)
 
 use ::gcs::client::{Client, ProgressResponse, ProgressState};
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
 use async_fs::rename;
 use errors::ffx_bail;
 use ffx_core::ffx_plugin;
 use ffx_product_download_args::DownloadCommand;
-use pbms::{make_way_for_output, pbv1_get::download, transfer_download, AuthFlowChoice};
+use pbms::{make_way_for_output, transfer_download, AuthFlowChoice};
 use std::{
     io::{stderr, stdin, stdout},
     path::Path,
@@ -26,18 +26,9 @@ pub async fn pb_download(cmd: DownloadCommand) -> Result<()> {
     let mut input = stdin();
     let mut output = stdout();
     let mut err_out = stderr();
-    let mut ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
-    if let Some(version) = cmd.legacy_release {
-        let sdk = ffx_config::global_env_context().expect("global context").get_sdk().await?;
-        download(&sdk, &cmd.auth, version, &cmd.manifest_url, &client, &mut ui).await
-    } else {
-        if let Some(product_dir) = cmd.product_dir {
-            pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &product_dir, &client, &ui)
-                .await
-        } else {
-            bail!("Required positional argument 'product_dir' not provided")
-        }
-    }
+    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut err_out);
+
+    pb_download_impl(&cmd.auth, cmd.force, &cmd.manifest_url, &cmd.product_dir, &client, &ui).await
 }
 
 pub async fn pb_download_impl<I: structured_ui::Interface + Sync>(

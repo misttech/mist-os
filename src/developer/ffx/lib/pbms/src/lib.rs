@@ -53,7 +53,6 @@ pub use sdk_metadata::{LoadedProductBundle, ProductBundle};
 
 mod gcs;
 mod pbms;
-pub mod pbv1_get;
 mod repo;
 mod repo_info;
 pub mod transfer_manifest;

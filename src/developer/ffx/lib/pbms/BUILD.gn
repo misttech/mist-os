@@ -55,7 +55,6 @@ if (is_host) {
       "src/gcs.rs",
       "src/lib.rs",
       "src/pbms.rs",
-      "src/pbv1_get.rs",
       "src/repo.rs",
       "src/repo_info.rs",
       "src/transfer_manifest.rs",
