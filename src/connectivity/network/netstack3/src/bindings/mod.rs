@@ -17,6 +17,7 @@ mod filter_worker;
 mod inspect;
 mod interfaces_admin;
 mod interfaces_watcher;
+mod name_worker;
 mod neighbor_worker;
 mod netdevice_worker;
 mod root_fidl_worker;
@@ -1006,6 +1007,7 @@ impl Netstack {
 }
 
 pub(crate) enum Service {
+    DnsServerWatcher(fidl_fuchsia_net_name::DnsServerWatcherRequestStream),
     DebugDiagnostics(fidl::endpoints::ServerEnd<fidl_fuchsia_net_debug::DiagnosticsMarker>),
     DebugInterfaces(fidl_fuchsia_net_debug::InterfacesRequestStream),
     Filter(fidl_fuchsia_net_filter::FilterRequestStream),
@@ -1315,6 +1317,9 @@ impl NetstackSeed {
                         }
                         Service::DebugDiagnostics(debug_diagnostics) => {
                             diagnostics_handler.serve_diagnostics(debug_diagnostics).await
+                        }
+                        Service::DnsServerWatcher(dns) => {
+                            dns.serve_with(|rs| name_worker::serve(netstack.clone(), rs)).await
                         }
                         Service::Filter(filter) => {
                             filter.serve_with(|rs| filter_worker::serve(rs)).await

@@ -55,6 +55,7 @@ pub fn main() {
         .add_proxy_service::<fidl_fuchsia_net_dhcp::ClientProviderMarker, _>()
         .add_service_connector(Service::DebugDiagnostics)
         .add_fidl_service(Service::DebugInterfaces)
+        .add_fidl_service(Service::DnsServerWatcher)
         .add_fidl_service(Service::Stack)
         .add_fidl_service(Service::Socket)
         .add_fidl_service(Service::PacketSocket)
