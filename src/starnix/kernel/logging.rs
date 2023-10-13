@@ -66,7 +66,6 @@ macro_rules! not_implemented {
     )
 }
 
-#[allow(unused)]
 macro_rules! not_implemented_log_once {
     ($($arg:tt)*) => (
         {

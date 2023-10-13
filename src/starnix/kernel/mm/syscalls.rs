@@ -203,7 +203,7 @@ pub fn sys_msync(
     length: usize,
     _flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented!("msync not implemented");
+    not_implemented_log_once!("msync not implemented");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
     current_task.mm.ensure_mapped(addr, length)?;
