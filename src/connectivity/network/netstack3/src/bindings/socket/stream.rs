@@ -5,7 +5,6 @@
 //! Stream sockets, primarily TCP sockets.
 
 use std::{
-    convert::Infallible as Never,
     num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::ControlFlow,
     sync::Arc,
@@ -568,10 +567,7 @@ pub(super) fn spawn_worker(
     ctx: crate::bindings::Ctx,
     request_stream: fposix_socket::StreamSocketRequestStream,
     spawner: &worker::ProviderScopedSpawner<crate::bindings::util::TaskWaitGroupSpawner>,
-) where
-    DeviceId<BindingsNonSyncCtxImpl>: TryFromFidlWithContext<Never, Error = DeviceNotFoundError>
-        + TryFromFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
-{
+) {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
             spawner.spawn(SocketWorker::serve_stream_with(

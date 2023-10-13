@@ -998,25 +998,6 @@ where
     }
 }
 
-impl TryFromFidlWithContext<Never> for DeviceId<BindingsNonSyncCtxImpl> {
-    type Error = DeviceNotFoundError;
-
-    fn try_from_fidl_with_ctx<C: ConversionContext>(
-        _ctx: &C,
-        fidl: Never,
-    ) -> Result<Self, Self::Error> {
-        match fidl {}
-    }
-}
-
-impl TryIntoFidlWithContext<Never> for DeviceId<BindingsNonSyncCtxImpl> {
-    type Error = DeviceNotFoundError;
-
-    fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<Never, Self::Error> {
-        Err(DeviceNotFoundError)
-    }
-}
-
 impl TryFromFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
     type Error = DeviceNotFoundError;
 
@@ -1033,14 +1014,6 @@ impl TryIntoFidlWithContext<BindingId> for DeviceId<BindingsNonSyncCtxImpl> {
 
     fn try_into_fidl_with_ctx<C: ConversionContext>(self, ctx: &C) -> Result<BindingId, Never> {
         Ok(ctx.get_binding_id(self))
-    }
-}
-
-impl TryIntoFidlWithContext<Never> for WeakDeviceId<BindingsNonSyncCtxImpl> {
-    type Error = DeviceNotFoundError;
-
-    fn try_into_fidl_with_ctx<C: ConversionContext>(self, _ctx: &C) -> Result<Never, Self::Error> {
-        Err(DeviceNotFoundError)
     }
 }
 
