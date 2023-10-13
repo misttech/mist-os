@@ -17,13 +17,13 @@ macro_rules! generate_cfi_directives {
     ($state:expr) => {
         unsafe {
             let state_addr = std::ptr::addr_of!($state);
-            // The base address that the unwinder will use is stored in t6. Then it will look for
+            // The base address that the unwinder will use is stored in s11. Then it will look for
             // each register value at an offset specified below. These offsets match the offsets of
             // the register values in the `zx_restricted_state_t` struct.
             std::arch::asm!(
                 ".cfi_remember_state",
-                ".cfi_def_cfa t6, 0",
-                ".cfi_offset 32, 0",  // GNU Assembler doesn't recognize pc.
+                ".cfi_def_cfa s11, 0",
+                ".cfi_offset 64, 0",  // GNU Assembler doesn't recognize pc.
                 ".cfi_offset ra, 0x08",
                 ".cfi_offset sp, 0x10",
                 ".cfi_offset gp, 0x18",
@@ -56,9 +56,9 @@ macro_rules! generate_cfi_directives {
                 ".cfi_offset t5, 0xF0",
                 ".cfi_offset t6, 0xF8",
 
-                // t6 could technically get clobbered between here and `execute_syscall`.
+                // s11 could technically get clobbered between here and `execute_syscall`.
                 // TODO(https://fxbug.dev/297897817): Use a more robust approach to unwind.
-                in("t6") state_addr,
+                in("s11") state_addr,
                 options(nomem, preserves_flags, nostack),
             );
         }
