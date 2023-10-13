@@ -387,13 +387,13 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
 
   template <class IoProvider>
   void EnableTxInterrupt(IoProvider& io, bool enable = true) {
-    auto ier = InterruptEnableRegister::Get().FromValue(0);
-    ier.set_rx_available(true).set_tx_empty(enable).WriteTo(io.io());
+    auto ier = InterruptEnableRegister::Get().ReadFrom(io.io());
+    ier.set_tx_empty(enable).WriteTo(io.io());
   }
 
   template <class IoProvider>
   void EnableRxInterrupt(IoProvider& io, bool enable = true) {
-    auto ier = InterruptEnableRegister::Get().FromValue(0);
+    auto ier = InterruptEnableRegister::Get().ReadFrom(io.io());
     ier.set_rx_available(enable).WriteTo(io.io());
   }
 
