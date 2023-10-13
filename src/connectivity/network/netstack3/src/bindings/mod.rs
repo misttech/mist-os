@@ -531,7 +531,6 @@ impl<I: icmp::IcmpIpExt, B: BufferMut> icmp::BufferIcmpContext<I, B> for Binding
         _src_ip: I::Addr,
         _dst_ip: I::Addr,
         _id: u16,
-        _seq_num: u16,
         _data: B,
     ) {
         unimplemented!("TODO(https://fxbug.dev/125482): implement ICMP sockets")

@@ -616,7 +616,6 @@ pub trait BufferIcmpContext<I: IcmpIpExt, B: BufferMut>: IcmpContext<I> {
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,
-        seq_num: u16,
         data: B,
     );
 }
@@ -1427,11 +1426,10 @@ impl<
                 ctx.increment_debug_counter("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::echo_reply");
                 trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
                 let id = echo_reply.message().id();
-                let seq = echo_reply.message().seq();
                 let meta = echo_reply.parse_metadata();
                 buffer.undo_parse(meta);
                 let device = sync_ctx.downgrade_device_id(device);
-                receive_icmp_echo_reply(sync_ctx,ctx, src_ip, dst_ip, id, seq, buffer, device);
+                receive_icmp_echo_reply(sync_ctx,ctx, src_ip, dst_ip, id, buffer, device);
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
                 ctx.increment_debug_counter("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::timestamp_request");
@@ -2167,7 +2165,6 @@ impl<
                 // source address is unspecified.
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     let id = echo_reply.message().id();
-                    let seq = echo_reply.message().seq();
                     let meta = echo_reply.parse_metadata();
                     buffer.undo_parse(meta);
                     let device = sync_ctx.downgrade_device_id(device);
@@ -2177,7 +2174,6 @@ impl<
                         src_ip.get(),
                         dst_ip,
                         id,
-                        seq,
                         buffer,
                         device,
                     );
@@ -3235,7 +3231,6 @@ fn receive_icmp_echo_reply<
     src_ip: I::Addr,
     dst_ip: SpecifiedAddr<I::Addr>,
     id: u16,
-    seq: u16,
     body: B,
     device: SC::WeakDeviceId,
 ) {
@@ -3286,14 +3281,7 @@ fn receive_icmp_echo_reply<
             };
             if let Some(socket) = socket {
                 trace!("receive_icmp_echo_reply: Received echo reply for local socket");
-                ctx.receive_icmp_echo_reply(
-                    *socket,
-                    src_ip.addr(),
-                    dst_ip.addr(),
-                    id.get(),
-                    seq,
-                    body,
-                );
+                ctx.receive_icmp_echo_reply(*socket, src_ip.addr(), dst_ip.addr(), id.get(), body);
                 return;
             }
         }
@@ -3940,7 +3928,6 @@ mod tests {
             src_ip: I::Addr,
             dst_ip: I::Addr,
             id: u16,
-            seq_num: u16,
             data: B,
         ) {
             self.state_mut().receive_icmp_echo_reply.push(ReceiveIcmpEchoReply {
@@ -3948,7 +3935,6 @@ mod tests {
                 src_ip,
                 dst_ip,
                 id,
-                seq_num,
                 data: data.as_ref().to_vec(),
             });
         }
@@ -4709,7 +4695,7 @@ mod tests {
             .unwrap()
             .into_inner()
             .into_inner();
-        assert_matches!(&replies[..], [(1, body)] if *body == expected);
+        assert_matches!(&replies[..], [body] if *body == expected);
     }
 
     // Tests that only require an ICMP stack. Unlike the preceding tests, these
@@ -4740,7 +4726,6 @@ mod tests {
     #[allow(unused)] // TODO(joshlf): Remove once we access these fields.
     struct ReceiveIcmpEchoReply<I: Ip> {
         conn: SocketId<I>,
-        seq_num: u16,
         src_ip: I::Addr,
         dst_ip: I::Addr,
         id: u16,

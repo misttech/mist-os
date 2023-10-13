@@ -198,8 +198,8 @@ pub(crate) mod benchmarks {
 #[derive(Default)]
 /// Non-sync context state held by [`FakeNonSyncCtx`].
 pub struct FakeNonSyncCtxState {
-    icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<(u16, Vec<u8>)>>,
-    icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<(u16, Vec<u8>)>>,
+    icmpv4_replies: HashMap<crate::ip::icmp::SocketId<Ipv4>, Vec<Vec<u8>>>,
+    icmpv6_replies: HashMap<crate::ip::icmp::SocketId<Ipv6>, Vec<Vec<u8>>>,
     pub(crate) rx_available: Vec<LoopbackDeviceId<FakeNonSyncCtx>>,
     pub(crate) tx_available: Vec<DeviceId<FakeNonSyncCtx>>,
 }
@@ -330,7 +330,7 @@ impl FakeNonSyncCtx {
     pub(crate) fn take_icmp_replies<I: Ip>(
         &mut self,
         conn: crate::ip::icmp::SocketId<I>,
-    ) -> Vec<(u16, Vec<u8>)> {
+    ) -> Vec<Vec<u8>> {
         I::map_ip::<_, IpInvariant<Option<Vec<_>>>>(
             (IpInvariant(self), conn),
             |(IpInvariant(this), conn)| IpInvariant(this.state_mut().icmpv4_replies.remove(&conn)),
@@ -1137,12 +1137,11 @@ impl<B: BufferMut> BufferIcmpContext<Ipv4, B> for FakeNonSyncCtx {
         _src_ip: Ipv4Addr,
         _dst_ip: Ipv4Addr,
         _id: u16,
-        seq_num: u16,
         data: B,
     ) {
         let mut state = self.state_mut();
         let replies = state.icmpv4_replies.entry(conn).or_insert_with(Vec::default);
-        replies.push((seq_num, data.as_ref().to_owned()));
+        replies.push(data.as_ref().to_owned());
     }
 }
 
@@ -1153,12 +1152,11 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
         _src_ip: Ipv6Addr,
         _dst_ip: Ipv6Addr,
         _id: u16,
-        seq_num: u16,
         data: B,
     ) {
         let mut state = self.state_mut();
         let replies = state.icmpv6_replies.entry(conn).or_insert_with(Vec::default);
-        replies.push((seq_num, data.as_ref().to_owned()))
+        replies.push(data.as_ref().to_owned())
     }
 }
 
