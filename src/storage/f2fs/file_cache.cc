@@ -755,20 +755,24 @@ pgoff_t FileCache::Writeback(WritebackOperation &operation) {
 }
 
 pgoff_t FileCache::WritebackFromDirtyList(const WritebackOperation &operation) {
-  // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for pages in the fifo list.
-  VmoCleaner cleaner(operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_));
-  // Fetch |size| of dirty pages from the fifo list.
-  // TODO(https://fxbug.dev/122292):
-  // If new pages are dirtied after |cleaner|, kernel unnecessarily keeps them even after
-  // ZX_PAGER_OP_WRITEBACK_END, and the pages get free at the next flush time or in
-  // VnodeF2fs::RecycleNode().
+  std::vector<std::unique_ptr<VmoCleaner>> cleaners;
   size_t merged_blocks = 0;
+  // Fetch |size| of dirty pages from the fifo list.
   size_t size = vnode_->GetDirtyPageList().Size();
   size_t nwritten = size;
   while (size) {
     bool flush = false;
     auto num_pages = std::min(size, static_cast<uint64_t>(kDefaultBlocksPerSegment / 4));
     auto pages = vnode_->GetDirtyPageList().TakePages(num_pages);
+
+    for (const auto &page : pages) {
+      // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for the page.
+      // TODO(b/293977738): VmoCleaner is instantiated on a per-page basis, so
+      // ZX_PAGER_OP_WRITEBACK_BEGIN is called for each dirty page. We need to change it to work on
+      // a per-range basis for efficient system calls.
+      cleaners.push_back(std::make_unique<VmoCleaner>(
+          operation.bSync, fbl::RefPtr<VnodeF2fs>(vnode_), page->GetKey(), page->GetKey() + 1));
+    }
     merged_blocks += pages.size();
     size -= pages.size();
     // Allocate block addrs for |pages|.

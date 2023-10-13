@@ -291,16 +291,16 @@ class LockedPage final {
 
   // CopyRefPtr() returns copied RefPtr, so that increases ref_count of page.
   // The page remains locked, and still managed by the LockedPage instance.
-  fbl::RefPtr<Page> CopyRefPtr() { return page_; }
+  fbl::RefPtr<Page> CopyRefPtr() const { return page_; }
 
   template <typename T = Page>
-  T &GetPage() {
+  T &GetPage() const {
     return static_cast<T &>(*page_);
   }
 
-  Page *get() { return page_.get(); }
-  Page &operator*() { return *page_; }
-  Page *operator->() { return page_.get(); }
+  Page *get() const { return page_.get(); }
+  Page &operator*() const { return *page_; }
+  Page *operator->() const { return page_.get(); }
   explicit operator bool() const { return page_ != nullptr; }
 
   // Comparison against nullptr operators (of the form, myptr == nullptr).

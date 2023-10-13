@@ -374,7 +374,7 @@ VmoCleaner::VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t s
   if (end < kPgOffMax) {
     end_offset = page_to_address(end);
   }
-  end_offset = std::min(end, vnode_->GetVmoManager().GetContentSize(true));
+  end_offset = std::min(end_offset, vnode_->GetVmoManager().GetContentSize(true));
   if (start >= end_offset) {
     return;
   }
