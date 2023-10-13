@@ -248,7 +248,7 @@ async fn wipe_storage_not_supported() {
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
 
     let result = admin
-        .wipe_storage(blobfs_server)
+        .wipe_storage(Some(blobfs_server), None)
         .await
         .unwrap()
         .expect_err("WipeStorage unexpectedly succeeded");

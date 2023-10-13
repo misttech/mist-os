@@ -320,7 +320,7 @@ zx_status_t RealMain(Flags flags) {
       return ZX_OK;
     }
     case Command::kWipe: {
-      fidl::WireResult result = fshost_client->WipeStorage({});
+      fidl::WireResult result = fshost_client->WipeStorage({}, {});
       zx_status_t status;
       if (!result.ok()) {
         status = result.status();

@@ -13,59 +13,22 @@ use {
     fidl_fuchsia_hardware_block::BlockProxy,
     fidl_fuchsia_hardware_block_partition::PartitionMarker,
     fidl_fuchsia_io as fio,
-    fs_management::{
-        partition::{find_partition_in, PartitionMatcher},
-        Blobfs,
-    },
-    fshost_test_fixture::TestFixture,
+    fs_management::partition::{find_partition_in, PartitionMatcher},
+    fshost_test_fixture::{write_test_blob, write_test_blob_fxblob},
     fuchsia_zircon as zx,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
 };
 
-// Blob containing 8192 bytes of 0xFF ("oneblock").
-const TEST_BLOB_LEN: u64 = 8192;
-const TEST_BLOB_DATA: [u8; TEST_BLOB_LEN as usize] = [0xFF; TEST_BLOB_LEN as usize];
-const TEST_BLOB_NAME: &'static str =
-    "68d131bc271f9c192d4f6dcd8fe61bef90004856da19d0f2f514a7f4098b0737";
-
-async fn write_test_blob(directory: &fio::DirectoryProxy) {
-    let test_blob = fuchsia_fs::directory::open_file(
-        directory,
-        TEST_BLOB_NAME,
-        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-    )
-    .await
-    .unwrap();
-    test_blob.resize(TEST_BLOB_LEN).await.unwrap().expect("Resize failed");
-    let bytes_written = test_blob.write(&TEST_BLOB_DATA).await.unwrap().expect("Write failed");
-    assert_eq!(bytes_written, TEST_BLOB_LEN);
-}
-
-// TODO(fxbug.dev/112142): Due to a race between the block watcher and some fshost functionality
-// (e.g. WipeStorage), we have to wait for the block watcher to finish binding all expected drivers.
-//
-// Regardless of the `ramdisk_image` / `gpt_all` config options, fshost will match
-// the first block device with a GPT or FVM partition and bind those drivers.
-async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) {
-    let ramdisk = fixture.ramdisks.first().unwrap();
-    let gpt_path = "/part-000/block";
-    let ramdisk_dir = ramdisk.as_dir().expect("invalid directory proxy");
-    if has_formatted_fvm {
-        // TODO(https://fxbug.dev/121274): Remove hardcoded paths
-        let blobfs_path = format!("{}/fvm/blobfs-p-1/block", gpt_path);
-        recursive_wait(ramdisk_dir, &blobfs_path).await.unwrap();
-        let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
-        recursive_wait(ramdisk_dir, &data_path).await.unwrap();
-    } else {
-        recursive_wait(ramdisk_dir, &gpt_path).await.unwrap();
-    }
-}
+const TEST_BLOB_DATA: [u8; 8192] = [0xFF; 8192];
+// TODO(https://fxbug.dev/121274): Remove hardcoded paths
+const GPT_PATH: &'static str = "/part-000/block";
+const BLOBFS_FVM_PATH: &'static str = "/part-000/block/fvm/blobfs-p-1/block";
+const DATA_FVM_PATH: &'static str = "/part-000/block/fvm/data-p-2/block";
 
 // Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn no_fvm_device() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
@@ -79,7 +42,7 @@ async fn no_fvm_device() {
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
     let result = admin
-        .wipe_storage(blobfs_server)
+        .wipe_storage(Some(blobfs_server), None)
         .await
         .expect("FIDL call to WipeStorage failed")
         .expect_err("WipeStorage unexpectedly succeeded");
@@ -88,135 +51,177 @@ async fn no_fvm_device() {
 }
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob() {
     let mut builder = new_builder();
-    // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
-    // treating them as "real" storage devices.
     builder.fshost().set_config_value("ramdisk_image", true);
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    let ramdisk_dir =
+        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+    if cfg!(feature = "fxblob") {
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    } else {
+        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+        recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+    }
+
+    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
+        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        (Some(proxy), Some(server_end))
+    } else {
+        (None, None)
+    };
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+    admin
+        .wipe_storage(Some(blobfs_server), blob_creator)
+        .await
+        .unwrap()
+        .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    write_test_blob(&blobfs_root).await;
+    if cfg!(feature = "fxblob") {
+        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
+    } else {
+        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
+    }
 
     fixture.tear_down().await;
 }
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method when a data
 // data partition does not already exist.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn write_blob_no_existing_data_partition() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
     builder
-        .with_zbi_ramdisk()
-        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() });
+        .with_disk()
+        .format_volumes(VolumesSpec { create_data_partition: false, ..volumes_spec() })
+        .with_gpt();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    let ramdisk_dir =
+        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+    if cfg!(feature = "fxblob") {
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    } else {
+        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+    }
+
+    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
+        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        (Some(proxy), Some(server_end))
+    } else {
+        (None, None)
+    };
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+    admin
+        .wipe_storage(Some(blobfs_server), blob_creator)
+        .await
+        .unwrap()
+        .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    write_test_blob(&blobfs_root).await;
+    if cfg!(feature = "fxblob") {
+        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
+    } else {
+        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
+    }
 
     fixture.tear_down().await;
 }
 
 // Verify that all existing blobs are purged after running fuchsia.fshost.Admin/WipeStorage.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn blobfs_formatted() {
     let mut builder = new_builder();
-    builder.fshost().set_config_value("ramdisk_image", true);
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
-    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
 
     let fixture = builder.build().await;
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
 
-    // Mount Blobfs and write a blob.
-    {
-        let test_disk = fixture.ramdisks.first().unwrap();
-        let test_disk_path = test_disk
-            .as_controller()
-            .expect("ramdisk didn't have controller proxy")
-            .get_topological_path()
-            .await
-            .expect("get topo path fidl failed")
-            .expect("get topo path returned error");
-        let matcher = PartitionMatcher {
-            parent_device: Some(test_disk_path),
-            labels: Some(vec!["blobfs".to_string()]),
-            ..Default::default()
-        };
-        let controller = find_partition_in(
-            &fixture.dir("dev-topological/class/block", fio::OpenFlags::empty()),
-            matcher,
-            zx::Duration::INFINITE,
-        )
-        .await
-        .unwrap();
-        let blobfs = Blobfs::new(controller).serve().await.unwrap();
+    // The test fixture writes tests blobs to blobfs or fxblob when it is formatted.
+    fixture.check_test_blob(cfg!(feature = "fxblob")).await;
 
-        let blobfs_root = blobfs.root();
-        write_test_blob(blobfs_root).await;
-        assert!(fuchsia_fs::directory::dir_contains(blobfs_root, TEST_BLOB_NAME).await.unwrap());
+    let vmo = fixture.into_vmo().await.unwrap();
+
+    let mut builder = new_builder().with_disk_from_vmo(vmo);
+    builder.fshost().set_config_value("ramdisk_image", true);
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
+
+    let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    let ramdisk_dir =
+        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+    if cfg!(feature = "fxblob") {
+        recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+    } else {
+        recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+        recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
     }
+
+    let blob_creator = if cfg!(feature = "fxblob") {
+        let (_, server_end) = fidl::endpoints::create_proxy().unwrap();
+        Some(server_end)
+    } else {
+        None
+    };
 
     // Invoke the WipeStorage API.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
     admin
-        .wipe_storage(blobfs_server)
+        .wipe_storage(Some(blobfs_server), blob_creator)
         .await
         .unwrap()
         .map_err(zx::Status::from_raw)
         .expect("WipeStorage unexpectedly failed");
 
-    // Verify there are no more blobs.
+    // Verify there are no blobs.
     assert!(fuchsia_fs::directory::readdir(&blobfs_root).await.unwrap().is_empty());
 
     fixture.tear_down().await;
 }
 
 // Verify that the data partition is wiped and remains unformatted.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
+// This test is very specific to fvm, so we don't run it against fxblob. Since both volumes are in
+// fxfs anyway with fxblob, this test is somewhat redundant with the basic tests.
 #[fuchsia::test]
 #[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn data_unformatted() {
@@ -227,9 +232,15 @@ async fn data_unformatted() {
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    let ramdisk_dir =
+        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+    recursive_wait(ramdisk_dir, BLOBFS_FVM_PATH).await.unwrap();
+    recursive_wait(ramdisk_dir, DATA_FVM_PATH).await.unwrap();
+
     let test_disk = fixture.ramdisks.first().unwrap();
     let test_disk_path = test_disk
         .as_controller()
@@ -272,7 +283,11 @@ async fn data_unformatted() {
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+    admin
+        .wipe_storage(Some(blobfs_server), None)
+        .await
+        .unwrap()
+        .expect("WipeStorage unexpectedly failed");
 
     // Ensure the data partition was assigned a new instance GUID.
     let data_controller =
@@ -297,32 +312,48 @@ async fn data_unformatted() {
 }
 
 // Verify that WipeStorage can handle a completely corrupted FVM.
-// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
 // TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(feature = "f2fs", ignore)]
 async fn handles_corrupt_fvm() {
     let mut builder = new_builder();
-    // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
-    // treating them as "real" storage devices.
     builder.fshost().set_config_value("ramdisk_image", true);
-    // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
-    builder.with_disk().format_volumes(volumes_spec()).with_gpt().with_unformatted_fvm();
+    // Ensure that, while we allocate an FVM or Fxfs partition inside the GPT, we leave it empty.
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().with_unformatted_volume_manager();
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
+    // Wait for the zbi ramdisk filesystems
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
-    wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ false).await;
+    // Also wait for any driver binding on the "on-disk" devices
+    let ramdisk_dir =
+        fixture.ramdisks.first().expect("no ramdisks?").as_dir().expect("invalid dir proxy");
+    recursive_wait(ramdisk_dir, GPT_PATH).await.unwrap();
+
+    let (blob_creator_proxy, blob_creator) = if cfg!(feature = "fxblob") {
+        let (proxy, server_end) = fidl::endpoints::create_proxy().unwrap();
+        (Some(proxy), Some(server_end))
+    } else {
+        (None, None)
+    };
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
     let admin =
         fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
-    admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
+    admin
+        .wipe_storage(Some(blobfs_server), blob_creator)
+        .await
+        .unwrap()
+        .expect("WipeStorage unexpectedly failed");
 
     // Ensure that we can write a blob into the new Blobfs instance.
-    write_test_blob(&blobfs_root).await;
+    if cfg!(feature = "fxblob") {
+        write_test_blob_fxblob(blob_creator_proxy.unwrap(), &TEST_BLOB_DATA).await;
+    } else {
+        write_test_blob(&blobfs_root, &TEST_BLOB_DATA, false).await;
+    }
 
     fixture.tear_down().await;
 }

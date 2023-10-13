@@ -22,6 +22,8 @@ pub mod disk_builder;
 pub mod fshost_builder;
 mod mocks;
 
+pub use disk_builder::{write_test_blob, write_test_blob_fxblob};
+
 pub struct TestFixtureBuilder {
     netboot: bool,
     no_fuchsia_boot: bool,

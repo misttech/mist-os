@@ -131,6 +131,89 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     Err(anyhow!("Data partition not found"))
 }
 
+async fn wipe_storage(
+    config: &fshost_config::Config,
+    ramdisk_prefix: Option<String>,
+    launcher: &FilesystemLauncher,
+    ignored_paths: &mut HashSet<String>,
+    blobfs_root: Option<ServerEnd<DirectoryMarker>>,
+    blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
+) -> Result<(), Error> {
+    if config.fxfs_blob {
+        // For fxblob, we skip several of the arguments that the fvm one needs. For config and
+        // launcher, there currently aren't any options that modify how fxblob works, so we don't
+        // need access (that will probably change eventually, at which point those will need to be
+        // threaded through). For ignored_paths, fxblob launching doesn't generate any new block
+        // devices that we need to mark as accounted for for the block watcher.
+        wipe_storage_fxblob(ramdisk_prefix, blobfs_root, blob_creator).await
+    } else {
+        wipe_storage_fvm(config, ramdisk_prefix, launcher, ignored_paths, blobfs_root).await
+    }
+}
+
+async fn wipe_storage_fxblob(
+    ramdisk_prefix: Option<String>,
+    blobfs_root: Option<ServerEnd<DirectoryMarker>>,
+    blob_creator: Option<ServerEnd<fidl_fuchsia_fxfs::BlobCreatorMarker>>,
+) -> Result<(), Error> {
+    tracing::info!("Searching for fxfs block device");
+
+    let fxfs_matcher = PartitionMatcher {
+        type_guids: Some(vec![constants::FVM_TYPE_GUID, constants::FVM_LEGACY_TYPE_GUID]),
+        ignore_prefix: ramdisk_prefix,
+        ..Default::default()
+    };
+
+    let fxfs_controller = find_partition(fxfs_matcher, FIND_PARTITION_DURATION)
+        .await
+        .context("Failed to find FVM")?;
+    let fxfs_path = fxfs_controller
+        .get_topological_path()
+        .await
+        .context("fvm get_topo_path transport error")?
+        .map_err(zx::Status::from_raw)
+        .context("fvm get_topo_path returned error")?;
+
+    tracing::info!(device_path = ?fxfs_path, "Wiping storage");
+    tracing::info!("Reformatting Fxfs.");
+
+    let mut fxfs = filesystem::Filesystem::new(fxfs_controller, Fxfs::default());
+    fxfs.format().await.context("Failed to format fxfs")?;
+
+    let blobfs_root = match blobfs_root {
+        Some(handle) => handle,
+        None => {
+            tracing::info!("Not provisioning fxblob: missing blobfs root handle");
+            return Ok(());
+        }
+    };
+
+    let blob_creator = match blob_creator {
+        Some(handle) => handle,
+        None => {
+            tracing::info!("Not provisioning fxblob: missing blob creator handle");
+            return Ok(());
+        }
+    };
+
+    let mut serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
+    let blob_volume = serving_fxfs
+        .create_volume("blob", fidl_fuchsia_fxfs::MountOptions { crypt: None, as_blob: true })
+        .await
+        .context("making blob volume")?;
+    clone_onto_no_describe(blob_volume.root(), None, blobfs_root)?;
+    blob_volume.exposed_dir().open(
+        fio::OpenFlags::empty(),
+        fio::ModeType::empty(),
+        "svc/fuchsia.fxfs.BlobCreator",
+        blob_creator.into_channel().into(),
+    )?;
+    // Forget the fxfs instance so it's not dropped, because the drop impl shuts down the
+    // filesystem.
+    std::mem::forget(serving_fxfs);
+    Ok(())
+}
+
 #[link(name = "fvm")]
 extern "C" {
     // This function initializes FVM on a fuchsia.hardware.block.Block device
@@ -145,13 +228,12 @@ fn initialize_fvm(fvm_slice_size: u64, device: &BlockProxy) -> Result<(), Error>
     Ok(())
 }
 
-// TODO(https://fxbug.dev/122942) Add support for fxblob.
-async fn wipe_storage(
+async fn wipe_storage_fvm(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
     ignored_paths: &mut HashSet<String>,
-    blobfs_root: ServerEnd<DirectoryMarker>,
+    blobfs_root: Option<ServerEnd<DirectoryMarker>>,
 ) -> Result<(), Error> {
     tracing::info!("Searching for block device with FVM");
 
@@ -193,10 +275,13 @@ async fn wipe_storage(
             .await
             .context("waiting for FVM driver")?;
 
-    if blobfs_root.as_handle_ref().is_invalid() {
-        tracing::info!("Not provisioning blobfs");
-        return Ok(());
-    }
+    let blobfs_root = match blobfs_root {
+        Some(handle) => handle,
+        None => {
+            tracing::info!("Not provisioning blobfs");
+            return Ok(());
+        }
+    };
 
     tracing::info!("Allocating new partitions");
     // Volumes will be dynamically resized.
@@ -549,7 +634,11 @@ pub fn fshost_admin(
                             );
                         });
                     }
-                    Ok(fshost::AdminRequest::WipeStorage { responder, blobfs_root }) => {
+                    Ok(fshost::AdminRequest::WipeStorage {
+                        responder,
+                        blobfs_root,
+                        blob_creator,
+                    }) => {
                         tracing::info!("admin wipe storage called");
                         let mut ignored_paths = matcher_lock.lock().await;
                         let res = if !config.ramdisk_image {
@@ -565,6 +654,7 @@ pub fn fshost_admin(
                                 &launcher,
                                 &mut *ignored_paths,
                                 blobfs_root,
+                                blob_creator,
                             )
                             .await
                             {

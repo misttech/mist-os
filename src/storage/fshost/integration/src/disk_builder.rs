@@ -198,6 +198,62 @@ async fn create_hermetic_crypt_service(
     realm
 }
 
+/// Write a blob to blobfs to ensure that on format, blobfs doesn't get wiped.
+pub async fn write_test_blob(
+    blob_volume_root: &fio::DirectoryProxy,
+    data: &[u8],
+    as_delivery_blob: bool,
+) -> Hash {
+    let mut builder = MerkleTreeBuilder::new();
+    builder.write(&data);
+    let hash = builder.finish().root();
+    let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+    let (name, data) = if as_delivery_blob {
+        (delivery_blob_path(hash), compressed_data.as_slice())
+    } else {
+        (hash.to_string(), data)
+    };
+
+    let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+    let flags =
+        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+    blob_volume_root
+        .open(flags, fio::ModeType::empty(), &name, ServerEnd::new(server_end.into_channel()))
+        .expect("open failed");
+    let _: Vec<_> = blob.query().await.expect("open file failed");
+
+    blob.resize(data.len() as u64).await.expect("FIDL call failed").expect("truncate failed");
+    for chunk in data.chunks(fio::MAX_TRANSFER_SIZE as usize) {
+        assert_eq!(
+            blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
+            chunk.len() as u64
+        );
+    }
+    hash
+}
+
+/// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
+/// wiped.
+pub async fn write_test_blob_fxblob(blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
+    let mut builder = MerkleTreeBuilder::new();
+    builder.write(&data);
+    let hash = builder.finish().root();
+    let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
+
+    let blob_writer_client_end = blob_creator
+        .create(&hash.into(), false)
+        .await
+        .expect("transport error on create")
+        .expect("failed to create blob");
+
+    let writer = blob_writer_client_end.into_proxy().unwrap();
+    let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
+        .await
+        .expect("failed to create BlobWriter");
+    blob_writer.write(&compressed_data).await.unwrap();
+    hash
+}
+
 pub enum Disk {
     Prebuilt(zx::Vmo),
     Builder(DiskBuilder),
@@ -246,7 +302,8 @@ pub struct DiskBuilder {
     corrupt_data: bool,
     gpt: bool,
     with_account_and_virtualization: bool,
-    format_fvm: bool,
+    // Note: fvm also means fxfs acting as the volume manager when using fxblob.
+    format_volume_manager: bool,
     legacy_data_label: bool,
     // Only used if 'fs_switch' set.
     fs_switch: Option<String>,
@@ -263,7 +320,7 @@ impl DiskBuilder {
             corrupt_data: false,
             gpt: false,
             with_account_and_virtualization: false,
-            format_fvm: true,
+            format_volume_manager: true,
             legacy_data_label: false,
             fs_switch: None,
         }
@@ -291,7 +348,7 @@ impl DiskBuilder {
     pub fn format_data(&mut self, data_spec: DataSpec) -> &mut Self {
         tracing::info!(?data_spec, "formatting data volume");
         if !self.volumes_spec.fxfs_blob {
-            assert!(self.format_fvm);
+            assert!(self.format_volume_manager);
         } else {
             if let Some(format) = data_spec.format {
                 assert_eq!(format, "fxfs");
@@ -321,9 +378,9 @@ impl DiskBuilder {
         self
     }
 
-    pub fn with_unformatted_fvm(&mut self) -> &mut Self {
+    pub fn with_unformatted_volume_manager(&mut self) -> &mut Self {
         assert!(self.data_spec.format.is_none());
-        self.format_fvm = false;
+        self.format_volume_manager = false;
         self
     }
 
@@ -332,20 +389,9 @@ impl DiskBuilder {
         self
     }
 
-    async fn build_no_fvm(mut self) -> zx::Vmo {
-        let vmo = zx::Vmo::create(self.size).unwrap();
-        let mut ramdisk = RamdiskClientBuilder::new_with_vmo(
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-            Some(RAMDISK_BLOCK_SIZE),
-        )
-        .build()
-        .await
-        .unwrap();
-
-        // There is no fvm for fxfs_blob so we directly format Fxfs onto the ramdisk.
-        let ramdisk_controller = ramdisk.take_controller().expect("invalid ramdisk controller");
+    async fn build_fxfs_as_volume_manager(&mut self, device_controller: ControllerProxy) {
         let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
-        let mut fxfs = Fxfs::new(ramdisk_controller);
+        let mut fxfs = Fxfs::new(device_controller);
         // Wipes the device
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
@@ -357,67 +403,20 @@ impl DiskBuilder {
             blob_volume.exposed_dir(),
         )
         .expect("failed to connect to the Blob service");
-        self.blob_hash = Some(self.write_test_blob_fxblob(blob_creator, &BLOB_CONTENTS).await);
+        self.blob_hash = Some(write_test_blob_fxblob(blob_creator, &BLOB_CONTENTS).await);
 
         if self.data_spec.format.is_some() {
             self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
         } else {
             fs.shutdown().await.expect("shutdown failed");
         }
-        // Destroy the ramdisk device and return a VMO containing the partitions/filesystems.
-        ramdisk.destroy().await.expect("destroy failed");
-        vmo
     }
 
-    pub async fn build(mut self) -> zx::Vmo {
-        let vmo = zx::Vmo::create(self.size).unwrap();
-
-        if self.volumes_spec.fxfs_blob {
-            return self.build_no_fvm().await;
-        }
-
-        // Initialize the VMO with GPT headers and an *empty* FVM partition.
-        if self.gpt {
-            initialize_gpt(&vmo, RAMDISK_BLOCK_SIZE);
-        }
-
-        if !self.format_fvm {
-            return vmo;
-        }
-
-        // Create a ramdisk with a duplicate handle of `vmo` so we can keep the data once destroyed.
-        let ramdisk = RamdiskClientBuilder::new_with_vmo(
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-            Some(RAMDISK_BLOCK_SIZE),
-        )
-        .build()
-        .await
-        .unwrap();
-
-        // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
-        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
-        let block_path = "/part-000/block";
-        let device_dir = if self.gpt {
-            bind_gpt_driver(&ramdisk).await;
-            let device_dir = recursive_wait_and_open_directory(
-                ramdisk.as_dir().expect("invalid directory proxy"),
-                block_path,
-            )
-            .await
-            .expect("failed to open device");
-            Some(device_dir)
-        } else {
-            None
-        };
-
-        let device_dir =
-            device_dir.as_ref().unwrap_or(ramdisk.as_dir().expect("invalid directory proxy"));
-        let device_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
-            device_dir,
-            "device_controller",
-        )
-        .expect("failed to connect to device controller");
-
+    async fn build_fvm_as_volume_manager(
+        &mut self,
+        device_dir: &fio::DirectoryProxy,
+        device_controller: ControllerProxy,
+    ) {
         // Initialize/provision the FVM headers and bind the FVM driver.
         let volume_manager = set_up_fvm(&device_controller, device_dir, FVM_SLICE_SIZE as usize)
             .await
@@ -445,8 +444,7 @@ impl DiskBuilder {
         blobfs.format().await.expect("format failed");
         blobfs.fsck().await.expect("failed to fsck blobfs");
         let mut serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
-        self.blob_hash =
-            Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS, false).await);
+        self.blob_hash = Some(write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS, false).await);
         serving_blobfs.shutdown().await.expect("shutdown failed");
         if self.volumes_spec.create_data_partition {
             let data_label = if self.legacy_data_label { "minfs" } else { "data" };
@@ -522,8 +520,59 @@ impl DiskBuilder {
             .await
             .expect("create_fvm_volume failed");
         }
+    }
 
-        // Destroy the ramdisk device and return a VMO containing the partitions/filesystems.
+    pub async fn build(mut self) -> zx::Vmo {
+        let vmo = zx::Vmo::create(self.size).unwrap();
+
+        // Initialize the VMO with GPT headers and an *empty* FVM partition.
+        if self.gpt {
+            initialize_gpt(&vmo, RAMDISK_BLOCK_SIZE);
+        }
+
+        if !self.format_volume_manager {
+            return vmo;
+        }
+
+        // Create a ramdisk with a duplicate handle of `vmo` so we can keep the data once destroyed.
+        let ramdisk = RamdiskClientBuilder::new_with_vmo(
+            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+            Some(RAMDISK_BLOCK_SIZE),
+        )
+        .build()
+        .await
+        .unwrap();
+
+        // Path to block device or partition which will back the FVM. Assumed to be empty/zeroed.
+        // TODO(https://fxbug.dev/121274): Remove hardcoded path.
+        let block_path = "/part-000/block";
+        let device_dir = if self.gpt {
+            bind_gpt_driver(&ramdisk).await;
+            let device_dir = recursive_wait_and_open_directory(
+                ramdisk.as_dir().expect("invalid directory proxy"),
+                block_path,
+            )
+            .await
+            .expect("failed to open device");
+            Some(device_dir)
+        } else {
+            None
+        };
+
+        let device_dir =
+            device_dir.as_ref().unwrap_or(ramdisk.as_dir().expect("invalid directory proxy"));
+        let device_controller = connect_to_named_protocol_at_dir_root::<ControllerMarker>(
+            device_dir,
+            "device_controller",
+        )
+        .expect("failed to connect to device controller");
+
+        if self.volumes_spec.fxfs_blob {
+            self.build_fxfs_as_volume_manager(device_controller).await;
+        } else {
+            self.build_fvm_as_volume_manager(device_dir, device_controller).await;
+        }
+
         ramdisk.destroy().await.expect("destroy failed");
         vmo
     }
@@ -614,64 +663,6 @@ impl DiskBuilder {
         };
         self.write_test_data(&vol.root()).await;
         fs.shutdown().await.expect("shutdown failed");
-    }
-
-    /// Write a blob to blobfs to ensure that on format, blobfs doesn't get wiped.
-    async fn write_test_blob(
-        &self,
-        blob_volume_root: &fio::DirectoryProxy,
-        data: &[u8],
-        as_delivery_blob: bool,
-    ) -> Hash {
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
-        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
-        let (name, data) = if as_delivery_blob {
-            (delivery_blob_path(hash), compressed_data.as_slice())
-        } else {
-            (hash.to_string(), data)
-        };
-
-        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
-        let flags = fio::OpenFlags::CREATE
-            | fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_WRITABLE;
-        blob_volume_root
-            .open(flags, fio::ModeType::empty(), &name, ServerEnd::new(server_end.into_channel()))
-            .expect("open failed");
-        let _: Vec<_> = blob.query().await.expect("open file failed");
-
-        blob.resize(data.len() as u64).await.expect("FIDL call failed").expect("truncate failed");
-        for chunk in data.chunks(fio::MAX_TRANSFER_SIZE as usize) {
-            assert_eq!(
-                blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
-                chunk.len() as u64
-            );
-        }
-        hash
-    }
-
-    /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
-    /// wiped.
-    async fn write_test_blob_fxblob(&self, blob_creator: BlobCreatorProxy, data: &[u8]) -> Hash {
-        let mut builder = MerkleTreeBuilder::new();
-        builder.write(&data);
-        let hash = builder.finish().root();
-        let compressed_data = Type1Blob::generate(&data, CompressionMode::Always);
-
-        let blob_writer_client_end = blob_creator
-            .create(&hash.into(), false)
-            .await
-            .expect("transport error on create")
-            .expect("failed to create blob");
-
-        let writer = blob_writer_client_end.into_proxy().unwrap();
-        let mut blob_writer = BlobWriter::create(writer, compressed_data.len() as u64)
-            .await
-            .expect("failed to create BlobWriter");
-        blob_writer.write(&compressed_data).await.unwrap();
-        hash
     }
 
     /// Create a small set of known files to test for presence. The test tree is

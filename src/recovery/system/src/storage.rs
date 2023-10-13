@@ -18,7 +18,7 @@ pub async fn wipe_storage() -> Result<fio::DirectoryProxy, Error> {
 
     let (blobfs_client, blobfs_server) = create_proxy::<fio::DirectoryMarker>().unwrap();
     fshost_admin
-        .wipe_storage(blobfs_server)
+        .wipe_storage(Some(blobfs_server), None)
         .await
         .context("Wiping storage")?
         .map_err(zx::Status::from_raw)?;

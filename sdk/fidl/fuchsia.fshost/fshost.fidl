@@ -4,6 +4,7 @@
 library fuchsia.fshost;
 
 using zx;
+using fuchsia.fxfs;
 using fuchsia.hardware.block;
 using fuchsia.io;
 
@@ -72,8 +73,15 @@ closed protocol Admin {
     }) -> () error zx.Status;
 
     /// Reprovision the first non-ramdisk FVM volume, and format/mount the blob partition.
-    /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`; if an
-    /// invalid handle is provided, then blobfs won't be formatted.
+    /// The formatted Blobfs instance can be accessed via the client end of `blobfs_root`; if no
+    /// handle is provided, then blobfs won't be formatted.
+    ///
+    /// If fxblob is configured, blob_creator will be connected with the fxfs BlobCreator protocol,
+    /// which should be used instead of creating blobs in the `blobfs_root`. `blobfs_root` will
+    /// still be connected and can be used to read blobs. If fxblob is configured, but no handle is
+    /// provided for blob_creator or for blobfs_root, the blob volume won't be formatted. If a
+    /// handle is provided for blob_creator but fxblob is not configured, the channel will be
+    /// closed.
     ///
     /// This function will pause the fshost block watcher regardless of success or failure.
     /// Requires fshost to be started with the `ramdisk_image` config option set to true.
@@ -84,7 +92,8 @@ closed protocol Admin {
     /// This can race with the fshost block device manager, which attempts to bind the FVM driver
     /// and unseal the zxcrypt volume.
     strict WipeStorage(resource struct {
-        blobfs_root server_end:<fuchsia.io.Directory>;
+        blobfs_root server_end:<fuchsia.io.Directory, optional>;
+        blob_creator server_end:<fuchsia.fxfs.BlobCreator, optional>;
     }) -> () error zx.Status;
 
     /// Wipes the data volume which will get reinitialised upon next boot.  This is not
