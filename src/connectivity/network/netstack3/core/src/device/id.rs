@@ -13,8 +13,8 @@ use crate::{
     device::{
         ethernet::EthernetLinkDevice,
         loopback::{LoopbackDevice, LoopbackDeviceId, LoopbackWeakDeviceId},
-        state::IpLinkDeviceStateSpec,
-        DeviceIdDebugTag, DeviceLayerTypes, IpLinkDeviceState,
+        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState},
+        DeviceIdDebugTag, DeviceLayerTypes,
     },
     sync::{PrimaryRc, StrongRc, WeakRc},
 };
@@ -96,8 +96,8 @@ impl<C: DeviceLayerTypes> WeakDeviceId<C> {
 }
 
 enum DebugReferencesInner<C: DeviceLayerTypes> {
-    Loopback(crate::sync::DebugReferences<IpLinkDeviceState<LoopbackDevice, C>>),
-    Ethernet(crate::sync::DebugReferences<IpLinkDeviceState<EthernetLinkDevice, C>>),
+    Loopback(crate::sync::DebugReferences<BaseDeviceState<LoopbackDevice, C>>),
+    Ethernet(crate::sync::DebugReferences<BaseDeviceState<EthernetLinkDevice, C>>),
 }
 
 /// A type offering a [`Debug`] implementation that helps debug dangling device
@@ -228,13 +228,13 @@ impl<C: DeviceLayerTypes> Debug for DeviceId<C> {
 /// maintaining reference identifiers.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
-pub struct BaseWeakDeviceId<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> {
+pub struct BaseWeakDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
-    rc: WeakRc<IpLinkDeviceState<T, C>>,
+    rc: WeakRc<BaseDeviceState<T, C>>,
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BaseDeviceId<T, C>>
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BaseDeviceId<T, C>>
     for BaseWeakDeviceId<T, C>
 {
     fn eq(&self, other: &BaseDeviceId<T, C>) -> bool {
@@ -242,7 +242,7 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BaseDeviceId<T,
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BaseWeakDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BaseWeakDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO(https://fxbug.dev/133946): Replace pointer value with bindings
         // debug information.
@@ -251,17 +251,17 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BaseWeakDeviceI
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Id for BaseWeakDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Id for BaseWeakDeviceId<T, C> {
     fn is_loopback(&self) -> bool {
         T::IS_LOOPBACK
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> WeakId for BaseWeakDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> WeakId for BaseWeakDeviceId<T, C> {
     type Strong = BaseDeviceId<T, C>;
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> BaseWeakDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseWeakDeviceId<T, C> {
     /// Attempts to upgrade the ID to a strong ID, failing if the
     /// device no longer exists.
     pub fn upgrade(&self) -> Option<BaseDeviceId<T, C>> {
@@ -276,13 +276,13 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> BaseWeakDeviceId<T, C> {
 /// maintaining reference identifiers.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Hash(bound = ""), Eq(bound = ""), PartialEq(bound = ""))]
-pub struct BaseDeviceId<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> {
+pub struct BaseDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
-    rc: StrongRc<IpLinkDeviceState<T, C>>,
+    rc: StrongRc<BaseDeviceState<T, C>>,
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BaseWeakDeviceId<T, C>>
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BaseWeakDeviceId<T, C>>
     for BaseDeviceId<T, C>
 {
     fn eq(&self, BaseWeakDeviceId { rc: other_rc }: &BaseWeakDeviceId<T, C>) -> bool {
@@ -291,7 +291,7 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BaseWeakDeviceI
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BasePrimaryDeviceId<T, C>>
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialEq<BasePrimaryDeviceId<T, C>>
     for BaseDeviceId<T, C>
 {
     fn eq(&self, BasePrimaryDeviceId { rc: other_rc }: &BasePrimaryDeviceId<T, C>) -> bool {
@@ -300,13 +300,13 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialEq<BasePrimaryDevi
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> PartialOrd for BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> PartialOrd for BaseDeviceId<T, C> {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Ord for BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Ord for BaseDeviceId<T, C> {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         let Self { rc: me } = self;
         let Self { rc: other } = other;
@@ -315,7 +315,7 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Ord for BaseDeviceId<T, C
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BaseDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { rc } = self;
 
@@ -327,23 +327,23 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BaseDeviceId<T,
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Id for BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Id for BaseDeviceId<T, C> {
     fn is_loopback(&self) -> bool {
         T::IS_LOOPBACK
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> StrongId for BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> StrongId for BaseDeviceId<T, C> {
     type Weak = BaseWeakDeviceId<T, C>;
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> BaseDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> BaseDeviceId<T, C> {
     pub(crate) fn device_state(&self) -> &IpLinkDeviceState<T, C> {
-        &*self.rc
+        &self.rc.ip
     }
     /// Returns a reference to the external state for the device.
-    pub fn external_state(&self) -> &T::External {
-        &self.device_state().external_state
+    pub fn external_state(&self) -> &T::External<C> {
+        &self.rc.external_state
     }
 
     /// Downgrades the ID to an [`EthernetWeakDeviceId`].
@@ -359,13 +359,13 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> BaseDeviceId<T, C> {
 }
 
 /// The primary reference to a device.
-pub(crate) struct BasePrimaryDeviceId<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> {
+pub(crate) struct BasePrimaryDeviceId<T: DeviceStateSpec, C: DeviceLayerTypes> {
     // NB: This is not a tuple struct because regular structs play nicer with
     // type aliases, which is how we use BaseDeviceId.
-    rc: PrimaryRc<IpLinkDeviceState<T, C>>,
+    rc: PrimaryRc<BaseDeviceState<T, C>>,
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BasePrimaryDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> Debug for BasePrimaryDeviceId<T, C> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { rc } = self;
 
@@ -377,17 +377,17 @@ impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> Debug for BasePrimaryDevi
     }
 }
 
-impl<T: IpLinkDeviceStateSpec<C>, C: DeviceLayerTypes> BasePrimaryDeviceId<T, C> {
+impl<T: DeviceStateSpec, C: DeviceLayerTypes> BasePrimaryDeviceId<T, C> {
     pub(crate) fn clone_strong(&self) -> BaseDeviceId<T, C> {
         let Self { rc } = self;
         BaseDeviceId { rc: PrimaryRc::clone_strong(rc) }
     }
 
-    pub(crate) fn new(state: IpLinkDeviceState<T, C>) -> Self {
+    pub(crate) fn new(state: BaseDeviceState<T, C>) -> Self {
         Self { rc: PrimaryRc::new(state) }
     }
 
-    pub(crate) fn into_inner(self) -> PrimaryRc<IpLinkDeviceState<T, C>> {
+    pub(crate) fn into_inner(self) -> PrimaryRc<BaseDeviceState<T, C>> {
         self.rc
     }
 }

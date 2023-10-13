@@ -40,7 +40,7 @@ use crate::{
             BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
             ParseSentFrameError, ReceivedFrame, SentFrame,
         },
-        state::{IpLinkDeviceState, IpLinkDeviceStateSpec},
+        state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceSendFrameError, FrameDestination, Mtu,
     },
@@ -75,9 +75,9 @@ pub enum LoopbackDevice {}
 
 impl Device for LoopbackDevice {}
 
-impl<C: DeviceLayerTypes> IpLinkDeviceStateSpec<C> for LoopbackDevice {
-    type Link = LoopbackDeviceState;
-    type External = C::LoopbackDeviceState;
+impl DeviceStateSpec for LoopbackDevice {
+    type Link<C: DeviceLayerTypes> = LoopbackDeviceState;
+    type External<C: DeviceLayerTypes> = C::LoopbackDeviceState;
     const IS_LOOPBACK: bool = true;
     const DEBUG_TYPE: &'static str = "Loopback";
 }

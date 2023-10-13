@@ -58,9 +58,9 @@ use crate::{
             BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
             NonSyncContext as SocketNonSyncContext, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
-        state::IpLinkDeviceState,
-        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceSendFrameError,
-        EthernetDeviceId, FrameDestination, Mtu, RecvIpFrameMeta,
+        state::{DeviceStateSpec, IpLinkDeviceState},
+        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu, RecvIpFrameMeta,
     },
     ip::{
         device::nud::{
@@ -73,8 +73,6 @@ use crate::{
     sync::{Mutex, RwLock},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
-
-use super::{state::IpLinkDeviceStateSpec, DeviceLayerTypes};
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -1332,12 +1330,12 @@ impl LinkDevice for EthernetLinkDevice {
     type Address = Mac;
 }
 
-impl<C: DeviceLayerTypes> IpLinkDeviceStateSpec<C> for EthernetLinkDevice {
-    type Link = EthernetDeviceState<
+impl DeviceStateSpec for EthernetLinkDevice {
+    type Link<C: DeviceLayerTypes> = EthernetDeviceState<
         <C as InstantBindingsTypes>::Instant,
         <C as LinkResolutionContext<EthernetLinkDevice>>::Notifier,
     >;
-    type External = C::EthernetDeviceState;
+    type External<C: DeviceLayerTypes> = C::EthernetDeviceState;
     const IS_LOOPBACK: bool = false;
     const DEBUG_TYPE: &'static str = "Ethernet";
 }

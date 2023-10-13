@@ -968,7 +968,7 @@ pub(crate) fn with_ethernet_state_and_sync_ctx<
     // Even though the device state is technically accessible outside of the
     // `SyncCtx`, it is held inside `SyncCtx` so we propagate the same lock
     // level as we were called with to avoid lock ordering issues.
-    cb(Locked::new_locked(&state), sync_ctx)
+    cb(Locked::new_locked(state), sync_ctx)
 }
 
 pub(crate) fn with_ethernet_state<
@@ -1024,7 +1024,7 @@ pub(crate) fn with_loopback_state_and_sync_ctx<
     // Even though the device state is technically accessible outside of the
     // `SyncCtx`, it is held inside `SyncCtx` so we propagate the same lock
     // level as we were called with to avoid lock ordering issues.
-    cb(Locked::new_locked(&state), sync_ctx)
+    cb(Locked::new_locked(state), sync_ctx)
 }
 
 pub(crate) fn with_ip_device_state<

@@ -48,7 +48,7 @@ use crate::{
             tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
         },
         socket::HeldSockets,
-        state::{IpLinkDeviceState, IpLinkDeviceStateSpec},
+        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
     },
     error::{
         ExistsError, NotFoundError, NotSupportedError, SetIpAddressPropertiesError,
@@ -456,11 +456,13 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
     ) -> EthernetDeviceId<C> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
-        let primary = EthernetPrimaryDeviceId::new(IpLinkDeviceState::new(
-            EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
-            external_state(),
-            self.origin.clone(),
-        ));
+        let primary = EthernetPrimaryDeviceId::new(BaseDeviceState {
+            ip: IpLinkDeviceStateInner::new(
+                EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
+                self.origin.clone(),
+            ),
+            external_state: external_state(),
+        });
         let id = primary.clone_strong();
 
         assert!(ethernet.insert(id.clone(), primary).is_none());
@@ -481,11 +483,13 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
             return Err(ExistsError);
         }
 
-        let primary = LoopbackPrimaryDeviceId::new(IpLinkDeviceState::new(
-            LoopbackDeviceState::new(mtu, metric),
-            external_state(),
-            self.origin.clone(),
-        ));
+        let primary = LoopbackPrimaryDeviceId::new(BaseDeviceState {
+            ip: IpLinkDeviceStateInner::new(
+                LoopbackDeviceState::new(mtu, metric),
+                self.origin.clone(),
+            ),
+            external_state: external_state(),
+        });
 
         let id = primary.clone_strong();
 
@@ -665,7 +669,7 @@ impl<R> RemoveDeviceResult<R, Never> {
 pub type RemoveDeviceResultWithContext<S, C> =
     RemoveDeviceResult<S, <C as crate::ReferenceNotifiers>::ReferenceReceiver<S>>;
 
-fn remove_device<T: IpLinkDeviceStateSpec<NonSyncCtx>, NonSyncCtx: NonSyncContext>(
+fn remove_device<T: DeviceStateSpec, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: BaseDeviceId<T, NonSyncCtx>,
@@ -673,7 +677,7 @@ fn remove_device<T: IpLinkDeviceStateSpec<NonSyncCtx>, NonSyncCtx: NonSyncContex
         &mut Devices<NonSyncCtx>,
         BaseDeviceId<T, NonSyncCtx>,
     ) -> (BasePrimaryDeviceId<T, NonSyncCtx>, BaseDeviceId<T, NonSyncCtx>),
-) -> RemoveDeviceResultWithContext<T::External, NonSyncCtx>
+) -> RemoveDeviceResultWithContext<T::External<NonSyncCtx>, NonSyncCtx>
 where
     BaseDeviceId<T, NonSyncCtx>: Into<DeviceId<NonSyncCtx>>,
 {
@@ -699,11 +703,10 @@ where
     core::mem::drop(strong);
     match PrimaryRc::unwrap_or_notify_with(primary.into_inner(), || {
         let (notifier, receiver) =
-            NonSyncCtx::new_reference_notifier::<T::External, _>(debug_references);
-        let notifier =
-            crate::sync::MapRcNotifier::new(notifier, |state: IpLinkDeviceState<_, _>| {
-                state.external_state
-            });
+            NonSyncCtx::new_reference_notifier::<T::External<NonSyncCtx>, _>(debug_references);
+        let notifier = crate::sync::MapRcNotifier::new(notifier, |state: BaseDeviceState<_, _>| {
+            state.external_state
+        });
         (notifier, receiver)
     }) {
         Ok(s) => RemoveDeviceResult::Removed(s.external_state),
