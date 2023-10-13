@@ -40,6 +40,8 @@ zx_status_t power_cpu_off();
 // CPU ID is architecture specific (e.g. MPID on ARM, hart ID on RISC-V, etc.) and not equivalent to
 // a cpu_num_t. This function does not block/wait on the CPU actually coming online. Callers are
 // expected to use power_get_cpu_state to poll the state of the CPU until it comes online.
+//
+// On some architectures, the context argument is passed to the newly started CPU.
 zx_status_t power_cpu_on(uint64_t hw_cpu_id, paddr_t entry, uint64_t context);
 zx::result<power_cpu_state> power_get_cpu_state(uint64_t hw_cpu_id);
 
