@@ -20,12 +20,32 @@ async fn inspect_sockets(name: &str) {
     type N = netstack_testing_common::realms::Netstack3;
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+
+    let interfaces_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("connect to protocol");
+    let dev = realm.join_network(&network, "dev").await.expect("join network");
+    let link_local =
+        netstack_testing_common::interfaces::wait_for_v6_ll(&interfaces_state, dev.id())
+            .await
+            .expect("wait for v6 link local");
 
     // Ensure ns3 has started and that there is a Socket to collect inspect data about.
     let _tcp_socket = realm
         .stream_socket(fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp)
         .await
         .expect("create TCP socket");
+
+    let tcp_socket = realm
+        .stream_socket(fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("create TCP socket");
+    const PORT: u16 = 8080;
+
+    let scope = dev.id().try_into().unwrap();
+    let sockaddr = std::net::SocketAddrV6::new(link_local.into(), PORT, 0, scope);
+    tcp_socket.bind(&sockaddr.into()).expect("bind socket");
 
     let data =
         get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
@@ -41,6 +61,12 @@ async fn inspect_sockets(name: &str) {
                 RemoteAddress: "[NOT CONNECTED]",
                 TransportProtocol: "TCP",
                 NetworkProtocol: "IPv4"
+            },
+            "1": {
+                LocalAddress: format!("[{link_local}%{scope}]:{PORT}"),
+                RemoteAddress: "[NOT CONNECTED]",
+                TransportProtocol: "TCP",
+                NetworkProtocol: "IPv6"
             }
         }
     })

@@ -19,7 +19,7 @@ use net_types::{
     Witness as _,
 };
 use netstack3_core::{
-    device::{self, DeviceId},
+    device::{self, DeviceId, WeakDeviceId},
     ip,
     transport::tcp,
 };
@@ -31,8 +31,11 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
         inspector: fuchsia_inspect::Inspector,
         count: usize,
     }
-    impl tcp::socket::InfoVisitor for Visitor {
-        fn visit<I: Ip, D: fmt::Display>(&mut self, socket: tcp::socket::SocketStats<I, D>) {
+    impl<I: Ip> tcp::socket::InfoVisitor<I, WeakDeviceId<BindingsNonSyncCtxImpl>> for Visitor {
+        fn visit(
+            &mut self,
+            socket: tcp::socket::SocketStats<I, WeakDeviceId<BindingsNonSyncCtxImpl>>,
+        ) {
             let Self { inspector, count } = self;
             let id = core::mem::replace(count, *count + 1);
             let tcp::socket::SocketStats { local, remote } = socket;
@@ -47,11 +50,15 @@ pub(crate) fn sockets(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
                 );
                 node.record_string(
                     "LocalAddress",
-                    local.map_or("[NOT BOUND]".into(), |socket| format!("{}", socket)),
+                    local.map_or("[NOT BOUND]".into(), |socket| {
+                        format!("{}", socket.map_zone(|device| device.bindings_id().id))
+                    }),
                 );
                 node.record_string(
                     "RemoteAddress",
-                    remote.map_or("[NOT CONNECTED]".into(), |socket| format!("{}", socket)),
+                    remote.map_or("[NOT CONNECTED]".into(), |socket| {
+                        format!("{}", socket.map_zone(|device| device.bindings_id().id))
+                    }),
                 )
             })
         }

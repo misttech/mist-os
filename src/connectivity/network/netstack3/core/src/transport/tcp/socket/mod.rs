@@ -334,6 +334,14 @@ impl<A: IpAddress, D> From<SocketAddr<A, D>>
     }
 }
 
+impl<A: IpAddress, D> SocketAddr<A, D> {
+    /// Maps the [`SocketAddr`]'s zone type.
+    pub fn map_zone<Y>(self, f: impl FnOnce(D) -> Y) -> SocketAddr<A, Y> {
+        let Self { ip, port } = self;
+        SocketAddr { ip: ip.into_inner().map_zone(f).into(), port }
+    }
+}
+
 impl<A: IpAddress, D: fmt::Display> fmt::Display for SocketAddr<A, D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let Self { ip, port } = self;
@@ -1391,7 +1399,7 @@ pub(crate) trait SocketHandler<I: IpExt, C: NonSyncContext<I, Self::WeakDeviceId
         id: &TcpSocketId<I, Self::WeakDeviceId, C>,
     ) -> Option<ConnectionError>;
 
-    fn with_info<V: InfoVisitor>(&mut self, cb: &mut V);
+    fn with_info<V: InfoVisitor<I, Self::WeakDeviceId>>(&mut self, cb: &mut V);
 }
 
 impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I, C>>
@@ -2308,19 +2316,15 @@ impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I,
         })
     }
 
-    fn with_info<V: InfoVisitor>(&mut self, visitor: &mut V) {
-        const DEVICE_ID_PLACEHOLDER: &'static str =
-            "TODO(http://fxbug.dev/133946): Populate with bindings device id once available";
+    fn with_info<V: InfoVisitor<I, Self::WeakDeviceId>>(&mut self, visitor: &mut V) {
         self.for_each_socket(|socket_state| {
             let stats: Option<SocketStats<I, _>> = match socket_state {
                 TcpSocketState::Unbound(_) => Some(SocketStats { local: None, remote: None }),
                 TcpSocketState::Bound(BoundSocketState::Listener((_state, _sharing, addr))) => {
-                    let ListenerAddr {
-                        ip: ListenerIpAddr { identifier, addr },
-                        device: ref _device,
-                    } = *addr;
+                    let ListenerAddr { ip: ListenerIpAddr { identifier, addr }, ref device } =
+                        *addr;
                     let local = addr.map(|addr| SocketAddr {
-                        ip: maybe_zoned(*addr.as_ref(), &Some(DEVICE_ID_PLACEHOLDER)),
+                        ip: maybe_zoned(*addr.as_ref(), device),
                         port: identifier,
                     });
                     Some(SocketStats { local, remote: None })
@@ -2342,14 +2346,14 @@ impl<I: IpLayerIpExt, C: NonSyncContext<I, SC::WeakDeviceId>, SC: SyncContext<I,
                                     local: (local_ip, local_port),
                                     remote: (remote_ip, remote_port),
                                 },
-                            device: ref _device,
+                            ref device,
                         } = *addr;
                         let local = Some(SocketAddr {
-                            ip: maybe_zoned(*local_ip.as_ref(), &Some(DEVICE_ID_PLACEHOLDER)),
+                            ip: maybe_zoned(*local_ip.as_ref(), device),
                             port: local_port,
                         });
                         let remote = Some(SocketAddr {
-                            ip: maybe_zoned(*remote_ip.as_ref(), &Some(DEVICE_ID_PLACEHOLDER)),
+                            ip: maybe_zoned(*remote_ip.as_ref(), device),
                             port: remote_port,
                         });
                         SocketStats { local, remote }
@@ -3060,9 +3064,9 @@ pub struct SocketStats<I: Ip, D> {
 }
 
 /// Visitor for socket state.
-pub trait InfoVisitor {
+pub trait InfoVisitor<I: Ip, D> {
     /// Called once for each TCP socket in the system.
-    fn visit<I: Ip, D: fmt::Display>(&mut self, state: SocketStats<I, D>);
+    fn visit(&mut self, state: SocketStats<I, D>);
 }
 
 /// Provides access to shared and per-socket TCP stats via a visitor.
@@ -3070,7 +3074,9 @@ pub fn with_info<I, C, V>(sync_ctx: &SyncCtx<C>, cb: &mut V)
 where
     I: IpExt,
     C: crate::NonSyncContext,
-    V: InfoVisitor,
+    V: InfoVisitor<I, device::WeakDeviceId<C>>
+        + InfoVisitor<Ipv4, device::WeakDeviceId<C>>
+        + InfoVisitor<Ipv6, device::WeakDeviceId<C>>,
 {
     let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(r) = I::map_ip(
@@ -3446,13 +3452,6 @@ mod tests {
     };
 
     use super::*;
-
-    impl<A: IpAddress, D> SocketAddr<A, D> {
-        fn map_zone<Y>(self, f: impl FnOnce(D) -> Y) -> SocketAddr<A, Y> {
-            let Self { ip, port } = self;
-            SocketAddr { ip: ip.into_inner().map_zone(f).into(), port }
-        }
-    }
 
     trait TcpTestIpExt: IpExt + TestIpExt + IpDeviceStateIpExt + IpLayerIpExt {
         fn recv_src_addr(addr: Self::Addr) -> Self::RecvSrcAddr;
