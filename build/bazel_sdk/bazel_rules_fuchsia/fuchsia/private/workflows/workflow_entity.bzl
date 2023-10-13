@@ -108,8 +108,6 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
             "inputs": attr.label_list(
                 doc = "Task dependencies. Use `$location(path/to/file)` to reference these in arguments.",
             ),
-            #TODO(b/303681889): remove this attribute once we stop using the transition in workflows
-            "fuchsia_api_level": attr.string(),
         }),
         **kwargs
     )

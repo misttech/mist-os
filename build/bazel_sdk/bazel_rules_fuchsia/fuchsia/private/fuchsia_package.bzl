@@ -42,6 +42,7 @@ def fuchsia_package(
         package_name = None,
         archive_name = None,
         platform = None,
+        fuchsia_api_level = None,
         components = [],
         resources = [],
         tools = [],
@@ -83,6 +84,7 @@ def fuchsia_package(
         tools: Additional tools that should be added to this package.
         package_name: An optional name to use for this package, defaults to name.
         archive_name: An option name for the far file.
+        fuchsia_api_level: The API level to build for.
         platform: Optionally override the platform to build the package for.
         **kwargs: extra attributes to pass along to the build rule.
     """
@@ -98,6 +100,7 @@ def fuchsia_package(
         tools = tools,
         package_name = package_name or name,
         archive_name = archive_name,
+        fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         **kwargs
     )
@@ -117,6 +120,8 @@ def _fuchsia_test_package(
         package_name = None,
         archive_name = None,
         resources = [],
+        fuchsia_api_level = None,
+        platform = None,
         _test_component_mapping,
         _components = [],
         **kwargs):
@@ -130,6 +135,8 @@ def _fuchsia_test_package(
         resources = resources,
         package_name = package_name or name,
         archive_name = archive_name,
+        fuchsia_api_level = fuchsia_api_level,
+        platform = platform,
         **kwargs
     )
 
@@ -146,6 +153,8 @@ def fuchsia_test_package(
         name,
         test_components = [],
         components = [],
+        fuchsia_api_level = None,
+        platform = None,
         **kwargs):
     """A test variant of fuchsia_package.
 
@@ -154,6 +163,8 @@ def fuchsia_test_package(
         name = name,
         _test_component_mapping = {label_name(component): component for component in test_components},
         _components = components,
+        fuchsia_api_level = fuchsia_api_level,
+        platform = platform,
         **kwargs
     )
 
@@ -162,6 +173,8 @@ def fuchsia_unittest_package(
         name,
         package_name = None,
         archive_name = None,
+        fuchsia_api_level = None,
+        platform = None,
         resources = [],
         unit_tests,
         **kwargs):
@@ -169,7 +182,6 @@ def fuchsia_unittest_package(
     """A variant of fuchsia_test_package containing unit tests.
 
     See _fuchsia_test_package for additional arguments."""
-
     test_component_mapping = {}
     for unit_test in unit_tests:
         run_tag = label_name(unit_test)
@@ -187,6 +199,8 @@ def fuchsia_unittest_package(
         package_name = package_name,
         archive_name = archive_name,
         resources = resources,
+        fuchsia_api_level = fuchsia_api_level,
+        platform = platform,
         _test_component_mapping = test_component_mapping,
         **kwargs
     )
