@@ -262,7 +262,7 @@ const size_t NUM_MAC_BYTES = 6;
 
 static constexpr std::string_view kMacPattern{
     R"(\b()"
-    R"(\b((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3})(?:[0-9a-fA-F]{1,2}(?:[\.:-])){2}[0-9a-fA-F]{1,2}\b)"
+    R"(\b((?:[[:xdigit:]]{1,2}(?:[\.:-])){3})(?:[[:xdigit:]]{1,2}(?:[\.:-])){2}[[:xdigit:]]{1,2}\b)"
     R"()\b)"};
 
 std::string GetOuiPrefix(const std::string& mac) {
@@ -281,7 +281,7 @@ std::string CanonicalizeMac(const std::string& original_mac) {
   re2::StringPiece lowercased_mac_view(lowercased_mac);
   for (size_t i = 0; i < NUM_MAC_BYTES; ++i) {
     re2::StringPiece mac_byte;
-    re2::RE2::FindAndConsume(&lowercased_mac_view, R"(([0-9a-fA-F]{1,2}))", &mac_byte);
+    re2::RE2::FindAndConsume(&lowercased_mac_view, R"(([[:xdigit:]]{1,2}))", &mac_byte);
 
     if (mac_byte.length() == 2) {
       canonical_mac.replace(3 * i, 2, mac_byte.data(), 2);
@@ -315,7 +315,7 @@ namespace {
 
 // The SSID identifier contains at most 32 pairs of hexadecimal characters, but match any number so
 // SSID identifiers with the wrong number of hexadecimal characters are also redacted.
-constexpr std::string_view kSsidPattern = R"((<ssid-[0-9a-fA-F]*>))";
+constexpr std::string_view kSsidPattern = R"((<ssid-[[:xdigit:]]*>))";
 
 std::string RedactSsid(RedactionIdCache& cache, const std::string& match) {
   const int id = cache.GetId(match);
