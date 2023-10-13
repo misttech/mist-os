@@ -125,8 +125,9 @@ Replacer FunctionBasedReplacer(
     return nullptr;
   }
 
-  if (regexp->NumberOfCapturingGroups() != 1) {
-    FX_LOGS(ERROR) << "Regexp \"" << pattern << "\" expected to have 1 capture group, has "
+  if (regexp->NumberOfCapturingGroups() < 1) {
+    FX_LOGS(ERROR) << "Regexp \"" << pattern
+                   << "\" expected to have at least 1 capturing group, has "
                    << regexp->NumberOfCapturingGroups();
     return nullptr;
   }
@@ -259,13 +260,15 @@ namespace mac_utils {
 
 const size_t NUM_MAC_BYTES = 6;
 
-static constexpr re2::LazyRE2 kOui = MakeLazyRE2(R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))");
+static constexpr std::string_view kMacPattern{
+    R"(\b()"
+    R"(\b((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3})(?:[0-9a-fA-F]{1,2}(?:[\.:-])){2}[0-9a-fA-F]{1,2}\b)"
+    R"()\b)"};
 
 std::string GetOuiPrefix(const std::string& mac) {
+  static constexpr re2::LazyRE2 regexp = MakeLazyRE2(kMacPattern.data());
   std::string oui;
-  if (!re2::RE2::PartialMatch(mac, *kOui, &oui)) {
-    oui = "regex error";
-  }
+  re2::RE2::FullMatch(mac, *regexp, nullptr, &oui);
   return oui;
 }
 
@@ -298,11 +301,6 @@ std::string CanonicalizeMac(const std::string& original_mac) {
 
 namespace {
 
-constexpr std::string_view kMacPattern{
-    R"(\b()"
-    R"(\b(?:(?:[0-9a-fA-F]{1,2}(?:[\.:-])){3})(?:[0-9a-fA-F]{1,2}(?:[\.:-])){2}[0-9a-fA-F]{1,2}\b)"
-    R"()\b)"};
-
 std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
   const std::string oui = mac_utils::GetOuiPrefix(mac);
   const int id = cache.GetId(mac_utils::CanonicalizeMac(mac));
@@ -311,7 +309,7 @@ std::string RedactMac(RedactionIdCache& cache, const std::string& mac) {
 
 }  // namespace
 
-Replacer ReplaceMac() { return FunctionBasedReplacer(kMacPattern, RedactMac); }
+Replacer ReplaceMac() { return FunctionBasedReplacer(mac_utils::kMacPattern, RedactMac); }
 
 namespace {
 
