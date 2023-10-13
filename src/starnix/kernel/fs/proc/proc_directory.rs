@@ -415,15 +415,16 @@ impl DynamicFileSource for MeminfoFile {
                 log_error!("FIDL error getting memory stats: {e}");
                 errno!(EIO)
             })?;
-        writeln!(sink, "MemTotal:\t {} kB", memstats.total_bytes.unwrap_or_default() / 1024)?;
-        writeln!(sink, "MemFree:\t {} kB", memstats.free_bytes.unwrap_or_default() / 1024)?;
-        writeln!(
-            sink,
-            "MemAvailable:\t {} kB",
-            (memstats.free_bytes.unwrap_or_default()
-                + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
-                / 1024
-        )?;
+
+        let mem_total = memstats.total_bytes.unwrap_or_default() / 1024;
+        let mem_free = memstats.free_bytes.unwrap_or_default() / 1024;
+        let mem_available = (memstats.free_bytes.unwrap_or_default()
+            + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
+            / 1024;
+
+        writeln!(sink, "MemTotal:       {:8} kB", mem_total)?;
+        writeln!(sink, "MemFree:        {:8} kB", mem_free)?;
+        writeln!(sink, "MemAvailable:   {:8} kB", mem_available)?;
         Ok(())
     }
 }
