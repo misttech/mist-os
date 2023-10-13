@@ -127,7 +127,7 @@ func (f *File) SetURL(url string) { f.url = url }
 
 // TODO: Remove once bazel-based license collection is enabled.
 func (f *File) AttemptedFuchsiaGoogleSourceURL() string {
-	return fmt.Sprintf("https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/%s", f.RelPath())
+	return fmt.Sprintf("https://cs.opensource.google/fuchsia/fuchsia/+/main:%s", f.RelPath())
 }
 
 // Getters

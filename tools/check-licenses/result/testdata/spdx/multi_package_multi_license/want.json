@@ -68,7 +68,7 @@
       "extractedText": "package A 1st license file",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package_multi_license/path1"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package_multi_license/path1"
       ]
     },
     {
@@ -77,7 +77,7 @@
       "extractedText": "package A 2nd license file",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package_multi_license/path2"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package_multi_license/path2"
       ]
     },
     {
@@ -86,7 +86,7 @@
       "extractedText": "package A 3rd license file",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package_multi_license/path3"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package_multi_license/path3"
       ]
     },
     {
@@ -95,7 +95,7 @@
       "extractedText": "package B license file",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package_multi_license_b/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package_multi_license_b/path"
       ]
     }
   ],

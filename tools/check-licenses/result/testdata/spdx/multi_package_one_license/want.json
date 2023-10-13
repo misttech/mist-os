@@ -68,7 +68,7 @@
       "extractedText": "Testing Testing 123",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package_one_license/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package_one_license/path"
       ]
     }
   ],

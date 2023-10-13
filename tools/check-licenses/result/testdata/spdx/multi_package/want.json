@@ -68,7 +68,7 @@
       "extractedText": "Example License Text for PackageA",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package/path"
       ]
     }
   ],

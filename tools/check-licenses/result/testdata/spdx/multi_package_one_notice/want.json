@@ -68,7 +68,7 @@
       "extractedText": "Testing 123 1",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package/path"
       ]
     },
     {
@@ -77,7 +77,7 @@
       "extractedText": "Testing 123 2",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package/path"
       ]
     },
     {
@@ -86,7 +86,7 @@
       "extractedText": "Testing 123 3",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package/path"
       ]
     },
     {
@@ -95,7 +95,7 @@
       "extractedText": "Testing 123 4",
       "seeAlsos": [
         "www.example.com",
-        "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/fake/multi_package/path"
+        "https://cs.opensource.google/fuchsia/fuchsia/+/main:fake/multi_package/path"
       ]
     }
   ],
