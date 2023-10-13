@@ -363,12 +363,12 @@ class DriverImpl : public DriverBase<DriverImpl<KdrvExtra, KdrvConfig>, KdrvExtr
 
   template <class IoProvider>
   bool TxReady(IoProvider& io) {
-    return LineStatusRegister::Get().ReadFrom(io.io()).tx_empty();
+    return LineStatusRegister::Get().ReadFrom(io.io()).tx_register_empty();
   }
 
   template <class IoProvider, typename It1, typename It2>
   auto Write(IoProvider& io, bool, It1 it, const It2& end) {
-    // The FIFO is empty now, so fill it completely.
+    // The FIFO is empty now and we know the size, so fill it completely.
     auto tx = TxBufferRegister::Get().FromValue(0);
     auto space = fifo_depth_;
     do {
