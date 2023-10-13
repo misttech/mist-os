@@ -5,9 +5,8 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/arch/x86/boot-cpuid.h>
+#include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
-#include <lib/trivial-allocator/basic-leaky-allocator.h>
-#include <lib/trivial-allocator/single-heap-allocator.h>
 #include <stdio.h>
 #include <zircon/limits.h>
 
@@ -42,13 +41,11 @@ constexpr size_t kBootstrapMemoryBytes = 512 * 1024;
 // Bootstrap memory pool.
 alignas(ZX_MIN_PAGE_SIZE) ktl::array<ktl::byte, kBootstrapMemoryBytes> gBootstrapMemory;
 
-void SetUpAddressSpace(AddressSpace::PageTableAllocator allocator) {
+void SetUpAddressSpace(AddressSpace& aspace) {
   // Ensure that executable pages are allowed.
   hwreg::X86MsrIo msr;
   arch::X86ExtendedFeatureEnableRegisterMsr::Get().ReadFrom(&msr).set_nxe(1).WriteTo(&msr);
-
-  AddressSpace aspace;
-  aspace.Init(ktl::move(allocator));
+  aspace.Init();
   aspace.SetUpIdentityMappings();
   aspace.ArchInstall();
 }
@@ -56,26 +53,27 @@ void SetUpAddressSpace(AddressSpace::PageTableAllocator allocator) {
 }  // namespace
 
 void ArchSetUpAddressSpaceEarly() {
-  ktl::span<ktl::byte> memory{gBootstrapMemory};
+  memalloc::Pool& pool = Allocation::GetPool();
 
-  trivial_allocator::BasicLeakyAllocator<trivial_allocator::SingleHeapAllocator> allocator(memory);
-  auto paging_allocator = [&allocator](uint64_t size,
-                                       uint64_t alignment) -> ktl::optional<uint64_t> {
-    void* allocated = allocator.allocate(size, alignment);
-    if (!allocated) {
-      return {};
-    }
-    return reinterpret_cast<uint64_t>(allocated);
-  };
-  SetUpAddressSpace(ktl::move(paging_allocator));
+  uint64_t bootstrap_start = reinterpret_cast<uintptr_t>(gBootstrapMemory.data());
+  uint64_t bootstrap_end = bootstrap_start + gBootstrapMemory.size();
 
-  ktl::span<const ktl::byte> leftover = allocator.unallocated();
-  if (!leftover.empty()) {
-    if (Allocation::GetPool()
-            .Free(reinterpret_cast<uint64_t>(leftover.data()), leftover.size())
-            .is_error()) {
-      printf("Failed to release .bss bootstrap memory\n");
-    }
+  // Per the above, we Free() the .bss bootstrap region to be able to allocate
+  // from it, and then clamp the global page table allocation bounds to it.
+
+  if (pool.Free(bootstrap_start, gBootstrapMemory.size()).is_error()) {
+    ZX_PANIC("Failed to free .bss page table bootstrap region [%#" PRIx64 ", %#" PRIx64 ")",
+             bootstrap_start, bootstrap_end);
   }
+
+  // TODO(fxbug.dev/91187): Remember to unset the allocation bounds when we
+  // once a global address space instance is set-up here instead.
+  AddressSpace aspace;
+  aspace.SetPageTableAllocationBounds(bootstrap_start, bootstrap_end);
+  SetUpAddressSpace(aspace);
 }
-void ArchSetUpAddressSpaceLate() { SetUpAddressSpace(AddressSpace::PhysPageTableAllocator()); }
+
+void ArchSetUpAddressSpaceLate() {
+  AddressSpace aspace;
+  SetUpAddressSpace(aspace);
+}

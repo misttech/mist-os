@@ -25,16 +25,20 @@
 
 #include <ktl/enforce.h>
 
-AddressSpace::PageTableAllocator AddressSpace::PhysPageTableAllocator(memalloc::Pool& pool) {
-  return [&pool](uint64_t alignment, uint64_t size) -> ktl::optional<uint64_t> {
-    auto result = pool.Allocate(memalloc::Type::kIdentityPageTables, size, alignment);
-    if (result.is_error()) {
-      return ktl::nullopt;
-    }
-    uint64_t addr = ktl::move(result).value();
-    memset(reinterpret_cast<void*>(addr), 0, static_cast<size_t>(size));
-    return addr;
-  };
+void AddressSpace::AllocateRootPageTables() {
+  auto temp_allocator = temporary_allocator();
+
+  ktl::optional<uint64_t> lower_root = temp_allocator(
+      LowerPaging::kTableSize<LowerPaging::kFirstLevel>, LowerPaging::kTableAlignment);
+  ZX_ASSERT_MSG(lower_root, "failed to allocate %sroot page table", kDualSpaces ? "lower " : "");
+  lower_root_paddr_ = *lower_root;
+
+  if constexpr (kDualSpaces) {
+    ktl::optional<uint64_t> upper_root = temp_allocator(
+        UpperPaging::kTableSize<UpperPaging::kFirstLevel>, UpperPaging::kTableAlignment);
+    ZX_ASSERT_MSG(upper_root, "failed to allocate upper root page table");
+    upper_root_paddr_ = *upper_root;
+  }
 }
 
 fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t size, uint64_t paddr,
@@ -43,14 +47,15 @@ fit::result<AddressSpace::MapError> AddressSpace::Map(uint64_t vaddr, uint64_t s
                 "virtual address %#" PRIx64 " must be < %#" PRIx64 " or >= %#" PRIx64, vaddr,
                 kLowerVirtualAddressRangeEnd, kUpperVirtualAddressRangeStart);
 
+  auto temp_allocator = temporary_allocator();
   if constexpr (kDualSpaces) {
     if (vaddr >= kUpperVirtualAddressRangeStart) {
-      return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, ktl::ref(allocator_), state_, vaddr,
-                              size, paddr, settings);
+      return UpperPaging::Map(upper_root_paddr_, paddr_to_io_, temp_allocator, state_, vaddr, size,
+                              paddr, settings);
     }
   }
-  return LowerPaging::Map(lower_root_paddr_, paddr_to_io_, ktl::ref(allocator_), state_, vaddr,
-                          size, paddr, settings);
+  return LowerPaging::Map(lower_root_paddr_, paddr_to_io_, temp_allocator, state_, vaddr, size,
+                          paddr, settings);
 }
 
 void AddressSpace::IdentityMapRam() {

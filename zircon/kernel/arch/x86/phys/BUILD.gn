@@ -300,7 +300,7 @@ if (current_toolchain == default_toolchain) {
       sources += [ "address-space-64.cc" ]
     }
     deps = [
-      "//src/lib/trivial-allocator",
+      "//sdk/lib/fit",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:address-space.header",

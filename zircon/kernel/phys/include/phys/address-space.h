@@ -11,6 +11,7 @@
 
 #include <hwreg/array.h>
 #include <ktl/byte.h>
+#include <ktl/functional.h>
 #include <ktl/integer_sequence.h>
 #include <ktl/move.h>
 #include <ktl/optional.h>
@@ -70,10 +71,6 @@ class AddressSpace {
 
   using MapError = arch::MapError;
 
-  // An allocator of page tables, as expected by the libarch PagingTraits API.
-  using PageTableAllocator =
-      fit::inline_function<ktl::optional<uint64_t>(uint64_t size, uint64_t alignment)>;
-
   // Whether the upper and lower virtual address spaces are configured and
   // operated upon separately.
   static constexpr bool kDualSpaces = !ktl::is_same_v<LowerPaging, UpperPaging>;
@@ -87,35 +84,30 @@ class AddressSpace {
     return {.access = access, .memory = kArchNormalMemoryType};
   }
 
-  // Returns the main memalloc::Pool-backed allocator.
-  static PageTableAllocator PhysPageTableAllocator(memalloc::Pool& pool = Allocation::GetPool());
-
-  // Initializes the address space with a given page table allocator and the
-  // arguments specified by ArchCreatePagingState().
-  template <typename... PagingStateCreationArgs>
-  void Init(PageTableAllocator allocator, PagingStateCreationArgs&&... args) {
-    allocator_ = ktl::move(allocator);
-
-    ktl::optional<uint64_t> lower_root =
-        allocator_(LowerPaging::kTableSize<LowerPaging::kFirstLevel>, LowerPaging::kTableAlignment);
-    ZX_ASSERT_MSG(lower_root, "failed to allocate %sroot page table", kDualSpaces ? "lower " : "");
-    lower_root_paddr_ = *lower_root;
-
-    if constexpr (kDualSpaces) {
-      ktl::optional<uint64_t> upper_root = allocator_(
-          UpperPaging::kTableSize<UpperPaging::kFirstLevel>, UpperPaging::kTableAlignment);
-      ZX_ASSERT_MSG(upper_root, "failed to allocate upper root page table");
-      upper_root_paddr_ = *upper_root;
-    }
-
-    state_ = ArchCreatePagingState(ktl::forward<PagingStateCreationArgs>(args)...);
+  // Restricts the memory out of which page tables may be allocated. A bound of
+  // ktl::nullopt indicates that the corresponding default bound on the global
+  // memalloc::Pool should be respected instead (i.e., the default behaviour).
+  //
+  // This method may be called before Init() in order to ensure that root page
+  // allocation respects these bounds as well.
+  //
+  // In a nebulous period of early boot on x86-64, we have no guarantees on
+  // what memory is mapped beyond our load image; in that case we must restrict
+  // the allocation of fresh mappings out of that load image, which is where
+  // this method comes in handy.
+  void SetPageTableAllocationBounds(ktl::optional<uint64_t> low, ktl::optional<uint64_t> high) {
+    ZX_ASSERT(!low || !high || *low <= *high);
+    pt_allocation_lower_bound_ = low;
+    pt_allocation_upper_bound_ = high;
   }
 
-  // As above, but specifies PhysPageTableAllocator() for a page table
-  // allocator.
+  // Initializes the address space, allocating the root page table(s), and
+  // initializes system paging state with the arguments specified by
+  // ArchCreatePagingState().
   template <typename... Args>
   void Init(Args&&... args) {
-    Init(PhysPageTableAllocator(), ktl::forward<Args>(args)...);
+    AllocateRootPageTables();
+    state_ = ArchCreatePagingState(ktl::forward<Args>(args)...);
   }
 
   template <bool DualSpaces = kDualSpaces, typename = ktl::enable_if_t<DualSpaces>>
@@ -176,6 +168,7 @@ class AddressSpace {
   static constexpr uint64_t kUpperVirtualAddressRangeStart =
       *UpperPaging::kUpperVirtualAddressRangeStart;
 
+  void AllocateRootPageTables();
   void IdentityMapRam();
   void IdentityMapUart();
 
@@ -183,10 +176,34 @@ class AddressSpace {
     return reinterpret_cast<Table*>(paddr)->direct_io();
   };
 
-  PageTableAllocator allocator_;
+  template <memalloc::Type AllocationType>
+  ktl::optional<uint64_t> AllocatePageTable(uint64_t size, uint64_t alignment) {
+    auto result = Allocation::GetPool().Allocate(
+        AllocationType, size, alignment, pt_allocation_lower_bound_, pt_allocation_upper_bound_);
+    if (result.is_error()) {
+      return ktl::nullopt;
+    }
+    auto addr = static_cast<uintptr_t>(result.value());
+    memset(reinterpret_cast<void*>(addr), 0, static_cast<size_t>(size));
+    return addr;
+  }
+
+  // TODO(fxbug.dev/91187): Use a different type indicating permanent mappings
+  // in the following cases:
+  // * Allocation of tables in the upper address space;
+  // * Allocation of the root page table when the address space is unified.
+  auto temporary_allocator() {
+    return ktl::bind_front(&AddressSpace::AllocatePageTable<memalloc::Type::kIdentityPageTables>,
+                           this);
+  }
+
   uint64_t lower_root_paddr_ = 0;
   uint64_t upper_root_paddr_ = 0;
   SystemState state_ = {};
+
+  // See SetPageTableAllocationBounds() above.
+  ktl::optional<uint64_t> pt_allocation_lower_bound_;
+  ktl::optional<uint64_t> pt_allocation_upper_bound_;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ADDRESS_SPACE_H_
