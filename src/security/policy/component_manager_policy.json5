@@ -365,19 +365,6 @@
                 ],
             },
             {
-                // We restrict access to PackageResolver-ota because it gives direct access to
-                // package handles which provide executability which bypass VX security policy.
-                // Additionally, this "-ota" implementation does not protect resolved packages from
-                // garbage collection and so should only be used by the system-updater.
-                source_moniker: "/core/pkg-resolver",
-                source: "component",
-                source_name: "fuchsia.pkg.PackageResolver-ota",
-                capability: "protocol",
-                target_monikers: [
-                    "/core/system-update/system-updater",
-                ],
-            },
-            {
                 // We restrict access to ProcessResolver because it is a deprecated protocol
                 // that allows resolving binaries from universe packages.
                 source_moniker: "/core/process_resolver",
