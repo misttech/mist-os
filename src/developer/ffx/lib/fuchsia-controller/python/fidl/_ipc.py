@@ -8,6 +8,7 @@ import os
 import sys
 import typing
 import fuchsia_controller_py as fc
+from abc import ABC, abstractmethod
 
 
 class _QueueWrapper(object):
@@ -52,8 +53,36 @@ def enqueue_ready_zx_handle_from_fd(
         logging.debug(f"Dropping notification for: {handle_no}")
 
 
-class GlobalChannelWaker(object):
-    """A class for handling notifications on a channel. By default hooks into global state."""
+class HandleWaker(ABC):
+    """Base class for a waker used with potentially blocking handles."""
+
+    @abstractmethod
+    def register(self, channel: fc.Channel) -> None:
+        """Registers a handle to receive wake notifications."""
+        pass
+
+    @abstractmethod
+    def unregister(self, channel: fc.Channel) -> None:
+        """Unregisters a handle, meaning it is not possible to wait for it to be ready."""
+        pass
+
+    @abstractmethod
+    def post_channel_ready(self, channel: fc.Channel):
+        """Notifies the waker that a channel is ready."""
+        pass
+
+    @abstractmethod
+    async def wait_channel_ready(self, channel: fc.Channel) -> int:
+        """Waits for a channel to be ready asynchronously."""
+        pass
+
+
+class GlobalHandleWaker(HandleWaker):
+    """A class for handling notifications on a readable handle.
+
+    As this is a global channel waker, this hooks into global state. This is the default waker used
+    with all client and server code, as well as async wrapper code around readable handles.
+    """
 
     def __init__(self):
         self.handle_ready_queues = HANDLE_READY_QUEUES

@@ -7,7 +7,7 @@ import fuchsia_controller_py as fc
 from fidl_codec import decode_fidl_request, encode_fidl_message
 from dataclasses import dataclass
 
-from ._ipc import GlobalChannelWaker
+from ._ipc import GlobalHandleWaker
 from ._fidl_common import *
 
 
@@ -44,7 +44,7 @@ class ServerBase(object):
     def __init__(self, channel: fc.Channel, channel_waker=None):
         self.channel = channel
         if channel_waker is None:
-            self.channel_waker = GlobalChannelWaker()
+            self.channel_waker = GlobalHandleWaker()
         else:
             self.channel_waker = channel_waker
 

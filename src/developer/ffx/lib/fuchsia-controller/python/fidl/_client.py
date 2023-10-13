@@ -9,7 +9,7 @@ from fidl_codec import encode_fidl_message
 import typing
 from typing import Dict, Set
 
-from ._ipc import GlobalChannelWaker
+from ._ipc import GlobalHandleWaker
 from ._fidl_common import *
 
 TXID: TXID_Type = 0
@@ -22,7 +22,7 @@ class FidlClient(object):
         else:
             self.channel = channel
         if channel_waker is None:
-            self.channel_waker = GlobalChannelWaker()
+            self.channel_waker = GlobalHandleWaker()
         else:
             self.channel_waker = channel_waker
         self.pending_txids: Set[TXID_Type] = set({})

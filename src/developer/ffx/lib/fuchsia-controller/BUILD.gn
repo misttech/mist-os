@@ -118,6 +118,7 @@ python_library("fidl_bindings") {
   ]
   sources = [
     "__init__.py",
+    "_async_socket.py",
     "_client.py",
     "_fidl_common.py",
     "_import.py",

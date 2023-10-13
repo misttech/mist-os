@@ -9,6 +9,8 @@ import types
 from ._library import get_fidl_ir_map
 from ._library import load_module
 from ._fidl_common import TransportError
+from ._ipc import HandleWaker, GlobalHandleWaker
+from ._async_socket import AsyncSocket
 
 
 class FIDLImportFinder(importlib.abc.MetaPathFinder):
@@ -26,6 +28,13 @@ class FIDLImportFinder(importlib.abc.MetaPathFinder):
         return load_module(fullname)
 
 
-sys.modules["fidl.TransportError"] = TransportError
+def export(ty: type) -> None:
+    sys.modules[f"fidl.{ty.__name__}"] = ty
+
+
+export(TransportError)
+export(AsyncSocket)
+export(HandleWaker)
+export(GlobalHandleWaker)
 meta_hook = FIDLImportFinder()
 sys.meta_path.insert(0, meta_hook)
