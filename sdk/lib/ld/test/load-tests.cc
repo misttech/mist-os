@@ -137,4 +137,16 @@ TYPED_TEST(LdLoadTests, ManyDeps) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, InitFini) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("init-fini"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace

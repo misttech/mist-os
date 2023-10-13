@@ -108,6 +108,8 @@ constexpr cpp20::span<const typename Elf::Dyn> DecodeModuleDynamic(
   module.link_map.ld = dyn.data();
 
   elfldltl::DecodeDynamic(diag, memory, dyn, elfldltl::DynamicSymbolInfoObserver(module.symbols),
+                          elfldltl::DynamicInitObserver(module.init),
+                          elfldltl::DynamicFiniObserver(module.fini),
                           std::forward<DynamicObservers>(dynamic_observers)...);
   module.soname = module.symbols.soname();
   return dyn;

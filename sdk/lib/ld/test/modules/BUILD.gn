@@ -26,6 +26,8 @@ executables = [
   ":symbolic-namespace.in-process",
   ":many-deps",
   ":many-deps.in-process",
+  ":init-fini",
+  ":init-fini.in-process",
 ]
 shlibs = [
   ":ld-dep-a",
@@ -352,4 +354,10 @@ test_executable("many-deps") {
     ":ld-dep-f",
     "../..",
   ]
+}
+
+test_executable("init-fini") {
+  can_be_in_process = true
+  sources = [ "init-fini.cc" ]
+  deps = [ "../.." ]
 }

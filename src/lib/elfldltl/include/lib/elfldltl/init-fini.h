@@ -75,7 +75,7 @@ struct InitFiniInfo {
   // true iff Addr has already been relocated.  The argument flag should be
   // true iff relocations affecting RELRO data have already been applied.
   template <typename T>
-  constexpr void VisitInit(T&& init, bool relocated) {
+  constexpr void VisitInit(T&& init, bool relocated) const {
     if (legacy_ != 0) {
       init(legacy_, false);
     }
@@ -86,7 +86,7 @@ struct InitFiniInfo {
 
   // Same as VisitInit, but in the reverse order.
   template <typename T>
-  constexpr void VisitFini(T&& fini, bool relocated) {
+  constexpr void VisitFini(T&& fini, bool relocated) const {
     for (auto it = array_.rbegin(); it != array_.rend(); ++it) {
       fini(*it, relocated);
     }
@@ -109,12 +109,12 @@ struct InitFiniInfo {
   }
 
   // Call all the functions in initialization order.
-  void CallInit(size_type bias, bool relocated = true) {
+  void CallInit(size_type bias, bool relocated = true) const {
     VisitInit(RelocatedCall(bias), relocated);
   }
 
   // Call all the functions in finalization order.
-  void CallFini(size_type bias, bool relocated = true) {
+  void CallFini(size_type bias, bool relocated = true) const {
     VisitFini(RelocatedCall(bias), relocated);
   }
 
