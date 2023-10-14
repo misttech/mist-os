@@ -20,6 +20,8 @@ load(
 load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
+_FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
+
 def get_driver_component_manifests(package):
     """ Returns a list of the manifest paths for drivers in the package
 
@@ -93,6 +95,11 @@ def fuchsia_package(
     # register another driver.
     disable_repository_name = kwargs.pop("disable_repository_name", None)
 
+    # Fuchsia packages are only compatible with the fuchsia OS.
+    target_compat = kwargs.pop("target_compatible_with", [])
+    if _FUCHSIA_OS_PLATFORM not in target_compat:
+        target_compat.append(_FUCHSIA_OS_PLATFORM)
+
     _build_fuchsia_package(
         name = "%s_fuchsia_package" % name,
         components = components,
@@ -102,6 +109,7 @@ def fuchsia_package(
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
+        target_compatible_with = target_compat,
         **kwargs
     )
 
@@ -128,6 +136,12 @@ def _fuchsia_test_package(
     """Defines test variants of fuchsia_package.
 
     See fuchsia_package for argument descriptions."""
+
+    # Fuchsia packages are only compatible with the fuchsia OS.
+    target_compat = kwargs.pop("target_compatible_with", [])
+    if _FUCHSIA_OS_PLATFORM not in target_compat:
+        target_compat.append(_FUCHSIA_OS_PLATFORM)
+
     _build_fuchsia_package_test(
         name = "%s_fuchsia_package" % name,
         test_components = _test_component_mapping.values(),
@@ -137,6 +151,7 @@ def _fuchsia_test_package(
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
+        target_compatible_with = target_compat,
         **kwargs
     )
 
