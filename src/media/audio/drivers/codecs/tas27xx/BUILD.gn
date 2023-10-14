@@ -18,6 +18,7 @@ driver_bind_rules("ti_tas27xx-bind") {
   deps = [
     "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.i2c",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.ti.platform",
   ]
 }

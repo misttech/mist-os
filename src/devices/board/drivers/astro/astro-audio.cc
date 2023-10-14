@@ -73,65 +73,58 @@ static const std::vector<fpbus::Bti> tdm_btis{
     }},
 };
 
-const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+const std::vector<fdf::BindRule> kGpioInitRules{
     fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
-const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+const std::vector<fdf::NodeProperty> kGpioInitProps{
     fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
-const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
+const std::vector<fdf::BindRule> kAudioEnableGpioRules{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_SOC_AUDIO_EN)),
 };
-const std::vector<fdf::NodeProperty> kAudioEnableGpioProps = std::vector{
+const std::vector<fdf::NodeProperty> kAudioEnableGpioProps{
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_ENABLE),
 };
 
-const std::vector<fdf::BindRule> kCodecRules = std::vector{
+const std::vector<fdf::BindRule> kCodecRules{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID, kCodecVid),
     fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID, kCodecDid),
 };
-const std::vector<fdf::NodeProperty> kCodecProps = std::vector{
+const std::vector<fdf::NodeProperty> kCodecProps{
     fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_codec::BIND_FIDL_PROTOCOL_SERVICE),
     fdf::MakeProperty(bind_fuchsia::CODEC_INSTANCE, static_cast<uint32_t>(1)),
 };
 
-const ddk::BindRule kI2cRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector<fdf::BindRule> kI2cRules{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(ASTRO_I2C_3)),
-    ddk::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_BUS_ID, static_cast<uint32_t>(ASTRO_I2C_3)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::I2C_ADDRESS,
                             bind_fuchsia_i2c::BIND_I2C_ADDRESS_AUDIO_CODEC),
 };
-const device_bind_prop_t kI2cProps[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
-    ddk::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AUDIO_CODEC),
-    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+const std::vector<fdf::NodeProperty> kI2cProps{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_i2c::BIND_FIDL_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, bind_fuchsia_i2c::BIND_I2C_ADDRESS_AUDIO_CODEC),
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                       bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI),
-    ddk::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+    fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
                       bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_TAS2770),
 };
 
-const ddk::BindRule kFaultGpioRules[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+const std::vector<fdf::BindRule> kFaultGpioRules{
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
+    fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(GPIO_AUDIO_SOC_FAULT_L)),
 };
-const device_bind_prop_t kFaultGpioProps[] = {
-    ddk::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
-    ddk::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
-};
-
-const ddk::BindRule kGpioInitRulesDdk[] = {
-    ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
-};
-const device_bind_prop_t kGpioInitPropsDdk[] = {
-    ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+const std::vector<fdf::NodeProperty> kFaultGpioProps{
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL, bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
+    fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_SOC_AUDIO_FAULT),
 };
 
 const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
@@ -146,7 +139,6 @@ const std::vector<fdf::ParentSpec> kParentSpecGpioInit = std::vector{
 
 zx_status_t Astro::AudioInit() {
   zx_status_t status;
-  fidl::Arena<> fidl_arena;
   fdf::Arena arena('AUDI');
   uint8_t tdm_instance_id = 1;
 
@@ -262,8 +254,8 @@ zx_status_t Astro::AudioInit() {
         "aml_tdm_dai_out",
         kParentSpecGpioInit,
     }};
-    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                            fidl::ToWire(fidl_arena, tdm_spec));
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, tdm_dev),
+                                                            fidl::ToWire(arena, tdm_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
@@ -289,22 +281,37 @@ zx_status_t Astro::AudioInit() {
       metadata.init_sequence2[i].value = tas2770_init_sequence2[i].value;
     }
 #endif
-    const device_metadata_t codec_metadata[] = {
-        {
-            .type = DEVICE_METADATA_PRIVATE,
-            .data = reinterpret_cast<uint8_t*>(&metadata),
-            .length = sizeof(metadata),
-        },
-    };
 
-    status = DdkAddCompositeNodeSpec("audio_codec_tas27xx",
-                                     ddk::CompositeNodeSpec(kI2cRules, kI2cProps)
-                                         .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
-                                         .AddParentSpec(kGpioInitRulesDdk, kGpioInitPropsDdk)
-                                         .set_metadata(codec_metadata));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);
-      return status;
+    fpbus::Node dev;
+    dev.name() = "audio_codec_tas27xx";
+    dev.vid() = PDEV_VID_TI;
+    dev.did() = PDEV_DID_TI_TAS2770;
+    dev.metadata() = std::vector<fpbus::Metadata>{
+        {{
+            .type = DEVICE_METADATA_PRIVATE,
+            .data = std::vector<uint8_t>(
+                reinterpret_cast<const uint8_t*>(&metadata),
+                reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
+        }},
+    };
+    auto parents = std::vector{
+        fdf::ParentSpec{{kI2cRules, kI2cProps}},
+        fdf::ParentSpec{{kFaultGpioRules, kFaultGpioProps}},
+        fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+    };
+    auto composite_node_spec =
+        fdf::CompositeNodeSpec{{.name = "audio_codec_tas27xx", .parents = parents}};
+
+    fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+        fidl::ToWire(arena, dev), fidl::ToWire(arena, composite_node_spec));
+    if (!result.ok()) {
+      zxlogf(ERROR, "Failed to send AddCompositeNodeSpec request: %s", result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "Failed to add composite node spec: %s",
+             zx_status_get_string(result->error_value()));
+      return result->error_value();
     }
   }
   {
@@ -368,8 +375,8 @@ zx_status_t Astro::AudioInit() {
         "aml_tdm",
         kTdmI2sSpec,
     }};
-    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                            fidl::ToWire(fidl_arena, tdm_spec));
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, tdm_dev),
+                                                            fidl::ToWire(arena, tdm_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
@@ -428,8 +435,8 @@ zx_status_t Astro::AudioInit() {
         "aml_tdm_dai_in",
         kParentSpecGpioInit,
     }};
-    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
-                                                            fidl::ToWire(fidl_arena, tdm_spec));
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, tdm_dev),
+                                                            fidl::ToWire(arena, tdm_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec request failed: %s", result.FormatDescription().data());
       return result.status();
@@ -492,8 +499,8 @@ zx_status_t Astro::AudioInit() {
         "aml_pdm",
         kParentSpecGpioInit,
     }};
-    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
-                                                            fidl::ToWire(fidl_arena, pdm_spec));
+    auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, dev_in),
+                                                            fidl::ToWire(arena, pdm_spec));
     if (!result.ok()) {
       zxlogf(ERROR, "AddCompositeNodeSpec Audio(dev_in) request failed: %s",
              result.FormatDescription().data());
