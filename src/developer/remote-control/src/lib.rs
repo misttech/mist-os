@@ -274,6 +274,10 @@ impl RemoteControlService {
                 responder.send(fuchsia_zircon::Time::get_monotonic().into_nanos())?;
                 Ok(())
             }
+            rcs::RemoteControlRequest::_UnknownMethod { ordinal, .. } => {
+                warn!("Received unknown request with ordinal {ordinal}");
+                Ok(())
+            }
         }
     }
 

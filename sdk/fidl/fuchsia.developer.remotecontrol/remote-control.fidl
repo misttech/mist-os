@@ -24,7 +24,7 @@ type TunnelError = strict enum {
 };
 
 @discoverable
-closed protocol RemoteControl {
+open protocol RemoteControl {
     /// Returns the input.
     strict EchoString(struct {
         value string:255;
@@ -40,7 +40,7 @@ closed protocol RemoteControl {
     }) -> ();
 
     /// Connects to the root [`fuchsia.sys2/RealmExplorer`] protocol.
-    strict RootRealmExplorer(resource struct {
+    flexible RootRealmExplorer(resource struct {
         server server_end:sys2.RealmExplorer;
     }) -> () error zx.Status;
 
@@ -52,21 +52,21 @@ closed protocol RemoteControl {
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/LifecycleController`] protocol.
-    strict RootLifecycleController(resource struct {
+    flexible RootLifecycleController(resource struct {
         server server_end:sys2.LifecycleController;
     }) -> () error zx.Status;
 
     /// Connects to the root [`fuchsia.sys2/RouteValidator`] protocol.
-    strict RootRouteValidator(resource struct {
+    flexible RootRouteValidator(resource struct {
         server server_end:sys2.RouteValidator;
     }) -> () error zx.Status;
 
     // Connects to the [`fuchsia.kernel/Stats`] protocol
-    strict KernelStats(resource struct {
+    flexible KernelStats(resource struct {
         server server_end:kernel.Stats;
     }) -> () error zx.Status;
 
-    strict IdentifyHost() -> (struct {
+    flexible IdentifyHost() -> (struct {
         response IdentifyHostResponse;
     }) error IdentifyHostError;
 
@@ -74,7 +74,7 @@ closed protocol RemoteControl {
     // component identified by the given moniker exposes a capability of the
     // requested name.
     @deprecated("Please use `OpenCapability` with `OpenDirType::Exposed`")
-    strict ConnectCapability(resource struct {
+    flexible ConnectCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;
         capability_name component.name;
         server_chan zx.Handle:CHANNEL;
@@ -84,7 +84,7 @@ closed protocol RemoteControl {
     // Connects a channel to a service, given a moniker and a channel iff the
     // component identified by the given moniker exposes a capability of the
     // requested name.
-    strict OpenCapability(resource struct {
+    flexible OpenCapability(resource struct {
         moniker string:component.MAX_MONIKER_LENGTH;
         capability_set sys2.OpenDirType;
         capability_name component.name;
@@ -113,14 +113,14 @@ closed protocol RemoteControl {
 
     // Establishes a TCP connection to the given address and forwards traffic through the given
     // socket.
-    strict ForwardTcp(resource struct {
+    flexible ForwardTcp(resource struct {
         addr net.SocketAddress;
         socket zx.Handle:SOCKET;
     }) -> () error TunnelError;
 
     // Listens on a TCP port and forwards any incoming connections to newly-created sockets which
     // are passed back via the callback.
-    strict ReverseTcp(resource struct {
+    flexible ReverseTcp(resource struct {
         addr net.SocketAddress;
         client client_end:ForwardCallback;
     }) -> () error TunnelError;
