@@ -477,7 +477,7 @@ class FFX:
             if _DEVICE_NOT_CONNECTED in str(err.output):
                 raise errors.DeviceNotConnectedError(
                     f"{self._target} is not connected to host"
-                )
+                ) from err
             raise errors.FfxCommandError(
                 f"Failed to get check RCS connection of {self._target}"
             ) from err

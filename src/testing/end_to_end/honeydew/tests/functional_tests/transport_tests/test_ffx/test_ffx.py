@@ -65,19 +65,24 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
     def test_get_target_type(self) -> None:
         """Test case for FFX.get_target_type()."""
         # TODO(b/293640613): uncomment after landing qemu-x64 switch to x64
-        # assert isinstance(self.device, transports_capable.FFXCapableDevice)
-        # target_type: str = self.device.ffx.get_target_type()
+        asserts.skip(
+            reason="TODO(b/293640613): uncomment this after landing "
+            "qemu-x64 switch to x64"
+        )
+
+        assert isinstance(self.device, transports_capable.FFXCapableDevice)
+        target_type: str = self.device.ffx.get_target_type()
         # Note - If "target_type" is specified in "expected_values" in
         # params.yml then compare with it.
-        # if self.user_params["expected_values"] and self.user_params[
-        #    "expected_values"
-        # ].get("target_type"):
-        #    asserts.assert_equal(
-        #        target_type, self.user_params["expected_values"]["target_type"]
-        #    )
-        # else:
-        #    asserts.assert_is_not_none(target_type)
-        #    asserts.assert_is_instance(target_type, str)
+        if self.user_params["expected_values"] and self.user_params[
+            "expected_values"
+        ].get("target_type"):
+            asserts.assert_equal(
+                target_type, self.user_params["expected_values"]["target_type"]
+            )
+        else:
+            asserts.assert_is_not_none(target_type)
+            asserts.assert_is_instance(target_type, str)
 
     def test_is_target_connected(self) -> None:
         """Test case for FFX.is_target_connected()."""
@@ -92,6 +97,11 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
         cmd: list[str] = ["target", "ssh", "ls"]
         self.device.ffx.run(cmd)
+
+    def test_wait_for_rcs_connection(self) -> None:
+        """Test case for FFX.wait_for_rcs_connection()."""
+        assert isinstance(self.device, transports_capable.FFXCapableDevice)
+        self.device.ffx.wait_for_rcs_connection()
 
 
 if __name__ == "__main__":

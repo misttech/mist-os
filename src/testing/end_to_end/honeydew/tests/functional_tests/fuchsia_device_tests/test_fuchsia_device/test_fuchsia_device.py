@@ -29,6 +29,17 @@ _LOGGER: logging.Logger = logging.getLogger(__name__)
 # * `reboot()` - Test class is @ <>/end_to_end/examples/test_soft_reboot/
 # * `power_cycle()`
 
+# Note - Below APIs will be tested automatically in `.reboot()` test case
+#   * `on_device_boot()`
+#   * `wait_for_offline()`
+
+# Note - Do not add separate functional test for `close()` as it will clean up
+# the FuchsiaDevice HoneyDew object and thus any subsequent calls will fail.
+# `close()` is called anyway when Mobly calls `destroy()` defined in the
+# FuchsiaDevice mobly controller
+
+# Note - `register_for_on_device_boot()` has been fully tested using unit test
+
 
 # pylint: disable=pointless-statement
 class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -64,9 +75,15 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for device_type"""
         # TODO(b/293640613): uncomment when we've landed the switch from
         # qemu-x64 to x64 boards
-        # asserts.assert_equal(
-        #    self.device.device_type,
-        #    self.user_params["expected_values"]["device_type"])
+        asserts.skip(
+            reason="TODO(b/293640613): uncomment this after landing "
+            "qemu-x64 switch to x64"
+        )
+
+        asserts.assert_equal(
+            self.device.device_type,
+            self.user_params["expected_values"]["device_type"],
+        )
 
     def test_manufacturer(self) -> None:
         """Test case for manufacturer"""
@@ -110,6 +127,10 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         else:
             asserts.assert_is_instance(self.device.firmware_version, str)
 
+    def test_health_check(self) -> None:
+        """Test case for health_check()"""
+        self.device.health_check()
+
     def test_log_message_to_device(self) -> None:
         """Test case for log_message_to_device()"""
         self.device.log_message_to_device(
@@ -132,6 +153,10 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
             self.device.snapshot(directory=tmpdir, snapshot_file="snapshot.zip")
             exists: bool = os.path.exists(f"{tmpdir}/snapshot.zip")
         asserts.assert_true(exists, msg="snapshot failed")
+
+    def test_wait_for_online(self) -> None:
+        """Test case for wait_for_online()"""
+        self.device.wait_for_online()
 
 
 if __name__ == "__main__":
