@@ -6,6 +6,7 @@
 #define LIB_DRIVER_DEVICETREE_VISITORS_REGISTRATION_H_
 
 #include <lib/driver/devicetree/manager/visitor.h>
+#include <lib/driver/logging/cpp/logger.h>
 
 #include <memory>
 
@@ -26,7 +27,7 @@ struct VisitorRegistration {
     // error.
     // TODO(fxbug.dev/134108) : Temporarily using C++ ABI. Move to C ABI once
     // visitor interface is stabilized.
-    std::unique_ptr<fdf_devicetree::Visitor> (*create_visitor)();
+    std::unique_ptr<fdf_devicetree::Visitor> (*create_visitor)(fdf::Logger* logger);
   } v1;
 };
 
@@ -41,9 +42,11 @@ struct VisitorRegistration {
   extern "C" const VisitorRegistration __devicetree_visitor_registration__ __EXPORT \
   DEVICETREE_VISITOR_REGISTRATION_V1(create_visitor)
 
-#define REGISTER_DEVICETREE_VISITOR(visitor_class)                                             \
-  EXPORT_DEVICETREE_VISITOR_REGISTRATION_V1([]() -> std::unique_ptr<fdf_devicetree::Visitor> { \
-    return std::make_unique<visitor_class>();                                                  \
-  })
+#define REGISTER_DEVICETREE_VISITOR(visitor_class)                          \
+  EXPORT_DEVICETREE_VISITOR_REGISTRATION_V1(                                \
+      [](fdf::Logger* logger) -> std::unique_ptr<fdf_devicetree::Visitor> { \
+        fdf::Logger::SetGlobalInstance(logger);                             \
+        return std::make_unique<visitor_class>();                           \
+      })
 
 #endif  // LIB_DRIVER_DEVICETREE_VISITORS_REGISTRATION_H_

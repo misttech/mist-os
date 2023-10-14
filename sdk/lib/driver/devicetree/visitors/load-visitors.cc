@@ -169,7 +169,7 @@ zx::result<std::unique_ptr<VisitorRegistry>> LoadVisitors(fdf::Namespace& incomi
       continue;
     }
 
-    auto visitor = registration->v1.create_visitor();
+    auto visitor = registration->v1.create_visitor(fdf::Logger::GlobalInstance());
     if (!visitor) {
       FDF_LOG(ERROR, "visitor '%s' creation failed", visitor_file.c_str());
       continue;

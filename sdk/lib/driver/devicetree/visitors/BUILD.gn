@@ -46,5 +46,8 @@ source_set("multivisitor") {
 
 source_set("registration") {
   public = [ "registration.h" ]
-  public_deps = [ "//sdk/lib/driver/devicetree/manager:headers" ]
+  public_deps = [
+    "//sdk/lib/driver/devicetree/manager:headers",
+    "//sdk/lib/driver/logging/cpp",
+  ]
 }
