@@ -5,7 +5,6 @@
 #include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/job.h>
-#include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <lib/zx/vmar.h>
 #include <zircon/threads.h>
@@ -13,7 +12,6 @@
 
 #include <thread>
 
-#include <mini-process/mini-process.h>
 #include <zxtest/zxtest.h>
 
 #include "utils.h"
@@ -79,15 +77,9 @@ void WaitForThreadState(zx_handle_t thread_handle, zx_thread_state_t state) {
   return;
 }
 
-// Test current behavior when transferring a channel with pending calls out of the current process.
-// TODO(fxbug.dev/34013): This test ensures that currently undefined behavior does not change
-// unexpectedly. Once the behavior is properly undefined, this test should be updated.
-TEST(ChannelInternalTest, TransferChannelWithPendingCallInSourceProcess) {
-  if (getenv("NO_NEW_PROCESS")) {
-    ZXTEST_SKIP("Running without the ZX_POL_NEW_PROCESS policy, skipping test case.");
-  }
+// Verify pending channel_calls are canceled when the handle is transferred.
+TEST(ChannelInternalTest, TransferChannelWithPendingCall) {
   constexpr uint32_t kRequestPayload = 0xc0ffee;
-  constexpr uint32_t kReplyPayload = 0xdeadbeef;
 
   zx::channel local;
   zx::channel remote;
@@ -119,30 +111,17 @@ TEST(ChannelInternalTest, TransferChannelWithPendingCallInSourceProcess) {
       };
       uint32_t actual_bytes = 0;
       uint32_t actual_handles = 0;
-      if (local.call(0, zx::time::infinite(), &args, &actual_bytes, &actual_handles) != ZX_OK) {
-        caller_error = "channel::call failed";
-        return;
-      }
 
-      if (actual_bytes != sizeof(Message)) {
-        caller_error = "Unexpected message size";
-        return;
-      }
+      const zx_status_t status =
+          local.call(0, zx::time::infinite(), &args, &actual_bytes, &actual_handles);
 
-      if (actual_handles != 0) {
-        caller_error = "Unexpected number of handles";
-        return;
-      }
-
-      if (reply.payload != kReplyPayload) {
-        caller_error = "Unexpected reply payload";
+      if (status != ZX_ERR_CANCELED) {
+        caller_error = "channel::call was not canceled as unexpected";
         return;
       }
     });
 
     ASSERT_OK(remote.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
-    ASSERT_NO_FATAL_FAILURE(
-        WaitForThreadState(caller_thread_handle.load(), ZX_THREAD_STATE_BLOCKED_CHANNEL));
 
     // Read the message from the test thread.
     Message request = {};
@@ -154,53 +133,35 @@ TEST(ChannelInternalTest, TransferChannelWithPendingCallInSourceProcess) {
     ASSERT_EQ(actual_bytes, sizeof(Message));
     ASSERT_EQ(kRequestPayload, request.payload);
 
-    // Create another process and transfer the handle to
-    // that process.
-    zx::process proc;
-    zx::thread thread;
-    zx::vmar vmar;
+    // See that the original thread is still blocked.
+    ASSERT_NO_FATAL_FAILURE(
+        WaitForThreadState(caller_thread_handle.load(), ZX_THREAD_STATE_BLOCKED_CHANNEL));
 
-    ASSERT_EQ(
-        zx::process::create(*zx::job::default_job(), "mini-pi-channel-test", 3u, 0, &proc, &vmar),
-        ZX_OK);
-    ASSERT_OK(zx::thread::create(proc, "mini-p-channel-test-thrd", 2u, 0u, &thread));
+    {
+      // Transfer the local endpoint in a channel message.
+      zx::channel a;
+      zx::channel b;
+      ASSERT_OK(zx::channel::create(0, &a, &b));
 
-    zx::channel cmd_channel;
-    ASSERT_OK(start_mini_process_etc(proc.get(), thread.get(), vmar.get(), local.release(), true,
-                                     cmd_channel.reset_and_get_address()));
+      Message transfer_msg;
+      zx_handle_t raw_handle = local.release();
+      ASSERT_OK(a.write(0, &transfer_msg, sizeof(transfer_msg), &raw_handle, 1));
+      raw_handle = ZX_HANDLE_INVALID;
 
-    auto cleanup = fit::defer([&cmd_channel]() {
-      ASSERT_EQ(mini_process_cmd(cmd_channel.get(), MINIP_CMD_EXIT_NORMAL, nullptr),
-                ZX_ERR_PEER_CLOSED);
-    });
+      // See that the original thread is still blocked.
+      ASSERT_NO_FATAL_FAILURE(
+          WaitForThreadState(caller_thread_handle.load(), ZX_THREAD_STATE_BLOCKED_CHANNEL));
 
-    // Have the other process write to the channel we sent it and wait for the result,
-    // to ensure that the endpoint we sent it is actually transferred.
-    ASSERT_OK(mini_process_cmd(cmd_channel.get(), MINIP_CMD_CHANNEL_WRITE, nullptr));
-    ASSERT_OK(remote.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), nullptr));
+      // Reading this channel message will unblock the caller_thread.
+      ASSERT_OK(b.read(0, &transfer_msg, local.reset_and_get_address(), sizeof(transfer_msg), 1,
+                       &actual_bytes, &actual_handles));
+      ASSERT_EQ(actual_bytes, sizeof(transfer_msg));
+      ASSERT_EQ(actual_handles, 1);
+    }
 
-    uint8_t mini_process_result = -1;
-    ASSERT_OK(remote.read(0, &mini_process_result, nullptr, 1, 0, &actual_bytes, &actual_handles));
-    ASSERT_EQ(actual_bytes, 1);
-    ASSERT_EQ(mini_process_result, 0);
-
-    // Make sure the original thread is still blocked.
-    // It is safe to read from caller_thread_handle since this is set before
-    // the read happends, and we waited until the remote endpoint became readable.
-    zx_info_thread_t info = {};
-    uint64_t actual = 0;
-    uint64_t actual_2 = 0;
-    ASSERT_OK(zx_object_get_info(caller_thread_handle.load(), ZX_INFO_THREAD, &info, sizeof(info),
-                                 &actual, &actual_2));
-    EXPECT_EQ(info.state, ZX_THREAD_STATE_BLOCKED_CHANNEL);
-
-    // Write a response to the original call after we know the endpoint has been
-    // transferred out of this process.
-    Message reply;
-    reply.id = request.id;
-    reply.payload = kReplyPayload;
-    ASSERT_OK(remote.write(0, &reply, sizeof(Message), nullptr, 0));
+    caller_thread.Join();
   }
+
   if (caller_error.load() != nullptr) {
     FAIL("caller_thread encountered an error on channel::call: %s", caller_error.load());
   }

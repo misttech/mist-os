@@ -130,8 +130,16 @@ static __WARN_UNUSED_RESULT zx_status_t msg_get_handles(ProcessDispatcher* up, M
   // The MessagePacket currently owns the handle.  Only after transferring the handles into this
   // process's handle table can we relieve MessagePacket of its handle ownership responsibility.
   for (size_t i = 0; i < num_handles; ++i) {
-    if (handle_list[i]->dispatcher()->is_waitable())
+    if (handle_list[i]->dispatcher()->is_waitable()) {
+      // Cancel any waiters on this handle prior to adding it to the process's handle table.
       handle_list[i]->dispatcher()->Cancel(handle_list[i]);
+      // If this handle refers to a channel, cancel any channel_call waits.
+      ChannelDispatcher* const channel =
+          DownCastDispatcher<ChannelDispatcher>(handle_list[i]->dispatcher().get());
+      if (channel) {
+        channel->CancelMessageWaiters();
+      }
+    }
     HandleOwner handle(handle_list[i]);
     // TODO(fxbug.dev/30916): This takes a lock per call. Consider doing these in a batch.
     up->handle_table().AddHandle(ktl::move(handle));

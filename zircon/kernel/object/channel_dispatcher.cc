@@ -134,17 +134,19 @@ void ChannelDispatcher::RemoveWaiter(MessageWaiter* waiter) {
   waiters_.erase(*waiter);
 }
 
+void ChannelDispatcher::CancelMessageWaitersLocked(zx_status_t status) {
+  while (!waiters_.is_empty()) {
+    MessageWaiter* waiter = waiters_.pop_front();
+    waiter->Cancel(status);
+  }
+}
+
 void ChannelDispatcher::on_zero_handles_locked() {
   canary_.Assert();
 
-  // (3A) Abort any waiting Call operations
-  // because we've been canceled by reason
-  // of our local handle going away.
-  // Remove waiter from list.
-  while (!waiters_.is_empty()) {
-    auto waiter = waiters_.pop_front();
-    waiter->Cancel(ZX_ERR_CANCELED);
-  }
+  // (3A) Abort any waiting Call operations because we've been canceled by reason of our local
+  // handle going away.
+  CancelMessageWaitersLocked(ZX_ERR_CANCELED);
 }
 
 void ChannelDispatcher::set_owner(zx_koid_t new_owner) {
@@ -174,14 +176,9 @@ void ChannelDispatcher::OnPeerZeroHandlesLocked() {
   }
 
   UpdateStateLocked(ZX_CHANNEL_WRITABLE, ZX_CHANNEL_PEER_CLOSED);
-  // (3B) Abort any waiting Call operations
-  // because we've been canceled by reason
-  // of the opposing endpoint going away.
-  // Remove waiter from list.
-  while (!waiters_.is_empty()) {
-    auto waiter = waiters_.pop_front();
-    waiter->Cancel(ZX_ERR_PEER_CLOSED);
-  }
+  // (3B) Abort any waiting Call operations because we've been canceled by reason of the opposing
+  // endpoint going away.
+  CancelMessageWaitersLocked(ZX_ERR_PEER_CLOSED);
 }
 
 // This method should never acquire |get_lock()|.  See the comment at |channel_lock_| for details.

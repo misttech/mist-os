@@ -55,6 +55,12 @@ class ChannelDispatcher final
   zx_status_t ResumeInterruptedCall(MessageWaiter* waiter, const Deadline& deadline,
                                     MessagePacketPtr* reply);
 
+  // Cancels any channel_call message waiters waiting on this endpoint.
+  void CancelMessageWaiters() {
+    Guard<CriticalMutex> guard{get_lock()};
+    CancelMessageWaitersLocked(ZX_ERR_CANCELED);
+  }
+
   // MessageWaiter's state is guarded by the lock of the
   // owning ChannelDispatcher, and Deliver(), Signal(), Cancel(),
   // and EndWait() methods must only be called under
@@ -117,6 +123,9 @@ class ChannelDispatcher final
   explicit ChannelDispatcher(fbl::RefPtr<PeerHolder<ChannelDispatcher>> holder);
 
   void RemoveWaiter(MessageWaiter* waiter);
+
+  // Cancels (with |status|) any channel_call message waiters waiting on this endpoint.
+  void CancelMessageWaitersLocked(zx_status_t status) TA_REQ(get_lock());
 
   // Attempt to deliver the message to a waiting MessageWaiter.
   //
