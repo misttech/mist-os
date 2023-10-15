@@ -679,8 +679,12 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
   #
   #       {
   #         target_label: The target for which this metadata applies.
+  #         target_type: The type of the target (e.g. "group", "source_set")
   #         license_labels: A list of license (see license.gni) targets that are applicable
   #             to this target.
+  #         third_party_resources (Optional): List of potential 3p resources used
+  #             directly by this target. This info is used in generated_licenses_spdx
+  #             to search for additional applicable licenses.
   #       }
   #
   #     The metadata is processed by `generated_licenses_spdx` targets
@@ -719,15 +723,60 @@ foreach(_target_type, _built_in_target_types_with_internal_wrapper) {
         deps = _applicable_licenses
       }
 
-      metadata = {
-        if (defined(invoker.metadata)) {
-          forward_variables_from(invoker.metadata, "*")
+      _resources = []
+      if (defined(sources)) {
+        _resources += sources
+      }
+      if (defined(inputs)) {
+        _resources += inputs
+      }
+
+      _metadata = {
+      }
+      if (defined(invoker.metadata)) {
+        _metadata = invoker.metadata
+
+        # Additional resource may be defined through distribution_entries metadata
+        # such as by resource.gni targets.
+        if (defined(_metadata.distribution_entries)) {
+          foreach(distribution_entry, _metadata.distribution_entries) {
+            if (defined(distribution_entry.source)) {
+              # The source is relative to root_build_dir, and need to be converted into
+              # an absolute label for downstream processing.
+              _resources += [ "//" + rebase_path(distribution_entry.source,
+                                                 "//",
+                                                 root_build_dir) ]
+            }
+          }
         }
+      }
+
+      _root_build_dir_filter =
+          "//" + rebase_path(root_build_dir, "//", root_build_dir) + "/*"
+
+      # Record all resources that have "third_party" or "prebuilt" in their name
+      # but ignore anything under out/default, because these are generated via
+      # an explicit dependency on a target which will have its own applicable_licenses
+      # metadata.
+      _third_party_resources =
+          filter_include(filter_exclude(_resources, [ _root_build_dir_filter ]),
+                         [
+                           "*third_party*",
+                           "*thirdparty*",
+                           "*prebuilt*",
+                         ])
+
+      metadata = {
+        forward_variables_from(_metadata, "*")
+
         applicable_licenses = [
           {
             target_label = _target_label
             target_type = _target_type
             license_labels = _applicable_licenses
+            if (_third_party_resources != []) {
+              third_party_resources = _third_party_resources
+            }
           },
         ]
       }
