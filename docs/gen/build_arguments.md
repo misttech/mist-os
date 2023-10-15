@@ -79,7 +79,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2034
+From //build/config/BUILDCONFIG.gn:2083
 
 ### allowed_test_device_types
 
@@ -3111,7 +3111,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1769
+From //build/config/BUILDCONFIG.gn:1818
 
 ### extra_vbmeta_descriptors
 
@@ -4333,7 +4333,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1574
+From //build/config/BUILDCONFIG.gn:1623
 
 ### legacy_base_driver_package_labels
 
@@ -7792,7 +7792,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2024
+From //build/config/BUILDCONFIG.gn:2073
 
 ### select_variant_canonical
 
@@ -7802,7 +7802,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2029
+From //build/config/BUILDCONFIG.gn:2078
 
 ### select_variant_shortcuts
 
@@ -7860,7 +7860,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1815
+From //build/config/BUILDCONFIG.gn:1864
 
 ### size_checker_input
 
@@ -8351,7 +8351,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1799
+From //build/config/BUILDCONFIG.gn:1848
 
 ### universe_package_labels
 
