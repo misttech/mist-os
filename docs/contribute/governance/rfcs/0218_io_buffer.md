@@ -719,5 +719,5 @@ accesses, and unmap-on-close functionality.
 - [Implement a lock-free R/W ring buffer](https://fuchsia-review.googlesource.com/c/fuchsia/+/674342)
 
 [fuchsia-trace]: /docs/concepts/kernel/tracing-system.md
-[fxt-format]: /reference/tracing/trace-format.md
+[fxt-format]: /docs/reference/tracing/trace-format.md
 [lockless-discardable-vmo]: /docs/contribute/governance/rfcs/0181_lockless_discardable_vmo.md

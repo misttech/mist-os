@@ -581,5 +581,5 @@ root:
 [ffx-inspect]: https://fuchsia.dev/reference/tools/sdk/ffx.md#inspect
 [health-check]: /docs/development/diagnostics/inspect/health.md
 [overview]: /docs/development/diagnostics/inspect/README.md
-[moniker]: /reference/components/moniker
-[selectors]: /reference/diagnostics/selectors
+[moniker]: /docs/reference/components/moniker.md
+[selectors]: /docs/reference/diagnostics/selectors.md
