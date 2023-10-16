@@ -20,6 +20,7 @@ ffx_plugin("ffx_target_forward_tcp") {
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target:lib",
     "//third_party/rust_crates:async-trait",
   ]
   test_deps = [

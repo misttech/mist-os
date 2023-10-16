@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Result};
 use errors::ffx_error;
 use ffx_agis_args::{AgisCommand, ListenOp, Operation, RegisterOp};
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
 use fho::{daemon_protocol, moniker, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{ListenerProxy, TargetQuery};
 use fidl_fuchsia_gpu_agis::{ComponentRegistryProxy, ObserverProxy};
@@ -68,6 +68,7 @@ pub struct AgisTool {
     listener: ListenerProxy,
     #[command]
     cmd: AgisCommand,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(AgisTool);
@@ -77,7 +78,7 @@ impl FfxMain for AgisTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        agis(self.component_registry, self.observer, self.listener, self.cmd)
+        agis(self.component_registry, self.observer, self.listener, self.cmd, self.context)
             .await
             .map_err(Into::into)
     }
@@ -88,8 +89,9 @@ async fn agis(
     observer: ObserverProxy,
     listener: ListenerProxy,
     cmd: AgisCommand,
+    context: EnvironmentContext,
 ) -> Result<(), anyhow::Error> {
-    println!("{}", agis_impl(component_registry, observer, listener, cmd).await?);
+    println!("{}", agis_impl(component_registry, observer, listener, cmd, context).await?);
     Ok(())
 }
 
@@ -146,8 +148,9 @@ async fn observer_vtcs(observer: ObserverProxy) -> Result<AgisResult, anyhow::Er
 async fn listener_listen(
     listener: ListenerProxy,
     op: ListenOp,
+    context: &EnvironmentContext,
 ) -> Result<AgisResult, anyhow::Error> {
-    let target_name = ffx_config::get(TARGET_DEFAULT_KEY).await?;
+    let target_name = ffx_target::get_default_target(context).await?;
     let target_query = TargetQuery { string_matcher: target_name, ..Default::default() };
     listener
         .listen(&target_query, op.global_id)
@@ -173,11 +176,12 @@ async fn agis_impl(
     observer: ObserverProxy,
     listener: ListenerProxy,
     cmd: AgisCommand,
+    context: EnvironmentContext,
 ) -> Result<AgisResult, anyhow::Error> {
     match cmd.operation {
         Operation::Register(op) => component_registry_register(component_registry, op).await,
         Operation::Vtcs(_) => observer_vtcs(observer).await,
-        Operation::Listen(op) => listener_listen(listener, op).await,
+        Operation::Listen(op) => listener_listen(listener, op, &context).await,
         Operation::Shutdown(_) => listener_shutdown(listener).await,
     }
 }
@@ -185,6 +189,7 @@ async fn agis_impl(
 #[cfg(test)]
 mod test {
     use super::*;
+    use ffx_config::test_init;
     use fidl_fuchsia_developer_ffx::ListenerRequest;
     use fidl_fuchsia_gpu_agis::{ComponentRegistryRequest, ObserverRequest};
 
@@ -255,7 +260,9 @@ mod test {
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let mut listener = fake_listener();
-        let mut result = agis_impl(component_registry, observer, listener, cmd).await;
+        let env = test_init().await.unwrap();
+        let mut result =
+            agis_impl(component_registry, observer, listener, cmd, env.context.clone()).await;
         result.unwrap();
 
         let no_name_cmd = AgisCommand {
@@ -268,7 +275,14 @@ mod test {
         let no_name_component_registry = fake_component_registry();
         let observer = fake_observer();
         listener = fake_listener();
-        result = agis_impl(no_name_component_registry, observer, listener, no_name_cmd).await;
+        result = agis_impl(
+            no_name_component_registry,
+            observer,
+            listener,
+            no_name_cmd,
+            env.context.clone(),
+        )
+        .await;
         assert!(result.is_err());
     }
 
@@ -278,7 +292,9 @@ mod test {
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
-        let result = agis_impl(component_registry, observer, listener, cmd).await;
+        let env = test_init().await.unwrap();
+        let result =
+            agis_impl(component_registry, observer, listener, cmd, env.context.clone()).await;
         let expected_output = serde_json::json!([{
             "global_id": GLOBAL_ID,
             "process_koid": PROCESS_KOID,
@@ -295,8 +311,10 @@ mod test {
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
-        let result = agis_impl(component_registry, observer, listener, cmd).await;
-        assert!(result.is_err());
+        let env = test_init().await.unwrap();
+        let result =
+            agis_impl(component_registry, observer, listener, cmd, env.context.clone()).await;
+        assert!(!result.is_err());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -305,7 +323,9 @@ mod test {
         let component_registry = fake_component_registry();
         let observer = fake_observer();
         let listener = fake_listener();
-        let result = agis_impl(component_registry, observer, listener, cmd).await;
+        let env = test_init().await.unwrap();
+        let result =
+            agis_impl(component_registry, observer, listener, cmd, env.context.clone()).await;
         assert!(!result.is_err());
     }
 }

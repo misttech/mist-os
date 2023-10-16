@@ -5,7 +5,7 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
+use ffx_config::EnvironmentContext;
 use ffx_target_repository_deregister_args::DeregisterCommand;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::RepositoryRegistryProxy;
@@ -27,8 +27,7 @@ impl FfxMain for DeregisterTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         deregister(
-            self.context
-                .get(TARGET_DEFAULT_KEY)
+            ffx_target::get_default_target(&self.context)
                 .await
                 .user_message("Failed to get default target from config")?,
             self.cmd,

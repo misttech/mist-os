@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
+use ffx_config::EnvironmentContext;
 use ffx_target_forward_tcp_args::TcpCommand;
 use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx as ffx;
@@ -24,9 +24,7 @@ fho::embedded_plugin!(ForwardTcpTool);
 impl FfxMain for ForwardTcpTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        let target: Option<String> = self
-            .context
-            .get(TARGET_DEFAULT_KEY)
+        let target = ffx_target::get_default_target(&self.context)
             .await
             .user_message("Failed to get default target from config")?;
         let target = if let Some(target) = target {

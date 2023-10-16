@@ -6,8 +6,9 @@ use {
     anyhow::anyhow,
     async_trait::async_trait,
     camino::Utf8Path,
-    ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext},
+    ffx_config::EnvironmentContext,
     ffx_repository_serve_args::ServeCommand,
+    ffx_target::get_default_target,
     fho::{AvailabilityFlag, FfxContext, FfxMain, FfxTool, Result, SimpleWriter},
     fidl_fuchsia_developer_ffx::{
         RepositoryError as FfxCliRepositoryError,
@@ -74,12 +75,12 @@ impl FfxMain for ServeTool {
             repo_path
         };
 
-        let target_identifier: String = self
-            .context
-            .query(TARGET_DEFAULT_KEY)
-            .get()
+        let target_identifier: Option<String> = get_default_target(&self.context)
             .await
             .map_err(|e| anyhow!("Failed to get target_identifier: {:?}", e))?;
+        let target_identifier: Result<String> =
+            target_identifier.ok_or(anyhow!("no default target value").into());
+        let target_identifier: String = target_identifier?;
 
         // Construct RepositoryTarget from same args as `ffx target repository register`
         let repo_target_info = FfxDaemonRepositoryTarget::try_from(FfxCliRepositoryTarget {
@@ -179,7 +180,7 @@ mod test {
     use {
         super::*,
         assert_matches::assert_matches,
-        ffx_config::{ConfigLevel, TestEnv},
+        ffx_config::{keys::TARGET_DEFAULT_KEY, ConfigLevel, TestEnv},
         fho::macro_deps::ffx_writer::TestBuffer,
         fidl::endpoints::DiscoverableProtocolMarker as _,
         fidl_fuchsia_developer_ffx::{

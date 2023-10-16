@@ -4,7 +4,8 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
-use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
+use ffx_config::EnvironmentContext;
+use ffx_target::get_default_target;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
 use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
@@ -107,24 +108,28 @@ fn more_than_init_record(
 
 fn stats_to_print(trace_stat: ProviderStats, verbose: bool) -> Vec<String> {
     let mut stats_output = Vec::new();
-    let (Some(provider_name),
+    let (
+        Some(provider_name),
         Some(pid),
         Some(buffering_mode),
         Some(wrapped_count),
         Some(records_dropped),
         Some(durable_buffer_used),
-        Some(non_durable_bytes_written)) =
-        (trace_stat.name,
+        Some(non_durable_bytes_written),
+    ) = (
+        trace_stat.name,
         trace_stat.pid,
         trace_stat.buffering_mode,
         trace_stat.buffer_wrapped_count,
         trace_stat.records_dropped,
         trace_stat.percentage_durable_buffer_used,
-        trace_stat.non_durable_bytes_written) else {
-            if verbose {
-                stats_output.push(String::from("A provider returned stats with missing values"));
-            }
-            return stats_output;
+        trace_stat.non_durable_bytes_written,
+    )
+    else {
+        if verbose {
+            stats_output.push(String::from("A provider returned stats with missing values"));
+        }
+        return stats_output;
     };
     if (verbose
         && more_than_init_record(non_durable_bytes_written, durable_buffer_used, buffering_mode))
@@ -322,7 +327,9 @@ fn symbolize_ordinal(ordinal: u64, ir_files: Vec<String>, mut writer: Writer) ->
                 continue;
             };
             for method in methods {
-                let Some(method_ordinal) = method["ordinal"].as_u64() else { continue; };
+                let Some(method_ordinal) = method["ordinal"].as_u64() else {
+                    continue;
+                };
                 if method_ordinal == ordinal {
                     let method_name = method["name"].as_str().unwrap_or("-");
                     writer.line(format!("{} -> {}.{}", ordinal, protocol_name, method_name))?;
@@ -388,7 +395,7 @@ pub async fn trace(
     mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
-    let default_target: Option<String> = context.get(TARGET_DEFAULT_KEY).await?;
+    let default_target: Option<String> = get_default_target(&context).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
             let controller = controller.await?;
@@ -433,8 +440,7 @@ pub async fn trace(
             }
         }
         TraceSubCommand::Start(opts) => {
-            let string_matcher: Option<String> = context.get(TARGET_DEFAULT_KEY).await.ok();
-            let default = ffx::TargetQuery { string_matcher, ..Default::default() };
+            let default = ffx::TargetQuery { string_matcher: default_target, ..Default::default() };
             let triggers = if opts.trigger.is_empty() { None } else { Some(opts.trigger) };
             if triggers.is_some() && !opts.background {
                 ffx_bail!(
@@ -621,7 +627,7 @@ async fn handle_recording_result(
     res: Result<ffx::TargetInfo, RecordingError>,
     output: &String,
 ) -> Result<ffx::TargetInfo> {
-    let default: Option<String> = context.get(TARGET_DEFAULT_KEY).await.ok();
+    let default = get_default_target(context).await.unwrap_or(None);
     match res {
         Ok(t) => Ok(t),
         Err(e) => match e {

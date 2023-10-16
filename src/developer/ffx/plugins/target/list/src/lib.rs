@@ -6,7 +6,7 @@ use crate::target_formatter::{JsonTarget, JsonTargetFormatter, TargetFormatter};
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::{ffx_bail, ffx_bail_with_code};
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
 use ffx_list_args::{AddressTypes, ListCommand};
 use fho::{daemon_protocol, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{
@@ -35,6 +35,7 @@ pub struct ListTool {
     cmd: ListCommand,
     #[with(daemon_protocol())]
     tc_proxy: TargetCollectionProxy,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(ListTool);
@@ -43,7 +44,7 @@ fho::embedded_plugin!(ListTool);
 impl FfxMain for ListTool {
     type Writer = MachineWriter<Vec<JsonTarget>>;
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        list_targets(self.tc_proxy, writer, self.cmd).await?;
+        list_targets(self.tc_proxy, writer, self.cmd, &self.context).await?;
         Ok(())
     }
 }
@@ -52,6 +53,7 @@ async fn list_targets(
     tc_proxy: TargetCollectionProxy,
     mut writer: MachineWriter<Vec<JsonTarget>>,
     cmd: ListCommand,
+    context: &EnvironmentContext,
 ) -> Result<()> {
     let (reader, server) = fidl::endpoints::create_endpoints::<TargetCollectionReaderMarker>();
 
@@ -95,13 +97,13 @@ async fn list_targets(
             if writer.is_machine() {
                 let res = target_formatter::filter_targets_by_address_types(res, address_types);
                 let mut formatter = JsonTargetFormatter::try_from(res)?;
-                let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
+                let default: Option<String> = ffx_target::get_default_target(&context).await?;
                 JsonTargetFormatter::set_default_target(&mut formatter.targets, default.as_deref());
                 writer.machine(&formatter.targets)?;
             } else {
                 let formatter =
                     Box::<dyn TargetFormatter>::try_from((cmd.format, address_types, res))?;
-                let default: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
+                let default: Option<String> = ffx_target::get_default_target(&context).await?;
                 writer.line(formatter.lines(default.as_deref()).join("\n"))?;
             }
         }
@@ -180,30 +182,38 @@ mod test {
         })
     }
 
-    async fn try_run_list_test(num_tests: usize, cmd: ListCommand) -> Result<String> {
+    async fn try_run_list_test(
+        num_tests: usize,
+        cmd: ListCommand,
+        context: &EnvironmentContext,
+    ) -> Result<String> {
         let proxy = setup_fake_target_collection_server(num_tests);
         let test_buffers = TestBuffers::default();
         let writer = MachineWriter::new_test(None, &test_buffers);
-        list_targets(proxy, writer, cmd).await?;
+        list_targets(proxy, writer, cmd, context).await?;
         Ok(test_buffers.into_stdout_str())
     }
 
-    async fn run_list_test(num_tests: usize, cmd: ListCommand) -> String {
-        try_run_list_test(num_tests, cmd).await.unwrap()
+    async fn run_list_test(
+        num_tests: usize,
+        cmd: ListCommand,
+        context: &EnvironmentContext,
+    ) -> String {
+        try_run_list_test(num_tests, cmd, context).await.unwrap()
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_no_devices_and_no_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let output = run_list_test(0, tab_list_cmd(None)).await;
+        let env = ffx_config::test_init().await.unwrap();
+        let output = run_list_test(0, tab_list_cmd(None), &env.context).await;
         assert_eq!("".to_string(), output);
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_one_device_and_no_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let output = run_list_test(1, tab_list_cmd(None)).await;
+        let env = ffx_config::test_init().await.unwrap();
+        let output = run_list_test(1, tab_list_cmd(None), &env.context).await;
         let value = format!("Test {}", 0);
         let node_listing = Regex::new(&value).expect("test regex");
         assert_eq!(
@@ -218,9 +228,9 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_multiple_devices_and_no_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let num_tests = 10;
-        let output = run_list_test(num_tests, tab_list_cmd(None)).await;
+        let output = run_list_test(num_tests, tab_list_cmd(None), &env.context).await;
         for x in 0..num_tests {
             let value = format!("Test {}", x);
             let node_listing = Regex::new(&value).expect("test regex");
@@ -237,8 +247,8 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_one_device_and_matching_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let output = run_list_test(1, tab_list_cmd(Some("Test 0".to_string()))).await;
+        let env = ffx_config::test_init().await.unwrap();
+        let output = run_list_test(1, tab_list_cmd(Some("Test 0".to_string())), &env.context).await;
         let value = format!("Test {}", 0);
         let node_listing = Regex::new(&value).expect("test regex");
         assert_eq!(
@@ -253,25 +263,29 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_one_device_and_not_matching_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let output = try_run_list_test(1, tab_list_cmd(Some("blarg".to_string()))).await;
+        let env = ffx_config::test_init().await.unwrap();
+        let output =
+            try_run_list_test(1, tab_list_cmd(Some("blarg".to_string())), &env.context).await;
         assert!(output.is_err());
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_multiple_devices_and_not_matching_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let num_tests = 25;
-        let output = try_run_list_test(num_tests, tab_list_cmd(Some("blarg".to_string()))).await;
+        let output =
+            try_run_list_test(num_tests, tab_list_cmd(Some("blarg".to_string())), &env.context)
+                .await;
         assert!(output.is_err());
         Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_multiple_devices_and_matching_nodename() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
-        let output = run_list_test(25, tab_list_cmd(Some("Test 19".to_string()))).await;
+        let env = ffx_config::test_init().await.unwrap();
+        let output =
+            run_list_test(25, tab_list_cmd(Some("Test 19".to_string())), &env.context).await;
         let value = format!("Test {}", 0);
         let node_listing = Regex::new(&value).expect("test regex");
         assert_eq!(0, node_listing.find_iter(&output).count());
@@ -283,10 +297,10 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_with_address_types_none() -> Result<()> {
-        let _env = ffx_config::test_init().await.unwrap();
+        let env = ffx_config::test_init().await.unwrap();
         let num_tests = 25;
         let cmd_none = ListCommand { no_ipv4: true, no_ipv6: true, ..Default::default() };
-        let output = try_run_list_test(num_tests, cmd_none).await;
+        let output = try_run_list_test(num_tests, cmd_none, &env.context).await;
         assert!(output.is_err());
         Ok(())
     }

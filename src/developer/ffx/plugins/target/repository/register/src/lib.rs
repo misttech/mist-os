@@ -5,9 +5,9 @@
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use errors::ffx_bail;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
 use ffx_target_repository_register_args::RegisterCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
+use fho::{daemon_protocol, FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryTarget};
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 
@@ -17,6 +17,7 @@ pub struct RegisterTool {
     cmd: RegisterCommand,
     #[with(daemon_protocol())]
     repos: RepositoryRegistryProxy,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(RegisterTool);
@@ -25,14 +26,20 @@ fho::embedded_plugin!(RegisterTool);
 impl FfxMain for RegisterTool {
     type Writer = SimpleWriter;
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        register_cmd(self.cmd, self.repos).await?;
+        register_cmd(self.cmd, self.repos, self.context).await?;
         Ok(())
     }
 }
 
-pub async fn register_cmd(cmd: RegisterCommand, repos: RepositoryRegistryProxy) -> Result<()> {
+pub async fn register_cmd(
+    cmd: RegisterCommand,
+    repos: RepositoryRegistryProxy,
+    context: EnvironmentContext,
+) -> Result<()> {
     register(
-        ffx_config::get(TARGET_DEFAULT_KEY).await.context("getting default target from config")?,
+        ffx_target::get_default_target(&context)
+            .await
+            .user_message("getting default target from config")?,
         cmd,
         repos,
     )

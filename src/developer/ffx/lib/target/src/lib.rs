@@ -4,7 +4,7 @@
 
 use anyhow::{Context as _, Result};
 use errors::FfxError;
-use ffx_config::EnvironmentContext;
+use ffx_config::{keys::TARGET_DEFAULT_KEY, EnvironmentContext};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
     DaemonError, DaemonProxy, TargetCollectionMarker, TargetMarker, TargetQuery,
@@ -150,7 +150,8 @@ pub fn open_target_with_fut<'a>(
 pub async fn resolve_default_target(
     env_context: &EnvironmentContext,
 ) -> Result<Option<TargetKind>> {
-    Ok(maybe_inline_target(env_context.get("target.default").await?, &env_context).await)
+    let t = get_default_target(&env_context).await?;
+    Ok(maybe_inline_target(t, &env_context).await)
 }
 
 /// In the event that a default target is supplied and there needs to be additional Fastboot
@@ -197,4 +198,9 @@ pub async fn knock_target(target: &TargetProxy) -> Result<(), KnockError> {
     rcs::knock_rcs(&rcs_proxy)
         .await
         .map_err(|e| KnockError::NonCriticalError(anyhow::anyhow!("{e:?}")))
+}
+
+pub async fn get_default_target(context: &EnvironmentContext) -> Result<Option<String>> {
+    let target = ffx_config::query(TARGET_DEFAULT_KEY).context(Some(context)).get().await?;
+    Ok(target)
 }

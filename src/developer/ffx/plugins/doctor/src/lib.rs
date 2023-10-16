@@ -8,13 +8,11 @@ use async_lock::Mutex;
 use async_trait::async_trait;
 use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
 use errors::{ffx_bail, ffx_error};
-use ffx_config::{
-    environment::EnvironmentContext, get, global_env_context, keys::TARGET_DEFAULT_KEY,
-    print_config,
-};
+use ffx_config::{environment::EnvironmentContext, get, global_env_context, print_config};
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
+use ffx_target::get_default_target;
 use fho::{FfxMain, FfxTool, SimpleWriter};
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
@@ -318,10 +316,8 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
 
     let recorder = Arc::new(Mutex::new(DoctorRecorder::new()));
     let mut handler = DefaultDoctorStepHandler::new(recorder.clone(), Box::new(writer));
-    let default_target = context
-        .get(TARGET_DEFAULT_KEY)
-        .await
-        .map_err(|e: ffx_config::api::ConfigError| format!("{:?}", e).replace("\n", ""));
+    let default_target =
+        get_default_target(&context).await.map_err(|e| format!("{:?}", e).replace("\n", ""));
 
     // create ledger
     let ledger_mode = match cmd.verbose {

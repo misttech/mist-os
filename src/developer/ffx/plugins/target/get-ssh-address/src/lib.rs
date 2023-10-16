@@ -6,7 +6,7 @@ use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_config::keys::TARGET_DEFAULT_KEY;
+use ffx_config::EnvironmentContext;
 use ffx_get_ssh_address_args::GetSshAddressCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
@@ -21,6 +21,7 @@ pub struct GetSshAddressTool {
     cmd: GetSshAddressCommand,
     #[with(daemon_protocol())]
     collection_proxy: TargetCollectionProxy,
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(GetSshAddressTool);
@@ -29,7 +30,7 @@ fho::embedded_plugin!(GetSshAddressTool);
 impl FfxMain for GetSshAddressTool {
     type Writer = SimpleWriter;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        get_ssh_address_impl(self.collection_proxy, self.cmd, &mut writer).await?;
+        get_ssh_address_impl(self.collection_proxy, self.cmd, self.context, &mut writer).await?;
         Ok(())
     }
 }
@@ -41,11 +42,12 @@ const DEFAULT_SSH_PORT: u16 = 22;
 async fn get_ssh_address_impl<W: Write>(
     collection_proxy: TargetCollectionProxy,
     cmd: GetSshAddressCommand,
+    context: EnvironmentContext,
     writer: &mut W,
 ) -> Result<()> {
     let timeout_dur = Duration::from_secs_f64(cmd.timeout().await?);
     let (proxy, handle) = fidl::endpoints::create_proxy::<TargetMarker>()?;
-    let target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
+    let target: Option<String> = ffx_target::get_default_target(&context).await?;
     let ffx: ffx_command::Ffx = argh::from_env();
     let is_default_target = ffx.target.is_none();
     let t_clone = target.clone();
