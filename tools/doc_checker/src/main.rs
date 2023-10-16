@@ -58,13 +58,14 @@ pub(crate) mod mock_path_helper_module {
         path.exists() ||
 
         // if is_dir returns true, the directory needs to exist as well.
-        is_dir(path) ||
+        (is_dir(path) &&!path_str.ends_with("no-extension")) ||
 
         // markdown files exist with a couple exceptions.
         path_str.ends_with(".md") &&
         (!path_str.ends_with("no_readme/README.md") &&
         !path_str.ends_with("unused/README.md") &&
-        !path_str.ends_with("missing.md" ) )   ||
+        !path_str.ends_with("missing.md" ) &&
+        !path_str.ends_with("no-extension") )   ||
 
         // OWNERS file exists.
         path.ends_with("OWNERS")
@@ -334,6 +335,8 @@ mod test {
                 "Obsolete or invalid project garnet: https://fuchsia.googlesource.com/garnet/+/refs/heads/main/README.md"),
             DocCheckError::new_error(21,PathBuf::from("doc_checker_test_data/docs/README.md"),
                 "Cannot normalize /docs/../../README.md, references parent beyond root."),
+            DocCheckError::new_error_helpful(28,PathBuf::from("doc_checker_test_data/docs/README.md"),
+                "in-tree link to /docs/no-extension could not be found at \"doc_checker_test_data/docs/no-extension\"", "\"no-extension.md\""),
             DocCheckError::new_error(5, PathBuf::from("doc_checker_test_data/docs/_common/_included.md"),
                 "in-tree link to /docs/missing.md could not be found at \"doc_checker_test_data/docs/missing.md\""),
             DocCheckError::new_error(7, PathBuf::from("doc_checker_test_data/docs/include_here.md"),

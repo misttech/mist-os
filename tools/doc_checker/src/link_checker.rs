@@ -441,6 +441,22 @@ pub(crate) fn do_in_tree_check(
     let filepath = root_dir.join(in_tree_path.strip_prefix("/").unwrap_or(in_tree_path));
 
     if !path_helper::exists(&filepath) {
+        // Look for missing the file extension.
+        if filepath.extension().is_none() {
+            let mut md_path = filepath.clone();
+            md_path.set_extension("md");
+            if path_helper::exists(&md_path) {
+                return Some(DocCheckError::new_error_helpful(
+                    doc_line.line_num,
+                    doc_line.file_name.clone(),
+                    &format!(
+                        "in-tree link to {} could not be found at {:?}",
+                        link_to_check, filepath
+                    ),
+                    &format!("{:#?}", md_path.file_name()?),
+                ));
+            }
+        }
         return Some(DocCheckError::new_error(
             doc_line.line_num,
             doc_line.file_name.clone(),
