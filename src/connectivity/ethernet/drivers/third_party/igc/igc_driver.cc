@@ -116,6 +116,10 @@ IgcDriver::IgcDriver(zx_device_t* parent)
 }
 
 IgcDriver::~IgcDriver() {
+  // The driver release the control to firmware.
+  uint32_t ctrl_ext = IGC_READ_REG(&adapter_->hw, IGC_CTRL_EXT);
+  IGC_WRITE_REG(&adapter_->hw, IGC_CTRL_EXT, ctrl_ext & ~IGC_CTRL_EXT_DRV_LOAD);
+
   igc_reset_hw(&adapter_->hw);
   adapter_->osdep.pci.SetBusMastering(false);
   io_buffer_release(&adapter_->desc_buffer);
