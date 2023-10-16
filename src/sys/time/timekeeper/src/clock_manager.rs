@@ -4,6 +4,7 @@
 
 use fidl_fuchsia_time as fft;
 use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::{channel::mpsc, select, FutureExt, SinkExt, StreamExt};
 use {
     crate::{
         diagnostics::{Diagnostics, Event},
@@ -23,7 +24,7 @@ use {
         sync::Arc,
     },
     time_util::Transform,
-    tracing::{debug, error, info},
+    tracing::{debug, error, info, warn},
 };
 
 /// One million for PPM calculations
@@ -285,6 +286,8 @@ pub struct ClockManager<R: Rtc, D: Diagnostics> {
     delayed_updates: Option<fasync::Task<()>>,
     /// Timekeeper config.
     config: Arc<Config>,
+    // Test channel for signalization. Test only.
+    test_signaler: Option<mpsc::Sender<()>>,
 }
 
 impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
@@ -297,9 +300,10 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         diagnostics: Arc<D>,
         track: Track,
         config: Arc<Config>,
+        async_commands: mpsc::Receiver<()>,
     ) {
-        ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config)
-            .maintain_clock()
+        ClockManager::new(clock, time_source_manager, rtc, diagnostics, track, config, None)
+            .maintain_clock(async_commands)
             .await
     }
 
@@ -316,6 +320,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         diagnostics: Arc<D>,
         track: Track,
         config: Arc<Config>,
+        test_signaler: Option<mpsc::Sender<()>>,
     ) -> Self {
         ClockManager {
             clock,
@@ -326,16 +331,18 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             track,
             delayed_updates: None,
             config,
+            test_signaler,
         }
     }
 
     /// Maintain the clock indefinitely. This future will never complete.
-    async fn maintain_clock(mut self) {
+    async fn maintain_clock(mut self, async_commands: mpsc::Receiver<()>) {
         let pull_delay = self.config.get_back_off_time_between_pull_samples();
         let details = self.clock.get_details().expect("failed to get UTC clock details");
         let mut clock_started =
             details.backstop.into_nanos() != details.ticks_to_synthetic.synthetic_offset;
         std::mem::drop(details);
+        let mut receiver = async_commands.fuse(); // Required by select! below.
 
         loop {
             // Acquire a new sample.
@@ -364,13 +371,31 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
             } else {
                 self.apply_clock_correction(&estimate_transform).await;
             }
-
             // Update the RTC clock if we have one.
             self.update_rtc(&estimate_transform).await;
 
-            if self.time_source_manager.is_suspendable_source() {
+            // Back off for a bit.
+            let delay = if self.time_source_manager.is_suspendable_source() {
                 debug!("backing off for pull source resampling.");
-                fasync::Timer::new(fasync::Time::after(pull_delay)).await;
+                pull_delay
+            } else {
+                zx::Duration::from_millis(10)
+            };
+            select! {
+                // TODO: b/304805834 - Add actual command processing here.
+                // Respond to a command.
+                command = receiver.next() => {
+                    debug!("received command: {:?}", &command);
+                    if let Some(ref mut test_signaler) = self.test_signaler {
+                        if let Err(ref e) = test_signaler.send(()).await {
+                            warn!("could not acknowledge error: {:?}, command: {:?}",
+                                &e, &command);
+                        }
+                    }
+                },
+
+                // If no command, then wait.
+                _ = fasync::Timer::new(fasync::Time::after(delay)).fuse() => {},
             }
         }
     }
@@ -587,6 +612,7 @@ mod tests {
         rtc: Option<FakeRtc>,
         diagnostics: Arc<FakeDiagnostics>,
         config: Arc<Config>,
+        test_signaler: Option<mpsc::Sender<()>>,
     ) -> ClockManager<FakeRtc, FakeDiagnostics> {
         let mut events: Vec<TimeSourceEvent> =
             samples.into_iter().map(|sample| TimeSourceEvent::from(sample)).collect();
@@ -601,7 +627,15 @@ mod tests {
             time_source,
             Arc::clone(&diagnostics),
         );
-        ClockManager::new(clock, time_source_manager, rtc, diagnostics, *TEST_TRACK, config)
+        ClockManager::new(
+            clock,
+            time_source_manager,
+            rtc,
+            diagnostics,
+            *TEST_TRACK,
+            config,
+            test_signaler,
+        )
     }
 
     /// Creates a new transform.
@@ -834,11 +868,13 @@ mod tests {
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
             config,
+            None,
         );
 
         // Maintain the clock until no more work remains.
         let monotonic_before = zx::Time::get_monotonic();
-        let mut fut = clock_manager.maintain_clock().boxed();
+        let (_, r) = mpsc::channel(1);
+        let mut fut = clock_manager.maintain_clock(r).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::Time::get_monotonic();
@@ -865,6 +901,35 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn verify_asynchronous_signal_honored() {
+        let mut executor = fasync::LocalExecutor::new();
+        let (test_sender, mut test_received) = mpsc::channel(1);
+        let (_, r) = mpsc::channel(1);
+        let _t = fasync::Task::local(async move {
+            let clock = create_clock();
+            let rtc = FakeRtc::valid(BACKSTOP_TIME);
+            let diagnostics = Arc::new(FakeDiagnostics::new());
+            let config = make_test_config();
+
+            let monotonic_ref = zx::Time::get_monotonic();
+            let clock_manager = create_clock_manager(
+                Arc::clone(&clock),
+                vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+                None,
+                Some(rtc.clone()),
+                Arc::clone(&diagnostics),
+                config,
+                Some(test_sender),
+            );
+            clock_manager.maintain_clock(r).boxed().await;
+        });
+
+        let ret = executor.run_singlethreaded(async move { test_received.next().await });
+
+        assert_eq!(Some(()), ret);
+    }
+
+    #[fuchsia::test]
     fn single_update_without_rtc() {
         let mut executor = fasync::TestExecutor::new();
 
@@ -879,11 +944,13 @@ mod tests {
             None,
             Arc::clone(&diagnostics),
             config,
+            None,
         );
 
         // Maintain the clock until no more work remains
         let monotonic_before = zx::Time::get_monotonic();
-        let mut fut = clock_manager.maintain_clock().boxed();
+        let (_, r) = mpsc::channel(1);
+        let mut fut = clock_manager.maintain_clock(r).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::Time::get_monotonic();
@@ -943,11 +1010,13 @@ mod tests {
             None,
             Arc::clone(&diagnostics),
             config,
+            None,
         );
 
         // Maintain the clock until no more work remains
         let monotonic_before = zx::Time::get_monotonic();
-        let mut fut = clock_manager.maintain_clock().boxed();
+        let (_, r) = mpsc::channel(1);
+        let mut fut = clock_manager.maintain_clock(r).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let monotonic_after = zx::Time::get_monotonic();
@@ -1021,12 +1090,14 @@ mod tests {
             None,
             Arc::clone(&diagnostics),
             config,
+            None,
         );
 
         // Maintain the clock until no more work remains, which should correspond to having started
         // a clock skew but blocking on the timer to end it.
         let monotonic_before = zx::Time::get_monotonic();
-        let mut fut = clock_manager.maintain_clock().boxed();
+        let (_, r) = mpsc::channel(1);
+        let mut fut = clock_manager.maintain_clock(r).boxed();
         let _ = executor.run_until_stalled(&mut fut);
         let updated_utc = clock.read().unwrap();
         let details = clock.get_details().unwrap();
@@ -1044,6 +1115,13 @@ mod tests {
         // modified rate with a smaller error bound.
         assert!(executor.wake_next_timer().is_some());
         let _ = executor.run_until_stalled(&mut fut);
+        // This stepwise execution of the control algorithm is sensitive to the changes
+        // in task scheduling, and may need an arbitrary number of "stalled runs"
+        // to complete with success. This additional stalled run is a consequence
+        // of adding a new async `mpsc::Sender` for async commands.
+        assert!(executor.wake_next_timer().is_some());
+        let _ = executor.run_until_stalled(&mut fut);
+
         let details2 = clock.get_details().unwrap();
         assert_geq!(details2.mono_to_synthetic.rate.synthetic_ticks, 1000050);
         assert_eq!(details2.mono_to_synthetic.rate.reference_ticks, 1000000);

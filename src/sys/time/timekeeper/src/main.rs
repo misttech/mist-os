@@ -14,6 +14,12 @@ mod rtc;
 mod time_source;
 mod time_source_manager;
 
+use futures::{
+    channel::mpsc,
+    future::{self, OptionFuture},
+    stream::StreamExt as _,
+    SinkExt,
+};
 use {
     crate::{
         clock_manager::ClockManager,
@@ -30,10 +36,6 @@ use {
     fidl_fuchsia_time as ftime, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_zircon as zx,
-    futures::{
-        future::{self, OptionFuture},
-        stream::StreamExt as _,
-    },
     std::sync::Arc,
     time_metrics_registry::TimeMetricDimensionExperiment,
     tracing::{debug, error, info, warn},
@@ -359,6 +361,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
     });
 
     info!("launching clock managers...");
+    let (mut s1, r1) = mpsc::channel(1);
     let fut1 = ClockManager::execute(
         primary.clock,
         primary_source_manager,
@@ -366,7 +369,9 @@ async fn maintain_utc<R: 'static, D: 'static>(
         Arc::clone(&diagnostics),
         Track::Primary,
         Arc::clone(&config),
+        r1,
     );
+    let (_, r2) = mpsc::channel(1);
     let fut2: OptionFuture<_> = monitor_source_manager_and_clock
         .map(|(source_manager, clock)| {
             ClockManager::<R, D>::execute(
@@ -376,10 +381,16 @@ async fn maintain_utc<R: 'static, D: 'static>(
                 diagnostics,
                 Track::Monitor,
                 config,
+                r2,
             )
         })
         .into();
-    future::join(fut1, fut2).await;
+    let oneshot = Box::pin(async move {
+        // TODO: b/304805834 - Integrate with actual management API here.
+        fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(5))).await;
+        let _ignore = s1.send(()).await;
+    });
+    future::join3(fut1, fut2, oneshot).await;
 }
 
 // Reexport test config creation to be used in other tests.
