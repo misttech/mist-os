@@ -7682,17 +7682,6 @@ Identifier for the Core SDK.
 
 From //sdk/config.gni:7
 
-### sdk_inside_idk_sub_build
-
-True when building an IDK cpu-specific sub-build. See //build/sdk/build_final_idk.py.
-Certain targets must not appear in the GN build graph to avoid circular dependency
-issues. Should only be set in the args.gn files created by generate_final_idl()
-actions.
-
-**Current value (from the default):** `false`
-
-From //build/sdk/config.gni:17
-
 ### sdk_inside_supported_api_sub_build
 
 True when building an IDK cpu-specific and supported API sub-build. See
@@ -7702,7 +7691,7 @@ related artifacts.
 
 **Current value (from the default):** `false`
 
-From //build/sdk/config.gni:23
+From //build/sdk/config.gni:17
 
 ### sdk_no_host_tools
 
