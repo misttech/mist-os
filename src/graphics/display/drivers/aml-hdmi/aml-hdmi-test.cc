@@ -200,7 +200,7 @@ TEST_F(AmlHdmiTest, ResetTest) {
 TEST_F(AmlHdmiTest, ModeSetTest) {
   fidl::Arena allocator;
   fuchsia_hardware_hdmi::wire::StandardDisplayMode standard_display_mode{
-      .pixel_clock_10khz = 0,
+      .pixel_clock_khz = 0,
       .h_addressable = 0,
       .h_front_porch = 0,
       .h_sync_pulse = 0,

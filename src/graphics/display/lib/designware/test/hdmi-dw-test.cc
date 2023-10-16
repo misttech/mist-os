@@ -320,7 +320,7 @@ TEST_F(HdmiDwTest, EdidTransferTest) {
 TEST_F(HdmiDwTest, ConfigHdmitxTest) {
   fidl::Arena allocator;
   StandardDisplayMode standard_display_mode{
-      .pixel_clock_10khz = 30,
+      .pixel_clock_khz = 300,
       .h_addressable = 24,
       .h_front_porch = 15,
       .h_sync_pulse = 50,

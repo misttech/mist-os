@@ -162,11 +162,7 @@ void AmlHdmiDevice::Reset(ResetRequestView request, ResetCompleter::Sync& comple
 
 void CalculateTxParam(const fuchsia_hardware_hdmi::wire::DisplayMode& mode,
                       hdmi_dw::hdmi_param_tx* p) {
-  if ((mode.mode().pixel_clock_10khz * 10) > 500000) {
-    p->is4K = true;
-  } else {
-    p->is4K = false;
-  }
+  p->is4K = mode.mode().pixel_clock_khz > 500'000;
 
   if (mode.mode().h_addressable * 3 == mode.mode().v_addressable * 4) {
     p->aspect_ratio = HDMI_ASPECT_RATIO_4x3;

@@ -17,7 +17,7 @@ type ModeFlag = flexible bits : uint32 {
 /// The video parameters which specify the display mode.
 /// Should be the same as display-controller.banjo
 type StandardDisplayMode = struct {
-    pixel_clock_10khz uint32;
+    pixel_clock_khz uint32;
     h_addressable uint32;
     h_front_porch uint32;
     h_sync_pulse uint32;

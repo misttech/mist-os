@@ -20,30 +20,25 @@ namespace amlogic_display {
 
 namespace {
 
-void TranslateDisplayMode(fidl::AnyArena& allocator, const display_mode_t& in_mode,
-                          const fuchsia_hardware_hdmi::wire::ColorParam& in_color,
-                          fuchsia_hardware_hdmi::wire::DisplayMode* out_mode) {
-  // Serves to translate between banjo struct display_mode_t and fidl struct DisplayMode
+fuchsia_hardware_hdmi::wire::DisplayMode ToHdmiFidlDisplayMode(
+    fidl::AnyArena& allocator, const display_mode_t& banjo_display_mode,
+    const fuchsia_hardware_hdmi::wire::ColorParam& color) {
   fuchsia_hardware_hdmi::wire::StandardDisplayMode mode{
-      .pixel_clock_10khz = in_mode.pixel_clock_10khz,
-      .h_addressable = in_mode.h_addressable,
-      .h_front_porch = in_mode.h_front_porch,
-      .h_sync_pulse = in_mode.h_sync_pulse,
-      .h_blanking = in_mode.h_blanking,
-      .v_addressable = in_mode.v_addressable,
-      .v_front_porch = in_mode.v_front_porch,
-      .v_sync_pulse = in_mode.v_sync_pulse,
-      .v_blanking = in_mode.v_blanking,
-      .flags = in_mode.flags,
+      .pixel_clock_khz = banjo_display_mode.pixel_clock_10khz * 10,
+      .h_addressable = banjo_display_mode.h_addressable,
+      .h_front_porch = banjo_display_mode.h_front_porch,
+      .h_sync_pulse = banjo_display_mode.h_sync_pulse,
+      .h_blanking = banjo_display_mode.h_blanking,
+      .v_addressable = banjo_display_mode.v_addressable,
+      .v_front_porch = banjo_display_mode.v_front_porch,
+      .v_sync_pulse = banjo_display_mode.v_sync_pulse,
+      .v_blanking = banjo_display_mode.v_blanking,
+      .flags = banjo_display_mode.flags,
   };
-  out_mode->set_mode(allocator, mode);
-
-  fuchsia_hardware_hdmi::wire::ColorParam color{
-      .input_color_format = in_color.input_color_format,
-      .output_color_format = in_color.output_color_format,
-      .color_depth = in_color.color_depth,
-  };
-  out_mode->set_color(color);
+  return fuchsia_hardware_hdmi::wire::DisplayMode::Builder(allocator)
+      .mode(mode)
+      .color(color)
+      .Build();
 }
 
 // `mode` must be a mode supported by `HdmiHost`.
@@ -254,9 +249,9 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
   WRITE32_REG(HHI, HHI_VDAC_CNTL1_G12A, 8);  // set Cdac_pwd [whatever that is]
 
   fidl::Arena<2048> allocator;
-  fuchsia_hardware_hdmi::wire::DisplayMode translated_mode(allocator);
-  TranslateDisplayMode(allocator, mode, color_, &translated_mode);
-  auto res = hdmi_->ModeSet(1, translated_mode);  // only supports 1 display for now
+  fuchsia_hardware_hdmi::wire::DisplayMode hdmi_fidl_mode =
+      ToHdmiFidlDisplayMode(allocator, mode, color_);
+  auto res = hdmi_->ModeSet(1, hdmi_fidl_mode);  // only supports 1 display for now
   if ((res.status() != ZX_OK) || res->is_error()) {
     zxlogf(ERROR, "Unable to initialize interface");
     return ZX_ERR_INTERNAL;
