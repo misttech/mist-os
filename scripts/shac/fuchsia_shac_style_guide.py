@@ -16,12 +16,17 @@ import sys
 
 COMMON_DOT_STAR = "scripts/shac/common.star"
 
+# Add a comment of this form after the closing parenthesis of a `print()` call
+# to allow it to be committed.
+ALLOW_PRINT_DIRECTIVE = "# allow-print"
+
 
 def main():
     findings = collections.defaultdict(list)
     path = sys.argv[1]
     with open(path) as f:
         contents = f.read()
+        lines = contents.splitlines()
 
     tree = ast.parse(contents)
     for node in ast.walk(tree):
@@ -39,7 +44,11 @@ def main():
                 "`message` argument to `ctx.emit.finding()` must be set."
             )
 
-        if isinstance(node, ast.Call) and ast.unparse(node.func) == "print":
+        if (
+            isinstance(node, ast.Call)
+            and ast.unparse(node.func) == "print"
+            and not lines[node.end_lineno - 1].endswith(ALLOW_PRINT_DIRECTIVE)
+        ):
             findings[node].append(
                 "Do not commit shac check code that calls `print()`, "
                 "it's only to be used for debugging."

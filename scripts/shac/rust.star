@@ -33,6 +33,15 @@ def _clippy(ctx):
     ]).wait()
 
     for finding in json.decode(res.stdout):
+        end_col = finding["end_col"]
+        if finding["line"] == finding["end_line"] and finding["col"] >= finding["end_col"]:
+            # TODO(olivernewman): Remove this debug statement and handling once
+            # col >= end_col instances are fixed.
+            print(
+                "WARNING: Clippy finding has col >= end_col: %s",
+                finding,
+            )  # allow-print
+            end_col = None
         ctx.emit.finding(
             message = finding["message"],
             level = "warning",
@@ -40,7 +49,7 @@ def _clippy(ctx):
             line = finding["line"],
             end_line = finding["end_line"],
             col = finding["col"],
-            end_col = finding["end_col"],
+            end_col = end_col,
             replacements = finding["replacements"],
         )
 
