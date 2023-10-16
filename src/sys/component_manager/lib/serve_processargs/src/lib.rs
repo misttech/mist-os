@@ -216,7 +216,7 @@ mod test_util {
             service.clone().open(scope, flags, path, server_end.into());
         };
 
-        let open = Open::new(open_fn, fio::DirentType::Service, fio::OpenFlags::empty());
+        let open = Open::new(open_fn, fio::DirentType::Service);
 
         (open, Receiver(receiver))
     }
@@ -232,7 +232,7 @@ mod test_util {
                 sender.send((relative_path, server_end)).await.unwrap();
             })
         };
-        let open = Open::new(open_fn, fio::DirentType::Directory, fio::OpenFlags::DIRECTORY);
+        let open = Open::new(open_fn, fio::DirentType::Directory);
 
         (open, receiver)
     }
@@ -525,10 +525,11 @@ mod tests {
         use futures::task::Poll;
         let mut exec = fasync::TestExecutor::new();
         let (open, receiver) = open();
+        let directory = open.into_directory(fio::OpenFlags::DIRECTORY);
 
         let mut processargs = ProcessArgs::new();
         let mut dict = Dict::new();
-        dict.entries.insert("data".to_string(), Box::new(open));
+        dict.entries.insert("data".to_string(), Box::new(directory));
         let delivery_map = hashmap! {
             "data".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())

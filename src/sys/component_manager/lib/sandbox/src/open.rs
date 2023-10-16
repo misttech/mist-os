@@ -10,10 +10,11 @@ use {
     fidl::endpoints::create_endpoints,
     fidl::endpoints::ServerEnd,
     fidl::epitaph::ChannelEpitaphExt,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
     futures::future::BoxFuture,
     futures::FutureExt,
+    futures::TryStreamExt,
     std::sync::Arc,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
@@ -25,13 +26,8 @@ use {
 /// ## Open via remoting
 ///
 /// The most straightforward way to open the capability is via [Capability::to_zx_handle].
-/// This will:
-///
-/// * Return a client endpoint.
-/// * Wait for someone to use the client endpoint.
-/// * Open the capability with the "." (dot) path, `open_flags`, and the corresponding
-///   server endpoint.
-/// * You may then serve a desired FIDL protocol on the server endpoint.
+/// This will return a `fuchsia.io/Openable` client endpoint, where FIDL open requests on
+/// that endpoint translate to [OpenFn] calls.
 ///
 /// Intuitively this is opening a new connection to the current object.
 ///
@@ -60,7 +56,6 @@ use {
 pub struct Open {
     open: Arc<OpenFn>,
     entry_type: fio::DirentType,
-    open_flags: fio::OpenFlags,
 }
 
 /// The function that will be called when this capability is opened.
@@ -71,7 +66,6 @@ impl fmt::Debug for Open {
         f.debug_struct("Open")
             .field("open", &"[open function]")
             .field("entry_type", &self.entry_type)
-            .field("open_flags", &self.open_flags)
             .finish()
     }
 }
@@ -87,14 +81,17 @@ impl Open {
     ///   within a `Dict` and the user enumerates the `fuchsia.io/Directory` representation
     ///   of the dictionary.
     ///
-    /// * `open_flags` - The flags that will be used to open a new connection to this capability
-    ///   during [Capability::to_zx_handle].
-    ///
-    pub fn new<F>(open: F, entry_type: fio::DirentType, open_flags: fio::OpenFlags) -> Self
+    pub fn new<F>(open: F, entry_type: fio::DirentType) -> Self
     where
         F: Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync + 'static,
     {
-        Open { open: Arc::new(open), entry_type, open_flags }
+        Open { open: Arc::new(open), entry_type }
+    }
+
+    /// Converts the [Open] capability into a [Directory] capability such that it will be
+    /// opened with `open_flags` during [Capability::to_zx_handle].
+    pub fn into_directory(self, open_flags: fio::OpenFlags) -> Directory {
+        Directory::from_open(self, open_flags)
     }
 
     /// Turn the [Open] into a remote VFS node.
@@ -124,13 +121,6 @@ impl Open {
     }
 }
 
-impl From<Open> for Directory {
-    fn from(value: Open) -> Directory {
-        let (handle, fut) = value.to_zx_handle();
-        Directory::new(handle.into(), fut)
-    }
-}
-
 impl Capability for Open {
     fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
@@ -142,41 +132,33 @@ impl Capability for Open {
     ) -> Result<Box<dyn std::any::Any>, ConversionError> {
         if type_id == std::any::TypeId::of::<Self>() {
             return Ok(Box::new(self).into_any());
-        } else if type_id == std::any::TypeId::of::<Directory>() {
-            let directory: Directory = self.try_into().map_err(anyhow::Error::from)?;
-            return Ok(Box::new(directory));
         }
         Err(ConversionError::NotSupported)
     }
 
-    /// Opens the capability with "." path when a request comes from the returned client endpoint.
+    /// Returns a `fuchsia.io/Openable` client endpoint that can open this capability.
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        let open_flags = self.open_flags;
         let remote = self.into_remote();
         let scope = ExecutionScope::new();
-        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
+        let (client_end, server_end) = create_endpoints::<fio::OpenableMarker>();
         // If this future is dropped, stop serving the connection.
         let guard = scopeguard::guard(scope.clone(), move |scope| {
             scope.shutdown();
         });
+        let mut request_stream = server_end.into_stream().unwrap();
         let fut = async move {
             let _guard = guard;
-            // Wait for the client endpoint to be written or closed. These are the only two
-            // operations the client could do that warrants our attention.
-            let server_end = fasync::Channel::from_channel(server_end.into_channel())
-                .expect("failed to convert server_end into async channel");
-            let on_signal_fut = fasync::OnSignals::new(
-                &server_end,
-                zx::Signals::CHANNEL_READABLE | zx::Signals::CHANNEL_PEER_CLOSED,
-            );
-            let signals = on_signal_fut.await.unwrap();
-            if signals & zx::Signals::CHANNEL_READABLE != zx::Signals::NONE {
-                remote.clone().open(
-                    scope.clone(),
-                    open_flags,
-                    vfs::path::Path::dot(),
-                    server_end.into_zx_channel().into(),
-                );
+            while let Ok(Some(request)) = request_stream.try_next().await {
+                match request {
+                    fio::OpenableRequest::Open { flags, mode: _mode, path, object, .. } => {
+                        match vfs::path::Path::validate_and_split(path) {
+                            Ok(path) => remote.clone().open(scope.clone(), flags, path, object),
+                            Err(status) => {
+                                let _ = object.close_with_epitaph(status);
+                            }
+                        }
+                    }
+                }
             }
             scope.wait().await;
         }
@@ -206,7 +188,6 @@ impl AsRouter for Open {
                     }
                 },
                 fio::DirentType::Unknown,
-                request.flags,
             );
             completer.complete(Ok(Box::new(inner_open)));
         };
@@ -243,7 +224,6 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
         let remote = open.into_remote();
         let dir = pfs::simple();
@@ -277,20 +257,22 @@ mod tests {
                   flags: fio::OpenFlags,
                   relative_path: Path,
                   server_end: zx::Channel| {
-                assert_eq!(relative_path.into_string(), "");
+                assert_eq!(relative_path.into_string(), "path");
                 assert_eq!(flags, fio::OpenFlags::DIRECTORY);
                 OPEN_COUNT.inc();
                 drop(server_end);
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
 
         assert_eq!(OPEN_COUNT.get(), 0);
         let (client_end, fut) = open.to_zx_handle();
-        zx::Channel::from(client_end)
-            .write(&[1], &mut [])
-            .expect("should be able to write to the client endpoint");
+        let client_end =
+            fidl::endpoints::ClientEnd::<fio::DirectoryMarker>::from(zx::Channel::from(client_end));
+        let client = client_end.into_proxy().unwrap();
+        let (_client_end, server_end) = create_endpoints();
+        client.open(fio::OpenFlags::DIRECTORY, fio::ModeType::empty(), "path", server_end).unwrap();
+        drop(client);
         fut.unwrap().await;
         assert_eq!(OPEN_COUNT.get(), 1);
     }
@@ -312,7 +294,6 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
 
         assert_eq!(OPEN_COUNT.get(), 0);

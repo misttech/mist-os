@@ -25,7 +25,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::Open,
+    sandbox::{AnyCapability, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -109,7 +109,7 @@ async fn add_use_decls(
 
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
-        let capability = match use_ {
+        let capability: AnyCapability = match use_ {
             cm_rust::UseDecl::Directory(_) => directory_use(&use_, component.as_weak()),
             cm_rust::UseDecl::Storage(storage) => storage_use(storage, use_, component).await?,
             cm_rust::UseDecl::Protocol(s) => {
@@ -150,7 +150,7 @@ async fn storage_use(
     use_storage_decl: &UseStorageDecl,
     use_decl: &UseDecl,
     component: &Arc<ComponentInstance>,
-) -> Result<Box<Open>, CreateNamespaceError> {
+) -> Result<Box<Directory>, CreateNamespaceError> {
     // Prevent component from using storage capability if it is restricted to the component ID
     // index, and the component isn't in the index.
     // To check that the storage capability is restricted to the storage decl, we have
@@ -176,7 +176,7 @@ async fn storage_use(
 /// `component` is a weak pointer, which is important because we don't want the task
 /// waiting for channel readability to hold a strong pointer to this component lest it
 /// create a reference cycle.
-fn directory_use(use_: &UseDecl, component: WeakComponentInstance) -> Box<Open> {
+fn directory_use(use_: &UseDecl, component: WeakComponentInstance) -> Box<Directory> {
     let flags = match use_ {
         UseDecl::Directory(dir) => Rights::from(dir.rights).into_legacy(),
         UseDecl::Storage(_) => fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -215,8 +215,8 @@ fn directory_use(use_: &UseDecl, component: WeakComponentInstance) -> Box<Open> 
         ));
     };
 
-    let open = Open::new(open_fn, fio::DirentType::Directory, flags);
-    Box::new(open)
+    let open = Open::new(open_fn, fio::DirentType::Directory);
+    Box::new(open.into_directory(flags))
 }
 
 async fn route_directory(
@@ -347,7 +347,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         component.blocking_task_group().spawn(task)
     };
 
-    let open = Open::new(route_open_fn, fio::DirentType::Service, fio::OpenFlags::empty());
+    let open = Open::new(route_open_fn, fio::DirentType::Service);
     Box::new(open)
 }
 

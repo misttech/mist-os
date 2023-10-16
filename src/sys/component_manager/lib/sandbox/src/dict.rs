@@ -174,9 +174,6 @@ impl TryInto<Open> for Dict {
                 dir.clone().open(scope.clone(), flags, relative_path, server_end.into())
             },
             fio::DirentType::Directory,
-            // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
-            // requires READABLE.
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
         ))
     }
 }
@@ -231,7 +228,10 @@ impl Capability for Dict {
             return Ok(Box::new(open));
         } else if type_id == std::any::TypeId::of::<Directory>() {
             let open: Open = self.try_into().map_err(anyhow::Error::from)?;
-            let directory: Directory = open.into();
+            // TODO(https://fxbug.dev/129636): Remove RIGHT_READABLE when `opendir` no longer
+            // requires READABLE.
+            let directory =
+                open.into_directory(fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE);
             return Ok(Box::new(directory));
         }
         Err(ConversionError::NotSupported)
@@ -563,7 +563,6 @@ mod tests {
                 unreachable!();
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
         let mut dict = Dict::new();
         // This string is too long to be a valid fuchsia.io name.
@@ -589,7 +588,6 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
         let mut dict = Dict::new();
         dict.entries.insert(CAP_KEY.to_string(), Box::new(open));
@@ -630,7 +628,6 @@ mod tests {
                 drop(server_end);
             },
             fio::DirentType::Directory,
-            fio::OpenFlags::DIRECTORY,
         );
         let mut inner_dict = Dict::new();
         inner_dict.entries.insert(CAP_KEY.to_string(), Box::new(open));
