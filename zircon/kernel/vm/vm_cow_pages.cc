@@ -60,6 +60,9 @@ namespace {
 
 KCOUNTER(vm_vmo_high_priority, "vm.vmo.high_priority")
 KCOUNTER(vm_vmo_no_reclamation_strategy, "vm.vmo.no_reclamation_strategy")
+KCOUNTER(vm_vmo_dont_need, "vm.vmo.dont_need")
+KCOUNTER(vm_vmo_always_need, "vm.vmo.always_need")
+KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim")
 
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
@@ -3898,6 +3901,7 @@ void VmCowPages::PromoteRangeForReclamationLocked(uint64_t offset, uint64_t len)
       // always_need hint is sticky.
       if (page->object.get_object() == root && page->object.pin_count == 0 && is_page_clean(page)) {
         pmm_page_queues()->MoveToPagerBackedDontNeed(page);
+        vm_vmo_dont_need.Add(1);
       }
     }
     // Can't really do anything in case an error is encountered while looking up the page. Simply
@@ -3976,6 +3980,7 @@ void VmCowPages::ProtectRangeFromReclamationLocked(uint64_t offset, uint64_t len
         DEBUG_ASSERT(!page->is_loaned());
         if (set_always_need) {
           page->object.always_need = 1;
+          vm_vmo_always_need.Add(1);
           // Nothing more to do beyond marking the page always_need true. The lookup must have
           // already marked the page accessed, moving it to the head of the first page queue.
         }
@@ -5931,6 +5936,7 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
     // eviction. Pages move out of said queue when accessed, and continue aging as other pages.
     // Pages in the queue are considered for eviction pre-OOM, but ignored otherwise.
     UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+    vm_vmo_always_need_skipped_reclaim.Add(1);
     return false;
   }
 
