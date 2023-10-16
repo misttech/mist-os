@@ -1872,8 +1872,8 @@ TEST_F(Threads, DebugRegistersValidation) {
 
   for (size_t i = 0; i < 4; i++)
     ASSERT_EQ(debug_regs.dr[i], 0);
-  // DR6: Should not have been written.
-  ASSERT_EQ(debug_regs.dr6, DR6_ZERO_MASK);
+  // Only the user accessible bits of DR6 should be set.
+  ASSERT_EQ(debug_regs.dr6, 0xffffefff);
   ASSERT_EQ(debug_regs.dr7, 0xffff07ff);
 #elif defined(__aarch64__)
   zx_thread_state_debug_regs_t debug_regs = {};
@@ -1918,6 +1918,131 @@ TEST_F(Threads, DebugRegistersValidation) {
   EXPECT_EQ(actual_regs.hw_bps[1].dbgbvr, debug_regs.hw_bps[1].dbgbvr);
 #endif
 }
+
+#if defined(__x86_64__)
+// This is a regression test for fxbug.dev/92181.
+//
+// See that DR6 is reset after a hardware debug exception.
+TEST_F(Threads, DebugRegistersDr6ResetOnDebugException) {
+  // Start a thread that will spin at |spin_address|.
+  zx_thread_state_debug_regs_t debug_regs{};
+  RegisterReadSetup<zx_thread_state_debug_regs_t> setup;
+  setup.RunUntil(vmar(), &spin_with_debug_regs, &debug_regs,
+                 reinterpret_cast<uintptr_t>(&spin_address));
+
+  // Create a channel upon which we'll receive debug exceptions.
+  zx::channel exception_channel;
+  ASSERT_OK(zx::process::self()->create_exception_channel(ZX_EXCEPTION_CHANNEL_DEBUGGER,
+                                                          &exception_channel));
+
+  // Set hardware breakpoints, resume the thread, and wait for them to be hit.
+  for (size_t i = 0; i < 4; ++i) {
+    debug_regs.dr[i] = reinterpret_cast<uintptr_t>(&spin_address);
+  }
+  debug_regs.dr7 = DR7_ZERO_MASK | 0xff;  // enable "local" and "global" for all 4 with length 1
+  ASSERT_OK(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                  sizeof(debug_regs)));
+  setup.Resume();
+  zx::exception exception;
+  wait_thread_excp_type(setup.thread_handle(), exception_channel.get(), ZX_EXCP_HW_BREAKPOINT,
+                        ZX_EXCP_THREAD_STARTING, exception.reset_and_get_address());
+
+  // The thread should now be blocked on a debug exception.  Verify the debug register state.
+  wait_thread_blocked(setup.thread_handle(), ZX_THREAD_STATE_BLOCKED_EXCEPTION);
+  ASSERT_OK(zx_thread_read_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                 sizeof(debug_regs)));
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(debug_regs.dr[i], reinterpret_cast<uintptr_t>(&spin_address));
+  }
+  // See that all 4 breakpoints were hit.
+  EXPECT_EQ(debug_regs.dr6, DR6_ZERO_MASK | 0b1111);
+
+  // Clear the status register and set 4 new breakpoints that should never be hit.
+  debug_regs.dr6 = DR6_ZERO_MASK;
+  for (size_t i = 0; i < 4; ++i) {
+    debug_regs.dr[i] = reinterpret_cast<uintptr_t>(&zx_handle_close);
+  }
+  debug_regs.dr7 = DR7_ZERO_MASK | 0xff;
+  ASSERT_OK(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                  sizeof(debug_regs)));
+
+  // Handle the debug exception and verify the thread resumes execution.
+  uint32_t state = ZX_EXCEPTION_STATE_HANDLED;
+  ASSERT_OK(exception.set_property(ZX_PROP_EXCEPTION_STATE, &state, sizeof(state)));
+  exception.reset();
+  zx_signals_t unused = 0u;
+  ASSERT_OK(
+      zx_object_wait_one(setup.thread_handle(), ZX_THREAD_RUNNING, ZX_TIME_INFINITE, &unused));
+
+  // Suspend the thread and see that the debug registers are as we left them.  In particular, DR6
+  // should contain its reset value.
+  setup.Suspend();
+  ASSERT_OK(zx_thread_read_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                 sizeof(debug_regs)));
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(debug_regs.dr[i], reinterpret_cast<uintptr_t>(&zx_handle_close));
+  }
+  EXPECT_EQ(debug_regs.dr6, DR6_ZERO_MASK);
+  EXPECT_EQ(debug_regs.dr7, DR7_ZERO_MASK | 0xff);
+}
+
+// This is a regression test for the failure case detailed in https://fxbug.dev/92181#c8.
+//
+// See that dr6 remains correct after a hardware breakpoint has been removed.
+TEST_F(Threads, DebugRegistersDr6CorrectAfterBreakpointRemoval) {
+  // Start a thread that will spin at |spin_address|.
+  zx_thread_state_debug_regs_t debug_regs{};
+  RegisterReadSetup<zx_thread_state_debug_regs_t> setup;
+  setup.RunUntil(vmar(), &spin_with_debug_regs, &debug_regs,
+                 reinterpret_cast<uintptr_t>(&spin_address));
+
+  // Create a channel upon which we'll receive debug exceptions.
+  zx::channel exception_channel;
+  ASSERT_OK(zx::process::self()->create_exception_channel(ZX_EXCEPTION_CHANNEL_DEBUGGER,
+                                                          &exception_channel));
+
+  // Set hardware breakpoints, resume the thread, and wait for them to be hit.
+  for (size_t i = 0; i < 4; ++i) {
+    debug_regs.dr[i] = reinterpret_cast<uintptr_t>(&spin_address);
+  }
+  debug_regs.dr7 = DR7_ZERO_MASK | 0xff;  // enable "local" and "global" for all 4 with length 1
+  ASSERT_OK(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                  sizeof(debug_regs)));
+  setup.Resume();
+  zx::exception exception;
+  wait_thread_excp_type(setup.thread_handle(), exception_channel.get(), ZX_EXCP_HW_BREAKPOINT,
+                        ZX_EXCP_THREAD_STARTING, exception.reset_and_get_address());
+
+  // The thread should now be blocked on a debug exception. Verify the debug register state.
+  wait_thread_blocked(setup.thread_handle(), ZX_THREAD_STATE_BLOCKED_EXCEPTION);
+  ASSERT_OK(zx_thread_read_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                 sizeof(debug_regs)));
+  for (size_t i = 0; i < 4; ++i) {
+    EXPECT_EQ(debug_regs.dr[i], reinterpret_cast<uintptr_t>(&spin_address));
+  }
+  // See that all 4 breakpoints were hit.
+  EXPECT_EQ(debug_regs.dr6, DR6_ZERO_MASK | 0b1111);
+
+  // Remove the hardware breakpoint.
+  for (size_t i = 0; i < 4; ++i) {
+    debug_regs.dr[i] = 0;
+  }
+  debug_regs.dr7 = DR7_ZERO_MASK;
+  ASSERT_OK(zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                  sizeof(debug_regs)));
+
+  // Now read the debug state and verify that dr6 still correctly shows that all 4 breakpoints were
+  // hit.
+  ASSERT_OK(zx_thread_read_state(setup.thread_handle(), ZX_THREAD_STATE_DEBUG_REGS, &debug_regs,
+                                 sizeof(debug_regs)));
+  EXPECT_EQ(debug_regs.dr6, DR6_ZERO_MASK | 0b1111);
+
+  // Handle the exception so that the thread continues.
+  uint32_t state = ZX_EXCEPTION_STATE_HANDLED;
+  ASSERT_OK(exception.set_property(ZX_PROP_EXCEPTION_STATE, &state, sizeof(state)));
+  exception.reset();
+}
+#endif
 
 // This is a regression test for fxbug.dev/34166. Verify that upon entry to the kernel via fault on
 // hardware that lacks SMAP, a subsequent usercopy does not panic.

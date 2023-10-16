@@ -130,6 +130,11 @@ static void x86_debug_handler(iframe_t* frame) {
   // We save the current state so that exception handlers can check what kind of exception it was.
   x86_read_debug_status(&thread->arch().debug_state.dr6);
 
+  // The value in the thread's debug_state struct is authoritative. Reset the hardware state of DR6
+  // to ensure that if we context switch to another thread that thread won't see this the DR6 meant
+  // for this thread.
+  x86_write_debug_status(X86_DR6_MASK);
+
   // NOTE: a HW breakpoint exception can also represent a single step.
   // TODO(fxbug.dev/32872): Is it worth separating this into two separate exceptions?
   if (try_dispatch_user_exception(frame, ZX_EXCP_HW_BREAKPOINT)) {
@@ -140,8 +145,6 @@ static void x86_debug_handler(iframe_t* frame) {
     X86_DBG_STATUS_BD_SET(&thread->arch().debug_state.dr6, 0);
     X86_DBG_STATUS_BS_SET(&thread->arch().debug_state.dr6, 0);
     X86_DBG_STATUS_BT_SET(&thread->arch().debug_state.dr6, 0);
-    x86_write_debug_status(thread->arch().debug_state.dr6);
-
     return;
   }
 

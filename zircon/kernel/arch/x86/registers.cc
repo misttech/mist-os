@@ -656,13 +656,16 @@ bool x86_validate_debug_state(x86_debug_state_t* debug_state) {
     }
   }
 
-  // DR6 is not writable from userspace, as it is a debug status registers.
-  // Zircon takes on the job of keeping it up to date.
+  // Ensure that only user writable bits in DR6 are set.
+  uint64_t dr6 = debug_state->dr6;
+  debug_state->dr6 = X86_DR6_MASK;
+  uint64_t values_to_write2 = dr6 & X86_DR6_USER_MASK;
+  debug_state->dr6 |= values_to_write2;
 
   // DR7.
   uint64_t dr7 = debug_state->dr7;
   debug_state->dr7 = X86_DR7_MASK;
-  uint64_t values_to_write2 = dr7 & X86_DR7_USER_MASK;
+  values_to_write2 = dr7 & X86_DR7_USER_MASK;
   debug_state->dr7 |= values_to_write2;
 
   return true;
@@ -706,8 +709,11 @@ void x86_write_hw_debug_regs(const x86_debug_state_t* debug_state) {
   asm volatile("mov %0, %%dr1" ::"r"(debug_state->dr[1]));
   asm volatile("mov %0, %%dr2" ::"r"(debug_state->dr[2]));
   asm volatile("mov %0, %%dr3" ::"r"(debug_state->dr[3]));
-  // DR6 is not writable from userspace.
-  // IMPORTANT: DR7 should be already masked at this point by calling x86_validate_debug_state.
+
+  // IMPORTANT: DR6 and DR7 should be already masked at this point by calling
+  // x86_validate_debug_state.
+  x86_write_debug_status(debug_state->dr6);
+
   asm volatile("mov %0, %%dr7" ::"r"(debug_state->dr7));
 }
 
