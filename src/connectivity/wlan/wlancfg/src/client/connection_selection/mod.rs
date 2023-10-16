@@ -14,7 +14,6 @@ use {
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
-    fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
     fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
     fuchsia_inspect::{Node as InspectNode, StringReference},
     fuchsia_inspect_contrib::{
@@ -30,14 +29,6 @@ use {
     tracing::{debug, error, info, warn},
     wlan_common::{self, security::SecurityAuthenticator, sequestered::Sequestered},
     wlan_inspect::wrappers::InspectWlanChan,
-    wlan_metrics_registry::{
-        SavedNetworkInScanResultMigratedMetricDimensionBssCount,
-        SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved as ActiveScanSsidsObserved,
-        ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount,
-        SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
-        SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
-        SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
-    },
 };
 
 pub mod bss_selection;
@@ -490,7 +481,6 @@ fn record_metrics_on_scan(
     mut merged_networks: Vec<types::ScannedCandidate>,
     telemetry_sender: &TelemetrySender,
 ) {
-    let mut metric_events = vec![];
     let mut merged_network_map: HashMap<types::NetworkIdentifier, Vec<types::ScannedCandidate>> =
         HashMap::new();
     for bss in merged_networks.drain(..) {
@@ -499,68 +489,23 @@ fn record_metrics_on_scan(
 
     let num_saved_networks_observed = merged_network_map.len();
     let mut num_actively_scanned_networks = 0;
-    for (_network_id, bsss) in merged_network_map {
-        // Record how many BSSs are visible in the scan results for this saved network.
-        let num_bss = match bsss.len() {
-            0 => unreachable!(), // The ::Zero enum exists, but we shouldn't get a scan result with no BSS
-            1 => SavedNetworkInScanResultMigratedMetricDimensionBssCount::One,
-            2..=4 => SavedNetworkInScanResultMigratedMetricDimensionBssCount::TwoToFour,
-            5..=10 => SavedNetworkInScanResultMigratedMetricDimensionBssCount::FiveToTen,
-            11..=20 => SavedNetworkInScanResultMigratedMetricDimensionBssCount::ElevenToTwenty,
-            21..=usize::MAX => {
-                SavedNetworkInScanResultMigratedMetricDimensionBssCount::TwentyOneOrMore
-            }
-            _ => unreachable!(),
-        };
-        metric_events.push(MetricEvent {
-            metric_id: SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
-            event_codes: vec![num_bss as u32],
-            payload: MetricEventPayload::Count(1),
-        });
+    let bss_count_per_saved_network = merged_network_map
+        .values()
+        .map(|bsss| {
+            // Check if the network was found via active scan.
+            if bsss.iter().any(|bss| matches!(bss.bss.observation, types::ScanObservation::Active))
+            {
+                num_actively_scanned_networks += 1;
+            };
+            // Count how many BSSs are visible in the scan results for this saved network.
+            bsss.len()
+        })
+        .collect();
 
-        // Check if the network was found via active scan.
-        if bsss.iter().any(|bss| matches!(bss.bss.observation, types::ScanObservation::Active)) {
-            num_actively_scanned_networks += 1;
-        };
-    }
-
-    let saved_network_count_metric = match num_saved_networks_observed {
-        0 => ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::Zero,
-        1 => ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::One,
-        2..=4 => ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::TwoToFour,
-        5..=20 => ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::FiveToTwenty,
-        21..=40 => ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::TwentyOneToForty,
-        41..=usize::MAX => {
-            ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::FortyOneOrMore
-        }
-        _ => unreachable!(),
-    };
-    metric_events.push(MetricEvent {
-        metric_id: SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
-        event_codes: vec![saved_network_count_metric as u32],
-        payload: MetricEventPayload::Count(1),
-    });
-
-    let actively_scanned_networks_metrics = match num_actively_scanned_networks {
-        0 => ActiveScanSsidsObserved::Zero,
-        1 => ActiveScanSsidsObserved::One,
-        2..=4 => ActiveScanSsidsObserved::TwoToFour,
-        5..=10 => ActiveScanSsidsObserved::FiveToTen,
-        11..=20 => ActiveScanSsidsObserved::ElevenToTwenty,
-        21..=50 => ActiveScanSsidsObserved::TwentyOneToFifty,
-        51..=100 => ActiveScanSsidsObserved::FiftyOneToOneHundred,
-        101..=usize::MAX => ActiveScanSsidsObserved::OneHundredAndOneOrMore,
-        _ => unreachable!(),
-    };
-    metric_events.push(MetricEvent {
-        metric_id: SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
-        event_codes: vec![actively_scanned_networks_metrics as u32],
-        payload: MetricEventPayload::Count(1),
-    });
-
-    telemetry_sender.send(TelemetryEvent::LogMetricEvents {
-        events: metric_events,
-        ctx: "connection_selection::record_metrics_on_scan",
+    telemetry_sender.send(TelemetryEvent::ConnectionSelectionScanResults {
+        saved_network_count: num_saved_networks_observed,
+        bss_count_per_saved_network,
+        saved_network_count_found_by_active_scan: num_actively_scanned_networks,
     });
 }
 #[cfg(test)]
@@ -1389,11 +1334,13 @@ mod tests {
             Ok(Some(TelemetryEvent::ActiveScanRequested { num_ssids_requested: 0 }))
         );
         assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::LogMetricEvents {
-                ctx: "connection_selection::record_metrics_on_scan",
-                ..
-            }))
+            telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
+                saved_network_count, bss_count_per_saved_network, saved_network_count_found_by_active_scan
+            })) => {
+                assert_eq!(saved_network_count, 2);
+                assert_eq!(bss_count_per_saved_network, vec![1, 1]);
+                assert_eq!(saved_network_count_found_by_active_scan, 0);
+            }
         );
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::NetworkSelectionDecision {
@@ -1591,49 +1538,14 @@ mod tests {
 
         record_metrics_on_scan(mock_scan_results, &telemetry_sender);
 
-        let metric_events = assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::LogMetricEvents { events, .. })) => events);
-        assert_eq!(metric_events.len(), 4);
-
-        // The order of the first two cobalt events is not deterministic
-        // Three BSSs present for network 1 in scan results
-        assert!(metric_events[..2].iter().any(|event| *event
-            == MetricEvent {
-                metric_id: SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    SavedNetworkInScanResultMigratedMetricDimensionBssCount::TwoToFour as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }));
-
-        // One BSS present for network 2 in scan results
-        assert!(metric_events[..2].iter().any(|event| *event
-            == MetricEvent {
-                metric_id: SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    SavedNetworkInScanResultMigratedMetricDimensionBssCount::One as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }));
-
-        // Total of two saved networks in the scan results
-        assert_eq!(
-            metric_events[2],
-            MetricEvent {
-                metric_id: SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::TwoToFour as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }
-        );
-
-        // One saved networks that was discovered via active scan
-        assert_eq!(
-            metric_events[3],
-            MetricEvent {
-                metric_id: SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
-                event_codes: vec![ActiveScanSsidsObserved::One as u32],
-                payload: MetricEventPayload::Count(1),
+        assert_variant!(
+            telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
+                saved_network_count, mut bss_count_per_saved_network, saved_network_count_found_by_active_scan
+            })) => {
+                assert_eq!(saved_network_count, 2);
+                bss_count_per_saved_network.sort();
+                assert_eq!(bss_count_per_saved_network, vec![1, 3]);
+                assert_eq!(saved_network_count_found_by_active_scan, 1);
             }
         );
     }
@@ -1647,28 +1559,13 @@ mod tests {
 
         record_metrics_on_scan(mock_scan_results, &telemetry_sender);
 
-        let metric_events = assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::LogMetricEvents { events, .. })) => events);
-        assert_eq!(metric_events.len(), 2);
-
-        // No saved networks in scan results
-        assert_eq!(
-            metric_events[0],
-            MetricEvent {
-                metric_id: SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
-                event_codes: vec![
-                    ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::Zero as u32
-                ],
-                payload: MetricEventPayload::Count(1),
-            }
-        );
-
-        // Also no saved networks that were discovered via active scan
-        assert_eq!(
-            metric_events[1],
-            MetricEvent {
-                metric_id: SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
-                event_codes: vec![ActiveScanSsidsObserved::Zero as u32],
-                payload: MetricEventPayload::Count(1),
+        assert_variant!(
+            telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ConnectionSelectionScanResults {
+                saved_network_count, bss_count_per_saved_network, saved_network_count_found_by_active_scan
+            })) => {
+                assert_eq!(saved_network_count, 0);
+                assert_eq!(bss_count_per_saved_network, Vec::<usize>::new());
+                assert_eq!(saved_network_count_found_by_active_scan, 0);
             }
         );
     }

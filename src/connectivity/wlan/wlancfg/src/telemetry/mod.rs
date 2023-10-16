@@ -291,6 +291,12 @@ pub enum TelemetryEvent {
     NetworkSelectionScanInterval {
         time_since_last_scan: zx::Duration,
     },
+    /// Statistics about networks observed in scan results for Connection Selection
+    ConnectionSelectionScanResults {
+        saved_network_count: usize,
+        bss_count_per_saved_network: Vec<usize>,
+        saved_network_count_found_by_active_scan: usize,
+    },
     /// Notify telemetry event loop that connection duration has reached threshold to log
     /// post-connect score deltas.
     PostConnectionScores {
@@ -310,13 +316,6 @@ pub enum TelemetryEvent {
     /// be created.
     UpdateExperiment {
         experiment: experiment::ExperimentUpdate,
-    },
-    /// This is a stepping stone for some metrics to Cobalt 1.1.  Metrics are currently being
-    /// migrated out of `LogMetricEvent` and toward their own `TelemetryEvent`s.  Please do not use
-    /// `LogMetricEvent` for new metrics.
-    LogMetricEvents {
-        events: Vec<MetricEvent>,
-        ctx: &'static str,
     },
     /// Notify the telemtry event loop that a PHY has failed to create an interface.
     IfaceCreationFailure,
@@ -1248,6 +1247,19 @@ impl Telemetry {
             TelemetryEvent::NetworkSelectionScanInterval { time_since_last_scan } => {
                 self.stats_logger.log_network_selection_scan_interval(time_since_last_scan).await;
             }
+            TelemetryEvent::ConnectionSelectionScanResults {
+                saved_network_count,
+                bss_count_per_saved_network,
+                saved_network_count_found_by_active_scan,
+            } => {
+                self.stats_logger
+                    .log_connection_selection_scan_results(
+                        saved_network_count,
+                        bss_count_per_saved_network,
+                        saved_network_count_found_by_active_scan,
+                    )
+                    .await;
+            }
             TelemetryEvent::StartClientConnectionsRequest => {
                 let now = fasync::Time::now();
                 if self.last_enabled_client_connections.is_none() {
@@ -1287,9 +1299,6 @@ impl Telemetry {
                         }
                     };
                 self.stats_logger.replace_cobalt_proxy(cobalt_1dot1_proxy);
-            }
-            TelemetryEvent::LogMetricEvents { events, ctx } => {
-                self.stats_logger.log_metric_events(events, ctx).await
             }
             TelemetryEvent::IfaceCreationFailure => {
                 self.stats_logger.log_iface_creation_failure().await;
@@ -2416,6 +2425,74 @@ impl StatsLogger {
         );
     }
 
+    async fn log_connection_selection_scan_results(
+        &mut self,
+        saved_network_count: usize,
+        bss_count_per_saved_network: Vec<usize>,
+        saved_network_count_found_by_active_scan: usize,
+    ) {
+        let mut metric_events = vec![];
+
+        use metrics::SavedNetworkInScanResultMigratedMetricDimensionBssCount as BssCount;
+        for bss_count in bss_count_per_saved_network {
+            // Record how many BSSs are visible in the scan results for this saved network.
+            let bss_count_metric = match bss_count {
+                0 => BssCount::Zero, // The ::Zero enum exists, but we shouldn't get a scan result with no BSS
+                1 => BssCount::One,
+                2..=4 => BssCount::TwoToFour,
+                5..=10 => BssCount::FiveToTen,
+                11..=20 => BssCount::ElevenToTwenty,
+                21..=usize::MAX => BssCount::TwentyOneOrMore,
+                _ => unreachable!(),
+            };
+            metric_events.push(MetricEvent {
+                metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
+                event_codes: vec![bss_count_metric as u32],
+                payload: MetricEventPayload::Count(1),
+            });
+        }
+
+        use metrics::ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount as SavedNetworkCount;
+        let saved_network_count_metric = match saved_network_count {
+            0 => SavedNetworkCount::Zero,
+            1 => SavedNetworkCount::One,
+            2..=4 => SavedNetworkCount::TwoToFour,
+            5..=20 => SavedNetworkCount::FiveToTwenty,
+            21..=40 => SavedNetworkCount::TwentyOneToForty,
+            41..=usize::MAX => SavedNetworkCount::FortyOneOrMore,
+            _ => unreachable!(),
+        };
+        metric_events.push(MetricEvent {
+            metric_id: metrics::SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
+            event_codes: vec![saved_network_count_metric as u32],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        use metrics::SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved as ActiveScanSsidsObserved;
+        let actively_scanned_networks_metrics = match saved_network_count_found_by_active_scan {
+            0 => ActiveScanSsidsObserved::Zero,
+            1 => ActiveScanSsidsObserved::One,
+            2..=4 => ActiveScanSsidsObserved::TwoToFour,
+            5..=10 => ActiveScanSsidsObserved::FiveToTen,
+            11..=20 => ActiveScanSsidsObserved::ElevenToTwenty,
+            21..=50 => ActiveScanSsidsObserved::TwentyOneToFifty,
+            51..=100 => ActiveScanSsidsObserved::FiftyOneToOneHundred,
+            101..=usize::MAX => ActiveScanSsidsObserved::OneHundredAndOneOrMore,
+            _ => unreachable!(),
+        };
+        metric_events.push(MetricEvent {
+            metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
+            event_codes: vec![actively_scanned_networks_metrics as u32],
+            payload: MetricEventPayload::Count(1),
+        });
+
+        log_cobalt_1dot1_batch!(
+            self.cobalt_1dot1_proxy,
+            &metric_events,
+            "log_connection_selection_scan_results",
+        );
+    }
+
     async fn log_establish_connection_cobalt_metrics(
         &mut self,
         policy_connect_reason: Option<client::types::ConnectReason>,
@@ -2789,10 +2866,6 @@ impl StatsLogger {
             .entry(index)
             .or_insert(fidl_fuchsia_metrics::HistogramBucket { index, count: 0 });
         entry.count = entry.count + 1;
-    }
-
-    async fn log_metric_events(&mut self, metric_events: Vec<MetricEvent>, ctx: &'static str) {
-        log_cobalt_1dot1_batch!(self.cobalt_1dot1_proxy, &metric_events, ctx,);
     }
 
     async fn log_iface_creation_failure(&mut self) {
@@ -5879,6 +5952,55 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_log_connection_selection_scan_results() {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        let event = TelemetryEvent::ConnectionSelectionScanResults {
+            saved_network_count: 4,
+            saved_network_count_found_by_active_scan: 1,
+            bss_count_per_saved_network: vec![10, 10],
+        };
+        test_helper.telemetry_sender.send(event);
+        test_helper.drain_cobalt_events(&mut test_fut);
+
+        let saved_networks_count =
+            test_helper.get_logged_metrics(metrics::SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID);
+        assert_eq!(saved_networks_count.len(), 1);
+        assert_eq!(
+            saved_networks_count[0].event_codes,
+            vec![
+                metrics::ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount::TwoToFour
+                    as u32
+            ]
+        );
+
+        let active_scanned_network = test_helper.get_logged_metrics(
+            metrics::SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
+        );
+        assert_eq!(active_scanned_network.len(), 1);
+        assert_eq!(
+            active_scanned_network[0].event_codes,
+            vec![metrics::SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved::One as u32]
+        );
+
+        let bss_count = test_helper
+            .get_logged_metrics(metrics::SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID);
+        assert_eq!(bss_count.len(), 2);
+        assert_eq!(
+            bss_count[0].event_codes,
+            vec![
+                metrics::SavedNetworkInScanResultMigratedMetricDimensionBssCount::FiveToTen as u32
+            ]
+        );
+        assert_eq!(
+            bss_count[1].event_codes,
+            vec![
+                metrics::SavedNetworkInScanResultMigratedMetricDimensionBssCount::FiveToTen as u32
+            ]
+        );
+    }
+
+    #[fuchsia::test]
     fn test_log_establish_connection_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
 
@@ -6932,35 +7054,6 @@ mod tests {
             metrics[0].payload,
             MetricEventPayload::IntegerValue(50.seconds().into_micros())
         );
-    }
-
-    #[fuchsia::test]
-    fn test_log_metric_events() {
-        let (mut test_helper, mut test_fut) = setup_test();
-
-        let metric_event_1 = MetricEvent {
-            metric_id: 1,
-            event_codes: vec![1],
-            payload: MetricEventPayload::Count(1),
-        };
-        let metric_event_2 = MetricEvent {
-            metric_id: 2,
-            event_codes: vec![2, 3],
-            payload: MetricEventPayload::IntegerValue(10),
-        };
-        test_helper.telemetry_sender.send(TelemetryEvent::LogMetricEvents {
-            events: vec![metric_event_1.clone(), metric_event_2.clone()],
-            ctx: "blah",
-        });
-
-        test_helper.drain_cobalt_events(&mut test_fut);
-        let metrics = test_helper.get_logged_metrics(metric_event_1.metric_id);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0], metric_event_1);
-
-        let metrics = test_helper.get_logged_metrics(metric_event_2.metric_id);
-        assert_eq!(metrics.len(), 1);
-        assert_eq!(metrics[0], metric_event_2);
     }
 
     #[fuchsia::test]
