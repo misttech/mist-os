@@ -166,6 +166,7 @@ pub mod executor {
         {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .worker_threads(self.num_threads)
+                .enable_io()
                 .build()
                 .expect("Could not start tokio runtime on current thread");
 
@@ -193,6 +194,7 @@ pub mod executor {
             F: Future,
         {
             let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_io()
                 .build()
                 .expect("Could not start tokio runtime on current thread");
             tokio::task::LocalSet::new().block_on(&rt, main_future)
