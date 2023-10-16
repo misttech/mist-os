@@ -304,62 +304,117 @@ closed protocol Node {
         1: is_alternate bool;
     }) error zx.Status;
 
-    /// Get the LogicalBufferCollection ID. This ID is also available from
-    /// Allocator.GetVmoInfo (along with the buffer_index within the
+    /// Get the logical buffer collection ID. This ID is also available from
+    /// `Allocator.GetVmoInfo` (along with the `buffer_index` within the
     /// collection).
     ///
     /// This call is mainly useful in situations where we can't convey a
-    /// BufferCollectionToken or BufferCollection directly, but can only convey
-    /// a VMO handle, which can be joined back up with a BufferCollection
-    /// client_end that was created via a different path. Prefer to convey a
-    /// BufferCollectionToken or BufferCollection directly when feasible.
+    /// `BufferCollectionToken` or `BufferCollection` directly, but can only
+    /// convey a VMO handle, which can be joined back up with a
+    /// `BufferCollection` `client_end` that was created via a different path.
+    /// Prefer to convey a `BufferCollectionToken` or `BufferCollection`
+    /// directly when feasible.
     ///
-    /// Trusting a buffer_collection_id value from a source other than sysmem is
-    /// analogous to trusting a koid value from a source other than zircon. Both
-    /// should be avoided unless really necessary, and both require caution. In
-    /// some situations it may be reasonable to refer to a pre-established
-    /// BufferCollection by buffer_collection_id via a protocol for efficiency
-    /// reasons, but an incoming value purporting to be a buffer_collection_id
-    /// is not sufficient alone to justify granting the sender any capability.
-    /// The sender must first prove to a receiver that the sender has/had a VMO
-    /// or has/had a BufferCollectionToken to the same collection by sending a
-    /// handle that sysmem confirms is a valid sysmem handle and which sysmem
-    /// maps to the buffer_collection_id value. The receiver should take care to
-    /// avoid assuming that a sender had a BufferCollectionToken in cases where
-    /// the sender has only proven that the sender had a VMO.
+    /// Trusting a `buffer_collection_id` value from a source other than sysmem
+    /// is analogous to trusting a koid value from a source other than zircon.
+    /// Both should be avoided unless really necessary, and both require
+    /// caution. In some situations it may be reasonable to refer to a
+    /// pre-established `BufferCollection` by `buffer_collection_id` via a
+    /// protocol for efficiency reasons, but an incoming value purporting to be
+    /// a `buffer_collection_id` is not sufficient alone to justify granting the
+    /// sender any capability. The sender must first prove to a receiver that
+    /// the sender has/had a VMO or has/had a `BufferCollectionToken` to the
+    /// same collection by sending a handle that sysmem confirms is a valid
+    /// sysmem handle and which sysmem maps to the `buffer_collection_id` value.
+    /// The receiver should take care to avoid assuming that a sender had a
+    /// `BufferCollectionToken` in cases where the sender has only proven that
+    /// the sender had a VMO.
     strict GetBufferCollectionId() -> (table {
         1: buffer_collection_id uint64;
     });
 
     /// Sets the current node and all child nodes created after this message to
-    /// weak, which means that a client's Node client_end (or a child created
-    /// after this message) is not alone sufficient to keep allocated VMOs
-    /// alive.
+    /// weak, which means that a client's `Node` `client_end` (or a child
+    /// created after this message) is not alone sufficient to keep allocated
+    /// VMOs alive.
     ///
-    /// This message is only permitted before the Node becomes ready for
-    /// allocation (else the server closes the channel with ZX_ERR_BAD_STATE):
-    ///   * BufferCollectionToken: any time
-    ///   * BufferCollection: before SetConstraints
-    ///   * BufferCollectionTokenGroup: before AllChildrenPresent
+    /// This message is only permitted before the `Node` becomes ready for
+    /// allocation (else the server closes the channel with `ZX_ERR_BAD_STATE`):
+    ///   * `BufferCollectionToken`: any time
+    ///   * `BufferCollection`: before `SetConstraints`
+    ///   * `BufferCollectionTokenGroup`: before `AllChildrenPresent`
     ///
     /// No conversion from strong to weak after ready for allocation is
     /// provided, but a client can simulate that by creating an additional node
     /// before allocation and setting that additional node to weak, and then
-    /// potentially at some point later doing Close() and close client_end on
-    /// the client's strong Node, but keeping the weak Node.
+    /// potentially at some point later doing `Close` and close `client_end` on
+    /// the client's strong `Node`, but keeping the weak `Node`.
     ///
-    /// Zero strong Node(s) and zero strong VMO handles will result in logical
-    /// buffer collection failure (all Node client_end(s) seeing
-    /// ZX_CHANNEL_PEER_CLOSED and all close_weak_asap client ends seeing
-    /// ZX_EVENTPAIR_PEER_CLOSED), but sysmem (intentionally) won't notice this
-    /// situation until all Node(s) are ready for allocation. For initial
-    /// allocation to succeed, at least one strong Node is required to exist at
-    /// allocation time, but after that client receives VMO handles, that client
-    /// can BufferCollection.Close() and close client_end without causing this
-    /// type of failure.
+    /// Zero strong `Node`(s) and zero strong VMO handles will result in logical
+    /// buffer collection failure (all `Node` `client_end`(s) seeing
+    /// `ZX_CHANNEL_PEER_CLOSED` and all `close_weak_asap` `client_end`(s)
+    /// seeing `ZX_EVENTPAIR_PEER_CLOSED`), but sysmem (intentionally) won't
+    /// notice this situation until all `Node`(s) are ready for allocation. For
+    /// initial allocation to succeed, at least one strong `Node` is required to
+    /// exist at allocation time, but after that client receives VMO handles,
+    /// that client can `BufferCollection.Close` and close `client_end` without
+    /// causing this type of failure.
     ///
-    /// For a BufferCollection Node, this implies SetWeakOk as well.
+    /// This implies `SetWeakOk` as well, but does not imply `SetWeakOk` with
+    /// `for_children_also` true, which can be sent separately as appropriate.
     strict SetWeak();
+
+    /// Send this message before `WaitForAllBuffersAllocated` if the client is
+    /// prepared to pay attention to `close_weak_asap`.
+    ///
+    /// All participants using a weak `BufferCollection` must send this message
+    /// before `WaitForAllBuffersAllocated`, or a parent `Node` must have set
+    /// `for_child_nodes_also` true, else the `WaitForAllBuffersAllocated` will
+    /// trigger logical buffer collection failure.
+    ///
+    /// This is necessary because weak sysmem VMOs have not always been a thing,
+    /// so older clients are not aware of the need to pay attention to
+    /// `close_weak_asap` `ZX_EVENTPAIR_PEER_CLOSED` and close all remaining
+    /// sysmem weak VMO handles asap. By having this message and requiring
+    /// participants to indicate their acceptance of this aspect of the overall
+    /// protocol, we avoid situations where an older client is delivered a weak
+    /// VMO without any way to get that VMO to close later.
+    ///
+    /// A non-weak-handling participant that also doesn't retreive any VMO
+    /// handles via `WaitForAllBuffersAllocated` doesn't need to send
+    /// `SetWeakOk` (and doesn't need to have a parent `Node` send `SetWeakOk`
+    /// with `for_child_nodes_also` true, but if that same participant has a
+    /// delegate which does retrieve VMOs, that delegate will need to send
+    /// `SetWeakOk` before `WaitForAllBuffersAllocated`.
+    ///
+    /// `for_child_nodes_also` - If present and true, this means direct child
+    /// nodes of this node created after this message plus all descendants of
+    /// those nodes will behave as if `SetWeakOk` was sent on those nodes. Any
+    /// child node of this node that was created before this message is not
+    /// included. This setting is "sticky" in the sense that a subsequent
+    /// `SetWeakOk` without this bool set to true does not reset the server-side
+    /// bool. If this creates a problem for a participant, a workaround is to
+    /// `SetWeakOk` with `for_child_nodes_also` true on child tokens instead, as
+    /// appropriate. A participant should only set `for_child_nodes_also` true
+    /// if the participant can really promise to obey `close_weak_asap` both for
+    /// its own weak VMO handles, and for all weak VMO handles held by
+    /// participants holding the corresponding child nodes.
+    ///
+    /// We intentionally don't provide a way to say "only_if_single_buffer"
+    /// here, but a participant can either set `max_buffer_count` 1 if multiple
+    /// buffers are never expected, or intentionally cause the
+    /// `BufferCollection` to fail shortly after allocation if
+    /// `WaitForAllBuffersAllocated` returns weak VMOs with `close_weak_asap`
+    /// present and more than one buffer. While posisble, the latter behavior is
+    /// discouraged except as a short-term workaround to avoid the combination
+    /// of weak VMOs and multiple buffers; instead, participants should listen
+    /// for `close_weak_asap` `ZX_EVENTPAIR_PEER_CLOSED` per-buffer_index and
+    /// close any corresponding weak VMO handles in response, so that the
+    /// participant can support weak VMOs and multiple buffers without leaking
+    /// VMOs.
+    strict SetWeakOk(resource table {
+        1: for_child_nodes_also bool;
+    });
 };
 
 /// A `BufferCollectionToken` is not a `BufferCollection`, but rather a way to
@@ -763,28 +818,6 @@ closed protocol BufferCollection {
         1: server_end zx.Handle:EVENTPAIR;
         2: buffers_remaining uint32;
     });
-
-    /// Send this message before WaitForAllBuffersAllocated if the client is
-    /// prepared to pay attention to close_weak_asap.
-    ///
-    /// All participants using a weak BufferCollection must send this message
-    /// before WaitForAllBuffersAllocated, else the WaitForAllBuffersAllocated
-    /// will trigger LogicalBufferCollection failure.
-    ///
-    /// This is necessary because weak sysmem VMOs have not always been a thing,
-    /// so older clients are not aware of the need to pay attention to
-    /// close_weak_asap ZX_EVENTPAIR_PEER_CLOSED and close all remaining sysmem
-    /// weak VMO handles asap. By having this message and requiring participants
-    /// to indicate their acceptance of this aspect of the overall protocol, we
-    /// avoid situations where an older client is delivered a weak VMO without
-    /// any way to get that VMO to close later.
-    ///
-    /// A non-weak-handling participant that also doesn't retreive any VMO
-    /// handles via WaitForAllBuffersAllocated doesn't need to send SetWeakOk,
-    /// but if that same participant has a delegate which does retrieve VMOs,
-    /// that delegate will need to send SetWeakOk before
-    /// WaitForAllBuffersAllocated.
-    strict SetWeakOk();
 };
 
 // BufferCollectionTokenGroup:

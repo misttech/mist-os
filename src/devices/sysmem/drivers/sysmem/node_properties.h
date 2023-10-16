@@ -193,6 +193,9 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   void SetWeak();
   [[nodiscard]] bool is_weak() const { return is_weak_; }
 
+  void SetWeakOk(bool for_child_nodes_also);
+  [[nodiscard]] bool is_weak_ok() const { return is_weak_ok_; }
+
   // These counts are for the current NodeProperties + any current children (direct and indirect) of
   // the current NodeProperties.  For LogicalBufferCollection::root_, these counts are for the whole
   // tree.
@@ -259,6 +262,9 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   bool buffers_logically_allocated_ = false;
 
   bool is_weak_ = false;
+
+  bool is_weak_ok_ = false;
+  bool is_weak_ok_for_child_nodes_also_ = false;
 
   // Constraints as set by:
   //

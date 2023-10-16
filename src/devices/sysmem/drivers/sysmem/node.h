@@ -422,6 +422,17 @@ class Node : public fbl::RefCounted<Node> {
     // ~completer; one-way message; no reply
   }
 
+  template <class SetWeakOkRequest, class SetWeakOkCompleterSync>
+  void SetWeakOkImplV2(SetWeakOkRequest& request, SetWeakOkCompleterSync& completer) {
+    if (is_done_) {
+      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeakOk() when already is_done_");
+      return;
+    }
+    bool for_child_nodes_also =
+        request.for_child_nodes_also().has_value() && *request.for_child_nodes_also();
+    node_properties().SetWeakOk(for_child_nodes_also);
+  }
+
   void CloseChannel(zx_status_t epitaph);
 
   virtual void CloseServerBinding(zx_status_t epitaph) = 0;

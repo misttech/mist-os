@@ -5697,7 +5697,7 @@ TEST(Sysmem, GetVmoInfo) {
   ASSERT_TRUE(wait_result.is_ok());
   auto collection_info = std::move(*wait_result->buffer_collection_info());
 
-  ASSERT_TRUE(weak_collection->SetWeakOk().is_ok());
+  ASSERT_TRUE(weak_collection->SetWeakOk(fuchsia_sysmem2::NodeSetWeakOkRequest{}).is_ok());
 
   auto weak_wait_result = weak_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(weak_wait_result.is_ok());
@@ -5782,7 +5782,7 @@ TEST(Sysmem, Weak_SetWeakOk_SentSucceeds) {
   ASSERT_TRUE(child_collection->Sync().is_ok());
   ASSERT_TRUE(strong_child_collection->Sync().is_ok());
   // sending SetWeakOk as late as allowed
-  ASSERT_TRUE(child_collection->SetWeakOk().is_ok());
+  ASSERT_TRUE(child_collection->SetWeakOk(fuchsia_sysmem2::NodeSetWeakOkRequest{}).is_ok());
   auto child_result = child_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(child_result.is_ok());
 }
@@ -5796,7 +5796,7 @@ TEST(Sysmem, Weak_SetWeakOk_TooLateFails) {
   // Sending SetWeakOk one-way message works, but the Sync call after doesn't, because the server
   // fails the collection on reception of SetWeakOk since it arrives after
   // WaitForAllBuffersAllocated.
-  ASSERT_TRUE(collection->SetWeakOk().is_ok());
+  ASSERT_TRUE(collection->SetWeakOk(fuchsia_sysmem2::NodeSetWeakOkRequest{}).is_ok());
   ASSERT_FALSE(collection->Sync().is_ok());
 }
 
@@ -5843,7 +5843,7 @@ TEST(Sysmem, Weak_SetWeak_SparseBufferSet) {
   ASSERT_EQ(ZX_OK, wait_status);
   ASSERT_TRUE(!!(pending_signals & ZX_EVENTPAIR_PEER_CLOSED));
   // sending SetWeakOk as late as allowed (just before WaitForAllBuffersAllocated)
-  ASSERT_TRUE(child_collection->SetWeakOk().is_ok());
+  ASSERT_TRUE(child_collection->SetWeakOk(fuchsia_sysmem2::NodeSetWeakOkRequest{}).is_ok());
   auto child_result = child_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(child_result.is_ok());
   auto child_info = std::move(child_result->buffer_collection_info().value());
@@ -6042,7 +6042,7 @@ TEST(Sysmem, LogWeakLeak_DoesNotCrashSysmem) {
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
   set_min_camping_constraints_v2(parent_collection, 0);
   set_min_camping_constraints_v2(child_collection, 1);
-  auto set_weak_ok_result = child_collection->SetWeakOk();
+  auto set_weak_ok_result = child_collection->SetWeakOk(fuchsia_sysmem2::NodeSetWeakOkRequest{});
   ASSERT_TRUE(set_weak_ok_result.is_ok());
   auto wait_result = child_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(wait_result.is_ok());
@@ -6057,6 +6057,39 @@ TEST(Sysmem, LogWeakLeak_DoesNotCrashSysmem) {
   zx::nanosleep(zx::deadline_after(zx::sec(6)));
   // make sure sysmem didn't crash
   auto extra_token = create_initial_token_v2();
+}
+
+TEST(Sysmem, SetWeakOk_ForChildNodesAlso) {
+  // strong Node, because we need a strong node at least until allocation, else
+  // LogicalBufferCollection will intentionally fail)
+  auto parent_token = create_initial_token_v2();
+
+  // weak Node
+  auto child1_token = create_token_under_token_v2(parent_token);
+  ASSERT_TRUE(child1_token->SetWeak().is_ok());
+  fuchsia_sysmem2::NodeSetWeakOkRequest set_weak_ok_request;
+  set_weak_ok_request.for_child_nodes_also() = true;
+  ASSERT_TRUE(child1_token->SetWeakOk(std::move(set_weak_ok_request)).is_ok());
+
+  auto child2_token = create_token_under_token_v2(child1_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child1_collection = convert_token_to_collection_v2(std::move(child1_token));
+  auto child2_collection = convert_token_to_collection_v2(std::move(child2_token));
+
+  set_min_camping_constraints_v2(parent_collection, 1);
+  set_min_camping_constraints_v2(child1_collection, 1);
+  set_min_camping_constraints_v2(child2_collection, 1);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child1_wait_result = child1_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child1_wait_result.is_ok());
+  auto child2_wait_result = child2_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child2_wait_result.is_ok());
+
+  // allocation success means child2 didn't cause LogicalBufferCollection failure, despite not
+  // sending SetWeakOk itself, thanks to child1 sending SetWeakOk(for_child_nodes_also=true)
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable

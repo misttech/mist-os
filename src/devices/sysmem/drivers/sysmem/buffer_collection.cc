@@ -259,7 +259,7 @@ bool BufferCollection::CommonWaitForAllBuffersAllocatedStage1(
           "#############################################################################################");
     }
   }
-  if (!is_weak_ok_ && node_properties().is_weak()) {
+  if (!node_properties().is_weak_ok() && node_properties().is_weak()) {
     // If this failure happens, the client should make sure to also pay attention to close_weak_asap
     // ZX_EVENTPAIR_PEER_CLOSED, in addition to sending SetWeakOk().
     FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
@@ -484,19 +484,6 @@ void BufferCollection::V2::AttachLifetimeTracking(
                                        request.buffers_remaining().value(), completer);
 }
 
-void BufferCollection::V2::SetWeakOk(SetWeakOkCompleter::Sync& completer) {
-  if (parent_.is_done_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetWeakOk() when already is_done_");
-    return;
-  }
-  if (parent_.wait_for_buffers_seen_) {
-    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
-                     "SetWeakOk() after WaitForAllBuffersAllocated()");
-    return;
-  }
-  parent_.is_weak_ok_ = true;
-}
-
 void BufferCollection::V1::SetVerboseLogging(SetVerboseLoggingCompleter::Sync& completer) {
   parent_.SetVerboseLoggingImpl(completer);
 }
@@ -529,8 +516,18 @@ void BufferCollection::V2::GetBufferCollectionId(GetBufferCollectionIdCompleter:
 
 void BufferCollection::V2::SetWeak(SetWeakCompleter::Sync& completer) {
   parent_.SetWeakImplV2(completer);
-  // SetWeak() implies SetWeakOk().
-  parent_.is_weak_ok_ = true;
+  // SetWeak() implies SetWeakOk(), but only for this Node, not on behalf of any child Node(s).
+  parent_.node_properties().SetWeakOk(false);
+}
+
+void BufferCollection::V2::SetWeakOk(SetWeakOkRequest& request,
+                                     SetWeakOkCompleter::Sync& completer) {
+  if (parent_.wait_for_buffers_seen_) {
+    parent_.FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE,
+                     "SetWeakOk() after WaitForAllBuffersAllocated()");
+    return;
+  }
+  parent_.SetWeakOkImplV2(request, completer);
 }
 
 void BufferCollection::V1::Close(CloseCompleter::Sync& completer) { parent_.CloseImpl(completer); }

@@ -150,6 +150,10 @@ closed protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem2/Node.SetWeak")
     strict SetWeakV2();
+    @selector("fuchsia.sysmem2/Node.SetWeakOk")
+    strict SetWeakOkV2(resource table {
+        1: for_child_nodes_also bool;
+    });
 
     // fuchsia.sysmem2/BufferCollectionToken, with de-conflicted names:
     @selector("fuchsia.sysmem2/BufferCollectionToken.DuplicateSync")

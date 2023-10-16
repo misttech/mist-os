@@ -159,7 +159,7 @@ class BufferCollection : public Node {
     void AttachToken(AttachTokenRequest& request, AttachTokenCompleter::Sync& completer) override;
     void AttachLifetimeTracking(AttachLifetimeTrackingRequest& request,
                                 AttachLifetimeTrackingCompleter::Sync& completer) override;
-    void SetWeakOk(SetWeakOkCompleter::Sync& completer) override;
+    void SetWeakOk(SetWeakOkRequest& request, SetWeakOkCompleter::Sync& completer) override;
 
     BufferCollection& parent_;
   };
@@ -220,8 +220,6 @@ class BufferCollection : public Node {
   std::list<std::pair</*async_id*/ uint64_t, V2::WaitForAllBuffersAllocatedCompleter::Async>>
       pending_wait_for_buffers_allocated_v2_;
 
-  bool is_done_ = false;
-
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem::BufferCollection>> server_binding_v1_;
   std::optional<fidl::ServerBindingRef<fuchsia_sysmem2::BufferCollection>> server_binding_v2_;
 
@@ -235,7 +233,6 @@ class BufferCollection : public Node {
   std::vector<PendingLifetimeTracking> pending_lifetime_tracking_;
 
   bool wait_for_buffers_seen_ = false;
-  bool is_weak_ok_ = false;
 };
 
 }  // namespace sysmem_driver

@@ -61,12 +61,21 @@ NodeProperties* NodeProperties::NewChild(LogicalBufferCollection* logical_buffer
   // when creating the child, but the child starts with the same rights masked away as the parent.
   result_ptr->rights_attenuation_mask_ = rights_attenuation_mask_;
   ZX_DEBUG_ASSERT(result_ptr->error_propagation_mode_ == ErrorPropagationMode::kPropagate);
+
   // The is_weak must propagate when the child is created; later changes to parent is_weak_ don't
   // change the child's is_weak_, intentionally.
   result_ptr->is_weak_ = is_weak_;
   if (!is_weak_) {
     result_ptr->logical_buffer_collection_->IncStrongNodeTally();
   }
+
+  // is_weak_ok_ doesn't propagate to children by default
+  if (is_weak_ok_for_child_nodes_also_) {
+    // propagation to all descendents of the child as well
+    result_ptr->is_weak_ok_for_child_nodes_also_ = true;
+    result_ptr->is_weak_ok_ = is_weak_ok_;
+  }
+
   return result_ptr;
 }
 
@@ -287,6 +296,13 @@ void NodeProperties::SetWeak() {
   }
   logical_buffer_collection_->DecStrongNodeTally();
   is_weak_ = true;
+}
+
+void NodeProperties::SetWeakOk(bool for_child_nodes_also) {
+  is_weak_ok_ = true;
+  if (for_child_nodes_also) {
+    is_weak_ok_for_child_nodes_also_ = true;
+  }
 }
 
 NodeProperties::NodeProperties(LogicalBufferCollection* logical_buffer_collection)

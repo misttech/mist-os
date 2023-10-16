@@ -58,6 +58,11 @@ void BufferCollectionTokenGroup::V2::SetWeak(SetWeakCompleter::Sync& completer) 
   parent_.SetWeakImplV2(completer);
 }
 
+void BufferCollectionTokenGroup::V2::SetWeakOk(SetWeakOkRequest& request,
+                                               SetWeakOkCompleter::Sync& completer) {
+  parent_.SetWeakOkImplV2(request, completer);
+}
+
 void BufferCollectionTokenGroup::V1::SetName(SetNameRequest& request,
                                              SetNameCompleter::Sync& completer) {
   parent_.SetNameImplV1(request, completer);
