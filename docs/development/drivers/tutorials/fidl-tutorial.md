@@ -32,6 +32,10 @@ protocol Echo {
         response string:<MAX_STRING_LENGTH, optional>;
     });
 };
+
+service EchoService {
+    echo client_end:Echo;
+};
 ```
 
 ## Parent Driver (The Server)
@@ -144,29 +148,20 @@ bound to the parent driver described above.
 
 ```
 zx_status_t CallEcho() {
-  // We start by creating a pair of endpoints. This is similar to the parent
-  // driver but this time we are creating them for the actual protocol we intend
-  // to use.
-  auto endpoints = fidl::CreateEndpoints<fidl_examples_echo::Echo>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create endpoints");
-    return endpoints.status_value();
-  }
-
-  // We turn the client side of the endpoint pair into a synchronous client.
-  fidl::WireSyncClient client{std::move(endpoints->client)};
-
   // The following method allows us to connect to the protocol we desire. This
   // works by providing the server end of our endpoint pair to the framework. It
   // will push this channel through the outgoing directory to our parent driver
   // which will then bind it to its server implementation. We do  not need to
   // name the protocol because the method is templated on the  channel type and
   // it is able to automatically derive the name from the type.
-  auto status = DdkConnectFidlProtocol(std::move(endpoints->server));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to connect fidl protocol");
-    return status;
+  zx::result client_end = DdkConnectFidlProtocol<fidl_examples_echo::EchoService::Echo>();
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Failed to connect fidl protocol: %s", client_end.status_string());
+    return client_end.status_value();
   }
+
+  // We turn the client side of the endpoint pair into a synchronous client.
+  fidl::WireSyncClient client{std::move(client_end.value())};
 
   // We can now utilize our client to make calls!
   constexpr std::string_view kInput = "Test String";
