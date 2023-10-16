@@ -35,6 +35,22 @@ impl<A: IpAddress, Z> SocketZonedIpAddr<A, Z> {
     pub fn into_inner(self) -> ZonedAddr<SpecifiedAddr<A>, Z> {
         self.0
     }
+
+    /// Creates from a specified IP address and an optional zone.
+    ///
+    /// If `addr` requires a zone, then `get_zone` will be called to provide
+    /// the zone.
+    ///
+    /// # Panics
+    /// This method panics if the `addr` wants a zone and `get_zone` will panic
+    /// when called.
+    pub fn new_with_zone(addr: SpecifiedAddr<A>, get_zone: impl FnOnce() -> Z) -> Self {
+        if let Some(addr_and_zone) = crate::socket::try_into_null_zoned(&addr) {
+            ZonedAddr::Zoned(addr_and_zone.map_zone(move |()| get_zone())).into()
+        } else {
+            ZonedAddr::Unzoned(addr).into()
+        }
+    }
 }
 
 impl<A: IpAddress, Z> Deref for SocketZonedIpAddr<A, Z> {

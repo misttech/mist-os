@@ -817,9 +817,13 @@ where
             );
 
         Self {
-            local_ip: transport::maybe_with_zone(local_ip, &device),
+            local_ip: SocketZonedIpAddr::new_with_zone(local_ip, || {
+                device.clone().expect("device must be bound for addresses that require zones")
+            }),
             local_port,
-            remote_ip: transport::maybe_with_zone(remote_ip, device),
+            remote_ip: SocketZonedIpAddr::new_with_zone(remote_ip, || {
+                device.expect("device must be bound for addresses that require zones")
+            }),
             remote_port,
         }
     }
@@ -868,7 +872,11 @@ where
             },
         );
 
-        let local_ip = addr.map(|addr| transport::maybe_with_zone(addr, device));
+        let local_ip = addr.map(|addr| {
+            SocketZonedIpAddr::new_with_zone(addr, || {
+                device.expect("device must be bound for addresses that require zones")
+            })
+        });
         Self { local_ip, local_port: identifier }
     }
 }
