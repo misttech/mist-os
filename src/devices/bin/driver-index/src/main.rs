@@ -68,7 +68,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
     ));
 
     // TODO(fxb/126225): Pass in a seed from the input, if available.
-    let (sender, receiver) = futures::channel::mpsc::unbounded::<ResolvedDriver>();
+    let (sender, receiver) = futures::channel::mpsc::unbounded::<Vec<ResolvedDriver>>();
     indexer.clone().start_driver_load(
         receiver,
         Session::new(

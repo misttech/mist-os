@@ -7,18 +7,19 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::SinkExt,
     futures::StreamExt,
-    rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng},
+    rand::{rngs::SmallRng, seq::SliceRandom, RngCore, SeedableRng},
 };
 
 pub struct Session {
-    sender: futures::channel::mpsc::UnboundedSender<ResolvedDriver>,
+    sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
     max_delay: zx::Duration,
     shuffled_boot_drivers: Vec<ResolvedDriver>,
+    rng: SmallRng,
 }
 
 impl Session {
     pub fn new(
-        sender: futures::channel::mpsc::UnboundedSender<ResolvedDriver>,
+        sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
         mut boot_drivers: Vec<ResolvedDriver>,
         max_delay: zx::Duration,
         seed: Option<u64>,
@@ -28,20 +29,54 @@ impl Session {
 
         let mut rng = SmallRng::seed_from_u64(seed_val);
         boot_drivers.shuffle(&mut rng);
-        Session { sender: sender, max_delay: max_delay, shuffled_boot_drivers: boot_drivers }
+        Session {
+            sender: sender,
+            max_delay: max_delay,
+            shuffled_boot_drivers: boot_drivers,
+            rng: rng,
+        }
     }
 
     pub async fn run(mut self) {
-        let delay = self.max_delay / self.shuffled_boot_drivers.len() as i64;
-        let mut timer = fasync::Interval::new(delay);
+        let max_load_delay = self.max_delay / self.shuffled_boot_drivers.len() as i64;
+
+        let mut driver_buffer: Vec<ResolvedDriver> = vec![];
         for driver in self.shuffled_boot_drivers.into_iter() {
-            if timer.next().await.is_none() {
-                return;
+            // Add a 30% chance of injecting a delay between driver loads.
+            let should_delay = (self.rng.next_u32() % 10) < 3;
+            if should_delay {
+                push_drivers(&self.sender, driver_buffer.clone()).await;
+                driver_buffer = vec![];
+
+                // Generate a delay between [0, max_load_delay).
+                let delay = if max_load_delay.into_millis() == 0 {
+                    max_load_delay
+                } else {
+                    fuchsia_zircon::Duration::from_millis(
+                        (self.rng.next_u32() as i64) % max_load_delay.into_millis(),
+                    )
+                };
+
+                let mut timer = fasync::Interval::new(delay);
+                if timer.next().await.is_none() {
+                    return;
+                }
             }
-            let driver_url = driver.component_url.clone();
-            if let Err(e) = self.sender.send(driver).await {
-                tracing::error!("Failed to send driver {} to the Indexer: {}", driver_url, e);
-            }
+
+            driver_buffer.push(driver);
+        }
+        push_drivers(&self.sender, driver_buffer).await;
+    }
+}
+
+async fn push_drivers(
+    mut sender: &futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
+    drivers: Vec<ResolvedDriver>,
+) {
+    if let Err(e) = sender.send(drivers.clone()).await {
+        tracing::error!("Failed to send drivers to the Indexer: {}", e);
+        for driver in drivers {
+            tracing::error!("     {}", driver.component_url);
         }
     }
 }
@@ -81,22 +116,25 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_driver_load() {
-        let test_boot_repo =
-            vec![make_fake_boot_driver("driver-1"), make_fake_boot_driver("driver-2")];
-        let (sender, mut receiver) = futures::channel::mpsc::unbounded::<ResolvedDriver>();
+        let mut test_boot_repo = vec![];
+        for i in 0..10 {
+            test_boot_repo.push(make_fake_boot_driver(format!("driver-{}", i).as_str()));
+        }
+
+        let (sender, mut receiver) = futures::channel::mpsc::unbounded::<Vec<ResolvedDriver>>();
 
         let test_seed = 0;
         let session = Session::new(
             sender,
             test_boot_repo.clone(),
-            fuchsia_zircon::Duration::from_millis(0),
+            fuchsia_zircon::Duration::from_millis(10),
             Some(test_seed),
         );
         session.run().await;
 
         let mut received_drivers = vec![];
-        while let Some(driver) = receiver.next().await {
-            received_drivers.push(driver);
+        while let Some(drivers) = receiver.next().await {
+            received_drivers.extend(drivers.into_iter());
         }
 
         for driver in test_boot_repo {

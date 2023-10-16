@@ -81,7 +81,7 @@ impl Indexer {
 
     pub fn start_driver_load(
         self: Rc<Self>,
-        receiver: futures::channel::mpsc::UnboundedReceiver<ResolvedDriver>,
+        receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
         session: Session,
     ) {
         fasync::Task::local(async move {
@@ -117,14 +117,17 @@ impl Indexer {
 
     pub async fn handle_add_boot_driver(
         self: Rc<Self>,
-        mut receiver: futures::channel::mpsc::UnboundedReceiver<ResolvedDriver>,
+        mut receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
     ) {
-        while let Some(driver) = receiver.next().await {
-            self.boot_repo.borrow_mut().push(driver.clone());
-            tracing::info!("Loaded driver {} into the driver index", driver.component_url);
-
-            let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
-            composite_node_spec_manager.new_driver_available(driver);
+        while let Some(drivers) = receiver.next().await {
+            let mut drivers_clone = drivers.clone();
+            self.boot_repo.borrow_mut().append(&mut drivers_clone);
+            tracing::info!("Loaded drivers into the driver index:");
+            for driver in drivers {
+                tracing::info!("     {}", driver.component_url);
+                let mut composite_node_spec_manager = self.composite_node_spec_manager.borrow_mut();
+                composite_node_spec_manager.new_driver_available(driver);
+            }
 
             self.report_driver_load();
         }
