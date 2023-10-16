@@ -27,7 +27,7 @@ use {
         checksum::Checksum,
         debug_assert_not_too_long,
         errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, Filesystem, SyncOptions},
+        filesystem::{ApplyContext, ApplyMode, FxFilesystem, SyncOptions},
         log::*,
         lsm_tree::cache::NullCache,
         object_handle::{ObjectHandle as _, ReadObjectHandle},
@@ -46,8 +46,8 @@ use {
             object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue},
             transaction::{
                 lock_keys, AllocatorMutation, Mutation, MutationV20, MutationV25, MutationV29,
-                MutationV30, MutationV31, ObjectStoreMutation, Options, Transaction, TxnMutation,
-                TRANSACTION_MAX_JOURNAL_USAGE,
+                MutationV30, MutationV31, ObjectStoreMutation, Options, Transaction,
+                TransactionHandler, TxnMutation, TRANSACTION_MAX_JOURNAL_USAGE,
             },
             DataObjectHandle, HandleOptions, HandleOwner, Item, ItemRef, LastObjectId, LockState,
             NewChildStoreOptions, ObjectStore, INVALID_OBJECT_ID,
@@ -513,7 +513,7 @@ impl Journal {
     /// Reads the latest super-block, and then replays journaled records.
     pub async fn replay(
         &self,
-        filesystem: Arc<dyn Filesystem>,
+        filesystem: Arc<FxFilesystem>,
         on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
     ) -> Result<(), Error> {
         trace_duration!("Journal::replay");
@@ -905,7 +905,7 @@ impl Journal {
 
     /// Creates an empty filesystem with the minimum viable objects (including a root parent and
     /// root store but no further child stores).
-    pub async fn init_empty(&self, filesystem: Arc<dyn Filesystem>) -> Result<(), Error> {
+    pub async fn init_empty(&self, filesystem: Arc<FxFilesystem>) -> Result<(), Error> {
         // The following constants are only used at format time. When mounting, the recorded values
         // in the superblock should be used.  The root parent store does not have a parent, but
         // needs an object ID to be registered with ObjectManager, so it cannot collide (i.e. have
@@ -1580,7 +1580,7 @@ impl Writer<'_> {
 mod tests {
     use {
         crate::{
-            filesystem::{Filesystem, FxFilesystem, SyncOptions},
+            filesystem::{FxFilesystem, SyncOptions},
             fsck::fsck,
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
@@ -1809,7 +1809,7 @@ mod fuzz {
     #[fuzz]
     fn fuzz_journal_bytes(input: Vec<u8>) {
         use {
-            crate::filesystem::{Filesystem as _, FxFilesystem},
+            crate::filesystem::FxFilesystem,
             fuchsia_async as fasync,
             std::io::Write,
             storage_device::{fake_device::FakeDevice, DeviceHolder},
@@ -1833,7 +1833,7 @@ mod fuzz {
     #[fuzz]
     fn fuzz_journal(input: Vec<super::JournalRecord>) {
         use {
-            crate::filesystem::{Filesystem as _, FxFilesystem},
+            crate::filesystem::FxFilesystem,
             fuchsia_async as fasync,
             storage_device::{fake_device::FakeDevice, DeviceHolder},
         };

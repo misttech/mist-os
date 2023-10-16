@@ -314,7 +314,7 @@ mod tests {
     use {
         super::Graveyard,
         crate::{
-            filesystem::{Filesystem, FxFilesystem},
+            filesystem::FxFilesystem,
             object_store::object_record::ObjectValue,
             object_store::transaction::{lock_keys, Options, TransactionHandler},
         },

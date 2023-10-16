@@ -7,7 +7,7 @@ use {
     anyhow::{bail, ensure, Context, Error},
     chrono::Local,
     fxfs::{
-        filesystem::{mkfs_with_default, Filesystem, FxFilesystem, SyncOptions},
+        filesystem::{mkfs_with_default, FxFilesystem, SyncOptions},
         serialized_types::LATEST_VERSION,
     },
     fxfs_crypto::Crypt,

@@ -7,7 +7,7 @@ use {
         errors::FxfsError,
         lsm_tree::types::{ItemRef, LayerIterator},
         object_store::{
-            transaction::{lock_keys, LockKey, Mutation, Options},
+            transaction::{lock_keys, LockKey, Mutation, Options, TransactionHandler},
             ObjectKey, ObjectKeyData, ObjectKind, ObjectStore, ObjectValue, ProjectProperty,
         },
     },

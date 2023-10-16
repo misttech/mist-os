@@ -30,7 +30,7 @@ use {
         metrics,
         object_store::{
             allocator::Allocator,
-            transaction::{lock_keys, LockKey, Options},
+            transaction::{lock_keys, LockKey, Options, TransactionHandler},
             volume::RootVolume,
             Directory, ObjectDescriptor, ObjectStore,
         },
@@ -631,11 +631,8 @@ mod tests {
         fuchsia_zircon::Status,
         futures::join,
         fxfs::{
-            errors::FxfsError,
-            filesystem::{Filesystem, FxFilesystem},
-            fsck::fsck,
-            object_store::allocator::SimpleAllocator,
-            object_store::volume::root_volume,
+            errors::FxfsError, filesystem::FxFilesystem, fsck::fsck,
+            object_store::allocator::SimpleAllocator, object_store::volume::root_volume,
         },
         fxfs_crypto::Crypt,
         fxfs_insecure_crypto::InsecureCrypt,

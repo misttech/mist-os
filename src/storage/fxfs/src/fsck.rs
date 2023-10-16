@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        filesystem::Filesystem,
+        filesystem::FxFilesystem,
         fsck::errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
         log::*,
         lsm_tree::{
@@ -18,7 +18,7 @@ use {
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             journal::super_block::SuperBlockInstance,
             load_store_info,
-            transaction::{lock_keys, LockKey},
+            transaction::{lock_keys, LockKey, TransactionHandler},
             volume::root_volume,
         },
     },
@@ -82,12 +82,12 @@ impl Default for FsckOptions<'_> {
 //
 // TODO(fxbug.dev/96075): This currently takes a write lock on the filesystem.  It would be nice if
 // we could take a snapshot.
-pub async fn fsck(filesystem: Arc<dyn Filesystem>) -> Result<(), Error> {
+pub async fn fsck(filesystem: Arc<FxFilesystem>) -> Result<(), Error> {
     fsck_with_options(filesystem, &FsckOptions::default()).await
 }
 
 pub async fn fsck_with_options(
-    filesystem: Arc<dyn Filesystem>,
+    filesystem: Arc<FxFilesystem>,
     options: &FsckOptions<'_>,
 ) -> Result<(), Error> {
     if !options.quiet {
@@ -215,7 +215,7 @@ pub async fn fsck_with_options(
 // TODO(fxbug.dev/96075): This currently takes a write lock on the filesystem.  It would be nice if
 // we could take a snapshot.
 pub async fn fsck_volume(
-    filesystem: &dyn Filesystem,
+    filesystem: &FxFilesystem,
     store_id: u64,
     crypt: Option<Arc<dyn Crypt>>,
 ) -> Result<(), Error> {
@@ -223,7 +223,7 @@ pub async fn fsck_volume(
 }
 
 pub async fn fsck_volume_with_options(
-    filesystem: &dyn Filesystem,
+    filesystem: &FxFilesystem,
     options: &FsckOptions<'_>,
     store_id: u64,
     crypt: Option<Arc<dyn Crypt>>,
@@ -336,7 +336,7 @@ impl<'a> Fsck<'a> {
     // Does not actually verify the inner contents of the store; for that, use check_child_store.
     async fn check_child_store_metadata(
         &mut self,
-        filesystem: &dyn Filesystem,
+        filesystem: &FxFilesystem,
         store_id: u64,
         root_store_root_objects: &mut Vec<u64>,
     ) -> Result<(), Error> {
@@ -353,7 +353,7 @@ impl<'a> Fsck<'a> {
 
     async fn check_child_store(
         &mut self,
-        filesystem: &dyn Filesystem,
+        filesystem: &FxFilesystem,
         store_id: u64,
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<(), Error> {
@@ -437,7 +437,7 @@ impl<'a> Fsck<'a> {
     // Assumes that every store in `store_object_ids` has been previously scanned.
     async fn verify_allocations(
         &self,
-        filesystem: &dyn Filesystem,
+        filesystem: &FxFilesystem,
         store_object_ids: &HashSet<u64>,
     ) -> Result<(), Error> {
         let allocator = filesystem.allocator();

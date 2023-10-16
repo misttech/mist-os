@@ -26,7 +26,7 @@
 use {
     crate::{
         errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, Filesystem, JournalingObject},
+        filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject},
         log::*,
         lsm_tree::{types::MutableLayer, LSMTree, LayerSet},
         metrics,
@@ -432,7 +432,7 @@ impl SuperBlockManager {
     pub async fn save(
         &self,
         super_block_header: SuperBlockHeader,
-        filesystem: Arc<dyn Filesystem>,
+        filesystem: Arc<FxFilesystem>,
         root_parent: LayerSet<ObjectKey, ObjectValue>,
     ) -> Result<(), Error> {
         let root_store = filesystem.root_store();
@@ -645,7 +645,7 @@ mod tests {
             MIN_SUPER_BLOCK_SIZE,
         },
         crate::{
-            filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
+            filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::ReadObjectHandle,
             object_store::{
                 allocator::Allocator,

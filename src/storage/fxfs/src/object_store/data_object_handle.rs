@@ -22,7 +22,7 @@ use {
             store_object_handle::NeedsTrim,
             transaction::{
                 self, lock_keys, AssocObj, AssociatedObject, LockKey, Mutation,
-                ObjectStoreMutation, Options, Transaction,
+                ObjectStoreMutation, Options, Transaction, TransactionHandler,
             },
             HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle, TrimMode, TrimResult,
         },
@@ -1140,8 +1140,7 @@ mod tests {
         crate::{
             errors::FxfsError,
             filesystem::{
-                Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem,
-                SyncOptions,
+                FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem, SyncOptions,
             },
             fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions},
             object_handle::{

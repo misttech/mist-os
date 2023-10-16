@@ -4,9 +4,7 @@
 
 use {
     crate::{
-        filesystem::{
-            Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem,
-        },
+        filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem},
         fsck::{
             errors::{FsckError, FsckFatal, FsckIssue, FsckWarning},
             fsck_volume_with_options, fsck_with_options, FsckOptions,
@@ -19,7 +17,9 @@ use {
         object_store::{
             allocator::{Allocator, AllocatorKey, AllocatorValue, CoalescingIterator},
             directory::Directory,
-            transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options},
+            transaction::{
+                self, lock_keys, LockKey, ObjectStoreMutation, Options, TransactionHandler,
+            },
             volume::root_volume,
             AttributeKey, ChildValue, EncryptionKeys, ExtentValue, HandleOptions, Mutation,
             ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
@@ -109,7 +109,7 @@ impl FsckTest {
         }
         Ok(())
     }
-    fn filesystem(&self) -> Arc<dyn Filesystem> {
+    fn filesystem(&self) -> Arc<FxFilesystem> {
         self.filesystem.as_ref().unwrap().deref().clone()
     }
     fn errors(&self) -> Vec<FsckIssue> {
@@ -125,7 +125,7 @@ impl FsckTest {
 // will still be subject to merging).
 // Doing this in the root store might cause a variety of unrelated failures.
 async fn install_items_in_store<K: Key, V: Value>(
-    filesystem: &Arc<dyn Filesystem>,
+    filesystem: &Arc<FxFilesystem>,
     store: &ObjectStore,
     items: impl AsRef<[Item<K, V>]>,
 ) {

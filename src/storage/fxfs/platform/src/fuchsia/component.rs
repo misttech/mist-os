@@ -26,10 +26,7 @@ use {
     futures::{lock::Mutex, TryStreamExt},
     fxfs::{
         errors::FxfsError,
-        filesystem::{
-            mkfs, Filesystem as _, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem,
-            MIN_BLOCK_SIZE,
-        },
+        filesystem::{mkfs, FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem, MIN_BLOCK_SIZE},
         fsck,
         log::*,
         metrics,

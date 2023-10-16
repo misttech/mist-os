@@ -15,7 +15,7 @@ use {
                 ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
                 ObjectKeyData, ObjectKind, ObjectValue, PosixAttributes, Timestamp,
             },
-            transaction::{LockKey, LockKeys, Mutation, Options, Transaction},
+            transaction::{LockKey, LockKeys, Mutation, Options, Transaction, TransactionHandler},
             DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
             StoreObjectHandle,
         },
@@ -353,11 +353,13 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         let store_id = self.store().store_object_id();
         // This mutation must already be in here as we've just modified the mtime.
-        let ObjectValue::Object{ attributes: ObjectAttributes{ project_id, .. }, .. } =
-            transaction.get_object_mutation(
-                store_id,
-                ObjectKey::object(self.object_id())
-        ).unwrap().item.value else {
+        let ObjectValue::Object { attributes: ObjectAttributes { project_id, .. }, .. } =
+            transaction
+                .get_object_mutation(store_id, ObjectKey::object(self.object_id()))
+                .unwrap()
+                .item
+                .value
+        else {
             return Err(anyhow!(FxfsError::Inconsistent));
         };
         if project_id > 0 {
@@ -842,7 +844,7 @@ mod tests {
     use {
         crate::{
             errors::FxfsError,
-            filesystem::{Filesystem, FxFilesystem, JournalingObject, SyncOptions},
+            filesystem::{FxFilesystem, JournalingObject, SyncOptions},
             object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
             object_store::{
                 directory::{replace_child, Directory, ReplacedChild},

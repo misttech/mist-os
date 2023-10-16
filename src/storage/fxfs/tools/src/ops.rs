@@ -7,7 +7,7 @@ use {
     chrono::{TimeZone, Utc},
     fxfs::{
         errors::FxfsError,
-        filesystem::{Filesystem, OpenFxFilesystem},
+        filesystem::OpenFxFilesystem,
         fsck,
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{

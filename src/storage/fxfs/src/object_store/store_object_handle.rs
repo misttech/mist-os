@@ -19,7 +19,7 @@ use {
             },
             transaction::{
                 lock_keys, AssocObj, AssociatedObject, LockKey, Mutation, ObjectStoreMutation,
-                Options, ReadGuard, Transaction,
+                Options, ReadGuard, Transaction, TransactionHandler,
             },
             HandleOptions, HandleOwner, ObjectStore, TrimMode, TrimResult,
         },
@@ -1319,7 +1319,7 @@ mod tests {
     use {
         crate::{
             errors::FxfsError,
-            filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
+            filesystem::{FxFilesystem, OpenFxFilesystem},
             object_handle::ObjectHandle,
             object_store::{
                 transaction::{lock_keys, Mutation, Options, TransactionHandler},

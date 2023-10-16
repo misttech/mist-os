@@ -16,8 +16,6 @@ pub mod object_manager;
 mod object_record;
 pub mod project_id;
 mod store_object_handle;
-#[cfg(test)]
-mod testing;
 pub mod transaction;
 mod tree;
 mod tree_cache;
@@ -37,8 +35,7 @@ use {
     crate::{
         errors::FxfsError,
         filesystem::{
-            ApplyContext, ApplyMode, Filesystem, FxFilesystem, JournalingObject, SyncOptions,
-            MAX_FILE_SIZE,
+            ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions, MAX_FILE_SIZE,
         },
         log::*,
         lsm_tree::{
@@ -54,7 +51,7 @@ use {
             key_manager::KeyManager,
             transaction::{
                 lock_keys, AssocObj, AssociatedObject, LockKey, ObjectStoreMutation, Operation,
-                Options, Transaction, UpdateMutationsKey,
+                Options, Transaction, TransactionHandler, UpdateMutationsKey,
             },
         },
         range::RangeExt,
@@ -447,7 +444,7 @@ pub struct ObjectStore {
     store_object_id: u64,
     device: Arc<dyn Device>,
     block_size: u64,
-    filesystem: Weak<dyn Filesystem>,
+    filesystem: Weak<FxFilesystem>,
     // Lock ordering: This must be taken before `lock_state`.
     store_info: Mutex<StoreOrReplayInfo>,
     tree: LSMTree<ObjectKey, ObjectValue>,
@@ -490,7 +487,7 @@ impl ObjectStore {
     fn new(
         parent_store: Option<Arc<ObjectStore>>,
         store_object_id: u64,
-        filesystem: Arc<dyn Filesystem>,
+        filesystem: Arc<FxFilesystem>,
         store_info: Option<StoreInfo>,
         object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
         mutations_cipher: Option<StreamCipher>,
@@ -523,7 +520,7 @@ impl ObjectStore {
     fn new_empty(
         parent_store: Option<Arc<ObjectStore>>,
         store_object_id: u64,
-        filesystem: Arc<dyn Filesystem>,
+        filesystem: Arc<FxFilesystem>,
         object_cache: Box<dyn ObjectCache<ObjectKey, ObjectValue>>,
     ) -> Arc<Self> {
         Self::new(
@@ -561,10 +558,7 @@ impl ObjectStore {
 
     /// Used to set filesystem on root_parent stores at bootstrap time after the filesystem has
     /// been created.
-    pub fn attach_filesystem(
-        mut this: ObjectStore,
-        filesystem: Arc<dyn Filesystem>,
-    ) -> ObjectStore {
+    pub fn attach_filesystem(mut this: ObjectStore, filesystem: Arc<FxFilesystem>) -> ObjectStore {
         this.filesystem = Arc::downgrade(&filesystem);
         this
     }
@@ -720,7 +714,7 @@ impl ObjectStore {
         self.block_size
     }
 
-    pub fn filesystem(&self) -> Arc<dyn Filesystem> {
+    pub fn filesystem(&self) -> Arc<FxFilesystem> {
         self.filesystem.upgrade().unwrap()
     }
 
@@ -2108,9 +2102,7 @@ mod tests {
         super::{StoreInfo, MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK},
         crate::{
             errors::FxfsError,
-            filesystem::{
-                Filesystem, FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions,
-            },
+            filesystem::{FxFilesystem, JournalingObject, OpenFxFilesystem, SyncOptions},
             fsck::fsck,
             lsm_tree::types::{Item, ItemRef, LayerIterator},
             object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID},
@@ -2489,7 +2481,7 @@ mod tests {
 
             let fs = reopen(fs).await;
 
-            let check_object = |fs: Arc<dyn Filesystem>| {
+            let check_object = |fs: Arc<FxFilesystem>| {
                 let crypt = crypt.clone();
                 async move {
                     let root_volume = root_volume(fs).await.expect("root_volume failed");

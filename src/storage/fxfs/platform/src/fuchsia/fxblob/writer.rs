@@ -390,7 +390,7 @@ impl FxDeliveryBlob {
                 let Some((seek_table, chunk_data)) = decode_archive(&inner.buffer, archive_length)
                     .context("Failed to decode chunked archive")?
                 else {
-                    return Ok(());  // Not enough data to decode archive header/seek table.
+                    return Ok(()); // Not enough data to decode archive header/seek table.
                 };
                 // We store the seek table out-of-line with the data, so we don't persist that
                 // part of the payload directly.
@@ -560,7 +560,6 @@ mod tests {
         fuchsia_async as fasync,
         fuchsia_merkle::MerkleTreeBuilder,
         fuchsia_zircon::Status,
-        fxfs::filesystem::Filesystem,
         rand::{thread_rng, Rng},
     };
 

@@ -25,7 +25,7 @@ use {
         object_store::{
             self,
             directory::{self, ReplacedChild},
-            transaction::{lock_keys, LockKey, Options, Transaction},
+            transaction::{lock_keys, LockKey, Options, Transaction, TransactionHandler},
             Directory, ObjectDescriptor, ObjectStore, Timestamp,
         },
     },

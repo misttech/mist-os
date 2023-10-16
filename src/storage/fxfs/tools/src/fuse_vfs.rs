@@ -18,7 +18,7 @@ use {
     futures_util::{stream, stream::Iter, StreamExt},
     fxfs::{
         errors::FxfsError,
-        filesystem::{Filesystem, SyncOptions},
+        filesystem::SyncOptions,
         log::info,
         object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},
         object_store::{
@@ -1180,7 +1180,7 @@ mod tests {
             Errno, FileType, Result, SetAttr, Timestamp,
         },
         futures::stream::StreamExt,
-        fxfs::{errors::FxfsError, filesystem::Filesystem as FxFs, object_store::ObjectDescriptor},
+        fxfs::{errors::FxfsError, object_store::ObjectDescriptor},
         std::ffi::OsStr,
     };
 

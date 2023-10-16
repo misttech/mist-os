@@ -13,7 +13,9 @@ use {
         object_store::{
             allocator::{self, Allocator},
             object_record::{AttributeKey, Timestamp},
-            transaction::{lock_keys, LockKey, Options, TRANSACTION_METADATA_MAX_AMOUNT},
+            transaction::{
+                lock_keys, LockKey, Options, TransactionHandler, TRANSACTION_METADATA_MAX_AMOUNT,
+            },
             writeback_cache::{FlushableMetadata, StorageReservation, WritebackCache},
             AssocObj, DataObjectHandle, HandleOwner, Mutation, ObjectKey, ObjectStore, ObjectValue,
             TrimMode, TrimResult,
@@ -454,7 +456,7 @@ mod tests {
     use {
         super::CACHE_READ_AHEAD_SIZE,
         crate::{
-            filesystem::{Filesystem, FxFilesystem, OpenFxFilesystem},
+            filesystem::{FxFilesystem, OpenFxFilesystem},
             fsck::{fsck_with_options, FsckOptions},
             lsm_tree::types::{ItemRef, LayerIterator},
             object_handle::{GetProperties, ObjectHandle, ReadObjectHandle, WriteObjectHandle},

@@ -23,7 +23,7 @@ use {
         log::*,
         object_handle::{ObjectHandle, ObjectProperties, ReadObjectHandle},
         object_store::{
-            transaction::{lock_keys, LockKey, Options},
+            transaction::{lock_keys, LockKey, Options, TransactionHandler},
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
         round::round_up,
@@ -554,7 +554,7 @@ mod tests {
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         futures::join,
-        fxfs::{filesystem::Filesystem, object_handle::INVALID_OBJECT_ID},
+        fxfs::object_handle::INVALID_OBJECT_ID,
         std::sync::{
             atomic::{self, AtomicBool},
             Arc,

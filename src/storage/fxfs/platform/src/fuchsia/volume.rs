@@ -648,7 +648,7 @@ mod tests {
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         fxfs::{
-            filesystem::{Filesystem, FxFilesystem},
+            filesystem::FxFilesystem,
             fsck::{fsck, fsck_volume},
             object_handle::{ObjectHandle, ObjectHandleExt},
             object_store::{

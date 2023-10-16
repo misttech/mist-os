@@ -5,12 +5,12 @@
 use {
     crate::{
         errors::FxfsError,
-        filesystem::Filesystem,
+        filesystem::FxFilesystem,
         object_store::{
             allocator::Allocator,
             directory::Directory,
             load_store_info,
-            transaction::{lock_keys, Options, Transaction},
+            transaction::{lock_keys, Options, Transaction, TransactionHandler},
             tree_cache::TreeCache,
             LockKey, NewChildStoreOptions, ObjectDescriptor, ObjectStore,
         },
@@ -32,7 +32,7 @@ pub const VOLUMES_DIRECTORY: &str = "volumes";
 /// RootVolume is the top-level volume which stores references to all of the other Volumes.
 pub struct RootVolume {
     _root_directory: Directory<ObjectStore>,
-    filesystem: Arc<dyn Filesystem>,
+    filesystem: Arc<FxFilesystem>,
 }
 
 impl RootVolume {
@@ -169,7 +169,7 @@ impl RootVolume {
 }
 
 /// Returns the root volume for the filesystem.
-pub async fn root_volume(filesystem: Arc<dyn Filesystem>) -> Result<RootVolume, Error> {
+pub async fn root_volume(filesystem: Arc<FxFilesystem>) -> Result<RootVolume, Error> {
     let root_store = filesystem.root_store();
     let root_directory = Directory::open(&root_store, root_store.root_directory_object_id())
         .await
@@ -195,7 +195,7 @@ mod tests {
     use {
         super::root_volume,
         crate::{
-            filesystem::{Filesystem, FxFilesystem, JournalingObject, SyncOptions},
+            filesystem::{FxFilesystem, JournalingObject, SyncOptions},
             object_handle::{ObjectHandle, WriteObjectHandle},
             object_store::{
                 allocator::Allocator,

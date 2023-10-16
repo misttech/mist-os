@@ -38,7 +38,7 @@ use {
         object_handle::{ObjectProperties, ReadObjectHandle},
         object_store::{
             self,
-            transaction::{lock_keys, LockKey, Options},
+            transaction::{lock_keys, LockKey, Options, TransactionHandler},
             HandleOptions, ObjectDescriptor, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
         serialized_types::BlobMetadata,

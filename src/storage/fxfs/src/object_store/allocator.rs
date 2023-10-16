@@ -8,7 +8,7 @@ use {
     crate::{
         debug_assert_not_too_long,
         errors::FxfsError,
-        filesystem::{ApplyContext, ApplyMode, Filesystem, JournalingObject, SyncOptions},
+        filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions},
         log::*,
         lsm_tree::{
             cache::NullCache,
@@ -26,6 +26,7 @@ use {
             object_manager::ReservationUpdate,
             transaction::{
                 lock_keys, AllocatorMutation, AssocObj, LockKey, Mutation, Options, Transaction,
+                TransactionHandler,
             },
             tree, CachingObjectHandle, DirectWriter, HandleOptions, ObjectStore,
         },
@@ -440,7 +441,7 @@ struct SimpleAllocatorCounters {
 // For now this just implements a simple strategy of returning the first gap it can find (no matter
 // the size).  This is a very naiive implementation.
 pub struct SimpleAllocator {
-    filesystem: Weak<dyn Filesystem>,
+    filesystem: Weak<FxFilesystem>,
     block_size: u64,
     device_size: u64,
     object_id: u64,
@@ -605,7 +606,7 @@ impl Inner {
 }
 
 impl SimpleAllocator {
-    pub fn new(filesystem: Arc<dyn Filesystem>, object_id: u64) -> SimpleAllocator {
+    pub fn new(filesystem: Arc<FxFilesystem>, object_id: u64) -> SimpleAllocator {
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
         SimpleAllocator {
             filesystem: Arc::downgrade(&filesystem),
@@ -1723,7 +1724,7 @@ impl LayerIterator<AllocatorKey, AllocatorValue> for CoalescingIterator<'_> {
 mod tests {
     use {
         crate::{
-            filesystem::{Filesystem, JournalingObject},
+            filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, OpenFxFilesystem},
             lsm_tree::{
                 cache::NullCache,
                 skip_list_layer::SkipListLayer,
@@ -1735,7 +1736,7 @@ mod tests {
                     merge::merge, Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
                     SimpleAllocator,
                 },
-                testing::fake_filesystem::FakeFilesystem,
+                // testing::fake_filesystem::FakeFilesystem,
                 transaction::{lock_keys, Options, TransactionHandler},
                 ObjectStore,
             },
@@ -1873,6 +1874,21 @@ mod tests {
         }
     }
 
+    async fn collect_allocations(allocator: &SimpleAllocator) -> Vec<Range<u64>> {
+        let layer_set = allocator.tree.layer_set();
+        let mut merger = layer_set.merger();
+        let mut iter = allocator.iter(&mut merger, Bound::Unbounded).await.expect("build iterator");
+        let mut allocations: Vec<Range<u64>> = Vec::new();
+        while let Some(ItemRef { key: AllocatorKey { device_range }, .. }) = iter.get() {
+            if let Some(r) = allocations.last() {
+                assert!(device_range.start >= r.end);
+            }
+            allocations.push(device_range.clone());
+            iter.advance().await.expect("advance failed");
+        }
+        allocations
+    }
+
     async fn check_allocations(allocator: &SimpleAllocator, expected_allocations: &[Range<u64>]) {
         let layer_set = allocator.tree.layer_set();
         let mut merger = layer_set.merger();
@@ -1889,29 +1905,18 @@ mod tests {
                     break;
                 }
             }
-            assert_eq!(l, 0);
+            assert_eq!(l, 0, "range {device_range:?} not covered by expectations");
             iter.advance().await.expect("advance failed");
         }
         // Make sure the total we found adds up to what we expect.
         assert_eq!(found, expected_allocations.iter().map(|r| r.length().unwrap()).sum::<u64>());
     }
 
-    async fn test_fs() -> (Arc<FakeFilesystem>, Arc<SimpleAllocator>, Arc<ObjectStore>) {
+    async fn test_fs() -> (OpenFxFilesystem, Arc<SimpleAllocator>, Arc<ObjectStore>) {
         let device = DeviceHolder::new(FakeDevice::new(4096, 4096));
-        let fs = FakeFilesystem::new(device);
-        let allocator = Arc::new(SimpleAllocator::new(fs.clone(), 1));
-        fs.object_manager().set_allocator(allocator.clone());
-        let store = ObjectStore::new_empty(None, 2, fs.clone(), Box::new(NullCache {}));
-        store.set_graveyard_directory_object_id(store.maybe_get_next_object_id());
-        fs.object_manager().set_root_store(store.clone());
-        fs.object_manager().init_metadata_reservation().expect("init_metadata_reservation failed");
-        let mut transaction = fs
-            .clone()
-            .new_transaction(lock_keys![], Options::default())
-            .await
-            .expect("new_transaction failed");
-        allocator.create(&mut transaction).await.expect("create failed");
-        transaction.commit().await.expect("commit failed");
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let allocator = fs.allocator();
+        let store = fs.object_manager().root_store();
         (fs, allocator, store)
     }
 
@@ -1921,7 +1926,7 @@ mod tests {
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
-        let mut device_ranges = Vec::new();
+        let mut device_ranges = collect_allocations(&allocator).await;
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
@@ -1960,7 +1965,7 @@ mod tests {
         let (fs, allocator, _) = test_fs().await;
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
-        let mut device_ranges = Vec::new();
+        let mut device_ranges = collect_allocations(&allocator).await;
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.device().size())
@@ -1980,6 +1985,8 @@ mod tests {
     async fn test_deallocations() {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
+        let initial_allocations = collect_allocations(&allocator).await;
+
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let device_range1 = allocator
@@ -1997,33 +2004,61 @@ mod tests {
             .expect("deallocate failed");
         transaction.commit().await.expect("commit failed");
 
-        check_allocations(&allocator, &[]).await;
+        check_allocations(&allocator, &initial_allocations).await;
     }
 
     #[fuchsia::test]
     async fn test_mark_allocated() {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
+        let mut device_ranges = collect_allocations(&allocator).await;
+        let range = {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(lock_keys![], Options::default())
+                .await
+                .expect("new failed");
+            // First, allocate 2 blocks.
+            allocator
+                .allocate(&mut transaction, STORE_OBJECT_ID, 2 * fs.block_size())
+                .await
+                .expect("allocate failed")
+            // Let the transaction drop which should put the allocation in `dropped_allocations`.
+        };
+
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
-        let mut device_ranges = Vec::new();
-        device_ranges.push(0..fs.block_size());
-        allocator
-            .mark_allocated(
-                &mut transaction,
-                STORE_OBJECT_ID,
-                device_ranges.last().unwrap().clone(),
-            )
-            .await
-            .expect("mark_allocated failed");
+
+        // If we allocate 1 block, the two blocks that were allocated earlier should be available,
+        // and this should return the first of them.
         device_ranges.push(
             allocator
                 .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed"),
         );
-        assert_eq!(device_ranges.last().unwrap().length().expect("Invalid range"), fs.block_size());
-        assert_eq!(overlap(&device_ranges[0], &device_ranges[1]), 0);
+
+        assert_eq!(device_ranges.last().unwrap().start, range.start);
+
+        // Mark the second block as allocated.
+        let mut range2 = range.clone();
+        range2.start += fs.block_size();
+        allocator
+            .mark_allocated(&mut transaction, STORE_OBJECT_ID, range2.clone())
+            .await
+            .expect("mark_allocated failed");
+        device_ranges.push(range2);
+
+        // This should avoid the range we marked as allocated.
+        device_ranges.push(
+            allocator
+                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                .await
+                .expect("allocate failed"),
+        );
+        let last_range = device_ranges.last().unwrap();
+        assert_eq!(last_range.length().expect("Invalid range"), fs.block_size());
+        assert_eq!(overlap(last_range, &range), 0);
         transaction.commit().await.expect("commit failed");
 
         check_allocations(&allocator, &device_ranges).await;
@@ -2035,8 +2070,8 @@ mod tests {
         let (fs, allocator, _) = test_fs().await;
 
         // Allocate some stuff.
-        assert_eq!(0, allocator.get_allocated_bytes());
-        let mut device_ranges = Vec::new();
+        let initial_allocated_bytes = allocator.get_allocated_bytes();
+        let mut device_ranges = collect_allocations(&allocator).await;
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         // Note we have a cap on individual allocation length so we allocate over multiple mutation.
@@ -2057,7 +2092,10 @@ mod tests {
         transaction.commit().await.expect("commit failed");
         check_allocations(&allocator, &device_ranges).await;
 
-        assert_eq!(fs.block_size() * 3000, allocator.get_allocated_bytes());
+        assert_eq!(
+            allocator.get_allocated_bytes(),
+            initial_allocated_bytes + fs.block_size() * 3000
+        );
 
         // Mark for deletion.
         let mut transaction =
@@ -2066,7 +2104,7 @@ mod tests {
         transaction.commit().await.expect("commit failed");
 
         // Expect that allocated bytes is updated immediately but device ranges are still allocated.
-        assert_eq!(0, allocator.get_allocated_bytes());
+        assert_eq!(allocator.get_allocated_bytes(), initial_allocated_bytes);
         check_allocations(&allocator, &device_ranges).await;
 
         // Allocate more space than we have until we deallocate the mark_for_deletion space.
@@ -2093,11 +2131,8 @@ mod tests {
         // The flush above seems to trigger an allocation for the allocator itself.
         // We will just check that we have the right size for the owner we care about.
 
-        assert_eq!(*allocator.get_owner_allocated_bytes().entry(99).or_default() as u64, 0);
-        assert_eq!(
-            *allocator.get_owner_allocated_bytes().entry(100).or_default() as u64,
-            1500 * fs.block_size()
-        );
+        assert_eq!(*allocator.get_owner_allocated_bytes().get(&STORE_OBJECT_ID).unwrap() as u64, 0);
+        assert_eq!(*allocator.get_owner_allocated_bytes().get(&100).unwrap() as u64, target_bytes,);
     }
 
     #[fuchsia::test]
@@ -2162,52 +2197,68 @@ mod tests {
     #[fuchsia::test]
     async fn test_flush() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
-        let mut transaction =
-            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
+
         let mut device_ranges = Vec::new();
-        device_ranges.push(
-            allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+        let device = {
+            let (fs, allocator, _) = test_fs().await;
+            let mut transaction = fs
+                .clone()
+                .new_transaction(lock_keys![], Options::default())
                 .await
-                .expect("allocate failed"),
-        );
-        device_ranges.push(
-            allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
-                .await
-                .expect("allocate failed"),
-        );
-        device_ranges.push(
-            allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
-                .await
-                .expect("allocate failed"),
-        );
-        transaction.commit().await.expect("commit failed");
+                .expect("new failed");
+            device_ranges.push(
+                allocator
+                    .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                    .await
+                    .expect("allocate failed"),
+            );
+            device_ranges.push(
+                allocator
+                    .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                    .await
+                    .expect("allocate failed"),
+            );
+            device_ranges.push(
+                allocator
+                    .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                    .await
+                    .expect("allocate failed"),
+            );
+            transaction.commit().await.expect("commit failed");
 
-        allocator.flush().await.expect("flush failed");
+            allocator.flush().await.expect("flush failed");
 
-        let allocator = Arc::new(SimpleAllocator::new(fs.clone(), 1));
-        fs.object_manager().set_allocator(allocator.clone());
-        allocator.open().await.expect("open failed");
-        // When we flushed the allocator, it would have been written to the device somewhere but
-        // without a journal, we will be missing those records, so this next allocation will likely
-        // be on top of those objects.  That won't matter for the purposes of this test, since we
-        // are not writing anything to these ranges.
+            fs.close().await.expect("close failed");
+            fs.take_device().await
+        };
+
+        device.reopen(false);
+        let fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+        let allocator = fs.allocator();
+
+        let allocated = collect_allocations(&allocator).await;
+
+        // Make sure the ranges we allocated earlier are still allocated.
+        for i in &device_ranges {
+            let mut overlapping = 0;
+            for j in &allocated {
+                overlapping += overlap(i, j);
+            }
+            assert_eq!(overlapping, i.length().unwrap(), "Range {i:?} not allocated");
+        }
+
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
-        device_ranges.push(
-            allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
-                .await
-                .expect("allocate failed"),
-        );
-        for r in &device_ranges[..3] {
-            assert_eq!(overlap(r, device_ranges.last().unwrap()), 0);
+        let range = allocator
+            .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+            .await
+            .expect("allocate failed");
+
+        // Make sure the range just allocated doesn't overlap any other allocated ranges.
+        for r in &allocated {
+            assert_eq!(overlap(r, &range), 0);
         }
         transaction.commit().await.expect("commit failed");
-        check_allocations(&allocator, &device_ranges).await;
     }
 
     #[fuchsia::test]
@@ -2245,10 +2296,11 @@ mod tests {
     async fn test_allocated_bytes() {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator, _) = test_fs().await;
-        assert_eq!(allocator.get_allocated_bytes(), 0);
+
+        let initial_allocated_bytes = allocator.get_allocated_bytes();
 
         // Verify allocated_bytes reflects allocation changes.
-        let allocated_bytes = fs.block_size();
+        let allocated_bytes = initial_allocated_bytes + fs.block_size();
         let allocated_range = {
             let mut transaction = fs
                 .clone()
@@ -2256,7 +2308,7 @@ mod tests {
                 .await
                 .expect("new_transaction failed");
             let range = allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, allocated_bytes)
+                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
                 .await
                 .expect("allocate failed");
             transaction.commit().await.expect("commit failed");
@@ -2297,7 +2349,7 @@ mod tests {
         transaction.commit().await.expect("commit failed");
 
         // After committing, all but 40 bytes should remain allocated.
-        assert_eq!(allocator.get_allocated_bytes(), 40);
+        assert_eq!(allocator.get_allocated_bytes(), initial_allocated_bytes + 40);
     }
 
     #[fuchsia::test]

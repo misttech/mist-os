@@ -10,11 +10,11 @@ use {
     futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _},
     fxfs::{
         errors::FxfsError,
-        filesystem::{Filesystem, FxFilesystem, SyncOptions},
+        filesystem::{FxFilesystem, SyncOptions},
         object_handle::{GetProperties, WriteBytes},
         object_store::{
             directory::Directory,
-            transaction::{lock_keys, LockKey},
+            transaction::{lock_keys, LockKey, TransactionHandler},
             volume::root_volume,
             DirectWriter, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID,
         },
@@ -208,7 +208,7 @@ struct BlobToInstall {
 }
 
 async fn install_blobs(
-    filesystem: Arc<dyn Filesystem>,
+    filesystem: Arc<FxFilesystem>,
     volume_name: &str,
     blobs: Vec<(Hash, PathBuf)>,
 ) -> Result<BlobsJsonOutput, Error> {
@@ -247,7 +247,7 @@ async fn install_blobs(
 
 async fn install_blob(
     blob: BlobToInstall,
-    filesystem: &Arc<dyn Filesystem>,
+    filesystem: &Arc<FxFilesystem>,
     directory: &Directory<ObjectStore>,
 ) -> Result<BlobsJsonOutputEntry, Error> {
     let merkle = blob.hash.to_string();

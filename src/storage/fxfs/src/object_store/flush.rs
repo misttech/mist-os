@@ -18,7 +18,7 @@ use {
             layer_size_from_encrypted_mutations_size,
             object_manager::{ObjectManager, ReservationUpdate},
             object_record::{ObjectKey, ObjectValue},
-            transaction::{lock_keys, AssociatedObject, LockKey, Mutation},
+            transaction::{lock_keys, AssociatedObject, LockKey, Mutation, TransactionHandler},
             tree, AssocObj, CachingObjectHandle, DirectWriter, EncryptedMutations, HandleOptions,
             LockState, ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
@@ -432,9 +432,7 @@ impl ObjectStore {
 mod tests {
     use {
         crate::{
-            filesystem::{
-                Filesystem, FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions,
-            },
+            filesystem::{FxFilesystem, FxFilesystemBuilder, JournalingObject, SyncOptions},
             object_handle::ObjectHandle,
             object_store::{
                 directory::Directory,

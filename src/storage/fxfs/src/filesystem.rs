@@ -102,48 +102,6 @@ impl Default for Options {
     }
 }
 
-#[async_trait]
-pub trait Filesystem: TransactionHandler {
-    /// Returns access to the undeyling device.
-    fn device(&self) -> Arc<dyn Device>;
-
-    /// Returns the root store or panics if it is not available.
-    fn root_store(&self) -> Arc<ObjectStore>;
-
-    /// Returns the allocator or panics if it is not available.
-    fn allocator(&self) -> Arc<SimpleAllocator>;
-
-    /// Returns the object manager for the filesystem.
-    fn object_manager(&self) -> &Arc<ObjectManager>;
-
-    /// Returns the journal for the filesystem.
-    fn journal(&self) -> &Arc<Journal>;
-
-    /// Flushes buffered data to the underlying device.
-    async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error>;
-
-    /// Returns the filesystem block size.
-    fn block_size(&self) -> u64;
-
-    /// Returns filesystem information.
-    fn get_info(&self) -> Info;
-
-    /// Returns the super-block header.
-    fn super_block_header(&self) -> SuperBlockHeader;
-
-    /// Returns the graveyard manager (whilst there exists a graveyard per store, the manager
-    /// handles all of them).
-    fn graveyard(&self) -> &Arc<Graveyard>;
-
-    /// Whether to enable verbose logging.
-    fn trace(&self) -> bool {
-        false
-    }
-
-    /// Returns the filesystem options.
-    fn options(&self) -> &Options;
-}
-
 /// The context in which a transaction is being applied.
 pub struct ApplyContext<'a, 'b> {
     /// The mode indicates whether the transaction is being replayed.
@@ -496,10 +454,6 @@ impl FxFilesystem {
         self.objects.root_parent_store()
     }
 
-    fn root_store(&self) -> Arc<ObjectStore> {
-        self.objects.root_store()
-    }
-
     pub async fn close(&self) -> Result<(), Error> {
         assert_eq!(self.closed.swap(true, Ordering::SeqCst), false);
         debug_assert_not_too_long!(self.graveyard.wait_for_reap());
@@ -518,6 +472,57 @@ impl FxFilesystem {
         // crash instead of exiting gracefully.
         self.device().close().await.context("Failed to close device")?;
         sync_status.map(|_| ())
+    }
+
+    pub fn device(&self) -> Arc<dyn Device> {
+        Arc::clone(&self.device)
+    }
+
+    pub fn root_store(&self) -> Arc<ObjectStore> {
+        self.objects.root_store()
+    }
+
+    pub fn allocator(&self) -> Arc<SimpleAllocator> {
+        self.objects.allocator()
+    }
+
+    pub fn object_manager(&self) -> &Arc<ObjectManager> {
+        &self.objects
+    }
+
+    pub fn journal(&self) -> &Arc<Journal> {
+        &self.journal
+    }
+
+    pub async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error> {
+        self.journal.sync(options).await.map(|_| ())
+    }
+
+    pub fn block_size(&self) -> u64 {
+        self.block_size
+    }
+
+    pub fn get_info(&self) -> Info {
+        Info {
+            total_bytes: self.device.size(),
+            used_bytes: self.object_manager().allocator().get_used_bytes(),
+        }
+    }
+
+    pub fn super_block_header(&self) -> SuperBlockHeader {
+        self.journal.super_block_header()
+    }
+
+    pub fn graveyard(&self) -> &Arc<Graveyard> {
+        &self.graveyard
+    }
+
+    pub fn trace(&self) -> bool {
+        self.trace
+    }
+
+    pub fn options(&self) -> &Options {
+        &self.options
     }
 
     async fn reservation_for_transaction<'a>(
@@ -601,60 +606,6 @@ impl FxFilesystem {
         if old <= MAX_IN_FLIGHT_TRANSACTIONS {
             self.event.notify(usize::MAX);
         }
-    }
-}
-
-#[async_trait]
-impl Filesystem for FxFilesystem {
-    fn device(&self) -> Arc<dyn Device> {
-        Arc::clone(&self.device)
-    }
-
-    fn root_store(&self) -> Arc<ObjectStore> {
-        self.objects.root_store()
-    }
-
-    fn allocator(&self) -> Arc<SimpleAllocator> {
-        self.objects.allocator()
-    }
-
-    fn object_manager(&self) -> &Arc<ObjectManager> {
-        &self.objects
-    }
-
-    fn journal(&self) -> &Arc<Journal> {
-        &self.journal
-    }
-
-    async fn sync(&self, options: SyncOptions<'_>) -> Result<(), Error> {
-        self.journal.sync(options).await.map(|_| ())
-    }
-
-    fn block_size(&self) -> u64 {
-        self.block_size
-    }
-
-    fn get_info(&self) -> Info {
-        Info {
-            total_bytes: self.device.size(),
-            used_bytes: self.object_manager().allocator().get_used_bytes(),
-        }
-    }
-
-    fn super_block_header(&self) -> SuperBlockHeader {
-        self.journal.super_block_header()
-    }
-
-    fn graveyard(&self) -> &Arc<Graveyard> {
-        &self.graveyard
-    }
-
-    fn trace(&self) -> bool {
-        self.trace
-    }
-
-    fn options(&self) -> &Options {
-        &self.options
     }
 }
 
@@ -805,7 +756,7 @@ impl FsckAfterEveryTransaction {
 #[cfg(test)]
 mod tests {
     use {
-        super::{Filesystem, FxFilesystem, FxFilesystemBuilder, SyncOptions},
+        super::{FxFilesystem, FxFilesystemBuilder, SyncOptions},
         crate::{
             fsck::fsck,
             lsm_tree::{types::Item, Operation},
