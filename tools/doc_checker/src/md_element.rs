@@ -233,17 +233,13 @@ impl<'a> DocContext<'a> {
 
     #[cfg(test)]
     pub fn new(filename: PathBuf, text: &'a str) -> DocContext<'a> {
-        Self::new_with_checks(filename, text, false)
+        Self::new_with_checks(filename, text)
     }
 
-    pub fn new_with_checks(
-        filename: PathBuf,
-        text: &'a str,
-        check_reference_links: bool,
-    ) -> DocContext<'a> {
+    pub fn new_with_checks(filename: PathBuf, text: &'a str) -> DocContext<'a> {
         let options = Options::empty();
         let cb: Option<&'a dyn Fn(&str, &str) -> Option<(String, String)>> =
-            if check_reference_links { Some(&Self::link_callback) } else { None };
+            Some(&Self::link_callback);
         let mut index = HashMap::new();
         let lines = text.lines();
         let mut line_num = 1;

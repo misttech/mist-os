@@ -925,7 +925,6 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
-            check_reference_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -933,7 +932,7 @@ mod tests {
 
         let ctx = DocContext::new(
             PathBuf::from("/docs/README.md"),
-            "This is a line to [something](/docs/something.md",
+            "This is a line to [something](/docs/something.md)",
         );
 
         if let Some(check) = checks.first_mut() {
@@ -982,7 +981,6 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
-            check_reference_links: false,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1132,7 +1130,6 @@ mod tests {
             project: "fuchsia".to_string(),
             docs_folder: PathBuf::from("docs"),
             local_links_only: true,
-            check_reference_links: true,
         };
 
         let mut checks = register_markdown_checks(&opt)?;
@@ -1142,16 +1139,14 @@ mod tests {
             (
             DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
-                "This is a line to [something](/docs/something.md)",
-                true
+                "This is a line to [something](/docs/something.md)"
             ),
             None,
         ),
         (
             DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
-                "invalid url [oops](https:///nowhere/something.md?xx)",
-                true
+                "invalid url [oops](https:///nowhere/something.md?xx)"
             ),
             Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
              "Invalid link https:///nowhere/something.md?xx : invalid format")].to_vec())
@@ -1160,8 +1155,7 @@ mod tests {
             DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
                 "A reference link to [`topaz`][flutter-gni]\n\n\
-                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\"",
-                true
+                [flutter-gni]: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni \"Flutter GN build template\""
             ),
             Some([DocCheckError::new_error(1, PathBuf::from("/docs/README.md"),
             "Obsolete or invalid project topaz: https://fuchsia.googlesource.com/topaz/+/HEAD/runtime/flutter_runner/flutter_app.gni")].to_vec())
@@ -1169,8 +1163,7 @@ mod tests {
         (
         DocContext::new_with_checks(
             PathBuf::from("/docs/README.md"),
-            "brackets which are not a link [your name here]",
-            true
+            "brackets which are not a link [your name here]"
         ),
         Some([DocCheckError::new_info_helpful(1, PathBuf::from("/docs/README.md"),
             "unescaped [your name here] not treating this as a shortcut link.",
@@ -1180,7 +1173,7 @@ mod tests {
         (
             DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
-                "missing [text][link-to-text]", true),
+                "missing [text][link-to-text]"),
                 Some([DocCheckError::new_error_helpful(1, PathBuf::from("/docs/README.md"),
                 "Unknown reference link to [text][link-to-text]",
                 "making sure you added a matching [link-to-text]: YOUR_LINK_HERE below this reference"
@@ -1190,7 +1183,6 @@ mod tests {
             DocContext::new_with_checks(
                 PathBuf::from("/docs/README.md"),
                 r#"pw_toolchain_STATIC_ANALYSIS_SKIP_INCLUDE_PATHS = [".*/third_party/.*"]"#,
-                true
             ),
             None
         ),
