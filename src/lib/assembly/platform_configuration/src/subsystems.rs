@@ -41,6 +41,7 @@ mod kernel;
 mod media;
 mod radar;
 mod rcs;
+mod recovery;
 mod session;
 mod setui;
 mod starnix;
@@ -268,6 +269,9 @@ fn configure_subsystems(
 
     radar::RadarSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'radar' subsystem")?;
+
+    recovery::RecoverySubsystem::define_configuration(context, &config.platform.recovery, builder)
+        .context("Configuring the 'recovery' subsystem")?;
 
     rcs::RcsSubsystemConfig::define_configuration(context, &(), builder)
         .context("Configuring the 'rcs' subsystem")?;
