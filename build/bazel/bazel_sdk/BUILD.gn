@@ -145,66 +145,60 @@ template("bazel_sdk_tests_for") {
   }
 }
 
-# Do not define the following targets in final_fuchsia_idk sub-builds to
-# avoid dependency recursion issues!
-if (!sdk_inside_idk_sub_build) {
+foreach(cpu, _fuchsia_sdk_target_cpus) {
+  # Run the test suite against the internal IDK used to populate
+  # @fuchsia_sdk, for the current target cpu only.
+  bazel_sdk_tests_for("bazel_sdk_tests_${cpu}") {
+    target_cpu = cpu
+  }
+}
+
+# Run the test suite against hte internal IDK used to populate
+# @fuchsia_sdk, once per supported target CPU architecture, if
+# bazel_fuchsia_sdk_all_cpus is set, otherwise only against
+# the current target_cpu value.
+group("bazel_sdk_tests") {
+  testonly = true
+  deps = []
   foreach(cpu, _fuchsia_sdk_target_cpus) {
-    # Run the test suite against the internal IDK used to populate
-    # @fuchsia_sdk, for the current target cpu only.
-    bazel_sdk_tests_for("bazel_sdk_tests_${cpu}") {
-      target_cpu = cpu
-    }
+    deps += [ ":bazel_sdk_tests_${cpu}" ]
   }
+}
 
-  # Run the test suite against hte internal IDK used to populate
-  # @fuchsia_sdk, once per supported target CPU architecture, if
-  # bazel_fuchsia_sdk_all_cpus is set, otherwise only against
-  # the current target_cpu value.
-  group("bazel_sdk_tests") {
-    testonly = true
-    deps = []
-    foreach(cpu, _fuchsia_sdk_target_cpus) {
-      deps += [ ":bazel_sdk_tests_${cpu}" ]
-    }
+foreach(cpu, idk_target_cpus) {
+  # This target runs the test suite against a locally-generated IDK
+  # (which includes support for all target architectures), but only
+  # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
+  # test suite with a build configuration that generates Fuchsia/arm64
+  # binaries.
+  #
+  # Note that the IDK does _not_ contain //sdk:driver atoms.
+  # (see //sdk:final_fuchsia_idk definition for details).
+  bazel_sdk_tests_for("bazel_sdk_tests_idk_${cpu}") {
+    target_cpu = cpu
+    idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
+    idk_exported_target = "//sdk:final_fuchsia_idk.exported"
   }
+}
 
+# This target runs the test suite against each target architecture
+# supported by the IDK. Currently, this runs multiple instances of
+# the test suite, one per target cpu.
+group("bazel_sdk_tests_idk") {
+  testonly = true
+  deps = []
   foreach(cpu, idk_target_cpus) {
-    # This target runs the test suite against a locally-generated IDK
-    # (which includes support for all target architectures), but only
-    # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
-    # test suite with a build configuration that generates Fuchsia/arm64
-    # binaries.
-    #
-    # Note that the IDK does _not_ contain //sdk:driver atoms.
-    # (see //sdk:final_fuchsia_idk definition for details).
-    bazel_sdk_tests_for("bazel_sdk_tests_idk_${cpu}") {
-      target_cpu = cpu
-      idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
-      idk_exported_target = "//sdk:final_fuchsia_idk.exported"
-    }
-  }
-
-  # This target runs the test suite against each target architecture
-  # supported by the IDK. Currently, this runs multiple instances of
-  # the test suite, one per target cpu.
-  group("bazel_sdk_tests_idk") {
-    testonly = true
-    deps = []
-    foreach(cpu, idk_target_cpus) {
-      deps += [ ":bazel_sdk_tests_idk_${cpu}" ]
-    }
+    deps += [ ":bazel_sdk_tests_idk_${cpu}" ]
   }
 }
 
 group("tests") {
   testonly = true
-  if (!sdk_inside_idk_sub_build) {
-    deps = [
-      ":bazel_sdk_tests",
-      # DO NOT INCLUDE bazel_sdk_tests_idk here to avoid making all core builds
-      # longer than necessary (https://fxbug.dev/132279). It is still possible
-      # to invoke the target manually during local development though.
-      # ":bazel_sdk_tests_idk",
-    ]
-  }
+  deps = [
+    ":bazel_sdk_tests",
+    # DO NOT INCLUDE bazel_sdk_tests_idk here to avoid making all core builds
+    # longer than necessary (https://fxbug.dev/132279). It is still possible
+    # to invoke the target manually during local development though.
+    # ":bazel_sdk_tests_idk",
+  ]
 }

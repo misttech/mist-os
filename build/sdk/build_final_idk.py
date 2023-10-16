@@ -347,7 +347,6 @@ def main():
             # Only build host tools in the x64 sub-build, to save
             # considerable time.
             args_gn_content += "sdk_no_host_tools = true\n"
-            args_gn_content += "sdk_inside_idk_sub_build = true\n"
 
             if api_level != 0:
                 args_gn_content += "sdk_inside_supported_api_sub_build = true\n"
