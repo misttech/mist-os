@@ -35,21 +35,19 @@ valid_bazel_fuchsia_sdk_content_values = [
   "driver",
 ]
 
-# A scope used to map a content set name to a list of //sdk: dependencies
-# Note that these lists cannot include testonly SDK atoms (https://fxbug.dev/119057)
-_fuchsia_sdk_deps_map = {
-  core = [ "//sdk:core" ]
-  driver = [
-    "//sdk:core",
-    "//sdk:driver",
-  ]
+# A scope used to map a content set name to a single sdk_collection label. Note
+# that these lists cannot include testonly SDK atoms (https://fxbug.dev/119057)
+_fuchsia_sdk_collection_map = {
+  core = "//sdk:core"
+  driver = "//sdk:driver"
 }
 
 assert(
-    defined(_fuchsia_sdk_deps_map[bazel_fuchsia_sdk_content]),
+    defined(_fuchsia_sdk_collection_map[bazel_fuchsia_sdk_content]),
     "Invalid bazel_fuchsia_sdk_content value ($bazel_fuchsia_sdk_content'), " +
         "should be one of: ${valid_bazel_fuchsia_sdk_content_values}")
 
-# The list of dependencies used to populate the IDK export directory
-# used to determine the content of the @fuchsia_sdk external repository.
-bazel_fuchsia_sdk_deps = _fuchsia_sdk_deps_map[bazel_fuchsia_sdk_content]
+# The sdk_collection label used to populate the IDK export directory used to
+# determine the content of the @fuchsia_sdk external repository.
+bazel_fuchsia_sdk_collection =
+    _fuchsia_sdk_collection_map[bazel_fuchsia_sdk_content]

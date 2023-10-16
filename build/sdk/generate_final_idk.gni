@@ -32,24 +32,19 @@ import("//sdk/config.gni")
 #      List of target cpu names. This must include the default target_cpu
 #      value for the current build configuration. Defaults to `idk_target_cpus`.
 #
-#    sdk_target_labels: (required)
-#      List of labels to sdk_collection() GN targets that will be merged into
-#      the final archive. Each one will be built for several CPU architecture.
+#    sdk_collection_label: (required)
+#      A single sdk_collection() GN target that will be built for several CPU
+#      architectures and API levels, and merged into the final archive.
 #
-#    validation_target_labels: (optional)
-#      List of labels to non-sdk_collection() GN targets that will be built
-#      as well, but whose output will not go into the final archive. These
-#      targets can depend on any sdk_target_labels dependency, and will be
-#      built by the top-level build as well as each sub-build launched by
-#      the action that creates the final export directory.
+#    sdk_target_labels: (deprecated)
+#      Deprecated. Pass a single `sdk_collection` to `sdk_collection_label`
+#      instead.
 #
 #    final_validation_target_labels: (optional)
-#      List of labels to a targets used to validate the content of
-#      the final exported directory before the archive is created. Unlike
-#      targets listed in validation_target_labels, these are only built
-#      in the top-level build. These targets should only depend on
-#      the ${target_name}.exported target, not the main one which builds
-#      the compressed archive.
+#      List of labels to a targets used to validate the content of the final
+#      exported directory before the archive is created. These targets should
+#      only depend on the ${target_name}.exported target, not the main one which
+#      builds the compressed archive.
 #
 #    extra_api_levels: (optional)
 #      List of extra API levels, as integers, to build prebuilts for, in
@@ -92,18 +87,20 @@ template("generate_final_idk") {
 
   # Compute sdk target labels to pass to the script
   _sdk_targets = []
-  foreach(label, invoker.sdk_target_labels) {
-    _dir = get_label_info(label, "dir")
-    _name = get_label_info(label, "name")
-    _sdk_targets += [ "${_dir}:${_name}" ]
-  }
+  if (defined(invoker.sdk_collection_label)) {
+    assert(!defined(invoker.sdk_target_labels),
+           "Don't specify both sdk_collection_label and sdk_target_labels.")
 
-  _validation_targets = []
-  if (defined(invoker.validation_target_labels)) {
-    foreach(label, invoker.validation_target_labels) {
+    _dir = get_label_info(invoker.sdk_collection_label, "dir")
+    _name = get_label_info(invoker.sdk_collection_label, "name")
+    _sdk_targets += [ "${_dir}:${_name}" ]
+  } else {
+    assert(defined(invoker.sdk_target_labels),
+           "Must specify either sdk_collection_label or sdk_target_labels.")
+    foreach(label, invoker.sdk_target_labels) {
       _dir = get_label_info(label, "dir")
       _name = get_label_info(label, "name")
-      _validation_targets += [ "${_dir}:${_name}" ]
+      _sdk_targets += [ "${_dir}:${_name}" ]
     }
   }
 
@@ -141,12 +138,6 @@ template("generate_final_idk") {
              sdk_id,
              "--sdk-targets",
            ] + _sdk_targets
-
-    if (_validation_targets != []) {
-      # NOTE: The target labels passed to the script are only used
-      # when invoking the sub-builds.
-      args += [ "--validation-targets" ] + _validation_targets
-    }
 
     args += [
       "--base-build-dir",
@@ -186,9 +177,9 @@ template("generate_final_idk") {
                              "visibility",
                            ])
 
-    # Depending on sdk_target_labels ensures that these are built in
-    # the top-level Ninja build directory.
-    deps = invoker.sdk_target_labels
+    # Depending on _sdk_targets ensures that these are built in the top-level
+    # Ninja build directory.
+    deps = _sdk_targets
 
     # This script cannot be hermetic.
     hermetic_deps = false
@@ -220,9 +211,6 @@ template("generate_final_idk") {
                              "visibility",
                            ])
     deps = [ ":" + _exported_dir_target ]
-    if (defined(invoker.validation_target_labels)) {
-      deps += invoker.validation_target_labels
-    }
     if (defined(invoker.final_validation_target_labels)) {
       deps += invoker.final_validation_target_labels
     }

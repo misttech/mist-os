@@ -16,11 +16,6 @@ import("//build/sdk/sdk_molecule.gni")
 import("//tools/check-licenses/build/license_data.gni")
 import("config.gni")
 
-# A list of non-sdk_collection() targets that will be built with the
-# Fuchsia Core IDK archive, for validation purpose. Note that these
-# will also be built in the sub-builds launched by generate_final_idk().
-_fuchsia_core_idk_validation_deps = []
-
 # Another list of validation targets, these will only be built in the
 # top-level build, and should depend on //sdk:final_fuchsia_idk.exported
 # directly to validate its content.
@@ -107,12 +102,7 @@ generated_file("plasa_manifest") {
 # several target_cpu architectures.
 generate_final_idk("final_fuchsia_idk") {
   output_name = "fuchsia_idk"
-  sdk_target_labels = [
-    # NOTE: Do not create any other sdk_collections and add them here. Instead,
-    # add atoms to the ":fuchsia_idk_atoms" sdk_molecule.
-    ":core",
-  ]
-  validation_target_labels = _fuchsia_core_idk_validation_deps
+  sdk_collection_label = ":core"
   final_validation_target_labels = _fuchsia_core_idk_final_validation_deps
   testonly = true
 }
@@ -588,8 +578,7 @@ if (is_host) {
 # Firmware IDK. See /src/firmware/README.md
 generate_final_idk("firmware") {
   output_name = "firmware"
-  sdk_target_labels = [ ":firmware_collection" ]
-  validation_target_labels = []
+  sdk_collection_label = ":firmware_collection"
   final_validation_target_labels = [ ":firmware_manifest_golden" ]
 }
 
@@ -682,12 +671,24 @@ sdk_molecule("driver_fidl") {
 # testonly atoms.
 sdk_collection("driver") {
   id = sdk_id
+  category = "experimental"
 
+  deps = [
+    # NOTE: Don't add any other sdk_molecules here.  Instead, add atoms to the
+    # ":fuchsia_idk_atoms" or ":driver_atoms" sdk_molecules.
+    ":driver_atoms",
+  ]
+}
+
+# An SDK molecule providing SDK atoms used for driver development. Their API/ABI
+# is not stable at all. Note: this cannot contain testonly atoms.
+sdk_molecule("driver_atoms") {
   category = "experimental"
 
   deps = [
     ":bind",
     ":driver_fidl",
+    ":fuchsia_idk_atoms",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
     "//sdk/lib/driver/component:driver_component",
