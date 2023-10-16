@@ -55,7 +55,7 @@ struct pll_param {
 
 struct cea_timing {
   bool interlace_mode;
-  int pfreq;
+  int pfreq_khz;
   int8_t ln;
   bool pixel_repeat;
   bool venc_pixel_repeat;

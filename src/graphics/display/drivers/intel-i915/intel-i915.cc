@@ -1563,8 +1563,7 @@ bool Controller::CheckDisplayLimits(
 
     // Either the pipe pixel rate or the link pixel rate can't support a simple
     // configuration at this display resolution.
-    static constexpr int64_t kHzPer10Khz = int64_t{10'000};
-    const int64_t pixel_clock_hz = banjo_display_config->mode.pixel_clock_10khz * kHzPer10Khz;
+    const int64_t pixel_clock_hz = banjo_display_config->mode.pixel_clock_khz * int64_t{1'000};
     if (max_pipe_pixel_rate_hz < pixel_clock_hz || !display->CheckPixelRate(pixel_clock_hz)) {
       return false;
     }

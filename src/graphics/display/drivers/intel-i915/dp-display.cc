@@ -1961,7 +1961,7 @@ bool DpDisplay::PipeConfigPreamble(const display_mode_t& mode, PipeId pipe_id,
 
   // Pixel clock rate: The rate at which pixels are sent, in pixels per
   // second, divided by 1000 (kHz).
-  int64_t pixel_clock_rate_khz = int64_t{mode.pixel_clock_10khz} * 10;
+  int64_t pixel_clock_rate_khz = mode.pixel_clock_khz;
 
   // This is the rate at which bits are sent on a single DisplayPort
   // lane, in raw bits per second, divided by 1000 (kbps).

@@ -24,7 +24,7 @@ fuchsia_hardware_hdmi::wire::DisplayMode ToHdmiFidlDisplayMode(
     fidl::AnyArena& allocator, const display_mode_t& banjo_display_mode,
     const fuchsia_hardware_hdmi::wire::ColorParam& color) {
   fuchsia_hardware_hdmi::wire::StandardDisplayMode mode{
-      .pixel_clock_khz = banjo_display_mode.pixel_clock_10khz * 10,
+      .pixel_clock_khz = banjo_display_mode.pixel_clock_khz,
       .h_addressable = banjo_display_mode.h_addressable,
       .h_front_porch = banjo_display_mode.h_front_porch,
       .h_sync_pulse = banjo_display_mode.h_sync_pulse,
@@ -46,7 +46,7 @@ cea_timing CalculateDisplayTimings(const display_mode_t& mode) {
   cea_timing timings;
 
   timings.interlace_mode = mode.flags & MODE_FLAG_INTERLACED;
-  timings.pfreq = (mode.pixel_clock_10khz * 10);  // KHz
+  timings.pfreq_khz = mode.pixel_clock_khz;
   // TODO: pixel repetition is 0 for most progressive. We don't support interlaced
   timings.pixel_repeat = false;
   timings.hactive = static_cast<int>(mode.h_addressable);
@@ -89,8 +89,7 @@ pll_param CalculateClockParameters(const display_mode_t& mode) {
   params.od2 = 1;
   params.od3 = 1;
 
-  int pixel_clock_khz = mode.pixel_clock_10khz * 10;
-  params.hpll_clk_out = (pixel_clock_khz * 10);
+  params.hpll_clk_out = (mode.pixel_clock_khz * 10);
   while (params.hpll_clk_out < 2900000) {
     if (params.od1 < 4) {
       params.od1 *= 2;
@@ -106,7 +105,7 @@ pll_param CalculateClockParameters(const display_mode_t& mode) {
                           "Failed to set HDMI PLL to a valid VCO frequency range for pixel clock "
                           "%d kHz. This should never happen since IsDisplayModeSupported() "
                           "returned true.",
-                          pixel_clock_khz);
+                          mode.pixel_clock_khz);
     }
   }
   ZX_DEBUG_ASSERT_MSG(params.hpll_clk_out <= 6000000,
@@ -205,7 +204,7 @@ zx_status_t HdmiHost::ModeSet(const display_mode_t& mode) {
     zxlogf(ERROR,
            "Display mode (%" PRIu32 " x %" PRIu32 " @ pixel rate %" PRIu32
            " kHz) is not supported.",
-           mode.h_addressable, mode.v_addressable, mode.pixel_clock_10khz * 10);
+           mode.h_addressable, mode.v_addressable, mode.pixel_clock_khz);
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -414,8 +413,7 @@ bool HdmiHost::IsDisplayModeSupported(const display_mode_t& mode) const {
     return false;
   }
 
-  const int pixel_clock_khz = mode.pixel_clock_10khz * 10;
-  if (!IsPixelClockSupported(pixel_clock_khz)) {
+  if (!IsPixelClockSupported(mode.pixel_clock_khz)) {
     return false;
   }
 

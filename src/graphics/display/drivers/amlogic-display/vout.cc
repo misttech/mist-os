@@ -386,8 +386,8 @@ void Vout::Dump() {
              dsi_.disp_setting.clock_factor);
       return;
     case VoutType::kHdmi:
-      zxlogf(INFO, "pixel_clock_10khz = 0x%x (%u)", hdmi_.cur_display_mode_.pixel_clock_10khz,
-             hdmi_.cur_display_mode_.pixel_clock_10khz);
+      zxlogf(INFO, "pixel_clock_khz = 0x%x (%u)", hdmi_.cur_display_mode_.pixel_clock_khz,
+             hdmi_.cur_display_mode_.pixel_clock_khz);
       zxlogf(INFO, "h_addressable = 0x%x (%u)", hdmi_.cur_display_mode_.h_addressable,
              hdmi_.cur_display_mode_.h_addressable);
       zxlogf(INFO, "h_front_porch = 0x%x (%u)", hdmi_.cur_display_mode_.h_front_porch,

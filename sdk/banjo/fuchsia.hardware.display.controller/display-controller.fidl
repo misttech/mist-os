@@ -286,7 +286,7 @@ type ModeFlag = strict enum : uint32 {
 
 /// The video parameters which specify the display mode.
 type DisplayMode = struct {
-    pixel_clock_10khz uint32;
+    pixel_clock_khz uint32;
     h_addressable uint32;
     h_front_porch uint32;
     h_sync_pulse uint32;

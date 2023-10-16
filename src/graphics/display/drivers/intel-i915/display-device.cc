@@ -154,9 +154,8 @@ bool DisplayDevice::Resume() {
 
 void DisplayDevice::LoadActiveMode() {
   pipe_->LoadActiveMode(&info_);
-  int32_t pixel_rate_khz = LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
-  info_.pixel_clock_10khz = pixel_rate_khz / 10;
-  zxlogf(INFO, "Active pixel clock: %u kHz", pixel_rate_khz);
+  info_.pixel_clock_khz = LoadPixelRateForTranscoderKhz(pipe_->connected_transcoder_id());
+  zxlogf(INFO, "Active pixel clock: %u kHz", info_.pixel_clock_khz);
 }
 
 bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
@@ -178,7 +177,7 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
     return true;
   }
 
-  if (mode->pixel_clock_10khz == info_.pixel_clock_10khz) {
+  if (mode->pixel_clock_khz == info_.pixel_clock_khz) {
     // Modeset is necessary not necessary if all display params are the same
     return false;
   }
@@ -186,12 +185,8 @@ bool DisplayDevice::CheckNeedsModeset(const display_mode_t* mode) {
   // Check to see if the hardware was already configured properly. The is primarily to
   // prevent unnecessary modesetting at startup. The extra work this adds to regular
   // modesetting is negligible.
-  //
-  // The display engine only supports up to 8K displays whose pixel clock is of
-  // a magnitude of 1GHz. So `info_.pixel_clock_10khz * 10` is of magnitude of
-  // 10^6 and will fit in int32_t range without causing any overflow.
-  int32_t pixel_clock_khz = static_cast<int32_t>(info_.pixel_clock_10khz) * 10;
-  DdiPllConfig desired_pll_config = ComputeDdiPllConfig(pixel_clock_khz);
+  DdiPllConfig desired_pll_config =
+      ComputeDdiPllConfig(static_cast<int32_t>(info_.pixel_clock_khz));
   ZX_DEBUG_ASSERT_MSG(desired_pll_config.IsEmpty(),
                       "CheckDisplayMode() should have rejected unattainable pixel rates");
   return !controller()->dpll_manager()->DdiPllMatchesConfig(ddi_id(), desired_pll_config);
