@@ -83,10 +83,6 @@ load(
     _fuchsia_package_repository = "fuchsia_package_repository",
 )
 load(
-    "//fuchsia/private:fuchsia_local_package_repository.bzl",
-    _fuchsia_local_package_repository = "fuchsia_local_package_repository",
-)
-load(
     "//fuchsia/private:fuchsia_package_group.bzl",
     _fuchsia_package_group = "fuchsia_package_group",
 )
@@ -103,14 +99,6 @@ load(
 load(
     "//fuchsia/private:compilation_database.bzl",
     _clangd_compilation_database = "clangd_compilation_database",
-)
-load(
-    "//fuchsia/private:fuchsia_emulator.bzl",
-    _fuchsia_emulator = "fuchsia_emulator",
-)
-load(
-    "//fuchsia/private:fuchsia_remote_product_bundle.bzl",
-    _fuchsia_remote_product_bundle = "fuchsia_remote_product_bundle",
 )
 load(
     "//fuchsia/constraints/platforms:supported_platforms.bzl",
@@ -140,7 +128,6 @@ fuchsia_debug_symbols = _fuchsia_debug_symbols
 fuchsia_driver_component = _fuchsia_driver_component
 fuchsia_driver_bind_bytecode = _fuchsia_driver_bind_bytecode
 fuchsia_driver_tool = _fuchsia_driver_tool
-fuchsia_emulator = _fuchsia_emulator
 fuchsia_fidl_library = _fuchsia_fidl_library
 fuchsia_fidl_bind_library = _fuchsia_fidl_bind_library
 fuchsia_bind_cc_library = _fuchsia_bind_cc_library
@@ -152,9 +139,7 @@ fuchsia_unittest_package = _fuchsia_unittest_package
 fuchsia_package_resource = _fuchsia_package_resource
 fuchsia_package_resource_group = _fuchsia_package_resource_group
 fuchsia_package_repository = _fuchsia_package_repository
-fuchsia_local_package_repository = _fuchsia_local_package_repository
 fuchsia_package_group = _fuchsia_package_group
-fuchsia_remote_product_bundle = _fuchsia_remote_product_bundle
 fuchsia_select = _fuchsia_select
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict

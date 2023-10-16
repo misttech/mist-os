@@ -2,14 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
-    "fuchsia_emulator",
-    "fuchsia_local_package_repository",
-    "fuchsia_remote_product_bundle",
-)
-load("@fuchsia_sdk//fuchsia:workflows.bzl", "fuchsia_development_configuration")
-
 test_suite(
     name = "tests",
     tags = ["all"],
@@ -53,54 +45,4 @@ filegroup(
         "//examples/hello_world_cpp:pkg",
         "//examples/hello_world_cpp:test_pkg",
     ],
-)
-
-# The workstation product bundle for running the emulator
-fuchsia_remote_product_bundle(
-    name = "pb_ws",
-    product_name = "workstation_eng.qemu-x64",
-    product_version = "fake_version",
-    repository = "workstation-packages",
-)
-
-# The workstation product bundle for running on the chromebook
-fuchsia_remote_product_bundle(
-    name = "pb_chromebook",
-    product_name = "workstation_eng.chromebook-x64",
-    product_version = "fake_version",
-    repository = "workstation-packages",
-)
-
-# A fuchsia emulator which runs the workstation product.
-# Note: The workstation_pb must be fetched before the emulator can be started.
-fuchsia_emulator(
-    name = "emu_ws",
-    emulator_name = "workstation-emulator",
-    launch_options = [
-        "--headless",
-    ],
-    product_bundle = ":pb_ws",
-)
-
-fuchsia_local_package_repository(
-    name = "dev_repo",
-    repo_name = "dev",
-    repo_path = ".package_repos/dev",
-    #TODO: add alias support
-)
-
-fuchsia_development_configuration(
-    name = "ws_emu_development",
-    emulator = ":emu_ws",
-    package_repository = ":dev_repo",
-    #TODO: workaround until fxb/113156 is fixed.
-    product_bundle = ":pb_ws",
-)
-
-fuchsia_development_configuration(
-    name = "ws_development",
-    autodetect_target = True,
-    package_repository = ":dev_repo",
-    product_bundle = ":pb_chromebook",
-    stop_emulators = True,
 )

@@ -22,28 +22,3 @@ label_name = _label_name
 normalized_target_name = _normalized_target_name
 rule_variants = _rule_variants
 wrap_executable = _wrap_executable
-
-def full_product_bundle_url(ctx, pb_info):
-    """ Returns the full url for the product bundle.
-
-    If the product does not have a version associated with it the sdk version
-    will be used. A valid fuchsia toolchain must be registered in the context.
-
-    Args:
-      ctx: rule context.
-      pb_info: product bundle info.
-
-    Returns:
-      URL string.
-    """
-    sdk_version = pb_info.version or ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"].sdk_id
-    if not sdk_version:
-        fail("Cannot find a version in the Fuchsia SDK")
-    product_version = sdk_version
-    if not product_version:
-        fail("Product version must have a string value.")
-
-    return "gs://fuchsia/development/{version}/sdk/product_bundles.json#{product}".format(
-        version = product_version,
-        product = pb_info.product_name,
-    )

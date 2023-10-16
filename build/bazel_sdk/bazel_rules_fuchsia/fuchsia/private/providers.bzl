@@ -69,14 +69,6 @@ FuchsiaComponentManifestShardCollectionInfo = provider(
     },
 )
 
-FuchsiaEmulatorInfo = provider(
-    "Contains information about a fuchsia emulator.",
-    fields = {
-        "name": "The name of the emulator",
-        "launch_options": "The list of additional options to use when launching",
-    },
-)
-
 FuchsiaFidlLibraryInfo = provider(
     "Contains information about a FIDL library",
     fields = {
@@ -216,14 +208,6 @@ FuchsiaPackageRepoInfo = provider(
         "packages": "The paths to the package_manifest.json files",
         "repo_dir": "The directory of the package repo.",
         "blobs": "The blobs needed by packages in this package repo.",
-    },
-)
-
-FuchsiaLocalPackageRepositoryInfo = provider(
-    doc = "A provider which provides the configuration for a local package repo.",
-    fields = {
-        "repo_name": "The name of the repository",
-        "repo_path": "The path of the repository. If relative it is treated as relative to the workspace root",
     },
 )
 

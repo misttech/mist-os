@@ -124,13 +124,6 @@ py_binary(
 )
 
 py_binary(
-    name = "detect_target",
-    srcs = ["detect_target.py"],
-    python_version = "PY3",
-    deps = [":fuchsia_task_lib"],
-)
-
-py_binary(
     name = "json_comparator",
     srcs = ["json_comparator.py"],
     python_version = "PY3",

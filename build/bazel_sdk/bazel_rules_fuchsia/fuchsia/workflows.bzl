@@ -25,10 +25,6 @@ load(
     _ffx_task_rule = "ffx_task_rule",
     _fuchsia_task_ffx = "fuchsia_task_ffx",
 )
-load(
-    "//fuchsia/private/workflows:fuchsia_development_configuration.bzl",
-    _fuchsia_development_configuration = "fuchsia_development_configuration",
-)
 load("//fuchsia/private/workflows:fuchsia_task_verbs.bzl", _verbs = "verbs")
 # load(
 #     "//fuchsia/private/workflows:fuchsia_remote_product_bundle.bzl",
@@ -56,7 +52,6 @@ fuchsia_task = _fuchsia_task
 fuchsia_workflow = _fuchsia_workflow
 fuchsia_shell_task = _fuchsia_shell_task
 fuchsia_task_ffx = _fuchsia_task_ffx
-fuchsia_development_configuration = _fuchsia_development_configuration
 verbs = _verbs
 
 # TODO(https://fxbug.dev/113205): Expose these rules once implementation/API is complete.
