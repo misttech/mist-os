@@ -448,12 +448,13 @@ assembly_input_bundle("kernel_pmm_checker_enabled") {
 #
 # Often used for manipulating device during E2E tests.
 assembly_input_bundle("sl4f") {
-  # We currently include SL4F in cache to support E2E tests that
-  # either do not download fuchsia packages or cannot start
-  # package serving due to network limitations.
-  cache_packages = [ "//src/testing/sl4f" ]
-
-  base_packages = [ "//src/sys/bin/start_sl4f" ]
+  base_packages = [
+    # We currently include SL4F in base to support E2E tests that
+    # either do not download fuchsia packages or cannot start
+    # package serving due to network limitations.
+    "//src/testing/sl4f",
+    "//src/sys/bin/start_sl4f",
+  ]
   shell_commands = [
     {
       package = "start_sl4f"
