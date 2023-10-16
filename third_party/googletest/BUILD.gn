@@ -19,8 +19,14 @@ config("gtest_config") {
   configs = [ "//build/config:Wno-undef" ]
 }
 
-static_library("gtest") {
-  testonly = true
+static_library("gtest_no_testonly") {
+  # In-tree tests should prefer //third_party/googletest:gtest.
+  visibility = [
+    ":*",
+    "//src/connectivity/bluetooth/*",
+    "//third_party/pigweed/*",
+  ]
+
   public = [
     "src/googletest/include/gtest/gtest-spi.h",
     "src/googletest/include/gtest/gtest.h",
@@ -93,6 +99,11 @@ static_library("gtest") {
       },
     ]
   }
+}
+
+group("gtest") {
+  testonly = true
+  public_deps = [ ":gtest_no_testonly" ]
 }
 
 # Library that defines the FRIEND_TEST macro.
