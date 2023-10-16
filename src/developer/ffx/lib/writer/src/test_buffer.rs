@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use futures::AsyncWrite;
 use std::cell::RefCell;
 use std::io::Write;
+use std::pin::Pin;
 use std::rc::Rc;
+use std::task::{Context, Poll};
 
 /// Provides shared memory buffers (in the form of [`TestBuffer`]s for stdout
 /// and stderr that can be used with implementations of [`crate::ToolIO`] to
@@ -81,5 +84,27 @@ impl Write for TestBuffer {
 
     fn flush(&mut self) -> std::io::Result<()> {
         self.inner.borrow_mut().flush()
+    }
+}
+
+impl AsyncWrite for TestBuffer {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<std::io::Result<usize>> {
+        let size = self.inner.borrow_mut().write(buf);
+        Poll::Ready(size)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        match self.inner.borrow_mut().flush() {
+            Ok(_) => Poll::Ready(Ok(())),
+            Err(e) => Poll::Ready(Err(e)),
+        }
+    }
+
+    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
