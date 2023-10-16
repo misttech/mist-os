@@ -42,6 +42,24 @@ UI.
 
 ![Fuchsia-Auto-Submit +1 tile](/docs/development/source_code/auto_submit_selected.png)
 
+### My change is broken but auto-submit keeps retrying presubmit. Why? {#retries}
+
+Auto-submit intentionally ignores the results of previous presubmit runs. It
+assumes that any failures are false rejections due to latent flakiness or
+transient breakages at HEAD. This makes auto-submit resilient to false
+rejections, at the cost of occasionally retrying presubmit on CLs that are
+legitimately broken and have no hope of passing presubmit checks.
+
+Auto-submit will stop retrying after four attempts as long as no human takes
+action on a change. The retry counter resets after any human action (uploading a
+new patchset, commenting, etc.).
+
+If incorrectly retrying is a concern, make sure a presubmit dry run passes
+before sending your change for review, or don't use auto-submit. Alternatively,
+use the
+[`Multiply` directive](/docs/development/testing/testing_for_flakiness_in_cq.md)
+if you're concerned about flakiness.
+
 ### I'm a reviewer on a change with auto-submit enabled. Can I approve it without submitting? {#unresolved-comments}
 
 If you leave unresolved comments at the time you grant **Code-Review +2**, the
@@ -51,4 +69,3 @@ However, the change author can still manually set **Commit-Queue +2** to submit
 the change. If you think the change should not be submitted, then it's
 recommended that either you withhold **Code-Review +2** or, if another reviewer
 has already approved the change, set **Code-Review -2**.
-
