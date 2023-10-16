@@ -48,7 +48,6 @@ CORE_SOURCES = [
   "src/proxy/handle/signals.rs",
   "src/proxy/handle/socket.rs",
   "src/router/mod.rs",
-  "src/router/security_context.rs",
   "src/router/service_map.rs",
   "src/test_util.rs",
 ]
