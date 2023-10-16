@@ -1993,9 +1993,9 @@ TEST(Vmar, RangeOpCommitVmoPages) {
   // Verify decommit of only part of a mapping.
   std::atomic_uint8_t* target = reinterpret_cast<std::atomic_uint8_t*>(vmar_base);
   target[0].store(5);
-  EXPECT_EQ(
-      zx_vmar_op_range(vmar, ZX_VMO_OP_DECOMMIT, vmar_base, zx_system_get_page_size(), nullptr, 0u),
-      ZX_OK);
+  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_DECOMMIT, vmar_base, zx_system_get_page_size(),
+                             nullptr, 0u),
+            ZX_OK);
   EXPECT_EQ(target[0].load(), 0u);
   target[zx_system_get_page_size()].store(7);
   EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMO_OP_DECOMMIT, vmar_base + zx_system_get_page_size(),
@@ -2007,7 +2007,7 @@ TEST(Vmar, RangeOpCommitVmoPages) {
   target[zx_system_get_page_size()].store(5);
   target[zx_system_get_page_size() * 2].store(6);
   EXPECT_EQ(target[zx_system_get_page_size() * 4].load(), 5u);
-  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMO_OP_DECOMMIT, vmar_base + zx_system_get_page_size(),
+  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_DECOMMIT, vmar_base + zx_system_get_page_size(),
                              zx_system_get_page_size() * 2, nullptr, 0u),
             ZX_OK);
   EXPECT_EQ(target[zx_system_get_page_size()].load(), 0u);
@@ -2015,7 +2015,7 @@ TEST(Vmar, RangeOpCommitVmoPages) {
   EXPECT_EQ(target[zx_system_get_page_size() * 4].load(), 0u);
 
   // Verify decommit including an unmapped region fails.
-  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMO_OP_DECOMMIT, vmar_base + zx_system_get_page_size(),
+  EXPECT_EQ(zx_vmar_op_range(vmar, ZX_VMAR_OP_DECOMMIT, vmar_base + zx_system_get_page_size(),
                              zx_system_get_page_size() * 3, nullptr, 0u),
             ZX_ERR_BAD_STATE);
 
@@ -2033,7 +2033,7 @@ TEST(Vmar, RangeOpCommitVmoPages) {
   ASSERT_EQ(zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, readonly_vmo, 0,
                         zx_system_get_page_size(), &readonly_mapping_addr),
             ZX_OK);
-  EXPECT_EQ(zx_vmar_op_range(zx_vmar_root_self(), ZX_VMO_OP_DECOMMIT, readonly_mapping_addr,
+  EXPECT_EQ(zx_vmar_op_range(zx_vmar_root_self(), ZX_VMAR_OP_DECOMMIT, readonly_mapping_addr,
                              zx_system_get_page_size(), nullptr, 0u),
             ZX_ERR_ACCESS_DENIED);
   EXPECT_EQ(zx_vmar_unmap(zx_vmar_root_self(), readonly_mapping_addr, zx_system_get_page_size()),
