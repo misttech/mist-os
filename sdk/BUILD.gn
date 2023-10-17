@@ -141,6 +141,7 @@ sdk_molecule("fuchsia_idk_atoms") {
   # levels they support. The sysroot molecule must also be built.
   deps = [
     ":core_cc_prebuilt_library",
+    ":core_loadable_module",
     ":core_packages",
     ":core_sysroot",
   ]
@@ -153,7 +154,6 @@ sdk_molecule("fuchsia_idk_atoms") {
       ":core_data",
       ":core_documentation",
       ":core_license",
-      ":core_loadable_module",
       ":version_history",
       "devices",
       "docs",
