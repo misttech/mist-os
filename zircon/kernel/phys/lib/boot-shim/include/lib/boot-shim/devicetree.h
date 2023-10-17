@@ -28,6 +28,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <optional>
@@ -349,37 +350,10 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
                                const devicetree::PropertyDecoder& decoder);
   devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
 
-  // Returns true if additional ranges from the devicetree are successfully appended.
-  // The matcher API constitutes only ranges encoded as device nodes within the devicetree.
-  // The additional ranges include those defined as 'memreserve'and the devicetree itself.
-  bool AppendAdditionalRanges(const devicetree::Devicetree& fdt) {
-    if (!AppendRange({
-            .addr = reinterpret_cast<uintptr_t>(fdt.fdt().data()),
-            .size = fdt.size_bytes(),
-            // The original DT Blob is copied into a ZBI ITEM, and the original range is discarded.
-            // It is only useful while the ZBI items are generated.
-            .type = memalloc::Type::kDevicetreeBlob,
-        })) {
-      return false;
-    }
-
-    for (auto [start, size] : fdt.memory_reservations()) {
-      if (!AppendRange(memalloc::Range{
-              .addr = start,
-              .size = size,
-              .type = memalloc::Type::kReserved,
-          })) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   // Memory Item API for the bootshim to initialize the memory layout.
   // An empty set of memory ranges indicates an error while parsing the devicetree
   // memory ranges.
-  constexpr cpp20::span<const memalloc::Range> memory_ranges() const {
+  constexpr cpp20::span<const memalloc::Range> ranges() const {
     if (ranges_count_ <= ranges_.size()) {
       return cpp20::span{ranges_.data(), ranges_count_};
     }
@@ -413,6 +387,83 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
   cpp20::span<memalloc::Range> ranges_;
   size_t ranges_count_ = 0;
 };
+
+// This routine passes each memory reservation to a provided callback,
+// excluding the ranges that overlap with a select number of "exclusions". The
+// The callback should return `true` if it wishes to proceed with the iteration
+// and `false` if it wishes to short-circuit; in the latter case the routine
+// itself will return `false`. The exclusions should be non-overlapping and in
+// order.
+//
+// While contrary to the devicetree spec - which says that a memory reservation
+// is memory that should not be used by the kernel - we have encountered
+// bootloaders that do generate reservations for the devicetree blob and
+// ramdisk. This routine works around that to ensure that such ranges do not
+// end up accounted for as RESERVED.
+//
+// This logic is separate from any matcher as memory reservations are not
+// encoded within a devicetree blob's tree structure, and the ramdisk - one of
+// the intended exclusions - is the product itself of a 'chosen' matcher.
+template <typename Callback>
+bool ForEachDevicetreeMemoryReservation(const devicetree::Devicetree& fdt,
+                                        cpp20::span<const memalloc::Range> exclusions,
+                                        Callback&& cb) {
+  using Reservation = devicetree::MemoryReservation;
+  static_assert(std::is_invocable_r_v<bool, Callback, Reservation>);
+
+  ZX_ASSERT(std::is_sorted(exclusions.begin(), exclusions.end(), [](auto a, auto b) {
+    return (a.addr < b.addr) || (a.addr == b.addr && a.size < b.size);
+  }));
+  for (size_t i = 0; i + 1 < exclusions.size(); ++i) {
+    ZX_ASSERT_MSG(exclusions[i].end() <= exclusions[i + 1].addr,
+                  "Overlapping memory reservation exclusions: [%#" PRIx64 ", %#" PRIx64
+                  "), [%#" PRIx64 ", %#" PRIx64 ")",                 //
+                  exclusions[i].addr, exclusions[i].end(),           //
+                  exclusions[i + 1].addr, exclusions[i + 1].end());  //
+  }
+
+  auto filter_exclusions = [&](Reservation res) -> bool {
+    for (auto exclusion : exclusions) {
+      //              [ res )
+      // [ exclusion ) ...
+      if (exclusion.end() <= res.start) {
+        continue;
+      }
+      // [ res )
+      //         [ exclusion ) ...
+      if (res.end() <= exclusion.addr) {
+        return cb(res);
+      }
+
+      // [ res )
+      //     [ exclusion ) ...
+      //
+      // or
+      //
+      // [        res        )
+      //     [ exclusion ) ...
+      if (res.start < exclusion.addr) {
+        if (!cb(Reservation{
+                .start = res.start,
+                .size = exclusion.addr - res.start,
+            })) {
+          return false;
+        }
+      }
+      if (res.end() <= exclusion.end()) {  // First case.
+        return true;
+      }
+      res = {.start = exclusion.end(), .size = res.end() - exclusion.end()};
+    }
+    return cb(res);
+  };
+  for (auto res : fdt.memory_reservations()) {
+    if (!filter_exclusions(res)) {
+      return false;
+    }
+  }
+  return true;
+}
 
 // This item parses the '/cpus' 'timebase-frequency property to generate a timer driver
 // configuration ZBI item.

@@ -30,6 +30,7 @@
 
 namespace {
 
+using devicetree::MemoryReservation;
 using devicetree::testing::LoadDtb;
 using devicetree::testing::LoadedDtb;
 
@@ -1216,159 +1217,219 @@ std::optional<LoadedDtb> MemoryItemTest::reserved_memory_ = std::nullopt;
 std::optional<LoadedDtb> MemoryItemTest::memreserve_ = std::nullopt;
 std::optional<LoadedDtb> MemoryItemTest::complex_ = std::nullopt;
 
-TEST_F(MemoryItemTest, ParseMemreserves) {
-  std::vector<memalloc::Range> storage(5);
+TEST_F(MemoryItemTest, ReservationsWithoutExclusions) {
+  std::vector<MemoryReservation> reservations;
 
   auto fdt = memreserve();
-  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+  ASSERT_TRUE(boot_shim::ForEachDevicetreeMemoryReservation(fdt, {},
+                                                            [&reservations](MemoryReservation res) {
+                                                              reservations.push_back(res);
+                                                              return true;
+                                                            }));
 
-  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
-  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  ASSERT_EQ(reservations.size(), 4);
 
-  auto ranges = memory_matcher.memory_ranges();
-  ASSERT_EQ(ranges.size(), 5);
+  // Sort in lexicographic order for stable comparison.
+  std::sort(reservations.begin(), reservations.end(), [](auto a, auto b) {
+    return a.start < b.start || (a.start == b.start && a.size < b.size);
+  });
 
-  // Account for the devicetree in use.
-  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
-  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
-  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+  // [0x12340000, 0x12342000)
+  EXPECT_EQ(reservations[0].start, 0x12340000);
+  EXPECT_EQ(reservations[0].size, 0x2000);
 
-  // Each memreserve in order.
-  EXPECT_EQ(ranges[1].addr, 0x12340000);
-  EXPECT_EQ(ranges[1].size, 0x2000);
-  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+  // [0x56780000, 0x56783000)
+  EXPECT_EQ(reservations[1].start, 0x56780000);
+  EXPECT_EQ(reservations[1].size, 0x3000);
 
-  EXPECT_EQ(ranges[2].addr, 0x56780000);
-  EXPECT_EQ(ranges[2].size, 0x3000);
-  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+  // [0x00ffffff56780000, 0x00ffffffa6780000)
+  EXPECT_EQ(reservations[2].start, 0x00ffffff56780000);
+  EXPECT_EQ(reservations[2].size, 0x500000000);
 
-  EXPECT_EQ(ranges[3].addr, 0x7fffffff12340000);
-  EXPECT_EQ(ranges[3].size, 0x400000000);
-  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+  // [0x7fffffff12340000, 0x8000000312340000)
+  EXPECT_EQ(reservations[3].start, 0x7fffffff12340000);
+  EXPECT_EQ(reservations[3].size, 0x400000000);
+}
 
-  EXPECT_EQ(ranges[4].addr, 0x00ffffff56780000);
-  EXPECT_EQ(ranges[4].size, 0x500000000);
-  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+TEST_F(MemoryItemTest, ReservationsWithNonOverlappingExclusions) {
+  std::vector<MemoryReservation> reservations;
+
+  constexpr std::array kExclusions = {
+      // [0, 0x12340000): Ends right a first reservation.
+      memalloc::Range{.addr = 0, .size = 0x12340000, .type = memalloc::Type::kPoolTestPayload},
+
+      // [0x12342000, 0x56780000): In between the first two reservations.
+      memalloc::Range{
+          .addr = 0x12342000, .size = 0x4443e000, .type = memalloc::Type::kPoolTestPayload},
+  };
+
+  auto fdt = memreserve();
+  ASSERT_TRUE(boot_shim::ForEachDevicetreeMemoryReservation(fdt, {kExclusions},
+                                                            [&reservations](MemoryReservation res) {
+                                                              reservations.push_back(res);
+                                                              return true;
+                                                            }));
+
+  ASSERT_EQ(reservations.size(), 4);
+
+  // Sort in lexicographic order for stable comparison.
+  std::sort(reservations.begin(), reservations.end(), [](auto a, auto b) {
+    return a.start < b.start || (a.start == b.start && a.size < b.size);
+  });
+
+  // [0x12340000, 0x12342000)
+  EXPECT_EQ(reservations[0].start, 0x12340000);
+  EXPECT_EQ(reservations[0].size, 0x2000);
+
+  // [0x56780000, 0x56783000)
+  EXPECT_EQ(reservations[1].start, 0x56780000);
+  EXPECT_EQ(reservations[1].size, 0x3000);
+
+  // [0x00ffffff56780000, 0x00ffffffa6780000)
+  EXPECT_EQ(reservations[2].start, 0x00ffffff56780000);
+  EXPECT_EQ(reservations[2].size, 0x500000000);
+
+  // [0x7fffffff12340000, 0x8000000312340000)
+  EXPECT_EQ(reservations[3].start, 0x7fffffff12340000);
+  EXPECT_EQ(reservations[3].size, 0x400000000);
+}
+
+TEST_F(MemoryItemTest, ReservationsWithOverlappingExclusions) {
+  std::vector<MemoryReservation> reservations;
+
+  constexpr std::array kExclusions = {
+      // [0x1233f000, 0x12341000): Overlaps with the head of the first reservation.
+      memalloc::Range{.addr = 0x1233f000, .size = 0x2000, .type = memalloc::Type::kPoolTestPayload},
+
+      // [0x56781000, 0x56784000): Overlaps with the tail of the second reservation.
+      memalloc::Range{.addr = 0x56781000, .size = 0x3000, .type = memalloc::Type::kPoolTestPayload},
+
+      // [0x00ffffff56790000, 0x00ffffff567a0000): Contained within the third reservation.
+      memalloc::Range{
+          .addr = 0x00ffffff56790000, .size = 0x10000, .type = memalloc::Type::kPoolTestPayload},
+
+      // [0x7fffffff12340000, 0x8000000312340000): Spans the fourth reservation.
+      memalloc::Range{.addr = 0x7fffffff12340000,
+                      .size = 0x400000000,
+                      .type = memalloc::Type::kPoolTestPayload},
+  };
+
+  auto fdt = memreserve();
+  ASSERT_TRUE(boot_shim::ForEachDevicetreeMemoryReservation(fdt, {kExclusions},
+                                                            [&reservations](MemoryReservation res) {
+                                                              reservations.push_back(res);
+                                                              return true;
+                                                            }));
+
+  ASSERT_EQ(reservations.size(), 4);
+
+  // Sort in lexicographic order for stable comparison.
+  std::sort(reservations.begin(), reservations.end(), [](auto a, auto b) {
+    return a.start < b.start || (a.start == b.start && a.size < b.size);
+  });
+
+  // [0x12341000, 0x12342000) ( originally from [0x12340000, 0x12342000) )
+  EXPECT_EQ(reservations[0].start, 0x12341000);
+  EXPECT_EQ(reservations[0].size, 0x1000);
+
+  // [0x56780000, 0x56781000) ( originally from [0x56780000, 0x56783000) )
+  EXPECT_EQ(reservations[1].start, 0x56780000);
+  EXPECT_EQ(reservations[1].size, 0x1000);
+
+  // [0x00ffffff56780000, 0x00ffffff56790000) ( originally from
+  // [0x00ffffff56780000, 0x00ffffffa6780000) )
+  EXPECT_EQ(reservations[2].start, 0x00ffffff56780000);
+  EXPECT_EQ(reservations[2].size, 0x10000);
+
+  // [0x00ffffff567a0000, 0x00ffffffa6780000) ( originally from
+  // [0x00ffffff56780000, 0x00ffffffa6780000) )
+  EXPECT_EQ(reservations[3].start, 0x00ffffff567a0000);
+  EXPECT_EQ(reservations[3].size, 0x4fffe0000);
 }
 
 TEST_F(MemoryItemTest, ParseMemoryNodes) {
-  std::vector<memalloc::Range> storage(5);
+  std::vector<memalloc::Range> storage(4);
 
   auto fdt = memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
   ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
-  auto ranges = memory_matcher.memory_ranges();
-  ASSERT_EQ(ranges.size(), 5);
-
-  // Account for the devicetree in use.
-  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
-  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
-  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 4);
 
   // Each memory nodes in order.
-  EXPECT_EQ(ranges[1].addr, 0x40000000);
-  EXPECT_EQ(ranges[1].size, 0x10000000);
+  EXPECT_EQ(ranges[0].addr, 0x40000000);
+  EXPECT_EQ(ranges[0].size, 0x10000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[1].addr, 0x50000000);
+  EXPECT_EQ(ranges[1].size, 0x20000000);
   EXPECT_EQ(ranges[1].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[2].addr, 0x50000000);
-  EXPECT_EQ(ranges[2].size, 0x20000000);
+  EXPECT_EQ(ranges[2].addr, 0x60000000);
+  EXPECT_EQ(ranges[2].size, 0x30000000);
   EXPECT_EQ(ranges[2].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[3].addr, 0x60000000);
-  EXPECT_EQ(ranges[3].size, 0x30000000);
+  EXPECT_EQ(ranges[3].addr, 0x70000000);
+  EXPECT_EQ(ranges[3].size, 0x40000000);
   EXPECT_EQ(ranges[3].type, memalloc::Type::kFreeRam);
-
-  EXPECT_EQ(ranges[4].addr, 0x70000000);
-  EXPECT_EQ(ranges[4].size, 0x40000000);
-  EXPECT_EQ(ranges[4].type, memalloc::Type::kFreeRam);
 }
 
 TEST_F(MemoryItemTest, ParseReservedMemoryNodes) {
-  std::vector<memalloc::Range> storage(3);
+  std::vector<memalloc::Range> storage(2);
 
   auto fdt = reserved_memory();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
   ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
-  auto ranges = memory_matcher.memory_ranges();
-  ASSERT_EQ(ranges.size(), 3);
-
-  // Account for the devicetree in use.
-  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
-  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
-  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 2);
 
   // Each reserved memory nodes in order.
-  EXPECT_EQ(ranges[1].addr, 0x78000000);
-  EXPECT_EQ(ranges[1].size, 0x800000);
-  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
+  EXPECT_EQ(ranges[0].addr, 0x78000000);
+  EXPECT_EQ(ranges[0].size, 0x800000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kReserved);
 
-  EXPECT_EQ(ranges[2].addr, 0x76000000);
-  EXPECT_EQ(ranges[2].size, 0x400000);
-  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+  EXPECT_EQ(ranges[1].addr, 0x76000000);
+  EXPECT_EQ(ranges[1].size, 0x400000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
 }
 
 TEST_F(MemoryItemTest, ParseAll) {
-  std::vector<memalloc::Range> storage(11);
+  std::vector<memalloc::Range> storage(6);
 
   auto fdt = complex();
   boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
 
-  ASSERT_TRUE(memory_matcher.AppendAdditionalRanges(fdt));
   ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
-  auto ranges = memory_matcher.memory_ranges();
-  ASSERT_EQ(ranges.size(), 11);
-
-  // Account for the devicetree in use.
-  EXPECT_EQ(ranges[0].addr, reinterpret_cast<uintptr_t>(fdt.fdt().data()));
-  EXPECT_EQ(ranges[0].size, fdt.size_bytes());
-  EXPECT_EQ(ranges[0].type, memalloc::Type::kDevicetreeBlob);
-
-  // Each memreserve in order.
-  EXPECT_EQ(ranges[1].addr, 0x12340000);
-  EXPECT_EQ(ranges[1].size, 0x2000);
-  EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
-
-  EXPECT_EQ(ranges[2].addr, 0x56780000);
-  EXPECT_EQ(ranges[2].size, 0x3000);
-  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
-
-  EXPECT_EQ(ranges[3].addr, 0x7fffffff12340000);
-  EXPECT_EQ(ranges[3].size, 0x400000000);
-  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
-
-  EXPECT_EQ(ranges[4].addr, 0x00ffffff56780000);
-  EXPECT_EQ(ranges[4].size, 0x500000000);
-  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 6);
 
   // Each memory nodes in order.
-  EXPECT_EQ(ranges[5].addr, 0x40000000);
-  EXPECT_EQ(ranges[5].size, 0x10000000);
-  EXPECT_EQ(ranges[5].type, memalloc::Type::kFreeRam);
+  EXPECT_EQ(ranges[0].addr, 0x40000000);
+  EXPECT_EQ(ranges[0].size, 0x10000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[6].addr, 0x50000000);
-  EXPECT_EQ(ranges[6].size, 0x20000000);
-  EXPECT_EQ(ranges[6].type, memalloc::Type::kFreeRam);
+  EXPECT_EQ(ranges[1].addr, 0x50000000);
+  EXPECT_EQ(ranges[1].size, 0x20000000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[7].addr, 0x60000000);
-  EXPECT_EQ(ranges[7].size, 0x30000000);
-  EXPECT_EQ(ranges[7].type, memalloc::Type::kFreeRam);
+  EXPECT_EQ(ranges[2].addr, 0x60000000);
+  EXPECT_EQ(ranges[2].size, 0x30000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[8].addr, 0x70000000);
-  EXPECT_EQ(ranges[8].size, 0x40000000);
-  EXPECT_EQ(ranges[8].type, memalloc::Type::kFreeRam);
+  EXPECT_EQ(ranges[3].addr, 0x70000000);
+  EXPECT_EQ(ranges[3].size, 0x40000000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kFreeRam);
 
   // Each reserved memory nodes in order.
-  EXPECT_EQ(ranges[9].addr, 0x78000000);
-  EXPECT_EQ(ranges[9].size, 0x800000);
-  EXPECT_EQ(ranges[9].type, memalloc::Type::kReserved);
+  EXPECT_EQ(ranges[4].addr, 0x78000000);
+  EXPECT_EQ(ranges[4].size, 0x800000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
 
-  EXPECT_EQ(ranges[10].addr, 0x76000000);
-  EXPECT_EQ(ranges[10].size, 0x400000);
-  EXPECT_EQ(ranges[10].type, memalloc::Type::kReserved);
+  EXPECT_EQ(ranges[5].addr, 0x76000000);
+  EXPECT_EQ(ranges[5].size, 0x400000);
+  EXPECT_EQ(ranges[5].type, memalloc::Type::kReserved);
 }
 
 class RiscvDevicetreeTimerItemTest : public TestMixin<RiscvDevicetreeTest> {

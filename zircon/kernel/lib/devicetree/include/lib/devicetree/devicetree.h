@@ -532,11 +532,16 @@ class Properties {
   std::string_view string_block_;
 };
 
+struct MemoryReservation {
+  constexpr uint64_t end() const { return start + size; }
+
+  uint64_t start;
+  uint64_t size;
+};
+
 class MemoryReservations {
  public:
-  struct value_type {
-    uint64_t start, size;
-  };
+  using value_type = MemoryReservation;
 
   class iterator {
    public:
