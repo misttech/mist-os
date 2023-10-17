@@ -34,7 +34,8 @@
             },
             {
                 "paths": [
-                    "prebuilt/third_party/sysroot/linux"
+                    "prebuilt/third_party/sysroot/linux",
+                    "prebuilt/third_party/sysroot/ubuntu20.04"
                 ],
                 "notes": [
                     "Skip Linux sysroot directory, see fxbug.dev/59222."
