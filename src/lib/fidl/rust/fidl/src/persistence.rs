@@ -89,27 +89,23 @@ fn default_persistent_encode_context() -> Context {
 /// Encodes a FIDL object to bytes following RFC-0120. This only works on
 /// non-resource structs, tables, and unions. See `unpersist` for the reverse.
 pub fn persist<T: Persistable>(body: &T) -> Result<Vec<u8>> {
-    persist_with_context::<T>(body, default_persistent_encode_context())
-}
-
-// TODO(fxbug.dev/79584): Kept only for overnet, remove when possible.
-#[doc(hidden)]
-pub fn persist_with_context<T: ValueTypeMarker>(
-    body: T::Borrowed<'_>,
-    context: Context,
-) -> Result<Vec<u8>> {
-    let header = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
-    let msg = GenericMessage { header, body };
-    let mut combined_bytes = Vec::<u8>::new();
-    let mut handles = Vec::<HandleDisposition<'static>>::new();
-    Encoder::encode_with_context::<GenericMessageType<WireMetadata, T>>(
-        context,
-        &mut combined_bytes,
-        &mut handles,
-        msg,
-    )?;
-    debug_assert!(handles.is_empty(), "value type contains handles");
-    Ok(combined_bytes)
+    // This helper is needed to convince rustc that &T implements Encode<T>.
+    fn helper<T: ValueTypeMarker>(body: T::Borrowed<'_>) -> Result<Vec<u8>> {
+        let context = default_persistent_encode_context();
+        let header = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
+        let msg = GenericMessage { header, body };
+        let mut bytes = Vec::<u8>::new();
+        let mut handles = Vec::<HandleDisposition<'static>>::new();
+        Encoder::encode_with_context::<GenericMessageType<WireMetadata, T>>(
+            context,
+            &mut bytes,
+            &mut handles,
+            msg,
+        )?;
+        debug_assert!(handles.is_empty(), "value type contains handles");
+        Ok(bytes)
+    }
+    helper::<T>(body)
 }
 
 /// Decodes a FIDL object from bytes following RFC-0120. Must be a non-resource
