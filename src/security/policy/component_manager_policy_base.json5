@@ -232,6 +232,9 @@
                 source_name: "fuchsia.pkg.PackageResolver-ota",
                 capability: "protocol",
                 target_monikers: [
+                    // TODO(fxbug.dev/303275551): Update target "/core/pkg-resolver" when use-from-expose
+                    // policy check is fixed.
+                    "/core/pkg-resolver",
                     "/core/system-update/system-updater",
                 ],
             },
