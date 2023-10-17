@@ -7,8 +7,6 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
-#include <limits>
-
 namespace display {
 
 namespace {
@@ -70,8 +68,8 @@ constexpr void DebugAssertDisplayTimingIsValid(const DisplayTiming& timing_param
   ZX_DEBUG_ASSERT(timing_params.horizontal_sync_width_px >= 0);
   ZX_DEBUG_ASSERT(timing_params.horizontal_sync_width_px <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(timing_params.horizontal_blank_px >= 0);
-  ZX_DEBUG_ASSERT(timing_params.horizontal_blank_px <= kMaxTimingValue);
+  ZX_DEBUG_ASSERT(timing_params.horizontal_back_porch_px >= 0);
+  ZX_DEBUG_ASSERT(timing_params.horizontal_back_porch_px <= kMaxTimingValue);
 
   ZX_DEBUG_ASSERT(timing_params.vertical_active_lines >= 0);
   ZX_DEBUG_ASSERT(timing_params.vertical_active_lines <= kMaxTimingValue);
@@ -82,8 +80,8 @@ constexpr void DebugAssertDisplayTimingIsValid(const DisplayTiming& timing_param
   ZX_DEBUG_ASSERT(timing_params.vertical_sync_width_lines >= 0);
   ZX_DEBUG_ASSERT(timing_params.vertical_sync_width_lines <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(timing_params.vertical_blank_lines >= 0);
-  ZX_DEBUG_ASSERT(timing_params.vertical_blank_lines <= kMaxTimingValue);
+  ZX_DEBUG_ASSERT(timing_params.vertical_back_porch_lines >= 0);
+  ZX_DEBUG_ASSERT(timing_params.vertical_back_porch_lines <= kMaxTimingValue);
 
   ZX_DEBUG_ASSERT(timing_params.pixel_clock_frequency_khz >= 0);
   ZX_DEBUG_ASSERT(timing_params.pixel_clock_frequency_khz <= kMaxPixelClockKhz);
@@ -112,8 +110,13 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
   ZX_DEBUG_ASSERT(display_mode.h_sync_pulse >= 0);
   ZX_DEBUG_ASSERT(display_mode.h_sync_pulse <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(display_mode.h_blanking >= 0);
-  ZX_DEBUG_ASSERT(display_mode.h_blanking <= kMaxTimingValue);
+  // `h_front_porch` and `h_sync_pulse` are both within [0..kMaxTimingValue],
+  // so adding these two values won't cause an unsigned overflow.
+  ZX_DEBUG_ASSERT(display_mode.h_blanking >=
+                  display_mode.h_front_porch + display_mode.h_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.h_blanking -
+                      (display_mode.h_front_porch + display_mode.h_sync_pulse) <=
+                  kMaxTimingValue);
 
   ZX_DEBUG_ASSERT(display_mode.v_addressable >= 0);
   ZX_DEBUG_ASSERT(display_mode.v_addressable <= kMaxTimingValue);
@@ -124,8 +127,13 @@ constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_
   ZX_DEBUG_ASSERT(display_mode.v_sync_pulse >= 0);
   ZX_DEBUG_ASSERT(display_mode.v_sync_pulse <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(display_mode.v_blanking >= 0);
-  ZX_DEBUG_ASSERT(display_mode.v_blanking <= kMaxTimingValue);
+  // `v_front_porch` and `v_sync_pulse` are both within [0..kMaxTimingValue],
+  // so adding these two values won't cause an unsigned overflow.
+  ZX_DEBUG_ASSERT(display_mode.v_blanking >=
+                  display_mode.v_front_porch + display_mode.v_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.v_blanking -
+                      (display_mode.v_front_porch + display_mode.v_sync_pulse) <=
+                  kMaxTimingValue);
 
   constexpr uint32_t kFlagMask = MODE_FLAG_VSYNC_POSITIVE | MODE_FLAG_HSYNC_POSITIVE |
                                  MODE_FLAG_INTERLACED | MODE_FLAG_ALTERNATING_VBLANK |
@@ -157,8 +165,13 @@ constexpr void DebugAssertHdmiFidlDisplayModeIsValid(
   ZX_DEBUG_ASSERT(display_mode.h_sync_pulse >= 0);
   ZX_DEBUG_ASSERT(display_mode.h_sync_pulse <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(display_mode.h_blanking >= 0);
-  ZX_DEBUG_ASSERT(display_mode.h_blanking <= kMaxTimingValue);
+  // `h_front_porch` and `h_sync_pulse` are both within [0..kMaxTimingValue],
+  // so adding these two values won't cause an unsigned overflow.
+  ZX_DEBUG_ASSERT(display_mode.h_blanking >=
+                  display_mode.h_front_porch + display_mode.h_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.h_blanking -
+                      (display_mode.h_front_porch + display_mode.h_sync_pulse) <=
+                  kMaxTimingValue);
 
   ZX_DEBUG_ASSERT(display_mode.v_addressable >= 0);
   ZX_DEBUG_ASSERT(display_mode.v_addressable <= kMaxTimingValue);
@@ -169,8 +182,13 @@ constexpr void DebugAssertHdmiFidlDisplayModeIsValid(
   ZX_DEBUG_ASSERT(display_mode.v_sync_pulse >= 0);
   ZX_DEBUG_ASSERT(display_mode.v_sync_pulse <= kMaxTimingValue);
 
-  ZX_DEBUG_ASSERT(display_mode.v_blanking >= 0);
-  ZX_DEBUG_ASSERT(display_mode.v_blanking <= kMaxTimingValue);
+  // `v_front_porch` and `v_sync_pulse` are both within [0..kMaxTimingValue],
+  // so adding these two values won't cause an unsigned overflow.
+  ZX_DEBUG_ASSERT(display_mode.v_blanking >=
+                  display_mode.v_front_porch + display_mode.v_sync_pulse);
+  ZX_DEBUG_ASSERT(display_mode.v_blanking -
+                      (display_mode.v_front_porch + display_mode.v_sync_pulse) <=
+                  kMaxTimingValue);
 
   fuchsia_hardware_hdmi::wire::ModeFlag mode_flag(display_mode.flags);
   ZX_DEBUG_ASSERT_MSG(!mode_flag.has_unknown_bits(), "flags 0x%x has unknown bits: 0x%x",
@@ -181,15 +199,32 @@ constexpr void DebugAssertHdmiFidlDisplayModeIsValid(
 
 DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
   DebugAssertBanjoDisplayModeIsValid(banjo_display_mode);
+
+  // A valid display_mode_t guarantees that both h_front_porch and h_sync_pulse
+  // are no more than kMaxTimingValue, so (h_front_porch + h_addressable) won't
+  // overflow.
+  //
+  // It also guarantees that h_blanking >= h_front_porch + h_sync_pulse, and
+  // h_blanking - (h_front_porch + h_sync_pulse) won't overflow and will fit
+  // in [0, kMaxTimingValue] -- so we can use int32_t.
+  int32_t horizontal_back_porch_px =
+      static_cast<int32_t>(banjo_display_mode.h_blanking -
+                           (banjo_display_mode.h_front_porch + banjo_display_mode.h_sync_pulse));
+
+  // Ditto for the vertical back porch.
+  int32_t vertical_back_porch_lines =
+      static_cast<int32_t>(banjo_display_mode.v_blanking -
+                           (banjo_display_mode.v_front_porch + banjo_display_mode.v_sync_pulse));
+
   return DisplayTiming{
       .horizontal_active_px = static_cast<int32_t>(banjo_display_mode.h_addressable),
       .horizontal_front_porch_px = static_cast<int32_t>(banjo_display_mode.h_front_porch),
       .horizontal_sync_width_px = static_cast<int32_t>(banjo_display_mode.h_sync_pulse),
-      .horizontal_blank_px = static_cast<int32_t>(banjo_display_mode.h_blanking),
+      .horizontal_back_porch_px = horizontal_back_porch_px,
       .vertical_active_lines = static_cast<int32_t>(banjo_display_mode.v_addressable),
       .vertical_front_porch_lines = static_cast<int32_t>(banjo_display_mode.v_front_porch),
       .vertical_sync_width_lines = static_cast<int32_t>(banjo_display_mode.v_sync_pulse),
-      .vertical_blank_lines = static_cast<int32_t>(banjo_display_mode.v_blanking),
+      .vertical_back_porch_lines = vertical_back_porch_lines,
       .pixel_clock_frequency_khz = static_cast<int32_t>(banjo_display_mode.pixel_clock_khz),
       .fields_per_frame = (banjo_display_mode.flags & MODE_FLAG_INTERLACED)
                               ? FieldsPerFrame::kInterlaced
@@ -208,16 +243,33 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
 DisplayTiming ToDisplayTiming(
     const fuchsia_hardware_hdmi::wire::StandardDisplayMode& fidl_display_mode) {
   DebugAssertHdmiFidlDisplayModeIsValid(fidl_display_mode);
+
+  // A valid StandardDisplayMode guarantees that both h_front_porch and
+  // h_sync_pulse are no more than kMaxTimingValue, so
+  // (h_front_porch + h_sync_pulse) won't overflow.
+  //
+  // It also guarantees that h_blanking >= h_front_porch + h_sync_pulse, and
+  // h_blanking - (h_front_porch + h_sync_pulse) won't overflow and will fit
+  // in [0, kMaxTimingValue] -- so we can use int32_t.
+  int32_t horizontal_back_porch_px =
+      static_cast<int32_t>(fidl_display_mode.h_blanking -
+                           (fidl_display_mode.h_front_porch + fidl_display_mode.h_sync_pulse));
+
+  // Ditto for the vertical back porch.
+  int32_t vertical_back_porch_lines =
+      static_cast<int32_t>(fidl_display_mode.v_blanking -
+                           (fidl_display_mode.v_front_porch + fidl_display_mode.v_sync_pulse));
+
   fuchsia_hardware_hdmi::wire::ModeFlag fidl_flags(fidl_display_mode.flags);
   return DisplayTiming{
       .horizontal_active_px = static_cast<int32_t>(fidl_display_mode.h_addressable),
       .horizontal_front_porch_px = static_cast<int32_t>(fidl_display_mode.h_front_porch),
       .horizontal_sync_width_px = static_cast<int32_t>(fidl_display_mode.h_sync_pulse),
-      .horizontal_blank_px = static_cast<int32_t>(fidl_display_mode.h_blanking),
+      .horizontal_back_porch_px = horizontal_back_porch_px,
       .vertical_active_lines = static_cast<int32_t>(fidl_display_mode.v_addressable),
       .vertical_front_porch_lines = static_cast<int32_t>(fidl_display_mode.v_front_porch),
       .vertical_sync_width_lines = static_cast<int32_t>(fidl_display_mode.v_sync_pulse),
-      .vertical_blank_lines = static_cast<int32_t>(fidl_display_mode.v_blanking),
+      .vertical_back_porch_lines = vertical_back_porch_lines,
       .pixel_clock_frequency_khz = static_cast<int32_t>(fidl_display_mode.pixel_clock_khz),
       .fields_per_frame = (fidl_flags & fuchsia_hardware_hdmi::wire::ModeFlag::kInterlaced)
                               ? FieldsPerFrame::kInterlaced
@@ -242,11 +294,19 @@ display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params) {
       .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px),
       .h_sync_pulse = static_cast<uint32_t>(display_timing_params.horizontal_sync_width_px),
-      .h_blanking = static_cast<uint32_t>(display_timing_params.horizontal_blank_px),
+      // Hfront, hsync and hback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .h_blanking = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px +
+                                          display_timing_params.horizontal_sync_width_px +
+                                          display_timing_params.horizontal_back_porch_px),
       .v_addressable = static_cast<uint32_t>(display_timing_params.vertical_active_lines),
       .v_front_porch = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines),
       .v_sync_pulse = static_cast<uint32_t>(display_timing_params.vertical_sync_width_lines),
-      .v_blanking = static_cast<uint32_t>(display_timing_params.vertical_blank_lines),
+      // Vfront, vsync and vback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .v_blanking = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines +
+                                          display_timing_params.vertical_sync_width_lines +
+                                          display_timing_params.vertical_back_porch_lines),
       .flags = ToBanjoModeFlag(display_timing_params),
   };
 }
@@ -259,11 +319,19 @@ fuchsia_hardware_hdmi::wire::StandardDisplayMode ToHdmiFidlStandardDisplayMode(
       .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
       .h_front_porch = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px),
       .h_sync_pulse = static_cast<uint32_t>(display_timing_params.horizontal_sync_width_px),
-      .h_blanking = static_cast<uint32_t>(display_timing_params.horizontal_blank_px),
+      // Hfront, hsync and hback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .h_blanking = static_cast<uint32_t>(display_timing_params.horizontal_front_porch_px +
+                                          display_timing_params.horizontal_sync_width_px +
+                                          display_timing_params.horizontal_back_porch_px),
       .v_addressable = static_cast<uint32_t>(display_timing_params.vertical_active_lines),
       .v_front_porch = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines),
       .v_sync_pulse = static_cast<uint32_t>(display_timing_params.vertical_sync_width_lines),
-      .v_blanking = static_cast<uint32_t>(display_timing_params.vertical_blank_lines),
+      // Vfront, vsync and vback are all within [0, kMaxTimingValue], so the
+      // sum is also a valid 32-bit unsigned integer.
+      .v_blanking = static_cast<uint32_t>(display_timing_params.vertical_front_porch_lines +
+                                          display_timing_params.vertical_sync_width_lines +
+                                          display_timing_params.vertical_back_porch_lines),
       .flags = static_cast<uint32_t>(ToHdmiFidlModeFlag(display_timing_params)),
   };
 }

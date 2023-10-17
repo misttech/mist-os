@@ -21,11 +21,11 @@ TEST(DisplayTiming, EqualityReflective) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -41,11 +41,11 @@ TEST(DisplayTiming, EqualitySymmetric) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -57,11 +57,11 @@ TEST(DisplayTiming, EqualitySymmetric) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -78,11 +78,11 @@ TEST(DisplayTiming, EqualityTransitive) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -94,11 +94,11 @@ TEST(DisplayTiming, EqualityTransitive) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -110,11 +110,11 @@ TEST(DisplayTiming, EqualityTransitive) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -132,11 +132,11 @@ TEST(DisplayTiming, NonEquality) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -161,7 +161,7 @@ TEST(DisplayTiming, NonEquality) {
   }
   {
     DisplayTiming kParam = kParam1;
-    kParam.horizontal_blank_px = 0xff'ff;
+    kParam.horizontal_back_porch_px = 0xff'ff;
     EXPECT_NE(kParam, kParam1);
   }
   {
@@ -181,7 +181,7 @@ TEST(DisplayTiming, NonEquality) {
   }
   {
     DisplayTiming kParam = kParam1;
-    kParam.vertical_blank_lines = 0xff'ff;
+    kParam.vertical_back_porch_lines = 0xff'ff;
     EXPECT_NE(kParam, kParam1);
   }
   {
@@ -222,11 +222,11 @@ TEST(DisplayTiming, FromBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -256,11 +256,11 @@ TEST(DisplayTiming, FromBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -287,11 +287,11 @@ TEST(DisplayTiming, FromBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kNegative,
@@ -321,11 +321,11 @@ TEST(DisplayTiming, ToBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -353,11 +353,11 @@ TEST(DisplayTiming, ToBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -374,11 +374,11 @@ TEST(DisplayTiming, ToBanjo) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kNegative,
@@ -397,11 +397,11 @@ TEST(DisplayTiming, BanjoRoundTrip) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -418,11 +418,11 @@ TEST(DisplayTiming, FromHdmiFidl) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -495,11 +495,11 @@ TEST(DisplayTiming, ToHdmiFidl) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -530,11 +530,11 @@ TEST(DisplayTiming, ToHdmiFidl) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kPositive,
@@ -554,11 +554,11 @@ TEST(DisplayTiming, ToHdmiFidl) {
         .horizontal_active_px = 0x0f'0f,
         .horizontal_front_porch_px = 0x0a'0a,
         .horizontal_sync_width_px = 0x01'01,
-        .horizontal_blank_px = 0x0d'0d,
+        .horizontal_back_porch_px = 0x02'02,
         .vertical_active_lines = 0x0b'0b,
         .vertical_front_porch_lines = 0x03'03,
         .vertical_sync_width_lines = 0x04'04,
-        .vertical_blank_lines = 0x0c'0c,
+        .vertical_back_porch_lines = 0x05'05,
         .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
         .fields_per_frame = FieldsPerFrame::kInterlaced,
         .hsync_polarity = SyncPolarity::kNegative,
@@ -580,11 +580,11 @@ TEST(DisplayTiming, HdmiFidlRoundTrip) {
       .horizontal_active_px = 0x0f'0f,
       .horizontal_front_porch_px = 0x0a'0a,
       .horizontal_sync_width_px = 0x01'01,
-      .horizontal_blank_px = 0x0d'0d,
+      .horizontal_back_porch_px = 0x02'02,
       .vertical_active_lines = 0x0b'0b,
       .vertical_front_porch_lines = 0x03'03,
       .vertical_sync_width_lines = 0x04'04,
-      .vertical_blank_lines = 0x0c'0c,
+      .vertical_back_porch_lines = 0x05'05,
       .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
       .fields_per_frame = FieldsPerFrame::kInterlaced,
       .hsync_polarity = SyncPolarity::kPositive,
@@ -593,6 +593,88 @@ TEST(DisplayTiming, HdmiFidlRoundTrip) {
       .pixel_repetition = 0,
   };
   EXPECT_EQ(kDisplayTiming, ToDisplayTiming(ToHdmiFidlStandardDisplayMode(kDisplayTiming)));
+}
+
+TEST(DisplayTiming, AggregateHelpers) {
+  constexpr DisplayTiming kDisplayTiming = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+
+  // 0x0a'0a + 0x01'01 + 0x02'02 = 0x0d'0d
+  EXPECT_EQ(kDisplayTiming.horizontal_blank_px(), 0x0d'0d);
+  // 0x0f'0f + 0x0d'0d = 0x1c'1c
+  EXPECT_EQ(kDisplayTiming.horizontal_total_px(), 0x1c'1c);
+  // 0x03'03 + 0x04'04 + 0x05'05 = 0x0c'0c
+  EXPECT_EQ(kDisplayTiming.vertical_blank_lines(), 0x0c'0c);
+  // 0x0b'0b + 0x0c'0c = 0x17'17
+  EXPECT_EQ(kDisplayTiming.vertical_total_lines(), 0x17'17);
+}
+
+TEST(DisplayTiming, AggregateHelpersInterlaced) {
+  constexpr DisplayTiming kDisplayTimingWithoutAlternatingVblank = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+
+  // 0x0a'0a + 0x01'01 + 0x02'02 = 0x0d'0d
+  EXPECT_EQ(kDisplayTimingWithoutAlternatingVblank.horizontal_blank_px(), 0x0d'0d);
+  // 0x0f'0f + 0x0d'0d = 0x1c'1c
+  EXPECT_EQ(kDisplayTimingWithoutAlternatingVblank.horizontal_total_px(), 0x1c'1c);
+  // 0x03'03 + 0x04'04 + 0x05'05 = 0x0c'0c
+  EXPECT_EQ(kDisplayTimingWithoutAlternatingVblank.vertical_blank_lines(), 0x0c'0c);
+  // 2 * 0x0c'0c + 0x0b'0b = 0x23'23
+  EXPECT_EQ(kDisplayTimingWithoutAlternatingVblank.vertical_total_lines(), 0x23'23);
+
+  constexpr DisplayTiming kDisplayTimingWithAlternatingVblank = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kInterlaced,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kNegative,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+
+  // 0x0a'0a + 0x01'01 + 0x02'02 = 0x0d'0d
+  EXPECT_EQ(kDisplayTimingWithAlternatingVblank.horizontal_blank_px(), 0x0d'0d);
+  // 0x0f'0f + 0x0d'0d = 0x1c'1c
+  EXPECT_EQ(kDisplayTimingWithAlternatingVblank.horizontal_total_px(), 0x1c'1c);
+  // 0x03'03 + 0x04'04 + 0x05'05 = 0x0c'0c
+  EXPECT_EQ(kDisplayTimingWithAlternatingVblank.vertical_blank_lines(), 0x0c'0c);
+  // 0x0c'0c + (0x0c'0c + 1) + 0x0b'0b = 0x23'24
+  EXPECT_EQ(kDisplayTimingWithAlternatingVblank.vertical_total_lines(), 0x23'24);
 }
 
 }  // namespace

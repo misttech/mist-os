@@ -79,8 +79,8 @@ constexpr int32_t kMaxPixelClockKhz = std::numeric_limits<int32_t>::max();
 struct DisplayTiming {
   // Number of pixels on a video line that are visible on the display.
   //
-  // Also known as "HActive", "horizontal addressable time" and "horizontal
-  // resolution".
+  // Also known as "HActive", "HACT" (horizontal active), "horizontal
+  // addressable time" and "horizontal resolution".
   //
   // The DMT, DisplayID and E-EDID standards specify the active area as
   // the sum of the addressable area and two borders. For modern displays, the
@@ -95,7 +95,7 @@ struct DisplayTiming {
   // Number of blanking pixels between active pixels and the beginning of the
   // horizontal sync pulse.
   //
-  // Also known as "Hfront" and "horizontal offset".
+  // Also known as "Hfront", "HFP" and "horizontal offset".
   //
   // For legacy DMT standard formats with non-zero borders, this is the sum of
   // the horizontal right border and the horizontal front porch.
@@ -105,21 +105,22 @@ struct DisplayTiming {
 
   // Number of blanking pixels during the horizontal sync pulse.
   //
-  // Also known as "Hsync" and "horizontal sync time".
+  // Also known as "Hsync", "HSA" (horizontal sync active) and "horizontal sync
+  // time".
   //
   // Must be >= 0 and <= kMaxTimingValue.
   int32_t horizontal_sync_width_px;
 
-  // Number of blanking pixels in a video line.
+  // Number of blanking pixels between the end of the horizontal sync pulse and
+  // the active pixels.
   //
-  // Also known as "Hblank" and "horizontal blank time".
+  // Also known as "Hback" and "HBP".
   //
   // For legacy DMT standard formats with non-zero borders, this is the sum of
-  // the horizontal left border, horizontal right border and the horizontal
-  // blank.
+  // the horizontal back porch and the horizontal left border.
   //
   // Must be >= 0 and <= kMaxTimingValue.
-  int32_t horizontal_blank_px;
+  int32_t horizontal_back_porch_px;
 
   // Number of video lines that are visible on the display.
   //
@@ -146,20 +147,22 @@ struct DisplayTiming {
 
   // Number of blanking lines during the vertical sync pulse.
   //
-  // Also known as "Vsync" and "vertical sync time".
+  // Also known as "Vsync", "VSA" (vertical sync active) and "vertical sync
+  // time".
   //
   // Must be >= 0 and <= kMaxTimingValue.
   int32_t vertical_sync_width_lines;
 
-  // Number of blanking lines on the display.
+  // Number of blanking lines between the end of the vertical sync pulse and
+  // the active lines.
   //
-  // Also known as "Vblank" and "vertical blank time".
+  // Also known as "Vback" and "VBP".
   //
   // For legacy DMT standard formats with non-zero borders, this is the sum of
-  // the vertical top border, vertical bottom border and the vertical blank.
+  // the vertical blank and the vertical top border.
   //
   // Must be >= 0 and <= kMaxTimingValue.
-  int32_t vertical_blank_lines;
+  int32_t vertical_back_porch_lines;
 
   // Frequency of pixels transmitted to the display.
   //
@@ -170,12 +173,13 @@ struct DisplayTiming {
   SyncPolarity hsync_polarity = SyncPolarity::kNegative;
   SyncPolarity vsync_polarity = SyncPolarity::kNegative;
 
-  // If false, the vertical blank size is integral and does not change over
+  // If false, the vertical blank porch is integral and does not change over
   // time.
-  // If true, the vertical blank size has a fractional part of 0.5; for
-  // the generated signal, its vertical blank size must alternate between
-  // `vertical_blank_lines` and `vertical_blank_lines + 1` on consecutive
-  // fields, as described in:
+  // If true, the vertical blank porch has a fractional part of 0.5; for
+  // the generated signal, both its vertical front porch and vertical back
+  // porch must alternate between `vertical_{front,back}_porch_lines` and
+  // `vertical_{front,back}_porch_lines + 1` on consecutive fields, as described
+  // in:
   // - CTA-861 standard, Table 1. "Video Format Timings - Detailed Timing
   //   Information", Note a, page 45.
   // - CTA-861 standard, Figure 3-4. "General Interlaced Video Format Timing",
@@ -203,17 +207,55 @@ struct DisplayTiming {
   //
   // Must be 0 or 1.
   int pixel_repetition = 0;
+
+  // Number of blanking pixels in a video line.
+  //
+  // Also known as "Hblank" and "horizontal blank time".
+  //
+  // For legacy DMT standard formats with non-zero borders, this is the sum of
+  // the horizontal left border, horizontal right border and the horizontal
+  // blank.
+  int horizontal_blank_px() const {
+    return horizontal_front_porch_px + horizontal_sync_width_px + horizontal_back_porch_px;
+  }
+
+  // Number of blanking lines on the display.
+  //
+  // Also known as "Vblank" and "vertical blank time".
+  //
+  // For legacy DMT standard formats with non-zero borders, this is the sum of
+  // the vertical top border, vertical bottom bordea cvr and the vertical blank.
+  int vertical_blank_lines() const {
+    return vertical_front_porch_lines + vertical_sync_width_lines + vertical_back_porch_lines;
+  }
+
+  // Number of all pixels in a video line.
+  //
+  // Also known as "Htotal".
+  int horizontal_total_px() const { return horizontal_active_px + horizontal_blank_px(); }
+
+  // Number of all lines on the display.
+  //
+  // Also known as "Vtotal".
+  int vertical_total_lines() const {
+    // Interlaced display mode has 2 blanks.
+    if (fields_per_frame == FieldsPerFrame::kInterlaced) {
+      int total_vblanks = 2 * vertical_blank_lines() + (vblank_alternates ? 1 : 0);
+      return vertical_active_lines + total_vblanks;
+    }
+    return vertical_active_lines + vertical_blank_lines();
+  }
 };
 
 constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
   return lhs.horizontal_active_px == rhs.horizontal_active_px &&
          lhs.horizontal_front_porch_px == rhs.horizontal_front_porch_px &&
          lhs.horizontal_sync_width_px == rhs.horizontal_sync_width_px &&
-         lhs.horizontal_blank_px == rhs.horizontal_blank_px &&
+         lhs.horizontal_back_porch_px == rhs.horizontal_back_porch_px &&
          lhs.vertical_active_lines == rhs.vertical_active_lines &&
          lhs.vertical_front_porch_lines == rhs.vertical_front_porch_lines &&
          lhs.vertical_sync_width_lines == rhs.vertical_sync_width_lines &&
-         lhs.vertical_blank_lines == rhs.vertical_blank_lines &&
+         lhs.vertical_back_porch_lines == rhs.vertical_back_porch_lines &&
          lhs.pixel_clock_frequency_khz == rhs.pixel_clock_frequency_khz &&
          lhs.fields_per_frame == rhs.fields_per_frame && lhs.hsync_polarity == rhs.hsync_polarity &&
          lhs.vsync_polarity == rhs.vsync_polarity &&
