@@ -16,11 +16,18 @@ pub struct PlatformSessionManagerConfig {
     /// boots up.
     #[serde(default = "autolaunch_default")]
     pub autolaunch: bool,
+
+    #[serde(default)]
+    pub include_element_manager: bool,
 }
 
 impl Default for PlatformSessionManagerConfig {
     fn default() -> Self {
-        Self { enabled: Default::default(), autolaunch: autolaunch_default() }
+        Self {
+            enabled: Default::default(),
+            autolaunch: autolaunch_default(),
+            include_element_manager: Default::default(),
+        }
     }
 }
 

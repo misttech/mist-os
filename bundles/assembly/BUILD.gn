@@ -2389,6 +2389,14 @@ assembly_input_bundle("session_manager") {
   ]
 }
 
+# Element manager support
+#
+# feature_set_levels: minimal
+# build-types: all
+assembly_input_bundle("element_manager") {
+  cache_packages = [ "//src/session/bin/element_manager" ]
+}
+
 # UI support
 #
 # feature_set_levels: minimal

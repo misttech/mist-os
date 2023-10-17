@@ -149,6 +149,7 @@ user_platform_aib_names =
       "sensors_framework",
 
       # Session
+      "element_manager",
       "session_manager",
 
       # SetUI

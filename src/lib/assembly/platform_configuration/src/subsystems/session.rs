@@ -43,6 +43,14 @@ impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for 
             );
         }
 
+        if session_manager_config.include_element_manager {
+            ensure!(
+                *context.feature_set_level == FeatureSupportLevel::Minimal,
+                "The platform element manager is only supported in the default feature set level"
+            );
+            builder.platform_bundle("element_manager");
+        }
+
         Ok(())
     }
 }
