@@ -64,6 +64,15 @@ def get_supported_versions(version_history_path: Path) -> Dict[str, Any]:
         elif status == "supported":
             supported_fuchsia_api_levels.append(int(api_level))
 
+    # Sometimes, there actually *isn't* an "in development" API level, and GN
+    # doesn't support null values. As a hack, if there's no in-development API
+    # level, just say that the greatest supported level is "in-development",
+    # even though it isn't.
+    #
+    # TODO(b/305961460): Remove this special case.
+    if not in_development_api_level:
+        in_development_api_level = max(supported_fuchsia_api_levels)
+
     result = {
         "in_development_api_level": in_development_api_level,
         "supported_fuchsia_api_levels": supported_fuchsia_api_levels,

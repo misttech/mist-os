@@ -19,7 +19,7 @@ def freeze_in_development_api_level(version_history_path):
             version_history = json.load(f)
         new_version_history = freeze_version_history(version_history)
         with open(version_history_path, "w") as f:
-            json.dump(new_version_history, f)
+            json.dump(new_version_history, f, indent=4)
 
     except FileNotFoundError as e:
         raise Exception("Did you run this from the source tree root?") from e
