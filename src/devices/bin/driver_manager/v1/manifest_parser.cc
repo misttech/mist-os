@@ -13,7 +13,6 @@
 
 namespace {
 
-const std::string kFuchsiaPkgPrefix = "fuchsia-pkg://";
 const std::string kFuchsiaBootPrefix = "fuchsia-boot://";
 const std::string kRelativeUrlPrefix = "#";
 
