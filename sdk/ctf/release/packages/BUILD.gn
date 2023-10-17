@@ -5,11 +5,6 @@
 import("//sdk/ctf/build/internal/ctf.gni")
 import("//sdk/ctf/build/internal/platform_version.gni")
 
-generate_ctf_packages("packages_canary") {
-  api_level = "canary"
-  manifest = "//prebuilt/cts/canary/$host_platform/cts/package_archives.json"
-}
-
 generate_ctf_packages("packages_milestone") {
   api_level = max_supported_api_level
   manifest = "//prebuilt/cts/current_milestone/$host_platform/cts/package_archives.json"
@@ -24,8 +19,5 @@ generate_ctf_packages("packages_milestone") {
 #   fx gn ls out/default //sdk/ctf/release/packages:* | grep -E "(11)$"
 group("packages") {
   testonly = true
-  deps = [
-    ":packages_canary",
-    ":packages_milestone",
-  ]
+  deps = [ ":packages_milestone" ]
 }

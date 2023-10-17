@@ -11,15 +11,7 @@ compatibility_test_suite("ctf_milestone") {
   path = "//prebuilt/cts/current_milestone/$host_platform/cts"
 }
 
-compatibility_test_suite("ctf_canary") {
-  api_level = "canary"
-  path = "//prebuilt/cts/canary/$host_platform/cts"
-}
-
 group("tests") {
   testonly = true
-  deps = [
-    ":ctf_canary",
-    ":ctf_milestone",
-  ]
+  deps = [ ":ctf_milestone" ]
 }
