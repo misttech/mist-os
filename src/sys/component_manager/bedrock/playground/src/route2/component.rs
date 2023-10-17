@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Result};
 use cm_types::Availability;
-use fidl_fuchsia_io as fio;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
@@ -426,8 +425,8 @@ mod test {
         // Using the input dict of child_b, check we can obtain "cap".
         let router = input.as_router();
         let request = Request {
-            flags: fio::OpenFlags::empty(),
-            relative_path: sandbox::Path::new("cap".to_string()),
+            rights: None,
+            relative_path: sandbox::Path::new("cap"),
             target_moniker: Moniker::new(vec![
                 "root".try_into().unwrap(),
                 "child_b".try_into().unwrap(),

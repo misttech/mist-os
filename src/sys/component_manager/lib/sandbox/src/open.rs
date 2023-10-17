@@ -7,8 +7,7 @@ use {
         Router,
     },
     core::fmt,
-    fidl::endpoints::create_endpoints,
-    fidl::endpoints::ServerEnd,
+    fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
     fidl::epitaph::ChannelEpitaphExt,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     fuchsia_zircon::HandleBased,
@@ -16,7 +15,7 @@ use {
     futures::FutureExt,
     futures::TryStreamExt,
     std::sync::Arc,
-    vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
+    vfs::{execution_scope::ExecutionScope, path::Path},
 };
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
@@ -54,7 +53,7 @@ use {
 #[derive(Capability, Clone)]
 #[capability(as_trait(AsRouter))]
 pub struct Open {
-    open: Arc<OpenFn>,
+    open_fn: Arc<OpenFn>,
     entry_type: fio::DirentType,
 }
 
@@ -85,13 +84,51 @@ impl Open {
     where
         F: Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync + 'static,
     {
-        Open { open: Arc::new(open), entry_type }
+        Open { open_fn: Arc::new(open), entry_type }
     }
 
     /// Converts the [Open] capability into a [Directory] capability such that it will be
     /// opened with `open_flags` during [Capability::to_zx_handle].
     pub fn into_directory(self, open_flags: fio::OpenFlags) -> Directory {
-        Directory::from_open(self, open_flags)
+        Directory::from_open(self, open_flags, crate::router::Path::default())
+    }
+
+    /// Validates that `path` is a valid `fuchsia.io` path and opens the corresponding entry.
+    pub fn open(
+        &self,
+        scope: ExecutionScope,
+        flags: fio::OpenFlags,
+        path: String,
+        server_end: zx::Channel,
+    ) {
+        match Path::validate_and_split(path) {
+            Ok(path) => (self.open_fn)(scope.clone(), flags, path, server_end.into()),
+            Err(status) => {
+                let _ = server_end.close_with_epitaph(status);
+            }
+        }
+    }
+
+    /// Returns a capability which will open with rights downscoped to
+    /// `rights` if specified, and open paths relative to
+    /// `request.relative_path` if non-empty, from the base [`Open`] object.
+    pub fn downscoped(
+        self,
+        rights: Option<fio::OpenFlags>,
+        path: crate::router::Path,
+    ) -> Directory {
+        // Downscoping to just a subdir without also downscoping rights is not something
+        // that is directly supported in `fuchsia.io` v1, because there is no way to open
+        // and inherit the parent rights. This flag combination is the closest thing.
+        //
+        // TODO(fxbug.dev/293947862): when we migrate to v2 of `fuchsia.io`, the custom
+        // flags here can be replaced by opening and inheriting the parent rights.
+        let rights = rights.unwrap_or(
+            fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::POSIX_WRITABLE
+                | fio::OpenFlags::POSIX_EXECUTABLE,
+        );
+        Directory::from_open(self, rights, path)
     }
 
     /// Turn the [Open] into a remote VFS node.
@@ -101,12 +138,12 @@ impl Open {
     /// * `into_remote` returns a [vfs::remote::Remote] that supports
     ///   [DirectoryEntry::open].
     /// * [Capability::to_zx_handle] returns a client endpoint and calls
-    ///   [DirectoryEntry::open] with the server endpoint when the client is used.
+    ///   [DirectoryEntry::open] with the server endpoint given open requests.
     ///
     /// `into_remote` avoids a round trip through FIDL and channels, and is used as an
     /// internal performance optimization by `Dict` when building a directory tree.
     pub(crate) fn into_remote(self) -> Arc<vfs::remote::Remote> {
-        let open = self.open;
+        let open = self.open_fn;
         vfs::remote::remote_boxed_with_type(
             Box::new(
                 move |scope: ExecutionScope,
@@ -117,6 +154,27 @@ impl Open {
                 },
             ),
             self.entry_type,
+        )
+    }
+}
+
+impl From<ClientEnd<fio::DirectoryMarker>> for Open {
+    fn from(value: ClientEnd<fio::DirectoryMarker>) -> Self {
+        // Open is one-way so a synchronous proxy is not going to block.
+        let proxy = fio::DirectorySynchronousProxy::new(value.into_channel());
+        Open::new(
+            move |_scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: Path,
+                  server_end: zx::Channel| {
+                let _ = proxy.open(
+                    flags,
+                    fio::ModeType::empty(),
+                    relative_path.as_ref(),
+                    server_end.into(),
+                );
+            },
+            fio::DirentType::Directory,
         )
     }
 }
@@ -138,7 +196,6 @@ impl Capability for Open {
 
     /// Returns a `fuchsia.io/Openable` client endpoint that can open this capability.
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        let remote = self.into_remote();
         let scope = ExecutionScope::new();
         let (client_end, server_end) = create_endpoints::<fio::OpenableMarker>();
         // If this future is dropped, stop serving the connection.
@@ -151,12 +208,7 @@ impl Capability for Open {
             while let Ok(Some(request)) = request_stream.try_next().await {
                 match request {
                     fio::OpenableRequest::Open { flags, mode: _mode, path, object, .. } => {
-                        match vfs::path::Path::validate_and_split(path) {
-                            Ok(path) => remote.clone().open(scope.clone(), flags, path, object),
-                            Err(status) => {
-                                let _ = object.close_with_epitaph(status);
-                            }
-                        }
+                        self.open(scope.clone(), flags, path, object.into_channel())
                     }
                 }
             }
@@ -168,28 +220,16 @@ impl Capability for Open {
     }
 }
 
-/// [`Open`] can vend out routers. Each request from the router will yield an [`Open`] object
-/// which will open paths relative to `request.relative_path` from the base [`Open`] object.
+/// [`Open`] can vend out routers. Each request from the router will yield a [`Directory`] object
+/// which will with rights downscoped to `request.rights` and open paths relative to
+/// `request.relative_path` from the base [`Open`] object.
 impl AsRouter for Open {
     fn as_router(&self) -> Router {
         let open = self.clone();
         let route_fn = move |request: Request, completer: Completer| {
-            let open = open.clone();
-            let inner_open = Open::new(
-                move |scope: ExecutionScope,
-                      flags: fio::OpenFlags,
-                      relative_path: Path,
-                      server_end: zx::Channel| {
-                    match request.relative_path.joining(relative_path) {
-                        Ok(path) => (open.open)(scope, flags, path, server_end),
-                        Err(status) => {
-                            let _ = server_end.close_with_epitaph(status);
-                        }
-                    }
-                },
-                fio::DirentType::Unknown,
-            );
-            completer.complete(Ok(Box::new(inner_open)));
+            completer.complete(Ok(Box::new(
+                open.clone().downscoped(request.rights, request.relative_path),
+            )));
         };
         Router::new(route_fn)
     }
@@ -203,7 +243,7 @@ mod tests {
         lazy_static::lazy_static,
         test_util::Counter,
         vfs::{
-            directory::{entry::DirectoryEntry, immutable::simple as pfs},
+            directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
             name::Name,
         },
     };
@@ -301,5 +341,88 @@ mod tests {
         drop(client_end);
         fut.unwrap().await;
         assert_eq!(OPEN_COUNT.get(), 0);
+    }
+
+    async fn get_connection_rights(
+        directory: Directory,
+    ) -> anyhow::Result<(fasync::Task<()>, i32, fio::OpenFlags)> {
+        let (client_end, fut) = directory.to_zx_handle();
+        let fut = fasync::Task::spawn(fut.unwrap());
+        let client_end: ClientEnd<fio::DirectoryMarker> = client_end.into();
+        let client = client_end.into_proxy()?;
+        let (status, flags) = client.get_flags().await?;
+        Ok((fut, status, flags))
+    }
+
+    async fn get_entries(directory: Directory) -> anyhow::Result<(fasync::Task<()>, Vec<String>)> {
+        let (client_end, fut) = directory.to_zx_handle();
+        let fut = fasync::Task::spawn(fut.unwrap());
+        let client_end: ClientEnd<fio::DirectoryMarker> = client_end.into();
+        let client = client_end.into_proxy()?;
+        let entries = fuchsia_fs::directory::readdir(&client).await?;
+        Ok((fut, entries.into_iter().map(|entry| entry.name).collect()))
+    }
+
+    #[fuchsia::test]
+    async fn downscope_rights() {
+        // Make an [Open] that corresponds to `/` with read-write rights.
+        let dir = pfs::simple();
+        let scope = ExecutionScope::new();
+        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        dir.clone().open(
+            scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            vfs::path::Path::dot(),
+            dir_server_end.into_channel().into(),
+        );
+        let open = Open::from(dir_client_end);
+
+        // Verify that the connection is read-write.
+        let directory = open
+            .clone()
+            .into_directory(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::POSIX_WRITABLE);
+        let (_, status, flags) = get_connection_rights(directory).await.unwrap();
+        assert_eq!(status, zx::Status::OK.into_raw());
+        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+
+        // Downscope the rights to read-only.
+        let directory = open
+            .clone()
+            .downscoped(Some(fio::OpenFlags::RIGHT_READABLE), crate::router::Path::default());
+
+        // Verify that the connection is read-only.
+        let (_, status, flags) = get_connection_rights(directory).await.unwrap();
+        assert_eq!(status, zx::Status::OK.into_raw());
+        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE);
+    }
+
+    #[fuchsia::test]
+    async fn downscope_path() {
+        // Build a directory tree with `/foo`.
+        let dir = pfs::simple();
+        dir.add_entry_impl("foo".to_owned().try_into().unwrap(), pfs::simple(), false).unwrap();
+
+        // Make an [Open] that corresponds to `/`.
+        let scope = ExecutionScope::new();
+        let (dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
+        dir.clone().open(
+            scope.clone(),
+            fio::OpenFlags::RIGHT_READABLE,
+            vfs::path::Path::dot(),
+            dir_server_end.into_channel().into(),
+        );
+        let open = Open::from(dir_client_end);
+
+        // Verify that the connection has a directory named `foo`.
+        let directory = open.clone().into_directory(fio::OpenFlags::RIGHT_READABLE);
+        let (_, entries) = get_entries(directory).await.unwrap();
+        assert_eq!(entries, vec!["foo".to_owned()]);
+
+        // Downscope the path to `foo`.
+        let directory = open.clone().downscoped(None, crate::router::Path::new("foo"));
+
+        // Verify that the connection does not have anymore children, since `foo` has no children.
+        let (_, entries) = get_entries(directory).await.unwrap();
+        assert_eq!(entries, vec![] as Vec<String>);
     }
 }

@@ -55,6 +55,7 @@
 //! };
 //! Open::new(open_fn)
 //! ```
+//!
 
 pub mod component;
 pub mod program;

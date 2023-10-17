@@ -21,7 +21,6 @@ rustc_test("bin") {
   edition = "2021"
 
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/replace-with",
     "//src/sys/component_manager/lib/sandbox",

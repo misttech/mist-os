@@ -32,8 +32,10 @@ pub type RouteFn = dyn Fn(Request, Completer) -> () + Send + Sync;
 
 /// [`Request`] contains metadata around how to obtain a capability.
 pub struct Request {
-    /// The flags that should be used to open the capability.
-    pub flags: fio::OpenFlags,
+    /// If the capability supports fuchsia.io rights attenuation,
+    /// requests to access an attenuated capability with the specified rights.
+    /// Otherwise, the request should be rejected with an unsupported error.
+    pub rights: Option<fio::OpenFlags>,
 
     /// If the capability supports path-style child object access and attenuation,
     /// requests to access into that path. Otherwise, the request should be rejected
@@ -53,7 +55,7 @@ pub struct Path {
 }
 
 impl Path {
-    pub fn new(path: String) -> Path {
+    pub fn new(path: &str) -> Path {
         Path { segments: path.split("/").map(|s| s.to_owned()).collect() }
     }
 
@@ -69,15 +71,12 @@ impl Path {
         self.segments.push_front(segment);
     }
 
-    pub fn joining(&self, other: vfs::path::Path) -> Result<vfs::path::Path, zx::Status> {
-        let base = self.segments.iter().map(String::as_str).collect::<Vec<&str>>().join("/");
-        let other = other.into_string();
-        let path = if base.is_empty() || other.is_empty() {
-            format!("{}{}", base, other)
+    pub fn fuchsia_io_path(&self) -> String {
+        if self.is_empty() {
+            ".".to_owned()
         } else {
-            format!("{}/{}", base, other)
-        };
-        vfs::path::Path::validate_and_split(path)
+            self.segments.iter().map(String::as_str).collect::<Vec<&str>>().join("/")
+        }
     }
 }
 
