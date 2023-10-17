@@ -4,19 +4,19 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
-use assembly_config_schema::platform_config::session_manager_config::PlatformSessionManagerConfig;
+use assembly_config_schema::platform_config::session_config::PlatformSessionConfig;
 
 pub(crate) struct SessionConfig;
-impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for SessionConfig {
+impl DefineSubsystemConfiguration<(&PlatformSessionConfig, &String)> for SessionConfig {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        session_config: &(&PlatformSessionManagerConfig, &String),
+        config: &(&PlatformSessionConfig, &String),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let session_manager_config = session_config.0;
-        let session_url = session_config.1;
+        let session_config = config.0;
+        let session_url = config.1;
 
-        if session_manager_config.enabled {
+        if session_config.enabled {
             ensure!(
                 *context.feature_set_level == FeatureSupportLevel::Minimal,
                 "The platform session manager is only supported in the default feature set level"
@@ -35,7 +35,7 @@ impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for 
                 .package("session_manager")
                 .component("meta/session_manager.cm")?
                 .field("session_url", session_url.to_owned())?
-                .field("autolaunch", session_manager_config.autolaunch)?;
+                .field("autolaunch", session_config.autolaunch)?;
         } else {
             ensure!(
                 session_url.is_empty(),
@@ -43,7 +43,7 @@ impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for 
             );
         }
 
-        if session_manager_config.include_element_manager {
+        if session_config.include_element_manager {
             ensure!(
                 *context.feature_set_level == FeatureSupportLevel::Minimal,
                 "The platform element manager is only supported in the default feature set level"

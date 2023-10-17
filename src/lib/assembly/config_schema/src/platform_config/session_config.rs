@@ -4,10 +4,10 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Platform configuration options for the session manager.
+/// Platform configuration options for the session.
 #[derive(Debug, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct PlatformSessionManagerConfig {
+pub struct PlatformSessionConfig {
     #[serde(default)]
     pub enabled: bool,
 
@@ -21,7 +21,7 @@ pub struct PlatformSessionManagerConfig {
     pub include_element_manager: bool,
 }
 
-impl Default for PlatformSessionManagerConfig {
+impl Default for PlatformSessionConfig {
     fn default() -> Self {
         Self {
             enabled: Default::default(),

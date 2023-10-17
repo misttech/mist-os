@@ -21,7 +21,7 @@ pub mod kernel_config;
 pub mod media_config;
 pub mod paravirtualization_config;
 pub mod recovery_config;
-pub mod session_manager_config;
+pub mod session_config;
 pub mod setui_config;
 pub mod starnix_config;
 pub mod storage_config;
@@ -107,9 +107,9 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub recovery: recovery_config::RecoveryConfig,
 
-    /// Platform configuration options for the session manager.
+    /// Platform configuration options for the session.
     #[serde(default)]
-    pub session: session_manager_config::PlatformSessionManagerConfig,
+    pub session: session_config::PlatformSessionConfig,
 
     /// Platform configuration options for the SWD subsystem.
     #[serde(default)]
