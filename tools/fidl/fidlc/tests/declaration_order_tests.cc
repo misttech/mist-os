@@ -5,7 +5,6 @@
 #include <zircon/assert.h>
 
 #include <algorithm>
-#include <chrono>
 #include <map>
 #include <random>
 #include <string>
@@ -90,7 +89,7 @@ TEST(DeclarationOrderTest, GoodNoUnusedAnonymousNames) {
 library example;
 
 protocol #Protocol# {
-    Method() -> ();
+    strict Method() -> ();
 };
 
 )FIDL");

@@ -305,15 +305,17 @@ TEST(UnionTests, BadOnlyReservedStrictUnion) {
 
 TEST(UnionTests, GoodErrorSyntaxExplicitOrdinals) {
   TestLibrary library(R"FIDL(library example;
-protocol Example {
-    Method() -> () error int32;
+open protocol Example {
+    flexible Method() -> () error int32;
 };
 )FIDL");
   ASSERT_COMPILED(library);
   const fidl::flat::Union* error_union = library.LookupUnion("Example_Method_Result");
   ASSERT_NOT_NULL(error_union);
-  ASSERT_EQ(error_union->members.front().ordinal->value, 1);
-  ASSERT_EQ(error_union->members.back().ordinal->value, 2);
+  ASSERT_EQ(3, error_union->members.size());
+  ASSERT_EQ(1, error_union->members[0].ordinal->value);
+  ASSERT_EQ(2, error_union->members[1].ordinal->value);
+  ASSERT_EQ(3, error_union->members[2].ordinal->value);
 }
 
 TEST(UnionTests, BadNoSelector) {

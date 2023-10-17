@@ -55,10 +55,8 @@ bool Compiler::Compile() {
     return false;
   if (!VerifyDependenciesStep(this).Run())
     return false;
-  if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kUnknownInteractions)) {
-    if (!VerifyOpenInteractionsStep(this).Run())
-      return false;
-  }
+  if (!VerifyOpenInteractionsStep(this).Run())
+    return false;
 
   if (!all_libraries_->Insert(std::move(library_)))
     return false;

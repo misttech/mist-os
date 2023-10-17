@@ -2016,7 +2016,7 @@ TEST(TypeshapeTests, GoodSimpleResponse) {
   TestLibrary library(R"FIDL(library example;
 
 protocol Test {
-    Method() -> (struct { a int16; b int16; });
+    strict Method() -> (struct { a int16; b int16; });
 };
 )FIDL");
   ASSERT_COMPILED(library);

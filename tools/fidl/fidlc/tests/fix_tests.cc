@@ -202,7 +202,7 @@ TEST(FixTests, BadProtocolModifierFixMissingExperiment) {
 
 void GoodProtocolModifierFix(const std::string& before, const std::string& after) {
   GoodParsedFix<ProtocolModifierFix, Fixable::Kind::kProtocolModifier>(
-      ExperimentalFlags(ExperimentalFlags::Flag::kUnknownInteractions), before, after);
+      ExperimentalFlags(ExperimentalFlags::Flag::kNoop), before, after);
 }
 
 TEST(FixTests, GoodProtocolModifierFixEmptyProtocolAlreadyClosed) {

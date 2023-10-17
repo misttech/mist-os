@@ -7,10 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("test.protocollayoutssamelibrary") {
   testonly = true
   sources = [ "example.test.fidl" ]
-  experimental_flags = [
-    "output_index_json",
-    "unknown_interactions",
-  ]
+  experimental_flags = [ "output_index_json" ]
   enable_hlcpp = true
   golden_fuzzer = true
   disable_rustdoc = true

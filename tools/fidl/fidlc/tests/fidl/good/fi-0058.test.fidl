@@ -12,9 +12,9 @@ type MyResponse = struct {
 type MyError = flexible enum {};
 
 protocol MyProtocol {
-    MyInfallible(MyRequest) -> (MyResponse);
-    MyFallible(MyRequest) -> (MyResponse) error MyError;
-    -> MyEvent(MyResponse);
+    strict MyInfallible(MyRequest) -> (MyResponse);
+    strict MyFallible(MyRequest) -> (MyResponse) error MyError;
+    strict -> MyEvent(MyResponse);
 };
 
 type MyAnonymousReferences = struct {

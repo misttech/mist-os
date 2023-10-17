@@ -3,10 +3,7 @@
   "experiments": [
     "no_optional_structs",
     "output_index_json",
-    "transitional_allow_list",
-    "unknown_interactions",
-    "unknown_interactions_mandate",
-    "unknown_interactions_new_defaults"
+    "transitional_allow_list"
   ],
   "available": {
     "fuchsia": "LEGACY"

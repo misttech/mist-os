@@ -57,9 +57,6 @@ bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::
   // The formatter is run directly by fx format-code, not as part of the build,
   // so we can't rely on having accurate experimental flags. Instead, we just
   // set all the flags which could block parsing if disabled.
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
   auto formatter = fidl::fmt::NewFormatter(100, reporter);

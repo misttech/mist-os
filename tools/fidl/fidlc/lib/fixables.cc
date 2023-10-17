@@ -31,7 +31,7 @@ std::unordered_map<const Fixable::Kind, const Fixable> Fixable::kActiveFixables 
      {Fixable::Kind::kProtocolModifier,
       "protocol_modifier",
       Fixable::Scope::kParsed,
-      {ExperimentalFlags(ExperimentalFlags::Flag::kUnknownInteractions)}}},
+      {ExperimentalFlags(ExperimentalFlags::Flag::kNoop)}}},
 };
 
 const Fixable Fixable::Get(Fixable::Kind kind) { return kActiveFixables.at(kind); }

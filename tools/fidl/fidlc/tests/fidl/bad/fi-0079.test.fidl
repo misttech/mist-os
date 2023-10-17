@@ -4,6 +4,6 @@
 library test.bad.fi0079;
 
 protocol MyProtocol {
-    myMethod() -> ();
-    MyMethod() -> ();
+    strict myMethod() -> ();
+    strict MyMethod() -> ();
 };

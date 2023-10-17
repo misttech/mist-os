@@ -62,10 +62,7 @@ foreach(filename, standalone_libraries) {
       public_deps += [ "//sdk/fidl/fdf" ]
     }
 
-    experimental_flags = [ "unknown_interactions" ]
-    if (filename == "unknown_interactions.test.fidl") {
-      experimental_flags += [ "unknown_interactions_new_defaults" ]
-    }
+    experimental_flags = []
 
     if (filename == "new_type.test.fidl") {
       experimental_flags += [ "allow_new_types" ]

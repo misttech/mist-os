@@ -81,7 +81,7 @@ TEST(GeneratedNameTests, GoodInsideResponse) {
 library fidl.test;
 
 protocol Foo {
-  Bar() -> (@generated_name("Good") struct { x uint32; });
+  strict Bar() -> (@generated_name("Good") struct { x uint32; });
 };
 
 )FIDL");

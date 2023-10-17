@@ -21,8 +21,6 @@ std::string Format(const std::string& source, bool reformat_and_compare = true) 
   // and write.
   auto formatter = fidl::fmt::NewFormatter(40, lib.reporter());
   fidl::ExperimentalFlags experimental_flags;
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   auto result = formatter.Format(lib.source_file(), experimental_flags);
 
   // If we're still going to reformat, then this is the first pass.  Otherwise, we're on the second

@@ -862,7 +862,6 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
 
       // Parse the source with markers removed
       TestLibrary library(clean_source);
-      library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
       std::unique_ptr<fidl::raw::File> ast;
       if (!library.Parse(&ast)) {
         errors.push_back("failed to parse");

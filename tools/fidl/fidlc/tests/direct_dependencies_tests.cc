@@ -223,7 +223,6 @@ protocol CapturesDependencyThroughCompose {
 
 TEST(DirectDependenciesTests, GoodFlexibleResponse) {
   SharedAmongstLibraries shared;
-  shared.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   TestLibrary dep2(&shared, "dep2.fidl", R"FIDL(
 library dep2;
 

@@ -36,9 +36,7 @@
   "experiments": [
     "no_optional_structs",
     "output_index_json",
-    "transitional_allow_list",
-    "unknown_interactions",
-    "unknown_interactions_mandate"
+    "transitional_allow_list"
   ],
   "available": {
     "fuchsia": "LEGACY",

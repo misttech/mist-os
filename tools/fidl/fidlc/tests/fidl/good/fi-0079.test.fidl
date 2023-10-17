@@ -4,6 +4,6 @@
 library test.good.fi0079;
 
 protocol MyProtocol {
-    MyMethod() -> ();
-    MyOtherMethod() -> ();
+    strict MyMethod() -> ();
+    strict MyOtherMethod() -> ();
 };

@@ -4,17 +4,17 @@
 library test.bad.fi0058;
 
 protocol MyProtocol {
-    MyInfallible(struct {
+    strict MyInfallible(struct {
         in uint8;
     }) -> (struct {
         out int8;
     });
-    MyFallible(struct {
+    strict MyFallible(struct {
         in uint8;
     }) -> (struct {
         out int8;
     }) error flexible enum {};
-    -> MyEvent(struct {
+    strict -> MyEvent(struct {
         out int8;
     });
 };

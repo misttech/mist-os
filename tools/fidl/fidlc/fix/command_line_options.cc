@@ -130,8 +130,6 @@ cmdline::Status ProcessCommandLine(fidl::fix::CommandLineOptions& options,
 
   // Process experimental flags.
   fidl::ExperimentalFlags experimental_flags;
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   for (const auto& experiment : options.experiments) {
     if (!experimental_flags.EnableFlagByName(experiment)) {
       error_message << "Unknown --experimental: " << experiment.c_str();

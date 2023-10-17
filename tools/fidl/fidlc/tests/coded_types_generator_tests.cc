@@ -271,7 +271,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesOfProtocolErrorSyntax) {
 protocol SomeProtocol {};
 
 protocol UseOfProtocol {
-    Method() -> (resource struct {
+    strict Method() -> (resource struct {
         client client_end:SomeProtocol;
     }) error uint32;
 };
@@ -337,7 +337,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesGeneratedWrappers) {
   TestLibrary library(R"FIDL(library example;
 
 protocol ErrorSyntaxProtocol {
-    ErrorSyntaxMethod() -> () error uint32;
+    strict ErrorSyntaxMethod() -> () error uint32;
 };
 )FIDL");
   ASSERT_COMPILED(library);
@@ -368,12 +368,12 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesOfProtocolEnds) {
 protocol SomeProtocol {};
 
 protocol UseOfProtocolEnds {
-    ClientEnds(resource struct {
+    strict ClientEnds(resource struct {
         in client_end:SomeProtocol;
     }) -> (resource struct {
         out client_end:<SomeProtocol, optional>;
     });
-    ServerEnds(resource struct {
+    strict ServerEnds(resource struct {
         in server_end:<SomeProtocol, optional>;
     }) -> (resource struct {
         out server_end:SomeProtocol;
@@ -1387,7 +1387,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesStructMessageErrorSyntax) {
   TestLibrary library(R"FIDL(library example;
 
 protocol UseOfProtocol {
-    Method() -> (struct {
+    strict Method() -> (struct {
         arg1 bool;
         arg2 bool;
     }) error uint32;
@@ -1501,7 +1501,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesTableMessageErrorSyntax) {
   TestLibrary library(R"FIDL(library example;
 
 protocol UseOfProtocol {
-    Method() -> (table {
+    strict Method() -> (table {
         1: arg1 bool;
         2: arg2 bool;
     }) error uint32;
@@ -1614,7 +1614,7 @@ TEST(CodedTypesGeneratorTests, GoodCodedTypesUnionMessageErrorSyntax) {
   TestLibrary library(R"FIDL(library example;
 
 protocol UseOfProtocol {
-    Method() -> (strict union {
+    strict Method() -> (strict union {
         1: arg1 bool;
         2: arg2 bool;
     }) error uint32;

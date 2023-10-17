@@ -9,10 +9,6 @@ import("//sdk/ctf/build/ctf.gni")
 ctf_fidl("test.unknown.interactions") {
   testonly = true
   sources = [ "unknown_interactions.test.fidl" ]
-  experimental_flags = [
-    "unknown_interactions",
-    "unknown_interactions_new_defaults",
-  ]
   enable_hlcpp = true
   contains_drivers = true
 }

@@ -31,8 +31,6 @@ template("fidlc") {
 
   experimental_flags = [
     "no_optional_structs",
-    "unknown_interactions",
-    "unknown_interactions_mandate",
     "transitional_allow_list",
   ]
 

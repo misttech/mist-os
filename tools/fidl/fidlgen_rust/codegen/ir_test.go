@@ -65,7 +65,7 @@ func TestDerivesCalculation(t *testing.T) {
 }
 
 func TestExperiments(t *testing.T) {
-	default_experiments := []string{"unknown_interactions", "unknown_interactions_mandate"}
+	default_experiments := []string{}
 
 	cases := []struct {
 		desc        string

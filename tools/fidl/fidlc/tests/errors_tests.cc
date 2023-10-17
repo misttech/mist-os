@@ -14,7 +14,7 @@ TEST(ErrorsTests, GoodError) {
   TestLibrary library(R"FIDL(library example;
 
 protocol Example {
-    Method() -> (struct {
+    strict Method() -> (struct {
         foo string;
     }) error int32;
 };
@@ -68,7 +68,7 @@ TEST(ErrorsTests, GoodErrorEmptyStructAsSuccess) {
 library example;
 
 protocol MyProtocol {
-  MyMethod() -> () error uint32;
+  strict MyMethod() -> () error uint32;
 };
 )FIDL");
   ASSERT_COMPILED(library);
@@ -216,7 +216,6 @@ protocol Example {
 TEST(ErrorsTest, TransitionalAllowList) {
   TestLibrary library;
   library.AddFile("bad/fi-0202.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
   ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrTransitionalNotAllowed);
 }

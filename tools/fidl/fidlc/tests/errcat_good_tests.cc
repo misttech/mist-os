@@ -820,48 +820,36 @@ TEST(ErrcatGoodTests, Good0113) {
 TEST(ErrcatGoodTests, Good0114a) {
   TestLibrary library;
   library.AddFile("good/fi-0114-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0114b) {
   TestLibrary library;
   library.AddFile("good/fi-0114-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0115a) {
   TestLibrary library;
   library.AddFile("good/fi-0115-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0115b) {
   TestLibrary library;
   library.AddFile("good/fi-0115-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0116a) {
   TestLibrary library;
   library.AddFile("good/fi-0116-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0116b) {
   TestLibrary library;
   library.AddFile("good/fi-0116-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
   ASSERT_COMPILED(library);
 }
 
@@ -1359,16 +1347,12 @@ TEST(ErrcatGoodTests, Good0189) {
 TEST(ErrcatGoodTests, Good0191) {
   TestLibrary library;
   library.AddFile("good/fi-0191.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   ASSERT_COMPILED(library);
 }
 
 TEST(ErrcatGoodTests, Good0192) {
   TestLibrary library;
   library.AddFile("good/fi-0192.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsMandate);
   ASSERT_COMPILED(library);
 }
 
@@ -1388,7 +1372,6 @@ TEST(ErrcatTests, Good0201) {
 TEST(ErrcatTests, Good0202) {
   TestLibrary library;
   library.AddFile("good/fi-0202.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
   library.SelectVersion("test", "10");
   ASSERT_COMPILED(library);

@@ -7,10 +7,7 @@ import("//build/fidl/fidl.gni")
 fidl("test.placementofattributes") {
   testonly = true
   sources = [ "example.test.fidl" ]
-  experimental_flags = [
-    "output_index_json",
-    "unknown_interactions",
-  ]
+  experimental_flags = [ "output_index_json" ]
   public_deps = [ ":test.exampleusing" ]
   enable_hlcpp = true
   golden_fuzzer = true
@@ -20,7 +17,6 @@ fidl("test.placementofattributes") {
 fidl("test.exampleusing") {
   testonly = true
   sources = [ "exampleusing.test.fidl" ]
-  experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
   disable_rustdoc = true

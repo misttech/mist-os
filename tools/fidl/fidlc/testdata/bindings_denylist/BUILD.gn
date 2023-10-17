@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("test.dependent") {
   testonly = true
   sources = [ "dependent.test.fidl" ]
-  experimental_flags = [ "unknown_interactions" ]
   enable_hlcpp = true
   golden_fuzzer = true
   disable_rustdoc = true
@@ -17,10 +16,7 @@ fidl("test.bindingsdenylist") {
   testonly = true
   sources = [ "example.test.fidl" ]
   public_deps = [ ":test.dependent" ]
-  experimental_flags = [
-    "output_index_json",
-    "unknown_interactions",
-  ]
+  experimental_flags = [ "output_index_json" ]
   enable_hlcpp = true
   golden_fuzzer = true
   disable_rustdoc = true
