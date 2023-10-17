@@ -17,9 +17,9 @@ source_set("hypervisor") {
   ]
   deps = [
     "//sdk/lib/fit",
-    "//zircon/kernel/dev/interrupt/arm_gic/common",
-    "//zircon/kernel/dev/interrupt/arm_gic/v2",
-    "//zircon/kernel/dev/interrupt/arm_gic/v3",
+    "//zircon/kernel/dev/interrupt/gic/common",
+    "//zircon/kernel/dev/interrupt/gic/v2",
+    "//zircon/kernel/dev/interrupt/gic/v3",
     "//zircon/kernel/dev/psci",
     "//zircon/kernel/dev/timer/arm_generic",
     "//zircon/kernel/hypervisor:headers",

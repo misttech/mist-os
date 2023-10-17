@@ -135,7 +135,7 @@ if (toolchain_environment == "physmem" ||
       "user-copy",
       "//sdk/lib/fit",
       "//zircon/kernel/dev/coresight",
-      "//zircon/kernel/dev/interrupt/arm_gic/common",
+      "//zircon/kernel/dev/interrupt/gic/common",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/dev/psci",
       "//zircon/kernel/lib/arch",
