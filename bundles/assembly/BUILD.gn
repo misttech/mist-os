@@ -424,6 +424,7 @@ assembly_input_bundle("kernel_args_user") {
     "kernel.enable-debugging-syscalls=false",
     "kernel.enable-serial-syscalls=false",
     "netsvc.disable=true",
+    "kernel.serial=none",
   ]
 }
 
