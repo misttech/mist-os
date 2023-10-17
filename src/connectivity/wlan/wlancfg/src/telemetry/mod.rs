@@ -2328,8 +2328,12 @@ impl StatsLogger {
             11..=20 => ActiveScanSsidsRequested::ElevenToTwenty,
             21..=50 => ActiveScanSsidsRequested::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
-            101..=usize::MAX => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
-            _ => unreachable!(),
+            101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
+            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+            _ => {
+                error!("unreachable value for ActiveScanSsidsRequested");
+                return ();
+            }
         };
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
@@ -2353,8 +2357,12 @@ impl StatsLogger {
             11..=20 => ActiveScanSsidsRequested::ElevenToTwenty,
             21..=50 => ActiveScanSsidsRequested::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
-            101..=usize::MAX => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
-            _ => unreachable!(),
+            101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
+            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+            _ => {
+                error!("unreachable value for ActiveScanSsidsRequested");
+                return ();
+            }
         };
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
@@ -2380,8 +2388,12 @@ impl StatsLogger {
             2..=4 => SavedNetworksCount::TwoToFour,
             5..=40 => SavedNetworksCount::FiveToForty,
             41..=500 => SavedNetworksCount::FortyToFiveHundred,
-            501..=usize::MAX => SavedNetworksCount::FiveHundredAndOneOrMore,
-            _ => unreachable!(),
+            501.. => SavedNetworksCount::FiveHundredAndOneOrMore,
+            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+            _ => {
+                error!("unreachable value for SavedNetworksCount");
+                return ();
+            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SAVED_NETWORKS_MIGRATED_METRIC_ID,
@@ -2398,8 +2410,12 @@ impl StatsLogger {
                 2..=4 => ConfigCountDimension::TwoToFour,
                 5..=40 => ConfigCountDimension::FiveToForty,
                 41..=500 => ConfigCountDimension::FortyToFiveHundred,
-                501..=usize::MAX => ConfigCountDimension::FiveHundredAndOneOrMore,
-                _ => unreachable!(),
+                501.. => ConfigCountDimension::FiveHundredAndOneOrMore,
+                // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+                _ => {
+                    error!("unreachable value for ConfigCountDimension");
+                    return ();
+                }
             };
             metric_events.push(MetricEvent {
                 metric_id: metrics::SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
@@ -2442,8 +2458,12 @@ impl StatsLogger {
                 2..=4 => BssCount::TwoToFour,
                 5..=10 => BssCount::FiveToTen,
                 11..=20 => BssCount::ElevenToTwenty,
-                21..=usize::MAX => BssCount::TwentyOneOrMore,
-                _ => unreachable!(),
+                21.. => BssCount::TwentyOneOrMore,
+                // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+                _ => {
+                    error!("unreachable value for BssCount");
+                    return ();
+                }
             };
             metric_events.push(MetricEvent {
                 metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
@@ -2459,8 +2479,12 @@ impl StatsLogger {
             2..=4 => SavedNetworkCount::TwoToFour,
             5..=20 => SavedNetworkCount::FiveToTwenty,
             21..=40 => SavedNetworkCount::TwentyOneToForty,
-            41..=usize::MAX => SavedNetworkCount::FortyOneOrMore,
-            _ => unreachable!(),
+            41.. => SavedNetworkCount::FortyOneOrMore,
+            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+            _ => {
+                error!("unreachable value for SavedNetworkCount");
+                return ();
+            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
@@ -2477,8 +2501,12 @@ impl StatsLogger {
             11..=20 => ActiveScanSsidsObserved::ElevenToTwenty,
             21..=50 => ActiveScanSsidsObserved::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsObserved::FiftyOneToOneHundred,
-            101..=usize::MAX => ActiveScanSsidsObserved::OneHundredAndOneOrMore,
-            _ => unreachable!(),
+            101.. => ActiveScanSsidsObserved::OneHundredAndOneOrMore,
+            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
+            _ => {
+                error!("unreachable value for ActiveScanSsidsObserved");
+                return ();
+            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
