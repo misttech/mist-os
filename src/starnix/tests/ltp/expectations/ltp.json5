@@ -12,8 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // Uses socketcall, which does not exist on x64 or arm.
-                "accept4_01",
                 "add_key01",
                 "add_key03",
                 "adjtimex01",
@@ -23,8 +21,6 @@
                 "aio01",
                 "aio02",
                 "bind02",
-                "bind04",
-                "bind05",
                 "bpf_map01",
                 "bpf_prog01",
                 "bpf_prog03",
@@ -33,10 +29,6 @@
                 "bpf_prog07",
                 "clock_adjtime01",
                 "clock_adjtime02",
-
-                // Failure caused by two skipped assertions:
-                //   `The libc wrapper may dereference req or rem`.
-                "clock_nanosleep01",
                 "clock_settime01",
                 "clock_settime02",
                 "clone05",
@@ -45,7 +37,6 @@
                 "copy_file_range01",
                 "cpuacct_1_1",
                 "cve-2016-10044",
-                "cve-2016-4997",
                 "cve-2016-5195",
                 "cve-2016-7042",
                 "cve-2016-9604",
@@ -112,14 +103,9 @@
                 "futex_wake04",
                 "futimesat01",
                 "getcpu01",
-
-                // These getdents* tests "fail" because of skipped subtests.
-                "getdents01",
-                "getdents02",
                 "getitimer01",
                 "getpriority01",
                 "getpriority02",
-                "getrusage02",
                 "init_module01",
                 "input01",
                 "input02",
@@ -157,7 +143,6 @@
                 "keyctl06",
                 "leapsec01",
                 "lseek11",
-                "madvise01",
                 "madvise02",
                 "madvise08",
                 "membarrier01",
@@ -208,7 +193,6 @@
                 "quotactl04",
                 "quotactl08",
                 "quotactl09",
-                "read02",
                 "readahead01",
                 "readahead02",
                 "readdir21",
@@ -235,10 +219,6 @@
                 "sched_setparam05",
                 "sched_setscheduler02",
                 "sched_stress",
-
-                // Two skipped test cases for select variants that do not exist in 64 bit.
-                "select01",
-                "select02",
                 "send02",
                 "sendfile02",
                 "sendfile02_64",
@@ -271,7 +251,6 @@
                 "ssetmask01",
                 "stat04",
                 "stat04_64",
-                "statx01",
                 "statx04",
                 "statx06",
                 "statx08",
@@ -314,13 +293,16 @@
 
                 // These tests fail when an init is run in the container to set up /apex.
                 // TODO(https://fxbug.dev/129839) re-enable these tests
-                "ioctl_loop06",
                 "mmapstress04",
             ],
         },
         {
             type: "skip",
             matchers: [
+                // sys_eventfd() is supported only on x86, so the test is skipped on arm64.
+                // TODO(b/290879459): Remove once we stop using hardcoded skipped test list.
+                "eventfd01",
+
                 // Flaky test.
                 "cve-2017-17052",
                 "io_pgetevents01",
