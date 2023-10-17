@@ -2,7 +2,8 @@
 
 <span class="compare-better">Recommended</span>: Use [FIDL] types and protocols
 to define interfaces between any two things that may update separately. Leverage
-the [FIDL rubric][fidl-rubric] where applicable.
+the [Fuchsia API evolution guidelines][fidl-evolution] and
+[FIDL rubric][fidl-rubric] where applicable.
 
 - FIDL has [versioning annotations][fidl-versioning].
 - FIDL offers [API and ABI compatibility guarantees][fidl-compatibility].
@@ -38,6 +39,7 @@ and [diagnostics selectors][selectors].
 
 [fidl]: /docs/concepts/fidl/overview.md
 [fidl-compatibility]: /docs/development/languages/fidl/guides/compatibility/README.md
+[fidl-evolution]: /docs/development/api/evolution.md
 [fidl-rubric]: /docs/development/api/fidl.md
 [identifiers]: /docs/concepts/components/v2/identifiers.md
 [rfc-0021]: /docs/contribute/governance/rfcs/0021_soft_transitions_methods_add_remove.md

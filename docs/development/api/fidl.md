@@ -675,7 +675,7 @@ Use `array` for fixed-length data:
 
  * Use `array` for MAC addresses because a MAC address is always six bytes long.
 
-### Should I use a `struct` or a `table`?
+### Should I use a `struct` or a `table`? {#should-i-use-a-struct-or-a-table}
 
 Both structs and tables represent an object with multiple named fields. The
 difference is that structs have a fixed layout in the wire format, which means

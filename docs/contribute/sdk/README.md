@@ -12,45 +12,66 @@ place.
 
 ## Contributing to an API in the SDK
 
-To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the following:
+To contribute to the [Fuchsia API Surface][fuchsia-api-surface], do the
+following:
 
-*  Evaluate whether your change is large or small.
+* Evaluate whether your change is large or small.
 
-   *  If you have a small, incremental change to the API, contribute your
+  * If you have a small, incremental change to the API, contribute your
       change by completing the steps in
       [Create a change in Gerrit][create-a-change-in-gerrit], as you would for
       any Fuchsia source code change.
-   *  If you have a large change to the API, that is, a change that
+  * If you have a large change to the API, that is, a change that
       significantly expands on the function of the API or modifies the
       API extensively, do the following:
 
-      *  Create an [RFC][rfc] that explains the design of your modification
+    * Create an [RFC][rfc] that explains the design of your modification
          to the API.
-      *  This RFC should be reviewed through the normal [RFC process][rfc-process].
-         The API reviewer for the relevant area should be a stakeholder in the RFC. See
-         the [Fuchsia API Council Charter][api-council] to identify API reviewers.
-      *  After your API RFC is approved, contribute your change by completing the steps
-         in [Create a change in Gerrit][create-a-change-in-gerrit], as you would
-         for any Fuchsia source code change.
+    * This RFC should be reviewed through the normal
+      [RFC process][rfc-process]. The API reviewer for the relevant area should
+      be a stakeholder in the RFC. See the
+      [Fuchsia API Council Charter][api-council] to identify API reviewers.
+    * After your API RFC is approved, contribute your change by completing the
+      steps in [Create a change in Gerrit][create-a-change-in-gerrit], as you
+      would for any Fuchsia source code change.
 
-* [Request a code review][request-a-code-review] from an API council member. Select
-  your API council reviewer based on the area of the Fuchsia API that you're modifying.
-  For a list of API council members and their areas of focus, see [Membership][membership]
-  in the Fuchsia API Council Charter.
+* [Request a code review][request-a-code-review] from an API council member.
+  Select your API council reviewer based on the area of the Fuchsia API that
+  you're modifying. For a list of API council members and their areas of focus,
+  see [Membership][membership] in the Fuchsia API Council Charter.
 
-## Promoting an API to the `partner` category
+## Promoting an API to the `partner_internal` category
 
-For an API to be included in the Fuchsia SDK in the `partner`,
-`partner_internal`, or `public` [SDK category][sdk-category], it must clear two
-hurdles: there must be a ready and willing customer, and the API must have gone
-through [API calibration][calibration].
+For an API to be included in the Fuchsia SDK in the `partner_internal`
+[SDK category][sdk-category], it must follow the
+[API evolution guidelines][evolve-gracefully] which is focused on enabling API
+evolution while maintaining compatibility.
 
-To request an API Calibration, fill out this form:
-[goto.google.com/fuchsia-api-calibration-request](https://goto.google.com/fuchsia-api-calibration-request).
+Keep in mind that there are additional considerations when promoting an API to
+partner, which may reveal tradeoff decisions between compatibility and long term
+usability.
+
+Once the API is ready for review, request an API Calibration by filling out this
+form: [goto.google.com/fuchsia-api-calibration-request][calibration-form]
+indicating that this API is targeting the `partner_internal` category.
 
 If you don't have access to that form, send an email to
 api-council@fuchsia.dev indicating the specific library or libraries you'd
 like to promote, and the API council will follow up with next steps.
+
+## Promoting an API to the `partner` category
+
+For an API to be included in the Fuchsia SDK in the `partner`, or `public`
+[SDK category][sdk-category], it must clear two hurdles: there must be a ready
+and willing customer, and the API must have gone through
+[API calibration][calibration].
+
+To request an API Calibration, fill out this form:
+[goto.google.com/fuchsia-api-calibration-request][calibration-form].
+
+If you don't have access to that form, send an email to api-council@fuchsia.dev
+indicating the specific library or libraries you'd like to promote, and the API
+council will follow up with next steps.
 
 <!-- Reference links -->
 
@@ -64,3 +85,5 @@ like to promote, and the API council will follow up with next steps.
 [membership]: /docs/contribute/governance/api_council.md#membership
 [sdk-category]: /docs/contribute/sdk/categories.md
 [calibration]: /docs/contribute/governance/api_council.md#calibration
+[calibration-form]: https://goto.google.com/fuchsia-api-calibration-request
+[evolve-gracefully]: /docs/development/api/evolution.md#evolve-gracefully
