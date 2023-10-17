@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
 	resultpb "go.chromium.org/luci/resultdb/proto/v1"
 
+	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
@@ -86,6 +88,14 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
 	}
+	artifactNames := []string{}
+	for name := range result.Artifacts {
+		artifactNames = append(artifactNames, name)
+	}
+	sort.Strings(artifactNames)
+	if diff := cmp.Diff(artifactNames, []string{"dir1_outputfile", "dir2_outputfile"}); diff != "" {
+		t.Errorf("Diff in output files (-got +want):\n%s", diff)
+	}
 }
 
 func TestSetTestCaseToResultSink(t *testing.T) {
@@ -112,6 +122,14 @@ func TestSetTestCaseToResultSink(t *testing.T) {
 		if len(result.Artifacts) != 2 {
 			t.Errorf("Got %d artifacts for test case %d, want 2", len(result.Artifacts), i+1)
 		}
+		artifactNames := []string{}
+		for name := range result.Artifacts {
+			artifactNames = append(artifactNames, name)
+		}
+		sort.Strings(artifactNames)
+		if diff := cmp.Diff(artifactNames, []string{"outputfile1", "outputfile2"}); diff != "" {
+			t.Errorf("Diff in output files (-got +want):\n%s", diff)
+		}
 	}
 }
 
@@ -134,7 +152,7 @@ func createTestSummary(testCount int) *runtests.TestSummary {
 func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.TestDetails {
 	t := []runtests.TestCaseResult{}
 	if outputRoot != "" {
-		for _, f := range []string{"outputfile1", "outputfile2", "case/outputfile1", "case/outputfile2"} {
+		for _, f := range []string{"dir1/outputfile", "dir2/outputfile", "case/outputfile1", "case/outputfile2"} {
 			outputfile := filepath.Join(outputRoot, f)
 			os.MkdirAll(filepath.Dir(outputfile), os.ModePerm)
 			os.WriteFile(outputfile, []byte("output"), os.ModePerm)
@@ -154,7 +172,7 @@ func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.Tes
 	return &runtests.TestDetails{
 		Name:                 "foo",
 		GNLabel:              "some label",
-		OutputFiles:          []string{"outputfile1", "outputfile2"},
+		OutputFiles:          []string{"dir1/outputfile", "dir2/outputfile"},
 		Result:               runtests.TestSuccess,
 		StartTime:            time.Now(),
 		DurationMillis:       39797,

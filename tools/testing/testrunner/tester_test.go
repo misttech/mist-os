@@ -94,7 +94,9 @@ func TestSubprocessTester(t *testing.T) {
 	passingProfile := filepath.Join("llvm-profile", passingTest, "default.profraw")
 	failingTest := filepath.Join("host_x64", "failing")
 	failingProfile := filepath.Join("llvm-profile", failingTest, "default.profraw")
-	for _, profile := range []string{passingProfile, failingProfile} {
+	testWithOutputFile := filepath.Join("host_x64", "test_with_output")
+	outputFile := filepath.Join(testWithOutputFile, "output_file.txt")
+	for _, profile := range []string{passingProfile, failingProfile, outputFile} {
 		abs := filepath.Join(tmpDir, profile)
 		os.MkdirAll(filepath.Dir(abs), 0o700)
 		f, err := os.Create(abs)
@@ -110,14 +112,15 @@ func TestSubprocessTester(t *testing.T) {
 	}
 
 	cases := []struct {
-		name           string
-		test           build.Test
-		runErrs        []error
-		expectedResult runtests.TestResult
-		useSandboxing  bool
-		env            map[string]string
-		wantCmd        []string
-		wantDataSinks  runtests.DataSinkMap
+		name            string
+		test            build.Test
+		runErrs         []error
+		expectedResult  runtests.TestResult
+		useSandboxing   bool
+		env             map[string]string
+		wantCmd         []string
+		wantDataSinks   runtests.DataSinkMap
+		wantOutputFiles []string
 	}{
 		{
 			name:           "no path",
@@ -253,6 +256,14 @@ func TestSubprocessTester(t *testing.T) {
 			wantDataSinks:  nil,
 		},
 		{
+			name:            "test passes with outputfile",
+			test:            build.Test{Path: testWithOutputFile},
+			expectedResult:  runtests.TestSuccess,
+			wantCmd:         []string{"./" + testWithOutputFile},
+			wantDataSinks:   nil,
+			wantOutputFiles: []string{filepath.Base(outputFile)},
+		},
+		{
 			name:           "test fails",
 			test:           build.Test{Path: failingTest},
 			runErrs:        []error{fmt.Errorf("test failed")},
@@ -332,6 +343,14 @@ func TestSubprocessTester(t *testing.T) {
 			sinks := testResult.DataSinks.Sinks
 			if diff := cmp.Diff(c.wantDataSinks, sinks); diff != "" {
 				t.Errorf("Diff in data sinks (-want +got):\n%s", diff)
+			}
+			if c.wantOutputFiles != nil {
+				if testResult.OutputDir != outDir {
+					t.Errorf("got output dir: %s, want: %s", testResult.OutputDir, outDir)
+				}
+			}
+			if diff := cmp.Diff(c.wantOutputFiles, testResult.OutputFiles); diff != "" {
+				t.Errorf("Diff in output files (-want +got):\n%s", diff)
 			}
 		})
 	}
