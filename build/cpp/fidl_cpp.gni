@@ -566,28 +566,19 @@ template("fidl_cpp_family") {
 
   group("${target_name}_cpp_wire") {
     public_deps = [ ":${invoker.target_name}_cpp" ]
-    visibility = [
-      "//third_party/*",
-      "//vendor/*",
-    ]
+    visibility = [ "//third_party/*" ]
     forward_variables_from(invoker, [ "testonly" ])
   }
 
   group("${target_name}_cpp_wire_testing") {
     public_deps = [ ":${invoker.target_name}_cpp_testing" ]
-    visibility = [
-      "//third_party/*",
-      "//vendor/*",
-    ]
+    visibility = [ "//third_party/*" ]
     testonly = true
   }
 
   group("${target_name}_cpp_natural_ostream") {
     public_deps = [ ":${invoker.target_name}_cpp" ]
-    visibility = [
-      "//third_party/*",
-      "//vendor/*",
-    ]
+    visibility = [ "//third_party/*" ]
     forward_variables_from(invoker, [ "testonly" ])
   }
 
