@@ -67,8 +67,8 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
       "sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb-bus",
       "sys/platform/pt/PCI0/bus/00:17.0/00_17_0/ahci",
       // TODO(fxbug.dev/84037): Temporarily removed.
-      // "sys/platform/pt/PCI0/bus/00:1f.3/00:1f.3/intel-hda-000",
-      // "sys/platform/pt/PCI0/bus/00:1f.3/00:1f.3/intel-hda-controller",
+      // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-000",
+      // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-controller",
       "sys/platform/pt/PCI0/bus/00:1f.6/00:1f.6/e1000",
   };
 

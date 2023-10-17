@@ -11,7 +11,11 @@ import("//build/test.gni")
 
 driver_bind_rules("ihda_controller_bind") {
   rules = "intel_hda.bind"
-  deps = [ "//src/devices/bind/fuchsia.pci" ]
+  deps = [
+    "//src/devices/bind/fuchsia.acpi",
+    "//src/devices/bind/fuchsia.pci",
+    "//src/devices/bind/fuchsia.sysmem",
+  ]
   tests = "bind_test.json"
 }
 
