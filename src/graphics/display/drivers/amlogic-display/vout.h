@@ -16,7 +16,6 @@
 #include "src/graphics/display/drivers/amlogic-display/dsi-host.h"
 #include "src/graphics/display/drivers/amlogic-display/hdmi-host.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
-#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
@@ -71,10 +70,10 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   void DisplayDisconnected();
 
   // Vout must be of `kHdmi` type.
-  bool IsDisplayModeSupported(const display::DisplayTiming& mode);
+  bool IsDisplayModeSupported(const display_mode_t* mode);
 
   // Vout must be of `kHdmi` type.
-  zx::result<> ApplyConfiguration(const display::DisplayTiming& mode);
+  zx::result<> ApplyConfiguration(const display_mode_t* mode);
 
   zx::result<> OnDisplaysChanged(added_display_info_t& info);
 
@@ -127,7 +126,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
   struct hdmi_t {
     std::unique_ptr<HdmiHost> hdmi_host;
 
-    display::DisplayTiming cur_display_mode_;
+    display_mode_t cur_display_mode_;
   } hdmi_;
 };
 

@@ -75,7 +75,7 @@ class Osd {
   void SetMinimumRgb(uint8_t minimum_rgb);
 
  private:
-  Osd(int32_t fb_width, int32_t fb_height, int32_t display_width, int32_t display_height,
+  Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t display_height,
       inspect::Node* inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
       std::unique_ptr<RdmaEngine> rdma);
   void DefaultSetup();
@@ -91,11 +91,11 @@ class Osd {
   std::optional<fdf::MmioBuffer> vpu_mmio_;
 
   // Framebuffer dimension
-  int32_t fb_width_;
-  int32_t fb_height_;
+  uint32_t fb_width_;
+  uint32_t fb_height_;
   // Actual display dimension
-  int32_t display_width_;
-  int32_t display_height_;
+  uint32_t display_width_;
+  uint32_t display_height_;
 
   // All current metrics have been moved to RdmaEngine.
   // inspect::Node* inspect_node_;

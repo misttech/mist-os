@@ -185,7 +185,7 @@ OsdRegisters osd1_registers = {
 
 display::ConfigStamp Osd::GetLastConfigStampApplied() { return rdma_->GetLastConfigStampApplied(); }
 
-Osd::Osd(int32_t fb_width, int32_t fb_height, int32_t display_width, int32_t display_height,
+Osd::Osd(uint32_t fb_width, uint32_t fb_height, uint32_t display_width, uint32_t display_height,
          inspect::Node* unused_osd_inspect_node, std::optional<fdf::MmioBuffer> vpu_mmio,
          std::unique_ptr<RdmaEngine> rdma)
     : vpu_mmio_(std::move(vpu_mmio)),
@@ -300,16 +300,14 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
   zxlogf(TRACE, "Table index %d used", next_table_idx);
   zxlogf(TRACE, "AFBC %s", info->is_afbc ? "enabled" : "disabled");
 
-  display::DisplayTiming display_timing = display::ToDisplayTiming(config[0].mode);
-
-  if ((display_timing.horizontal_active_px != display_width_) ||
-      (display_timing.vertical_active_lines != display_height_)) {
+  if ((config[0].mode.h_addressable != display_width_) ||
+      (config[0].mode.v_addressable != display_height_)) {
     zxlogf(INFO, "Mode change (%d x %d) to (%d x %d)", display_width_, display_height_,
-           display_timing.horizontal_active_px, display_timing.vertical_active_lines);
-    display_width_ = display_timing.horizontal_active_px;
-    display_height_ = display_timing.vertical_active_lines;
-    fb_width_ = display_timing.horizontal_active_px;
-    fb_height_ = display_timing.vertical_active_lines;
+           config[0].mode.h_addressable, config[0].mode.v_addressable);
+    display_width_ = config[0].mode.h_addressable;
+    display_height_ = config[0].mode.v_addressable;
+    fb_width_ = config[0].mode.h_addressable;
+    fb_height_ = config[0].mode.v_addressable;
     HwInit();
   }
 
