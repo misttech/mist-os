@@ -1830,13 +1830,7 @@ impl WeakBinderPeer {
 
     /// Upgrades the process and thread weak references as a tuple.
     fn upgrade(&self) -> Option<(TempRef<'static, BinderProcess>, Arc<BinderThread>)> {
-        self.proc
-            .upgrade()
-            .map(|r| {
-                // SAFTETY: This is safe, as the return ref will only be kept on the stack
-                unsafe { TempRef::into_static(r) }
-            })
-            .zip(self.thread.upgrade())
+        self.proc.upgrade().map(TempRef::into_static).zip(self.thread.upgrade())
     }
 }
 
@@ -2815,10 +2809,7 @@ impl BinderDriver {
     ) -> Result<(Arc<BinderObject>, TempRef<'_, BinderProcess>), Errno> {
         let mut context_manager = self.context_manager.lock();
         if let Some(context_manager_object) = context_manager.as_ref().cloned() {
-            match context_manager_object.owner.upgrade().map(|r| {
-                // SAFTETY: This is safe, as the returned ref will only be used on the stack.
-                unsafe { TempRef::into_static(r) }
-            }) {
+            match context_manager_object.owner.upgrade().map(TempRef::into_static) {
                 Some(owner) => {
                     return Ok((context_manager_object, owner));
                 }
@@ -3123,10 +3114,7 @@ impl BinderDriver {
                     let owner = object
                         .owner
                         .upgrade()
-                        .map(|r| {
-                            // SAFTETY: This is safe, as the returned ref is kept on the stack.
-                            unsafe { TempRef::into_static(r) }
-                        })
+                        .map(TempRef::into_static)
                         .ok_or(TransactionError::Dead)?;
                     let guard = object.inc_strong(&mut actions);
                     (object, owner, Some(guard))

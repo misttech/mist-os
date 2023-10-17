@@ -336,7 +336,7 @@ impl ThreadGroup {
         // to call set_stopped.
         // SAFETY: tasks is kept on the stack. The static is required to ensure the lock on
         // ThreadGroup can be dropped.
-        let tasks = state.tasks().map(|x| unsafe { TempRef::into_static(x) }).collect::<Vec<_>>();
+        let tasks = state.tasks().map(TempRef::into_static).collect::<Vec<_>>();
         drop(state);
 
         // Detach from any ptraced tasks.

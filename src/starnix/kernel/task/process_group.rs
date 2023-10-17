@@ -139,11 +139,7 @@ impl ProcessGroup {
             let tasks = thread_groups
                 .iter()
                 .flat_map(|tg| {
-                    tg.read().get_signal_target(&unchecked_signal).map(|task| {
-                        // SAFETY: tasks is kept on the stack. The static is required
-                        // to ensure the lock on ThreadGroup can be dropped.
-                        unsafe { TempRef::into_static(task) }
-                    })
+                    tg.read().get_signal_target(&unchecked_signal).map(TempRef::into_static)
                 })
                 .collect::<Vec<_>>();
             for task in tasks {

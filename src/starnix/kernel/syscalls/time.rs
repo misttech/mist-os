@@ -497,11 +497,7 @@ mod test {
                     let signal_target = thread_group
                         .read()
                         .get_signal_target(&signal_info.signal.into())
-                        .map(|task| {
-                            // SAFETY: signal_target is kept on the stack. The static is required
-                            // to ensure the lock on ThreadGroup can be dropped.
-                            unsafe { TempRef::into_static(task) }
-                        });
+                        .map(TempRef::into_static);
                     if let Some(task) = signal_target {
                         crate::signals::send_signal(&task, signal_info);
                     }

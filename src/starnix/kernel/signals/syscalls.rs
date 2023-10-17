@@ -305,16 +305,12 @@ pub fn sys_kill(
                 }
             };
 
-            // SAFETY: target  is kept on the stack. The static is required to ensure the lock on
-            // ThreadGroup can be dropped.
-            let target = unsafe {
-                TempRef::into_static(
-                    target_thread_group
-                        .read()
-                        .get_signal_target(&unchecked_signal)
-                        .ok_or_else(|| errno!(ESRCH))?,
-                )
-            };
+            let target = TempRef::into_static(
+                target_thread_group
+                    .read()
+                    .get_signal_target(&unchecked_signal)
+                    .ok_or_else(|| errno!(ESRCH))?,
+            );
             if !current_task.can_signal(&target, &unchecked_signal) {
                 return error!(EPERM);
             }
@@ -527,11 +523,7 @@ where
         let target = thread_group
             .read()
             .get_signal_target(unchecked_signal)
-            .map(|task| {
-                // SAFETY: target is kept on the stack. The static is required
-                // to ensure the lock on ThreadGroup can be dropped.
-                unsafe { TempRef::into_static(task) }
-            })
+            .map(TempRef::into_static)
             .ok_or_else(|| errno!(ESRCH))?;
         if !task.can_signal(&target, unchecked_signal) {
             last_error = errno!(EPERM);

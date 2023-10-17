@@ -343,12 +343,10 @@ impl<'a, T> TempRef<'a, T> {
 
     /// This allows to change the lifetime annotation of a `TempRef` to static.
     ///
-    /// # Safety
-    ///
     /// As `TempRef` must be dropped as soon as possible, this provided the way to block the release
-    /// of the related `OwnedRef`s and as such is considered unsafe. Any caller must ensure that
+    /// of the related `OwnedRef`s and as such is considered sensitive. Any caller must ensure that
     /// the returned `TempRef` is not kept around while doing blocking calls.
-    pub unsafe fn into_static(this: Self) -> TempRef<'static, T> {
+    pub fn into_static(this: Self) -> TempRef<'static, T> {
         TempRef::new(this.0.clone())
     }
 }
@@ -882,7 +880,7 @@ mod test {
         let value = OwnedRefByRef::new(Data {});
         let weak = WeakRef::from(&value);
         // SAFETY: This is safe, as static_ref remains on the stack.
-        let static_ref = unsafe { TempRef::into_static(weak.upgrade().unwrap()) };
+        let static_ref = TempRef::into_static(weak.upgrade().unwrap());
         // Check that weak can now be dropped.
         std::mem::drop(weak);
         // Drop static_ref
