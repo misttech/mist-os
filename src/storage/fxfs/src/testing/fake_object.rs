@@ -7,14 +7,7 @@ use {
         object_handle::{
             GetProperties, ObjectHandle, ObjectProperties, ReadObjectHandle, WriteObjectHandle,
         },
-        object_store::{
-            journal::JournalHandle,
-            transaction::{
-                LockKeys, LockManager, MetadataReservation, Options, Transaction,
-                TransactionHandler,
-            },
-            Timestamp,
-        },
+        object_store::{journal::JournalHandle, Timestamp},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -33,12 +26,11 @@ use {
 
 pub struct FakeObject {
     buf: Mutex<Vec<u8>>,
-    lock_manager: LockManager,
 }
 
 impl FakeObject {
     pub fn new() -> Self {
-        FakeObject { buf: Mutex::new(Vec::new()), lock_manager: LockManager::new() }
+        FakeObject { buf: Mutex::new(Vec::new()) }
     }
 
     fn read(&self, offset: u64, mut buf: MutableBufferRef<'_>) -> Result<usize, Error> {
@@ -66,35 +58,6 @@ impl FakeObject {
 
     pub fn get_size(&self) -> u64 {
         self.buf.lock().unwrap().len() as u64
-    }
-}
-
-#[async_trait]
-impl TransactionHandler for FakeObject {
-    async fn new_transaction<'a>(
-        self: Arc<Self>,
-        locks: LockKeys,
-        _options: Options<'a>,
-    ) -> Result<Transaction<'a>, Error> {
-        Ok(Transaction::new(self, MetadataReservation::Borrowed, LockKeys::None, locks).await)
-    }
-
-    async fn commit_transaction(
-        self: Arc<Self>,
-        transaction: &mut Transaction<'_>,
-        callback: &mut (dyn FnMut(u64) + Send),
-    ) -> Result<u64, Error> {
-        transaction.take_mutations();
-        callback(0);
-        Ok(0)
-    }
-
-    fn drop_transaction(&self, transaction: &mut Transaction<'_>) {
-        self.lock_manager.drop_transaction(transaction);
-    }
-
-    fn lock_manager(&self) -> &LockManager {
-        &self.lock_manager
     }
 }
 
