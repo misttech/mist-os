@@ -83,9 +83,10 @@ impl TestRealmContext {
             ..Default::default()
         };
 
-        let _ =
-            realm_factory.set_realm_options(options).await.expect("Could not set realm options");
-        let _ = realm_factory.create_realm(realm_server).await.expect("Could not create realm");
+        let _ = realm_factory
+            .create_realm(options, realm_server)
+            .await
+            .expect("Could not create realm");
 
         // Start the driver test realm
         let test_realm_proxy = RealmProxyClient::from(realm_client);

@@ -7,9 +7,11 @@ use crate::realm_factory::*;
 
 use {
     anyhow::{Error, Result},
+    fidl::endpoints::ControlHandle,
     fidl_test_wlan_realm::*,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
+    fuchsia_zircon_status as zx_status,
     futures::{StreamExt, TryStreamExt},
 };
 
@@ -28,13 +30,12 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
     let result: Result<(), Error> = async move {
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                RealmFactoryRequest::SetRealmOptions { options, responder } => {
-                    factory.set_realm_options(options)?;
-                    responder.send(Ok(()))?;
+                RealmFactoryRequest::_UnknownMethod { control_handle, .. } => {
+                    control_handle.shutdown_with_epitaph(zx_status::Status::NOT_SUPPORTED);
+                    unimplemented!();
                 }
-
-                RealmFactoryRequest::CreateRealm { realm_server, responder } => {
-                    let realm = factory.create_realm().await?;
+                RealmFactoryRequest::CreateRealm { options, realm_server, responder } => {
+                    let realm = factory.create_realm(options).await?;
                     let request_stream = realm_server.into_stream()?;
                     task_group.spawn(async move {
                         realm_proxy::service::serve(realm, request_stream).await.unwrap();

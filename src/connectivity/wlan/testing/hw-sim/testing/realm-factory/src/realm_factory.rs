@@ -13,30 +13,18 @@ use {
     tracing::info,
 };
 
-pub(crate) struct WlanTestRealmFactory {
-    realm_options: Option<fidl_realm::RealmOptions>,
-}
+pub(crate) struct WlanTestRealmFactory;
 
 impl WlanTestRealmFactory {
     pub fn new() -> Self {
-        Self { realm_options: Some(fidl_realm::RealmOptions { ..Default::default() }) }
+        Self {}
     }
 
-    pub fn set_realm_options(&mut self, options: fidl_realm::RealmOptions) -> Result<(), Error> {
-        match self.realm_options {
-            None => bail!("the realm has already been created"),
-            Some(_) => self.realm_options.replace(options),
-        };
-
-        info!("set_realm_options: {:?}", self.realm_options);
-        Ok(())
-    }
-
-    pub async fn create_realm(&mut self) -> Result<RealmInstance, Error> {
-        let realm_options = self.realm_options.take().unwrap();
-        let inst = build_realm(realm_options).await?;
-
-        Ok(inst)
+    pub async fn create_realm(
+        &mut self,
+        options: fidl_realm::RealmOptions,
+    ) -> Result<RealmInstance, Error> {
+        Ok(build_realm(options).await?)
     }
 }
 
