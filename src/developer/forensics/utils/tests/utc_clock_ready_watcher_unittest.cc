@@ -4,8 +4,6 @@
 
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 
-#include <fuchsia/time/cpp/fidl.h>
-
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -31,12 +29,11 @@ class UtcClockReadyWatcherTest : public UnitTestFixture {
   }
 
  protected:
-  void SyncClock() {
+  void StartClock(const zx::time start_time = zx::time(kTime.get())) {
     if (const zx_status_t status =
-            clock_handle_.signal(/*clear_mask=*/0,
-                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
+            clock_handle_.update(zx::clock::update_args().set_value(start_time));
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to sync clock";
+      FX_PLOGS(FATAL, status) << "Failed to start clock";
     }
   }
 
@@ -46,49 +43,37 @@ class UtcClockReadyWatcherTest : public UnitTestFixture {
   std::unique_ptr<UtcClockReadyWatcher> utc_clock_ready_watcher_;
 };
 
-TEST_F(UtcClockReadyWatcherTest, Check_ClockSyncs) {
-  bool clock_synced{false};
-
-  utc_clock_ready_watcher_->OnClockReady([&] { clock_synced = true; });
-  ASSERT_FALSE(clock_synced);
-
-  SyncClock();
-  RunLoopUntilIdle();
-
-  ASSERT_TRUE(clock_synced);
-}
-
-TEST_F(UtcClockReadyWatcherTest, Check_ClockStartedPreviously) {
-  bool clock_synced{false};
-  SyncClock();
-  RunLoopUntilIdle();
-
-  utc_clock_ready_watcher_->OnClockReady([&] { clock_synced = true; });
-  ASSERT_TRUE(clock_synced);
-}
-
-TEST_F(UtcClockReadyWatcherTest, Check_ClockNeverSyncs) {
-  bool clock_synced{false};
-
-  utc_clock_ready_watcher_->OnClockReady([&] { clock_synced = true; });
-  ASSERT_FALSE(clock_synced);
-
-  for (size_t i = 0; i < 100; ++i) {
-    RunLoopFor(zx::hour(23));
-    EXPECT_FALSE(clock_synced);
-  }
-}
-
-TEST_F(UtcClockReadyWatcherTest, Check_NotReadyOnClockStart) {
+TEST_F(UtcClockReadyWatcherTest, Check_ClockStarts) {
   bool clock_started{false};
 
   utc_clock_ready_watcher_->OnClockReady([&] { clock_started = true; });
   ASSERT_FALSE(clock_started);
 
-  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  StartClock();
   RunLoopUntilIdle();
 
-  EXPECT_FALSE(clock_started);
+  ASSERT_TRUE(clock_started);
+}
+
+TEST_F(UtcClockReadyWatcherTest, Check_ClockStartedPreviously) {
+  bool clock_started{false};
+  StartClock();
+  RunLoopUntilIdle();
+
+  utc_clock_ready_watcher_->OnClockReady([&] { clock_started = true; });
+  ASSERT_TRUE(clock_started);
+}
+
+TEST_F(UtcClockReadyWatcherTest, Check_ClockNeverStarts) {
+  bool clock_started{false};
+
+  utc_clock_ready_watcher_->OnClockReady([&] { clock_started = true; });
+  ASSERT_FALSE(clock_started);
+
+  for (size_t i = 0; i < 100; ++i) {
+    RunLoopFor(zx::hour(23));
+    EXPECT_FALSE(clock_started);
+  }
 }
 
 }  // namespace

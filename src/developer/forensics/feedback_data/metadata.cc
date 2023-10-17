@@ -225,14 +225,14 @@ void AddLogRedactionCanary(const std::string& log_redaction_canary, Document* me
 
 }  // namespace
 
-Metadata::Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
-                   UtcClockReadyWatcherBase* utc_clock_ready_watcher, RedactorBase* redactor,
+Metadata::Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock, RedactorBase* redactor,
                    const bool is_first_instance, const std::set<std::string>& annotation_allowlist,
                    const feedback::AttachmentKeys& attachment_allowlist)
     : log_redaction_canary_(redactor->UnredactedCanary()),
       annotation_allowlist_(annotation_allowlist),
       attachment_allowlist_(attachment_allowlist),
-      utc_provider_(utc_clock_ready_watcher, clock,
+      utc_clock_ready_watcher_(dispatcher, zx::unowned_clock(zx_utc_reference_get())),
+      utc_provider_(&utc_clock_ready_watcher_, clock,
                     PreviousBootFile::FromCache(is_first_instance, kUtcMonotonicDifferenceFile)) {
   redactor->Redact(log_redaction_canary_);
 }

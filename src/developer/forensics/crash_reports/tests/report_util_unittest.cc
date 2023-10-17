@@ -14,13 +14,11 @@
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
-#include "src/lib/timekeeper/clock.h"
 
 namespace forensics {
 namespace crash_reports {
 namespace {
 
-using ::testing::IsSupersetOf;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAreArray;
 
@@ -88,60 +86,6 @@ TEST(MakeReport, AddsSnapshotAnnotations) {
   ASSERT_TRUE(report.is_ok());
   EXPECT_EQ(report.value().Annotations().Get("snapshot_annotation_key"),
             "snapshot_annotation_value");
-}
-
-TEST(MakeReport, AddsCrashServerAnnotationsWithoutReportTime) {
-  const feedback::Annotations annotations = {
-      {feedback::kDeviceFeedbackIdKey, "device_id"},
-  };
-
-  fuchsia::feedback::CrashReport crash_report;
-  crash_report.set_program_name("program_name");
-
-  Product product{
-      .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
-  };
-
-  const fpromise::result<Report> report =
-      MakeReport(std::move(crash_report), /*report_id=*/0, "snapshot_uuid", annotations,
-                 /*current_time=*/std::nullopt, std::move(product),
-                 /*is_hourly_report=*/false);
-  ASSERT_TRUE(report.is_ok());
-  EXPECT_THAT(report.value().Annotations().Raw(), IsSupersetOf({
-                                                      Pair("ptype", "program_name"),
-                                                      Pair("program", "program_name"),
-                                                      Pair("debug.report-time.set", "false"),
-                                                      Pair("guid", "device_id"),
-                                                  }));
-}
-
-TEST(MakeReport, AddsCrashServerAnnotationsWithReportTime) {
-  const feedback::Annotations annotations = {
-      {feedback::kDeviceFeedbackIdKey, "device_id"},
-  };
-
-  fuchsia::feedback::CrashReport crash_report;
-  crash_report.set_program_name("program_name");
-
-  Product product{
-      .name = "product_name",
-      .version = "product_version",
-      .channel = "product_channel",
-  };
-
-  const fpromise::result<Report> report =
-      MakeReport(std::move(crash_report), /*report_id=*/0, "snapshot_uuid", annotations,
-                 /*current_time=*/timekeeper::time_utc(zx::sec(55).get()), std::move(product),
-                 /*is_hourly_report=*/false);
-  ASSERT_TRUE(report.is_ok());
-  EXPECT_THAT(report.value().Annotations().Raw(), IsSupersetOf({
-                                                      Pair("ptype", "program_name"),
-                                                      Pair("program", "program_name"),
-                                                      Pair("reportTimeMillis", "55000"),
-                                                      Pair("guid", "device_id"),
-                                                  }));
 }
 
 TEST(MakeReport, AddsRequiredAnnotations) {

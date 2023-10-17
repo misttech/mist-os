@@ -4,18 +4,15 @@
 
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 
-#include <fuchsia/time/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace forensics {
 
 UtcClockReadyWatcher::UtcClockReadyWatcher(async_dispatcher_t* dispatcher,
                                            zx::unowned_clock clock_handle)
-    : wait_for_clock_sync_(this, clock_handle->get_handle(),
-                           fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED,
-                           /*options=*/0) {
-  if (const zx_status_t status = wait_for_clock_sync_.Begin(dispatcher); status != ZX_OK) {
-    FX_PLOGS(FATAL, status) << "Failed to wait for clock sync";
+    : wait_for_clock_start_(this, clock_handle->get_handle(), ZX_CLOCK_STARTED, /*options=*/0) {
+  if (const zx_status_t status = wait_for_clock_start_.Begin(dispatcher); status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "Failed to wait for clock start";
   }
 }
 
@@ -30,12 +27,12 @@ void UtcClockReadyWatcher::OnClockReady(::fit::callback<void()> callback) {
 
 bool UtcClockReadyWatcher::IsUtcClockReady() const { return is_utc_clock_ready_; }
 
-void UtcClockReadyWatcher::OnClockSync(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                       zx_status_t status, const zx_packet_signal_t* signal) {
+void UtcClockReadyWatcher::OnClockStart(async_dispatcher_t* dispatcher, async::WaitBase* wait,
+                                        zx_status_t status, const zx_packet_signal_t* signal) {
   if (status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "Wait for clock sync completed with error, trying again";
+    FX_PLOGS(WARNING, status) << "Wait for clock start completed with error, trying again";
 
-    // Attempt to wait for the clock to sync again.
+    // Attempt to wait for the clock to start again.
     wait->Begin(dispatcher);
     return;
   }
