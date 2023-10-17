@@ -3,5 +3,12 @@
 // found in the LICENSE file.
 
 using fuchsia.gpio;
+using fuchsia.hardware.gpioimpl;
 
-fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.IMPL;
+if fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.IMPL {
+    true;
+} else if fuchsia.hardware.gpioimpl.Service == fuchsia.hardware.gpioimpl.Service.DriverTransport {
+    true;
+} else {
+    false;
+}

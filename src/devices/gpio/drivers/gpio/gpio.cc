@@ -124,15 +124,28 @@ void GpioDevice::DdkUnbind(ddk::UnbindTxn txn) {
 void GpioDevice::DdkRelease() { delete this; }
 
 zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
-  gpio_impl_protocol_t gpio;
-  auto status = device_get_protocol(parent, ZX_PROTOCOL_GPIO_IMPL, &gpio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get gpio impl protocol: %s", zx_status_get_string(status));
-    return status;
+  const ddk::GpioImplProtocolClient gpio_banjo(parent);
+  if (gpio_banjo.is_valid()) {
+    zxlogf(INFO, "Using Banjo gpioimpl protocol");
   }
 
-  // Process init metadata while we are still the exclusive owner of the GPIO client.
-  GpioInitDevice::Create(parent, &gpio);
+  {
+    fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
+    if (!gpio_banjo.is_valid()) {
+      zx::result gpio_fidl_client =
+          DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent);
+      if (gpio_fidl_client.is_ok()) {
+        zxlogf(INFO, "Failed to get Banjo gpioimpl protocol, falling back to FIDL");
+        gpio_fidl = fdf::WireSyncClient(std::move(*gpio_fidl_client));
+      } else {
+        zxlogf(ERROR, "Failed to get Banjo or FIDL gpioimpl protocol");
+        return ZX_ERR_NO_RESOURCES;
+      }
+    }
+
+    // Process init metadata while we are still the exclusive owner of the GPIO client.
+    GpioInitDevice::Create(parent, {gpio_banjo, std::move(gpio_fidl)});
+  }
 
   auto pins = ddk::GetMetadataArray<gpio_pin_t>(parent, DEVICE_METADATA_GPIO_PINS);
   if (!pins.is_ok()) {
@@ -151,13 +164,25 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   for (auto pin : pins.value()) {
+    fdf::WireSyncClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_fidl;
+    if (!gpio_banjo.is_valid()) {
+      zx::result gpio_fidl_client =
+          DdkConnectRuntimeProtocol<fuchsia_hardware_gpioimpl::Service::Device>(parent);
+      ZX_ASSERT_MSG(gpio_fidl_client.is_ok(), "Failed to get additional FIDL client: %s",
+                    gpio_fidl_client.status_string());
+      gpio_fidl = fdf::WireSyncClient(std::move(*gpio_fidl_client));
+    }
+
+    GpioImplProxy gpio(gpio_banjo, std::move(gpio_fidl));
+
     fbl::AllocChecker ac;
-    std::unique_ptr<GpioDevice> dev(new (&ac) GpioDevice(parent, &gpio, pin.pin, pin.name));
+    std::unique_ptr<GpioDevice> dev(new (&ac)
+                                        GpioDevice(parent, std::move(gpio), pin.pin, pin.name));
     if (!ac.check()) {
       return ZX_ERR_NO_MEMORY;
     }
 
-    status = dev->InitAddDevice();
+    zx_status_t status = dev->InitAddDevice();
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add device: %s", zx_status_get_string(status));
       return status;
@@ -170,7 +195,7 @@ zx_status_t GpioDevice::Create(void* ctx, zx_device_t* parent) {
   return ZX_OK;
 }
 
-void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClient& gpio) {
+void GpioInitDevice::Create(zx_device_t* parent, GpioImplProxy gpio) {
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_gpio::wire::InitMetadata>(
@@ -206,8 +231,7 @@ void GpioInitDevice::Create(zx_device_t* parent, const ddk::GpioImplProtocolClie
 }
 
 zx_status_t GpioInitDevice::ConfigureGpios(
-    const fuchsia_hardware_gpio::wire::InitMetadata& metadata,
-    const ddk::GpioImplProtocolClient& gpio) {
+    const fuchsia_hardware_gpio::wire::InitMetadata& metadata, const GpioImplProxy& gpio) {
   // Stop processing the list if any call returns an error so that GPIOs are not accidentally put
   // into an unexpected state.
   for (const auto& step : metadata.steps) {
@@ -252,6 +276,166 @@ zx_status_t GpioInitDevice::ConfigureGpios(
     }
   }
 
+  return ZX_OK;
+}
+
+zx_status_t GpioImplProxy::ConfigIn(uint32_t index, uint32_t flags) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.ConfigIn(index, flags);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->ConfigIn(
+      index, static_cast<fuchsia_hardware_gpio::GpioFlags>(flags));
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::ConfigOut(uint32_t index, uint8_t initial_value) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.ConfigOut(index, initial_value);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->ConfigOut(index, initial_value);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::SetAltFunction(uint32_t index, uint64_t function) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.SetAltFunction(index, function);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->SetAltFunction(index, function);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::Read(uint32_t index, uint8_t* out_value) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.Read(index, out_value);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->Read(index);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_value = result->value()->value;
+  return ZX_OK;
+}
+
+zx_status_t GpioImplProxy::Write(uint32_t index, uint8_t value) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.Write(index, value);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->Write(index, value);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::GetInterrupt(uint32_t index, uint32_t flags,
+                                        zx::interrupt* out_irq) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.GetInterrupt(index, flags, out_irq);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->GetInterrupt(index, flags);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_irq = std::move(result->value()->irq);
+  return ZX_OK;
+}
+
+zx_status_t GpioImplProxy::ReleaseInterrupt(uint32_t index) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.ReleaseInterrupt(index);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->ReleaseInterrupt(index);
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::SetPolarity(uint32_t index, gpio_polarity_t polarity) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.SetPolarity(index, polarity);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->SetPolarity(
+      index, static_cast<fuchsia_hardware_gpio::GpioPolarity>(polarity));
+  if (!result.ok()) {
+    return result.status();
+  }
+
+  return result->is_error() ? result->error_value() : ZX_OK;
+}
+
+zx_status_t GpioImplProxy::GetDriveStrength(uint32_t index, uint64_t* out_value) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.GetDriveStrength(index, out_value);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->GetDriveStrength(index);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_value = result->value()->result_ua;
+  return ZX_OK;
+}
+
+zx_status_t GpioImplProxy::SetDriveStrength(uint32_t index, uint64_t ds_ua,
+                                            uint64_t* out_actual_ua) const {
+  if (gpio_banjo_.is_valid()) {
+    return gpio_banjo_.SetDriveStrength(index, ds_ua, out_actual_ua);
+  }
+
+  fdf::Arena arena('GPIO');
+  const auto result = gpio_fidl_.buffer(arena)->SetDriveStrength(index, ds_ua);
+  if (!result.ok()) {
+    return result.status();
+  }
+  if (result->is_error()) {
+    return result->error_value();
+  }
+
+  *out_actual_ua = result->value()->actual_ds_ua;
   return ZX_OK;
 }
 

@@ -11,7 +11,10 @@ driver_bind_rules("gpio_bind") {
   rules = "gpio.bind"
   bind_output = "gpio.bindbc"
   tests = "bind_tests.json"
-  deps = [ "//src/devices/bind/fuchsia.gpio" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_bindlib",
+    "//src/devices/bind/fuchsia.gpio",
+  ]
 }
 
 fuchsia_driver("gpio-driver") {
@@ -26,6 +29,7 @@ fuchsia_driver("gpio-driver") {
     "//sdk/banjo/fuchsia.hardware.gpio:fuchsia.hardware.gpio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/lib/driver",
@@ -64,6 +68,9 @@ test("gpio-test-bin") {
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp_mock",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_cpp",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
