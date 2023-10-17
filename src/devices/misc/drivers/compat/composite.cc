@@ -85,16 +85,10 @@ zx::result<fuchsia_device_manager::wire::CompositeDeviceDescriptor> CreateCompos
     compvec[i] = std::move(dc);
   }
 
-  fidl::VectorView<fuchsia_device_manager::wire::DeviceMetadata> metadata(
-      arena, comp_desc->metadata_count);
-  for (size_t i = 0; i < comp_desc->metadata_count; i++) {
-    auto meta = fuchsia_device_manager::wire::DeviceMetadata{
-        .key = comp_desc->metadata_list[i].type,
-        .data = fidl::VectorView<uint8_t>::FromExternal(
-            reinterpret_cast<uint8_t*>(const_cast<void*>(comp_desc->metadata_list[i].data)),
-            comp_desc->metadata_list[i].length)};
-    metadata[i] = std::move(meta);
-  }
+  ZX_ASSERT_MSG(comp_desc->metadata_list == nullptr,
+                "Metadata not supported on composite devices. Please add metadata to a child.");
+  ZX_ASSERT_MSG(comp_desc->metadata_count == 0,
+                "Metadata not supported on composite devices. Please add metadata to a child.");
 
   fidl::VectorView<fuchsia_driver_legacy::wire::DeviceProperty> props(arena,
                                                                       comp_desc->props_count);
@@ -124,8 +118,7 @@ zx::result<fuchsia_device_manager::wire::CompositeDeviceDescriptor> CreateCompos
       .str_props = str_props,
       .fragments = compvec,
       .primary_fragment_index = primary_fragment_index,
-      .spawn_colocated = comp_desc->spawn_colocated,
-      .metadata = metadata};
+      .spawn_colocated = comp_desc->spawn_colocated};
   return zx::ok(std::move(comp_dev));
 }
 

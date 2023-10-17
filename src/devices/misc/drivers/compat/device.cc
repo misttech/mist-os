@@ -944,9 +944,10 @@ zx_status_t Device::AddCompositeNodeSpec(const char* name, const composite_node_
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (!spec->metadata_list && spec->metadata_count > 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+  ZX_ASSERT_MSG(spec->metadata_list == nullptr,
+                "Metadata not supported on composite node specs. Please add metadata to a child.");
+  ZX_ASSERT_MSG(spec->metadata_count == 0,
+                "Metadata not supported on composite node specs. Please add metadata to a child.");
 
   auto composite_node_manager =
       driver_->driver_namespace().Connect<fuchsia_driver_framework::CompositeNodeManager>();
