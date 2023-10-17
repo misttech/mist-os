@@ -394,7 +394,14 @@ pub fn sys_tgkill(
 
     let weak_target = current_task.get_task(tid);
     let target = Task::from_weak(&weak_target)?;
-    if target.get_pid() != tgid {
+
+    let thread_group = match current_task.kernel().pids.read().get_process(tgid) {
+        Some(ProcessEntryRef::Process(proc)) => proc,
+        Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
+        None => return error!(ESRCH),
+    };
+
+    if !Arc::ptr_eq(&target.thread_group, &thread_group) {
         return error!(EINVAL);
     }
 
