@@ -33,7 +33,6 @@ group("tools") {
     "//src/sys/tools/log",
     "//src/ui/tools:scenic",
     "//third_party/boringssl:boringssl_tool",
-    "//third_party/cobalt:host",
     "//third_party/curl",
     "//third_party/iperf",
     "//third_party/openssh-portable:openssh-tools",
