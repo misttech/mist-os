@@ -324,6 +324,12 @@ class SymbolInfo {
     return {};
   }
 
+  // Return the DT_FLAGS bits.
+  constexpr size_type flags() const { return flags_; }
+
+  // Return the DT_FLAGS_1 bits.
+  constexpr size_type flags1() const { return flags1_; }
+
   // Install data for the various tables.  These return *this so they can be
   // called in fluent style, e.g. in a constexpr initializer.
 
@@ -357,6 +363,16 @@ class SymbolInfo {
 
   constexpr SymbolInfo& set_soname(size_type soname) {
     soname_ = soname;
+    return *this;
+  }
+
+  constexpr SymbolInfo& set_flags(size_type flags) {
+    flags_ = flags;
+    return *this;
+  }
+
+  constexpr SymbolInfo& set_flags1(size_type flags1) {
+    flags1_ = flags1;
     return *this;
   }
 
@@ -414,6 +430,8 @@ class SymbolInfo {
   Span<Word> compat_hash_;
   Span<Addr> gnu_hash_;
   Addr soname_ = 0;
+  Addr flags_ = 0;   // DT_FLAGS
+  Addr flags1_ = 0;  // DT_FLAGS_1
 };
 
 // This constructs a SymbolInfo that just contains a single undefined symbol.

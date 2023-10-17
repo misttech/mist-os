@@ -152,6 +152,20 @@ enum class ElfDynTag : uint32_t {
   kFlags1 = 0x6ffffffb,
 };
 
+// These are individual flag bits that can be set in the value for the DT_FLAGS
+// entry in PT_DYNAMIC.  The enum lives inside a struct so that the constants
+// are used via scoped names ElfDynFlags:kFoo but it's not an `enum class` so
+// that it implicitly converts to uint32_t.
+struct ElfDynFlags {
+  enum : uint32_t {
+    kOrigin = 1 << 0,
+    kSymbolic = 1 << 1,
+    kTextRel = 1 << 2,
+    kBindNow = 1 << 3,
+    kStaticTls = 1 << 4,
+  };
+};
+
 // These are the "binding" classes of symbols, found in Elf::Sym::bind().
 enum class ElfSymBind : uint8_t {
   kLocal = 0,

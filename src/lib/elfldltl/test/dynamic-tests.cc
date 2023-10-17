@@ -10,7 +10,6 @@
 #include <lib/elfldltl/testing/typed-test.h>
 
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "symbol-tests.h"
@@ -65,36 +64,54 @@ TYPED_TEST(ElfldltlDynamicTests, MissingTerminator) {
 TYPED_TEST(ElfldltlDynamicTests, RejectTextrel) {
   using Elf = typename TestFixture::Elf;
 
-  std::vector<std::string> errors;
-  auto diag = elfldltl::CollectStringsDiagnostics(errors, kDiagFlags);
-
   elfldltl::DirectMemory memory({}, 0);
 
-  // PT_DYNAMIC without DT_TEXTREL.
-  constexpr typename Elf::Dyn dyn_notextrel[] = {
-      {.tag = elfldltl::ElfDynTag::kNull},
-  };
+  {
+    // PT_DYNAMIC without DT_TEXTREL.
+    constexpr typename Elf::Dyn dyn_notextrel[] = {
+        {.tag = elfldltl::ElfDynTag::kNull},
+    };
 
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_notextrel),
-                                      elfldltl::DynamicTextrelRejectObserver{}));
+    auto diag = ExpectOkDiagnostics();
 
-  EXPECT_EQ(0u, diag.errors());
-  EXPECT_EQ(0u, diag.warnings());
-  EXPECT_TRUE(errors.empty());
+    EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_notextrel),
+                                        elfldltl::DynamicTextrelRejectObserver{}));
 
-  // PT_DYNAMIC with DT_TEXTREL.
-  constexpr typename Elf::Dyn dyn_textrel[] = {
-      {.tag = elfldltl::ElfDynTag::kTextRel},
-      {.tag = elfldltl::ElfDynTag::kNull},
-  };
+    EXPECT_EQ(0u, diag.errors());
+    EXPECT_EQ(0u, diag.warnings());
+  }
 
-  EXPECT_TRUE(elfldltl::DecodeDynamic(diag, memory, cpp20::span(dyn_textrel),
-                                      elfldltl::DynamicTextrelRejectObserver{}));
+  {
+    // PT_DYNAMIC with DT_TEXTREL.
+    constexpr typename Elf::Dyn dyn_textrel[] = {
+        {.tag = elfldltl::ElfDynTag::kTextRel},
+        {.tag = elfldltl::ElfDynTag::kNull},
+    };
 
-  EXPECT_EQ(1u, diag.errors());
-  EXPECT_EQ(0u, diag.warnings());
-  ASSERT_GE(errors.size(), 1u);
-  EXPECT_EQ(errors.front(), elfldltl::DynamicTextrelRejectObserver::Message());
+    auto expected = elfldltl::testing::ExpectedSingleError{
+        elfldltl::DynamicTextrelRejectObserver::kMessage,
+    };
+
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected.diag(), memory, cpp20::span(dyn_textrel),
+                                        elfldltl::DynamicTextrelRejectObserver{}));
+  }
+
+  {
+    // PT_DYNAMIC with DF_TEXTREL.
+    constexpr typename Elf::Dyn dyn_flags_textrel[] = {
+        {
+            .tag = elfldltl::ElfDynTag::kFlags,
+            .val = elfldltl::ElfDynFlags::kTextRel | elfldltl::ElfDynFlags::kBindNow,
+        },
+        {.tag = elfldltl::ElfDynTag::kNull},
+    };
+
+    auto expected = elfldltl::testing::ExpectedSingleError{
+        elfldltl::DynamicTextrelRejectObserver::kMessage,
+    };
+    EXPECT_TRUE(elfldltl::DecodeDynamic(expected.diag(), memory, cpp20::span(dyn_flags_textrel),
+                                        elfldltl::DynamicTextrelRejectObserver{}));
+  }
 }
 
 class TestDiagnostics {
@@ -1045,6 +1062,10 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
   TestDiagnostics diag;
   SymbolInfoTestImage<Elf> test_image;
 
+  constexpr uint32_t kDynFlags =
+      elfldltl::ElfDynFlags::kBindNow | elfldltl::ElfDynFlags::kStaticTls;
+  constexpr uint32_t kDynFlags1 = 0x3;
+
   // PT_DYNAMIC with full valid symbol info.
   const Dyn dyn_goodsyms[] = {
       {.tag = elfldltl::ElfDynTag::kSoname, .val = test_image.soname_offset()},
@@ -1060,6 +1081,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
           .tag = elfldltl::ElfDynTag::kGnuHash,
           .val = test_image.gnu_hash_addr(),
       },
+      {.tag = elfldltl::ElfDynTag::kFlags, .val = kDynFlags},
+      {.tag = elfldltl::ElfDynTag::kFlags1, .val = kDynFlags1},
       {.tag = elfldltl::ElfDynTag::kNull},
   };
 
@@ -1078,6 +1101,8 @@ TYPED_TEST(ElfldltlDynamicTests, SymbolInfoObserverFullValid) {
   EXPECT_EQ(info.soname(), "libfoo.so");
   EXPECT_TRUE(info.compat_hash());
   EXPECT_TRUE(info.gnu_hash());
+  EXPECT_EQ(info.flags(), kDynFlags);
+  EXPECT_EQ(info.flags1(), kDynFlags1);
 }
 
 // We'll reuse that same image for the various error case tests.
