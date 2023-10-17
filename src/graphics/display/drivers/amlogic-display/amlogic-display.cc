@@ -40,6 +40,7 @@
 #include "src/graphics/display/drivers/amlogic-display/vout.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -151,7 +152,7 @@ bool AmlogicDisplay::IgnoreDisplayMode() const {
   return vout_->type() == VoutType::kDsi;
 }
 
-bool AmlogicDisplay::IsNewDisplayMode(const display_mode_t& mode) {
+bool AmlogicDisplay::IsNewDisplayMode(const display::DisplayTiming& mode) {
   // TODO(fxbug.dev/132603): Do not use byte-wise comparison for structs.
   // We should replace `display_mode_t` (banjo type) with an internal type.
   return memcmp(&current_display_mode_, &mode, sizeof(display_mode_t)) != 0;
@@ -456,14 +457,16 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
   }
 
   if (!IgnoreDisplayMode()) {
+    display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
+
     // `current_display_mode_` is already applied to the display so it's
-    // guaranteed to be supported. We can skip the check if `mode` equals to
-    // `current_display_mode_`.
-    if (!IsNewDisplayMode(display_configs[0]->mode)) {
+    // guaranteed to be supported. We can skip the check if `display_timing`
+    // equals to `current_display_mode_`.
+    if (!IsNewDisplayMode(display_timing)) {
       return CONFIG_CHECK_RESULT_OK;
     }
 
-    if (!vout_->IsDisplayModeSupported(&display_configs[0]->mode)) {
+    if (!vout_->IsDisplayModeSupported(display_timing)) {
       return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
     }
   }
@@ -502,8 +505,9 @@ config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
   }
 
   if (success) {
-    const uint32_t width = display_configs[0]->mode.h_addressable;
-    const uint32_t height = display_configs[0]->mode.v_addressable;
+    display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
+    const uint32_t width = display_timing.horizontal_active_px;
+    const uint32_t height = display_timing.vertical_active_lines;
     // Make sure ther layer configuration is supported
     const primary_layer_t& layer = display_configs[0]->layer_list[0]->cfg.primary;
     // TODO(fxbug.dev/130594) Instead of using memcmp() to compare the frame
@@ -551,8 +555,9 @@ void AmlogicDisplay::DisplayControllerImplApplyConfiguration(
       // Setting up OSD may require Vout framebuffer information, which may be
       // changed on each ApplyConfiguration(), so we need to apply the
       // configuration to Vout first before initializing the display and OSD.
-      if (IsNewDisplayMode(display_configs[0]->mode)) {
-        zx::result<> apply_config_result = vout_->ApplyConfiguration(&display_configs[0]->mode);
+      display::DisplayTiming display_timing = display::ToDisplayTiming(display_configs[0]->mode);
+      if (IsNewDisplayMode(display_timing)) {
+        zx::result<> apply_config_result = vout_->ApplyConfiguration(display_timing);
         if (!apply_config_result.is_ok()) {
           zxlogf(ERROR, "Failed to apply config to Vout: %s", apply_config_result.status_string());
           return;

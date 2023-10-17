@@ -257,7 +257,7 @@ class AmlogicDisplay
 
   // Whether `mode` is a new display mode different from the mode currently
   // applied to the display.
-  bool IsNewDisplayMode(const display_mode_t& mode);
+  bool IsNewDisplayMode(const display::DisplayTiming& mode);
 
   // Zircon handles
   zx::bti bti_;

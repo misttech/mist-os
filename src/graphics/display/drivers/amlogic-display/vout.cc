@@ -16,6 +16,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
+#include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
 
@@ -85,7 +86,7 @@ uint32_t Vout::display_width() const {
     case VoutType::kDsi:
       return dsi_.disp_setting.h_active;
     case VoutType::kHdmi:
-      return hdmi_.cur_display_mode_.h_addressable;
+      return hdmi_.cur_display_mode_.horizontal_active_px;
   }
   ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
   return 0;
@@ -96,7 +97,7 @@ uint32_t Vout::display_height() const {
     case VoutType::kDsi:
       return dsi_.disp_setting.v_active;
     case VoutType::kHdmi:
-      return hdmi_.cur_display_mode_.v_addressable;
+      return hdmi_.cur_display_mode_.vertical_active_lines;
   }
   ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
   return 0;
@@ -107,7 +108,7 @@ uint32_t Vout::fb_width() const {
     case VoutType::kDsi:
       return dsi_.width;
     case VoutType::kHdmi:
-      return hdmi_.cur_display_mode_.h_addressable;
+      return hdmi_.cur_display_mode_.horizontal_active_px;
   }
   ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
   return 0;
@@ -118,7 +119,7 @@ uint32_t Vout::fb_height() const {
     case VoutType::kDsi:
       return dsi_.height;
     case VoutType::kHdmi:
-      return hdmi_.cur_display_mode_.v_addressable;
+      return hdmi_.cur_display_mode_.vertical_active_lines;
   }
   ZX_DEBUG_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
   return 0;
@@ -313,24 +314,22 @@ zx::result<> Vout::PowerOn() {
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
 }
 
-bool Vout::IsDisplayModeSupported(const display_mode_t* mode) {
+bool Vout::IsDisplayModeSupported(const display::DisplayTiming& mode) {
   ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
                       "Vout DisplayMode check is only supported for HDMI output.");
-  ZX_DEBUG_ASSERT(mode != nullptr);
-  return hdmi_.hdmi_host->IsDisplayModeSupported(*mode);
+  return hdmi_.hdmi_host->IsDisplayModeSupported(mode);
 }
 
-zx::result<> Vout::ApplyConfiguration(const display_mode_t* mode) {
+zx::result<> Vout::ApplyConfiguration(const display::DisplayTiming& mode) {
   ZX_DEBUG_ASSERT_MSG(type_ == VoutType::kHdmi,
                       "Vout DisplayMode set is only supported for HDMI output.");
-  ZX_DEBUG_ASSERT(mode != nullptr);
-  zx_status_t status = hdmi_.hdmi_host->ModeSet(*mode);
+  zx_status_t status = hdmi_.hdmi_host->ModeSet(mode);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to set HDMI display mode: %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
-  memcpy(&hdmi_.cur_display_mode_, mode, sizeof(display_mode_t));
+  hdmi_.cur_display_mode_ = mode;
   return zx::ok();
 }
 
@@ -386,26 +385,30 @@ void Vout::Dump() {
              dsi_.disp_setting.clock_factor);
       return;
     case VoutType::kHdmi:
-      zxlogf(INFO, "pixel_clock_khz = 0x%x (%u)", hdmi_.cur_display_mode_.pixel_clock_khz,
-             hdmi_.cur_display_mode_.pixel_clock_khz);
-      zxlogf(INFO, "h_addressable = 0x%x (%u)", hdmi_.cur_display_mode_.h_addressable,
-             hdmi_.cur_display_mode_.h_addressable);
-      zxlogf(INFO, "h_front_porch = 0x%x (%u)", hdmi_.cur_display_mode_.h_front_porch,
-             hdmi_.cur_display_mode_.h_front_porch);
-      zxlogf(INFO, "h_sync_pulse = 0x%x (%u)", hdmi_.cur_display_mode_.h_sync_pulse,
-             hdmi_.cur_display_mode_.h_sync_pulse);
-      zxlogf(INFO, "h_blanking = 0x%x (%u)", hdmi_.cur_display_mode_.h_blanking,
-             hdmi_.cur_display_mode_.h_blanking);
-      zxlogf(INFO, "v_addressable = 0x%x (%u)", hdmi_.cur_display_mode_.v_addressable,
-             hdmi_.cur_display_mode_.v_addressable);
-      zxlogf(INFO, "v_front_porch = 0x%x (%u)", hdmi_.cur_display_mode_.v_front_porch,
-             hdmi_.cur_display_mode_.v_front_porch);
-      zxlogf(INFO, "v_sync_pulse = 0x%x (%u)", hdmi_.cur_display_mode_.v_sync_pulse,
-             hdmi_.cur_display_mode_.v_sync_pulse);
-      zxlogf(INFO, "v_blanking = 0x%x (%u)", hdmi_.cur_display_mode_.v_blanking,
-             hdmi_.cur_display_mode_.v_blanking);
-      zxlogf(INFO, "flags = 0x%x (%u)", hdmi_.cur_display_mode_.flags,
-             hdmi_.cur_display_mode_.flags);
+      zxlogf(INFO, "horizontal_active_px = %d", hdmi_.cur_display_mode_.horizontal_active_px);
+      zxlogf(INFO, "horizontal_front_porch_px = %d",
+             hdmi_.cur_display_mode_.horizontal_front_porch_px);
+      zxlogf(INFO, "horizontal_sync_width_px = %d",
+             hdmi_.cur_display_mode_.horizontal_sync_width_px);
+      zxlogf(INFO, "horizontal_back_porch_px = %d",
+             hdmi_.cur_display_mode_.horizontal_back_porch_px);
+      zxlogf(INFO, "vertical_active_lines = %d", hdmi_.cur_display_mode_.vertical_active_lines);
+      zxlogf(INFO, "vertical_front_porch_lines = %d",
+             hdmi_.cur_display_mode_.vertical_front_porch_lines);
+      zxlogf(INFO, "vertical_sync_width_lines = %d",
+             hdmi_.cur_display_mode_.vertical_sync_width_lines);
+      zxlogf(INFO, "vertical_back_porch_lines = %d",
+             hdmi_.cur_display_mode_.vertical_back_porch_lines);
+      zxlogf(INFO, "pixel_clock_frequency_khz = %d",
+             hdmi_.cur_display_mode_.pixel_clock_frequency_khz);
+      zxlogf(INFO, "fields_per_frame (enum) = %u",
+             static_cast<uint32_t>(hdmi_.cur_display_mode_.fields_per_frame));
+      zxlogf(INFO, "hsync_polarity (enum) = %u",
+             static_cast<uint32_t>(hdmi_.cur_display_mode_.hsync_polarity));
+      zxlogf(INFO, "vsync_polarity (enum) = %u",
+             static_cast<uint32_t>(hdmi_.cur_display_mode_.vsync_polarity));
+      zxlogf(INFO, "vblank_alternates = %d", hdmi_.cur_display_mode_.vblank_alternates);
+      zxlogf(INFO, "pixel_repetition = %d", hdmi_.cur_display_mode_.pixel_repetition);
       return;
   }
   ZX_ASSERT_MSG(false, "Invalid Vout type: %u", static_cast<uint8_t>(type_));
