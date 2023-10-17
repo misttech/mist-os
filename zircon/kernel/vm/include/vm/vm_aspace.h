@@ -270,10 +270,6 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
 
   static AslrConfig CreateAslrConfig(Type type);
 
-  // TODO(fxbug.dev/101641): Once priorities are applied via profiles this method can be removed.
-  // Sets this aspace as being latency sensitive. This cannot be undone.
-  void MarkAsLatencySensitive();
-
   // Increments or decrements the priority count of this aspace. The high priority count is used to
   // control active page table reclamation, and applies to the whole aspace. The count is never
   // allowed to go negative and so callers must only subtract what they have already added. Further,

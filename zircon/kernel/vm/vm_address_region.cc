@@ -600,12 +600,6 @@ zx_status_t VmAddressRegion::RangeOp(RangeOpType op, vaddr_t base, size_t len,
 
   const vaddr_t last_addr = base + len;
 
-  if (op == RangeOpType::AlwaysNeed) {
-    // TODO(fxb/101641): For the moment marking any part of the address space as always need causes
-    // the entire aspace to be considered latency sensitive.
-    aspace_->MarkAsLatencySensitive();
-  }
-
   Guard<CriticalMutex> guard{lock()};
   // Capture the validation that we need to do whenever the lock is acquired.
   auto validate = [this, base, len]() TA_REQ(lock()) -> zx_status_t {

@@ -772,36 +772,6 @@ void VmAspace::ChangeHighPriorityCountLocked(int64_t delta) {
   DEBUG_ASSERT(delta + old >= 0);
 }
 
-void VmAspace::MarkAsLatencySensitive() {
-  if (IsHighMemoryPriority()) {
-    return;
-  }
-  fbl::RefPtr<VmAddressRegion> root_vmar;
-  {
-    Guard<CriticalMutex> guard{&lock_};
-    if (root_vmar_ == nullptr || aspace_destroyed_) {
-      // Aspace hasn't been initialized or has already been destroyed.
-      return;
-    }
-
-    // TODO(fxb/101641): Need a better mechanism than checking for the process name here. See
-    // fxbug.dev/85056 for more context.
-    char name[ZX_MAX_NAME_LEN];
-    if (Thread::Current::Get()->active_aspace() != this) {
-      return;
-    }
-    ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-    [[maybe_unused]] zx_status_t status = up->get_name(name);
-    DEBUG_ASSERT(status == ZX_OK);
-    if (strncmp(name, "audio_core.cm", ZX_MAX_NAME_LEN) != 0 &&
-        strncmp(name, "waves_host.cm", ZX_MAX_NAME_LEN) != 0) {
-      return;
-    }
-    root_vmar = root_vmar_;
-  }
-  root_vmar->SetMemoryPriority(VmAddressRegion::MemoryPriority::HIGH);
-}
-
 void VmAspace::HarvestAllUserAccessedBits(NonTerminalAction non_terminal_action,
                                           TerminalAction terminal_action) {
   VM_KTRACE_DURATION(2, "VmAspace::HarvestAllUserAccessedBits");
