@@ -70,6 +70,9 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
       // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-000",
       // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-controller",
       "sys/platform/pt/PCI0/bus/00:1f.6/00:1f.6/e1000",
+#ifdef include_packaged_drivers
+      "sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlanphyimpl",
+#endif
   };
 
   ASSERT_NO_FATAL_FAILURE(TestRunner(kDevicePaths, std::size(kDevicePaths)));
