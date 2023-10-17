@@ -934,8 +934,6 @@
                 "SigaltstackTest.WalksOffBottom",
                 "Signalfd/SignalfdTest.Blocking/*",
                 "Signalfd/SignalfdTest.ThreadGroup/*",
-                "SigtimedwaitTest.AlarmReturnsAlarm",
-                "SigtimedwaitTest.NullTimeoutReturnsEINTR",
                 "AddressFamily/SendFileTest.SendMultiple/*",
                 "AddressFamily/SendFileTest.Shutdown/*",
                 "BindToDeviceTest/BindToDeviceDistributionTest.Tcp/*",

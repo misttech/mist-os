@@ -121,7 +121,9 @@ pub struct SignalState {
     pub run_state: RunState,
 
     /// The signal mask of the task.
-    // See https://man7.org/linux/man-pages/man2/rt_sigprocmask.2.html
+    ///
+    /// It is the set of signals whose delivery is currently blocked for the caller.
+    /// See https://man7.org/linux/man-pages/man7/signal.7.html
     mask: SigSet,
 
     /// The signal mask that should be restored by the signal handling machinery, after dequeuing
@@ -173,6 +175,10 @@ impl SignalState {
 
     pub fn mask(&self) -> SigSet {
         self.mask
+    }
+
+    pub fn saved_mask(&self) -> Option<SigSet> {
+        self.saved_mask
     }
 
     pub fn enqueue(&mut self, siginfo: SignalInfo) {

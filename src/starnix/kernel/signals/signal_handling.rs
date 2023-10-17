@@ -22,20 +22,23 @@ use crate::{
 pub fn send_signal(task: &Task, siginfo: SignalInfo) {
     let mut task_state = task.write();
 
-    let action_is_masked = task_state.signals.mask().has_signal(siginfo.signal);
+    let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
+    let was_masked =
+        task_state.signals.saved_mask().map_or(false, |mask| mask.has_signal(siginfo.signal));
     let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
     let action = action_for_signal(&siginfo, sigaction);
 
-    // Enqueue a masked signal, since it can be unmasked later, but don't enqueue an ignored
-    // signal, since it cannot. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.  In
-    // either case, if it is ptraced, enqueue it, so it can do the signal-delivery-stop.
-    if task_state.is_ptraced() || action != DeliveryAction::Ignore || action_is_masked {
+    // Enqueue any signal that is blocked by the current mask or blocked by the original mask,
+    // since it can be unmasked later.
+    // But don't enqueue an ignored signal. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.
+    // If it is ptraced, enqueue it, so it can do the signal-delivery-stop.
+    if is_masked || was_masked || action != DeliveryAction::Ignore || task_state.is_ptraced() {
         task_state.signals.enqueue(siginfo.clone());
     }
 
     drop(task_state);
 
-    if !action_is_masked && action.must_interrupt(sigaction) {
+    if !is_masked && action.must_interrupt(sigaction) {
         // Wake the task. Note that any potential signal handler will be executed before
         // the task returns from the suspend (from the perspective of user space).
         task.interrupt();

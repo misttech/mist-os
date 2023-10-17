@@ -175,7 +175,7 @@ pub fn sys_rt_sigsuspend(
 }
 
 pub fn sys_rt_sigtimedwait(
-    current_task: &CurrentTask,
+    current_task: &mut CurrentTask,
     set_addr: UserRef<SigSet>,
     siginfo_addr: UserAddress,
     timeout_addr: UserRef<timespec>,
@@ -185,8 +185,10 @@ pub fn sys_rt_sigtimedwait(
         return error!(EINVAL);
     }
 
-    let mask = current_task.read_object(set_addr)?;
-    let mask = mask & !UNBLOCKABLE_SIGNALS;
+    // Signals in `set_addr` are what we are waiting for.
+    let set = current_task.read_object(set_addr)?;
+    // Attempts to wait for `UNBLOCKABLE_SIGNALS` will be ignored.
+    let unblock = set & !UNBLOCKABLE_SIGNALS;
     let deadline = if timeout_addr.is_null() {
         zx::Time::INFINITE
     } else {
@@ -194,28 +196,42 @@ pub fn sys_rt_sigtimedwait(
         zx::Time::after(duration_from_timespec(timeout)?)
     };
 
-    let signal = loop {
+    let signal_info = loop {
         let waiter;
         {
             let signals = &mut current_task.write().signals;
-            if let Some(signal) = signals.take_next_where(|sig| mask.has_signal(sig.signal)) {
-                if !siginfo_addr.is_null() {
-                    current_task.write_memory(siginfo_addr, &signal.as_siginfo_bytes())?;
-                }
+            // If one of the signals in set is already pending for the calling thread,
+            // sigwaitinfo() will return immediately.
+            if let Some(signal) = signals.take_next_where(|sig| unblock.has_signal(sig.signal)) {
                 break signal;
             }
+
             waiter = Waiter::new();
             signals.signal_wait.wait_async(&waiter);
         }
-        waiter.wait_until(current_task, deadline).map_err(|e| {
-            if e == ETIMEDOUT {
-                errno!(EAGAIN)
-            } else {
-                e
-            }
-        })?;
+
+        // A new signal is enqueued when it's masked in the SignalState. So we need to invert
+        // the SigSet to block them.
+        let tmp_mask = current_task.read().signals.mask() & !unblock;
+
+        // Wait for a timeout or a new signal.
+        let waiter_result = current_task.wait_with_temporary_mask(tmp_mask, |current_task| {
+            waiter.wait_until(current_task, deadline)
+        });
+
+        // Restore mask after timeout or get a new signal.
+        current_task.write().signals.restore_mask();
+
+        if let Err(e) = waiter_result {
+            return Err(if e == ETIMEDOUT { errno!(EAGAIN) } else { e });
+        }
     };
-    Ok(signal.signal)
+
+    if !siginfo_addr.is_null() {
+        current_task.write_memory(siginfo_addr, &signal_info.as_siginfo_bytes())?;
+    }
+
+    Ok(signal_info.signal)
 }
 
 pub fn sys_signalfd4(
