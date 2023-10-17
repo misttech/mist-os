@@ -128,6 +128,7 @@ impl BinderConnection {
         if process.pid == current_task.get_pid() {
             Ok(process)
         } else {
+            process.release(());
             error!(EINVAL)
         }
     }
