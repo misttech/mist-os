@@ -154,6 +154,7 @@ pub struct Target {
     // This transient bit is cleared when the target next transitions out of the `Disconnected`
     // state.
     transient: Cell<bool>,
+    keep_alive: Cell<Weak<KeepAliveHandle>>,
     pub(crate) last_response: RefCell<DateTime<Utc>>,
     pub(crate) addrs: RefCell<BTreeSet<TargetAddrEntry>>,
     // ssh_port if set overrides the global default configuration for ssh port,
@@ -183,16 +184,17 @@ impl Target {
 
         let id = random::<u64>();
         let mut ids = HashSet::new();
-        ids.insert(id.clone());
+        ids.insert(id);
 
         let target = Rc::new(Self {
-            id: id.clone(),
+            id,
             ids: RefCell::new(ids),
             nodename: RefCell::new(None),
             last_response: RefCell::new(Utc::now()),
             state: RefCell::new(Default::default()),
             enabled: Cell::new(false),
             transient: Cell::new(false),
+            keep_alive: Cell::new(Weak::new()),
             addrs: RefCell::new(BTreeSet::new()),
             ssh_port: RefCell::new(None),
             serial: RefCell::new(None),
@@ -781,6 +783,10 @@ impl Target {
     }
 
     pub async fn usb(&self) -> Result<(String, Interface)> {
+        if !self.is_enabled() {
+            return Err(anyhow!("Cannot open USB interface for disabled target"));
+        }
+
         match self.serial.borrow().as_ref() {
             Some(s) => Ok((
                 s.to_string(),
@@ -1031,6 +1037,11 @@ impl Target {
 
     #[tracing::instrument]
     pub fn run_host_pipe(self: &Rc<Self>, overnet_node: &Arc<overnet_core::Router>) {
+        if !self.is_enabled() {
+            tracing::error!("Cannot run host pipe for device not in use");
+            return;
+        }
+
         if self.host_pipe.borrow().is_some() {
             tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
@@ -1118,6 +1129,10 @@ impl Target {
         self: &Rc<Self>,
         overnet_node: &Arc<overnet_core::Router>,
     ) -> Result<RemoteControlProxy> {
+        if !self.is_enabled() {
+            return Err(anyhow!("Cannot open RCS for disabled target"));
+        }
+
         // Ensure auto-connect has at least started.
         self.run_host_pipe(overnet_node);
         match self.events.wait_for(None, |e| e == TargetEvent::RcsActivated).await {
@@ -1168,6 +1183,11 @@ impl Target {
                 _ => None,
             };
 
+            if new_state.is_some() && self.is_transient() && self.has_keep_alive() {
+                tracing::debug!("Not expiring state for transient target with keep alive");
+                return current_state;
+            }
+
             if let Some(ref new_state) = new_state {
                 tracing::debug!(
                     "Target {:?} state {:?} => {:?} due to expired state after {:?}.",
@@ -1182,8 +1202,28 @@ impl Target {
         });
     }
 
+    pub fn keep_alive(self: &Rc<Target>) -> Rc<KeepAliveHandle> {
+        let weak = self.keep_alive.replace(Weak::new());
+        if let Some(handle) = Weak::upgrade(&weak) {
+            self.keep_alive.set(weak);
+            return handle;
+        }
+
+        let handle = Rc::new(KeepAliveHandle { target: Rc::downgrade(self) });
+        self.keep_alive.set(Rc::downgrade(&handle));
+        handle
+    }
+
+    pub fn has_keep_alive(&self) -> bool {
+        let weak = self.keep_alive.replace(Weak::new());
+        let has_keep_alive = Weak::upgrade(&weak).is_some();
+        self.keep_alive.set(weak);
+        has_keep_alive
+    }
+
     pub fn is_connected(&self) -> bool {
-        self.state.borrow().is_connected()
+        // Only enabled targets are considered connected.
+        self.is_enabled() && self.state.borrow().is_connected()
     }
 
     pub fn is_enabled(&self) -> bool {
@@ -1223,6 +1263,10 @@ impl Target {
             TargetAddrType::Manual(timeout) => timeout,
             _ => None,
         }
+    }
+
+    pub fn is_waiting_for_rcs_identity(&self) -> bool {
+        self.is_manual() && self.is_host_pipe_running() && self.nodename.borrow().is_none()
     }
 
     pub fn disconnect(&self) {
@@ -1351,27 +1395,6 @@ pub fn target_addr_info_to_socketaddr(tai: TargetAddrInfo) -> SocketAddr {
 }
 
 #[cfg(test)]
-pub(crate) fn clone_target(target: &Target) -> Rc<Target> {
-    let new = Target::new();
-    new.nodename.replace(target.nodename());
-    // Note: ID is omitted deliberately, as ID merging is unconditional on
-    // match, which breaks some uses of this helper function.
-    new.ids.replace(target.ids.borrow().clone());
-    new.state.replace(target.state.borrow().clone());
-    new.addrs.replace(target.addrs.borrow().clone());
-    new.ssh_port.replace(target.ssh_port.borrow().clone());
-    new.serial.replace(target.serial.borrow().clone());
-    new.boot_timestamp_nanos.replace(target.boot_timestamp_nanos.borrow().clone());
-    new.build_config.replace(target.build_config.borrow().clone());
-    new.last_response.replace(target.last_response.borrow().clone());
-    new.set_compatibility_status(&target.get_compatibility_status());
-    // TODO(raggi): there are missing fields here, as there were before the
-    // refactor in which I introduce this comment. It should be a goal to
-    // remove this helper function over time.
-    new
-}
-
-#[cfg(test)]
 impl PartialEq for Target {
     fn eq(&self, o: &Target) -> bool {
         self.nodename() == o.nodename()
@@ -1400,6 +1423,20 @@ impl PartialEq<Target> for DiscoveredTarget {
 impl PartialEq<Rc<Target>> for DiscoveredTarget {
     fn eq(&self, o: &Rc<Target>) -> bool {
         (&self.0) == o
+    }
+}
+
+/// Prevents a transient target from expiring until dropped.
+pub struct KeepAliveHandle {
+    target: Weak<Target>,
+}
+
+impl Drop for KeepAliveHandle {
+    fn drop(&mut self) {
+        if let Some(target) = Weak::upgrade(&self.target) {
+            // Immediately expire target state in case it was already stale.
+            target.expire_state();
+        }
     }
 }
 
@@ -1609,6 +1646,7 @@ mod test {
             },
         ] {
             let t = Target::new_named("schlabbadoo");
+            t.enable();
             let a2 = IpAddr::V6(Ipv6Addr::new(
                 0xfe80, 0xcafe, 0xf00d, 0xf000, 0xb412, 0xb455, 0x1337, 0xfeed,
             ));
@@ -2452,9 +2490,15 @@ mod test {
                 TargetConnectionState::Mdns(Instant::now() - Duration::from_secs(60 * 60))
             });
 
-            // But should disable when expired.
+            // Should not expire with active keep alive handle.
+            let handle = target.keep_alive();
             assert!(target.is_enabled());
             target.expire_state();
+            assert!(target.is_connected());
+            assert!(target.is_enabled());
+
+            // But should disable when expired.
+            drop(handle);
             assert!(!target.is_enabled());
             assert!(!target.is_connected());
         }

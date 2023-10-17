@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
+use ffx::DaemonError;
 use ffx_daemon_events::{TargetConnectionState, TargetInfo};
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
 use fidl::{
@@ -213,17 +214,25 @@ impl DaemonProtocolProvider for FakeDaemon {
         // assumption that any target being added is going to be looked up later for
         // a test.
         Ok((
-            self.get_target_info(target_identifier).await?,
+            self.get_target_info(target_identifier).await.map_err(|err| anyhow!("{:?}", err))?,
             self.open_protocol(protocol_name.to_string()).await?,
         ))
     }
 
-    async fn get_target_info(&self, target_identifier: Option<String>) -> Result<ffx::TargetInfo> {
+    async fn get_target_info(
+        &self,
+        target_identifier: Option<String>,
+    ) -> Result<ffx::TargetInfo, DaemonError> {
+        let query = target_identifier.into();
         Ok(ffx::TargetInfo::from(
             &*self
                 .target_collection
-                .get(target_identifier.clone())
-                .ok_or(anyhow!("couldn't find target for query: {:?}", target_identifier))?,
+                .query_single_enabled_target(&query)
+                .map_err(|_| DaemonError::TargetAmbiguous)?
+                .ok_or_else(|| {
+                    tracing::error!("couldn't find target for query: {:?}", query);
+                    DaemonError::TargetNotFound
+                })?,
         ))
     }
 
@@ -268,7 +277,8 @@ impl FakeDaemonBuilder {
             assert!(built_target.set_preferred_ssh_address(addr.into()));
         }
 
-        let _ = self.target_collection.merge_insert(built_target);
+        let target = self.target_collection.merge_insert(built_target);
+        self.target_collection.use_target(target.into(), "test");
         self
     }
 

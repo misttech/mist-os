@@ -52,7 +52,7 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         let inner = Rc::new(Inner { events_in: receiver, events_out: sender });
         self.inner.replace(inner.clone());
         let inner = Rc::downgrade(&inner);
-        let is_disabled: bool = ffx_daemon_target::fastboot::is_usb_discovery_enabled().await;
+        let is_disabled: bool = ffx_daemon_target::fastboot::is_usb_discovery_disabled().await;
         // Probably could avoid creating the entire inner object but that refactoring can wait
         if is_disabled {
             return Ok(());

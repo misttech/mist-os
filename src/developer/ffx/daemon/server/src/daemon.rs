@@ -220,10 +220,6 @@ impl DaemonProtocolProvider for Daemon {
             .await
             .map_err(|e| anyhow!("{:#?}", e))
             .context("getting default target")?;
-        let Some(overnet_node) = self.overnet_node.as_ref() else {
-            bail!("Attempting to get target event queue when daemon is not started");
-        };
-        target.run_host_pipe(overnet_node);
         let events = target.events.clone();
         Ok((target, events))
     }
@@ -259,12 +255,15 @@ impl DaemonProtocolProvider for Daemon {
         Ok((target.as_ref().into(), client))
     }
 
-    async fn get_target_info(&self, target_identifier: Option<String>) -> Result<ffx::TargetInfo> {
+    async fn get_target_info(
+        &self,
+        target_identifier: Option<String>,
+    ) -> Result<ffx::TargetInfo, DaemonError> {
         let target = self
-            .get_target(target_identifier)
-            .await
-            .map_err(|e| anyhow!("{:#?}", e))
-            .context("getting target")?;
+            .target_collection
+            .query_single_enabled_target(&target_identifier.into())
+            .map_err(|_| DaemonError::TargetAmbiguous)?
+            .ok_or(DaemonError::TargetNotFound)?;
         Ok(target.as_ref().into())
     }
 
@@ -626,19 +625,33 @@ impl Daemon {
     /// get_target attempts to get the target that matches the match string if
     /// provided, otherwise the default target from the target collection.
     async fn get_target(&self, matcher: Option<String>) -> Result<Rc<Target>, DaemonError> {
+        // TODO(72818): make target match timeout configurable / paramterable
         #[cfg(not(test))]
         const GET_TARGET_TIMEOUT: Duration = Duration::from_secs(8);
         #[cfg(test)]
         const GET_TARGET_TIMEOUT: Duration = Duration::from_secs(1);
 
-        // TODO(72818): make target match timeout configurable / paramterable
-        self.target_collection
-            .wait_for_match(matcher)
-            .on_timeout(GET_TARGET_TIMEOUT, || match self.target_collection.is_empty() {
-                true => Err(DaemonError::TargetCacheEmpty),
-                false => Err(DaemonError::TargetNotFound),
-            })
-            .await
+        let query = matcher.into();
+        let target_collection = &self.target_collection;
+
+        // Get a previously used target first, otherwise fall back to discovery + open.
+        match target_collection.query_single_enabled_target(&query) {
+            Ok(Some(target)) => Ok(target),
+            Ok(None) => {
+                target_collection
+                    // OpenTarget is called on behalf of the user, as ListTargets will (soon) not
+                    // surface discovered targets by default.
+                    .discover_target(&query)
+                    .map_err(|_| DaemonError::TargetAmbiguous)
+                    .on_timeout(GET_TARGET_TIMEOUT, || match self.target_collection.is_empty() {
+                        true => Err(DaemonError::TargetCacheEmpty),
+                        false => Err(DaemonError::TargetNotFound),
+                    })
+                    .await
+                    .map(|t| target_collection.use_target(t, "OpenTarget request"))
+            }
+            Err(()) => Err(DaemonError::TargetAmbiguous),
+        }
     }
 
     #[tracing::instrument(skip(self, quit_tx, stream))]

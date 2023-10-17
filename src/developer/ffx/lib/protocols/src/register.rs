@@ -227,6 +227,7 @@ mod test {
     use super::*;
     use crate::{DaemonProtocolProvider, FidlProtocol, FidlStreamHandler};
     use async_trait::async_trait;
+    use ffx::DaemonError;
     use fidl::endpoints::DiscoverableProtocolMarker;
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_ffx_test as ffx_test;
@@ -261,7 +262,7 @@ mod test {
         async fn get_target_info(
             &self,
             _target_identifier: Option<String>,
-        ) -> Result<ffx::TargetInfo> {
+        ) -> Result<ffx::TargetInfo, DaemonError> {
             unimplemented!()
         }
     }

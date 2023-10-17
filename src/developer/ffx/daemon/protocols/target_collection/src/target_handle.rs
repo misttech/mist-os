@@ -26,6 +26,7 @@ impl TargetHandle {
         handle: ServerEnd<ffx::TargetMarker>,
     ) -> Result<Pin<Box<dyn Future<Output = ()>>>> {
         let reboot_controller = reboot::RebootController::new(target.clone(), cx.overnet_node()?);
+        let keep_alive = target.keep_alive();
         let inner = TargetHandleInner { target, reboot_controller };
         let stream = handle.into_stream()?;
         let fut = Box::pin(async move {
@@ -33,6 +34,7 @@ impl TargetHandle {
                 .map_err(|err| anyhow!("{}", err))
                 .try_for_each_concurrent_while_connected(None, |req| inner.handle(&cx, req))
                 .await;
+            drop(keep_alive);
         });
         Ok(fut)
     }

@@ -142,7 +142,7 @@ impl InterfaceFactory<Interface> for UsbFactory {
     }
 
     async fn is_target_discovery_enabled(&self) -> bool {
-        is_usb_discovery_enabled().await
+        !is_usb_discovery_disabled().await
     }
 }
 
@@ -154,7 +154,7 @@ impl Drop for UsbFactory {
     }
 }
 
-pub async fn is_usb_discovery_enabled() -> bool {
+pub async fn is_usb_discovery_disabled() -> bool {
     get(FASTBOOT_USB_DISCOVERY_DISABLED).await.unwrap_or(false)
 }
 
