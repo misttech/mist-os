@@ -7701,6 +7701,28 @@ Whether to omit host tools from the generated IDKs.
 
 From //build/sdk/config.gni:11
 
+### sdk_sub_build_max_load_average
+
+Value of `-l` to pass to ninja during a subbuild. If the system load average
+on the system goes beyond this value, ninja will throttle itself. If left
+blank, the subbuild script will make a guess.
+
+**Current value (from the default):** `""`
+
+From //build/sdk/config.gni:29
+
+### sdk_sub_build_parallelism
+
+Value of `-j` to pass to ninja during a subbuild. Note that several
+subbuilds may be happening in parallel (as of 2023-10-13, up to 15), so the
+number of concurrent actions may go as high as this number times the number
+of concurrent subbuilds. If left blank, the subbuild script will make a
+guess.
+
+**Current value (from the default):** `""`
+
+From //build/sdk/config.gni:24
+
 ### sdk_with_all_supported_api_levels
 
 Set to true to build IDK atoms for all supported API levels that are
