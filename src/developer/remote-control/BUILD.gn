@@ -47,6 +47,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+    "//src/developer/remote-control/fidl:fuchsia.developer.remotecontrol.connector_rust",
     "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

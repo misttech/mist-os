@@ -6,7 +6,7 @@ use {
     anyhow::{Context as _, Result},
     argh::FromArgs,
     compat_info::{CompatibilityInfo, CompatibilityState, ConnectionInfo},
-    fidl_fuchsia_developer_remotecontrol::RemoteControlMarker,
+    fidl_fuchsia_developer_remotecontrol_connector::ConnectorMarker,
     fuchsia_component::client::connect_to_protocol,
     futures::future::select,
     futures::io::BufReader,
@@ -98,11 +98,11 @@ async fn main() -> Result<()> {
         tracing::warn!("--abi-revision not present. Compatibility checks are disabled.");
     }
 
-    let rcs_proxy = connect_to_protocol::<RemoteControlMarker>()?;
+    let rcs_proxy = connect_to_protocol::<ConnectorMarker>()?;
     let (local_socket, remote_socket) = fidl::Socket::create_stream();
 
     if args.circuit {
-        rcs_proxy.add_overnet_link(args.id.unwrap_or(0), remote_socket).await?;
+        rcs_proxy.establish_circuit(args.id.unwrap_or(0), remote_socket).await?;
     } else {
         return Err(anyhow::format_err!("Legacy overnet is no longer supported."));
     }
@@ -134,34 +134,33 @@ mod test {
         fidl_fuchsia_developer_remotecontrol::{
             IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
         },
+        fidl_fuchsia_developer_remotecontrol_connector::{
+            ConnectorMarker, ConnectorProxy, ConnectorRequest,
+        },
         fuchsia_async as fasync,
         std::cell::RefCell,
         std::rc::Rc,
     };
 
-    async fn send_request(proxy: &RemoteControlProxy, id: Option<u64>) -> Result<()> {
-        // If the program was launched with a u64, that's our ffx daemon ID, so add it to RCS.
-        // The daemon id is used to map the RCS instance back to an ip address or
-        // nodename in the daemon, for target merging.
-        if let Some(id) = id {
-            proxy.add_id(id).await.with_context(|| format!("Failed to add id {} to RCS", id))
-        } else {
-            // We just need to make a request to the RCS - it doesn't really matter
-            // what we choose here so long as there are no side effects.
-            let _ = proxy.identify_host().await?;
-            Ok(())
-        }
+    async fn send_request(proxy: &RemoteControlProxy) -> Result<()> {
+        // We just need to make a request to the RCS - it doesn't really matter
+        // what we choose here so long as there are no side effects.
+        let _ = proxy.identify_host().await?;
+        Ok(())
     }
 
-    fn setup_fake_rcs(handle_stream: bool) -> RemoteControlProxy {
+    fn setup_fake_rcs(handle_stream: bool) -> (RemoteControlProxy, ConnectorProxy) {
         let (proxy, mut stream) = create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+        let (runner_proxy, mut runner_stream) =
+            create_proxy_and_stream::<ConnectorMarker>().unwrap();
 
         if !handle_stream {
-            return proxy;
+            return (proxy, runner_proxy);
         }
+        let last_id = Rc::new(RefCell::new(0));
 
+        let last_id_clone = Rc::clone(&last_id);
         fasync::Task::local(async move {
-            let last_id = Rc::new(RefCell::new(0));
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(RemoteControlRequest::IdentifyHost { responder }) => {
@@ -169,14 +168,10 @@ mod test {
                             .send(Ok(&IdentifyHostResponse {
                                 nodename: Some("".to_string()),
                                 addresses: Some(vec![]),
-                                ids: Some(vec![last_id.borrow().clone()]),
+                                ids: Some(vec![last_id_clone.borrow().clone()]),
                                 ..Default::default()
                             }))
                             .unwrap();
-                    }
-                    Some(RemoteControlRequest::AddId { id, responder }) => {
-                        last_id.replace(id);
-                        responder.send().unwrap();
                     }
                     _ => assert!(false),
                 }
@@ -184,27 +179,38 @@ mod test {
         })
         .detach();
 
-        proxy
+        fasync::Task::local(async move {
+            while let Ok(Some(ConnectorRequest::EstablishCircuit { id, socket: _, responder })) =
+                runner_stream.try_next().await
+            {
+                last_id.replace(id);
+                responder.send().unwrap();
+            }
+        })
+        .detach();
+
+        (proxy, runner_proxy)
     }
 
     #[fuchsia::test]
     async fn test_handles_successful_response() -> Result<(), Error> {
-        let rcs_proxy = setup_fake_rcs(true);
-        assert!(send_request(&rcs_proxy, None).await.is_ok());
+        let (rcs_proxy, _runner_proxy) = setup_fake_rcs(true);
+        assert!(send_request(&rcs_proxy).await.is_ok());
         Ok(())
     }
 
     #[fuchsia::test]
     async fn test_handles_failed_response() -> Result<(), Error> {
-        let rcs_proxy = setup_fake_rcs(false);
-        assert!(send_request(&rcs_proxy, None).await.is_err());
+        let (rcs_proxy, _runner_proxy) = setup_fake_rcs(false);
+        assert!(send_request(&rcs_proxy).await.is_err());
         Ok(())
     }
 
     #[fuchsia::test]
     async fn test_sends_id_if_given() -> Result<(), Error> {
-        let rcs_proxy = setup_fake_rcs(true);
-        send_request(&rcs_proxy, Some(34u64)).await.unwrap();
+        let (rcs_proxy, runner_proxy) = setup_fake_rcs(true);
+        let (pumpkin, _) = fidl::Socket::create_stream();
+        runner_proxy.establish_circuit(34u64, pumpkin).await?;
         let ident = rcs_proxy.identify_host().await?.unwrap();
         assert_eq!(34u64, ident.ids.unwrap()[0]);
         Ok(())

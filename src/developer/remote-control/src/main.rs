@@ -97,9 +97,13 @@ async fn exec_server() -> Result<(), Error> {
     };
 
     let sc1 = service.clone();
+    let sc2 = service.clone();
     let mut fs = ServiceFs::new_local();
     fs.dir("svc").add_fidl_service(move |req| {
         fasync::Task::local(sc1.clone().serve_stream(req)).detach();
+    });
+    fs.dir("svc").add_fidl_service(move |req| {
+        fasync::Task::local(sc2.clone().serve_connector_stream(req)).detach();
     });
 
     fs.take_and_serve_directory_handle()?;

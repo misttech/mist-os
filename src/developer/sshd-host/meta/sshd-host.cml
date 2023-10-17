@@ -89,7 +89,7 @@
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.cobalt.SystemDataUpdater",
-                "fuchsia.developer.remotecontrol.RemoteControl",
+                "fuchsia.developer.remotecontrol.connector.Connector",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",

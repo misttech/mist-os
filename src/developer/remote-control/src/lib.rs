@@ -9,8 +9,9 @@ use {
     component_debug::lifecycle::*,
     fidl::endpoints::ServerEnd,
     fidl::prelude::*,
-    fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_diagnostics as diagnostics,
-    fidl_fuchsia_io as io,
+    fidl_fuchsia_developer_remotecontrol as rcs,
+    fidl_fuchsia_developer_remotecontrol_connector as connector,
+    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as io,
     fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
     fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_path,
@@ -88,11 +89,19 @@ impl RemoteControlService {
         self.ids.borrow_mut().retain(|wirc| wirc.strong_count() > 0);
     }
 
-    async fn handle(
+    async fn handle_connector(
         self: &Rc<Self>,
         client: &Client,
-        request: rcs::RemoteControlRequest,
+        request: connector::ConnectorRequest,
     ) -> Result<()> {
+        let connector::ConnectorRequest::EstablishCircuit { id, socket, responder } = request;
+        (self.connector)(socket);
+        client.allocated_ids.borrow_mut().push(id);
+        responder.send()?;
+        Ok(())
+    }
+
+    async fn handle(self: &Rc<Self>, request: rcs::RemoteControlRequest) -> Result<()> {
         match request {
             rcs::RemoteControlRequest::EchoString { value, responder } => {
                 info!("Received echo string {}", value);
@@ -109,17 +118,6 @@ impl RemoteControlService {
                     // Tracing crate doesn't have a Fatal level, just log an error with a FATAL message embedded.
                     diagnostics::Severity::Fatal => error!(%tag, "<FATAL> {}", message),
                 }
-                responder.send()?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::AddId { id, responder } => {
-                client.allocated_ids.borrow_mut().push(id);
-                responder.send()?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::AddOvernetLink { id, socket, responder } => {
-                (self.connector)(socket);
-                client.allocated_ids.borrow_mut().push(id);
                 responder.send()?;
                 Ok(())
             }
@@ -281,7 +279,7 @@ impl RemoteControlService {
         }
     }
 
-    pub async fn serve_stream(self: Rc<Self>, stream: rcs::RemoteControlRequestStream) {
+    pub async fn serve_connector_stream(self: Rc<Self>, stream: connector::ConnectorRequestStream) {
         // When the stream ends, the client (and its ids) will drop
         let allocated_ids = Rc::new(RefCell::new(vec![]));
         self.ids.borrow_mut().push(Rc::downgrade(&allocated_ids));
@@ -291,7 +289,23 @@ impl RemoteControlService {
                 match request {
                     Ok(request) => {
                         let _ = self
-                            .handle(&client, request)
+                            .handle_connector(&client, request)
+                            .await
+                            .map_err(|e| warn!("stream request handling error: {:?}", e));
+                    }
+                    Err(e) => warn!("stream error: {:?}", e),
+                }
+            })
+            .await;
+    }
+
+    pub async fn serve_stream(self: Rc<Self>, stream: rcs::RemoteControlRequestStream) {
+        stream
+            .for_each_concurrent(None, |request| async {
+                match request {
+                    Ok(request) => {
+                        let _ = self
+                            .handle(request)
                             .await
                             .map_err(|e| warn!("stream request handling error: {:?}", e));
                     }
@@ -819,16 +833,29 @@ mod tests {
     }
 
     fn setup_rcs_proxy() -> rcs::RemoteControlProxy {
+        setup_rcs_proxy_with_connector().0
+    }
+
+    fn setup_rcs_proxy_with_connector() -> (rcs::RemoteControlProxy, connector::ConnectorProxy) {
         let service = make_rcs();
 
         let (rcs_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<rcs::RemoteControlMarker>().unwrap();
+        fasync::Task::local({
+            let service = Rc::clone(&service);
+            async move {
+                service.serve_stream(stream).await;
+            }
+        })
+        .detach();
+        let (connector_proxy, stream) =
+            fidl::endpoints::create_proxy_and_stream::<connector::ConnectorMarker>().unwrap();
         fasync::Task::local(async move {
-            service.serve_stream(stream).await;
+            service.serve_connector_stream(stream).await;
         })
         .detach();
 
-        return rcs_proxy;
+        (rcs_proxy, connector_proxy)
     }
 
     fn setup_fake_lifecycle_controller() -> fsys::LifecycleControllerProxy {
@@ -995,13 +1022,15 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_ids_in_host_identify() -> Result<()> {
-        let rcs_proxy = setup_rcs_proxy();
+        let (rcs_proxy, connector_proxy) = setup_rcs_proxy_with_connector();
 
         let ident = rcs_proxy.identify_host().await.unwrap().unwrap();
         assert_eq!(ident.ids, Some(vec![]));
 
-        rcs_proxy.add_id(1234).await.unwrap();
-        rcs_proxy.add_id(4567).await.unwrap();
+        let (pumpkin_a, _) = fidl::Socket::create_stream();
+        let (pumpkin_b, _) = fidl::Socket::create_stream();
+        connector_proxy.establish_circuit(1234, pumpkin_a).await.unwrap();
+        connector_proxy.establish_circuit(4567, pumpkin_b).await.unwrap();
 
         let ident = rcs_proxy.identify_host().await.unwrap().unwrap();
         let ids = ident.ids.unwrap();

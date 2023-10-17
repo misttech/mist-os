@@ -10,6 +10,7 @@
     },
     capabilities: [
         { protocol: "fuchsia.developer.remotecontrol.RemoteControl" },
+        { protocol: "fuchsia.developer.remotecontrol.connector.Connector" },
     ],
     use: [
         {
@@ -45,6 +46,10 @@
     expose: [
         {
             protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.developer.remotecontrol.connector.Connector",
             from: "self",
         },
     ],

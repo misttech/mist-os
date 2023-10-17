@@ -273,7 +273,7 @@
             to: "#sshd-host",
         },
         {
-            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            protocol: "fuchsia.developer.remotecontrol.connector.Connector",
             from: "#remote-control",
             to: "#sshd-host",
         },
