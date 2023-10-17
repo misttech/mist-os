@@ -4,7 +4,6 @@
 
 use anyhow::{Context as _, Result};
 use async_trait::async_trait;
-use ffx::DaemonError;
 use ffx_daemon_core::events::Queue;
 use ffx_daemon_events::{DaemonEvent, TargetEvent};
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
@@ -45,10 +44,7 @@ pub trait DaemonProtocolProvider {
         capability_name: &str,
     ) -> Result<(ffx::TargetInfo, fidl::Channel)>;
 
-    async fn get_target_info(
-        &self,
-        target_identifier: Option<String>,
-    ) -> Result<ffx::TargetInfo, DaemonError>;
+    async fn get_target_info(&self, target_identifier: Option<String>) -> Result<ffx::TargetInfo>;
 
     async fn get_target_event_queue(
         &self,
@@ -117,7 +113,7 @@ impl Context {
     pub async fn get_target_info(
         &self,
         target_identifier: Option<String>,
-    ) -> Result<ffx::TargetInfo, DaemonError> {
+    ) -> Result<ffx::TargetInfo> {
         self.inner.get_target_info(target_identifier).await
     }
 

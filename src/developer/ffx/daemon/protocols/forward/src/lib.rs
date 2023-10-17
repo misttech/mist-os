@@ -317,7 +317,6 @@ impl FidlProtocol for Forward {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ffx::DaemonError;
     use protocols::testing::FakeDaemonBuilder;
 
     #[derive(Default, Clone)]
@@ -377,7 +376,7 @@ mod tests {
         async fn get_target_info(
             &self,
             _target_identifier: Option<String>,
-        ) -> Result<ffx::TargetInfo, DaemonError> {
+        ) -> Result<ffx::TargetInfo> {
             unimplemented!()
         }
     }
