@@ -11,10 +11,10 @@ for details.
 
 Prior to building a custom Rust toolchain for Fuchsia, you need to do the following:
 
-1. Run the following command to install cmake:
+1. Run the following command to install cmake and jq/tomlq:
 
    ```posix-terminal
-   sudo apt-get install cmake ninja-build
+   sudo apt-get install cmake ninja-build jq yq
    ```
 
 1. Run the following command to obtain the infra sources:
@@ -36,12 +36,13 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    have the most recent configurations and tools.
 
 1. Run the following command to use `cipd` to get a Fuchsia core IDK, a Linux
-   sysroot, and a recent version of clang:
+   sysroot, a recent version of clang, and the correct beta compiler for
+   building Fuchsia's Rust toolchain:
 
    ```posix-terminal
    DEV_ROOT={{ '<var>' }}DEV_ROOT{{ '</var>' }}
-
-   cat <<"EOF" > cipd.ensure
+   HOST_TRIPLE={{ '<var>' }}x86_64-unknown-linux-gnu{{ '</var>' }}
+   cat << "EOF" > cipd.ensure
    @Subdir sdk
    fuchsia/sdk/core/${platform} latest
    @Subdir sysroot/linux
@@ -49,7 +50,11 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
    @Subdir clang
    fuchsia/third_party/clang/${platform} integration
    EOF
-
+   BETA_DATE=`jq .compiler.date ${DEV_ROOT}/rust/src/stage0.json --raw-output`
+   BETA_COMMIT_HASH=`curl -s "https://static.rust-lang.org/dist/${BETA_DATE}/channel-rust-beta.toml" | tomlq .pkg.rust.git_commit_hash --raw-output`
+   echo "@Subdir beta" >> cipd.ensure
+   echo "fuchsia/third_party/rust/host/${platform} git_revision:${BETA_COMMIT_HASH}" >> cipd.ensure
+   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} git_revision:${BETA_COMMIT_HASH}" >> cipd.ensure
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root $DEV_ROOT --ensure-file cipd.ensure
    ```
 
@@ -80,6 +85,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
        config_toml \
        --clang-prefix=$DEV_ROOT/clang \
        --host-sysroot=$DEV_ROOT/sysroot/linux \
+       --beta=$DEV_ROOT/beta \
        --prefix=$(pwd)/install/fuchsia-rust \
       | tee fuchsia-config.toml
 
@@ -89,6 +95,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --eval \
          --clang-prefix=$DEV_ROOT/clang \
          --sdk-dir=$DEV_ROOT/sdk \
+         --beta=$DEV_ROOT/beta \
          --linux-amd64-sysroot=$DEV_ROOT/sysroot/linux \
          --linux-arm64-sysroot=$DEV_ROOT/sysroot/linux \
       | tee fuchsia-env.sh
