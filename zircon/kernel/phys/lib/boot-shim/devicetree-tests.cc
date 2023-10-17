@@ -398,6 +398,57 @@ TEST_F(ArmDevicetreeTimerItemTest, ParseQemu) {
   ASSERT_TRUE(present);
 }
 
+void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
+                      cpp20::span<const zbi_topology_node_t> expected_nodes) {
+  ASSERT_EQ(actual_nodes.size(), expected_nodes.size());
+  for (size_t i = 0; i < actual_nodes.size(); ++i) {
+    const auto& actual_node = actual_nodes[i];
+    const auto& expected_node = expected_nodes[i];
+    EXPECT_EQ(actual_node.parent_index, expected_node.parent_index);
+    EXPECT_EQ(actual_node.entity.discriminant, expected_node.entity.discriminant);
+
+    switch (actual_nodes[i].entity.discriminant) {
+      case ZBI_TOPOLOGY_ENTITY_CLUSTER:
+        EXPECT_EQ(actual_node.entity.cluster.performance_class,
+                  expected_node.entity.cluster.performance_class);
+        break;
+      case ZBI_TOPOLOGY_ENTITY_SOCKET:
+        break;
+      case ZBI_TOPOLOGY_ENTITY_PROCESSOR:
+        const auto& actual_processor = actual_node.entity.processor;
+        const auto& expected_processor = expected_node.entity.processor;
+        EXPECT_EQ(actual_processor.flags, expected_processor.flags);
+        EXPECT_EQ(actual_processor.logical_id_count, expected_processor.logical_id_count);
+        EXPECT_EQ(actual_processor.logical_ids[0], expected_processor.logical_ids[0]);
+        EXPECT_EQ(actual_processor.logical_ids[1], expected_processor.logical_ids[1]);
+        EXPECT_EQ(actual_processor.logical_ids[2], expected_processor.logical_ids[2]);
+        EXPECT_EQ(actual_processor.logical_ids[3], expected_processor.logical_ids[3]);
+        EXPECT_EQ(actual_processor.architecture_info.discriminant,
+                  expected_processor.architecture_info.discriminant);
+        switch (actual_nodes[i].entity.processor.architecture_info.discriminant) {
+          case ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64: {
+            const auto& actual_arm64 = actual_processor.architecture_info.arm64;
+            const auto& expected_arm64 = expected_processor.architecture_info.arm64;
+            EXPECT_EQ(actual_arm64.cluster_1_id, expected_arm64.cluster_1_id);
+            EXPECT_EQ(actual_arm64.cluster_2_id, expected_arm64.cluster_2_id);
+            EXPECT_EQ(actual_arm64.cluster_3_id, expected_arm64.cluster_3_id);
+            EXPECT_EQ(actual_arm64.cpu_id, expected_arm64.cpu_id);
+            EXPECT_EQ(actual_arm64.gic_id, expected_arm64.gic_id);
+          } break;
+          case ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64: {
+            const auto& actual_riscv = actual_processor.architecture_info.riscv64;
+            const auto& expected_riscv = expected_processor.architecture_info.riscv64;
+            EXPECT_EQ(actual_riscv.hart_id, expected_riscv.hart_id);
+          } break;
+          default:
+            break;
+        }
+
+        break;
+    }
+  }
+}
+
 class ArmCpuTopologyItemTest : public TestMixin<ArmDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
@@ -435,7 +486,150 @@ std::optional<LoadedDtb> ArmCpuTopologyItemTest::cpus_dtb_ = std::nullopt;
 std::optional<LoadedDtb> ArmCpuTopologyItemTest::cpus_single_cell_dtb_ = std::nullopt;
 std::optional<LoadedDtb> ArmCpuTopologyItemTest::cpus_no_cpu_map_dtb_ = std::nullopt;
 
-TEST_F(ArmCpuTopologyItemTest, ParseCpus) {
+TEST_F(ArmCpuTopologyItemTest, CpusMultipleCells) {
+  constexpr std::array kExpectedTopology = {
+
+      // socket0
+      zbi_topology_node_t{
+          .entity = {.discriminant = ZBI_TOPOLOGY_ENTITY_SOCKET},
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@11100000101
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 7,
+                                          .cpu_id = 1,
+                                          .gic_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cpu@11100000100
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 7,
+                                          .cpu_id = 0,
+                                          .gic_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cluster1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -466,94 +660,156 @@ TEST_F(ArmCpuTopologyItemTest, ParseCpus) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 7u);
-
-      // socket0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_SOCKET);
-
-      // cluster0
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[1].entity.cluster.performance_class, 0x7F);
-
-      // cpu@11100000101
-      EXPECT_EQ(nodes[2].parent_index, 1);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_3_id, 7);
-
-      // cpu@11100000100
-      EXPECT_EQ(nodes[3].parent_index, 1);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_3_id, 7);
-
-      // cluster1
-      EXPECT_EQ(nodes[4].parent_index, 0);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[4].entity.cluster.performance_class, 0xFF);
-
-      // cpu@1
-      EXPECT_EQ(nodes[5].parent_index, 4);
-      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@0
-      EXPECT_EQ(nodes[6].parent_index, 4);
-      EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[6].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_3_id, 0);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
-TEST_F(ArmCpuTopologyItemTest, ParseCpusSingleCell) {
+TEST_F(ArmCpuTopologyItemTest, CpusSingleCell) {
+  constexpr std::array kExpectedTopology = {
+
+      // socket0
+      zbi_topology_node_t{
+          .entity = {.discriminant = ZBI_TOPOLOGY_ENTITY_SOCKET},
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@101
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cpu@100
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cluster1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -584,94 +840,124 @@ TEST_F(ArmCpuTopologyItemTest, ParseCpusSingleCell) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 7u);
-
-      // socket0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_SOCKET);
-
-      // cluster0
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[1].entity.cluster.performance_class, 0x7F);
-
-      // cpu@101
-      EXPECT_EQ(nodes[2].parent_index, 1);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@100
-      EXPECT_EQ(nodes[3].parent_index, 1);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cluster1
-      EXPECT_EQ(nodes[4].parent_index, 0);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[4].entity.cluster.performance_class, 0xFF);
-
-      // cpu@1
-      EXPECT_EQ(nodes[5].parent_index, 4);
-      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@0
-      EXPECT_EQ(nodes[6].parent_index, 4);
-      EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[6].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.arm64.cluster_3_id, 0);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
-TEST_F(ArmCpuTopologyItemTest, ParseCpusNoCpuMap) {
+TEST_F(ArmCpuTopologyItemTest, CpusNoCpuMap) {
+  constexpr std::array kExpectedTopology = {
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 0,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@100
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 1,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 3,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -702,80 +988,124 @@ TEST_F(ArmCpuTopologyItemTest, ParseCpusNoCpuMap) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 4u);
-
-      // cpu@0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[0].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@100
-      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@101
-      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_1_id, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_3_id, 0);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
-TEST_F(ArmCpuTopologyItemTest, ParseQemu) {
+TEST_F(ArmCpuTopologyItemTest, Qemu) {
+  constexpr std::array kExpectedTopology = {
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 0,
+                                          .gic_id = 0,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 1,
+                                          .gic_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@100
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 2,
+                                          .gic_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64,
+                                  .arm64 =
+                                      {
+                                          .cluster_1_id = 0,
+                                          .cluster_2_id = 0,
+                                          .cluster_3_id = 0,
+                                          .cpu_id = 3,
+                                          .gic_id = 3,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -806,74 +1136,7 @@ TEST_F(ArmCpuTopologyItemTest, ParseQemu) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 4u);
-
-      // cpu@0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[0].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cpu_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cpu_id, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@2
-      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cpu_id, 2);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.arm64.cluster_3_id, 0);
-
-      // cpu@3
-      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_ARM64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cpu_id, 3);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_1_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_2_id, 0);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.arm64.cluster_3_id, 0);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -1567,7 +1830,134 @@ std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_nested_cl
 std::optional<LoadedDtb> RiscvDevictreeCpuTopologyItemTest::riscv_cpus_no_cpu_map_dtb_ =
     std::nullopt;
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodes) {
+TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
+  constexpr std::array kExpectedTopology = {
+
+      // socket0
+      zbi_topology_node_t{
+          .entity = {.discriminant = ZBI_TOPOLOGY_ENTITY_SOCKET},
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cluster1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 4,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -1599,82 +1989,192 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodes) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 7u);
-
-      // socket0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_SOCKET);
-
-      // cluster0
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[1].entity.cluster.performance_class, 0xFF);
-
-      // cpu@0
-      EXPECT_EQ(nodes[2].parent_index, 1);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[3].parent_index, 1);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cluster1
-      EXPECT_EQ(nodes[4].parent_index, 0);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[4].entity.cluster.performance_class, 0x7F);
-
-      // cpu@2
-      EXPECT_EQ(nodes[5].parent_index, 4);
-      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@3
-      EXPECT_EQ(nodes[6].parent_index, 4);
-      EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[6].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[6].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[6].entity.processor.architecture_info.riscv64.hart_id, 3);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNestedClusters) {
+TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
+  constexpr std::array kExpectedTopology = {
+
+      // socket0
+      zbi_topology_node_t{
+          .entity = {.discriminant = ZBI_TOPOLOGY_ENTITY_SOCKET},
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 1,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0xFF,
+                      },
+              },
+          .parent_index = 2,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 3,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 3,
+      },
+
+      // cluster1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 6,
+      },
+
+      // cluster2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x7F,
+                      },
+              },
+          .parent_index = 7,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 8,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 8,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -1706,106 +2206,107 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNestedClusters) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      // This is tied to the visit order of the cpu nodes.
-      // 4 cpus, parents, cpu#4 (id = 3) is the one with hart id = 3.
-      ASSERT_EQ(nodes.size(), 11u);
-
-      // socket0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_SOCKET);
-
-      // cluster0
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[1].entity.cluster.performance_class, 0xFF);
-
-      // cluster00
-      EXPECT_EQ(nodes[2].parent_index, 1);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[2].entity.cluster.performance_class, 0xFF);
-
-      // cluster000
-      EXPECT_EQ(nodes[3].parent_index, 2);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[3].entity.cluster.performance_class, 0xFF);
-
-      // cpu@0
-      // core 0 - thread 0
-      EXPECT_EQ(nodes[4].parent_index, 3);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[4].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 0);
-
-      // cpu@1
-      // core 1 - thread 0
-      EXPECT_EQ(nodes[5].parent_index, 3);
-      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cluster1
-      EXPECT_EQ(nodes[6].parent_index, 0);
-      EXPECT_EQ(nodes[6].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[6].entity.cluster.performance_class, 0x7F);
-
-      // cluster10
-      EXPECT_EQ(nodes[7].parent_index, 6);
-      EXPECT_EQ(nodes[7].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[7].entity.cluster.performance_class, 0x7F);
-
-      // cluster100
-      EXPECT_EQ(nodes[8].parent_index, 7);
-      EXPECT_EQ(nodes[8].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[8].entity.cluster.performance_class, 0x7F);
-
-      // cpu@2
-      // core 2 - thread 0
-      EXPECT_EQ(nodes[9].parent_index, 8);
-      EXPECT_EQ(nodes[9].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[9].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[9].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[9].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[9].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[9].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[9].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[9].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[9].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@3
-      // core 3 - thread 0
-      EXPECT_EQ(nodes[10].parent_index, 8);
-      EXPECT_EQ(nodes[10].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[10].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[10].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[10].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[10].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[10].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[10].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[10].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[10].entity.processor.architecture_info.riscv64.hart_id, 3);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
-TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNoCpuMap) {
+TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
+  constexpr std::array kExpectedTopology = {
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -1837,66 +2338,120 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, ParseCpuNodesNoCpuMap) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      ASSERT_EQ(nodes.size(), 4u);
-
-      // cpu@0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[0].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.riscv64.hart_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cpu@2
-      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@3
-      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 3);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
+  constexpr std::array kExpectedTopology = {
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -1928,71 +2483,130 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      ASSERT_EQ(nodes.size(), 5u);
-
-      // cluster0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[0].entity.cluster.performance_class, 1u);
-
-      // cpu@0
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[2].parent_index, 0);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cpu@2
-      EXPECT_EQ(nodes[3].parent_index, 0);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@3
-      EXPECT_EQ(nodes[4].parent_index, 0);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 3);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
+  constexpr std::array kExpectedTopology = {
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@4
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 4,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {4, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -2024,79 +2638,143 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      ASSERT_EQ(nodes.size(), 5u);
-
-      // cpu@0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[0].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[0].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[0].entity.processor.architecture_info.riscv64.hart_id, 0);
-
-      // cpu@1
-      EXPECT_EQ(nodes[1].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cpu@2
-      EXPECT_EQ(nodes[2].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@3
-      EXPECT_EQ(nodes[3].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 3);
-
-      // cpu@4
-      EXPECT_EQ(nodes[4].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[4].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 4);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 4);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
 }
 
 TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
+  constexpr std::array kExpectedTopology = {
+      // cluster0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                  .cluster =
+                      {
+                          .performance_class = 0x1,
+                      },
+              },
+          .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+      },
+
+      // cpu@3
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 3,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {3, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@1
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 1,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {1, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@4
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 4,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {2, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@2
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 2,
+                                      },
+                              },
+                          .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                          .logical_ids = {0, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+
+      // cpu@0
+      zbi_topology_node_t{
+          .entity =
+              {
+                  .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                  .processor =
+                      {
+                          .architecture_info =
+                              {
+                                  .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                  .riscv64 =
+                                      {
+                                          .hart_id = 0,
+                                      },
+                              },
+                          .flags = 0,
+                          .logical_ids = {4, 0, 0, 0},
+                          .logical_id_count = 1,
+                      },
+              },
+          .parent_index = 0,
+      },
+  };
+
   std::array<std::byte, 1024> image_buffer;
   std::vector<void*> allocs;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
@@ -2128,78 +2806,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-
-      ASSERT_EQ(nodes.size(), 6u);
-
-      // cluster0
-      EXPECT_EQ(nodes[0].parent_index, ZBI_TOPOLOGY_NO_PARENT);
-      EXPECT_EQ(nodes[0].entity.discriminant, ZBI_TOPOLOGY_ENTITY_CLUSTER);
-      EXPECT_EQ(nodes[0].entity.cluster.performance_class, 1);
-
-      // cpu@3
-      EXPECT_EQ(nodes[1].parent_index, 0);
-      EXPECT_EQ(nodes[1].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[1].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[0], 3);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[1].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[1].entity.processor.architecture_info.riscv64.hart_id, 3);
-
-      // cpu@1
-      EXPECT_EQ(nodes[2].parent_index, 0);
-      EXPECT_EQ(nodes[2].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[2].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[0], 1);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[2].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[2].entity.processor.architecture_info.riscv64.hart_id, 1);
-
-      // cpu@4
-      EXPECT_EQ(nodes[3].parent_index, 0);
-      EXPECT_EQ(nodes[3].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[3].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[0], 2);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[3].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[3].entity.processor.architecture_info.riscv64.hart_id, 4);
-
-      // cpu@2
-      EXPECT_EQ(nodes[4].parent_index, 0);
-      EXPECT_EQ(nodes[4].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[4].entity.processor.flags, ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[0], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[4].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[4].entity.processor.architecture_info.riscv64.hart_id, 2);
-
-      // cpu@0
-      EXPECT_EQ(nodes[5].parent_index, 0);
-      EXPECT_EQ(nodes[5].entity.discriminant, ZBI_TOPOLOGY_ENTITY_PROCESSOR);
-      EXPECT_EQ(nodes[5].entity.processor.flags, 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[0], 4);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[1], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[2], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_ids[3], 0);
-      EXPECT_EQ(nodes[5].entity.processor.logical_id_count, 1);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.discriminant,
-                ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64);
-      EXPECT_EQ(nodes[5].entity.processor.architecture_info.riscv64.hart_id, 0);
+      CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
