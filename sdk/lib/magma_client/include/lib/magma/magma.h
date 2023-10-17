@@ -183,20 +183,6 @@ MAGMA_EXPORT void magma_connection_release_semaphore(
 ///        ownership of |semaphore_handle| on both success and failure.
 /// \param connection An open connection.
 /// \param semaphore_handle A valid semaphore handle.
-/// \param semaphore_out The returned semaphore.
-/// \param id_out The id of the semaphore.
-///
-MAGMA_EXPORT magma_status_t magma_connection_import_semaphore(
-    magma_connection_t connection,
-    magma_handle_t semaphore_handle,
-    magma_semaphore_t* semaphore_out,
-    magma_semaphore_id_t* id_out);
-
-///
-/// \brief Imports and takes ownership of the semaphore referred to by the given handle. Takes
-///        ownership of |semaphore_handle| on both success and failure.
-/// \param connection An open connection.
-/// \param semaphore_handle A valid semaphore handle.
 /// \param flags Pass MAGMA_IMPORT_SEMAPHORE_ONESHOT to prevent auto-reset after wait.
 /// \param semaphore_out The returned semaphore.
 /// \param id_out The id of the semaphore.

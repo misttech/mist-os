@@ -435,14 +435,6 @@ magma_status_t magma_semaphore_export(magma_semaphore_t semaphore, uint32_t* sem
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t magma_connection_import_semaphore(magma_connection_t connection,
-                                                 uint32_t semaphore_handle,
-                                                 magma_semaphore_t* semaphore_out,
-                                                 magma_semaphore_id_t* id_out) {
-  return magma_connection_import_semaphore2(connection, semaphore_handle, /*flags=*/0,
-                                            semaphore_out, id_out);
-}
-
 magma_status_t magma_connection_import_semaphore2(magma_connection_t connection,
                                                   uint32_t semaphore_handle, uint64_t flags,
                                                   magma_semaphore_t* semaphore_out,

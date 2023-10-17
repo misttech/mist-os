@@ -849,25 +849,6 @@ class TestConnection {
     magma_connection_release_semaphore(connection_, semaphore);
   }
 
-  void SemaphoreImport(magma_handle_t handle, magma_semaphore_id_t exported_id) {
-    ASSERT_TRUE(connection_);
-
-    magma_semaphore_t semaphore;
-    magma_semaphore_id_t id;
-    ASSERT_EQ(magma_connection_import_semaphore(connection_, handle, &semaphore, &id),
-              MAGMA_STATUS_OK);
-    EXPECT_NE(id, exported_id);
-
-    magma_connection_release_semaphore(connection_, semaphore);
-  }
-
-  static void SemaphoreImportExport(TestConnection* test1, TestConnection* test2) {
-    magma_handle_t handle;
-    magma_semaphore_id_t exported_id;
-    test1->SemaphoreExport(&handle, &exported_id);
-    test2->SemaphoreImport(handle, exported_id);
-  }
-
   void SemaphoreImport2(magma_handle_t handle, magma_semaphore_id_t exported_id,
                         bool one_shot = false) {
     ASSERT_TRUE(connection_);
@@ -1606,12 +1587,6 @@ TEST_F(Magma, Semaphore) {
   test.Semaphore(1);
   test.Semaphore(2);
   test.Semaphore(3);
-}
-
-TEST_F(Magma, SemaphoreImportExport) {
-  TestConnection test1;
-  TestConnection test2;
-  TestConnection::SemaphoreImportExport(&test1, &test2);
 }
 
 TEST_F(Magma, SemaphoreImportExport2) {
