@@ -100,8 +100,8 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   // mutable allocations at a time, so the caller must then promptly splice it
   // into the link_map list before the next Load call allocates the next one.
   template <class Allocator, class File>
-  StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
-                         Elf::size_type& max_tls_modid) {
+  [[nodiscard]] StartupLoadResult Load(Diagnostics& diag, Allocator& allocator, File&& file,
+                                       Elf::size_type& max_tls_modid) {
     // Diagnostics sent to diag during loading will be prefixed with the module
     // name, unless the name is empty as it is for the main executable.
     ModuleDiagnostics module_diag(diag, this->name().str());
@@ -322,7 +322,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
       const bool was_already_loaded = it->IsLoaded();
       if (!was_already_loaded) {
         if (auto file = get_dep_file(it->name())) {
-          it->Load(diag, initial_exec, *file, max_tls_modid);
+          needed_count = it->Load(diag, initial_exec, *file, max_tls_modid).needed_count;
           assert(it->IsLoaded());
         } else {
           diag.MissingDependency(it->name().str());

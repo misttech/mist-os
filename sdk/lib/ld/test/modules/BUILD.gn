@@ -16,6 +16,7 @@ in_process_executables = [
   ":symbolic-reloc",
   ":ld-dep",
   ":basic-dep",
+  ":indirect-deps",
   ":passive-abi-basic",
   ":symbolic-namespace",
   ":many-deps",
@@ -35,6 +36,9 @@ shlibs = [
   ":ld-dep-d",
   ":ld-dep-e",
   ":ld-dep-f",
+  ":indirect-deps-a",
+  ":indirect-deps-b",
+  ":indirect-deps-c",
   ":tls-dep",
 ]
 
@@ -292,6 +296,31 @@ test_executable("basic-dep") {
   can_be_in_process = true
   sources = [ "basic-dep.cc" ]
   deps = [ ":ld-dep-a" ]
+}
+
+test_executable("indirect-deps") {
+  can_be_in_process = true
+  sources = [ "basic-dep.cc" ]
+  deps = [ ":indirect-deps-a" ]
+}
+
+test_shared_library("indirect-deps-a") {
+  sources = [ "indirect-deps-a.cc" ]
+  deps = [
+    ":indirect-deps-b",
+    ":indirect-deps-c",
+    "//zircon/system/public",
+  ]
+}
+
+test_shared_library("indirect-deps-b") {
+  sources = [ "indirect-deps-b.cc" ]
+  deps = [ "//zircon/system/public" ]
+}
+
+test_shared_library("indirect-deps-c") {
+  sources = [ "indirect-deps-c.cc" ]
+  deps = [ "//zircon/system/public" ]
 }
 
 test_executable("passive-abi-basic") {

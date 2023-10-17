@@ -96,6 +96,24 @@ TYPED_TEST(LdLoadTests, BasicDep) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, IndirectDeps) {
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({
+      "libindirect-deps-a.so",
+      "libindirect-deps-b.so",
+      "libindirect-deps-c.so",
+  }));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("indirect-deps"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
   constexpr int64_t kReturnValue = 17;
 
