@@ -3,6 +3,17 @@
         "fuchsiaDir": "{FUCHSIA_DIR}",
         "skips": [
             {
+                "notes": [
+                    "Legacy GN license checker does not know how to process SPDX files.",
+                    "This is a temporary skip until either the old system is updated to read spdx,",
+                    "or the new bazel-based GN metadata solution is enabled across the tree.",
+                    "See b/305986490"
+                ],
+                "paths": [
+                    "prebuilt/drivers/rtc/pcf8563"
+                ]
+            },
+            {
                 "paths": [
                     "src/connectivity/telephony/lib/qmi-protocol/tests",
                     "third_party/android/platform/system/tools/hidl/test",
