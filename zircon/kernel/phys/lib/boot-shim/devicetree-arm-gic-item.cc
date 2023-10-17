@@ -23,7 +23,6 @@
 #include <cstdint>
 #include <limits>
 #include <optional>
-#include <string>
 #include <string_view>
 #include <type_traits>
 
@@ -118,20 +117,21 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
   zbi_dcfg_arm_gic_v3_driver_t dcfg{};
 
   if (reg.size() > 1) {
-    if (auto gicd = decoder.TranslateAddress(*reg[GicV3Regs::kGicd].address())) {
-      dcfg.gicd_offset = 0;
-      dcfg.mmio_phys = *gicd;
-    } else {
+    auto gicd = decoder.TranslateAddress(*reg[GicV3Regs::kGicd].address());
+    if (!gicd) {
       OnError("GIC v3: GICD address translation failed.");
       return devicetree::ScanState::kDone;
     }
 
-    if (auto gicr = decoder.TranslateAddress(*reg[GicV3Regs::kGicr].address())) {
-      dcfg.gicr_offset = *gicr - dcfg.mmio_phys;
-    } else {
+    auto gicr = decoder.TranslateAddress(*reg[GicV3Regs::kGicr].address());
+    if (!gicr) {
       OnError("GIC v3: GICR address translation failed.");
       return devicetree::ScanState::kDone;
     }
+
+    dcfg.mmio_phys = std::min(*gicd, *gicr);
+    dcfg.gicr_offset = *gicr - dcfg.mmio_phys;
+    dcfg.gicd_offset = *gicd - dcfg.mmio_phys;
 
     if (redistributor_stride) {
       if (auto stride = redistributor_stride->AsUint32()) {
@@ -175,46 +175,65 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV2(
   auto& reg = *reg_ptr;
 
   zbi_dcfg_arm_gic_v2_driver_t dcfg{};
-
   if (reg.size() > 1) {
-    if (auto gicd = decoder.TranslateAddress(*reg[GicV2Regs::kGicd].address())) {
-      dcfg.mmio_phys = *gicd;
-      dcfg.gicd_offset = 0;
-    } else {
+    auto gicd = decoder.TranslateAddress(*reg[GicV2Regs::kGicd].address());
+    if (!gicd) {
       OnError("GIC v2: Failed to translate gicd address.");
       return devicetree::ScanState::kDone;
     }
 
     if (!reg[GicV2Regs::kGicc].address()) {
-      dcfg.gicc_offset = 0;
-    } else if (auto gicr = decoder.TranslateAddress(*reg[GicV2Regs::kGicc].address())) {
-      dcfg.gicc_offset = *gicr - dcfg.mmio_phys;
-    } else {
-      OnError("GIC v2: Failed to translate gicr address.");
+      OnError("GIC v2: Failed to obtain GICC address.");
       return devicetree::ScanState::kDone;
     }
+
+    auto gicc = decoder.TranslateAddress(*reg[GicV2Regs::kGicc].address());
+    if (!gicc) {
+      OnError("GIC v2: Failed to translate gicc address.");
+      return devicetree::ScanState::kDone;
+    }
+
+    dcfg.mmio_phys = std::min(*gicd, *gicc);
+    dcfg.gicd_offset = *gicd - dcfg.mmio_phys;
+    dcfg.gicc_offset = *gicc - dcfg.mmio_phys;
+    dcfg.gich_offset = 0;
+    dcfg.gicv_offset = 0;
   }
 
   // If there are more than 2, then the virtualization extension is provided.
   if (reg.size() > 2) {
-    dcfg.gich_offset = reg[GicV2Regs::kGich].address().value_or(dcfg.mmio_phys) - dcfg.mmio_phys;
     if (!reg[GicV2Regs::kGich].address()) {
-      dcfg.gich_offset = 0;
-    } else if (auto gich = decoder.TranslateAddress(*reg[GicV2Regs::kGich].address())) {
-      dcfg.gich_offset = *gich;
-    } else {
-      OnError("GIC v2: Failed to translate gich address.");
+      OnError("GIC v2: Failed to obtain GICH address.");
+      return devicetree::ScanState::kDone;
+    }
+
+    auto gich = decoder.TranslateAddress(*reg[GicV2Regs::kGich].address());
+    if (!gich) {
+      OnError("GIC v2: Failed to translate GICH address.");
       return devicetree::ScanState::kDone;
     }
 
     if (!reg[GicV2Regs::kGicv].address()) {
-      dcfg.gicv_offset = 0;
-    } else if (auto gicv = decoder.TranslateAddress(*reg[GicV2Regs::kGicv].address())) {
-      dcfg.gicv_offset = *gicv;
-    } else {
-      OnError("GIC v2: Failed to translate gicv address.");
+      OnError("GIC v2: Failed to obtain GICH address.");
       return devicetree::ScanState::kDone;
     }
+
+    auto gicv = decoder.TranslateAddress(*reg[GicV2Regs::kGicv].address());
+    if (!gicv) {
+      OnError("GIC v2: Failed to translate GICV address.");
+      return devicetree::ScanState::kDone;
+    }
+
+    uint64_t min_mmio_phys = std::min(dcfg.mmio_phys, std::min(*gicv, *gich));
+
+    // Need to recalculate offsets from new minimal address.
+    if (min_mmio_phys != dcfg.mmio_phys) {
+      dcfg.gicd_offset = dcfg.gicd_offset + dcfg.mmio_phys - min_mmio_phys;
+      dcfg.gicc_offset = dcfg.gicc_offset + dcfg.mmio_phys - min_mmio_phys;
+      dcfg.mmio_phys = min_mmio_phys;
+    }
+    dcfg.gich_offset = *gich - dcfg.mmio_phys;
+    dcfg.gicv_offset = *gicv - dcfg.mmio_phys;
   }
 
   dcfg.ipi_base = 0;
