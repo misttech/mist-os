@@ -11,16 +11,8 @@ import("//zircon/kernel/phys/phys_executable.gni")
 import("//zircon/kernel/phys/qemu.gni")
 import("//zircon/kernel/phys/shim_executable.gni")
 
-legacy_shims = [
-  "riscv64-qemu-boot-shim",
-  "linux-riscv64-boot-shim",
-]
-
 group("boot-shim") {
-  deps = []
-  foreach(shim, legacy_shims) {
-    deps += [ ":$shim" ]
-  }
+  deps = [ ":linux-riscv64-boot-shim" ]
 }
 
 shim_executable("linux-riscv64-boot-shim") {
@@ -41,23 +33,8 @@ shim_executable("linux-riscv64-boot-shim") {
   ]
 }
 
-shim_executable("riscv64-qemu-boot-shim") {
-  sources = [ "riscv64-qemu-boot-shim.cc" ]
-  deps = [
-    "..:linuxboot",
-    "//zircon/kernel/lib/boot-options",
-    "//zircon/kernel/lib/devicetree",
-    "//zircon/kernel/lib/ktl",
-    "//zircon/kernel/lib/libc",
-    "//zircon/kernel/phys:allocation-init",
-    "//zircon/kernel/phys:boot-zbi",
-    "//zircon/kernel/phys:exception",
-    "//zircon/kernel/phys:main",
-    "//zircon/kernel/phys:stdio",
-    "//zircon/kernel/phys:symbolize",
-    "//zircon/kernel/phys:uart",
-    "//zircon/kernel/phys/lib/boot-shim",
-  ]
+group("tests") {
+  testonly = true
 }
 
 qemu_shim_phys_tests = [
@@ -75,37 +52,26 @@ if (current_cpu == target_cpu) {
 }
 
 template("qemu_shim_test") {
-  foreach(shim, legacy_shims) {
-    zbi_test("$shim-$target_name") {
-      foreach(qemu, qemu_boot_formats) {
-        if (qemu.name == qemu_boot_format) {
-          qemu_kernel = ":$shim(${qemu.environment})"
-          forward_variables_from(qemu, [ "timeout" ])
-        }
+  zbi_test("linux-riscv64-boot-shim-$target_name") {
+    foreach(qemu, qemu_boot_formats) {
+      if (qemu.name == qemu_boot_format) {
+        qemu_kernel = ":linux-riscv64-boot-shim(${qemu.environment})"
+        forward_variables_from(qemu, [ "timeout" ])
       }
-      assert(defined(qemu_kernel),
-             "$qemu_boot_format not in $qemu_boot_formats")
-
-      device_types = [ "QEMU" ]
-
-      forward_variables_from(invoker, "*")
     }
-  }
-}
+    assert(defined(qemu_kernel), "$qemu_boot_format not in $qemu_boot_formats")
 
-group("tests") {
-  testonly = true
-  deps = []
+    device_types = [ "QEMU" ]
+
+    forward_variables_from(invoker, "*")
+  }
 }
 
 group("boot_tests") {
   testonly = true
-  deps = []
-  foreach(shim, legacy_shims) {
-    deps += [ ":$shim" ]
-    foreach(test, qemu_shim_tests) {
-      deps += [ ":$shim-$test" ]
-    }
+  deps = [ ":boot-shim" ]
+  foreach(test, qemu_shim_tests) {
+    deps += [ ":linux-riscv64-boot-shim-$test" ]
   }
 }
 
