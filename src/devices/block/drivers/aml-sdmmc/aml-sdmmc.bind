@@ -7,7 +7,7 @@ using fuchsia.amlogic.platform;
 fuchsia.BIND_COMPOSITE == 1;
 fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_VID.AMLOGIC;
 accept fuchsia.BIND_PLATFORM_DEV_DID {
-  0x06,  // PDEV_DID_AMLOGIC_SDMMC_A
-  0x07,  // PDEV_DID_AMLOGIC_SDMMC_B
-  0x08,  // PDEV_DID_AMLOGIC_SDMMC_C
+  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.SDMMC_A,
+  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.SDMMC_B,
+  fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.SDMMC_C,
 }
