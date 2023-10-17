@@ -8,7 +8,6 @@ load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_t
 load(":fuchsia_component.bzl", "fuchsia_component_for_unit_test")
 load(":fuchsia_debug_symbols.bzl", "collect_debug_symbols", "get_build_id_dirs", "strip_resources")
 load(":fuchsia_transition.bzl", "fuchsia_transition")
-load(":package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load(
     ":providers.bzl",
     "FuchsiaComponentInfo",
@@ -386,13 +385,6 @@ def _build_fuchsia_package_impl(ctx):
         meta_far,
     ]
 
-    # Attempt to publish if told to do so
-    repo_path = package_repo_path_from_label(ctx.attr._package_repo_path)
-    if repo_path:
-        # TODO: collect all dependent packages
-        stamp_file = publish_package(ctx, sdk.pm, repo_path, [output_package_manifest])
-        output_files.append(stamp_file)
-
     # Sanity check that we are not trying to put 2 different resources at the same mountpoint
     collected_blobs = {}
     for resource in package_resources:
@@ -477,10 +469,6 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "_fuchsia_sdk_debug_symbols": attr.label(
             doc = "Include debug symbols from @fuchsia_sdk.",
             default = "@fuchsia_sdk//:debug_symbols",
-        ),
-        "_package_repo_path": attr.label(
-            doc = "The command line flag used to publish packages.",
-            default = "//fuchsia:package_repo",
         ),
         "_elf_strip_tool": attr.label(
             default = "//fuchsia/tools:elf_strip",

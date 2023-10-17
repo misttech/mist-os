@@ -196,13 +196,6 @@ AccessTokenInfo = provider(
     },
 )
 
-FuchsiaPackageRepoPathInfo = provider(
-    doc = "A provider which provides the path to a fuchsia package repo",
-    fields = {
-        "path": "The path to the repository.",
-    },
-)
-
 FuchsiaPackageRepoInfo = provider(
     doc = "A provider which provides the contents of a fuchsia package repo",
     fields = {

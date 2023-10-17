@@ -5,7 +5,6 @@
 """Implement fuchsia_prebuilt_package() rule."""
 
 load("//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
-load("//fuchsia/private:package_publishing.bzl", "package_repo_path_from_label", "publish_package")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 
 def _relative_file_name(ctx, filename):
@@ -112,12 +111,6 @@ def _fuchsia_prebuilt_package_impl(ctx):
     )
     output_files.append(rebased_package_manifest_json)
 
-    # Attempt to publish if told to do so
-    repo_path = package_repo_path_from_label(ctx.attr._package_repo_path)
-    if repo_path:
-        stamp_file = publish_package(ctx, sdk.pm, repo_path, [rebased_package_manifest_json])
-        output_files.append(stamp_file)
-
     return [
         DefaultInfo(files = depset(output_files)),
         FuchsiaPackageInfo(
@@ -147,10 +140,6 @@ _fuchsia_prebuilt_package = rule(
         "drivers": attr.string_list(
             doc = "drivers of this driver",
             default = [],
-        ),
-        "_package_repo_path": attr.label(
-            doc = "The command line flag used to publish packages.",
-            default = "//fuchsia:package_repo",
         ),
         "_rebase_package_manifest": attr.label(
             default = "//fuchsia/tools:rebase_package_manifest",

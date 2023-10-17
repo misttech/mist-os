@@ -17,7 +17,6 @@ ignore_policy = struct(
 
     # These rules will be ignored:
     rules = bool_dict([
-        "package_repo_path_flag",  # Config flag
         "fuchsia_scrutiny_config",  # Build time verification data.
         "fuchsia_debug_symbols",  # Debug symbols have no separate licenses.
     ]),
