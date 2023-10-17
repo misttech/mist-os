@@ -123,11 +123,7 @@ closed protocol DriverIndex {
     /// Adds a composite node spec to the driver index. The driver index stores the
     /// composite node spec and maps it by the name. The stored composite node specs are
     /// included in the driver matching process.
-    // TODO(fxbug.dev/111076): Return just the status.
-    strict AddCompositeNodeSpec(fuchsia.driver.framework.CompositeNodeSpec) -> (struct {
-        composite_driver MatchedCompositeInfo;
-        node_names vector<string:MAX>:MAX;
-    }) error zx.Status;
+    strict AddCompositeNodeSpec(fuchsia.driver.framework.CompositeNodeSpec) -> () error zx.Status;
 
     /// Rematch the composite node spec to a composite driver. If a driver url suffix is
     /// provided, the composite node spec will only be matched against drivers with URLS that

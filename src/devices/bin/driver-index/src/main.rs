@@ -270,10 +270,7 @@ async fn run_index_server(
                 }
                 DriverIndexRequest::AddCompositeNodeSpec { payload, responder } => {
                     responder
-                        .send(match indexer.add_composite_node_spec(payload) {
-                            Ok((ref driver, ref names)) => Ok((driver, names)),
-                            Err(e) => Err(e),
-                        })
+                        .send(indexer.add_composite_node_spec(payload))
                         .or_else(ignore_peer_closed)
                         .context("error responding to AddCompositeNodeSpec")?;
                 }
@@ -1782,7 +1779,7 @@ mod tests {
             }];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
@@ -1961,25 +1958,26 @@ mod tests {
                 },
             ];
 
-            let result = proxy
-                .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                    name: Some("spec_match".to_string()),
-                    parents: Some(vec![
-                        fdf::ParentSpec {
-                            bind_rules: node_1_bind_rules.clone(),
-                            properties: node_1_props_match.clone(),
-                        },
-                        fdf::ParentSpec {
-                            bind_rules: node_2_bind_rules.clone(),
-                            properties: node_2_props_match.clone(),
-                        },
-                    ]),
-                    ..Default::default()
-                })
-                .await
-                .unwrap()
-                .unwrap();
-            assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
+            assert_eq!(
+                Ok(()),
+                proxy
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
+                        name: Some("spec_match".to_string()),
+                        parents: Some(vec![
+                            fdf::ParentSpec {
+                                bind_rules: node_1_bind_rules.clone(),
+                                properties: node_1_props_match.clone(),
+                            },
+                            fdf::ParentSpec {
+                                bind_rules: node_2_bind_rules.clone(),
+                                properties: node_2_props_match.clone(),
+                            },
+                        ]),
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap()
+            );
 
             let node_1_props_nonmatch = vec![fdf::NodeProperty {
                 key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
@@ -1987,7 +1985,7 @@ mod tests {
             }];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_1".to_string()),
@@ -2013,7 +2011,7 @@ mod tests {
             }];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_2".to_string()),
@@ -2162,25 +2160,26 @@ mod tests {
                 },
             ];
 
-            let result = proxy
-                .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                    name: Some("spec_match".to_string()),
-                    parents: Some(vec![
-                        fdf::ParentSpec {
-                            bind_rules: node_1_bind_rules.clone(),
-                            properties: node_1_props_match.clone(),
-                        },
-                        fdf::ParentSpec {
-                            bind_rules: node_2_bind_rules.clone(),
-                            properties: node_2_props_match.clone(),
-                        },
-                    ]),
-                    ..Default::default()
-                })
-                .await
-                .unwrap()
-                .unwrap();
-            assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
+            assert_eq!(
+                Ok(()),
+                proxy
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
+                        name: Some("spec_match".to_string()),
+                        parents: Some(vec![
+                            fdf::ParentSpec {
+                                bind_rules: node_1_bind_rules.clone(),
+                                properties: node_1_props_match.clone(),
+                            },
+                            fdf::ParentSpec {
+                                bind_rules: node_2_bind_rules.clone(),
+                                properties: node_2_props_match.clone(),
+                            },
+                        ]),
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap()
+            );
 
             let node_1_props_nonmatch = vec![fdf::NodeProperty {
                 key: fdf::NodePropertyKey::StringValue("trembler".to_string()),
@@ -2188,7 +2187,7 @@ mod tests {
             }];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_1".to_string()),
@@ -2214,7 +2213,7 @@ mod tests {
             }];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("spec_non_match_2".to_string()),
@@ -2374,29 +2373,30 @@ mod tests {
                 },
             ];
 
-            let result = proxy
-                .add_composite_node_spec(&fdf::CompositeNodeSpec {
-                    name: Some("spec_match".to_string()),
-                    parents: Some(vec![
-                        fdf::ParentSpec {
-                            bind_rules: node_1_bind_rules.clone(),
-                            properties: node_1_props_match.clone(),
-                        },
-                        fdf::ParentSpec {
-                            bind_rules: optional_1_bind_rules.clone(),
-                            properties: optional_1_props_match.clone(),
-                        },
-                        fdf::ParentSpec {
-                            bind_rules: node_2_bind_rules.clone(),
-                            properties: node_2_props_match.clone(),
-                        },
-                    ]),
-                    ..Default::default()
-                })
-                .await
-                .unwrap()
-                .unwrap();
-            assert_eq!(url.to_string(), result.0.driver_info.unwrap().url.unwrap());
+            assert_eq!(
+                Ok(()),
+                proxy
+                    .add_composite_node_spec(&fdf::CompositeNodeSpec {
+                        name: Some("spec_match".to_string()),
+                        parents: Some(vec![
+                            fdf::ParentSpec {
+                                bind_rules: node_1_bind_rules.clone(),
+                                properties: node_1_props_match.clone(),
+                            },
+                            fdf::ParentSpec {
+                                bind_rules: optional_1_bind_rules.clone(),
+                                properties: optional_1_props_match.clone(),
+                            },
+                            fdf::ParentSpec {
+                                bind_rules: node_2_bind_rules.clone(),
+                                properties: node_2_props_match.clone(),
+                            },
+                        ]),
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap()
+            );
         }
         .fuse();
 
@@ -2508,7 +2508,7 @@ mod tests {
 
             // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
@@ -2706,7 +2706,7 @@ mod tests {
 
             // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
@@ -2915,7 +2915,7 @@ mod tests {
 
             // When we add the spec it should get not found since there's no drivers.
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),
@@ -3050,7 +3050,7 @@ mod tests {
             ];
 
             assert_eq!(
-                Err(Status::NOT_FOUND.into_raw()),
+                Ok(()),
                 proxy
                     .add_composite_node_spec(&fdf::CompositeNodeSpec {
                         name: Some("test_group".to_string()),

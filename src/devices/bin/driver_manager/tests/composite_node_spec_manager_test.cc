@@ -76,20 +76,7 @@ class FakeDeviceManagerBridge : public CompositeManagerBridge {
   void BindNodesForCompositeNodeSpec() override {}
   void AddSpecToDriverIndex(fdf::wire::CompositeNodeSpec spec,
                             AddToIndexCallback callback) override {
-    auto iter = spec_matches_.find(std::string(spec.name().get()));
-    zx::result<fdi::DriverIndexAddCompositeNodeSpecResponse> result;
-    if (iter == spec_matches_.end()) {
-      result = zx::error(ZX_ERR_NOT_FOUND);
-    } else {
-      auto composite = iter->second.composite();
-      auto names = iter->second.node_names();
-      ZX_ASSERT(composite.has_value());
-      ZX_ASSERT(names.has_value());
-      result =
-          zx::ok(fdi::DriverIndexAddCompositeNodeSpecResponse(composite.value(), names.value()));
-    }
-    auto defer =
-        fit::defer([callback = std::move(callback), result]() mutable { callback(result); });
+    callback(zx::ok());
   }
 
   void RequestRebindFromDriverIndex(std::string spec, std::optional<std::string> driver_url_suffix,

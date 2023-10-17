@@ -72,14 +72,7 @@ void TestDriverIndex::VerifyRequestCount(uint32_t id, size_t expected_count) {
 
 void TestBindManagerBridge::AddSpecToDriverIndex(
     fuchsia_driver_framework::wire::CompositeNodeSpec spec, AddToIndexCallback callback) {
-  auto name = std::string(spec.name().get());
-  auto response = fdi::DriverIndexAddCompositeNodeSpecResponse(
-      fdi::MatchedCompositeInfo{{
-          .composite_name = name,
-          .driver_info = fdi::MatchedDriverInfo{{.driver_url = "fuchsia-boot:///#meta/test.cm"}},
-      }},
-      specs_.at(name).fidl_info.node_names().value());
-  callback(zx::ok(response));
+  callback(zx::ok());
 }
 
 void TestBindManagerBridge::AddCompositeNodeSpec(std::string composite,

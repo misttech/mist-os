@@ -514,13 +514,6 @@ TEST(MiscTestCase, AddCompositeNodeSpec) {
           .parents = parents,
           .metadata = metadata,
       };
-  const fdi::MatchedCompositeNodeSpecInfo match({
-      .composite = fdi::MatchedCompositeInfo(
-          {.composite_name = "composite_name",
-           .driver_info = fdi::MatchedDriverInfo({.url = "#driver/mock-device.so"})}),
-      .node_names = {{"shoveler"}},
-  });
-  fake_driver_index.AddCompositeNodeSpecMatch("spec", match);
 
   ASSERT_OK(coordinator.AddCompositeNodeSpec(device, "spec", spec));
   loop.RunUntilIdle();

@@ -113,7 +113,7 @@ void DriverLoader::AddCompositeNodeSpec(fuchsia_driver_framework::wire::Composit
     return;
   }
 
-  callback(zx::ok(fidl::ToNatural(*result->value())));
+  callback(zx::ok());
 }
 
 const std::vector<MatchedDriver> DriverLoader::MatchDeviceDriverIndex(

@@ -27,35 +27,20 @@ fit::result<fdfw::CompositeNodeSpecError> CompositeNodeSpecManager::AddSpec(
     return fit::error(fdfw::CompositeNodeSpecError::kAlreadyExists);
   }
 
-  auto parent_count = fidl_spec.parents().count();
-  AddToIndexCallback callback =
-      [this, spec_impl = std::move(spec), name,
-       parent_count](zx::result<fuchsia_driver_index::DriverIndexAddCompositeNodeSpecResponse>
-                         result) mutable {
-        if (!result.is_ok()) {
-          if (result.status_value() == ZX_ERR_NOT_FOUND) {
-            specs_[name] = std::move(spec_impl);
-            return;
-          }
+  AddToIndexCallback callback = [this, spec_impl = std::move(spec),
+                                 name](zx::result<> result) mutable {
+    if (!result.is_ok()) {
+      LOGF(ERROR, "CompositeNodeSpecManager::AddCompositeNodeSpec failed: %d",
+           result.status_value());
+      return;
+    }
 
-          LOGF(ERROR, "CompositeNodeSpecManager::AddCompositeNodeSpec failed: %d",
-               result.status_value());
-          return;
-        }
+    specs_[name] = std::move(spec_impl);
 
-        if (result->node_names().size() != parent_count) {
-          LOGF(
-              WARNING,
-              "DriverIndexAddCompositeNodeSpecResponse node_names count doesn't match node_count.");
-          return;
-        }
-
-        specs_[name] = std::move(spec_impl);
-
-        // Now that there is a new composite node spec, we can tell the bridge to attempt binds
-        // again.
-        bridge_->BindNodesForCompositeNodeSpec();
-      };
+    // Now that there is a new composite node spec, we can tell the bridge to attempt binds
+    // again.
+    bridge_->BindNodesForCompositeNodeSpec();
+  };
 
   bridge_->AddSpecToDriverIndex(fidl_spec, std::move(callback));
   return fit::ok();

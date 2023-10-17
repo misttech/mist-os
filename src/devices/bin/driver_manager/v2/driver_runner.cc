@@ -280,7 +280,7 @@ void DriverRunner::AddSpecToDriverIndex(fuchsia_driver_framework::wire::Composit
           return;
         }
 
-        callback(zx::ok(fidl::ToNatural(*result->value())));
+        callback(zx::ok());
       });
 }
 

@@ -62,7 +62,7 @@ impl CompositeNodeSpecManager {
         &mut self,
         spec: fdf::CompositeNodeSpec,
         composite_drivers: Vec<&ResolvedDriver>,
-    ) -> fdi::DriverIndexAddCompositeNodeSpecResult {
+    ) -> Result<(), i32> {
         // Get and validate the name.
         let name = spec.name.ok_or(Status::INVALID_ARGS.into_raw())?;
         if let Ok(name_regex) = Regex::new(NAME_REGEX) {
@@ -113,24 +113,21 @@ impl CompositeNodeSpecManager {
         }
 
         let matched_composite_result =
-            self.find_composite_driver_match(&parents, &composite_drivers)?;
-        if let Some(matched_composite) = matched_composite_result {
+            self.find_composite_driver_match(&parents, &composite_drivers);
+
+        if let Some(matched_composite) = &matched_composite_result {
             tracing::info!(
                 "Matched '{}' to composite node spec '{}'",
-                get_driver_url(&matched_composite),
+                get_driver_url(matched_composite),
                 name
             );
+        }
 
-            let result = (matched_composite.info.clone(), matched_composite.names.clone());
-            self.spec_list.insert(
-                name.clone(),
-                CompositeNodeSpecInfo { nodes: parents, matched: Some(matched_composite) },
-            );
-            return Ok(result);
-        };
-
-        self.spec_list.insert(name, CompositeNodeSpecInfo { nodes: parents, matched: None });
-        Err(Status::NOT_FOUND.into_raw())
+        self.spec_list.insert(
+            name,
+            CompositeNodeSpecInfo { nodes: parents, matched: matched_composite_result },
+        );
+        Ok(())
     }
 
     // Match the given device properties to all the nodes. Returns a list of specs for all the
@@ -197,7 +194,7 @@ impl CompositeNodeSpecManager {
         composite_drivers: Vec<&ResolvedDriver>,
     ) -> Result<(), zx_status_t> {
         let spec = self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
-        let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers)?;
+        let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers);
         self.spec_list.entry(spec_name).and_modify(|spec| {
             spec.matched = new_match;
         });
@@ -229,7 +226,7 @@ impl CompositeNodeSpecManager {
 
         for spec_name in specs_to_rebind {
             let spec = self.spec_list.get(&spec_name).ok_or(Status::NOT_FOUND.into_raw())?;
-            let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers)?;
+            let new_match = self.find_composite_driver_match(&spec.nodes, &composite_drivers);
             self.spec_list.entry(spec_name).and_modify(|spec| {
                 spec.matched = new_match;
             });
@@ -282,18 +279,14 @@ impl CompositeNodeSpecManager {
         &self,
         parents: &'a Vec<fdf::ParentSpec>,
         composite_drivers: &Vec<&ResolvedDriver>,
-    ) -> Result<Option<MatchedComposite>, i32> {
+    ) -> Option<MatchedComposite> {
         for composite_driver in composite_drivers {
-            let matched_composite = match_composite_properties(composite_driver, parents)?;
-            if let Some(matched_composite) = matched_composite {
-                return Ok(Some(MatchedComposite {
-                    info: matched_composite.info.clone(),
-                    names: matched_composite.names.clone(),
-                    primary_index: matched_composite.primary_index,
-                }));
+            let matched_composite = match_composite_properties(composite_driver, parents);
+            if let Ok(Some(matched_composite)) = matched_composite {
+                return Some(matched_composite);
             }
         }
-        Ok(None)
+        None
     }
 }
 
@@ -735,7 +728,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -831,7 +824,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -884,7 +877,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -958,7 +951,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -970,7 +963,7 @@ mod tests {
         );
 
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec2".to_string()),
@@ -1071,7 +1064,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1089,7 +1082,7 @@ mod tests {
         );
 
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec2".to_string()),
@@ -1107,7 +1100,7 @@ mod tests {
         );
 
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec3".to_string()),
@@ -1182,7 +1175,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1251,7 +1244,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1344,7 +1337,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1633,18 +1626,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![
-                    TEST_PRIMARY_NAME.to_string(),
-                    TEST_ADDITIONAL_B_NAME.to_string(),
-                    TEST_ADDITIONAL_A_NAME.to_string()
-                ]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1802,18 +1784,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![
-                    TEST_ADDITIONAL_B_NAME.to_string(),
-                    TEST_ADDITIONAL_A_NAME.to_string(),
-                    TEST_PRIMARY_NAME.to_string(),
-                ]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -1988,18 +1959,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![
-                    TEST_PRIMARY_NAME.to_string(),
-                    TEST_ADDITIONAL_B_NAME.to_string(),
-                    TEST_ADDITIONAL_A_NAME.to_string()
-                ]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -2171,19 +2131,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![
-                    TEST_PRIMARY_NAME.to_string(),
-                    TEST_ADDITIONAL_B_NAME.to_string(),
-                    TEST_OPTIONAL_NAME.to_string(),
-                    TEST_ADDITIONAL_A_NAME.to_string()
-                ]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -2355,7 +2303,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -2386,7 +2334,7 @@ mod tests {
             )],
         };
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test-spec".to_string()),
@@ -2398,7 +2346,7 @@ mod tests {
         );
 
         assert_eq!(
-            Err(Status::NOT_FOUND.into_raw()),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -2484,14 +2432,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![TEST_PRIMARY_NAME.to_string(),]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),
@@ -2561,14 +2502,7 @@ mod tests {
 
         let mut composite_node_spec_manager = CompositeNodeSpecManager::new();
         assert_eq!(
-            Ok((
-                fdi::MatchedCompositeInfo {
-                    composite_name: Some(TEST_DEVICE_NAME.to_string()),
-                    driver_info: Some(composite_driver.clone().create_matched_driver_info()),
-                    ..Default::default()
-                },
-                vec![TEST_PRIMARY_NAME.to_string(),]
-            )),
+            Ok(()),
             composite_node_spec_manager.add_composite_node_spec(
                 fdf::CompositeNodeSpec {
                     name: Some("test_spec".to_string()),

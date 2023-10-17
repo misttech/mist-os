@@ -241,10 +241,7 @@ impl Indexer {
         }
     }
 
-    pub fn add_composite_node_spec(
-        &self,
-        spec: fdf::CompositeNodeSpec,
-    ) -> fdi::DriverIndexAddCompositeNodeSpecResult {
+    pub fn add_composite_node_spec(&self, spec: fdf::CompositeNodeSpec) -> Result<(), i32> {
         let driver_list = self.list_drivers();
         let composite_drivers = driver_list
             .iter()
