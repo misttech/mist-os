@@ -17,7 +17,7 @@ load(
     "FuchsiaPackageResourcesInfo",
     "FuchsiaPackagedComponentInfo",
 )
-load(":utils.bzl", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
+load(":utils.bzl", "fuchsia_cpu_from_ctx", "label_name", "make_resource_struct", "rule_variants", "stub_executable")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 
 _FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
@@ -404,6 +404,7 @@ def _build_fuchsia_package_impl(ctx):
     return [
         DefaultInfo(files = depset(output_files), executable = stub_executable(ctx)),
         FuchsiaPackageInfo(
+            fuchsia_cpu = fuchsia_cpu_from_ctx(ctx),
             far_file = far_file,
             package_manifest = output_package_manifest,
             files = [output_package_manifest, meta_far] + build_inputs,

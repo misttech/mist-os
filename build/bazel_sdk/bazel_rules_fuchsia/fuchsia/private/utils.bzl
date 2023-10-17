@@ -8,6 +8,16 @@ load(":providers.bzl", "FuchsiaProvidersInfo")
 
 _INVALID_LABEL_CHARACTERS = "\"!%@^_#$&'()*+,;<=>?[]{|}~/".elems()
 
+def _fuchsia_cpu_alias(cpu):
+    if cpu == "aarch64":
+        return "arm64"
+    return cpu
+
+def fuchsia_cpu_from_ctx(ctx):
+    """ Returns the Fuchsia CPU for the given rule invocation. """
+    target_cpu = ctx.var["TARGET_CPU"]
+    return _fuchsia_cpu_alias(target_cpu)
+
 def normalized_target_name(label):
     label = label.lower()
     for c in _INVALID_LABEL_CHARACTERS:
