@@ -125,6 +125,7 @@ template("golden_go_proto") {
     }
     _golden_name = "${_target_name}_desc_pb_diff"
     golden_files(_golden_name) {
+      binary = true
       comparisons = [
         {
           golden = "${_dir}/${_target_name}.desc.pb"

@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
+import difflib
 import filecmp
 import json
 import os
@@ -43,6 +44,15 @@ def print_failure_msg(manual_updates, label):
     print(MANUAL_UPDATE_FOOTER.format(label=label))
 
 
+def get_diff_lines(file1, file2):
+    """Returns a list of strings representing the unified diff of the two file."""
+    with open(file1) as f:
+        lines1 = f.readlines()
+    with open(file2) as f:
+        lines2 = f.readlines()
+    return list(difflib.unified_diff(lines1, lines2, file1, file2))
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", help="GN label for this test", required=True)
@@ -77,6 +87,11 @@ def main():
         "--err-msg",
         help="Additional error message to display if files don't match",
     )
+    parser.add_argument(
+        "--binary",
+        help="Use binary comparison for the files.",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     with open(args.comparisons) as f:
@@ -97,10 +112,17 @@ def main():
         if formatted_golden:
             inputs.append(formatted_golden)
 
+        diff_lines = []
         if os.path.exists(golden):
-            current_comparison_failed = not filecmp.cmp(
-                candidate, formatted_golden or golden
-            )
+            if args.binary:
+                current_comparison_failed = not filecmp.cmp(
+                    candidate, formatted_golden or golden
+                )
+            else:
+                diff_lines = get_diff_lines(
+                    candidate, formatted_golden or golden
+                )
+                current_comparison_failed = bool(diff_lines)
         else:
             current_comparison_failed = True
 
@@ -111,6 +133,15 @@ def main():
                 str += args.err_msg
             else:
                 str += f'Golden file mismatch: {comparison["golden"]}'
+
+            if diff_lines:
+                max_diff_lines = 16
+                if len(diff_lines) > max_diff_lines:
+                    str += f"\nDiff (truncated):\n"
+                else:
+                    str += f"\nDiff:\n"
+                str += "".join(diff_lines[:max_diff_lines])
+
             print(str)
 
             if args.bless:
