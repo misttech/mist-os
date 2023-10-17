@@ -429,24 +429,6 @@ func (t *SubprocessTester) Test(ctx context.Context, test testsharder.Test, stdo
 		testResult.FailReason = err.Error()
 	}
 
-	testResult.OutputDir = outDir
-	if err := filepath.WalkDir(outDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		relPath, err := filepath.Rel(outDir, path)
-		if err != nil {
-			return err
-		}
-		testResult.OutputFiles = append(testResult.OutputFiles, relPath)
-		return nil
-	}); err != nil {
-		logger.Errorf(ctx, "unable to record output files: %s", err)
-	}
-
 	var sinks []runtests.DataSink
 	profileErr := filepath.WalkDir(profileAbsDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
