@@ -1,8 +1,9 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-from fuchsia_controller_py import ZxStatus
 import unittest
+
+from fuchsia_controller_py import ZxStatus
 
 
 class Errors(unittest.TestCase):

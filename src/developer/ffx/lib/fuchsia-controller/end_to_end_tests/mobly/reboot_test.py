@@ -2,14 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import asyncio
 
-import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
 from fuchsia_controller_py import ZxStatus
 from mobly import base_test
 from mobly import test_runner
-
 from mobly_controller import fuchsia_device
 from mobly_controller.fuchsia_device import asynctest
 

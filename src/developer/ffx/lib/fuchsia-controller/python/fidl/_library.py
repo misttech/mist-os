@@ -10,28 +10,30 @@ import inspect
 import json
 import keyword
 import os
-import re
 import sys
 import types
-
 from typing import (
-    Dict,
-    List,
-    Optional,
-    Mapping,
-    ForwardRef,
-    Set,
-    Union,
-    Sequence,
-    Tuple,
-    Callable,
-    Iterable,
     Any,
+    Callable,
+    Dict,
+    ForwardRef,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
 )
+
 from fidl_codec import add_ir_path
+
 from ._client import FidlClient
-from ._server import ServerBase, MethodInfo
-from ._fidl_common import camel_case_to_snake_case, internal_kind_to_type
+from ._fidl_common import camel_case_to_snake_case
+from ._fidl_common import internal_kind_to_type
+from ._server import MethodInfo
+from ._server import ServerBase
 
 LIB_MAP: Dict[str, str] = {}
 MAP_INIT = False
@@ -358,7 +360,7 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
         ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         if ident_kind == "bits":
-            py_name = Union[ty, Set[ty]]
+            Union[ty, Set[ty]]
         return wrap_optional(ty)
     elif kind == "primitive":
         return string_to_basetype(type_ir["subtype"])
@@ -738,8 +740,6 @@ def protocol_server_type(ir: IR, root_ir) -> type:
         ident = ""
         if "maybe_request_payload" in method:
             ident = method.request_payload_identifier()
-        success_type = None
-        err_type = None
         properties["method_map"][method.ordinal()] = MethodInfo(
             name=method_snake_case,
             request_ident=ident,

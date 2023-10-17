@@ -2,13 +2,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import sys
-import re
-import inspect
-import typing
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import List, Tuple, Dict
+import inspect
+import re
+import sys
+import typing
+from typing import List, Tuple
 
 # These can be updated to use TypeAlias when python is updated to 3.10+
 TXID_Type = int

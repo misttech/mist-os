@@ -2,20 +2,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fidl_codec import (
-    encode_fidl_message,
-    add_ir_path,
-    method_ordinal,
-    decode_fidl_request,
-)
+import unittest  # NOQA
+
 import common
-import unittest
+from fidl_codec import decode_fidl_request
+from fidl_codec import encode_fidl_message
+from fidl_codec import method_ordinal
 
 
 class EncodeObj(object):
     """Just a generic object to be used for encoding tests."""
-
-    pass
 
 
 class Encode(common.FuchsiaControllerTest):

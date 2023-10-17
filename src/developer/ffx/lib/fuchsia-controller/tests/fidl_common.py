@@ -2,13 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import unittest
 import sys
 import types
 import typing
+import unittest
+
+from fidl._fidl_common import *
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_net as fnet
-from fidl._fidl_common import *
 
 
 class FidlCommon(unittest.TestCase):

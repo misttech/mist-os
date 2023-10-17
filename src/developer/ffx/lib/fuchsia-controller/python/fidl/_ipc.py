@@ -2,13 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Module for handling encoding and decoding FIDL messages, as well as for handling async I/O."""
+from abc import ABC
+from abc import abstractmethod
 import asyncio
 import logging
 import os
 import sys
 import typing
+
 import fuchsia_controller_py as fc
-from abc import ABC, abstractmethod
 
 
 class _QueueWrapper(object):
@@ -59,22 +61,18 @@ class HandleWaker(ABC):
     @abstractmethod
     def register(self, channel: fc.Channel) -> None:
         """Registers a handle to receive wake notifications."""
-        pass
 
     @abstractmethod
     def unregister(self, channel: fc.Channel) -> None:
         """Unregisters a handle, meaning it is not possible to wait for it to be ready."""
-        pass
 
     @abstractmethod
     def post_channel_ready(self, channel: fc.Channel):
         """Notifies the waker that a channel is ready."""
-        pass
 
     @abstractmethod
     async def wait_channel_ready(self, channel: fc.Channel) -> int:
         """Waits for a channel to be ready asynchronously."""
-        pass
 
 
 class GlobalHandleWaker(HandleWaker):

@@ -2,13 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 import asyncio
-import typing
-import fuchsia_controller_py as fc
-from fidl_codec import decode_fidl_request, encode_fidl_message
 from dataclasses import dataclass
+import typing
 
-from ._ipc import GlobalHandleWaker
+from fidl_codec import decode_fidl_request
+from fidl_codec import encode_fidl_message
+import fuchsia_controller_py as fc
+
 from ._fidl_common import *
+from ._ipc import GlobalHandleWaker
 
 
 @dataclass
@@ -32,8 +34,6 @@ class ServerBase(object):
 
     class StopService(Exception):
         """StopService is used to stop the serving loop, close the channel, and shutdown cleanly."""
-
-        pass
 
     class Error:
         """Simple wrapper class around an error."""
@@ -89,7 +89,7 @@ class ServerBase(object):
             else:
                 raise e
         info = self.method_map[ordinal]
-        ident = info.request_ident
+        info.request_ident
         method_name = info.name
         method = getattr(self, method_name)
         if msg is not None:

@@ -1,20 +1,16 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import unittest
 import asyncio
+import unittest
+
+import fidl.fuchsia_controller_test as fc_test
 import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_io as f_io
-import fidl.zx as zx
-import fidl.fuchsia_controller_test as fc_test
-import os
-import sys
-import tempfile
-import os.path
-import asyncio
+from fuchsia_controller_py import Channel
+from fuchsia_controller_py import ZxStatus
+
 from fidl import TransportError
-from fidl_codec import encode_fidl_message, method_ordinal
-from fuchsia_controller_py import Context, IsolateDir, Channel, ZxStatus
 
 
 class TestEchoer(ffx.Echo.Server):
@@ -93,17 +89,19 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         (tx, rx) = Channel.create()
         server = TestEchoer(rx)
         client = ffx.Echo.Client(tx)
-        task = asyncio.get_running_loop().create_task(server.serve())
+        server_task = asyncio.get_running_loop().create_task(server.serve())
         res = await client.echo_string(value="foobar")
         self.assertEqual(res.response, "foobar")
+        server_task.cancel()
 
     async def test_echo_server_async(self):
         (tx, rx) = Channel.create()
         server = AsyncEchoer(rx)
         client = ffx.Echo.Client(tx)
-        task = asyncio.get_running_loop().create_task(server.serve())
+        server_task = asyncio.get_running_loop().create_task(server.serve())
         res = await client.echo_string(value="foobar")
         self.assertEqual(res.response, "foobar")
+        server_task.cancel()
 
     async def test_not_implemented(self):
         (tx, rx) = Channel.create()
@@ -161,6 +159,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         )
         res = await file_proxy.read(count=4)
         self.assertEqual(res.response.data, [1, 2, 3, 4])
+        server_task.cancel()
 
     async def test_failing_file_server(self):
         client, server = Channel.create()
@@ -172,6 +171,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await file_proxy.read(count=4)
         self.assertEqual(res.response, None)
         self.assertEqual(res.err, ZxStatus.ZX_ERR_PEER_CLOSED)
+        server_task.cancel()
 
     async def test_testing_server(self):
         client, server = Channel.create()
@@ -183,6 +183,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await t_client.return_union_with_table()
         self.assertEqual(res.y.str, "bazzz")
         self.assertEqual(res.y.integer, -2)
+        server_task.cancel()
 
     async def test_flexible_method_err(self):
         client, server = Channel.create()
@@ -191,3 +192,4 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         server_task = asyncio.get_running_loop().create_task(t_server.serve())
         res = await t_client.some_method()
         self.assertEqual(res.transport_err, TransportError.UNKNOWN_METHOD)
+        server_task.cancel()

@@ -2,8 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fidl_codec import add_ir_path
 import unittest
+
+from fidl_codec import add_ir_path
 
 
 class IR(unittest.TestCase):

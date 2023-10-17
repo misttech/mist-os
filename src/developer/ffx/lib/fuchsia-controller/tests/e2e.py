@@ -1,15 +1,18 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-import unittest
-import fidl.fuchsia_developer_ffx as ffx_fidl
-import os
-import sys
-import tempfile
-import os.path
 import asyncio
-from fidl_codec import encode_fidl_message, method_ordinal
-from fuchsia_controller_py import Context, IsolateDir, Channel
+import os
+import os.path
+import sys
+import unittest
+
+import fidl.fuchsia_developer_ffx as ffx_fidl
+from fidl_codec import encode_fidl_message
+from fidl_codec import method_ordinal
+from fuchsia_controller_py import Channel
+from fuchsia_controller_py import Context
+from fuchsia_controller_py import IsolateDir
 
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
@@ -133,7 +136,7 @@ class EndToEnd(unittest.IsolatedAsyncioTestCase):
             _ctx = Context(target="foo", config={"target.default": "bar"})
 
     def test_context_creation_no_args(self):
-        _ctx = Context()
+        Context()
 
     def test_setting_fidl_clients(self):
         """Previously a classmethod was setting the handle.

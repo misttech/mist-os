@@ -2,19 +2,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fidl_codec import (
-    add_ir_path,
-    method_ordinal,
-    encode_fidl_message,
-    decode_fidl_request,
-)
-from pstats import SortKey
 import importlib
-import os
 import unittest
-import cProfile
-import pstats
-import io
+
+from fidl_codec import decode_fidl_request
+from fidl_codec import encode_fidl_message
+from fidl_codec import method_ordinal
 
 
 class Importing(unittest.TestCase):

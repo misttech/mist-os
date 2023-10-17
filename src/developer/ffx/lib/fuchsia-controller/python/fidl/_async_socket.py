@@ -2,10 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import asyncio
 import fuchsia_controller_py as fc
 
-from ._ipc import GlobalHandleWaker, HandleWaker
+from ._ipc import GlobalHandleWaker
+from ._ipc import HandleWaker
 
 
 class AsyncSocket:

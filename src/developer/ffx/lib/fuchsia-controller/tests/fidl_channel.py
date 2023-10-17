@@ -2,8 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-from fuchsia_controller_py import Channel, ZxStatus
 import unittest
+
+from fuchsia_controller_py import Channel
+from fuchsia_controller_py import ZxStatus
 
 
 class ChannelTests(unittest.TestCase):

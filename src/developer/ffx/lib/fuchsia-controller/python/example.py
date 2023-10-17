@@ -1,13 +1,12 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-from fuchsia_controller_py import Context, IsolateDir
-import fidl.fuchsia_developer_ffx as fd_ffx
-import fidl.fuchsia_developer_remotecontrol as fd_remotecontrol
-import fidl.fuchsia_diagnostics as f_diagnostics
-import os
-import logging
 import asyncio
+import logging
+
+import fidl.fuchsia_developer_ffx as fd_ffx
+from fuchsia_controller_py import Context
+from fuchsia_controller_py import IsolateDir
 
 logging.basicConfig(level=logging.DEBUG)
 

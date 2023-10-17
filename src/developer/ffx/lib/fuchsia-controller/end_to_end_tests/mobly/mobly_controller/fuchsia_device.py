@@ -8,21 +8,13 @@ import logging
 import os
 import os.path
 import time
-
-from typing import Any
-from typing import Awaitable
-from typing import Callable
-from typing import Dict
-from typing import List
+from typing import Any, Awaitable, Callable, Dict, List
 
 import fidl.fuchsia_developer_ffx as ffx
-import fidl.fuchsia_device as device
-
-from mobly import asserts
-from mobly import base_test
 from fuchsia_controller_py import Context
 from fuchsia_controller_py import IsolateDir
 from fuchsia_controller_py import ZxStatus
+from mobly import base_test
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 TIMEOUTS: Dict[str, float] = {
@@ -142,7 +134,6 @@ def destroy(_: List[FuchsiaDevice]) -> None:
     Args:
         _: The list of Fuchsia devices being destroyed.
     """
-    pass
 
 
 def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:

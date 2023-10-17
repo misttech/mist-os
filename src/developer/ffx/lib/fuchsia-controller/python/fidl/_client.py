@@ -3,14 +3,14 @@
 # found in the LICENSE file.
 import asyncio
 import logging
-import fuchsia_controller_py as fc
-from fidl_codec import decode_fidl_response
-from fidl_codec import encode_fidl_message
-import typing
 from typing import Dict, Set
 
-from ._ipc import GlobalHandleWaker
+from fidl_codec import decode_fidl_response
+from fidl_codec import encode_fidl_message
+import fuchsia_controller_py as fc
+
 from ._fidl_common import *
+from ._ipc import GlobalHandleWaker
 
 TXID: TXID_Type = 0
 
@@ -75,7 +75,6 @@ class FidlClient(object):
                     logging.warning(
                         f"FIDL channel event on chan: {self.channel.as_int()}. Currently ignoring."
                     )
-                    pass
                 elif recvd_txid not in self.pending_txids:
                     self.channel_waker.unregister(self.channel)
                     self.channel = None

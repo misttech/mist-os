@@ -4,13 +4,12 @@
 """Defines the import hooks for when a user writes `import fidl.[fidl_library]`."""
 import importlib.abc
 import sys
-import types
 
-from ._library import get_fidl_ir_map
-from ._library import load_module
-from ._fidl_common import TransportError
-from ._ipc import HandleWaker, GlobalHandleWaker
 from ._async_socket import AsyncSocket
+from ._fidl_common import TransportError
+from ._ipc import GlobalHandleWaker
+from ._ipc import HandleWaker
+from ._library import load_module
 
 
 class FIDLImportFinder(importlib.abc.MetaPathFinder):
