@@ -149,10 +149,12 @@ TEST(BacktraceRequest, IgnoreNormalException) {
     // Cause a non-breakpoint machine exception.  The `asm goto` tells the
     // compiler that the code can jump to the exit: label below.  The test code
     // below will mutate the PC to that label when it catches the exception.
-#if defined(__aarch64__)
-    __asm__ goto("mov x0, xzr; brk #1" : : : "x0" : exit);
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
     __asm__ goto("ud2" : : : : exit);
+#elif defined(__aarch64__)
+    __asm__ goto("mov x0, xzr; brk #1" : : : "x0" : exit);
+#elif defined(__riscv)
+    __asm__ goto("unimp" : : : : exit);
 #else
 #error "what machine?"
 #endif
@@ -176,10 +178,12 @@ TEST(BacktraceRequest, IgnoreNormalException) {
 
   // Move the program counter past the exception and resume. The thread should exit and
   // clean up normally.
-#ifdef __aarch64__
-  regs.pc = reinterpret_cast<size_t>(exit_address);
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
   regs.rip = reinterpret_cast<size_t>(exit_address);
+#elif defined(__aarch64__)
+  regs.pc = reinterpret_cast<size_t>(exit_address);
+#elif defined(__riscv)
+  regs.pc = reinterpret_cast<size_t>(exit_address);
 #else
 #error "what machine?"
 #endif
