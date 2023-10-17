@@ -2280,7 +2280,7 @@ static void brcmf_log_client_stats(struct brcmf_cfg80211_info* cfg) {
                  BRCMF_MAX_DEAUTHS_PER_HOUR);
       // Reset the rx freeze count when deauth is triggered, waiting for the next trigger.
       ndev->stats.rx_freeze_count = 0;
-      brcmf_link_down(ifp->vif, deauth_reason_code.value(), BRCMF_E_DEAUTH_IND);
+      brcmf_link_down(ifp->vif, deauth_reason_code.value(), BRCMF_E_DEAUTH);
       deauth_times->push_back(current_log_count);
     }
   }

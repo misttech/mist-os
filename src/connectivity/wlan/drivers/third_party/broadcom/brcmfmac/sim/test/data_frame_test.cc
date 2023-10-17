@@ -189,6 +189,9 @@ class DataFrameTest : public SimTest {
     // Track number of deauth indications.
     size_t deauth_ind_count = 0;
 
+    // Track if this is locally initiated
+    bool locally_initiated = false;
+
     // Track the last received deauth reason code.
     fuchsia_wlan_ieee80211::wire::ReasonCode last_deauth_reason_code =
         static_cast<fuchsia_wlan_ieee80211::wire::ReasonCode>(0);
@@ -305,6 +308,7 @@ void DataFrameTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndica
 
   assoc_context_.deauth_ind_count++;
   assoc_context_.last_deauth_reason_code = ind->reason_code;
+  assoc_context_.locally_initiated = ind->locally_initiated;
   assoc_context_.expected_results.push_front(wlan_ieee80211::StatusCode::kSuccess);
   // Do a re-association right after deauth.
   env_->ScheduleNotification(std::bind(&DataFrameTest::StartConnect, this), zx::msec(200));
@@ -746,10 +750,13 @@ TEST_F(DataFrameTest, WmeRxErrorHighDeauthTest) {
   env_->Run(kWmeRxErrorTestDuration);
 
   // One deauth should be triggered and a deauth_ind was sent to SME, and there should be only two
-  // deauths triggered in the one hour test. Also this should carry reason code FwRxStalled.
+  // deauths triggered in the one hour test. Also this should carry reason code kFwHighWmeRxErrRate.
   EXPECT_EQ(assoc_context_.deauth_ind_count, (size_t)BRCMF_MAX_DEAUTHS_PER_HOUR);
   EXPECT_EQ(assoc_context_.last_deauth_reason_code,
             fuchsia_wlan_ieee80211::wire::ReasonCode::kFwHighWmeRxErrRate);
+
+  // Since this deauth is triggered by the driver, the locally initiated bit needs to be set.
+  EXPECT_EQ(assoc_context_.locally_initiated, true);
 
   // The device got reconnected after deauth.
   EXPECT_EQ(ap.GetNumAssociatedClient(), 1U);
