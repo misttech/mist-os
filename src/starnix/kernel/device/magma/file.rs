@@ -15,6 +15,7 @@ use std::{
 
 use super::{ffi::*, magma::*};
 use crate::{
+    device::sync_file::*,
     device::wayland::image_file::*,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -22,7 +23,7 @@ use crate::{
         *,
     },
     lock::Mutex,
-    logging::{impossible_error, log_error, log_warn},
+    logging::{impossible_error, log_error, log_warn, set_zx_name},
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::*,
     task::CurrentTask,
@@ -241,6 +242,60 @@ impl MagmaFile {
 
     fn get_semaphore(&self, semaphore: magma_semaphore_t) -> Result<Arc<MagmaSemaphore>, Errno> {
         Ok(self.semaphores.lock().get(&semaphore).ok_or_else(|| errno!(EINVAL))?.clone())
+    }
+
+    fn import_semaphore2(
+        &self,
+        current_task: &CurrentTask,
+        control: &virtio_magma_connection_import_semaphore2_ctrl_t,
+        response: &mut virtio_magma_connection_import_semaphore2_resp_t,
+    ) {
+        let status: i32;
+
+        let fd = FdNumber::from_raw(control.semaphore_handle as i32);
+
+        let mut semaphore = 0;
+        let mut semaphore_id = 0;
+        if let (Ok(connection), Ok(file)) =
+            (self.get_connection(control.connection), current_task.files.get(fd))
+        {
+            if let Some(sync_file) = file.downcast_file::<SyncFile>() {
+                // TODO(fxbug.dev/128389) - support multiple sync points
+                assert!(sync_file.fence.sync_points.len() == 1);
+
+                if let Ok(vmo) =
+                    sync_file.fence.sync_points[0].handle.duplicate_handle(zx::Rights::SAME_RIGHTS)
+                {
+                    if control.flags & MAGMA_IMPORT_SEMAPHORE_ONE_SHOT == 0 {
+                        // For most non-test cases, one shot should be specified.
+                        log_warn!("Importing magma semaphore without one shot");
+                    }
+                    (status, semaphore, semaphore_id) =
+                        import_semaphore2(&connection, vmo, control.flags);
+                    if status == MAGMA_STATUS_OK {
+                        self.semaphores.lock().insert(
+                            semaphore,
+                            Arc::new(MagmaSemaphore { connection, handle: semaphore }),
+                        );
+                    }
+                } else {
+                    status = MAGMA_STATUS_MEMORY_ERROR;
+                }
+            } else {
+                status = MAGMA_STATUS_INVALID_ARGS;
+            }
+        } else {
+            status = MAGMA_STATUS_INVALID_ARGS;
+        }
+
+        // Import is expected to close the file that was imported.
+        let _ = current_task.files.close(fd);
+
+        response.result_return = status as u64;
+        response.semaphore_out = semaphore;
+        response.id_out = semaphore_id;
+        response.hdr.type_ =
+            virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2 as u32;
     }
 }
 
@@ -525,21 +580,35 @@ impl FileOps for MagmaFile {
                     virtio_magma_connection_create_semaphore_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
                 let connection = self.get_connection(control.connection)?;
+                let mut status: i32 = MAGMA_STATUS_OK;
+
+                // Use VMO semaphores for compatibility with sync files, which need timestamps.
+                let vmo_result = zx::Vmo::create(/*size=*/ 1);
+                if vmo_result.is_err() {
+                    status = MAGMA_STATUS_MEMORY_ERROR;
+                }
 
                 let mut semaphore_out = 0;
                 let mut semaphore_id = 0;
-                let status = unsafe {
-                    magma_connection_create_semaphore(
-                        connection.handle,
-                        &mut semaphore_out,
-                        &mut semaphore_id,
-                    )
-                };
                 if status == MAGMA_STATUS_OK {
-                    self.semaphores.lock().insert(
-                        semaphore_out,
-                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
-                    );
+                    let flags: u64 = 0;
+                    let vmo = vmo_result.unwrap();
+                    set_zx_name(&vmo, b"magma semaphore");
+                    status = unsafe {
+                        magma_connection_import_semaphore2(
+                            connection.handle,
+                            vmo.into_raw(),
+                            flags,
+                            &mut semaphore_out,
+                            &mut semaphore_id,
+                        )
+                    };
+                    if status == MAGMA_STATUS_OK {
+                        self.semaphores.lock().insert(
+                            semaphore_out,
+                            Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
+                        );
+                    }
                 }
 
                 response.result_return = status as u64;
@@ -568,30 +637,23 @@ impl FileOps for MagmaFile {
                     virtio_magma_connection_import_semaphore_ctrl_t,
                     virtio_magma_connection_import_semaphore_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
-                let connection = self.get_connection(control.connection)?;
 
-                let mut semaphore_out = 0;
-                let mut semaphore_id = 0;
-                let status = unsafe {
-                    magma_connection_import_semaphore(
-                        connection.handle,
-                        control.semaphore_handle,
-                        &mut semaphore_out,
-                        &mut semaphore_id,
-                    )
+                let control2 = virtio_magma_connection_import_semaphore2_ctrl_t {
+                    hdr: control.hdr,
+                    connection: control.connection,
+                    semaphore_handle: control.semaphore_handle,
+                    flags: 0,
                 };
-                if status == MAGMA_STATUS_OK {
-                    self.semaphores.lock().insert(
-                        semaphore_out,
-                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
-                    );
-                }
-                response.result_return = status as u64;
-                response.semaphore_out = semaphore_out;
-                response.id_out = semaphore_id;
+                let mut response2 = virtio_magma_connection_import_semaphore2_resp_t::default();
+
+                self.import_semaphore2(current_task, &control2, &mut response2);
 
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE as u32;
+                response.semaphore_out = response2.semaphore_out;
+                response.id_out = response2.id_out;
+                response.result_return = response2.result_return;
+
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_IMPORT_SEMAPHORE2 => {
@@ -599,31 +661,9 @@ impl FileOps for MagmaFile {
                     virtio_magma_connection_import_semaphore2_ctrl_t,
                     virtio_magma_connection_import_semaphore2_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
-                let connection = self.get_connection(control.connection)?;
 
-                let mut semaphore_out = 0;
-                let mut semaphore_id = 0;
-                let status = unsafe {
-                    magma_connection_import_semaphore2(
-                        connection.handle,
-                        control.semaphore_handle,
-                        control.flags,
-                        &mut semaphore_out,
-                        &mut semaphore_id,
-                    )
-                };
-                if status == MAGMA_STATUS_OK {
-                    self.semaphores.lock().insert(
-                        semaphore_out,
-                        Arc::new(MagmaSemaphore { connection, handle: semaphore_out }),
-                    );
-                }
-                response.result_return = status as u64;
-                response.semaphore_out = semaphore_out;
-                response.id_out = semaphore_id;
+                self.import_semaphore2(current_task, &control, &mut response);
 
-                response.hdr.type_ =
-                    virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_IMPORT_SEMAPHORE2 as u32;
                 current_task.write_object(UserRef::new(response_address), &response)
             }
             virtio_magma_ctrl_type_VIRTIO_MAGMA_CMD_CONNECTION_RELEASE_SEMAPHORE => {
@@ -643,15 +683,39 @@ impl FileOps for MagmaFile {
                     virtio_magma_semaphore_export_ctrl_t,
                     virtio_magma_semaphore_export_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
+                let mut status: i32 = MAGMA_STATUS_OK;
 
-                let semaphore = self.get_semaphore(control.semaphore)?;
+                let semaphore_result = self.get_semaphore(control.semaphore);
+                if semaphore_result.is_err() {
+                    status = MAGMA_STATUS_INVALID_ARGS;
+                }
 
-                let mut semaphore_handle_out = 0;
-                response.result_return = unsafe {
-                    magma_semaphore_export(semaphore.handle, &mut semaphore_handle_out) as u64
-                };
-                response.semaphore_handle_out = semaphore_handle_out as u64;
+                let mut sync_file_fd: i32 = -1;
+                if status == MAGMA_STATUS_OK {
+                    let mut vmo_handle = 0;
+                    status = unsafe {
+                        magma_semaphore_export(semaphore_result.unwrap().handle, &mut vmo_handle)
+                    };
+                    if status == MAGMA_STATUS_OK {
+                        let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(vmo_handle)) };
 
+                        let sync_points: Vec<SyncPoint> =
+                            vec![SyncPoint { timeline: Timeline::Magma, handle: Arc::new(vmo) }];
+
+                        let sync_file_name: &[u8; 32] =
+                            b"magma semaphore\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
+                        let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
+
+                        let file =
+                            Anon::new_file(current_task, Box::new(sync_file), OpenFlags::RDWR);
+
+                        let fd = current_task.add_file(file, FdFlags::empty())?;
+                        sync_file_fd = fd.raw();
+                    }
+                }
+
+                response.result_return = status as u64;
+                response.semaphore_handle_out = sync_file_fd as u64;
                 response.hdr.type_ =
                     virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_SEMAPHORE_EXPORT as u32;
                 current_task.write_object(UserRef::new(response_address), &response)

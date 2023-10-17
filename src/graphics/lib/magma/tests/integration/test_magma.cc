@@ -807,12 +807,45 @@ class TestConnection {
 #endif
   }
 
+  static void CheckNativeHandle(magma_handle_t handle, bool expect_signaled) {
+#if defined(__Fuchsia__)
+    zx_handle_t zx_handle = handle;
+    if (expect_signaled) {
+      EXPECT_EQ(ZX_OK, zx_object_wait_one(zx_handle, ZX_EVENT_SIGNALED, /*deadline=*/0,
+                                          /*observed=*/nullptr));
+    } else {
+      EXPECT_EQ(ZX_ERR_TIMED_OUT, zx_object_wait_one(zx_handle, ZX_EVENT_SIGNALED, /*deadline=*/0,
+                                                     /*observed=*/nullptr));
+    }
+#elif defined(__linux__)
+    struct pollfd pfd = {
+        .fd = static_cast<int>(handle),
+        .events = POLLIN,
+        .revents = 0,
+    };
+    if (expect_signaled) {
+      EXPECT_EQ(1, poll(&pfd, 1, /*timeout=*/0));
+      EXPECT_EQ(POLLIN, pfd.revents);
+    } else {
+      EXPECT_EQ(0, poll(&pfd, 1, /*timeout=*/0));
+      EXPECT_EQ(0, pfd.revents);
+    }
+#endif
+  }
+
   void SemaphoreExport(magma_handle_t* handle_out, magma_semaphore_id_t* id_out) {
     ASSERT_TRUE(connection_);
 
     magma_semaphore_t semaphore;
     ASSERT_EQ(magma_connection_create_semaphore(connection_, &semaphore, id_out), MAGMA_STATUS_OK);
     EXPECT_EQ(magma_semaphore_export(semaphore, handle_out), MAGMA_STATUS_OK);
+
+    EXPECT_NO_FATAL_FAILURE(CheckNativeHandle(*handle_out, false));
+    magma_semaphore_signal(semaphore);
+    EXPECT_NO_FATAL_FAILURE(CheckNativeHandle(*handle_out, true));
+    magma_semaphore_reset(semaphore);
+    EXPECT_NO_FATAL_FAILURE(CheckNativeHandle(*handle_out, false));
+
     magma_connection_release_semaphore(connection_, semaphore);
   }
 

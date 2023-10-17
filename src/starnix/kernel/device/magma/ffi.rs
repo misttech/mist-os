@@ -585,3 +585,22 @@ pub fn release_connection(
     }
     response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_CONNECTION_RELEASE as u32;
 }
+
+pub fn import_semaphore2(
+    connection: &Arc<MagmaConnection>,
+    vmo: zx::Vmo,
+    flags: u64,
+) -> (i32, u64, u64) {
+    let mut semaphore = 0;
+    let mut semaphore_id = 0;
+    let status = unsafe {
+        magma_connection_import_semaphore2(
+            connection.handle,
+            vmo.into_raw(),
+            flags,
+            &mut semaphore,
+            &mut semaphore_id,
+        )
+    };
+    (status, semaphore, semaphore_id)
+}

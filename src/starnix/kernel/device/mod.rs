@@ -9,6 +9,7 @@ mod framebuffer_server;
 mod perfetto_consumer;
 mod registry;
 mod remote_binder;
+mod sync_file;
 
 pub use binder::*;
 pub use common::*;

@@ -144,3 +144,21 @@ executable("virtmagma_no_cpp_test") {
   # Builds fail
   exclude_toolchain_tags = [ "asan" ]
 }
+
+executable("virtmagma_sync_file_tests") {
+  testonly = true
+
+  defines = [ "VIRTMAGMA=1" ]
+
+  sources = [ "test_magma_sync_file.cc" ]
+
+  deps = [
+    "$magma_build_root/src/libmagma_virt",
+    "//sdk/lib/magma_client:magma_headers",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+  include_dirs = [
+    "//third_party/android/platform/bionic/libc/kernel/uapi",
+    "//third_party/android/platform/bionic/libc/kernel/android/uapi",
+  ]
+}

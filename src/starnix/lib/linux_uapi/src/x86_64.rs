@@ -4176,6 +4176,7 @@ pub const STATX_ATTR_AUTOMOUNT: u32 = 4096;
 pub const STATX_ATTR_MOUNT_ROOT: u32 = 8192;
 pub const STATX_ATTR_VERITY: u32 = 1048576;
 pub const STATX_ATTR_DAX: u32 = 2097152;
+pub const SYNC_IOC_MAGIC: u8 = 62u8;
 pub const SI_LOAD_SHIFT: u32 = 16;
 pub const IGNBRK: u32 = 1;
 pub const BRKINT: u32 = 2;
@@ -12233,6 +12234,34 @@ pub struct statx {
     pub stx_dio_mem_align: __u32,
     pub stx_dio_offset_align: __u32,
     pub __spare3: [__u64; 12usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct sync_merge_data {
+    pub name: [crate::types::c_char; 32usize],
+    pub fd2: __s32,
+    pub fence: __s32,
+    pub flags: __u32,
+    pub pad: __u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct sync_fence_info {
+    pub obj_name: [crate::types::c_char; 32usize],
+    pub driver_name: [crate::types::c_char; 32usize],
+    pub status: __s32,
+    pub flags: __u32,
+    pub timestamp_ns: __u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+pub struct sync_file_info {
+    pub name: [crate::types::c_char; 32usize],
+    pub status: __s32,
+    pub flags: __u32,
+    pub num_fences: __u32,
+    pub pad: __u32,
+    pub sync_fence_info: __u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, AsBytes)]

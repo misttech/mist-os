@@ -8,7 +8,7 @@ use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, Po
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
         Arc, Weak,
     },
 };
@@ -113,9 +113,19 @@ pub struct ZxioSignalHandler {
     pub get_events_from_zxio_signals: fn(zxio_signals_t) -> FdEvents,
 }
 
+// The counter is incremented as each handle is signaled; when the counter reaches the handle
+// count, the event handler is called with the given events.
+pub struct ManyZxHandleSignalHandler {
+    pub count: usize,
+    pub counter: Arc<AtomicUsize>,
+    pub expected_signals: zx::Signals,
+    pub events: FdEvents,
+}
+
 pub enum SignalHandlerInner {
     Zxio(ZxioSignalHandler),
     ZxHandle(fn(zx::Signals) -> FdEvents),
+    ManyZxHandle(ManyZxHandleSignalHandler),
 }
 
 pub struct SignalHandler {
@@ -128,13 +138,28 @@ impl SignalHandler {
         let SignalHandler { inner, event_handler } = self;
         let events = match inner {
             SignalHandlerInner::Zxio(ZxioSignalHandler { zxio, get_events_from_zxio_signals }) => {
-                get_events_from_zxio_signals(zxio.wait_end(signals))
+                Some(get_events_from_zxio_signals(zxio.wait_end(signals)))
             }
             SignalHandlerInner::ZxHandle(get_events_from_zx_signals) => {
-                get_events_from_zx_signals(signals)
+                Some(get_events_from_zx_signals(signals))
+            }
+            SignalHandlerInner::ManyZxHandle(signal_handler) => {
+                if signals.contains(signal_handler.expected_signals) {
+                    let new_count = signal_handler.counter.fetch_add(1, Ordering::Relaxed) + 1;
+                    assert!(new_count <= signal_handler.count);
+                    if new_count == signal_handler.count {
+                        Some(signal_handler.events)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             }
         };
-        event_handler.handle(events)
+        if let Some(events) = events {
+            event_handler.handle(events)
+        }
     }
 }
 
@@ -160,10 +185,23 @@ struct WaitCancelerTimer {
     inner: HandleWaitCanceler,
 }
 
+pub struct WaitCancelerOneVmo {
+    pub handle: Weak<zx::Vmo>,
+    pub canceler: HandleWaitCanceler,
+}
+
+const WAIT_CANCELER_VMOS_COMMON_SIZE: usize = 1;
+
+struct WaitCancelerVmos {
+    // Commonly just one VMO, sometimes more than one
+    cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; WAIT_CANCELER_VMOS_COMMON_SIZE]>,
+}
+
 enum WaitCancelerInner {
     Zxio(WaitCancelerZxio),
     Timer(WaitCancelerTimer),
     Queue(WaitCancelerQueue),
+    Vmos(WaitCancelerVmos),
 }
 
 const MAX_INNER_CANCELLERS: usize = 2;
@@ -193,6 +231,12 @@ impl WaitCanceler {
 
     pub fn new_timer(timer: Weak<zx::Timer>, inner: HandleWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }))
+    }
+
+    pub fn new_vmos(
+        cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; WAIT_CANCELER_VMOS_COMMON_SIZE]>,
+    ) -> Self {
+        Self::new_inner(WaitCancelerInner::Vmos(WaitCancelerVmos { cancelers }))
     }
 
     pub fn merge(Self { mut cancellers }: Self, Self { cancellers: mut other }: Self) -> Self {
@@ -245,6 +289,14 @@ impl WaitCanceler {
                             }
                         }
                     };
+                }
+                WaitCancelerInner::Vmos(WaitCancelerVmos { mut cancelers }) => {
+                    for i in (0..cancelers.len()).rev() {
+                        let canceler = cancelers.remove(i);
+                        if let Some(handle) = canceler.handle.upgrade() {
+                            canceler.canceler.cancel(handle.as_handle_ref());
+                        }
+                    }
                 }
             }
         }

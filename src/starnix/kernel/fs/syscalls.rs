@@ -1971,13 +1971,25 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
         deadline: zx::Time,
     ) -> Result<(), Errno> {
         if self.ready_items.lock().is_empty() {
+            // When wait_until() returns Ok() it means there was a wake up; however there may not
+            // be a ready item, for example if waiting on a sync file with multiple sync points.
+            // Keep waiting until there's at least one ready item.
             let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signals.mask());
-            match current_task.wait_with_temporary_mask(signal_mask, |current_task| {
+            let mut result = current_task.wait_with_temporary_mask(signal_mask, |current_task| {
                 self.waiter.wait_until(current_task, deadline)
-            }) {
-                Err(err) if err == ETIMEDOUT => {}
-                result => result?,
-            };
+            });
+            loop {
+                match result {
+                    Err(err) if err == ETIMEDOUT => return Ok(()),
+                    Ok(()) => {
+                        if !self.ready_items.lock().is_empty() {
+                            break;
+                        }
+                    }
+                    result => result?,
+                };
+                result = self.waiter.wait_until(current_task, deadline);
+            }
         }
         Ok(())
     }

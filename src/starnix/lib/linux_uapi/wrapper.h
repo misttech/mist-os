@@ -66,6 +66,7 @@
 #include <linux/socket.h>
 #include <linux/sockios.h>
 #include <linux/stat.h>
+#include <linux/sync_file.h>
 #include <linux/sysinfo.h>
 #include <linux/termios.h>
 #include <linux/time.h>
