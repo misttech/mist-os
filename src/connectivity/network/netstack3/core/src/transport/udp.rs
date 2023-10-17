@@ -5409,8 +5409,7 @@ mod tests {
     ) -> (
         Result<(), SetMulticastMembershipError>,
         HashMap<(MultipleDevicesId, MulticastAddr<I::Addr>), NonZeroUsize>,
-    )
-where {
+    ) {
         let UdpMultipleDevicesCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpMultipleDevicesCtx::with_sync_ctx(
                 UdpMultipleDevicesSyncCtx::new_multiple_devices::<I>(),

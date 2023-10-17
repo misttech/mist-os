@@ -1498,9 +1498,7 @@ pub(crate) struct InUseError;
 
 pub(crate) fn create<I: IpExt, S: DatagramSocketSpec, C, SC: DatagramStateContext<I, C, S>>(
     sync_ctx: &mut SC,
-) -> S::SocketId<I>
-where
-{
+) -> S::SocketId<I> {
     sync_ctx.with_sockets_state_mut(|_sync_ctx, state| {
         state.push(SocketState::Unbound(UnboundSocketState::default())).into()
     })
@@ -1522,9 +1520,7 @@ pub(crate) fn remove<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::SocketId<I>,
-) -> SocketInfo<I, SC::WeakDeviceId, S>
-where
-{
+) -> SocketInfo<I, SC::WeakDeviceId, S> {
     sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
         let (ip_options, info) = match state.remove(id.get_key_index()).expect("invalid socket ID")
         {
@@ -1705,9 +1701,7 @@ pub(crate) fn get_info<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     id: S::SocketId<I>,
-) -> SocketInfo<I, SC::WeakDeviceId, S>
-where
-{
+) -> SocketInfo<I, SC::WeakDeviceId, S> {
     sync_ctx.with_sockets_state(|_sync_ctx, state| {
         match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => SocketInfo::Unbound,
