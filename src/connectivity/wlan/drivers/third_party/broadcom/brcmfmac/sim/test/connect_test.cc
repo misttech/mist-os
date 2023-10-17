@@ -147,7 +147,7 @@ class ConnectTest : public SimTest {
   void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
   void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
-  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacDeauthConfirm* resp);
+  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
   void OnSignalReport(const wlan_fullmac_wire::WlanFullmacSignalReportIndication* ind);
 
@@ -262,7 +262,7 @@ void ConnectInterface::DisassocConf(DisassocConfRequestView request, fdf::Arena&
 }
 void ConnectInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                                   DeauthConfCompleter::Sync& completer) {
-  test_->OnDeauthConf(&request->resp);
+  test_->OnDeauthConf(request);
   completer.buffer(arena).Reply();
 }
 void ConnectInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
@@ -388,7 +388,7 @@ void ConnectTest::OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocCon
   }
 }
 
-void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacDeauthConfirm* resp) {
+void ConnectTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp) {
   context_.deauth_conf_count++;
 }
 

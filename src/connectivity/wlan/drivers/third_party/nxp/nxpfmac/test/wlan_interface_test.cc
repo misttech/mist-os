@@ -20,6 +20,7 @@
 #include <fbl/string_buffer.h>
 #include <zxtest/zxtest.h>
 
+#include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/data_plane.h"
 #include "src/connectivity/wlan/drivers/third_party/nxp/nxpfmac/device.h"
@@ -276,7 +277,7 @@ struct WlanInterfaceTest : public zxtest::Test,
     bool connect_conf_called_ = false;
     fuchsia_wlan_fullmac::wire::WlanFullmacAuthInd auth_ind_;
     bool auth_ind_called_ = false;
-    fuchsia_wlan_fullmac::wire::WlanFullmacDeauthConfirm deauth_conf_;
+    fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest deauth_conf_;
     // Use completion as the invoke flag when the event could be triggered by a asynchronous
     // routine to avoid flakeness.
     libsync::Completion deauth_conf_called_;
@@ -319,8 +320,13 @@ struct WlanInterfaceTest : public zxtest::Test,
 
   void DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                   DeauthConfCompleter::Sync& completer) override {
-    memcpy(ifc_results_.deauth_conf_.peer_sta_address.data(), request->resp.peer_sta_address.data(),
-           ETH_ALEN);
+    auto builder =
+        fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
+    if (request->has_peer_sta_address()) {
+      builder.peer_sta_address(request->peer_sta_address());
+    }
+    ifc_results_.deauth_conf_ = builder.Build();
+
     ifc_results_.deauth_conf_called_.Signal();
     completer.buffer(arena).Reply();
   }
@@ -1175,7 +1181,10 @@ TEST_F(WlanInterfaceTest, SoftApStaLocalDisconnect) {
   env_.Run(zx::sec(2));
 
   ifc_results_.deauth_conf_called_.Wait();
-  EXPECT_BYTES_EQ(ifc_results_.deauth_conf_.peer_sta_address.data(), kTestSoftApClient, ETH_ALEN);
+  auto& deauth_conf = ifc_results_.deauth_conf_;
+  EXPECT_TRUE(deauth_conf.has_peer_sta_address());
+  EXPECT_EQ(ETH_ALEN, deauth_conf.peer_sta_address().size());
+  EXPECT_BYTES_EQ(ifc_results_.deauth_conf_.peer_sta_address().data(), kTestSoftApClient, ETH_ALEN);
 
   // And now ensure SoftAP Stop works ok.
   fuchsia_wlan_fullmac::wire::WlanFullmacStopReq stop_req;

@@ -221,9 +221,14 @@ pub fn convert_authenticate_indication(
 }
 
 pub fn convert_deauthenticate_confirm(
-    conf: banjo_wlan_fullmac::WlanFullmacDeauthConfirm,
+    peer_sta_address: *const u8,
 ) -> fidl_mlme::DeauthenticateConfirm {
-    fidl_mlme::DeauthenticateConfirm { peer_sta_address: conf.peer_sta_address }
+    let as_slice = unsafe {
+        std::slice::from_raw_parts(peer_sta_address, banjo_wlan_ieee80211::MAC_ADDR_LEN as usize)
+    };
+    fidl_mlme::DeauthenticateConfirm {
+        peer_sta_address: as_slice.try_into().expect("Could not convert"),
+    }
 }
 
 pub fn convert_deauthenticate_indication(

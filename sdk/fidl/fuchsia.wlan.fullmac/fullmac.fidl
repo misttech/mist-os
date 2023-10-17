@@ -217,10 +217,6 @@ type WlanAuthResult = strict enum : uint8 {
     FAILURE_TIMEOUT = 5;
 };
 
-type WlanFullmacDeauthConfirm = struct {
-    peer_sta_address ieee80211.MacAddr;
-};
-
 type WlanFullmacDeauthIndication = struct {
     peer_sta_address ieee80211.MacAddr;
     reason_code ieee80211.ReasonCode;
@@ -558,8 +554,8 @@ closed protocol WlanFullmacImplIfc {
     strict AuthInd(struct {
         resp WlanFullmacAuthInd;
     }) -> ();
-    strict DeauthConf(struct {
-        resp WlanFullmacDeauthConfirm;
+    strict DeauthConf(table {
+        1: peer_sta_address ieee80211.MacAddr;
     }) -> ();
     strict DeauthInd(struct {
         ind WlanFullmacDeauthIndication;

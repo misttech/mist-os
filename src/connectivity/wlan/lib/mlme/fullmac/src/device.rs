@@ -43,10 +43,8 @@ pub struct WlanFullmacIfcProtocolOps {
         ctx: &mut FullmacDriverEventSink,
         ind: *const banjo_wlan_fullmac::WlanFullmacAuthInd,
     ),
-    pub(crate) deauth_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacDeauthConfirm,
-    ),
+    pub(crate) deauth_conf:
+        extern "C" fn(ctx: &mut FullmacDriverEventSink, peer_sta_address: *const u8),
     pub(crate) deauth_ind: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
         ind: *const banjo_wlan_fullmac::WlanFullmacDeauthIndication,
@@ -149,11 +147,8 @@ extern "C" fn auth_ind(
     ctx.0.send(FullmacDriverEvent::AuthInd { ind });
 }
 #[no_mangle]
-extern "C" fn deauth_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacDeauthConfirm,
-) {
-    let resp = banjo_to_fidl::convert_deauthenticate_confirm(unsafe { *resp });
+extern "C" fn deauth_conf(ctx: &mut FullmacDriverEventSink, peer_sta_address: *const u8) {
+    let resp = banjo_to_fidl::convert_deauthenticate_confirm(peer_sta_address);
     ctx.0.send(FullmacDriverEvent::DeauthConf { resp });
 }
 #[no_mangle]

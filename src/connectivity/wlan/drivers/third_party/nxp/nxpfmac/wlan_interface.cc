@@ -494,14 +494,16 @@ void WlanInterface::DeauthReq(DeauthReqRequestView request, fdf::Arena& arena,
     zx_status_t status = soft_ap_.DeauthSta(request->req.peer_sta_address.data(),
                                             fidl::ToUnderlying(request->req.reason_code));
     if (status != ZX_OK) {
-      // Deauth request failed, respond to SME anyway since there is no way to indicate status.
-      fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp{};
-      memcpy(resp.peer_sta_address.data(), request->req.peer_sta_address.data(), ETH_ALEN);
       auto arena = fdf::Arena::Create(0, 0);
       if (arena.is_error()) {
         NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
         return;
       }
+
+      auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
+                      .peer_sta_address(request->req.peer_sta_address)
+                      .Build();
+
       auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
       if (!result.ok()) {
         NXPF_ERR("Failed to send deauth conf result.status: %s", result.status_string());
@@ -938,13 +940,20 @@ void WlanInterface::OnStaDisconnectEvent(uint8_t* sta_mac_addr, uint16_t reason_
     }
   } else {
     NXPF_INFO("Disconnect Event, locally initiated, send deauth conf");
-    fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm conf{};
-    memcpy(conf.peer_sta_address.data(), sta_mac_addr, ETH_ALEN);
     auto deauth_arena = fdf::Arena::Create(0, 0);
     if (deauth_arena.is_error()) {
       NXPF_ERR("Failed to create Arena status=%s", deauth_arena.status_string());
       return;
     }
+
+    fidl::Array<uint8_t, ETH_ALEN> address;
+    memcpy(address.data(), sta_mac_addr, ETH_ALEN);
+
+    auto conf =
+        fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*deauth_arena)
+            .peer_sta_address(address)
+            .Build();
+
     auto deauth_result = fullmac_ifc_.buffer(*deauth_arena)->DeauthConf(conf);
     if (!deauth_result.ok()) {
       NXPF_ERR("Failed to send deauth conf result.status: %s", deauth_result.status_string());
@@ -1019,13 +1028,19 @@ zx_status_t WlanInterface::SetMacAddressInFw() {
 }
 
 void WlanInterface::ConfirmDeauth() {
-  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp{};
-  memcpy(resp.peer_sta_address.data(), mac_address_, sizeof(mac_address_));
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     NXPF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  fidl::Array<uint8_t, ETH_ALEN> address;
+  memcpy(address.data(), mac_address_, sizeof(mac_address_));
+
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
+                  .peer_sta_address(address)
+                  .Build();
+
   auto result = fullmac_ifc_.buffer(*arena)->DeauthConf(resp);
   if (!result.ok()) {
     NXPF_ERR("Failed to send deauth conf result.status: %s", result.status_string());

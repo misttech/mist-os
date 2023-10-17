@@ -95,7 +95,7 @@ class CreateSoftAPTest : public SimTest {
 
   void OnAuthInd(const wlan_fullmac_wire::WlanFullmacAuthInd* ind);
   void OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthIndication* ind);
-  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacDeauthConfirm* resp);
+  void OnDeauthConf(const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp);
   void OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind);
   void OnDisassocConf(const wlan_fullmac_wire::WlanFullmacDisassocConfirm* resp);
   void OnDisassocInd(const wlan_fullmac_wire::WlanFullmacDisassocIndication* ind);
@@ -144,7 +144,7 @@ void SoftApInterface::DeauthInd(DeauthIndRequestView request, fdf::Arena& arena,
 }
 void SoftApInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                                  DeauthConfCompleter::Sync& completer) {
-  test_->OnDeauthConf(&request->resp);
+  test_->OnDeauthConf(request);
   completer.buffer(arena).Reply();
 }
 void SoftApInterface::AssocInd(AssocIndRequestView request, fdf::Arena& arena,
@@ -334,8 +334,10 @@ void CreateSoftAPTest::OnDeauthInd(const wlan_fullmac_wire::WlanFullmacDeauthInd
   ASSERT_EQ(std::memcmp(ind->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   deauth_ind_recv_ = true;
 }
-void CreateSoftAPTest::OnDeauthConf(const wlan_fullmac_wire::WlanFullmacDeauthConfirm* resp) {
-  ASSERT_EQ(std::memcmp(resp->peer_sta_address.data(), ind_expect_mac_.byte, ETH_ALEN), 0);
+void CreateSoftAPTest::OnDeauthConf(
+    const wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest* resp) {
+  ASSERT_TRUE(resp->has_peer_sta_address());
+  ASSERT_EQ(std::memcmp(resp->peer_sta_address().data(), ind_expect_mac_.byte, ETH_ALEN), 0);
   deauth_conf_recv_ = true;
 }
 void CreateSoftAPTest::OnAssocInd(const wlan_fullmac_wire::WlanFullmacAssocInd* ind) {

@@ -178,7 +178,11 @@ void SimInterface::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
 
 void SimInterface::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                               DeauthConfCompleter::Sync& completer) {
-  stats_.deauth_results.push_back(request->resp);
+  auto builder = wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(test_arena_);
+  if (request->has_peer_sta_address()) {
+    builder.peer_sta_address(request->peer_sta_address());
+  }
+  stats_.deauth_results.emplace_back(builder.Build());
   completer.buffer(arena).Reply();
 }
 

@@ -18,18 +18,14 @@
 #include <zircon/errors.h>
 #include <zircon/system/ulib/async-default/include/lib/async/default.h>
 
-#include <functional>
 #include <memory>
-#include <new>
-#include <optional>
-#include <tuple>
-#include <vector>
 
 #include <zxtest/zxtest.h>
 
-#include "fuchsia/wlan/common/c/banjo.h"
+#include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
 #include "fuchsia/wlan/fullmac/c/banjo.h"
 #include "src/connectivity/wlan/drivers/wlanif/test/test_bss.h"
+#include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace {
@@ -41,6 +37,32 @@ std::pair<zx::channel, zx::channel> make_channel() {
   zx::channel remote;
   zx::channel::create(0, &local, &remote);
   return {std::move(local), std::move(remote)};
+}
+
+rust_wlan_fullmac_ifc_protocol_ops_copy_t EmptyRustProtoOps() {
+  return rust_wlan_fullmac_ifc_protocol_ops_copy_t{
+      .on_scan_result = [](void* ctx, const wlan_fullmac_scan_result_t* result) {},
+      .on_scan_end = [](void* ctx, const wlan_fullmac_scan_end_t* end) {},
+      .connect_conf = [](void* ctx, const wlan_fullmac_connect_confirm_t* resp) {},
+      .roam_conf = [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) {},
+      .auth_ind = [](void* ctx, const wlan_fullmac_auth_ind_t* ind) {},
+      .deauth_conf = [](void* ctx, const uint8_t peer_sta_address[6]) {},
+      .deauth_ind = [](void* ctx, const wlan_fullmac_deauth_indication_t* ind) {},
+      .assoc_ind = [](void* ctx, const wlan_fullmac_assoc_ind_t* ind) {},
+      .disassoc_conf = [](void* ctx, const wlan_fullmac_disassoc_confirm_t* resp) {},
+      .disassoc_ind = [](void* ctx, const wlan_fullmac_disassoc_indication_t* ind) {},
+      .start_conf = [](void* ctx, const wlan_fullmac_start_confirm_t* resp) {},
+      .stop_conf = [](void* ctx, const wlan_fullmac_stop_confirm_t* resp) {},
+      .eapol_conf = [](void* ctx, const wlan_fullmac_eapol_confirm_t* resp) {},
+      .on_channel_switch = [](void* ctx, const wlan_fullmac_channel_switch_info_t* resp) {},
+      .signal_report = [](void* ctx, const wlan_fullmac_signal_report_indication_t* ind) {},
+      .eapol_ind = [](void* ctx, const wlan_fullmac_eapol_indication_t* ind) {},
+      .on_pmk_available = [](void* ctx, const wlan_fullmac_pmk_info_t* info) {},
+      .sae_handshake_ind = [](void* ctx, const wlan_fullmac_sae_handshake_ind_t* ind) {},
+      .sae_frame_rx = [](void* ctx, const wlan_fullmac_sae_frame_t* frame) {},
+      .on_wmm_status_resp = [](void* ctx, zx_status_t status,
+                               const wlan_wmm_parameters_t* wmm_params) {},
+  };
 }
 
 struct WlanifDeviceTest : public ::zxtest::Test,
@@ -56,6 +78,19 @@ struct WlanifDeviceTest : public ::zxtest::Test,
   }
 
   void TearDown() override { mock_ddk::ReleaseFlaggedDevices(device_->zxdev()); }
+
+  // Calls device_->Start() and throws away the returned out_sme_channel.
+  // Must be called at the start of any tests that check that wlanif::Device calls the ops in
+  // rust_wlan_fullmac_ifc_protocol_ops_copy_t.
+  void StartWlanifDevice(const rust_wlan_fullmac_ifc_protocol_ops_copy_t* ops, void* ctx) {
+    rust_wlan_fullmac_ifc_protocol_copy_t proto{
+        .ops = ops,
+        .ctx = ctx,
+    };
+
+    zx::channel out_sme_channel;
+    ASSERT_OK(device_->Start(&proto, &out_sme_channel));
+  }
 
   // WlanFullmacImpl implementations, dispatching FIDL requests from wlanif driver.
   void Start(StartRequestView request, fdf::Arena& arena,
@@ -231,6 +266,40 @@ TEST_F(WlanifDeviceTest, CheckAuthResp) {
   wlan_fullmac_impl_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
   memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
   device_->AuthenticateResp(&resp);
+}
+
+// Call DeauthConf on WlanFullmacImplIfc and verify that it calls deauth_conf on the given
+// protocol ops with the correct peer_sta_address.
+TEST_F(WlanifDeviceTest, CheckDeauthConf) {
+  device_->AddDevice();
+  device_->DdkAsyncRemove();
+
+  auto ops = EmptyRustProtoOps();
+  bool called = false;
+
+  ops.deauth_conf = [](void* ctx, const uint8_t peer_sta_address[6]) {
+    for (size_t i = 0; i < 6; i++) {
+      EXPECT_EQ(kPeerStaAddress[i], peer_sta_address[i]);
+    }
+
+    EXPECT_NOT_NULL(ctx);
+    bool* called = static_cast<bool*>(ctx);
+    *called = true;
+  };
+
+  StartWlanifDevice(&ops, &called);
+
+  fdf::Arena arena = fdf::Arena::Create(0, 0).value();
+
+  fidl::Array<uint8_t, 6> peer_sta_address;
+  memcpy(peer_sta_address.data(), kPeerStaAddress, 6);
+
+  auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest::Builder(arena)
+                 .peer_sta_address(peer_sta_address)
+                 .Build();
+
+  EXPECT_OK(client_.buffer(arena)->DeauthConf(req));
+  EXPECT_TRUE(called);
 }
 // TODO(fxb/121450) Add unit tests for other functions in wlanif::Device
 }  // namespace

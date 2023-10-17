@@ -1272,18 +1272,24 @@ static void brcmf_notify_deauth(struct net_device* ndev, const uint8_t peer_sta_
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacDeauthConfirm resp = {};
-  memcpy(resp.peer_sta_address.data(), peer_sta_address, ETH_ALEN);
-
   BRCMF_IFDBG(WLANIF, ndev, "Sending deauth confirm to SME.");
 #if !defined(NDEBUG)
   BRCMF_IFDBG(WLANIF, ndev, "  address: " FMT_MAC "", FMT_MAC_ARGS(peer_sta_address));
 #endif /* !defined(NDEBUG) */
+
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     BRCMF_ERR("Failed to create Arena status=%s", arena.status_string());
     return;
   }
+
+  fidl::Array<uint8_t, ETH_ALEN> address;
+  memcpy(address.data(), peer_sta_address, ETH_ALEN);
+
+  auto resp = fuchsia_wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest::Builder(*arena)
+                  .peer_sta_address(address)
+                  .Build();
+
   auto result = ndev->if_proto.buffer(*arena)->DeauthConf(resp);
   if (!result.ok()) {
     BRCMF_ERR("Failed to send deauth conf result.status: %s", result.status_string());

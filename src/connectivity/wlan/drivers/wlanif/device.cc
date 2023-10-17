@@ -822,10 +822,10 @@ void Device::AuthInd(AuthIndRequestView request, fdf::Arena& arena,
 
 void Device::DeauthConf(DeauthConfRequestView request, fdf::Arena& arena,
                         DeauthConfCompleter::Sync& completer) {
-  wlan_fullmac_deauth_confirm_t deauth_conf;
-  memcpy(deauth_conf.peer_sta_address, request->resp.peer_sta_address.data(), ETH_ALEN);
+  ZX_ASSERT(request->has_peer_sta_address());
+  ZX_ASSERT(request->peer_sta_address().size() == ETH_ALEN);
   wlan_fullmac_impl_ifc_protocol_ops_->deauth_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                   &deauth_conf);
+                                                   request->peer_sta_address().data());
   completer.buffer(arena).Reply();
 }
 

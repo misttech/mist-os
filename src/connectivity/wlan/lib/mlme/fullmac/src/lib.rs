@@ -1770,12 +1770,11 @@ mod handle_driver_event_tests {
         h.fake_device.query_device_info_mock.role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let deauth_conf =
-            banjo_wlan_fullmac::WlanFullmacDeauthConfirm { peer_sta_address: [1u8; 6] };
+        let peer_sta_address = [1u8; 6];
         unsafe {
             ((*h.driver_event_protocol.ops).deauth_conf)(
                 &mut h.driver_event_protocol.ctx,
-                &deauth_conf,
+                peer_sta_address.as_ptr(),
             );
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);

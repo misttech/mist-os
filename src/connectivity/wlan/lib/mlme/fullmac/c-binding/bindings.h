@@ -23,7 +23,7 @@ typedef struct {
   void (*connect_conf)(void *ctx, const wlan_fullmac_connect_confirm_t *resp);
   void (*roam_conf)(void *ctx, const wlan_fullmac_roam_confirm_t *resp);
   void (*auth_ind)(void *ctx, const wlan_fullmac_auth_ind_t *ind);
-  void (*deauth_conf)(void *ctx, const wlan_fullmac_deauth_confirm_t *resp);
+  void (*deauth_conf)(void *ctx, const uint8_t *peer_sta_address);
   void (*deauth_ind)(void *ctx, const wlan_fullmac_deauth_indication_t *ind);
   void (*assoc_ind)(void *ctx, const wlan_fullmac_assoc_ind_t *ind);
   void (*disassoc_conf)(void *ctx, const wlan_fullmac_disassoc_confirm_t *resp);
