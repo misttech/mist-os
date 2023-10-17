@@ -349,6 +349,7 @@
                 "MountTest.ActiveSubmountBusy",
                 "MountTest.BindSlaveToShared",
                 "MountTest.BindSlaveToSlave",
+                "MountTest.ChangeMountFlags",
                 "MountTest.LargeTreePropagationEvent",
                 "MountTest.MaxMounts",
                 "MountTest.MountInfo",
