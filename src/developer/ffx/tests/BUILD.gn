@@ -4,6 +4,7 @@
 
 group("tests") {
   deps = [
+    "cli-goldens:e2e_tests",
     "connection:tests",
     "help-json:tests",
     "target:tests",
@@ -13,5 +14,5 @@ group("tests") {
 
 group("e2e_tests") {
   testonly = true
-  deps = [ "e2e/cli-goldens:e2e_tests" ]
+  deps = []
 }
