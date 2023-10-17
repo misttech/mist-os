@@ -4,6 +4,8 @@
 
 #include "src/developer/forensics/feedback/annotations/time_provider.h"
 
+#include <fuchsia/time/cpp/fidl.h>
+
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -26,11 +28,12 @@ class TimeProviderTest : public UnitTestFixture {
   }
 
  protected:
-  void StartClock() {
+  void SyncClock() {
     if (const zx_status_t status =
-            clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get())));
+            clock_handle_.signal(/*clear_mask=*/0,
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to start clock";
+      FX_PLOGS(FATAL, status) << "Failed to sync clock";
     }
   }
 
@@ -46,24 +49,34 @@ class TimeProviderTest : public UnitTestFixture {
   std::unique_ptr<TimeProvider> time_provider_;
 };
 
-TEST_F(TimeProviderTest, Check_ClockStarts) {
+TEST_F(TimeProviderTest, Check_ClockSynced) {
   SetUpTimeProvider();
   EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 
-  StartClock();
+  SyncClock();
   RunLoopUntilIdle();
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
   EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kTimeStr);
 }
 
-TEST_F(TimeProviderTest, Check_ClockStartsBeforeFeedback) {
-  StartClock();
+TEST_F(TimeProviderTest, Check_ClockSyncedBeforeFeedback) {
+  SyncClock();
   SetUpTimeProvider();
   RunLoopUntilIdle();
 
   ASSERT_TRUE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
   EXPECT_EQ(time_provider_->Get().at(kDeviceUtcTimeKey).Value(), kTimeStr);
+}
+
+TEST_F(TimeProviderTest, Check_NotReadyOnClockStarted) {
+  SetUpTimeProvider();
+  EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
+
+  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(time_provider_->Get().at(kDeviceUtcTimeKey).HasValue());
 }
 
 }  // namespace

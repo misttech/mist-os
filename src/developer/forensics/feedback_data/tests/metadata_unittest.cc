@@ -18,6 +18,7 @@
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/metadata_schema.h"
+#include "src/developer/forensics/testing/stubs/utc_clock_ready_watcher.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
@@ -161,9 +162,11 @@ class MetadataTest : public UnitTestFixture {
 
   void SetUpMetadata(const std::set<std::string>& annotation_allowlist,
                      const feedback::AttachmentKeys& attachment_allowlist) {
-    metadata_ =
-        std::make_unique<Metadata>(dispatcher(), &clock_, &redactor_, /*is_first_instance=*/true,
-                                   annotation_allowlist, attachment_allowlist);
+    metadata_ = std::make_unique<Metadata>(
+        dispatcher(), &clock_, &utc_clock_ready_watcher_, &redactor_,
+        /*is_first_instance=*/true, annotation_allowlist, attachment_allowlist);
+
+    utc_clock_ready_watcher_.StartClock();
   }
 
   // Get the integrity metadata for the provided annotations and attachments, check that it adheres
@@ -197,6 +200,9 @@ class MetadataTest : public UnitTestFixture {
   timekeeper::TestClock clock_;
   RedactorForTest redactor_;
   std::unique_ptr<Metadata> metadata_;
+
+ private:
+  stubs::UtcClockReadyWatcher utc_clock_ready_watcher_;
 };
 
 TEST_F(MetadataTest, Check_AddsMissingAnnotationsOnNoAnnotations) {

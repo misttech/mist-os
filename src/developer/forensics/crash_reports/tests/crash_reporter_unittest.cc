@@ -247,7 +247,7 @@ class CrashReporterTest : public UnitTestFixture {
         {feedback::kBuildLatestCommitDateKey, kBuildLatestCommitDate},
         {feedback::kDeviceFeedbackIdKey, kDefaultDeviceId},
         {feedback::kSystemUpdateChannelCurrentKey, kDefaultChannel},
-        {"reportTimeMillis", Not(IsEmpty())},
+        {"debug.report-time.set", "false"},
         {"guid", kDefaultDeviceId},
         {"channel", kDefaultChannel},
         {"debug.snapshot.shared-request.num-clients", Not(IsEmpty())},

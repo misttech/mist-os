@@ -13,24 +13,24 @@
 
 namespace forensics {
 
-UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher,
+UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                                  timekeeper::Clock* clock)
     : UtcTimeProvider(utc_clock_ready_watcher, clock, std::nullopt) {}
 
-UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher,
+UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                                  timekeeper::Clock* clock,
                                  PreviousBootFile utc_monotonic_difference_file)
     : UtcTimeProvider(utc_clock_ready_watcher, clock,
                       std::optional(utc_monotonic_difference_file)) {}
 
-UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcher* utc_clock_ready_watcher,
+UtcTimeProvider::UtcTimeProvider(UtcClockReadyWatcherBase* utc_clock_ready_watcher,
                                  timekeeper::Clock* clock,
                                  std::optional<PreviousBootFile> utc_monotonic_difference_file)
     : clock_(clock),
       utc_monotonic_difference_file_(std::move(utc_monotonic_difference_file)),
       previous_boot_utc_monotonic_difference_(std::nullopt),
       utc_clock_ready_watcher_(utc_clock_ready_watcher) {
-  utc_clock_ready_watcher->OnClockReady(fit::bind_member<&UtcTimeProvider::OnClockStart>(this));
+  utc_clock_ready_watcher->OnClockReady(fit::bind_member<&UtcTimeProvider::OnClockSync>(this));
 
   if (!utc_monotonic_difference_file_.has_value()) {
     return;
@@ -72,7 +72,7 @@ std::optional<zx::duration> UtcTimeProvider::PreviousBootUtcMonotonicDifference(
   return previous_boot_utc_monotonic_difference_;
 }
 
-void UtcTimeProvider::OnClockStart() {
+void UtcTimeProvider::OnClockSync() {
   // Write the current difference between the UTC and monotonic clocks.
   if (utc_monotonic_difference_file_.has_value()) {
     const timekeeper::time_utc current_utc_time = CurrentUtcTimeRaw(clock_);

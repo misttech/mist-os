@@ -4,6 +4,7 @@
 
 #include "src/developer/forensics/utils/utc_time_provider.h"
 
+#include <fuchsia/time/cpp/fidl.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/time.h>
 
@@ -37,18 +38,17 @@ class UtcTimeProviderTest : public UnitTestFixture {
   }
 
  protected:
-  void StartClock(const zx::time start_time = zx::time(kTime.get())) {
+  void SyncClock() {
     if (const zx_status_t status =
-            clock_handle_.update(zx::clock::update_args().set_value(start_time));
+            clock_handle_.signal(/*clear_mask=*/0,
+                                 /*set_mask=*/fuchsia::time::SIGNAL_UTC_CLOCK_SYNCHRONIZED);
         status != ZX_OK) {
-      FX_PLOGS(FATAL, status) << "Failed to start clock";
+      FX_PLOGS(FATAL, status) << "Failed to sync clock";
     }
   }
 
  protected:
   timekeeper::TestClock clock_;
-
- protected:
   zx::clock clock_handle_;
   std::unique_ptr<UtcClockReadyWatcher> utc_clock_ready_watcher_;
   std::unique_ptr<UtcTimeProvider> utc_provider_;
@@ -56,7 +56,7 @@ class UtcTimeProviderTest : public UnitTestFixture {
 
 TEST_F(UtcTimeProviderTest, Check_CurrentUtcMonotonicDifference) {
   clock_.Set(zx::time(0));
-  StartClock(zx::time(0));
+  SyncClock();
   RunLoopUntilIdle();
 
   zx::time monotonic = clock_.Now();
@@ -88,7 +88,7 @@ TEST_F(UtcTimeProviderTest, Check_ReadsPreviousBootUtcMonotonicDifference) {
 }
 
 TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcMonotonicDifference) {
-  StartClock();
+  SyncClock();
   RunLoopUntilIdle();
 
   // |is_first_instance| is true becuase the previous UTC-monotonic difference should be read.
@@ -108,6 +108,13 @@ TEST_F(UtcTimeProviderTest, Check_WritesPreviousBootUtcMonotonicDifference) {
 
   ASSERT_TRUE(files::DeletePath("/cache/curren_utc_monotonic_difference.txt", /*recursive=*/true));
   ASSERT_TRUE(files::DeletePath("/tmp/curren_utc_monotonic_difference.txt", /*recursive=*/true));
+}
+
+TEST_F(UtcTimeProviderTest, Check_NotReadyOnClockStarted) {
+  ASSERT_EQ(clock_handle_.update(zx::clock::update_args().set_value(zx::time(kTime.get()))), ZX_OK);
+  RunLoopUntilIdle();
+
+  EXPECT_FALSE(utc_provider_->CurrentUtcMonotonicDifference().has_value());
 }
 
 }  // namespace
