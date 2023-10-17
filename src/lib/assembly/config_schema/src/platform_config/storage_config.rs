@@ -20,6 +20,9 @@ pub struct StorageConfig {
     pub component_id_index: ComponentIdIndexConfig,
 
     #[serde(default)]
+    pub factory_data: FactoryDataConfig,
+
+    #[serde(default)]
     pub filesystems: ProductFilesystemConfig,
 }
 
@@ -32,4 +35,11 @@ pub struct ComponentIdIndexConfig {
     /// An optional index to use for product-provided components.
     #[serde(default)]
     pub product_index: Option<Utf8PathBuf>,
+}
+
+/// Platform configuration options for the factory data store.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+pub struct FactoryDataConfig {
+    #[serde(default)]
+    pub enabled: bool,
 }

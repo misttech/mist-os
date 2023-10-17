@@ -70,6 +70,7 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "core_realm_networking",
     "core_realm_user_and_userdebug",
     "element_manager",
+    "factory_data",
     "factory_reset_trigger",
     "fan",
     "feedback_low_memory_product_config",

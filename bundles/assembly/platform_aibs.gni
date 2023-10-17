@@ -162,6 +162,9 @@ user_platform_aib_names =
       "setui_with_camera.icu_latest_${icu_git_info.latest}",
       "setui_with_camera.icu_stable_${icu_git_info.stable}",
 
+      # Storage
+      "factory_data",
+
       # Opaque input groups.
       "input_group_one",
       "input_group_two",

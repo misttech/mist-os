@@ -53,6 +53,12 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             })
             .with_context(|| format!("Adding bootfs file {}", &index_path))?;
 
+        if storage_config.factory_data.enabled
+            && context.board_info.provides_feature("fuchsia::factory_data")
+        {
+            builder.platform_bundle("factory_data");
+        }
+
         if storage_config.configure_fshost {
             // Collect the arguments from the board.
             let blobfs_max_bytes =

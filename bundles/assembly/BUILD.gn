@@ -1591,6 +1591,23 @@ assembly_input_bundle("camera") {
   ]
 }
 
+assembly_input_bundle("factory_data") {
+  flexible_packages = [ "//src/factory/factory_store_providers" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/factory/factory_store_providers/meta/factory_store_providers.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 # AIB containing bootfs resources needed by all fshost variants
 #
 # There are "pervasively routed" capability shards included here because there
